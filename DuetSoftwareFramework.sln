@@ -3,7 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.106
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DuetAPI", "DuetAPI\DuetAPI.csproj", "{4F662FDB-5850-4996-A882-F3A7C119EA29}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetAPI", "DuetAPI\DuetAPI.csproj", "{4F662FDB-5850-4996-A882-F3A7C119EA29}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetControlServer", "DuetControlServer\DuetControlServer.csproj", "{B93964D5-D62A-4255-97FF-C150261DC84C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetRestEndpoint", "DuetRestEndpoint\DuetRestEndpoint.csproj", "{9F8BB595-2FFB-4A1B-9069-D2916ABCD7E0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetUnitTest", "DuetUnitTest\DuetUnitTest.csproj", "{605DC6A1-6EF9-43F4-805D-9A1939AE1621}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +21,18 @@ Global
 		{4F662FDB-5850-4996-A882-F3A7C119EA29}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4F662FDB-5850-4996-A882-F3A7C119EA29}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4F662FDB-5850-4996-A882-F3A7C119EA29}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B93964D5-D62A-4255-97FF-C150261DC84C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B93964D5-D62A-4255-97FF-C150261DC84C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B93964D5-D62A-4255-97FF-C150261DC84C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B93964D5-D62A-4255-97FF-C150261DC84C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F8BB595-2FFB-4A1B-9069-D2916ABCD7E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F8BB595-2FFB-4A1B-9069-D2916ABCD7E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9F8BB595-2FFB-4A1B-9069-D2916ABCD7E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9F8BB595-2FFB-4A1B-9069-D2916ABCD7E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{605DC6A1-6EF9-43F4-805D-9A1939AE1621}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{605DC6A1-6EF9-43F4-805D-9A1939AE1621}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{605DC6A1-6EF9-43F4-805D-9A1939AE1621}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{605DC6A1-6EF9-43F4-805D-9A1939AE1621}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
