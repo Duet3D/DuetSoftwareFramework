@@ -1,10 +1,13 @@
 ﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace DuetAPI.Commands
 {
+    /// <summary>
+    /// Type of a generic G/M/T-code. If none is applicable, is treated as a comment
+    /// </summary>
+    [JsonConverter(typeof(CharEnumConverter))]
     public enum CodeType
     {
         Comment = 'C',
@@ -13,32 +16,64 @@ namespace DuetAPI.Commands
         TCode = 'T'
     }
 
-    [JsonConverter(typeof(StringEnumConverter))]
-    public enum CodeSource
-    {
-        Generic,
-        File,
-        HTTP,
-        Telnet
-    }
-
+    /// <summary>
+    /// Parsed representation of a generic G/M/T-code
+    /// </summary>
     public partial class Code : Command<CodeResult>
     {
-        public CodeType Type { get; set; } = CodeType.Comment; 
-        public int? MajorNumber { get; set; }
-        public int? MinorNumber { get; set; }
-        public List<CodeParameter> Parameters { get; } = new List<CodeParameter>();
-        public string Comment { get; set; }
-
-        public CodeSource Source { get; set; } = CodeSource.Generic;
-        public bool IsPreProcessed { get; set; }
-        public bool IsPostProcessed { get; set; }
-
+        /// <summary>
+        /// Create an empty code representation
+        /// </summary>
         public Code() { }
 
+        /// <summary>
+        /// Type of the code. If no exact type could be determined, it is interpreted as a comment
+        /// </summary>
+        public CodeType Type { get; set; } = CodeType.Comment; 
+        
+        /// <summary>
+        /// Major code number (e.g. 28 in G28)
+        /// </summary>
+        public int? MajorNumber { get; set; }
+        
+        /// <summary>
+        /// Minor code number (e.g. 3 in G54.3)
+        /// </summary>
+        public int? MinorNumber { get; set; }
+        
+        /// <summary>
+        /// List of parsed code parameters (see <see cref="CodeParameter"/> for further information)
+        /// </summary>
+        public List<CodeParameter> Parameters { get; } = new List<CodeParameter>();
+        
+        /// <summary>
+        /// Comment of the G/M/T-code. Note that the parser combines different comment styles and appends them
+        /// as a single value. So for example a code like 'G28 (Do homing) ; via G28' causes a comment like
+        /// 'Do homing via G28' to be generated in this field
+        /// </summary>
+        public string Comment { get; set; }
+
+        /// <summary>
+        /// Indicates if the code has been preprocessed (see also <see cref="DuetAPI.Connection.ConnectionType.Intercept"/>)
+        /// </summary>
+        public bool IsPreProcessed { get; set; }
+        
+        /// <summary>
+        /// Indicates if the code has been postprocessed (see also <see cref="DuetAPI.Connection.ConnectionType.Intercept"/>)
+        /// </summary>
+        public bool IsPostProcessed { get; set; }
+
+        /// <summary>
+        /// Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!
+        /// </summary>
+        /// <param name="c">Letter of the code parameter to find</param>
+        /// <returns>The parsed parameter instance or null if none could be found</returns>
         public CodeParameter GetParameter(char c) => Parameters.FirstOrDefault(p => p.Letter == 'C');
 
-        // Return a reconstructed text-based representation of the parsed G/M/T-code
+        /// <summary>
+        /// Convert the parsed code back to a text-based G/M/T-code
+        /// </summary>
+        /// <returns>The reconstructed code string</returns>
         public override string ToString()
         {
             if (Type == CodeType.Comment)
@@ -53,23 +88,13 @@ namespace DuetAPI.Commands
             // After this append each parameter and encapsulate it in double quotes
             foreach(CodeParameter parameter in Parameters)
             {
-                bool containsSpacesOrQuotes = false;
-                foreach(char c in parameter.Value)
+                if (parameter.Type == typeof(string))
                 {
-                    if (char.IsWhiteSpace(c) || c == '"')
-                    {
-                        containsSpacesOrQuotes = true;
-                        break;
-                    }
-                }
-
-                if (containsSpacesOrQuotes)
-                {
-                    result += $" {parameter.Letter}\"{parameter.Value.Replace("\"", "\"\"")}\"";
+                    result += $" {parameter.Letter}\"{parameter.AsString.Replace("\"", "\"\"")}\"";
                 }
                 else
                 {
-                    result += $" {parameter.Letter}{parameter.Value}";
+                    result += $" {parameter.Letter}{parameter.AsString}";
                 }
             }
 
@@ -81,7 +106,10 @@ namespace DuetAPI.Commands
             return result;
         }
 
-        // Get only the command portion of the code (e.g. G53.4)
+        /// <summary>
+        /// Convert only the command portion to a text-based G/M/T-code (e.g. G28)
+        /// </summary>
+        /// <returns>The command fraction of the code</returns>
         public string ToShortString()
         {
             if (Type == CodeType.Comment)

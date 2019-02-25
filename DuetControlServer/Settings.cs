@@ -2,13 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace DuetControlServer
 {
-    /*static*/
-    class Settings
+    /*static*/ class Settings
     {
         private static readonly string ConfigFile = Path.Combine(Directory.GetCurrentDirectory(), "config.json");
         private static readonly RegexOptions RegexFlags =  RegexOptions.IgnoreCase | RegexOptions.Singleline;

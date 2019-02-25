@@ -1,30 +1,30 @@
-﻿using DuetAPI;
-using DuetAPI.Commands;
+﻿using DuetAPI.Commands;
 using DuetControlServer.Codes;
 using System.Threading.Tasks;
+using DuetAPI.Connection;
 
 namespace DuetControlServer.Commands
 {
     public class Code : DuetAPI.Commands.Code
     {
-        public Code() : base() { }
-        public Code(string codeString) : base(codeString) { }
+        public Code() : base() {}
 
+        public Code(string code) : base(code) {}
+        
         // Run an arbitrary G/M/T-code
-        public override async Task<CodeResult> Execute()
+        protected override async Task<CodeResult> Run()
         {
             if (Type == CodeType.Comment)
             {
                 // Comments are discarded
-                return new CodeResult(this);
+                return new CodeResult();
             }
-
             CodeResult result = null;
 
             // Preprocess this code
             if (!IsPreProcessed)
             {
-                result = await IPC.Worker.Interception.Intercept(this, InterceptionType.Pre);
+                result = await IPC.Processors.Interception.Intercept(this, InterceptionMode.Pre);
                 if (result != null)
                 {
                     return result;
@@ -56,7 +56,7 @@ namespace DuetControlServer.Commands
             // If the could not be interpreted, post-process it
             if (!IsPostProcessed)
             {
-                result = await IPC.Worker.Interception.Intercept(this, InterceptionType.Post);
+                result = await IPC.Processors.Interception.Intercept(this, InterceptionMode.Post);
                 if (result != null)
                 {
                     return result;
@@ -64,7 +64,7 @@ namespace DuetControlServer.Commands
                 IsPostProcessed = true;
             }
 
-            // Then send it to RepRapFirmware
+            // Then have it processed by RepRapFirmware
             return await RepRapFirmware.Connector.ProcessCode(this);
         }
     }

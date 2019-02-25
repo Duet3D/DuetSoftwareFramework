@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using NUnit.Framework;
 using System.IO;
 using System.Threading.Tasks;
+using DuetAPI;
 
 namespace DuetUnitTest.FileInfo
 {
@@ -16,7 +17,7 @@ namespace DuetUnitTest.FileInfo
         public async Task Test(string fileName)
         {
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "FileInfo", fileName);
-            FileInfoResult info = await DuetControlServer.File.GetFileInfo(filePath);
+            ParsedFileInfo info = await DuetControlServer.File.GetFileInfo(filePath);
 
             TestContext.Out.Write(JsonConvert.SerializeObject(info, Formatting.Indented));
 

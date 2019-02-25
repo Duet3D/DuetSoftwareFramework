@@ -4,25 +4,75 @@ using System.Linq;
 
 namespace DuetAPI.Machine.Job
 {
+    /// <summary>
+    /// Information about the current file job (if any)
+    /// </summary>
     public class Model : ICloneable
     {
-        public File File { get; set; } = new File();
-        public long? FilePosition { get; set; }                                     // bytes
+        /// <summary>
+        /// Information about the file being processed
+        /// </summary>
+        public ParsedFileInfo File { get; set; } = new ParsedFileInfo();
+        
+        /// <summary>
+        /// Current position in the file being processed (in bytes or null)
+        /// </summary>
+        public long? FilePosition { get; set; }
+        
+        /// <summary>
+        /// Name of the last file processed
+        /// </summary>
         public string LastFileName { get; set; }
+        
+        /// <summary>
+        /// Name of the last file simulated
+        /// </summary>
         public bool LastFileSimulated { get; set; }
-        public double[] ExtrudedRaw { get; set; } = new double[0];                  // mm
-        public double? Duration { get; set; }                                       // seconds
+        
+        /// <summary>
+        /// Virtual amounts of extruded filament according to the G-code file (in mm)
+        /// </summary>
+        public double[] ExtrudedRaw { get; set; } = new double[0];
+        
+        /// <summary>
+        /// Total duration of the current job (in s)
+        /// </summary>
+        public double? Duration { get; set; }
+        
+        /// <summary>
+        /// Number of the current layer or 0 if none has been started yet
+        /// </summary>
         public uint? Layer { get; set; }
-        public double? LayerTime { get; set; }                                      // seconds
+        
+        /// <summary>
+        /// Time elapsed since the beginning of the current layer (in s)
+        /// </summary>
+        public double? LayerTime { get; set; }
+        
+        /// <summary>
+        /// Information about the past layers
+        /// </summary>
         public List<Layer> Layers { get; set; } = new List<Layer>();
-        public double? WarmUpDuration { get; set; }                                 // seconds
+        
+        /// <summary>
+        /// Time needed to heat up the heaters (in s)
+        /// </summary>
+        public double? WarmUpDuration { get; set; }
+        
+        /// <summary>
+        /// Estimated times left
+        /// </summary>
         public TimesLeft TimesLeft { get; set; } = new TimesLeft();
 
+        /// <summary>
+        /// Creates a clone of this instance
+        /// </summary>
+        /// <returns>A clone of this instance</returns>
         public object Clone()
         {
             return new Model
             {
-                File = (File)File.Clone(),
+                File = (ParsedFileInfo)File.Clone(),
                 FilePosition = FilePosition,
                 LastFileName = (LastFileName != null) ? string.Copy(LastFileName) : null,
                 LastFileSimulated = LastFileSimulated,

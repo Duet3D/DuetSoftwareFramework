@@ -2,11 +2,25 @@
 
 namespace DuetAPI.Machine.Move
 {
+    /// <summary>
+    /// Information about the current move
+    /// </summary>
     public class CurrentMove : ICloneable
     {
-        public double RequestedSpeed { get; set; }              // mm/s
-        public double TopSpeed { get; set; }                    // mm/s
+        /// <summary>
+        /// Requested speed of the current move (in mm/s)
+        /// </summary>
+        public double RequestedSpeed { get; set; }
+        
+        /// <summary>
+        /// Top speed of the current move (in mm/s)
+        /// </summary>
+        public double TopSpeed { get; set; }
 
+        /// <summary>
+        /// Creates a clone of this instance
+        /// </summary>
+        /// <returns>A clone of this instance</returns>
         public object Clone()
         {
             return new CurrentMove

@@ -2,6 +2,9 @@
 
 namespace DuetAPI.Commands
 {
+    /// <summary>
+    /// Exception class that is thrown when a G/M/T-code could not be parsed
+    /// </summary>
     public class CodeParserException : Exception
     {
         public CodeParserException() { }

@@ -12,7 +12,7 @@ namespace DuetUnitTest.Machine
             original.Scanner.Progress = 12.34;
             original.Scanner.Status = DuetAPI.Machine.Scanner.ScannerStatus.PostProcessing;
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original;
+            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
 
             Assert.AreEqual(original.Scanner.Progress, clone.Scanner.Progress);
             Assert.AreEqual(original.Scanner.Status, clone.Scanner.Status);

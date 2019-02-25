@@ -1,6 +1,8 @@
 ﻿namespace DuetAPI.Commands
 {
-    // Get the current machine model
-    // On completion an instance of Machine.Model is returned
+    /// <summary>
+    /// Get the current RepRapFirmware machine model
+    /// </summary>
+    /// <seealso cref="DuetAPI.Machine.Model"/>
     public class GetMachineModel : Command<Machine.Model> { }
 }

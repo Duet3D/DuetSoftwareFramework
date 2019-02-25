@@ -2,48 +2,55 @@
 
 namespace DuetAPI.Machine.State
 {
-    // TODO turn the string enums into real enums and convert them via dedicate attributes on serialization
-    public static class Mode
-    {
-        public const string FFF = "FFF";
-        public const string CNC = "CNC";
-        public const string Laser = "Laser";
-    }
-
-    public static class Status
-    {
-        public const string Updating = "updating";
-        public const string Off = "off";
-        public const string Halted = "halted";
-        public const string Pausing = "pausing";
-        public const string Paused = "paused";
-        public const string Resuming = "resuming";
-        public const string Processing = "processing";
-        public const string Simulating = "simulating";
-        public const string Busy = "busy";
-        public const string ChangingTool = "changingTool";
-        public const string Idle = "idle";
-    }
-
+    /// <summary>
+    /// Information about the machine state
+    /// </summary>
     public class Model : ICloneable
     {
+        /// <summary>
+        /// Whether or not ATX power is on
+        /// </summary>
         public bool AtxPower { get; set; }
-        public int CurrentTool { get; set; } = -1;                      // -1 if none selected
-        public string Mode { get; set; } = State.Mode.FFF;              // one of Mode
-        public bool RelativeExtrusion { get; set; }
-        public bool RelativePositioning { get; set; }
-        public string Status { get; set; } = State.Status.Idle;         // one of Status
+        
+        /// <summary>
+        /// Number of the currently selected tool or -1 if none is selected
+        /// </summary>
+        public int CurrentTool { get; set; } = -1;
 
+        /// <summary>
+        /// Current mode of operation
+        /// </summary>
+        public Mode Mode { get; set; } = Mode.FFF;
+        
+        /// <summary>
+        /// Whether relative extrusion is being used
+        /// </summary>
+        public bool RelativeExtrusion { get; set; }
+        
+        /// <summary>
+        /// Whether relative positioning is being used
+        /// </summary>
+        public bool RelativePositioning { get; set; }
+        
+        /// <summary>
+        /// Current state of the machine
+        /// </summary>
+        public Status Status { get; set; } = Status.Idle;
+
+        /// <summary>
+        /// Creates a clone of this instance
+        /// </summary>
+        /// <returns>A clone of this instance</returns>
         public object Clone()
         {
             return new Model
             {
                 AtxPower = AtxPower,
                 CurrentTool = CurrentTool,
-                Mode = (Mode != null) ? string.Copy(Mode) : null,
+                Mode = Mode,
                 RelativeExtrusion = RelativeExtrusion,
                 RelativePositioning = RelativePositioning,
-                Status = (Status != null) ? string.Copy(Status) : null
+                Status = Status
             };
         }
     }

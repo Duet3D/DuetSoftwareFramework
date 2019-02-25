@@ -1,36 +1,50 @@
 ﻿namespace DuetAPI.Commands
 {
-    public abstract class BaseResponse : JsonObject
+    /// <summary>
+    /// Base class for every response to a Command
+    /// </summary>
+    public class BaseResponse
     {
-        protected BaseResponse() { }
-
-        public bool Success { get; protected set; }
+        /// <summary>
+        /// Indicates if the command could complete without a runtime error
+        /// </summary>
+        public bool Success { get; set; } = true;
     }
 
-    public sealed class Response : BaseResponse
+    /// <summary>
+    /// Response of a command
+    /// </summary>
+    /// <typeparam name="T">Type of the response</typeparam>
+    public sealed class Response<T> : BaseResponse
     {
-        public object Data { get; set; }
+        public T Result { get; set; }
 
-        public Response(object data)
+        public Response(T result)
         {
-            Success = true;
-            Data = data;
+            Result = result;
         }
     }
 
-    public sealed class EmptyResponse : BaseResponse
-    {
-        public EmptyResponse()
-        {
-            Success = true;
-        }
-    }
-
+    /// <summary>
+    /// Response indicating an error occurred during the processing of a command
+    /// </summary>
     public sealed class ErrorResponse : BaseResponse
     {
-        public string ErrorType { get; private set; }
-        public string ErrorMessage { get; private set; }
+        /// <summary>
+        /// Name of the .NET error
+        /// </summary>
+        public string ErrorType { get; set; }
+        
+        /// <summary>
+        /// Error description of the .NET error
+        /// </summary>
+        public string ErrorMessage { get; set; }
 
+        /// <summary>
+        /// Creates a new response indicating a runtime error
+        /// </summary>
+        /// <param name="type">Name of the .NET error</param>
+        /// <param name="message">Error description of the .NET error</param>
         public ErrorResponse(string type, string message)
         {
             Success = false;

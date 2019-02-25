@@ -2,11 +2,14 @@
 {
     public partial class Code
     {
-        // Parse a simple text-based G/M/T-code
-        public Code(string codeString, CodeSource source = CodeSource.Generic)
+        /// <summary>
+        /// Create a parsed code representation from a text-based string
+        /// This constructor parses the whole code and fills the class members where applicable
+        /// </summary>
+        /// <param name="codeString">The text-based G/M/T-code</param>
+        /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
+        public Code(string codeString)
         {
-            Source = source;
-
             char paramLetter = '\0';
             string paramValue = "";
 
@@ -103,7 +106,7 @@
                         }
                         else if (paramLetter != '\0')
                         {
-                            Parameters.Add(new CodeParameter(paramLetter, paramValue));
+                            Parameters.Add(new CodeParameter(paramLetter, paramValue, inQuotes));
                             paramLetter = '\0';
                             paramValue = "";
                         }

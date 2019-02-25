@@ -2,6 +2,9 @@
 
 namespace DuetAPI.Machine.Move
 {
+    /// <summary>
+    /// List of supported geometry types
+    /// </summary>
     public static class GeometryType
     {
         public const string Cartesian = "cartesian";
@@ -16,12 +19,23 @@ namespace DuetAPI.Machine.Move
         public const string Scara = "Scara";
     }
 
+    /// <summary>
+    /// Information about the configured geometry
+    /// </summary>
     public class Geometry : ICloneable
     {
-        public string Type { get; set; }                    // one of GeometryType or null
+        /// <summary>
+        /// Currently configured geometry type or null if unknown
+        /// </summary>
+        /// <seealso cref="GeometryType"/>
+        public string Type { get; set; }
 
         // TODO expand this on demand
 
+        /// <summary>
+        /// Creates a clone of this instance
+        /// </summary>
+        /// <returns>A clone of this instance</returns>
         public object Clone()
         {
             return new Geometry

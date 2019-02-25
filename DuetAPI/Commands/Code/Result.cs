@@ -1,14 +1,24 @@
 ﻿using System.Collections.Generic;
+using System.Text;
 
 namespace DuetAPI.Commands
 {
+    /// <summary>
+    /// List-based representation of a code result.
+    /// Each item represents a <see cref="Message"/> instance which can be easily converted to a string
+    /// </summary>
     public class CodeResult : List<Message>
     {
-        public Code Code { get; }
+        public CodeResult() {}
 
-        public CodeResult(Code code)
+        public override string ToString()
         {
-            Code = code;
+            StringBuilder builder = new StringBuilder();
+            foreach (Message message in this)
+            {
+                builder.AppendLine(message.ToString());
+            }
+            return builder.ToString();
         }
     }
 }

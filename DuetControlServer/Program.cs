@@ -2,12 +2,14 @@
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
+using Newtonsoft.Json;
 
 namespace DuetControlServer
 {
     static class Program
     {
-        public static CancellationTokenSource CancelSource = new CancellationTokenSource();
+        public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
 
         static void Main(string[] args)
         {
@@ -19,12 +21,26 @@ namespace DuetControlServer
             // Deal with program termination requests (SIGTERM)
             AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) => CancelSource.Cancel();
 
-            // Initialise the settings
+            // Initialise settings
             Console.Write("Loading settings... ");
             try
             {
                 Settings.Load();
                 Settings.ParseParameters(args);
+                Console.WriteLine("Done!");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Error: {e.Message}");
+                return;
+            }
+            
+            // Initialise object model
+            Console.Write("Initialising object model... ");
+            try
+            {
+                RepRapFirmware.Model.Update();
+                Console.WriteLine("Done!");
             }
             catch (Exception e)
             {
@@ -46,7 +62,7 @@ namespace DuetControlServer
             }
 
             // Start up the IPC server
-            Console.Write("Initialising IPC socket... ");
+            Console.Write("Creating IPC socket... ");
             try
             {
                 IPC.Server.CreateSocket();
@@ -57,14 +73,21 @@ namespace DuetControlServer
                 Console.WriteLine($"Error: {e.Message}");
                 return;
             }
-
+            
             // Run the main tasks in the background
             Task ipcTask = IPC.Server.AcceptConnections();
             Task rrfTask = RepRapFirmware.Connector.Run();
-            Task[] taskList = new Task[] { ipcTask, rrfTask };
+            Task[] taskList = { ipcTask, rrfTask };
 
             // Wait for program termination
-            Task.WaitAny(taskList, CancelSource.Token);
+            try
+            {
+                Task.WaitAny(taskList);
+            }
+            catch (Exception e) when (!(e is OperationCanceledException))
+            {
+                throw;
+            }
 
             // Tell other tasks to stop in case this is an abnormal program termination
             if (!CancelSource.IsCancellationRequested)
@@ -76,7 +99,14 @@ namespace DuetControlServer
             IPC.Server.Shutdown();
 
             // Wait for all tasks to finish
-            Task.WaitAll(taskList);
+            try
+            {
+                Task.WaitAll(taskList);
+            }
+            catch (Exception e) when (!(e is OperationCanceledException))
+            {
+                throw;
+            }
         }
     }
 }

@@ -2,12 +2,30 @@
 
 namespace DuetAPI.Machine.Job
 {
+    /// <summary>
+    /// Estimations about the times left
+    /// </summary>
     public class TimesLeft : ICloneable
     {
-        public double? File { get; set; }           // seconds
-        public double? Filament { get; set; }       // seconds
-        public double? Layer { get; set; }          // seconds
+        /// <summary>
+        /// Time left based on file progress (in s or null)
+        /// </summary>
+        public double? File { get; set; }
+        
+        /// <summary>
+        /// Time left based on filament consumption (in s or null)
+        /// </summary>
+        public double? Filament { get; set; }
+        
+        /// <summary>
+        /// Time left based on the layer progress (in s or null)
+        /// </summary>
+        public double? Layer { get; set; }
 
+        /// <summary>
+        /// Creates a clone of this instance
+        /// </summary>
+        /// <returns>A clone of this instance</returns>
         public object Clone()
         {
             return new TimesLeft

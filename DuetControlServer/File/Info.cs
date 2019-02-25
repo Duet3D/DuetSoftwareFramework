@@ -1,23 +1,24 @@
-﻿using DuetAPI.Commands;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
+using DuetAPI.Commands;
+using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer
 {
     public static partial class File
     {
-        public static async Task<FileInfoResult> GetFileInfo(string fileName)
+        public static async Task<ParsedFileInfo> GetFileInfo(string fileName)
         {
             FileStream fileStream = new FileStream(fileName, FileMode.Open);
             StreamReader reader = new StreamReader(fileStream);
             try
             {
-                FileInfoResult result = new FileInfoResult
+                ParsedFileInfo result = new ParsedFileInfo
                 {
                     FileName = fileName,
                     Size = fileStream.Length,
@@ -26,8 +27,8 @@ namespace DuetControlServer
 
                 if (fileStream.Length > 0)
                 {
-                    result = await ParseHeader(reader, result);
-                    result = await ParseFooter(reader, result);
+                    await ParseHeader(reader, result);
+                    await ParseFooter(reader, result);
                 }
 
                 reader.Close();
@@ -42,7 +43,7 @@ namespace DuetControlServer
             }
         }
 
-        private static async Task<FileInfoResult> ParseHeader(StreamReader reader, FileInfoResult partialFileInfo)
+        private static async Task ParseHeader(StreamReader reader, ParsedFileInfo partialFileInfo)
         {
             // Every time CTS.Token is accessed a copy is generated. Hence we cache one until this method completes
             CancellationToken token = Program.CancelSource.Token;
@@ -109,10 +110,9 @@ namespace DuetControlServer
             while (reader.BaseStream.Position < Settings.FileInfoReadLimit);
 
             partialFileInfo.Filament = filamentConsumption.ToArray();
-            return partialFileInfo;
         }
 
-        private static async Task<FileInfoResult> ParseFooter(StreamReader reader, FileInfoResult partialFileInfo)
+        private static async Task ParseFooter(StreamReader reader, ParsedFileInfo partialFileInfo)
         {
             CancellationToken token = Program.CancelSource.Token;
             reader.BaseStream.Seek(0, SeekOrigin.End);
@@ -200,14 +200,12 @@ namespace DuetControlServer
             {
                 partialFileInfo.Height = lastZ.Value;
             }
-            return partialFileInfo;
         }
 
         private static async Task<string> ReadLineFromEndAsync(StreamReader reader)
         {
             const int bufferSize = 512;
             char[] buffer = new char[bufferSize];
-            Memory<char> bufferMemory = new Memory<char>(buffer);
 
             string line = "";
             long startPosition = reader.BaseStream.Position, totalBytesRead = 0;
@@ -227,7 +225,7 @@ namespace DuetControlServer
                         reader.BaseStream.Position = startPosition - totalBytesRead - 1;
                         return line;
                     }
-                    else if (c != '\r')
+                    if (c != '\r')
                     {
                         line = c + line;
                     }
@@ -237,7 +235,7 @@ namespace DuetControlServer
             return null;
         }
 
-        private static bool IsFileInfoComplete(FileInfoResult result)
+        private static bool IsFileInfoComplete(ParsedFileInfo result)
         {
             return (result.Height != 0) &&
                     (result.FirstLayerHeight != 0) &&
@@ -246,7 +244,7 @@ namespace DuetControlServer
                     (result.GeneratedBy != null);
         }
 
-        private static bool FindLayerHeight(string line, ref FileInfoResult fileInfo)
+        private static bool FindLayerHeight(string line, ref ParsedFileInfo fileInfo)
         {
             foreach (Regex item in Settings.LayerHeightFilters)
             {
@@ -298,7 +296,7 @@ namespace DuetControlServer
             return hadMatch;
         }
 
-        private static bool FindGeneratedBy(string line, ref FileInfoResult fileInfo)
+        private static bool FindGeneratedBy(string line, ref ParsedFileInfo fileInfo)
         {
             foreach (Regex item in Settings.GeneratedByFilters)
             {
@@ -312,7 +310,7 @@ namespace DuetControlServer
             return false;
         }
 
-        private static bool FindPrintTime(string line, ref FileInfoResult fileInfo)
+        private static bool FindPrintTime(string line, ref ParsedFileInfo fileInfo)
         {
             foreach (Regex item in Settings.PrintTimeFilters)
             {
@@ -324,17 +322,17 @@ namespace DuetControlServer
                     {
                         if (!string.IsNullOrEmpty(grp.Value))
                         {
-                            if (grp.Name == "h")
+                            switch (grp.Name)
                             {
-                                time += double.Parse(grp.Value) * 3600;
-                            }
-                            else if (grp.Name == "m")
-                            {
-                                time += double.Parse(grp.Value) * 60;
-                            }
-                            else if (grp.Name == "s")
-                            {
-                                time += double.Parse(grp.Value);
+                                case "h":
+                                    time += double.Parse(grp.Value) * 3600;
+                                    break;
+                                case "m":
+                                    time += double.Parse(grp.Value) * 60;
+                                    break;
+                                case "s":
+                                    time += double.Parse(grp.Value);
+                                    break;
                             }
                         }
                     }
@@ -345,7 +343,7 @@ namespace DuetControlServer
             return false;
         }
 
-        private static bool FindSimulatedTime(string line, ref FileInfoResult fileInfo)
+        private static bool FindSimulatedTime(string line, ref ParsedFileInfo fileInfo)
         {
             foreach (Regex item in Settings.SimulatedTimeFilters)
             {
@@ -357,17 +355,17 @@ namespace DuetControlServer
                     {
                         if (!string.IsNullOrEmpty(grp.Value))
                         {
-                            if (grp.Name == "h")
+                            switch (grp.Name)
                             {
-                                time += double.Parse(grp.Value) * 3600;
-                            }
-                            else if (grp.Name == "m")
-                            {
-                                time += double.Parse(grp.Value) * 60;
-                            }
-                            else if (grp.Name == "s")
-                            {
-                                time += double.Parse(grp.Value);
+                                case "h":
+                                    time += double.Parse(grp.Value) * 3600;
+                                    break;
+                                case "m":
+                                    time += double.Parse(grp.Value) * 60;
+                                    break;
+                                case "s":
+                                    time += double.Parse(grp.Value);
+                                    break;
                             }
                         }
                     }

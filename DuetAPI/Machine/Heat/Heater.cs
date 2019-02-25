@@ -2,23 +2,59 @@
 
 namespace DuetAPI.Machine.Heat
 {
+    /// <summary>
+    /// State of a heater (also see RepRapFirmware)
+    /// </summary>
     public enum HeaterState
     {
-        Off,
+        Off = 0,
         Standby,
         Active,
         Tuning
     }
 
+    /// <summary>
+    /// Information about a heater
+    /// </summary>
     public class Heater : ICloneable
     {
-        public double Current { get; set; }                                         // degC
+        /// <summary>
+        /// Current temperature of the heater (in degC)
+        /// </summary>
+        public double Current { get; set; }
+        
+        /// <summary>
+        /// Name of the heater or null if unset
+        /// </summary>
         public string Name { get; set; }
+        
+        /// <summary>
+        /// State of the heater
+        /// </summary>
         public HeaterState? State { get; set; }
+        
+        /// <summary>
+        /// Information about the heater model
+        /// </summary>
         public HeaterModel Model { get; set; } = new HeaterModel();
-        public double? Max { get; set; }                                            // degC
-        public uint? Sensor { get; set; }                                           // thermistor index
+        
+        /// <summary>
+        /// Maximum allowed temperature for this heater (in degC)
+        /// </summary>
+        /// <remarks>
+        /// This is only temporary and should be replaced by a representation of the heater protection as in RRF
+        /// </remarks>
+        public double? Max { get; set; }
+        
+        /// <summary>
+        /// Sensor number (thermistor index) of this heater or null if unknown
+        /// </summary>
+        public uint? Sensor { get; set; }
 
+        /// <summary>
+        /// Creates a clone of this instance
+        /// </summary>
+        /// <returns>A clone of this instance</returns>
         public object Clone()
         {
             return new Heater

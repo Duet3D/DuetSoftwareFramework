@@ -6,7 +6,8 @@ namespace DuetControlServer.RepRapFirmware
 {
     public static class Connector
     {
-        private static readonly BufferBlock<BaseCommand> PendingCommands = new BufferBlock<BaseCommand>();
+        private static readonly BufferBlock<BaseCommand> pendingCommands = new BufferBlock<BaseCommand>();
+        // TODO: Implement flush mechanism
 
         public static void Connect()
         {
@@ -21,13 +22,13 @@ namespace DuetControlServer.RepRapFirmware
             // 3) Deal with internal code streams
             // 4) Deal with pausing
             // 5) Keep the model up-to-date
-            await Task.CompletedTask;
+            await Task.Delay(-1, Program.CancelSource.Token);
         }
 
         public static Task<CodeResult> ProcessCode(Code code)
         {
             // TODO: Return TaskCompletionSource, enqueue code+TCS and deal with the actual execution in Run()
-            return Task.FromResult(new CodeResult(code));
+            return Task.FromResult(new CodeResult());
         }
     }
 }

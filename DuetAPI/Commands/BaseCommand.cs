@@ -3,34 +3,81 @@ using System.Threading.Tasks;
 
 namespace DuetAPI.Commands
 {
-    // Base class of a command
-    public abstract class BaseCommand : JsonObject
+    /// <summary>
+    /// Base class of a command.
+    /// When an instance of this class is processed in the control server, the connection identifier of the channel it was received from is assigned.
+    /// </summary>
+    public class BaseCommand
     {
-        public string Command { get; }
-
-        public BaseCommand()
+        /// <summary>
+        /// Creates a new instance of the BaseCommand
+        /// </summary>
+        protected BaseCommand()
         {
             Command = GetType().UnderlyingSystemType.Name;
         }
+        
+        /// <summary>
+        /// Name of the command.
+        /// In the .NET library this is automatically set to the actual class name representing the command name.
+        /// </summary>
+        public string Command { get; set; }
 
+        /// <summary>
+        /// The connection ID this command was received from. It is automatically overwritten by the control server
+        /// once the full command has been deserialized.
+        /// </summary>
+        public int SourceConnection { get; set; }
+
+        /// <summary>
+        /// Reserved for internal use in the control server
+        /// </summary>
         public virtual Task<object> Execute()
         {
-            throw new NotImplementedException();
+            throw new NotImplementedException($"{Command} not implemented");
         }
     }
-
-    // Base class of a command that is expected to return a value of type T
-    public class Command<T> : BaseCommand
+    
+    /// <summary>
+    /// Base class of commands that do not return a result
+    /// </summary>
+    public abstract class Command : BaseCommand
     {
-        public virtual new Task<T> Execute()
+        /// <summary>
+        /// Reserved for internal use in the control server
+        /// </summary>
+        public sealed override async Task<object> Execute()
         {
-            throw new NotImplementedException();
+            await Run();
+            return null;
+        }
+
+        /// <summary>
+        /// Reserved for internal use in the control server
+        /// </summary>
+        protected virtual Task Run()
+        {
+            throw new NotImplementedException($"{Command} not implemented");
         }
     }
-
-    // Base class of a command that does not return a value (i.e. null)
-    public class EmptyResponseCommand : BaseCommand
+    
+    /// <summary>
+    /// Base class of a command that return a result
+    /// </summary>
+    /// <typeparam name="T">Type of the command result</typeparam>
+    public abstract class Command<T> : BaseCommand
     {
-        public override Task<object> Execute() => null;
+        /// <summary>
+        /// Reserved for internal use in the control server
+        /// </summary>
+        public sealed override async Task<object> Execute() => await Run();
+
+        /// <summary>
+        /// Reserved for internal use in the control server
+        /// </summary>
+        protected virtual Task<T> Run()
+        {
+            throw new NotImplementedException($"{Command}<{nameof(T)}> not implemented");
+        }
     }
 }

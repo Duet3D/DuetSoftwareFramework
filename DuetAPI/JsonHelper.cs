@@ -3,40 +3,35 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
 namespace DuetAPI
 {
-    public class JsonObject
+    /// <summary>
+    /// Helper class for
+    /// - JSON serialization and deserialization
+    /// - JSON patch creation and application
+    /// </summary>
+    public static class JsonHelper
     {
-        [JsonIgnore]
-        public JObject AsJson
+        /// <summary>
+        /// Default JSON settings for serialization and deserialization.
+        /// It is strongly recommended to use these settings for Newtonsoft.Json!
+        /// </summary>
+        public static JsonSerializerSettings DefaultSettings => new JsonSerializerSettings
         {
-            get => JObject.FromObject(this, internalSerializer);
-            set => Patch(value);
-        }
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        };
 
-        public JObject Diff(object to)
-        {
-            JObject toObj = (to != null) ? JObject.FromObject(to, internalSerializer) : null;
-            return DiffObject(AsJson, toObj);
-        }
-
-        public void Patch(JObject diff) => PatchObject(this, diff);
-
-        private static JsonSerializer internalSerializer = JsonSerializer.Create(new JsonSerializerSettings
-        {
-            ContractResolver = new CamelCasePropertyNamesContractResolver(),
-            Converters = new List<JsonConverter> {
-                new EnumCharConverter()
-            }
-        });
-
-        private static bool HasValue(JToken item) => item != null && item.Type != JTokenType.Null;
-
-        private static JObject DiffObject(JObject from, JObject to)
+        /// <summary>
+        /// Create a JSON patch
+        /// </summary>
+        /// <param name="from">The source object</param>
+        /// <param name="to">The updated object</param>
+        /// <returns>The JSON patch as a JObject</returns>
+        /// <seealso cref="PatchObject"/>
+        public static JObject DiffObject(JObject from, JObject to)
         {
             if (HasValue(from) != HasValue(to))
             {
@@ -124,13 +119,18 @@ namespace DuetAPI
             return diff;
         }
 
-        private static bool IsListType(Type type) => typeof(IList).IsAssignableFrom(type) && type.GetGenericArguments().Length == 1;
-
-        private static void PatchObject(object obj, JObject json)
+        /// <summary>
+        /// Apply an arbitrary JSON patch
+        /// </summary>
+        /// <param name="obj">The object to patch</param>
+        /// <param name="json">The generated JSON patch</param>
+        /// <seealso cref="DiffObject"/>
+        public static void PatchObject(object obj, JObject json)
         {
+            Type type = obj.GetType();
             foreach (var pair in json)
             {
-                PropertyInfo prop = obj.GetType().GetProperty(pair.Key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                PropertyInfo prop = type.GetProperty(pair.Key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                 if (prop != null)
                 {
                     if (pair.Value.Type == JTokenType.Array && IsListType(prop.PropertyType))
@@ -184,9 +184,16 @@ namespace DuetAPI
                 }
             }
         }
-    }
+        
+        private static bool HasValue(JToken item) => item != null && item.Type != JTokenType.Null;
 
-    public class EnumCharConverter : JsonConverter
+        private static bool IsListType(Type type) => typeof(IList).IsAssignableFrom(type) && type.GetGenericArguments().Length == 1;
+    }
+    
+    /// <summary>
+    /// Helper class for Newtonsoft.Json to convert char enums to strings and vice versa
+    /// </summary>
+    public class CharEnumConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -196,13 +203,13 @@ namespace DuetAPI
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             char asChar = (char)(int)value;
-            writer.WriteValue(char.IsLetterOrDigit(asChar) ? (int)asChar : asChar);
+            writer.WriteValue(asChar.ToString());
         }
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            string value = reader.ReadAsString();
-            return (value?.Length == 1) ? reader.ReadAsString()[0] : Activator.CreateInstance(objectType);
+            string value = (string)reader.Value;
+            return (value?.Length == 1) ? (int)value[0] : existingValue;
         }
     }
 }

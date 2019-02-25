@@ -1,8 +1,6 @@
-﻿using DuetAPI;
-using DuetAPI.Commands;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.IO;
 using System.Threading.Tasks;
+using DuetAPI.Commands;
 
 namespace DuetControlServer
 {
@@ -15,7 +13,7 @@ namespace DuetControlServer
 
             // TODO push stack
 
-            CodeResult macroResult = new CodeResult(sourceCode);
+            CodeResult macroResult = new CodeResult();
 
             do
             {
@@ -27,8 +25,8 @@ namespace DuetControlServer
 
                 try
                 {
-                    Code code = new Code(line, sourceCode.Source);
-                    CodeResult result = await code.Execute();
+                    Code code = new Code(line) { SourceConnection = sourceCode.SourceConnection };
+                    CodeResult result = (CodeResult)await code.Execute();
                     macroResult.AddRange(result);
                 }
                 catch

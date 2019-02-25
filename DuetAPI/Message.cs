@@ -1,7 +1,9 @@
 ﻿using System;
 
+// Not documented in detail yet because this is not 100% final. At the moment it's just more or less copied & pasted from RRF
 namespace DuetAPI
 {
+    [Flags]
     public enum MessageType
     {
         // Message types
@@ -9,7 +11,7 @@ namespace DuetAPI
         Warning,
         Error,
 
-        // Message destinatons
+        // Message destinations
         Usb,
         Lcd,
         Http,
@@ -28,6 +30,20 @@ namespace DuetAPI
         public DateTime Time { get; set; } = DateTime.Now;
         public MessageType Type { get; set; } = Generic;
         public string Content { get; set; } = "";
+
+        public override string ToString()
+        {
+            string prefix = "";
+            if (Type.HasFlag(Error))
+            {
+                prefix = "Error: ";
+            }
+            else if (Type.HasFlag(Warning))
+            {
+                prefix = "Warning: ";
+            }
+            return prefix + Content;
+        }
 
         public object Clone()
         {
