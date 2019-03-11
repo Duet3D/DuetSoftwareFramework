@@ -12,7 +12,7 @@ namespace DuetUnitTest.Machine
             DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
 
             NetworkInterface iface = new NetworkInterface();
-            iface.ActiveProtocols = new string[] { Protocol.Telnet };
+            iface.ActiveProtocols = new NetworkProtocol[] { NetworkProtocol.Telnet };
             iface.ActualIP = "12.34.56.78";
             iface.ConfiguredIP = "34.34.56.78";
             iface.FirmwareVersion = "Firmware version";
@@ -20,7 +20,7 @@ namespace DuetUnitTest.Machine
             iface.Signal = -45;
             iface.Speed = 56;
             iface.Subnet = "255.0.255.0";
-            iface.Type = Type.LAN;
+            iface.Type = InterfaceType.LAN;
             original.Network.Interfaces.Add(iface);
 
             original.Network.Name = "Name";

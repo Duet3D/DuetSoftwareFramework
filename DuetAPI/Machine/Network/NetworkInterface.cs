@@ -1,24 +1,52 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using System;
+using System.Runtime.Serialization;
 
 namespace DuetAPI.Machine.Network
 {
     /// <summary>
     /// Supported types of network interfaces
     /// </summary>
-    public static class Type
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum InterfaceType
     {
-        public const string WiFi = "wifi";
-        public const string LAN = "lan";
+        /// <summary>
+        /// Wireless network interface
+        /// </summary>
+        [EnumMember(Value = "wifi")]
+        WiFi,
+
+        /// <summary>
+        /// Wired network interface
+        /// </summary>
+        [EnumMember(Value = "lan")]
+        LAN
     }
 
     /// <summary>
     /// Supported network protocols
     /// </summary>
-    public static class Protocol
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum NetworkProtocol
     {
-        public const string HTTP = "http";
-        public const string FTP = "ftp";
-        public const string Telnet = "telnet";
+        /// <summary>
+        /// HTTP protocol
+        /// </summary>
+        [EnumMember(Value = "http")]
+        HTTP,
+
+        /// <summary>
+        /// FTP protocol
+        /// </summary>
+        [EnumMember(Value = "ftp")]
+        FTP,
+
+        /// <summary>
+        /// Telnet protocol
+        /// </summary>
+        [EnumMember(Value = "telnet")]
+        Telnet
     }
 
     /// <summary>
@@ -29,8 +57,7 @@ namespace DuetAPI.Machine.Network
         /// <summary>
         /// Type of this network interface
         /// </summary>
-        /// <seealso cref="Type"/>
-        public string Type { get; set; } = Network.Type.WiFi;
+        public InterfaceType Type { get; set; } = InterfaceType.WiFi;
         
         /// <summary>
         /// Version of the network interface or null if unknown.
@@ -71,8 +98,7 @@ namespace DuetAPI.Machine.Network
         /// <summary>
         /// List of active protocols
         /// </summary>
-        /// <seealso cref="Protocol"/>
-        public string[] ActiveProtocols { get; set; } = new string[0];
+        public NetworkProtocol[] ActiveProtocols { get; set; } = new NetworkProtocol[0];
 
         /// <summary>
         /// Creates a clone of this instance
@@ -82,7 +108,7 @@ namespace DuetAPI.Machine.Network
         {
             return new NetworkInterface
             {
-                Type = (Type != null) ? string.Copy(Type) : null,
+                Type = Type,
                 FirmwareVersion = (FirmwareVersion != null) ? string.Copy(FirmwareVersion) : null,
                 Speed = Speed,
                 Signal = Signal,
@@ -90,7 +116,7 @@ namespace DuetAPI.Machine.Network
                 ActualIP = (ActualIP != null) ? string.Copy(ActualIP) : null,
                 Subnet = (Subnet != null) ? string.Copy(Subnet) : null,
                 NumReconnects = NumReconnects,
-                ActiveProtocols = (string[])ActiveProtocols.Clone()
+                ActiveProtocols = (NetworkProtocol[])ActiveProtocols.Clone()
             };
         }
     }

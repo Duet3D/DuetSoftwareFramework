@@ -17,8 +17,15 @@
     /// <typeparam name="T">Type of the response</typeparam>
     public sealed class Response<T> : BaseResponse
     {
+        /// <summary>
+        /// Result of the command
+        /// </summary>
         public T Result { get; set; }
 
+        /// <summary>
+        /// Creates a new Response instance
+        /// </summary>
+        /// <param name="result"></param>
         public Response(T result)
         {
             Result = result;

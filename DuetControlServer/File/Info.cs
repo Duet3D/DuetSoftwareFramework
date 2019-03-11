@@ -94,11 +94,11 @@ namespace DuetControlServer
                 }
                 else if (code.Type == CodeType.Comment)
                 {
-                    gotNewInfo |= (partialFileInfo.LayerHeight == 0 && FindLayerHeight(line, ref partialFileInfo));
+                    gotNewInfo |= partialFileInfo.LayerHeight == 0 && FindLayerHeight(line, ref partialFileInfo);
                     gotNewInfo |= FindFilamentUsed(line, ref filamentConsumption);
-                    gotNewInfo |= (partialFileInfo.GeneratedBy == null) && FindGeneratedBy(line, ref partialFileInfo);
-                    gotNewInfo |= (partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo));
-                    gotNewInfo |= (partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo));
+                    gotNewInfo |= partialFileInfo.GeneratedBy == null && FindGeneratedBy(line, ref partialFileInfo);
+                    gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo);
+                    gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo);
                 }
 
                 if (!gotNewInfo && !lastLineHadInfo && IsFileInfoComplete(partialFileInfo))
@@ -180,11 +180,11 @@ namespace DuetControlServer
                 }
                 else if (code.Type == CodeType.Comment)
                 {
-                    gotNewInfo |= (partialFileInfo.LayerHeight == 0 && FindLayerHeight(line, ref partialFileInfo));
+                    gotNewInfo |= partialFileInfo.LayerHeight == 0 && FindLayerHeight(line, ref partialFileInfo);
                     gotNewInfo |= FindFilamentUsed(line, ref filamentConsumption);
-                    // gotNewInfo |= (partialFileInfo.GeneratedBy == null) && FindSlicer(line, ref partialFileInfo);
-                    gotNewInfo |= (partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo));
-                    gotNewInfo |= (partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo));
+                    // gotNewInfo |= partialFileInfo.GeneratedBy == null) && FindSlicer(line, ref partialFileInfo);
+                    gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo);
+                    gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo);
                 }
 
                 if (!gotNewInfo && !lastLineHadInfo && IsFileInfoComplete(partialFileInfo))
@@ -369,7 +369,7 @@ namespace DuetControlServer
                             }
                         }
                     }
-                    fileInfo.PrintTime = time;
+                    fileInfo.SimulatedTime = time;
                     return true;
                 }
             }

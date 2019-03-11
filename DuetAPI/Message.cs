@@ -1,6 +1,8 @@
 ﻿using System;
 
 // Not documented in detail yet because this is not 100% final. At the moment it's just more or less copied & pasted from RRF
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
 namespace DuetAPI
 {
     [Flags]

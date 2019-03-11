@@ -9,9 +9,7 @@ using System.Reflection;
 namespace DuetAPI
 {
     /// <summary>
-    /// Helper class for
-    /// - JSON serialization and deserialization
-    /// - JSON patch creation and application
+    /// Helper class for JSON serialization, deserialization, patch creation and patch application
     /// </summary>
     public static class JsonHelper
     {
@@ -27,9 +25,9 @@ namespace DuetAPI
         /// <summary>
         /// Create a JSON patch
         /// </summary>
-        /// <param name="from">The source object</param>
-        /// <param name="to">The updated object</param>
-        /// <returns>The JSON patch as a JObject</returns>
+        /// <param name="from">Source object</param>
+        /// <param name="to">Updated object</param>
+        /// <returns>JSON patch</returns>
         /// <seealso cref="PatchObject"/>
         public static JObject DiffObject(JObject from, JObject to)
         {
@@ -122,8 +120,8 @@ namespace DuetAPI
         /// <summary>
         /// Apply an arbitrary JSON patch
         /// </summary>
-        /// <param name="obj">The object to patch</param>
-        /// <param name="json">The generated JSON patch</param>
+        /// <param name="obj">Object to patch</param>
+        /// <param name="json">JSON patch to apply</param>
         /// <seealso cref="DiffObject"/>
         public static void PatchObject(object obj, JObject json)
         {
@@ -195,17 +193,36 @@ namespace DuetAPI
     /// </summary>
     public class CharEnumConverter : JsonConverter
     {
+        /// <summary>
+        /// Checks if the object can be converted
+        /// </summary>
+        /// <param name="objectType">Object type to check</param>
+        /// <returns>Whether the object can be converted</returns>
         public override bool CanConvert(Type objectType)
         {
             return objectType.IsEnum;
         }
 
+        /// <summary>
+        /// Writes a char enum to JSON
+        /// </summary>
+        /// <param name="writer">JSON writer</param>
+        /// <param name="serializer">JSON Serializer</param>
+        /// <param name="value">Value to write</param>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             char asChar = (char)(int)value;
             writer.WriteValue(asChar.ToString());
         }
 
+        /// <summary>
+        /// Reads a char enum from JSON
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="objectType">Object type</param>
+        /// <param name="existingValue">Existing value</param>
+        /// <param name="serializer">JSON serializer</param>
+        /// <returns>Deserialized char enum</returns>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             string value = (string)reader.Value;

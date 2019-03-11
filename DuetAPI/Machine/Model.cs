@@ -9,9 +9,9 @@ namespace DuetAPI.Machine
     /// </summary>
     public class Model : ICloneable
     {
-        // <summary>
-        // Information about the main and expansion boards
-        // <summary>
+        /// <summary>
+        /// Information about the main and expansion boards
+        /// </summary>
         public Electronics.Model Electronics { get; set; } = new Electronics.Model();
         
         /// <summary>

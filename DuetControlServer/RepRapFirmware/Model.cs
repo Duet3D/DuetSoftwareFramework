@@ -35,7 +35,7 @@ namespace DuetControlServer.RepRapFirmware
                         ConfiguredIP = ipInfo.Address.ToString(),
                         Subnet = ipInfo.IPv4Mask.ToString(),
                         // Speed = (uint)(iface.Speed / 1000000),                // Unsupported in .NET Core 2.2 on Linux
-                        Type = iface.Name.StartsWith("w") ? DuetAPI.Machine.Network.Type.WiFi : DuetAPI.Machine.Network.Type.LAN
+                        Type = iface.Name.StartsWith("w") ? DuetAPI.Machine.Network.InterfaceType.WiFi : DuetAPI.Machine.Network.InterfaceType.LAN
                     });
                 }
             }

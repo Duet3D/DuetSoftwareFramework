@@ -7,8 +7,22 @@ namespace DuetAPI.Commands
     /// </summary>
     public class CodeParserException : Exception
     {
+        /// <summary>
+        /// Creates a new CodeParserException
+        /// </summary>
         public CodeParserException() { }
+
+        /// <summary>
+        /// Creates a new CodeParserException
+        /// </summary>
+        /// <param name="message">Exception message</param>
         public CodeParserException(string message) : base(message) { }
+
+        /// <summary>
+        /// Creates a new CodeParserException
+        /// </summary>
+        /// <param name="message">Exception message</param>
+        /// <param name="inner">Inner exception</param>
         public CodeParserException(string message, Exception inner) : base(message, inner) { }
     }
 }

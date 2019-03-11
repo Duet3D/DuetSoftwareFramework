@@ -5,24 +5,13 @@ using System.Linq;
 namespace DuetAPI.Commands
 {
     /// <summary>
-    /// Type of a generic G/M/T-code. If none is applicable, is treated as a comment
+    /// A parsed representation of a generic G/M/T-code
     /// </summary>
-    [JsonConverter(typeof(CharEnumConverter))]
-    public enum CodeType
-    {
-        Comment = 'C',
-        GCode = 'G',
-        MCode = 'M',
-        TCode = 'T'
-    }
-
-    /// <summary>
-    /// Parsed representation of a generic G/M/T-code
-    /// </summary>
+    /// <seealso cref="CodeParameter"/>
     public partial class Code : Command<CodeResult>
     {
         /// <summary>
-        /// Create an empty code representation
+        /// Create an empty Code representation
         /// </summary>
         public Code() { }
 
@@ -73,7 +62,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Convert the parsed code back to a text-based G/M/T-code
         /// </summary>
-        /// <returns>The reconstructed code string</returns>
+        /// <returns>Reconstructed code string</returns>
         public override string ToString()
         {
             if (Type == CodeType.Comment)
@@ -109,7 +98,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Convert only the command portion to a text-based G/M/T-code (e.g. G28)
         /// </summary>
-        /// <returns>The command fraction of the code</returns>
+        /// <returns>Command fraction of the code</returns>
         public string ToShortString()
         {
             if (Type == CodeType.Comment)

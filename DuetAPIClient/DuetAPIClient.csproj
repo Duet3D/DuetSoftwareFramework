@@ -4,6 +4,14 @@
         <TargetFramework>netcoreapp2.2</TargetFramework>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+      <DocumentationFile>C:\Users\Christian\Source\repos\DuetSoftwareFramework\DuetAPIClient\DuetAPIClient.xml</DocumentationFile>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+      <DocumentationFile>C:\Users\Christian\Source\repos\DuetSoftwareFramework\DuetAPIClient\DuetAPIClient.xml</DocumentationFile>
+    </PropertyGroup>
+
     <ItemGroup>
       <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
     </ItemGroup>

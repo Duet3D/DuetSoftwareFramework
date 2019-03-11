@@ -1,0 +1,2377 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>DuetAPI</name>
+    </assembly>
+    <members>
+        <member name="T:DuetAPI.Commands.BaseCommand">
+            <summary>
+            Base class of a command.
+            When an instance of this class is processed in the control server, the connection identifier of the channel it was received from is assigned.
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.BaseCommand.#ctor">
+            <summary>
+            Creates a new instance of the BaseCommand
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.BaseCommand.Command">
+            <summary>
+            Name of the command.
+            In the .NET library this is automatically set to the actual class name representing the command name.
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.BaseCommand.SourceConnection">
+            <summary>
+            The connection ID this command was received from. It is automatically overwritten by the control server
+            once the full command has been deserialized.
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.BaseCommand.Execute">
+            <summary>
+            Reserved for internal use in the control server
+            </summary>
+            <returns>Command result (if any)</returns>
+        </member>
+        <member name="T:DuetAPI.Commands.Command">
+            <summary>
+            Base class of commands that do not return a result
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.Command.Execute">
+            <summary>
+            Reserved for internal use in the control server
+            </summary>
+            <returns>null</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.Command.Run">
+            <summary>
+            Reserved for internal use in the control server. This is invoked by <see cref="M:DuetAPI.Commands.Command.Execute"/>
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.Command`1">
+            <summary>
+            Base class of a command that return a result
+            </summary>
+            <typeparam name="T">Type of the command result</typeparam>
+        </member>
+        <member name="M:DuetAPI.Commands.Command`1.Execute">
+            <summary>
+            Reserved for internal use in the control server
+            </summary>
+            <returns>Command result</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.Command`1.Run">
+            <summary>
+            Reserved for internal use in the control server. This is invoked by <see cref="M:DuetAPI.Commands.Command`1.Execute"/>
+            </summary>
+            <returns>Command result</returns>
+        </member>
+        <member name="T:DuetAPI.Commands.BaseResponse">
+            <summary>
+            Base class for every response to a Command
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.BaseResponse.Success">
+            <summary>
+            Indicates if the command could complete without a runtime error
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.Response`1">
+            <summary>
+            Response of a command
+            </summary>
+            <typeparam name="T">Type of the response</typeparam>
+        </member>
+        <member name="P:DuetAPI.Commands.Response`1.Result">
+            <summary>
+            Result of the command
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.Response`1.#ctor(`0)">
+            <summary>
+            Creates a new Response instance
+            </summary>
+            <param name="result"></param>
+        </member>
+        <member name="T:DuetAPI.Commands.ErrorResponse">
+            <summary>
+            Response indicating an error occurred during the processing of a command
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.ErrorResponse.ErrorType">
+            <summary>
+            Name of the .NET error
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.ErrorResponse.ErrorMessage">
+            <summary>
+            Error description of the .NET error
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.ErrorResponse.#ctor(System.String,System.String)">
+            <summary>
+            Creates a new response indicating a runtime error
+            </summary>
+            <param name="type">Name of the .NET error</param>
+            <param name="message">Error description of the .NET error</param>
+        </member>
+        <member name="T:DuetAPI.Commands.CodeType">
+            <summary>
+            Type of a generic G/M/T-code. If none is applicable, is treated as a comment
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeType.Comment">
+            <summary>
+            Comment type (ignored during execution)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeType.GCode">
+            <summary>
+            G-code
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeType.MCode">
+            <summary>
+            M-code
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeType.TCode">
+            <summary>
+            T-code
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.Code">
+            <summary>
+            A parsed representation of a generic G/M/T-code
+            </summary>
+            <seealso cref="T:DuetAPI.Commands.CodeParameter"/>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.#ctor">
+            <summary>
+            Create an empty Code representation
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.Type">
+            <summary>
+            Type of the code. If no exact type could be determined, it is interpreted as a comment
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.MajorNumber">
+            <summary>
+            Major code number (e.g. 28 in G28)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.MinorNumber">
+            <summary>
+            Minor code number (e.g. 3 in G54.3)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.Parameters">
+            <summary>
+            List of parsed code parameters (see <see cref="T:DuetAPI.Commands.CodeParameter"/> for further information)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.Comment">
+            <summary>
+            Comment of the G/M/T-code. Note that the parser combines different comment styles and appends them
+            as a single value. So for example a code like 'G28 (Do homing) ; via G28' causes a comment like
+            'Do homing via G28' to be generated in this field
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.IsPreProcessed">
+            <summary>
+            Indicates if the code has been preprocessed (see also <see cref="F:DuetAPI.Connection.ConnectionType.Intercept"/>)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.IsPostProcessed">
+            <summary>
+            Indicates if the code has been postprocessed (see also <see cref="F:DuetAPI.Connection.ConnectionType.Intercept"/>)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.GetParameter(System.Char)">
+            <summary>
+            Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!
+            </summary>
+            <param name="c">Letter of the code parameter to find</param>
+            <returns>The parsed parameter instance or null if none could be found</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.ToString">
+            <summary>
+            Convert the parsed code back to a text-based G/M/T-code
+            </summary>
+            <returns>Reconstructed code string</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.ToShortString">
+            <summary>
+            Convert only the command portion to a text-based G/M/T-code (e.g. G28)
+            </summary>
+            <returns>Command fraction of the code</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.#ctor(System.String)">
+            <summary>
+            Create a parsed code representation from a text-based string
+            This constructor parses the whole code and fills the class members where applicable
+            </summary>
+            <param name="codeString">The text-based G/M/T-code</param>
+            <exception cref="T:DuetAPI.Commands.CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
+        </member>
+        <member name="T:DuetAPI.Commands.CodeParameter">
+            <summary>
+            Represents a parsed parameter of a G/M/T-code
+            Initial parsing is done whenever a code is processed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.Letter">
+            <summary>
+            Letter of the code parameter (e.g. P in M106 P3)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.AsString">
+            <summary>
+            Unparsed string representation of the code parameter or an empty string if none present
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeParameter.ParsedValue">
+            <summary>
+            Internal parsed representation of the string value (one of string, int, long, double, int[], long[] or double[])
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.#ctor(System.Char,System.String,System.Boolean)">
+            <summary>
+            Creates a new CodeParameter instance and parses value to a native data type if applicable
+            </summary>
+            <param name="letter">Letter of the code parameter</param>
+            <param name="value">String representation of the value (also stored in <see cref="P:DuetAPI.Commands.CodeParameter.AsString"/>)</param>
+            <param name="isString">Whether this is a string. This is set to true if the parameter was inside quotation marks.</param>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.AsInt">
+            <summary>
+            Integer representation of the parsed value
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.AsLong">
+            <summary>
+            Long representation of the parsed value
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.AsDouble">
+            <summary>
+            Double representation of the parsed value
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.AsIntArray">
+            <summary>
+            Integer array representation of the parsed value
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.AsLongArray">
+            <summary>
+            Long array representation of the parsed value
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.AsDoubleArray">
+            <summary>
+            Double array representation of the parsed value
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.Type">
+            <summary>
+            Data type of the internally parsed value
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.CodeParameterConverter">
+            <summary>
+            Converts a <see cref="T:DuetAPI.Commands.CodeParameter"/> instance to JSON
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameterConverter.WriteJson(Newtonsoft.Json.JsonWriter,System.Object,Newtonsoft.Json.JsonSerializer)">
+            <summary>
+            Writes a code parameter to JSON
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="serializer">JSON Serializer</param>
+            <param name="value">Value to write</param>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameterConverter.ReadJson(Newtonsoft.Json.JsonReader,System.Type,System.Object,Newtonsoft.Json.JsonSerializer)">
+            <summary>
+            Reads a code parameters from JSON
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="objectType">Object type</param>
+            <param name="existingValue">Existing value</param>
+            <param name="serializer">JSON serializer</param>
+            <returns>Deserialized CodeParameter</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameterConverter.CanConvert(System.Type)">
+            <summary>
+            Checks if the corresponding type can be converted
+            </summary>
+            <param name="objectType">Object type to check</param>
+            <returns>Whether the object can be converted</returns>
+        </member>
+        <member name="T:DuetAPI.Commands.CodeParserException">
+            <summary>
+            Exception class that is thrown when a G/M/T-code could not be parsed
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParserException.#ctor">
+            <summary>
+            Creates a new CodeParserException
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParserException.#ctor(System.String)">
+            <summary>
+            Creates a new CodeParserException
+            </summary>
+            <param name="message">Exception message</param>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParserException.#ctor(System.String,System.Exception)">
+            <summary>
+            Creates a new CodeParserException
+            </summary>
+            <param name="message">Exception message</param>
+            <param name="inner">Inner exception</param>
+        </member>
+        <member name="T:DuetAPI.Commands.CodeResult">
+            <summary>
+            List-based representation of a code result.
+            Each item represents a <see cref="T:DuetAPI.Message"/> instance which can be easily converted to a string
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeResult.#ctor">
+            <summary>
+            Creates a new CodeResult
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeResult.ToString">
+            <summary>
+            Converts the CodeResult to a string
+            </summary>
+            <returns>The CodeResult as a string</returns>
+        </member>
+        <member name="T:DuetAPI.Commands.Flush">
+            <summary>
+            Instruct the control server to flush all pending commands and to wait for all moves to finish.
+            This is similar to M400 in RepRapFirmware.
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.GetFileInfo">
+            <summary>
+            Analyse a G-code file and return an instance of <see cref="T:DuetAPI.ParsedFileInfo"/> when ready
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.GetFileInfo.FileName">
+            <summary>
+            The filename to extract information from
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.GetMachineModel">
+            <summary>
+            Get the current RepRapFirmware machine model
+            </summary>
+            <seealso cref="T:DuetAPI.Machine.Model"/>
+        </member>
+        <member name="T:DuetAPI.Commands.Ignore">
+            <summary>
+            Ignore the code to intercept and allow it to be processed without any modifications.
+            This command is only permitted in Interception mode!
+            </summary>
+            <seealso cref="F:DuetAPI.Connection.ConnectionType.Intercept"/>
+        </member>
+        <member name="T:DuetAPI.Commands.Resolve">
+            <summary>
+            Resolve the code to intercept and return the given message details for its completion.
+            This command is only permitted in Interception mode!
+            </summary>
+            <seealso cref="F:DuetAPI.Connection.ConnectionType.Intercept"/>
+        </member>
+        <member name="P:DuetAPI.Commands.Resolve.Type">
+            <summary>
+            Type of the resolving message
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Resolve.Content">
+            <summary>
+            Content of the resolving message
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.SimpleCode">
+            <summary>
+            Perform a simple G/M/T-code.
+            Internally the code passed is populated as a full <see cref="P:DuetAPI.Commands.SimpleCode.Code"/> instance and on completion
+            its CodeResult is transformed back into a basic string. This is useful for minimal extensions
+            that do not require granular control of the code details
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.SimpleCode.Code">
+            <summary>
+            Code to parse and execute
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Connection.ClientInitMessage">
+            <summary>
+            An instance of this class is sent from the client to the server as a response to the <see cref="T:DuetAPI.Connection.ServerInitMessage"/>.
+            It allows a client to select the connection mode (<see cref="T:DuetAPI.Connection.ConnectionType"/>).
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Connection.ClientInitMessage.Type">
+            <summary>
+            Desired type the new connection
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Connection.CommandInitMessage">
+            <summary>
+            Enter command-based connection mode
+            In this conneciton mode nearly all of the commands in the <see cref="N:DuetAPI.Commands"/> namespace can be used
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Connection.InterceptionMode">
+            <summary>
+            Type of the intercepting connection
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Connection.InterceptionMode.Pre">
+            <summary>
+            Intercept codes before they are internally processed by the control server
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Connection.InterceptionMode.Post">
+            <summary>
+            Intercept codes after the initial processing of the control server but before they are forwarded
+            to the RepRapFirmware controller
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Connection.InterceptInitMessage">
+            <summary>
+            Enter interception mode
+            Whenever a code is received, the connection must respond with one of
+            - <cref see="DuetAPI.Commands.Ignore">Ignore</cref> to pass through the code without modifications
+            - <cref see="DuetAPI.Commands.Resolve">Resolve</cref> to resolve the current code and to return a message
+            In addition the interceptor may issue custom commands once a code has been received
+            Do not attempt to perform commands before an intercepting code is received, else the order of
+            command execution cannot be guaranteed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Connection.InterceptInitMessage.InterceptionMode">
+            <summary>
+            Intercept codes either before they are internally processed (pre)
+            or intercept them before they are forwarded to RepRapFirmware (post)
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Connection.SubscriptionMode">
+            <summary>
+            Type of the model subscription
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Connection.SubscriptionMode.Full">
+            <summary>
+            Receive full object model after every update
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Connection.SubscriptionMode.Patch">
+            <summary>
+            Receive only updated JSON fragments of the object model
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Connection.SubscribeInitMessage">
+            <summary>
+            Enter subscription mode and receive either the full object model or parts of it after every update
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Connection.SubscribeInitMessage.SubscriptionMode">
+            <summary>
+            Type of the subscription
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Connection.ConnectionType">
+            <summary>
+            Supported connection types for client connections
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Connection.ConnectionType.Unknown">
+            <summary>
+            Unknown connection type. If this is used, the connection is immediately terminated
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Connection.ConnectionType.Command">
+            <summary>
+            Command mode. This allows clients to send general purpose messages to the control server like
+            G-codes or requests of the full object model
+            </summary>
+            <seealso cref="T:DuetAPI.Connection.CommandInitMessage"/>
+        </member>
+        <member name="F:DuetAPI.Connection.ConnectionType.Intercept">
+            <summary>
+            Interception mode. This allows clients to intercept G/M/T-codes before or after they are initially processed
+            </summary>
+            <seealso cref="T:DuetAPI.Connection.InterceptInitMessage"/>
+        </member>
+        <member name="F:DuetAPI.Connection.ConnectionType.Subscribe">
+            <summary>
+            Subscription mode. In this mode object model updates are transmitted to the client after each update
+            </summary>
+            <seealso cref="T:DuetAPI.Connection.SubscribeInitMessage"/>
+        </member>
+        <member name="T:DuetAPI.Connection.ServerInitMessage">
+            <summary>
+            An instance of this class is sent by the server to the client in JSON format once a connection has been established.
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Connection.ServerInitMessage.Version">
+            <summary>
+            Version of the server-side API. A client is supposed to check if this API level s greater than or equal
+            to this value once a connection has been etablished in order to ensure that all of the required commands
+            are actually supported by the control server.
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Connection.ServerInitMessage.Id">
+            <summary>
+            Unique connection ID assigned by the control server to allow clients to track their commands
+            </summary>
+        </member>
+        <member name="T:DuetAPI.JsonHelper">
+            <summary>
+            Helper class for JSON serialization, deserialization, patch creation and patch application
+            </summary>
+        </member>
+        <member name="P:DuetAPI.JsonHelper.DefaultSettings">
+            <summary>
+            Default JSON settings for serialization and deserialization.
+            It is strongly recommended to use these settings for Newtonsoft.Json!
+            </summary>
+        </member>
+        <member name="M:DuetAPI.JsonHelper.DiffObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)">
+            <summary>
+            Create a JSON patch
+            </summary>
+            <param name="from">Source object</param>
+            <param name="to">Updated object</param>
+            <returns>JSON patch</returns>
+            <seealso cref="M:DuetAPI.JsonHelper.PatchObject(System.Object,Newtonsoft.Json.Linq.JObject)"/>
+        </member>
+        <member name="M:DuetAPI.JsonHelper.PatchObject(System.Object,Newtonsoft.Json.Linq.JObject)">
+            <summary>
+            Apply an arbitrary JSON patch
+            </summary>
+            <param name="obj">Object to patch</param>
+            <param name="json">JSON patch to apply</param>
+            <seealso cref="M:DuetAPI.JsonHelper.DiffObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)"/>
+        </member>
+        <member name="T:DuetAPI.CharEnumConverter">
+            <summary>
+            Helper class for Newtonsoft.Json to convert char enums to strings and vice versa
+            </summary>
+        </member>
+        <member name="M:DuetAPI.CharEnumConverter.CanConvert(System.Type)">
+            <summary>
+            Checks if the object can be converted
+            </summary>
+            <param name="objectType">Object type to check</param>
+            <returns>Whether the object can be converted</returns>
+        </member>
+        <member name="M:DuetAPI.CharEnumConverter.WriteJson(Newtonsoft.Json.JsonWriter,System.Object,Newtonsoft.Json.JsonSerializer)">
+            <summary>
+            Writes a char enum to JSON
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="serializer">JSON Serializer</param>
+            <param name="value">Value to write</param>
+        </member>
+        <member name="M:DuetAPI.CharEnumConverter.ReadJson(Newtonsoft.Json.JsonReader,System.Type,System.Object,Newtonsoft.Json.JsonSerializer)">
+            <summary>
+            Reads a char enum from JSON
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="objectType">Object type</param>
+            <param name="existingValue">Existing value</param>
+            <param name="serializer">JSON serializer</param>
+            <returns>Deserialized char enum</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Electronics.ExpansionBoard">
+            <summary>
+            Represents information about an attached expansion board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.ExpansionBoard.Name">
+            <summary>
+            Name of the attached expansion board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.ExpansionBoard.Revision">
+            <summary>
+            Revision of the expansion board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.ExpansionBoard.Firmware">
+            <summary>
+            Details about the firmware running on this expansion board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.ExpansionBoard.VIn">
+            <summary>
+            Set of the minimum, maximum and current input voltage (in V or null if unknown)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.ExpansionBoard.McuTemp">
+            <summary>
+            Set of the minimum, maximum and current MCU temperature (in degC or null if unknown)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.ExpansionBoard.MaxHeaters">
+            <summary>
+            How many heaters can be attached to this board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.ExpansionBoard.MaxMotors">
+            <summary>
+            How many drives can be attached to this board
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Electronics.ExpansionBoard.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Electronics.Firmware">
+            <summary>
+            Information about a firmware version
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Firmware.Name">
+            <summary>
+            Name of the firmware
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Firmware.Version">
+            <summary>
+            Version of the firmware
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Firmware.Date">
+            <summary>
+            Date of the firmware (i.e. when it was compiled)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Electronics.Firmware.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Electronics.MinMaxCurrent`1">
+            <summary>
+            Set holding minimum, maximum and current information
+            </summary>
+            <typeparam name="T">Type of each value</typeparam>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.MinMaxCurrent`1.Current">
+            <summary>
+            Current value
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.MinMaxCurrent`1.Min">
+            <summary>
+            Minimum value
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.MinMaxCurrent`1.Max">
+            <summary>
+            Maximum value
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Electronics.MinMaxCurrent`1.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Electronics.Model">
+            <summary>
+            Information about the electronics used
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Model.Type">
+            <summary>
+            Type name of the main board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Model.Name">
+            <summary>
+            Full name of the main board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Model.Revision">
+            <summary>
+            Revision of the main board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Model.Firmware">
+            <summary>
+            Main firmware of the attached main board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Model.ProcessorID">
+            <summary>
+            Processor ID of the main board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Model.VIn">
+            <summary>
+            Input voltage details of the main board (in V or null if unknown)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Model.McuTemp">
+            <summary>
+            MCU temperature details of the main board (in degC or null if unknown)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Model.ExpansionBoards">
+            <summary>
+            Information about attached expansion boards
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Electronics.Model.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Fans.Fan">
+            <summary>
+            Class representing information about an attached fan
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Fan.Value">
+            <summary>
+            Value of the fan on a scale between 0 to 1
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Fan.Name">
+            <summary>
+            Name of the fan
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Fan.Rpm">
+            <summary>
+            Current RPM of this fan or null if unknown/unset
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Fan.Inverted">
+            <summary>
+            Whether the PWM signal of this fan is inverted
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Fan.Frequency">
+            <summary>
+            Frequency of the fan (in Hz) or null if unknown/unset
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Fan.Min">
+            <summary>
+            Minimum value of this fan on a scale between 0 to 1
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Fan.Max">
+            <summary>
+            Maximum value of this fan on a scale between 0 to 1
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Fan.Blip">
+            <summary>
+            Blip value indicating how long the fan is supposed to run at 100% when turning it on to get it started (in s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Fan.Thermostatic">
+            <summary>
+            Thermostatic control parameters
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Fan.Pin">
+            <summary>
+            Pin number of the assigned fan or null if unknown/unset
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Fans.Fan.Clone">
+            <summary>
+            Creates a copy of this instance
+            </summary>
+            <returns>A copy of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Fans.Thermostatic">
+            <summary>
+            Thermostatic parameters of a fan
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Thermostatic.Control">
+            <summary>
+            Defines whether thermostatic control is enabled
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Thermostatic.Heaters">
+            <summary>
+            The heaters to monitor (indices)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Fans.Thermostatic.Temperature">
+            <summary>
+            Minimum temperature required to turn on the fan (in degC or null if unknown)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Fans.Thermostatic.Clone">
+            <summary>
+            Create a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Heat.BedOrChamber">
+            <summary>
+            Information about a bed or chamber heater
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.BedOrChamber.Number">
+            <summary>
+            Index of the bed or chamber heater
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.BedOrChamber.Active">
+            <summary>
+            Active temperatures (in degC)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.BedOrChamber.Standby">
+            <summary>
+            Standby temperatures (in degC)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.BedOrChamber.Name">
+            <summary>
+            Name of the bed or chamber or null if unset
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.BedOrChamber.Heaters">
+            <summary>
+            Heaters controlled by this bed or chamber (indices)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Heat.BedOrChamber.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Heat.ExtraHeater">
+            <summary>
+            Information about an extra heater (virtual)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.ExtraHeater.Current">
+            <summary>
+            Current temperature (in degC)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.ExtraHeater.Name">
+            <summary>
+            Name of the extra heater
+            </summary>
+            <remarks>
+            This must not be set to null
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.ExtraHeater.State">
+            <summary>
+            State of the extra heater or null if unknown/unset
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.ExtraHeater.Sensor">
+            <summary>
+            Sensor number (thermistor index) of the extra heater or null if unknown/unset
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Heat.ExtraHeater.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Heat.HeaterState">
+            <summary>
+            State of a heater (also see RepRapFirmware)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Heat.HeaterState.Off">
+            <summary>
+            Heater is turned off
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Heat.HeaterState.Standby">
+            <summary>
+            Heater is in standby mode
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Heat.HeaterState.Active">
+            <summary>
+            Heater is active
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Heat.HeaterState.Tuning">
+            <summary>
+            Heater is being tuned
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Heat.Heater">
+            <summary>
+            Information about a heater
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Heater.Current">
+            <summary>
+            Current temperature of the heater (in degC)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Heater.Name">
+            <summary>
+            Name of the heater or null if unset
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Heater.State">
+            <summary>
+            State of the heater
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Heater.Model">
+            <summary>
+            Information about the heater model
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Heater.Max">
+            <summary>
+            Maximum allowed temperature for this heater (in degC)
+            </summary>
+            <remarks>
+            This is only temporary and should be replaced by a representation of the heater protection as in RRF
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Heater.Sensor">
+            <summary>
+            Sensor number (thermistor index) of this heater or null if unknown
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Heat.Heater.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Heat.HeaterModel">
+            <summary>
+            Information about the way the heater heats up
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.HeaterModel.Gain">
+            <summary>
+            Gain value or null if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.HeaterModel.TimeConst">
+            <summary>
+            Time constant or null if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.HeaterModel.DeadTime">
+            <summary>
+            Dead time of this heater or null if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.HeaterModel.MaxPwm">
+            <summary>
+            Maximum PWM or null if unknown
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Heat.HeaterModel.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Heat.Model">
+            <summary>
+            Information about the heat subsystem
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Model.Beds">
+            <summary>
+            List of configured beds
+            </summary>
+            <remarks>
+            This may contain null items
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Model.Chambers">
+            <summary>
+            List of configured chambers 
+            </summary>
+            <remarks>
+            This may contain null items
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Model.ColdExtrudeTemperature">
+            <summary>
+            Minimum required temperature for extrusion moves (in degC)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Model.ColdRetractTemperature">
+            <summary>
+            Minimum required temperature for retraction moves (in degC)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Model.Extra">
+            <summary>
+            List of configured extra heaters
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Heat.Model.Heaters">
+            <summary>
+            List of configured heaters
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Heat.Model.Clone">
+            <summary>
+            Creates a copy of this instance
+            </summary>
+            <returns>A copy of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Job.Layer">
+            <summary>
+            Information about a layer from a file being printed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Layer.Duration">
+            <summary>
+            Duration of the layer (in s or null if unknown)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Layer.Height">
+            <summary>
+            Height of the layer (in mm or null if unknown)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Layer.Filament">
+            <summary>
+            Actual amount of filament extruded during this layer (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Layer.FractionPrinted">
+            <summary>
+            Fraction of the file printed during this layer (0..1 or null if unknown)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Job.Layer.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>Clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Job.Model">
+            <summary>
+            Information about the current file job (if any)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.File">
+            <summary>
+            Information about the file being processed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.FilePosition">
+            <summary>
+            Current position in the file being processed (in bytes or null)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.LastFileName">
+            <summary>
+            Name of the last file processed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.LastFileSimulated">
+            <summary>
+            Name of the last file simulated
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.ExtrudedRaw">
+            <summary>
+            Virtual amounts of extruded filament according to the G-code file (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.Duration">
+            <summary>
+            Total duration of the current job (in s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.Layer">
+            <summary>
+            Number of the current layer or 0 if none has been started yet
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.LayerTime">
+            <summary>
+            Time elapsed since the beginning of the current layer (in s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.Layers">
+            <summary>
+            Information about the past layers
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.WarmUpDuration">
+            <summary>
+            Time needed to heat up the heaters (in s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.Model.TimesLeft">
+            <summary>
+            Estimated times left
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Job.Model.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Job.TimesLeft">
+            <summary>
+            Estimations about the times left
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.TimesLeft.File">
+            <summary>
+            Time left based on file progress (in s or null)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.TimesLeft.Filament">
+            <summary>
+            Time left based on filament consumption (in s or null)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.TimesLeft.Layer">
+            <summary>
+            Time left based on the layer progress (in s or null)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Job.TimesLeft.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.MessageBox.MessageBoxMode">
+            <summary>
+            Supported modes of displaying a message box
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.MessageBox.MessageBoxMode.NoButtons">
+            <summary>
+            Display a message box without any buttons
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.MessageBox.MessageBoxMode.CloseOnly">
+            <summary>
+            Display a message box with only a Close button
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.MessageBox.MessageBoxMode.OkOnly">
+            <summary>
+            Display a message box with only an Ok button which is supposed to send M292 when pressed
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.MessageBox.MessageBoxMode.OkCancel">
+            <summary>
+            Display a message box with an Ok button that sends M292 P0 or a cancel button that sends M292 P1 when clicked
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.MessageBox.Model">
+            <summary>
+            Information about the message box to show
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MessageBox.Model.Mode">
+            <summary>
+            Mode of the message box to display or null if none is shown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MessageBox.Model.Title">
+            <summary>
+            Title of the message box
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MessageBox.Model.Message">
+            <summary>
+            Content of the message box
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MessageBox.Model.AxisControls">
+            <summary>
+            Optional axis movement controls to show (axis indices)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.MessageBox.Model.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Model">
+            <summary>
+            Representation of the full machine model
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Electronics">
+            <summary>
+            Information about the main and expansion boards
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Fans">
+            <summary>
+            Information about the fans
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Heat">
+            <summary>
+            Information about the heat subsystem
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Job">
+            <summary>
+            Information about the current file job (if any)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.MessageBox">
+            <summary>
+            Information about message box requests
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Move">
+            <summary>
+            Information about the move subsystem
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Network">
+            <summary>
+            Information about connected network adapters
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Output">
+            <summary>
+            Generic messages that do not belong explicitly to codes being executed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Scanner">
+            <summary>
+            Information about the 3D scanner subsystem
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Sensors">
+            <summary>
+            Information about connected sensors including Z-probes and endstops
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Spindles">
+            <summary>
+            Information about CNC spindles
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.State">
+            <summary>
+            Information about the machine state
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Storages">
+            <summary>
+            Information about the configured storage systems
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Tools">
+            <summary>
+            Information about configured tools
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Model.Clone">
+            <summary>
+            Creates a duplicate of the full object model
+            </summary>
+            <returns>A clone of this model</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Move.Axis">
+            <summary>
+            Information about a configured axis
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Axis.Letter">
+            <summary>
+            Letter of the axis
+            </summary>
+            <remarks>
+            This must be upper-case
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Axis.Drives">
+            <summary>
+            Array of the drives used (indices)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Axis.Homed">
+            <summary>
+            Whether or not the axis is homed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Axis.MachinePosition">
+            <summary>
+            Current machine position (in mm or null if unknown/unset)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Axis.Min">
+            <summary>
+            Minimum travel of this axis (in mm or null if unknown/unset)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Axis.Max">
+            <summary>
+            Maximum travel of this axis (in mm or null if unknown/unset)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Axis.Visible">
+            <summary>
+            Whether or not the axis is visible
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Move.Axis.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Move.CurrentMove">
+            <summary>
+            Information about the current move
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.CurrentMove.RequestedSpeed">
+            <summary>
+            Requested speed of the current move (in mm/s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.CurrentMove.TopSpeed">
+            <summary>
+            Top speed of the current move (in mm/s)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Move.CurrentMove.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Move.Drive">
+            <summary>
+            Information about a drive
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Drive.Position">
+            <summary>
+            Current user position of this drive (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Drive.Microstepping">
+            <summary>
+            Information about the configured microstepping
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Drive.Current">
+            <summary>
+            Configured current of this drive (in mA)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Drive.Acceleration">
+            <summary>
+            Acceleration of this drive (in mm/s^2)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Drive.MinSpeed">
+            <summary>
+            Minimum allowed speed for this drive (in mm/s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Drive.MaxSpeed">
+            <summary>
+            Maximum allowed speed for this drive (in mm/s)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Move.Drive.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Move.DriveMicrostepping">
+            <summary>
+            Information about configured microstepping
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.DriveMicrostepping.Value">
+            <summary>
+            Microstepping value (e.g. x16)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.DriveMicrostepping.Interpolated">
+            <summary>
+            Whether the microstepping is interpolated
+            </summary>
+            <remarks>
+            This may not be supported on all boards.
+            </remarks>
+        </member>
+        <member name="M:DuetAPI.Machine.Move.DriveMicrostepping.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Move.Extruder">
+            <summary>
+            Information about an extruder drive
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Extruder.Factor">
+            <summary>
+            Extrusion factor to use (1.0 equals 100%)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Extruder.Nonlinear">
+            <summary>
+            Nonlinear extrusion parameters (see M592)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Move.Extruder.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Move.ExtruderNonlinear">
+            <summary>
+            Nonlinear extrusion parameters (see M592)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.ExtruderNonlinear.A">
+            <summary>
+            A coefficient in the extrusion formula
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.ExtruderNonlinear.B">
+            <summary>
+            B coefficient in the extrusion formula
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.ExtruderNonlinear.UpperLimit">
+            <summary>
+            Upper limit of the nonlinear extrusion compensation
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.ExtruderNonlinear.Temperature">
+            <summary>
+            Reserved for future use, for the temperature at which these values are valid (in degC)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Move.ExtruderNonlinear.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Move.Geometry">
+            <summary>
+            Information about the configured geometry
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Geometry.Type">
+            <summary>
+            Currently configured geometry type or null if unknown
+            </summary>
+            <seealso cref="T:DuetAPI.Machine.Move.GeometryType"/>
+        </member>
+        <member name="M:DuetAPI.Machine.Move.Geometry.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Move.GeometryType">
+            <summary>
+            List of supported geometry types
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.GeometryType.Cartesian">
+            <summary>
+            Cartesian geometry
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.GeometryType.CoreXY">
+            <summary>
+            CoreXY geometry
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.GeometryType.CoreXYU">
+            <summary>
+            CoreXY geometry with extra U axis
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.GeometryType.CoreXYUV">
+            <summary>
+            CoreXY geometry with extra UV axes
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.GeometryType.CoreXZ">
+            <summary>
+            CoreXZ geometry
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.GeometryType.Hangprinter">
+            <summary>
+            Hangprinter geometry
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.GeometryType.Delta">
+            <summary>
+            Delta geometry
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.GeometryType.Polar">
+            <summary>
+            Polar geometry
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.GeometryType.RotaryDelta">
+            <summary>
+            Rotary delta geometry
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.GeometryType.Scara">
+            <summary>
+            SCARA geometry
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Move.Idle">
+            <summary>
+            Idle factor parameters for automatic motor current reduction
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Idle.Timeout">
+            <summary>
+            Idle timeout after which the stepper motor currents are reduced (in s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Idle.Factor">
+            <summary>
+            Motor current reduction factor (on a scale between 0 to 1)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Move.Idle.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Move.Model">
+            <summary>
+            Information about the move subsystem
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Model.Axes">
+            <summary>
+            List of the configured axes
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Model.BabystepZ">
+            <summary>
+            Current babystep amount in Z direction (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Model.CurrentMove">
+            <summary>
+            Information about the current move
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Model.Compensation">
+            <summary>
+            Name of the currently used bed compensation
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Model.Drives">
+            <summary>
+            List of configured drives
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Model.Extruders">
+            <summary>
+            List of configured extruders
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Model.Geometry">
+            <summary>
+            Information about the currently configured geometry
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Model.Idle">
+            <summary>
+            Idle current reduction parameters
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.Model.SpeedFactor">
+            <summary>
+            Speed factor applied to every regular move (1.0 equals 100%)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Move.Model.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Network.Model">
+            <summary>
+            Information about the network subsystem
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.Model.Name">
+            <summary>
+            Name of the machine
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.Model.Password">
+            <summary>
+            Password required to access this machine
+            </summary>
+            <remarks>
+            This concept is deprecated and may be dropped in favour of user authentication in the future
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.Model.Interfaces">
+            <summary>
+            List of available network interfaces
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Network.Model.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Network.InterfaceType">
+            <summary>
+            Supported types of network interfaces
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Network.InterfaceType.WiFi">
+            <summary>
+            Wireless network interface
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Network.InterfaceType.LAN">
+            <summary>
+            Wired network interface
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Network.NetworkProtocol">
+            <summary>
+            Supported network protocols
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Network.NetworkProtocol.HTTP">
+            <summary>
+            HTTP protocol
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Network.NetworkProtocol.FTP">
+            <summary>
+            FTP protocol
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Network.NetworkProtocol.Telnet">
+            <summary>
+            Telnet protocol
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Network.NetworkInterface">
+            <summary>
+            Information about a network interface
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.Type">
+            <summary>
+            Type of this network interface
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.FirmwareVersion">
+            <summary>
+            Version of the network interface or null if unknown.
+            This is primarily intended for the ESP8266-based network interfaces as used on the Duet WiFi
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.Speed">
+            <summary>
+            Speed of the network interface (in MBit, null if unknown, 0 if not connected)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.Signal">
+            <summary>
+            Signal of the WiFi adapter (only WiFi, in dBm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.ConfiguredIP">
+            <summary>
+            Configured IPv4 address of the network adapter
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.ActualIP">
+            <summary>
+            Actual IPv4 address of the network adapter
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.Subnet">
+            <summary>
+            Subnet of the network adapter
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.NumReconnects">
+            <summary>
+            Number of reconnect attempts or null if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.ActiveProtocols">
+            <summary>
+            List of active protocols
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Network.NetworkInterface.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Scanner.Model">
+            <summary>
+            Information about the 3D scanner subsystem
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Scanner.Model.Progress">
+            <summary>
+            Progress of the current action (on a scale between 0 to 1)
+            </summary>
+            <remarks>
+            Previous status responses used a scale of 0..100
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.Machine.Scanner.Model.Status">
+            <summary>
+            Status of the 3D scanner
+            </summary>
+            <seealso cref="T:DuetAPI.Machine.Scanner.ScannerStatus"/>
+        </member>
+        <member name="M:DuetAPI.Machine.Scanner.Model.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Scanner.ScannerStatus">
+            <summary>
+            Possible states of the attached 3D scanner
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Scanner.ScannerStatus.Disconnected">
+            <summary>
+            Scanner is disconnected (none present)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Scanner.ScannerStatus.Idle">
+            <summary>
+            Scanner is registered and idle
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Scanner.ScannerStatus.Scanning">
+            <summary>
+            Scanner is scanning an object
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Scanner.ScannerStatus.PostProcessing">
+            <summary>
+            Scanner is post-processing a file
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Scanner.ScannerStatus.Calibrating">
+            <summary>
+            Scanner is calibrating
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Scanner.ScannerStatus.Uploading">
+            <summary>
+            Scanner is uploading
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Sensors.EndstopPosition">
+            <summary>
+            Position of a configured endstop
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.EndstopPosition.None">
+            <summary>
+            Endstop is not configured
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.EndstopPosition.LowEnd">
+            <summary>
+            Endstop is configured to be hit at the low axis end
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.EndstopPosition.HighEnd">
+            <summary>
+            Endstop is configured to be hit at the high axis end
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Sensors.EndstopType">
+            <summary>
+            Type of a configured endstop
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.EndstopType.ActiveLow">
+            <summary>
+            The signal of the endstop is pulled from HIGH to LOW when hit
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.EndstopType.ActiveHigh">
+            <summary>
+            The signal of the endstop is pulled from LOW to HIGH when hit
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.EndstopType.Probe">
+            <summary>
+            A probe is used for this endstop
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.EndstopType.MotorLoadDetection">
+            <summary>
+            Motor load detection is used for this endstop
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Sensors.Endstop">
+            <summary>
+            Information about an endstop
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Endstop.Triggered">
+            <summary>
+            Whether or not the endstop is hit
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Endstop.Position">
+            <summary>
+            Position where the endstop is located
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Endstop.Type">
+            <summary>
+            Type of the endstop
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Sensors.Endstop.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Sensors.Model">
+            <summary>
+            Information about sensors
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Model.Endstops">
+            <summary>
+            List of configured endstops
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Model.Probes">
+            <summary>
+            List of configured probes
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Sensors.Model.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Sensors.ProbeType">
+            <summary>
+            Supported probe types
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.None">
+            <summary>
+            No probe
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.Unmodulated">
+            <summary>
+            A simple umodulated probe (like dc42's infrared probe)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.Modulated">
+            <summary>
+            A modulated probe (like the original one shipped with the RepRapPro Ormerod)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.ActiveLow">
+            <summary>
+            A probe that pulls the signal from HIGH to LOW when triggered
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.E0Switch">
+            <summary>
+            A probe that is connected to the E0 switch
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.ActiveHigh">
+            <summary>
+            A probe that pulls the signal from LOW to HIGH when triggered
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.E1Switch">
+            <summary>
+            A probe that is connected to the E1 switch
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.ZSwitch">
+            <summary>
+            A probe that is connected to the Z switch
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.UnfilteredActiveHigh">
+            <summary>
+            An unfiltered probe that pulls the signal from low to high when triggered (unfiltered for faster reaction)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.BLTouch">
+            <summary>
+            A BLTouch probe
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Sensors.ProbeType.MotorLoadDetection">
+            <summary>
+            Motor load detection
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Sensors.Probe">
+            <summary>
+            Information about a configured probe
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.Type">
+            <summary>
+            Type of the configured probe
+            </summary>
+            <seealso cref="T:DuetAPI.Machine.Sensors.ProbeType"/>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.Value">
+            <summary>
+            Current analog value of the probe
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.SecondaryValues">
+            <summary>
+            Secondary value(s) of the probe
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.Threshold">
+            <summary>
+            Configured trigger threshold (0..1023)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.Speed">
+            <summary>
+            Probe speed (in mm/s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.DiveHeight">
+            <summary>
+            Dive height (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.TriggerHeight">
+            <summary>
+            Z height at which the probe is triggered (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.Inverted">
+            <summary>
+            Whether the probe signal is inverted
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.RecoveryTime">
+            <summary>
+            Recovery time (in s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.TravelSpeed">
+            <summary>
+            Travel speed when probing multiple points (in mm/s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.MaxProbeCount">
+            <summary>
+            Maximum number of times to probe after a bad reading was determined
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.Tolerance">
+            <summary>
+            Allowed tolerance deviation between two measures (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Sensors.Probe.DisablesBed">
+            <summary>
+            Whether probing disables the bed heater(s)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Sensors.Probe.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Spindles.Spindle">
+            <summary>
+            Information about a CNC spindle
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Spindles.Spindle.Active">
+            <summary>
+            Active RPM
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Spindles.Spindle.Current">
+            <summary>
+            Current RPM
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Spindles.Spindle.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.State.Mode">
+            <summary>
+            Possible operation modes of the machine
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Mode.FFF">
+            <summary>
+            Filament Fused Fabrication (default)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Mode.CNC">
+            <summary>
+            Computer Numerical Control
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Mode.Laser">
+            <summary>
+            Laser operation mode (e.g. laser cutters)
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.State.Model">
+            <summary>
+            Information about the machine state
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.Model.AtxPower">
+            <summary>
+            Whether or not ATX power is on
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.Model.CurrentTool">
+            <summary>
+            Number of the currently selected tool or -1 if none is selected
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.Model.Mode">
+            <summary>
+            Current mode of operation
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.Model.RelativeExtrusion">
+            <summary>
+            Whether relative extrusion is being used
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.Model.RelativePositioning">
+            <summary>
+            Whether relative positioning is being used
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.Model.Status">
+            <summary>
+            Current state of the machine
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.State.Model.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.State.Status">
+            <summary>
+            Possible states of the firmware
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.Updating">
+            <summary>
+            The firmware is being updated
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.Off">
+            <summary>
+            The machine is turned off (i.e. the input voltage is too low for operation)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.Halted">
+            <summary>
+            The machine has encountered an emergency stop and is ready to reset
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.Pausing">
+            <summary>
+            The machine is about to pause a file job
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.Paused">
+            <summary>
+            The machine has paused a file job
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.Resuming">
+            <summary>
+            The machine is about to resume a paused file job
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.Processing">
+            <summary>
+            The machine is processing a file job
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.Simulating">
+            <summary>
+            The machine is simulating a file job to determine its printing time
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.Busy">
+            <summary>
+            The machine is busy doing something (e.g. moving)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.ChangingTool">
+            <summary>
+            The machine is changing the current tool
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.State.Status.Idle">
+            <summary>
+            The machine is on but has nothing to do
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Storages.Storage">
+            <summary>
+            Information about a storage device
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Storages.Storage.Mounted">
+            <summary>
+            Whether the storage device is mounted
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Storages.Storage.Speed">
+            <summary>
+            Speed of the storage device (in bytes/s or null if unknown)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Storages.Storage.Capacity">
+            <summary>
+            Total capacity of the storage device (in bytes)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Storages.Storage.Free">
+            <summary>
+            How much space is still available on this device (in bytes)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Storages.Storage.OpenFiles">
+            <summary>
+            Number of currently open files or null if unknown
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Storages.Storage.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Tools.Tool">
+            <summary>
+            Information about a configured tool
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Number">
+            <summary>
+            Number of the tool
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Active">
+            <summary>
+            Active temperatures of the associated heaters (in degC)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Standby">
+            <summary>
+            Standby temperatures of the associated heaters (in degC)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Name">
+            <summary>
+            Name of the tool or null if unset
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Filament">
+            <summary>
+            Name of the currently loaded filament
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Fans">
+            <summary>
+            List of associated fans (indices)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Heaters">
+            <summary>
+            List of associated heaters (indices)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Mix">
+            <summary>
+            Mix ratios of the associated extruder drives
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Spindle">
+            <summary>
+            Associated spindle (index)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Axes">
+            <summary>
+            Associated axes. At present only X and Y can be mapped per tool.
+            
+            The order is the same as the visual axes, so by default the layout is
+            [
+              [0],        // X
+              [1]         // Y
+            ]
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tools.Tool.Offsets">
+            <summary>
+            Axis offsets (in mm)
+            This list is in the same order as <see cref="P:DuetAPI.Machine.Move.Model.Axes"/>
+            </summary>
+            <seealso cref="T:DuetAPI.Machine.Move.Axis"/>
+        </member>
+        <member name="M:DuetAPI.Machine.Tools.Tool.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.ParsedFileInfo">
+            <summary>
+            Holds information about a parsed G-code file
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.FileName">
+            <summary>
+            The filename of the G-code file
+            TODO This should represent a relative file path starting from the RRF base path!
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.Size">
+            <summary>
+            Size of the file
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.LastModified">
+            <summary>
+            Date and time of the last modification or null if none is set 
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.Height">
+            <summary>
+            Build height of the G-code job or 0 if not found (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.FirstLayerHeight">
+            <summary>
+            Height of the first layer of 0 if not found (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.LayerHeight">
+            <summary>
+            Height of each other layer or 0 if not found (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.NumLayers">
+            <summary>
+            Number of total layers or null if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.Filament">
+            <summary>
+            Filament consumption per extruder drive (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.GeneratedBy">
+            <summary>
+            Name of the application that generated this file
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.PrintTime">
+            <summary>
+            Estimated print time (in s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ParsedFileInfo.SimulatedTime">
+            <summary>
+            Estimated print time from G-code simulation (in s)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.ParsedFileInfo.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+    </members>
+</doc>

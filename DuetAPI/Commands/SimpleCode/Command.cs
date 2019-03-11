@@ -8,7 +8,9 @@
     /// </summary>
     public class SimpleCode : Command<string>
     {
-        // The code to execute
+        /// <summary>
+        /// Code to parse and execute
+        /// </summary>
         public string Code { get; set; }
     }
 }

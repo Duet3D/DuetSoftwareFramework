@@ -61,7 +61,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Receive a fully-populated instance of a BaseCommand from the client
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Received command</returns>
         /// <exception cref="ArgumentException"></exception>
         public async Task<BaseCommand> ReceiveCommand()
         {

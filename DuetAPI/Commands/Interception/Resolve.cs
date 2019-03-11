@@ -7,7 +7,14 @@
     /// <seealso cref="DuetAPI.Connection.ConnectionType.Intercept"/>
     public class Resolve : Command
     {
+        /// <summary>
+        /// Type of the resolving message
+        /// </summary>
         public MessageType Type { get; set; } = MessageType.Success;
+
+        /// <summary>
+        /// Content of the resolving message
+        /// </summary>
         public string Content { get; set; } = "";
     }
 }

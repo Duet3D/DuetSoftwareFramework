@@ -32,6 +32,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Reserved for internal use in the control server
         /// </summary>
+        /// <returns>Command result (if any)</returns>
         public virtual Task<object> Execute()
         {
             throw new NotImplementedException($"{Command} not implemented");
@@ -46,6 +47,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Reserved for internal use in the control server
         /// </summary>
+        /// <returns>null</returns>
         public sealed override async Task<object> Execute()
         {
             await Run();
@@ -53,7 +55,7 @@ namespace DuetAPI.Commands
         }
 
         /// <summary>
-        /// Reserved for internal use in the control server
+        /// Reserved for internal use in the control server. This is invoked by <see cref="Execute"/>
         /// </summary>
         protected virtual Task Run()
         {
@@ -70,11 +72,13 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Reserved for internal use in the control server
         /// </summary>
+        /// <returns>Command result</returns>
         public sealed override async Task<object> Execute() => await Run();
 
         /// <summary>
-        /// Reserved for internal use in the control server
+        /// Reserved for internal use in the control server. This is invoked by <see cref="Execute"/>
         /// </summary>
+        /// <returns>Command result</returns>
         protected virtual Task<T> Run()
         {
             throw new NotImplementedException($"{Command}<{nameof(T)}> not implemented");

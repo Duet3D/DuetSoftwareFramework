@@ -106,7 +106,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Integer representation of the parsed value
         /// </summary>
-        /// <exception cref="ArgumentException">Thrown if the data type is not convertible</exception>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
         [JsonIgnore]
         public int AsInt
         {
@@ -124,7 +124,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Long representation of the parsed value
         /// </summary>
-        /// <exception cref="ArgumentException">Thrown if the data type is not convertible</exception>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
         [JsonIgnore]
         public long AsLong
         {
@@ -142,7 +142,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Double representation of the parsed value
         /// </summary>
-        /// <exception cref="ArgumentException">Thrown if the data type is not convertible</exception>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
         [JsonIgnore]
         public double AsDouble
         {
@@ -161,7 +161,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Integer array representation of the parsed value
         /// </summary>
-        /// <exception cref="ArgumentException">Thrown if the data type is not convertible</exception>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
         [JsonIgnore]
         public int[] AsIntArray
         {
@@ -184,7 +184,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Long array representation of the parsed value
         /// </summary>
-        /// <exception cref="ArgumentException">Thrown if the data type is not convertible</exception>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
         [JsonIgnore]
         public long[] AsLongArray
         {
@@ -207,7 +207,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Double array representation of the parsed value
         /// </summary>
-        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
         [JsonIgnore]
         public double[] AsDoubleArray
         {
@@ -236,10 +236,7 @@ namespace DuetAPI.Commands
         /// Data type of the internally parsed value
         /// </summary>
         [JsonIgnore]
-        public Type Type
-        {
-            get => ParsedValue.GetType();
-        }
+        public Type Type => ParsedValue.GetType();
     }
     
     /// <summary>
@@ -247,13 +244,19 @@ namespace DuetAPI.Commands
     /// </summary>
     public class CodeParameterConverter : JsonConverter
     {
-        class ParameterRepresentation
+        private class ParameterRepresentation
         {
             public char Letter { get; set; }
             public string Value { get; set; }
             public bool IsString { get; set; }
         }
         
+        /// <summary>
+        /// Writes a code parameter to JSON
+        /// </summary>
+        /// <param name="writer">JSON writer</param>
+        /// <param name="serializer">JSON Serializer</param>
+        /// <param name="value">Value to write</param>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             CodeParameter parameter = (CodeParameter)value;
@@ -265,12 +268,25 @@ namespace DuetAPI.Commands
             }).WriteTo(writer);
         }
 
+        /// <summary>
+        /// Reads a code parameters from JSON
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="objectType">Object type</param>
+        /// <param name="existingValue">Existing value</param>
+        /// <param name="serializer">JSON serializer</param>
+        /// <returns>Deserialized CodeParameter</returns>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             ParameterRepresentation representation = JToken.ReadFrom(reader).ToObject<ParameterRepresentation>();
             return new CodeParameter(representation.Letter, representation.Value, representation.IsString);
         }
 
+        /// <summary>
+        /// Checks if the corresponding type can be converted
+        /// </summary>
+        /// <param name="objectType">Object type to check</param>
+        /// <returns>Whether the object can be converted</returns>
         public override bool CanConvert(Type objectType)
         {
             return objectType == typeof(CodeParameter);

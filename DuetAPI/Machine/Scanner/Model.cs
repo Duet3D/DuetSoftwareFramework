@@ -1,22 +1,7 @@
 ﻿using System;
-using Newtonsoft.Json;
 
 namespace DuetAPI.Machine.Scanner
 {
-    /// <summary>
-    /// Possible states of the attached 3D scanner
-    /// </summary>
-    [JsonConverter(typeof(CharEnumConverter))]
-    public enum ScannerStatus
-    {
-        Disconnected = 'D',
-        Idle = 'I',
-        Scanning = 'S',
-        PostProcessing = 'P',
-        Calibrating = 'C',
-        Uploading = 'U'
-    }
-
     /// <summary>
     /// Information about the 3D scanner subsystem
     /// </summary>
