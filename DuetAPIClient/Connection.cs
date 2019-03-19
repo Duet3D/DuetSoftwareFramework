@@ -19,9 +19,11 @@ namespace DuetAPIClient
     public sealed class Connection : IDisposable
     {
         private readonly ConnectionType _connectionType;
-        private readonly Socket _unixSocket;
+        
+        private Socket _unixSocket;
         private NetworkStream _networkStream;
         private StreamReader _streamReader;
+        private JsonTextReader _jsonReader;
 
         /// <summary>
         /// Create a new connection instance
@@ -31,7 +33,6 @@ namespace DuetAPIClient
         public Connection(ConnectionType type)
         {
             _connectionType = type;
-            _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         }
 
         /// <summary>
@@ -45,10 +46,13 @@ namespace DuetAPIClient
         {
             // Create a new connection
             UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(socketPath);
+            _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
             _unixSocket.Connect(endPoint);
 
+            // Make sure we can deserialize incoming data
             _networkStream = new NetworkStream(_unixSocket);
             _streamReader = new StreamReader(_networkStream);
+            InitReader();
 
             // Verify server init message
             ServerInitMessage expectedMessage = new ServerInitMessage();
@@ -68,6 +72,15 @@ namespace DuetAPIClient
                 ErrorResponse errorResponse = (ErrorResponse) response;
                 throw new IOException($"Could not set connection type {_connectionType} ({errorResponse.ErrorType}: {errorResponse.ErrorMessage})");
             }
+        }
+
+        private void InitReader()
+        {
+            _jsonReader = new JsonTextReader(_streamReader)
+            {
+                CloseInput = false,
+                SupportMultipleContent = true
+            };
         }
 
         /// <summary>
@@ -93,7 +106,7 @@ namespace DuetAPIClient
         {
             _streamReader?.Dispose();
             _networkStream?.Dispose();
-            _unixSocket.Dispose();
+            _unixSocket?.Dispose();
         }
 
         #region General purpose commands
@@ -261,18 +274,22 @@ namespace DuetAPIClient
 
         private async Task<JObject> ReceiveJson(CancellationToken cancellationToken = default(CancellationToken))
         {
-            // This cannot become a member of this class because there is no way to reset the
-            // JsonTextReader after a parsing error occurs
-            using (JsonTextReader jsonReader = new JsonTextReader(_streamReader) { CloseInput = false })
+            try
             {
-                JToken token = await JToken.ReadFromAsync(jsonReader, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
+                await _jsonReader.ReadAsync(cancellationToken);
                 
+                JToken token = await JToken.ReadFromAsync(_jsonReader, cancellationToken);
                 if (token.Type == JTokenType.Object)
                 {
                     return (JObject)token;
                 }
+                
                 throw new IOException("Client received invalid JSON object");
+            }
+            catch (JsonReaderException)
+            {
+                InitReader();
+                throw;
             }
         }
 

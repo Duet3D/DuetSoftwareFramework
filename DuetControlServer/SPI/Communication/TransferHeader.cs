@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace DuetControlServer.RepRapFirmware.Communication
+namespace DuetControlServer.SPI.Communication
 {
     [StructLayout(LayoutKind.Sequential)]
     internal struct TransferHeader

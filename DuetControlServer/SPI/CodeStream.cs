@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace DuetControlServer.RepRapFirmware
+namespace DuetControlServer.SPI
 {
     public class CodeStream
     {

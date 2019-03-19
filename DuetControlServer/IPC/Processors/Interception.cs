@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -9,20 +10,40 @@ using DuetAPI.Connection;
 
 namespace DuetControlServer.IPC.Processors
 {
+    /// <summary>
+    /// Interception processor that notifies clients about G/M/T-codes being processed
+    /// </summary>
     public class Interception : Base
     {
-        private static readonly ConcurrentDictionary<Interception, InterceptionMode> interceptors = new ConcurrentDictionary<Interception, InterceptionMode>();
+        /// <summary>
+        /// List of supported commands in this mode
+        /// </summary>
+        public static readonly Type[] SupportedCommands =
+        {
+            typeof(Ignore),
+            typeof(Resolve)
+        };
         
-        private readonly BufferBlock<BaseCommand> pendingCommands = new BufferBlock<BaseCommand>();
-        private readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
+        private static readonly ConcurrentDictionary<Interception, InterceptionMode> _interceptors = new ConcurrentDictionary<Interception, InterceptionMode>();
+        
+        private readonly BufferBlock<BaseCommand> _commandQueue = new BufferBlock<BaseCommand>();
+        private readonly SemaphoreSlim _mutex = new SemaphoreSlim(1, 1);    // like a Mutex but with async/await methods
 
+        /// <summary>
+        /// Constructor of the interception processor
+        /// </summary>
+        /// <param name="conn">Connection instance</param>
+        /// <param name="initMessage">Initialization message</param>
         public Interception(Connection conn, ClientInitMessage initMessage) : base(conn, initMessage)
         {
-            interceptors.TryAdd(this, (initMessage as InterceptInitMessage).InterceptionMode);
+            _interceptors.TryAdd(this, (initMessage as InterceptInitMessage).InterceptionMode);
         }
         
-        // Attempt to read another code.
-        // This must happen here because we need to know when the sockets are closed
+        /// <summary>
+        /// Waits for commands to be received and enqueues them in a concurrent queue so that a <see cref="Code"/>
+        /// can decide when to resume/resolve the execution.
+        /// </summary>
+        /// <returns>Task that represents the lifecycle of the connection</returns>
         public override async Task Process()
         {
             try
@@ -35,64 +56,69 @@ namespace DuetControlServer.IPC.Processors
                 if (Connection.IsConnected)
                 {
                     // Inform the client about this error
-                    await Connection.Send(e);
+                    await Connection.SendResponse(e);
                 }
                 else
                 {
-                    interceptors.TryRemove(this, out InterceptionMode dummy);
+                    _interceptors.TryRemove(this, out InterceptionMode dummy);
                     throw;
                 }
             }
         }
 
-        // Handle an instruction from the interceptor
+        /// <summary>
+        /// Checks if the command request is allowed and enqueues it internally if that is the case.
+        /// If it is illegal, an exception is thrown that can be sent back to the client.
+        /// </summary>
+        /// <param name="command">Command to enqueue</param>
+        /// <returns>Task</returns>
+        /// <exception cref="ArgumentException">Thrown if the command type is illegal</exception>
         private async Task EnqueueCommand(BaseCommand command)
         {
-            // Only allow certain commands to be run
-            if (command is Ignore ||
-                command is Resolve ||
-                command is Code ||
-                command is Flush ||
-                command is SimpleCode)
+            if (SupportedCommands.Contains(command.GetType()) || Command.SupportedCommands.Contains(command.GetType()))
             {
-                await pendingCommands.SendAsync(command);
+                await _commandQueue.SendAsync(command);
             }
             else
             {
-                throw new ArgumentException($"Invalid command {command.GetType().Name} (wrong mode?)");
+                throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
             }
         }
 
-        // Notify the interceptors about a code that is supposed to be executed and wait for the result
+        /// <summary>
+        /// Called by the <see cref="Code"/> implementation to check if the client wants to intercept a G/M/T-code
+        /// </summary>
+        /// <param name="code">Code to intercept</param>
+        /// <returns>null if not intercepted or a <see cref="CodeResult"/> instance if resolved</returns>
         private async Task<CodeResult> Intercept(Code code)
         {
-            // Avoid race conditions
-            await semaphore.WaitAsync(Program.CancelSource.Token);
+            // Avoid race conditions. A client can deal with only one code at once!
+            await _mutex.WaitAsync(Program.CancelSource.Token);
             
             // Send it to the interceptor
-            await Connection.Send(code);
+            await Connection.SendResponse(code);
             
             // Keep on processing commands from the interceptor until a handling result is returned.
-            // This must be either an Ignore or a Resolve instruction
+            // This must be either an Ignore or a Resolve instruction!
             try
             {
-                while (await pendingCommands.OutputAvailableAsync(Program.CancelSource.Token))
+                while (await _commandQueue.OutputAvailableAsync(Program.CancelSource.Token))
                 {
-                    BaseCommand command = await pendingCommands.ReceiveAsync(Program.CancelSource.Token);
+                    BaseCommand command = await _commandQueue.ReceiveAsync(Program.CancelSource.Token);
 
-                    // Code is ignored. Don't do anything with it
+                    // Code is ignored. Don't do anything with it but acknowledge the request
                     if (command is Ignore)
                     {
-                        await Connection.Send(null);
+                        await Connection.SendResponse();
                         break;
                     }
 
-                    // Code is supposed to be resolved with a given result
+                    // Code is resolved with a given result and the request is acknowledged
                     if (command is Resolve)
                     {
-                        await Connection.Send(null);
-                        semaphore.Release();
-                        return new CodeResult()
+                        await Connection.SendResponse();
+                        _mutex.Release();
+                        return new CodeResult
                         {
                             new Message
                             {
@@ -101,10 +127,10 @@ namespace DuetControlServer.IPC.Processors
                             }
                         };
                     }
-
-                    // Execute the incoming command and pass the result
-                    //object result = command.Execute();
-                    //await Connection.Send(result);
+                    
+                    // Deal with other requests
+                    object result = command.Execute();
+                    await Connection.SendResponse(result);
                 }
             }
             catch (Exception e)
@@ -112,7 +138,7 @@ namespace DuetControlServer.IPC.Processors
                 if (Connection.IsConnected)
                 {
                     // Notify the client
-                    await Connection.Send(e);
+                    await Connection.SendResponse(e);
                 }
                 else
                 {
@@ -120,14 +146,20 @@ namespace DuetControlServer.IPC.Processors
                 }
             }
             
-            semaphore.Release();
+            _mutex.Release();
             return null;
         }
         
-        // Called when a G/M/T-code is supposed to be intercepted. If it is resolved, a CodeResult instance is returned
+        /// <summary>
+        /// Called by the <see cref="Code"/> class to intercept a code.
+        /// This method goes through each connected interception channel and notifies the clients.
+        /// </summary>
+        /// <param name="code">Code to intercept</param>
+        /// <param name="type">Type of the interception</param>
+        /// <returns>null if not intercepted and a CodeResult otherwise</returns>
         public static async Task<CodeResult> Intercept(Code code, InterceptionMode type)
         {
-            foreach (var pair in interceptors)
+            foreach (var pair in _interceptors)
             {
                 if (pair.Value == type)
                 {

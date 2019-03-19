@@ -29,7 +29,7 @@ namespace DuetAPI
         public double Height { get; set; }
         
         /// <summary>
-        /// Height of the first layer of 0 if not found (in mm)
+        /// Height of the first layer or 0 if not found (in mm)
         /// </summary>
         public double FirstLayerHeight { get; set; }
         

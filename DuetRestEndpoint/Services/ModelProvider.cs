@@ -9,8 +9,8 @@ namespace DuetRestEndpoint.Services
     /// </summary>
     public static class ModelProvider
     {
-        private static JObject _jsonModel = JObject.FromObject(new DuetAPI.Machine.Model());
-        private static AutoResetEvent _updateEvent = new AutoResetEvent(false);
+        private static readonly ManualResetEvent _updateEvent = new ManualResetEvent(false);
+        private static JObject _jsonModel = JObject.FromObject(new DuetAPI.Machine.Model(), DuetAPI.JsonHelper.DefaultSerializer);
 
         /// <summary>
         /// This indicates if a connection could be established by the ModelService class
@@ -26,7 +26,7 @@ namespace DuetRestEndpoint.Services
         {
             lock (_jsonModel)
             {
-                _jsonModel.ReplaceAll(newModel);
+                _jsonModel = newModel;
             }
         }
 
@@ -39,10 +39,9 @@ namespace DuetRestEndpoint.Services
             lock (_jsonModel)
             {
                 DuetAPI.JsonHelper.PatchObject(_jsonModel, diff);
-
-                _updateEvent.Set();
-                _updateEvent.Reset();
             }
+            _updateEvent.Set();
+            _updateEvent.Reset();
         }
 
         /// <summary>
@@ -61,7 +60,10 @@ namespace DuetRestEndpoint.Services
         /// Wait for an update to occur
         /// </summary>
         /// <returns>Task that completes when an update has occurred</returns>
-        public static Task WaitForUpdate(CancellationToken cancellationToken = default(CancellationToken)) => Task.Run(() => _updateEvent.WaitOne(), cancellationToken);
+        public static Task WaitForUpdate(CancellationToken cancellationToken = default(CancellationToken))
+        {
+            return Task.Run(() => _updateEvent.WaitOne(), cancellationToken);
+        }
 
         /// <summary>
         /// Retrieve a partial JSON patch since the last state represented by oldModel.
@@ -74,7 +76,7 @@ namespace DuetRestEndpoint.Services
             lock (_jsonModel)
             {
                 JObject diff = DuetAPI.JsonHelper.DiffObject(oldModel, _jsonModel);
-                oldModel.Merge(_jsonModel);
+                DuetAPI.JsonHelper.PatchObject(oldModel, diff);
                 return diff;
             }
         }

@@ -20,12 +20,12 @@ namespace DuetAPI.Machine.Job
         public long? FilePosition { get; set; }
         
         /// <summary>
-        /// Name of the last file processed
+        /// Name of the last file processed or null if none
         /// </summary>
         public string LastFileName { get; set; }
         
         /// <summary>
-        /// Name of the last file simulated
+        /// Indicates if the last file processed was simulated
         /// </summary>
         public bool LastFileSimulated { get; set; }
         

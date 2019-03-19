@@ -15,7 +15,7 @@ namespace DuetAPI.Machine.Heat
         /// <summary>
         /// Standby temperatures (in degC)
         /// </summary>
-        public double[] Standby { get; set; }
+        public double[] Standby { get; set; } = new double[0];
         
         /// <summary>
         /// Name of the bed or chamber or null if unset
@@ -36,7 +36,7 @@ namespace DuetAPI.Machine.Heat
             return new BedOrChamber
             {
                 Active = (double[])Active.Clone(),
-                Standby = (Standby != null) ? (double[])Standby.Clone() : null,
+                Standby = (double[])Standby.Clone(),
                 Name = (Name != null) ? string.Copy(Name) : null,
                 Heaters = (uint[])Heaters.Clone()
             };

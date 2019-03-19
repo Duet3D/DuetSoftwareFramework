@@ -9,7 +9,8 @@ namespace DuetRestEndpoint.Services
 {
     /// <summary>
     /// Service worker that keeps the internal JSON-based machine model up-to-date.
-    /// Note that this service does not - at any point - deserialize the object model. This is due to performance reasons
+    /// Note that this service does not - at any point - deserialize the object model.
+    /// This is due to performance reasons.
     /// </summary>
     public class ModelUpdateService : BackgroundService
     {
@@ -56,20 +57,21 @@ namespace DuetRestEndpoint.Services
                     ModelProvider.IsConnected = false;
                     await _connection.Connect( SocketPath, cancellationToken);
                     ModelProvider.IsConnected = true;
+                    _logger.LogInformation("Connected to DCS");
                 }
                 catch (Exception e)
                 {
                     if (!(e is OperationCanceledException))
                     {
-                        _logger.LogError($"Failed to connect to DCS: ${e.Message}");
-                        await Task.Delay(3000);
+                        _logger.LogError($"Could not connect to DCS: {e.Message}");
+                        await Task.Delay(3000, cancellationToken);
                     }
                 }
 
                 // Keep reading updates
-                try
+                while (_connection.IsConnected)
                 {
-                    if (_connection.IsConnected)
+                    try
                     {
                         // Receive the full object model
                         JObject model = await _connection.GetMachineModelPatch(cancellationToken);
@@ -83,13 +85,13 @@ namespace DuetRestEndpoint.Services
                         }
                         while (!cancellationToken.IsCancellationRequested);
                     }
-                }
-                catch (Exception e)
-                {
-                    if (!(e is OperationCanceledException))
+                    catch (Exception e)
                     {
-                        _logger.LogWarning($"Failed to read data from DCS via UNIX socket: ${e.Message}");
-                        await Task.Delay(3000);
+                        if (!(e is OperationCanceledException))
+                        {
+                            _logger.LogWarning($"Failed to read data from DCS: {e.Message}");
+                            await Task.Delay(3000, cancellationToken);
+                        }
                     }
                 }
             }

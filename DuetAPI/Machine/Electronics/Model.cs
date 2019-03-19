@@ -57,7 +57,7 @@ namespace DuetAPI.Machine.Electronics
         {
             return new Model
             {
-                Type = (Type != null) ?  string.Copy(Type) : null,
+                Type = (Type != null) ? string.Copy(Type) : null,
                 Name = (Name != null) ? string.Copy(Name) : null,
                 Revision = (Revision != null) ? string.Copy(Revision) : null,
                 Firmware = (Firmware)Firmware.Clone(),

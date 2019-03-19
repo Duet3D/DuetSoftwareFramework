@@ -1,10 +1,11 @@
 using System.Linq;
 using System.Net.NetworkInformation;
 
-namespace DuetControlServer.RepRapFirmware
+namespace DuetControlServer.SPI
 {
-    public static class Model
+    public static class ModelProvider
     {
+        // TODO: Make this thread-safe. Possibly this can be only achieved by returning clones but perhaps there is still another solution...
         public static DuetAPI.Machine.Model Current { get; private set; }
 
         public static void Update()
@@ -15,7 +16,7 @@ namespace DuetControlServer.RepRapFirmware
                 {
                     Type = "duet3",
                     Name = "Duet 3",
-                    Revision = "1.0"
+                    Revision = "0.5"
                 }
             };
 

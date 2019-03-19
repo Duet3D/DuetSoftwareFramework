@@ -10,12 +10,12 @@ namespace DuetAPI.Machine.Channels
         /// <summary>
         /// Current feedrate in mm/s
         /// </summary>
-        public float Feedrate { get; set; }
+        public float Feedrate { get; set; } = 50;
 
         /// <summary>
         /// Whether relative extrusion is being used
         /// </summary>
-        public bool RelativeExtrusion { get; set; }
+        public bool RelativeExtrusion { get; set; } = true;
 
         /// <summary>
         /// Whether relative positioning is being used

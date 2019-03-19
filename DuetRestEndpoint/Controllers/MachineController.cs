@@ -44,7 +44,7 @@ namespace DuetRestEndpoint.Controllers
                 WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
                 if (Services.ModelProvider.IsConnected)
                 {
-                    await ModelSocket.Process(HttpContext, webSocket);
+                    await WebSocketController.Process(webSocket, _logger);
                 }
                 else
                 {
@@ -64,11 +64,12 @@ namespace DuetRestEndpoint.Controllers
         /// </summary>
         /// <returns>Machine object model as JSON text or HTTP status code: (503) Machine model unavailable</returns>
         [HttpGet("status")]
-        public ActionResult<string> Status()
+        public IActionResult Status()
         {
             if (Services.ModelProvider.IsConnected)
             {
-                return Services.ModelProvider.GetFull().ToString();
+                string json = JsonConvert.SerializeObject(Services.ModelProvider.GetFull(), DuetAPI.JsonHelper.DefaultSettings);
+                return Content(json, "application/json");
             }
 
             _logger.LogError($"[{nameof(Status)}] DCS unavailable");

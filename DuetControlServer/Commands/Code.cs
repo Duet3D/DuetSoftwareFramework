@@ -83,7 +83,7 @@ namespace DuetControlServer.Commands
             }
 
             // Then have it processed by RepRapFirmware
-            return await RepRapFirmware.Connector.ProcessCode(this);
+            return await SPI.Connector.ProcessCode(this);
         }
     }
 }

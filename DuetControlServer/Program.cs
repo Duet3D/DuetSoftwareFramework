@@ -39,7 +39,7 @@ namespace DuetControlServer
             Console.Write("Initialising object model... ");
             try
             {
-                RepRapFirmware.Model.Update();
+                SPI.ModelProvider.Update();
                 Console.WriteLine("Done!");
             }
             catch (Exception e)
@@ -52,7 +52,7 @@ namespace DuetControlServer
             Console.Write("Connecting to RepRapFirmware... ");
             try
             {
-                RepRapFirmware.Connector.Connect();
+                SPI.Connector.Connect();
                 Console.WriteLine("Done!");
             }
             catch (Exception e)
@@ -74,9 +74,12 @@ namespace DuetControlServer
                 return;
             }
             
+            // Add an empty line so NLog can take over from here on
+            Console.WriteLine();
+            
             // Run the main tasks in the background
             Task ipcTask = IPC.Server.AcceptConnections();
-            Task rrfTask = RepRapFirmware.Connector.Run();
+            Task rrfTask = SPI.Connector.Run();
             Task[] taskList = { ipcTask, rrfTask };
 
             // Wait for program termination
