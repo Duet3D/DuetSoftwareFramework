@@ -1,8 +1,10 @@
 ﻿using DuetAPI;
 using DuetAPI.Machine.Scanner;
 using DuetAPI.Machine.State;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
+using System;
 
 namespace DuetUnitTest
 {
@@ -61,8 +63,8 @@ namespace DuetUnitTest
             b.State.Status = Status.Pausing;
             b.Scanner.Status = ScannerStatus.PostProcessing;
 
-            JObject serializedA = JObject.FromObject(a);
-            JObject serializedB = JObject.FromObject(b);
+            JObject serializedA = JObject.FromObject(a, JsonHelper.DefaultSerializer);
+            JObject serializedB = JObject.FromObject(b, JsonHelper.DefaultSerializer);
             JObject patch = JsonHelper.DiffObject(serializedA, serializedB);
             JsonHelper.PatchObject(a, patch);
 
@@ -76,6 +78,43 @@ namespace DuetUnitTest
             Assert.AreEqual(0.5, a.Fans[0].Value);
             Assert.AreEqual(Status.Pausing, a.State.Status);
             Assert.AreEqual(ScannerStatus.PostProcessing, a.Scanner.Status);
+        }
+
+        [Test]
+        public void Merge()
+        {
+            DuetAPI.Machine.Model a = new DuetAPI.Machine.Model();
+            a.Electronics.Firmware.Name = "Foobar";
+            a.Heat.Beds.Add(null);
+            a.Heat.Beds.Add(new DuetAPI.Machine.Heat.BedOrChamber { Name = "BED2", Standby = new double[] { 20 } });
+            a.Heat.Beds.Add(new DuetAPI.Machine.Heat.BedOrChamber { Name = "BED3" });
+            a.State.Status = Status.Busy;
+
+            DuetAPI.Machine.Model b = new DuetAPI.Machine.Model();
+            b.Electronics.Firmware.Name = "Foobar";
+            b.Heat.Beds.Add(new DuetAPI.Machine.Heat.BedOrChamber { Name = "Bed", Active = new double[] { 100 } });
+            b.Heat.Beds.Add(new DuetAPI.Machine.Heat.BedOrChamber { Name = "BED2", Standby = new double[] { 20 } });
+            b.Fans.Add(new DuetAPI.Machine.Fans.Fan() { Value = 0.5 });
+            b.State.Status = Status.Pausing;
+            b.Scanner.Status = ScannerStatus.PostProcessing;
+
+            JObject serializedA = JObject.FromObject(a, JsonHelper.DefaultSerializer);
+            JObject serializedB = JObject.FromObject(b, JsonHelper.DefaultSerializer);
+            JObject patch = JsonHelper.DiffObject(serializedA, serializedB);
+            JsonHelper.PatchObject(serializedA, patch);
+
+            DuetAPI.Machine.Model newModel = serializedA.ToObject<DuetAPI.Machine.Model>();
+
+            Assert.AreEqual("Foobar", newModel.Electronics.Firmware.Name);
+            Assert.AreEqual(2, newModel.Heat.Beds.Count);
+            Assert.AreEqual("Bed", newModel.Heat.Beds[0].Name);
+            Assert.AreEqual(new double[] { 100 }, newModel.Heat.Beds[0].Active);
+            Assert.AreEqual("BED2", newModel.Heat.Beds[1].Name);
+            Assert.AreEqual(new double[] { 20 }, newModel.Heat.Beds[1].Standby);
+            Assert.AreEqual(1, newModel.Fans.Count);
+            Assert.AreEqual(0.5, newModel.Fans[0].Value);
+            Assert.AreEqual(Status.Pausing, newModel.State.Status);
+            Assert.AreEqual(ScannerStatus.PostProcessing, newModel.Scanner.Status); ;
         }
     }
 }

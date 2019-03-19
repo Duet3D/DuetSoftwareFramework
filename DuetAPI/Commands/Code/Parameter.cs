@@ -24,7 +24,7 @@ namespace DuetAPI.Commands
         public string AsString { get; }
 
         /// <summary>
-        /// Internal parsed representation of the string value (one of string, int, long, double, int[], long[] or double[])
+        /// Internal parsed representation of the string value (one of string, int, uint, float, int[], uint[] or float[])
         /// </summary>
         private readonly object ParsedValue;
         
@@ -57,8 +57,8 @@ namespace DuetAPI.Commands
                     {
                         if (value.Contains('.'))
                         {
-                            // If there is a dot anywhere, attempt to parse it as a double array
-                            ParsedValue = subArgs.Select(subArg => double.Parse(subArg, NumberStyles.Any, CultureInfo.InvariantCulture)).ToArray();
+                            // If there is a dot anywhere, attempt to parse it as a float array
+                            ParsedValue = subArgs.Select(subArg => float.Parse(subArg, NumberStyles.Any, CultureInfo.InvariantCulture)).ToArray();
                         }
                         else
                         {
@@ -69,8 +69,8 @@ namespace DuetAPI.Commands
                             }
                             catch
                             {
-                                // If that failed, attempt to parse everything as a long array
-                                ParsedValue = subArgs.Select(long.Parse);
+                                // If that failed, attempt to parse everything as a uint array
+                                ParsedValue = subArgs.Select(uint.Parse);
                             }
                         }
                     }
@@ -85,15 +85,15 @@ namespace DuetAPI.Commands
                     // It is a valid integer
                     ParsedValue = asInt;
                 }
-                else if (long.TryParse(value, out long asLong))
+                else if (uint.TryParse(value, out uint asUInt))
                 {
                     // It is a valid long
-                    ParsedValue = asLong;
+                    ParsedValue = asUInt;
                 }
-                else if (double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out double asDouble))
+                else if (float.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out float asFloat))
                 {
-                    // It is a valid double
-                    ParsedValue = asDouble;
+                    // It is a valid float
+                    ParsedValue = asFloat;
                 }
                 else
                 {
@@ -102,7 +102,24 @@ namespace DuetAPI.Commands
                 }
             }
         }
-
+        /// <summary>
+        /// Float representation of the parsed value
+        /// </summary>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
+        [JsonIgnore]
+        public float AsFloat
+        {
+            get
+            {
+                if (ParsedValue is int || ParsedValue is float)
+                {
+                    return Convert.ToSingle(ParsedValue);
+                }
+                
+                throw new ArgumentException($"Cannot convert {Letter} parameter to float (value {AsString})");
+            }
+        }
+        
         /// <summary>
         /// Integer representation of the parsed value
         /// </summary>
@@ -112,7 +129,7 @@ namespace DuetAPI.Commands
         {
             get
             {
-                if (ParsedValue is int || ParsedValue is double)
+                if (ParsedValue is int || ParsedValue is float)
                 {
                     return Convert.ToInt32(ParsedValue);
                 }
@@ -122,17 +139,17 @@ namespace DuetAPI.Commands
         }
 
         /// <summary>
-        /// Long representation of the parsed value
+        /// Unsigned integer representation of the parsed value
         /// </summary>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         [JsonIgnore]
-        public long AsLong
+        public uint AsUInt
         {
             get
             {
                 if (ParsedValue is int || ParsedValue is long)
                 {
-                    return Convert.ToInt64(ParsedValue);
+                    return Convert.ToUInt32(ParsedValue);
                 }
                 
                 throw new ArgumentException($"Cannot convert {Letter} parameter to long (value {AsString})");
@@ -140,24 +157,42 @@ namespace DuetAPI.Commands
         }
         
         /// <summary>
-        /// Double representation of the parsed value
+        /// Boolean representation of the parsed value
+        /// </summary>
+        [JsonIgnore]
+        public bool AsBool
+        {
+            get => AsInt > 0;
+        }
+
+        /// <summary>
+        /// Float array representation of the parsed value
         /// </summary>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         [JsonIgnore]
-        public double AsDouble
+        public float[] AsFloatArray
         {
             get
             {
-                if (ParsedValue is int || ParsedValue is double)
+                if (ParsedValue is float[])
                 {
-                    return Convert.ToDouble(ParsedValue);
+                    return (float[])ParsedValue;
+                }
+
+                if (ParsedValue is int[])
+                {
+                    return ((int[])ParsedValue).Select(Convert.ToSingle).ToArray();
                 }
                 
-                throw new ArgumentException($"Cannot convert {Letter} parameter to double (value {AsString})");
+                if (ParsedValue is uint[])
+                {
+                    return ((uint[])ParsedValue).Select(Convert.ToSingle).ToArray();
+                }
+                
+                throw new ArgumentException($"Cannot convert {Letter} parameter to float array (value {AsString})");
             }
         }
-        
-        
+
         /// <summary>
         /// Integer array representation of the parsed value
         /// </summary>
@@ -172,9 +207,9 @@ namespace DuetAPI.Commands
                     return (int[])ParsedValue;
                 }
 
-                if (ParsedValue is double[])
+                if (ParsedValue is float[])
                 {
-                    return ((double[])ParsedValue).Select(Convert.ToInt32).ToArray();
+                    return ((float[])ParsedValue).Select(Convert.ToInt32).ToArray();
                 }
                 
                 throw new ArgumentException($"Cannot convert {Letter} parameter to integer array (value {AsString})");
@@ -182,53 +217,25 @@ namespace DuetAPI.Commands
         }
 
         /// <summary>
-        /// Long array representation of the parsed value
+        /// Unsigned integer array representation of the parsed value
         /// </summary>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         [JsonIgnore]
-        public long[] AsLongArray
+        public uint[] AsUIntArray
         {
             get
             {
-                if (ParsedValue is long[])
+                if (ParsedValue is uint[])
                 {
-                    return (long[])ParsedValue;
-                }
-                
-                if (ParsedValue is int[])
-                {
-                    return ((int[])ParsedValue).Select(Convert.ToInt64).ToArray();
+                    return (uint[])ParsedValue;
                 }
 
-                throw new ArgumentException($"Cannot convert {Letter} parameter to long array (value {AsString})");
-            }
-        }
-
-        /// <summary>
-        /// Double array representation of the parsed value
-        /// </summary>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        [JsonIgnore]
-        public double[] AsDoubleArray
-        {
-            get
-            {
-                if (ParsedValue is double[])
+                if (ParsedValue is float[])
                 {
-                    return (double[])ParsedValue;
-                }
-
-                if (ParsedValue is int[])
-                {
-                    return ((int[])ParsedValue).Select(Convert.ToDouble).ToArray();
+                    return ((float[])ParsedValue).Select(Convert.ToUInt32).ToArray();
                 }
                 
-                if (ParsedValue is long[])
-                {
-                    return ((long[])ParsedValue).Select(Convert.ToDouble).ToArray();
-                }
-                
-                throw new ArgumentException($"Cannot convert {Letter} parameter to double array (value {AsString})");
+                throw new ArgumentException($"Cannot convert {Letter} parameter to unsigned integer array (value {AsString})");
             }
         }
 

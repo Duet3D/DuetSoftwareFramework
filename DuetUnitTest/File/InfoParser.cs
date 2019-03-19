@@ -1,14 +1,12 @@
-﻿using DuetAPI.Commands;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using NUnit.Framework;
-using System.IO;
 using System.Threading.Tasks;
 using DuetAPI;
 
-namespace DuetUnitTest.FileInfo
+namespace DuetUnitTest.File
 {
     [TestFixture]
-    public class Parser
+    public class InfoParser
     {
         [Test]
         [TestCase("Cura.gcode")]
@@ -16,7 +14,7 @@ namespace DuetUnitTest.FileInfo
         [TestCase("Slic3r.gcode")]
         public async Task Test(string fileName)
         {
-            string filePath = Path.Combine(Directory.GetCurrentDirectory(), "FileInfo", fileName);
+            string filePath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "File/GCodes", fileName);
             ParsedFileInfo info = await DuetControlServer.File.GetFileInfo(filePath);
 
             TestContext.Out.Write(JsonConvert.SerializeObject(info, Formatting.Indented));

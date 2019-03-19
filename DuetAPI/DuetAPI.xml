@@ -4,6 +4,11 @@
         <name>DuetAPI</name>
     </assembly>
     <members>
+        <member name="T:DuetAPI.Commands.Acknowledge">
+            <summary>
+            Acknowledge a (partial) model update in subsciption mode
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.BaseCommand">
             <summary>
             Base class of a command.
@@ -116,6 +121,37 @@
             <param name="type">Name of the .NET error</param>
             <param name="message">Error description of the .NET error</param>
         </member>
+        <member name="T:DuetAPI.Commands.CodeChannel">
+            <summary>
+            Enumeration of every available code channel
+            <seealso cref="T:DuetAPI.Machine.Channels.Model"/>
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.Main">
+            <summary>
+            Main G/M/T-code channel
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.Serial">
+            <summary>
+            Serial G/M/T-code channel (UART)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.File">
+            <summary>
+            G/M/T-code channel for files (print jobs)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.HTTP">
+            <summary>
+            G/M/T-code channel for HTTP requests (DWC)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.Telnet">
+            <summary>
+            G/M/T-code channel for Telnet requests
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.CodeType">
             <summary>
             Type of a generic G/M/T-code. If none is applicable, is treated as a comment
@@ -144,6 +180,7 @@
         <member name="T:DuetAPI.Commands.Code">
             <summary>
             A parsed representation of a generic G/M/T-code
+            Line number support has not yet been implemented (TODO)
             </summary>
             <seealso cref="T:DuetAPI.Commands.CodeParameter"/>
         </member>
@@ -157,14 +194,24 @@
             Type of the code. If no exact type could be determined, it is interpreted as a comment
             </summary>
         </member>
+        <member name="P:DuetAPI.Commands.Code.Source">
+            <summary>
+            Origin of this code
+            </summary>
+        </member>
         <member name="P:DuetAPI.Commands.Code.MajorNumber">
             <summary>
-            Major code number (e.g. 28 in G28)
+            Major code number (e.g. 28 in G28). Defaults to -1 like in RepRapFirmware
             </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.MinorNumber">
             <summary>
-            Minor code number (e.g. 3 in G54.3)
+            Minor code number (e.g. 3 in G54.3). Defaults to -1 like in RepRapFirmware
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.EnforceAbsoluteCoordinates">
+            <summary>
+            Whether absolute coordinates must be used regardless of the current mode (see G53)
             </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.Parameters">
@@ -234,7 +281,7 @@
         </member>
         <member name="F:DuetAPI.Commands.CodeParameter.ParsedValue">
             <summary>
-            Internal parsed representation of the string value (one of string, int, long, double, int[], long[] or double[])
+            Internal parsed representation of the string value (one of string, int, uint, float, int[], uint[] or float[])
             </summary>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.#ctor(System.Char,System.String,System.Boolean)">
@@ -245,21 +292,32 @@
             <param name="value">String representation of the value (also stored in <see cref="P:DuetAPI.Commands.CodeParameter.AsString"/>)</param>
             <param name="isString">Whether this is a string. This is set to true if the parameter was inside quotation marks.</param>
         </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.AsFloat">
+            <summary>
+            Float representation of the parsed value
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
         <member name="P:DuetAPI.Commands.CodeParameter.AsInt">
             <summary>
             Integer representation of the parsed value
             </summary>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsLong">
+        <member name="P:DuetAPI.Commands.CodeParameter.AsUInt">
             <summary>
-            Long representation of the parsed value
+            Unsigned integer representation of the parsed value
             </summary>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsDouble">
+        <member name="P:DuetAPI.Commands.CodeParameter.AsBool">
             <summary>
-            Double representation of the parsed value
+            Boolean representation of the parsed value
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.AsFloatArray">
+            <summary>
+            Float array representation of the parsed value
             </summary>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
@@ -269,15 +327,9 @@
             </summary>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsLongArray">
+        <member name="P:DuetAPI.Commands.CodeParameter.AsUIntArray">
             <summary>
-            Long array representation of the parsed value
-            </summary>
-            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
-        </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsDoubleArray">
-            <summary>
-            Double array representation of the parsed value
+            Unsigned integer array representation of the parsed value
             </summary>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
@@ -400,6 +452,16 @@
         <member name="P:DuetAPI.Commands.Resolve.Content">
             <summary>
             Content of the resolving message
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.ResolvePath">
+            <summary>
+            Resolve a RepRapFirmware-style path to an actual file path
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.ResolvePath.Path">
+            <summary>
+            Path that is RepRapFirmware-compatible
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.SimpleCode">
@@ -541,10 +603,16 @@
             Helper class for JSON serialization, deserialization, patch creation and patch application
             </summary>
         </member>
-        <member name="P:DuetAPI.JsonHelper.DefaultSettings">
+        <member name="F:DuetAPI.JsonHelper.DefaultSettings">
             <summary>
             Default JSON settings for serialization and deserialization.
-            It is strongly recommended to use these settings for Newtonsoft.Json!
+            It is strongly recommended to use these settings with Newtonsoft.Json!
+            </summary>
+        </member>
+        <member name="F:DuetAPI.JsonHelper.DefaultSerializer">
+            <summary>
+            Default JSON serializer.
+            It is strongly recommended to use this serializer with Newtonsoft.Json!
             </summary>
         </member>
         <member name="M:DuetAPI.JsonHelper.DiffObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)">
@@ -554,14 +622,21 @@
             <param name="from">Source object</param>
             <param name="to">Updated object</param>
             <returns>JSON patch</returns>
-            <seealso cref="M:DuetAPI.JsonHelper.PatchObject(System.Object,Newtonsoft.Json.Linq.JObject)"/>
+            <seealso cref="M:DuetAPI.JsonHelper.PatchObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)"/>
+        </member>
+        <member name="M:DuetAPI.JsonHelper.PatchObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)">
+            <summary>
+            Apply an arbitrary JSON patch
+            </summary>
+            <param name="obj">Object to patch</param>
+            <param name="diff">JSON patch to apply</param>
         </member>
         <member name="M:DuetAPI.JsonHelper.PatchObject(System.Object,Newtonsoft.Json.Linq.JObject)">
             <summary>
             Apply an arbitrary JSON patch
             </summary>
             <param name="obj">Object to patch</param>
-            <param name="json">JSON patch to apply</param>
+            <param name="diff">JSON patch to apply</param>
             <seealso cref="M:DuetAPI.JsonHelper.DiffObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)"/>
         </member>
         <member name="T:DuetAPI.CharEnumConverter">
@@ -593,6 +668,69 @@
             <param name="existingValue">Existing value</param>
             <param name="serializer">JSON serializer</param>
             <returns>Deserialized char enum</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Channels.Channel">
+            <summary>
+            Information about a G/M/T-code channel. May be further expanded
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Channel.Feedrate">
+            <summary>
+            Current feedrate in mm/s
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Channel.RelativeExtrusion">
+            <summary>
+            Whether relative extrusion is being used
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Channel.RelativePositioning">
+            <summary>
+            Whether relative positioning is being used
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Channels.Channel.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Channels.Model">
+            <summary>
+            Information about the available G/M/T-code channels.
+            <seealso cref="T:DuetAPI.Commands.CodeChannel"/>
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.Main">
+            <summary>
+            Main G/M/T-code channel (default)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.Serial">
+            <summary>
+            G/M/T-code channel for serial lines (may be a PanelDue over UART)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.File">
+            <summary>
+            G/M/T-code channel for file prints
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.HTTP">
+            <summary>
+            G/M/T-code channel for HTTP requests
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.Telnet">
+            <summary>
+            G/M/T-code channel for Telnet requests
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Channels.Model.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
         </member>
         <member name="T:DuetAPI.Machine.Electronics.ExpansionBoard">
             <summary>
@@ -834,11 +972,6 @@
         <member name="T:DuetAPI.Machine.Heat.BedOrChamber">
             <summary>
             Information about a bed or chamber heater
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Machine.Heat.BedOrChamber.Number">
-            <summary>
-            Index of the bed or chamber heater
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Heat.BedOrChamber.Active">
@@ -1229,7 +1362,14 @@
         </member>
         <member name="T:DuetAPI.Machine.Model">
             <summary>
-            Representation of the full machine model
+            Representation of the full machine model.
+            
+            In the future this class will be further expanded by INotifyPropertyChanged and IObservableCollection interfaces.
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Model.Channels">
+            <summary>
+            Information about every available G/M/T-code channel
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Model.Electronics">
@@ -1257,6 +1397,12 @@
             Information about message box requests
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Model.Messages">
+            <summary>
+            Generic messages that do not belong explicitly to codes being executed.
+            This includes status messages, generic errors and outputs generated by M118
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Model.Move">
             <summary>
             Information about the move subsystem
@@ -1265,11 +1411,6 @@
         <member name="P:DuetAPI.Machine.Model.Network">
             <summary>
             Information about connected network adapters
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Machine.Model.Output">
-            <summary>
-            Generic messages that do not belong explicitly to codes being executed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Model.Scanner">
@@ -2115,16 +2256,6 @@
             Current mode of operation
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.State.Model.RelativeExtrusion">
-            <summary>
-            Whether relative extrusion is being used
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Machine.State.Model.RelativePositioning">
-            <summary>
-            Whether relative positioning is being used
-            </summary>
-        </member>
         <member name="P:DuetAPI.Machine.State.Model.Status">
             <summary>
             Current state of the machine
@@ -2305,6 +2436,58 @@
             Creates a clone of this instance
             </summary>
             <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.MessageType">
+            <summary>
+            Type of a generic message
+            </summary>
+        </member>
+        <member name="F:DuetAPI.MessageType.Success">
+            <summary>
+            This is a success message
+            </summary>
+        </member>
+        <member name="F:DuetAPI.MessageType.Warning">
+            <summary>
+            This is a warning message
+            </summary>
+        </member>
+        <member name="F:DuetAPI.MessageType.Error">
+            <summary>
+            This is an error message
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Message">
+            <summary>
+            Generic container for messages
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Message.Time">
+            <summary>
+            Time at which the message was generated
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Message.Type">
+            <summary>
+            Type of this message
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Message.Content">
+            <summary>
+            Content of this message
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Message.ToString">
+            <summary>
+            Converts this message to a RepRapFirmware-style message
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:DuetAPI.Message.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>Clone of this instance</returns>
         </member>
         <member name="T:DuetAPI.ParsedFileInfo">
             <summary>

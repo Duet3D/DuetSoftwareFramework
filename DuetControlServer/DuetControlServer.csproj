@@ -15,4 +15,9 @@
     <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="RepRapFirmware\Communication\LinuxRequests\" />
+    <Folder Include="RepRapFirmware\Communication\FirmwareRequests\" />
+  </ItemGroup>
+
 </Project>

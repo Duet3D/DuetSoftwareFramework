@@ -13,7 +13,6 @@ namespace DuetUnitTest.Machine
 
             BedOrChamber bed = new BedOrChamber
             {
-                Number = 1,
                 Active = new double[] { 123 },
                 Standby = new double[] { 456 },
                 Name = "Bed Name",
@@ -24,7 +23,6 @@ namespace DuetUnitTest.Machine
 
             BedOrChamber chamber = new BedOrChamber
             {
-                Number = 2,
                 Active = new double[] { 321 },
                 Standby = new double[] { 654 },
                 Name = "Chamber Name",
@@ -62,7 +60,6 @@ namespace DuetUnitTest.Machine
 
             Assert.AreEqual(2, original.Heat.Beds.Count);
             Assert.AreEqual(original.Heat.Beds[0], null);
-            Assert.AreEqual(original.Heat.Beds[1].Number, clone.Heat.Beds[1].Number);
             Assert.AreEqual(original.Heat.Beds[1].Active, clone.Heat.Beds[1].Active);
             Assert.AreEqual(original.Heat.Beds[1].Standby, clone.Heat.Beds[1].Standby);
             Assert.AreEqual(original.Heat.Beds[1].Name, clone.Heat.Beds[1].Name);
@@ -70,7 +67,6 @@ namespace DuetUnitTest.Machine
 
             Assert.AreEqual(2, original.Heat.Chambers.Count);
             Assert.AreEqual(original.Heat.Chambers[0], null);
-            Assert.AreEqual(original.Heat.Chambers[1].Number, clone.Heat.Chambers[1].Number);
             Assert.AreEqual(original.Heat.Chambers[1].Active, clone.Heat.Chambers[1].Active);
             Assert.AreEqual(original.Heat.Chambers[1].Standby, clone.Heat.Chambers[1].Standby);
             Assert.AreEqual(original.Heat.Chambers[1].Name, clone.Heat.Chambers[1].Name);
@@ -95,13 +91,11 @@ namespace DuetUnitTest.Machine
             Assert.AreEqual(original.Heat.Heaters[0].Model.MaxPwm, clone.Heat.Heaters[0].Model.MaxPwm);
             Assert.AreEqual(original.Heat.Heaters[0].Model.TimeConst, clone.Heat.Heaters[0].Model.TimeConst);
             
-            Assert.AreNotSame(original.Heat.Beds[1].Number, clone.Heat.Beds[1].Number);
             Assert.AreNotSame(original.Heat.Beds[1].Active, clone.Heat.Beds[1].Active);
             Assert.AreNotSame(original.Heat.Beds[1].Standby, clone.Heat.Beds[1].Standby);
             Assert.AreNotSame(original.Heat.Beds[1].Name, clone.Heat.Beds[1].Name);
             Assert.AreNotSame(original.Heat.Beds[1].Heaters, clone.Heat.Beds[1].Heaters);
 
-            Assert.AreNotSame(original.Heat.Chambers[1].Number, clone.Heat.Chambers[1].Number);
             Assert.AreNotSame(original.Heat.Chambers[1].Active, clone.Heat.Chambers[1].Active);
             Assert.AreNotSame(original.Heat.Chambers[1].Standby, clone.Heat.Chambers[1].Standby);
             Assert.AreNotSame(original.Heat.Chambers[1].Name, clone.Heat.Chambers[1].Name);

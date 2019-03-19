@@ -1,4 +1,6 @@
 using DuetAPI.Commands;
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 
@@ -6,6 +8,7 @@ namespace DuetControlServer.RepRapFirmware
 {
     public static class Connector
     {
+        private static ushort codeIdCounter = 0;
         private static readonly BufferBlock<BaseCommand> pendingCommands = new BufferBlock<BaseCommand>();
         // TODO: Implement flush mechanism
 

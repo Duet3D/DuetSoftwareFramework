@@ -23,7 +23,7 @@ namespace DuetAPI.Machine.Move
         /// Information about the current move
         /// </summary>
         public CurrentMove CurrentMove { get; set; } = new CurrentMove();
-        
+
         /// <summary>
         /// Name of the currently used bed compensation
         /// </summary>

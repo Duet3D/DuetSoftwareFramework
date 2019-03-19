@@ -8,11 +8,6 @@ namespace DuetAPI.Machine.Heat
     public class BedOrChamber : ICloneable
     {
         /// <summary>
-        /// Index of the bed or chamber heater
-        /// </summary>
-        public uint Number { get; set; }
-        
-        /// <summary>
         /// Active temperatures (in degC)
         /// </summary>
         public double[] Active { get; set; } = new double[0];
@@ -40,7 +35,6 @@ namespace DuetAPI.Machine.Heat
         {
             return new BedOrChamber
             {
-                Number = Number,
                 Active = (double[])Active.Clone(),
                 Standby = (Standby != null) ? (double[])Standby.Clone() : null,
                 Name = (Name != null) ? string.Copy(Name) : null,

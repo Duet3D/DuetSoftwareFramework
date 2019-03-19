@@ -66,8 +66,14 @@
                 else
                 {
                     // Get the code type. T-codes can follow M-codes so allow them as potential parameters
-                    if (!MajorNumber.HasValue && (c == 'G' || c == 'M' || c == 'T'))
+                    // Also allow major numbers after G53 to support enforcement of absolute positions
+                    if ((MajorNumber == -1 || MajorNumber == 53) && (c == 'G' || c == 'M' || c == 'T'))
                     {
+                        if (Type == CodeType.GCode && MajorNumber == 53)
+                        {
+                            MajorNumber = 0;
+                            EnforceAbsoluteCoordinates = true;
+                        }
                         Type = (CodeType)c;
                         isMajorCode = true;
                     }

@@ -18,43 +18,55 @@ namespace DuetAPIClient
     /// </summary>
     public sealed class Connection : IDisposable
     {
-        private readonly Socket unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-        private NetworkStream networkStream;
-        private StreamReader streamReader;
+        private readonly ConnectionType _connectionType;
+        private readonly Socket _unixSocket;
+        private NetworkStream _networkStream;
+        private StreamReader _streamReader;
+
+        /// <summary>
+        /// Create a new connection instance
+        /// <param name="type">Desired mode of the connection</param>
+        /// <seealso cref="Connect(string, CancellationToken)"/>
+        /// </summary>
+        public Connection(ConnectionType type)
+        {
+            _connectionType = type;
+            _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        }
 
         /// <summary>
         /// Establishes a connection to the given UNIX socket file
         /// </summary>
-        /// <param name="type">Desired mode of the connection</param>
         /// <param name="socketPath">Path to the UNIX socket file</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <exception cref="IOException">Thrown if the API level is incompatible or if the connection mode is unavailable</exception>
-        public async Task Connect(ConnectionType type, string socketPath = "/tmp/duet.sock", CancellationToken cancellationToken = default(CancellationToken))
+        /// <exception cref="InvalidOperationException">API level is incompatible</exception>
+        /// <exception cref="IOException">Connection mode is unavailable</exception>
+        public async Task Connect(string socketPath = "/tmp/duet.sock", CancellationToken cancellationToken = default(CancellationToken))
         {
             // Create a new connection
             UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(socketPath);
-            unixSocket.Connect(endPoint);
+            _unixSocket.Connect(endPoint);
 
-            networkStream = new NetworkStream(unixSocket);
-            streamReader = new StreamReader(networkStream);
+            _networkStream = new NetworkStream(_unixSocket);
+            _streamReader = new StreamReader(_networkStream);
 
             // Verify server init message
             ServerInitMessage expectedMessage = new ServerInitMessage();
             ServerInitMessage serverMessage = await Receive<ServerInitMessage>(cancellationToken);
             if (serverMessage.Version < expectedMessage.Version)
             {
-                throw new IOException($"Incompatible API version (expected {expectedMessage.Version}, got {serverMessage.Version}");
+                throw new InvalidOperationException($"Incompatible API version (expected {expectedMessage.Version}, got {serverMessage.Version}");
             }
 
             // Switch mode
-            ClientInitMessage clientMessage = new ClientInitMessage { Type = type };
+            ClientInitMessage clientMessage = new ClientInitMessage { Type = _connectionType };
             await Send(clientMessage);
 
             BaseResponse response = await ReceiveResponse<object>(cancellationToken);
             if (!response.Success)
             {
                 ErrorResponse errorResponse = (ErrorResponse) response;
-                throw new IOException($"Could not set connection type {type} ({errorResponse.ErrorType}: {errorResponse.ErrorMessage})");
+                throw new IOException($"Could not set connection type {_connectionType} ({errorResponse.ErrorType}: {errorResponse.ErrorMessage})");
             }
         }
 
@@ -63,24 +75,34 @@ namespace DuetAPIClient
         /// </summary>
         public bool IsConnected
         {
-            get => (unixSocket != null) && (unixSocket.Connected);
+            get => (_unixSocket != null) && (_unixSocket.Connected);
         }
 
-        // General purpose commands
+        /// <summary>
+        /// Closes the current connection and disposes it
+        /// </summary>
+        public void Close()
+        {
+            Dispose();
+        }
 
         /// <summary>
-        /// Executes an arbitrary pre-parsed code
+        /// Cleans up the current connection and all resources associated to it
         /// </summary>
-        /// <param name="code">The code to execute</param>
-        /// <returns>The result of the given code</returns>
-        /// <seealso cref="Code"/>
-        public async Task<CodeResult> SendCode(Code code) => await PerformCommand<CodeResult>(code);
+        public void Dispose()
+        {
+            _streamReader?.Dispose();
+            _networkStream?.Dispose();
+            _unixSocket.Dispose();
+        }
+
+        #region General purpose commands
 
         /// <summary>
         /// Instructs the control server to flush all pending commands and to finish all pending moves (like M400 in RepRapFirmware)
         /// </summary>
-        /// <seealso cref="Flush"/>
-        public async Task SendFlush() => await PerformCommand(new Flush());
+        /// <seealso cref="DuetAPI.Commands.Flush"/>
+        public async Task Flush() => await PerformCommand(new Flush());
 
         /// <summary>
         /// Parses a G-code file and returns file information about it
@@ -91,11 +113,28 @@ namespace DuetAPIClient
         public async Task<FileInfo> GetFileInfo(string fileName) => await PerformCommand<FileInfo>(new GetFileInfo { FileName = fileName });
 
         /// <summary>
-        /// Retrieves the current object model of the machine
+        /// Retrieves the full object model of the machine
+        /// In subscription mode this is the first command that has to be called once a connection has been established.
         /// </summary>
         /// <returns>The current machine model</returns>
-        /// <seealso cref="GetMachineModel"/>
-        public async Task<Model> GetMachineModel() => await PerformCommand<Model>(new GetMachineModel());
+        public async Task<Model> GetMachineModel(CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (_connectionType == ConnectionType.Subscribe)
+            {
+                Model model = await Receive<Model>(cancellationToken);
+                await Send(new Acknowledge());
+                return model;
+            }
+            return await PerformCommand<Model>(new GetMachineModel());
+        }
+
+        /// <summary>
+        /// Executes an arbitrary pre-parsed code
+        /// </summary>
+        /// <param name="code">The code to execute</param>
+        /// <returns>The result of the given code</returns>
+        /// <seealso cref="Code"/>
+        public async Task<CodeResult> PerformCode(Code code) => await PerformCommand<CodeResult>(code);
 
         /// <summary>
         /// Executes an arbitrary G/M/T-code in text form and returns the result as a string
@@ -103,10 +142,12 @@ namespace DuetAPIClient
         /// <param name="code">The code to execute</param>
         /// <returns>The code result as a string</returns>
         /// <seealso cref="SimpleCode"/>
-        public async Task<string> SendSimpleCode(string code) => await PerformCommand<string>(new SimpleCode { Code = code });
+        public async Task<string> PerformSimpleCode(string code) => await PerformCommand<string>(new SimpleCode { Code = code });
 
-        // Interception commands
-        
+        #endregion
+
+        #region Interception commands
+
         /// <summary>
         /// Wait for a code to be intercepted
         /// </summary>
@@ -115,10 +156,17 @@ namespace DuetAPIClient
         public async Task<Code> ReceiveCode(CancellationToken cancellationToken) => await Receive<Code>(cancellationToken);
 
         /// <summary>
+        /// Resolve a RepRapFirmware-style file path to a real file path
+        /// </summary>
+        /// <param name="path">File path to resolve</param>
+        /// <returns>Resolved file path</returns>
+        public async Task<string> ResolvePath(string path) => await PerformCommand<string>(new ResolvePath { Path = path });
+
+        /// <summary>
         /// Instruct the control server to ignore the last received code (in intercepting mode)
         /// </summary>
         /// <seealso cref="Ignore"/>
-        public async Task SendIgnore() => await PerformCommand(new Ignore());
+        public async Task IgnoreCode() => await PerformCommand(new Ignore());
 
         /// <summary>
         /// Instruct the control server to resolve the last received code with the given message details (in intercepting mode)
@@ -127,28 +175,29 @@ namespace DuetAPIClient
         /// <param name="content">Content of the resolving message</param>
         /// <seealso cref="Message"/>
         /// <seealso cref="Resolve"/>
-        public async Task SendResolve(MessageType type, string content) => await PerformCommand(new Resolve { Content = content, Type = type });
-        
-        // Subscription commands
+        public async Task ResolveCode(MessageType type, string content) => await PerformCommand(new Resolve { Content = content, Type = type });
+
+        #endregion
+
+        #region Subscription commands
 
         /// <summary>
-        /// Receive the full machine model.
-        /// This must be called initially after the connection in subscription mode has been established and
-        /// repeatable if the mode is set to <see cref="SubscriptionMode.Full"/>
-        /// </summary>
-        /// <param name="cancellationToken">An optional cancellation token</param>
-        /// <returns>The current full object model</returns>
-        public async Task<Model> ReceiveMachineModel(CancellationToken cancellationToken) => await Receive<Model>(cancellationToken);
-
-        /// <summary>
-        /// Receive a partial machine model update.
+        /// Receive a (partial) machine model update.
         /// If the subscription mode is set to <see cref="SubscriptionMode.Patch"/>, new update patches of the object model
         /// need to be applied manually. This method is intended to receive such fragments.
         /// </summary>
         /// <param name="cancellationToken">An optional cancellation token</param>
         /// <returns>The partial update JSON</returns>
+        /// <seealso cref="GetMachineModel(CancellationToken)"/>
         /// <seealso cref="JsonHelper.PatchObject(object, JObject)"/>
-        public async Task<JObject> ReceivePatch(CancellationToken cancellationToken) => await ReceiveJson(cancellationToken);
+        public async Task<JObject> GetMachineModelPatch(CancellationToken cancellationToken)
+        {
+            JObject patch = await ReceiveJson(cancellationToken);
+            await Send(new Acknowledge());
+            return patch;
+        }
+
+        #endregion
 
         private async Task PerformCommand(BaseCommand command)
         {
@@ -210,11 +259,11 @@ namespace DuetAPIClient
             return response;
         }
 
-        private async Task<JObject> ReceiveJson(CancellationToken cancellationToken)
+        private async Task<JObject> ReceiveJson(CancellationToken cancellationToken = default(CancellationToken))
         {
             // This cannot become a member of this class because there is no way to reset the
             // JsonTextReader after a parsing error occurs
-            using (JsonTextReader jsonReader = new JsonTextReader(streamReader) { CloseInput = false })
+            using (JsonTextReader jsonReader = new JsonTextReader(_streamReader) { CloseInput = false })
             {
                 JToken token = await JToken.ReadFromAsync(jsonReader, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
@@ -230,25 +279,7 @@ namespace DuetAPIClient
         private async Task Send(object obj)
         {
             string json = JsonConvert.SerializeObject(obj, JsonHelper.DefaultSettings);
-            await unixSocket.SendAsync(Encoding.UTF8.GetBytes(json + "\n"), SocketFlags.None);
-        }
-
-        /// <summary>
-        /// Closes the current connection and disposes it
-        /// </summary>
-        public void Close()
-        {
-            Dispose();
-        }
-
-        /// <summary>
-        /// Cleans up the current connection and all resources associated to it
-        /// </summary>
-        public void Dispose()
-        {
-            streamReader?.Dispose();
-            networkStream?.Dispose();
-            unixSocket.Dispose();
+            await _unixSocket.SendAsync(Encoding.UTF8.GetBytes(json + "\n"), SocketFlags.None);
         }
     }
 }

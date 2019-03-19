@@ -23,16 +23,6 @@ namespace DuetAPI.Machine.State
         public Mode Mode { get; set; } = Mode.FFF;
         
         /// <summary>
-        /// Whether relative extrusion is being used
-        /// </summary>
-        public bool RelativeExtrusion { get; set; }
-        
-        /// <summary>
-        /// Whether relative positioning is being used
-        /// </summary>
-        public bool RelativePositioning { get; set; }
-        
-        /// <summary>
         /// Current state of the machine
         /// </summary>
         public Status Status { get; set; } = Status.Idle;
@@ -48,8 +38,6 @@ namespace DuetAPI.Machine.State
                 AtxPower = AtxPower,
                 CurrentTool = CurrentTool,
                 Mode = Mode,
-                RelativeExtrusion = RelativeExtrusion,
-                RelativePositioning = RelativePositioning,
                 Status = Status
             };
         }

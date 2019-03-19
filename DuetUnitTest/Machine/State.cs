@@ -14,8 +14,6 @@ namespace DuetUnitTest.Machine
             original.State.AtxPower = true;
             original.State.CurrentTool = 123;
             original.State.Mode = Mode.Laser;
-            original.State.RelativeExtrusion = true;
-            original.State.RelativePositioning = true;
             original.State.Status = Status.Processing;
 
             DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
@@ -28,8 +26,6 @@ namespace DuetUnitTest.Machine
             Assert.AreNotSame(original.State.AtxPower, clone.State.AtxPower);
             Assert.AreNotSame(original.State.CurrentTool, clone.State.CurrentTool);
             Assert.AreNotSame(original.State.Mode, clone.State.Mode);
-            Assert.AreNotSame(original.State.RelativeExtrusion, clone.State.RelativeExtrusion);
-            Assert.AreNotSame(original.State.RelativePositioning, clone.State.RelativePositioning);
             Assert.AreNotSame(original.State.Status, clone.State.Status);
         }
     }

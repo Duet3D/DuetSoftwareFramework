@@ -10,8 +10,26 @@ namespace DuetControlServer.Commands
         public Code() : base() {}
 
         public Code(string code) : base(code) {}
-        
-        // Run an arbitrary G/M/T-code
+
+        /// <summary>
+        /// Internal file position when processing a file
+        /// </summary>
+        internal long FilePosition;
+
+        /// <summary>
+        /// Virtual extruder positions before this move
+        /// </summary>
+        internal float[] VirtualExtruderPositions;
+
+        /// <summary>
+        /// Diff amount of virtual extruder positions 
+        /// </summary>
+        internal float[] VirtualExtruderAmounts;
+
+        /// <summary>
+        /// Run an arbitrary G/M/T-code
+        /// </summary>
+        /// <returns>Code result instance</returns>
         protected override async Task<CodeResult> Run()
         {
             if (Type == CodeType.Comment)

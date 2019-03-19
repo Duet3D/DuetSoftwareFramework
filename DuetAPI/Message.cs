@@ -1,52 +1,66 @@
 ﻿using System;
 
-// Not documented in detail yet because this is not 100% final. At the moment it's just more or less copied & pasted from RRF
-#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-
 namespace DuetAPI
 {
-    [Flags]
+    /// <summary>
+    /// Type of a generic message
+    /// </summary>
     public enum MessageType
     {
-        // Message types
+        /// <summary>
+        /// This is a success message
+        /// </summary>
         Success,
+
+        /// <summary>
+        /// This is a warning message
+        /// </summary>
         Warning,
-        Error,
 
-        // Message destinations
-        Usb,
-        Lcd,
-        Http,
-        Telnet,
-        Aux,
-        Log
+        /// <summary>
+        /// This is an error message
+        /// </summary>
+        Error
     }
-
+    
+    /// <summary>
+    /// Generic container for messages
+    /// </summary>
     public class Message : ICloneable
     {
-        public const MessageType Debug = MessageType.Usb;			                                                    // A debug message to send in blocking mode to USB
-        public const MessageType Generic = MessageType.Usb | MessageType.Lcd | MessageType.Http | MessageType.Telnet;   // A message that is to be sent to the web, Telnet, USB and panel
-        public const MessageType Error = Generic | MessageType.Log | MessageType.Error;                                 // An error message
-        public const MessageType Warning = Generic | MessageType.Log | MessageType.Warning;                             // A warning message
-
+        /// <summary>
+        /// Time at which the message was generated
+        /// </summary>
         public DateTime Time { get; set; } = DateTime.Now;
-        public MessageType Type { get; set; } = Generic;
+
+        /// <summary>
+        /// Type of this message
+        /// </summary>
+        public MessageType Type { get; set; } = MessageType.Success;
+
+        /// <summary>
+        /// Content of this message
+        /// </summary>
         public string Content { get; set; } = "";
 
+        /// <summary>
+        /// Converts this message to a RepRapFirmware-style message
+        /// </summary>
+        /// <returns></returns>
         public override string ToString()
         {
-            string prefix = "";
-            if (Type.HasFlag(Error))
+            switch (Type)
             {
-                prefix = "Error: ";
+                case MessageType.Error: return "Error: " + Content;
+                case MessageType.Warning: return "Warning: " + Content;
+                default: return Content;
             }
-            else if (Type.HasFlag(Warning))
-            {
-                prefix = "Warning: ";
-            }
-            return prefix + Content;
         }
 
+        /// <summary>
+        /// Creates a clone of this instance
+        /// </summary>
+        /// <returns>Clone of this instance</returns>
         public object Clone()
         {
             return new Message

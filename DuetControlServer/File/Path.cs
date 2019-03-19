@@ -8,9 +8,9 @@ namespace DuetControlServer
         // In the future this may be expanded to allow virtual disks
         public static string ResolvePath(string filePath)
         {
-            if (filePath.StartsWith("0:"))
+            if (filePath.StartsWith("0:/"))
             {
-                filePath = filePath.Substring(2);
+                filePath = filePath.Substring(3);
             }
             return Path.Combine(Settings.BaseDirectory, filePath);
         }

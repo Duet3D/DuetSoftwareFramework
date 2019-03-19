@@ -83,7 +83,7 @@ namespace DuetControlServer
                         CodeParameter param = code.Parameters.Find(item => item.Letter == 'Z');
                         if (param != null)
                         {
-                            double z = param.AsDouble;
+                            float z = param.AsFloat;
                             if (z <= Settings.MaxLayerHeight)
                             {
                                 partialFileInfo.FirstLayerHeight = z;
@@ -160,11 +160,11 @@ namespace DuetControlServer
                             gotNewInfo = true;
                             if (lastZ == null)
                             {
-                                lastZ = param.AsDouble;
+                                lastZ = param.AsFloat;
                             }
                             else
                             {
-                                double z = param.AsDouble;
+                                double z = param.AsFloat;
                                 if (lastZ - z > Settings.MaxLayerHeight)
                                 {
                                     partialFileInfo.Height = z;

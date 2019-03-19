@@ -15,9 +15,18 @@ namespace DuetAPI
     {
         /// <summary>
         /// Default JSON settings for serialization and deserialization.
-        /// It is strongly recommended to use these settings for Newtonsoft.Json!
+        /// It is strongly recommended to use these settings with Newtonsoft.Json!
         /// </summary>
-        public static JsonSerializerSettings DefaultSettings => new JsonSerializerSettings
+        public static readonly JsonSerializerSettings DefaultSettings = new JsonSerializerSettings
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        };
+
+        /// <summary>
+        /// Default JSON serializer.
+        /// It is strongly recommended to use this serializer with Newtonsoft.Json!
+        /// </summary>
+        public static readonly JsonSerializer DefaultSerializer = new JsonSerializer
         {
             ContractResolver = new CamelCasePropertyNamesContractResolver()
         };
@@ -28,7 +37,7 @@ namespace DuetAPI
         /// <param name="from">Source object</param>
         /// <param name="to">Updated object</param>
         /// <returns>JSON patch</returns>
-        /// <seealso cref="PatchObject"/>
+        /// <seealso cref="PatchObject(JObject, JObject)"/>
         public static JObject DiffObject(JObject from, JObject to)
         {
             if (HasValue(from) != HasValue(to))
@@ -121,12 +130,44 @@ namespace DuetAPI
         /// Apply an arbitrary JSON patch
         /// </summary>
         /// <param name="obj">Object to patch</param>
-        /// <param name="json">JSON patch to apply</param>
+        /// <param name="diff">JSON patch to apply</param>
+        public static void PatchObject(JObject obj, JObject diff)
+        {
+            foreach (var pair in diff)
+            {
+                JToken token = obj[pair.Key];
+                if (token != null)
+                {
+                    if (token.Type == JTokenType.Array)
+                    {
+                        PatchList((JArray)token, (JArray)pair.Value);
+                    }
+                    else if (token.Type == JTokenType.Object)
+                    {
+                        PatchObject((JObject)token, (JObject)pair.Value);
+                    }
+                    else
+                    {
+                        obj[pair.Key] = pair.Value;
+                    }
+                }
+                else
+                {
+                    obj[pair.Key] = pair.Value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Apply an arbitrary JSON patch
+        /// </summary>
+        /// <param name="obj">Object to patch</param>
+        /// <param name="diff">JSON patch to apply</param>
         /// <seealso cref="DiffObject"/>
-        public static void PatchObject(object obj, JObject json)
+        public static void PatchObject(object obj, JObject diff)
         {
             Type type = obj.GetType();
-            foreach (var pair in json)
+            foreach (var pair in diff)
             {
                 PropertyInfo prop = type.GetProperty(pair.Key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                 if (prop != null)
@@ -154,6 +195,39 @@ namespace DuetAPI
             }
         }
 
+        private static void PatchList(JArray a, JArray b)
+        {
+            for (int i = a.Count - 1; i >= b.Count; i--)
+            {
+                a.RemoveAt(i);
+            }
+
+            for (int i = 0; i < b.Count; i++)
+            {
+                JToken token = b[i];
+                if (i >= a.Count)
+                {
+                    a.Add(token);
+                }
+                else
+                {
+                    JToken source = a[i];
+                    if (HasValue(source) && token.Type == JTokenType.Object)
+                    {
+                        PatchObject((JObject)source, (JObject)token);
+                    }
+                    else if (HasValue(source) && token.Type == JTokenType.Array)
+                    {
+                        PatchList((JArray)source, (JArray)token);
+                    }
+                    else
+                    {
+                        a[i] = b[i];
+                    }
+                }
+            }
+        }
+
         private static void PatchList(IList list, Type itemType, JArray array)
         {
             for (int i = list.Count - 1; i >= array.Count; i--)
@@ -168,17 +242,21 @@ namespace DuetAPI
                 {
                     list.Add(token.ToObject(itemType));
                 }
-                else if (token.Type == JTokenType.Object && list[i] != null)
-                {
-                    PatchObject(list[i], (JObject)token);
-                }
-                else if (token.Type == JTokenType.Array && list[i] != null && IsListType(list[i].GetType()))
-                {
-                    PatchList((IList)list[i], list[i].GetType(), (JArray)token);
-                }
                 else
                 {
-                    list[i] = token.ToObject(itemType);
+                    object source = list[i];
+                    if (source != null && token.Type == JTokenType.Object && list[i] != null)
+                    {
+                        PatchObject(source, (JObject)token);
+                    }
+                    else if (source != null && token.Type == JTokenType.Array && IsListType(list[i].GetType()))
+                    {
+                        PatchList((IList)source, list[i].GetType(), (JArray)token);
+                    }
+                    else
+                    {
+                        list[i] = token.ToObject(itemType);
+                    }
                 }
             }
         }

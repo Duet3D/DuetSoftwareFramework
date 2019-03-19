@@ -1,11 +1,11 @@
-﻿using Newtonsoft.Json;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 
 namespace DuetAPI.Commands
 {
     /// <summary>
     /// A parsed representation of a generic G/M/T-code
+    /// Line number support has not yet been implemented (TODO)
     /// </summary>
     /// <seealso cref="CodeParameter"/>
     public partial class Code : Command<CodeResult>
@@ -18,17 +18,27 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Type of the code. If no exact type could be determined, it is interpreted as a comment
         /// </summary>
-        public CodeType Type { get; set; } = CodeType.Comment; 
+        public CodeType Type { get; set; } = CodeType.Comment;
+
+        /// <summary>
+        /// Origin of this code
+        /// </summary>
+        public CodeChannel Source { get; set; }
+
+        /// <summary>
+        /// Major code number (e.g. 28 in G28). Defaults to -1 like in RepRapFirmware
+        /// </summary>
+        public int MajorNumber { get; set; } = -1;
         
         /// <summary>
-        /// Major code number (e.g. 28 in G28)
+        /// Minor code number (e.g. 3 in G54.3). Defaults to -1 like in RepRapFirmware
         /// </summary>
-        public int? MajorNumber { get; set; }
-        
+        public int MinorNumber { get; set; } = -1;
+
         /// <summary>
-        /// Minor code number (e.g. 3 in G54.3)
+        /// Whether absolute coordinates must be used regardless of the current mode (see G53)
         /// </summary>
-        public int? MinorNumber { get; set; }
+        public bool EnforceAbsoluteCoordinates { get; set; }
         
         /// <summary>
         /// List of parsed code parameters (see <see cref="CodeParameter"/> for further information)
@@ -106,7 +116,7 @@ namespace DuetAPI.Commands
                 return "(comment)";
             }
 
-            if (MinorNumber.HasValue)
+            if (MinorNumber != -1)
             {
                 return $"{(char)Type}{MajorNumber}.{MinorNumber}";
             }
