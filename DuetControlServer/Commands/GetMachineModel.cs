@@ -3,9 +3,16 @@ using DuetAPI.Machine;
 
 namespace DuetControlServer.Commands
 {
+    /// <summary>
+    /// Implementation of the GetMachineModel command
+    /// </summary>
     public class GetMachineModel : DuetAPI.Commands.GetMachineModel
     {
-        // Return the current machine model. Note that it is not cloned here for performance reasons
+        /// <summary>
+        /// Retrieve the current machine model
+        /// </summary>
+        /// <returns>Current machine model</returns>
         protected override Task<Model> Run() => Task.FromResult(SPI.ModelProvider.Current);
+        #warning This should be safely accessed and cloned...
     }
 }

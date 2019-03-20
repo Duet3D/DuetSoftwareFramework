@@ -5,10 +5,20 @@ using DuetAPI.Connection;
 
 namespace DuetControlServer.Commands
 {
+    /// <summary>
+    /// Implementation for G/M/T-code commands
+    /// </summary>
     public class Code : DuetAPI.Commands.Code
     {
+        /// <summary>
+        /// Creates a new Code instance
+        /// </summary>
         public Code() : base() {}
 
+        /// <summary>
+        /// Creates a new Code instance and attempts to parse the given code string
+        /// </summary>
+        /// <param name="code">G/M/T-Code</param>
         public Code(string code) : base(code) {}
 
         /// <summary>

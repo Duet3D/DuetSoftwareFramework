@@ -7,7 +7,7 @@ namespace DuetAPI.Connection
     /// Supported connection types for client connections
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    public enum ConnectionType
+    public enum ConnectionMode
     {
         /// <summary>
         /// Unknown connection type. If this is used, the connection is immediately terminated

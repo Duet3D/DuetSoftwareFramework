@@ -91,23 +91,25 @@ namespace DuetControlServer.IPC
             }
         }
 
+        private class DeserializableInitMessage : ClientInitMessage { }
+
         private static async Task<Processors.Base> GetConnectionProcessor(Connection conn)
         {
             try
             {
                 JObject response = await conn.ReceiveJson();
                 ClientInitMessage initMessage = response.ToObject<ClientInitMessage>();
-                switch (initMessage.Type)
+                switch (initMessage.Mode)
                 {
-                    case ConnectionType.Command:
+                    case ConnectionMode.Command:
                         initMessage = response.ToObject<CommandInitMessage>();
                         return new Processors.Command(conn, initMessage);
                     
-                    case ConnectionType.Intercept:
+                    case ConnectionMode.Intercept:
                         initMessage = response.ToObject<InterceptInitMessage>();
                         return new Processors.Interception(conn, initMessage);
                     
-                    case ConnectionType.Subscribe:
+                    case ConnectionMode.Subscribe:
                         initMessage = response.ToObject<SubscribeInitMessage>();
                         return new Processors.Subscription(conn, initMessage);
                     

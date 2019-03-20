@@ -8,7 +8,7 @@ namespace DuetControlServer.IPC.Processors
     /// <summary>
     /// Base class for connection interpreters
     /// </summary>
-    /// <seealso cref="DuetAPI.Connection.ConnectionType"/>
+    /// <seealso cref="ConnectionMode"/>
     public abstract class Base
     {
         /// <summary>

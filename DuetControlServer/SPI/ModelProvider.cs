@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Net.NetworkInformation;
 
@@ -10,6 +11,7 @@ namespace DuetControlServer.SPI
 
         public static void Update()
         {
+            // Set new machine model
             Current = new DuetAPI.Machine.Model
             {
                 Electronics =
@@ -17,6 +19,10 @@ namespace DuetControlServer.SPI
                     Type = "duet3",
                     Name = "Duet 3",
                     Revision = "0.5"
+                },
+                Network =
+                {
+                    Name = Environment.MachineName
                 }
             };
 

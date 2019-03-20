@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace DuetControlServer.IPC.Processors
@@ -27,9 +28,9 @@ namespace DuetControlServer.IPC.Processors
         private static readonly ConcurrentDictionary<Subscription, SubscriptionMode> _subscriptions = new ConcurrentDictionary<Subscription, SubscriptionMode>();
 
         private readonly SubscriptionMode _mode;
-
-        private readonly AutoResetEvent _updateEvent = new AutoResetEvent(false);
         private JObject _jsonModel, _lastModel;
+        
+        private readonly AutoResetEvent _updateEvent = new AutoResetEvent(false);
         
         /// <summary>
         /// Constructor of the subscription processor
@@ -38,8 +39,10 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="initMessage">Initialization message</param>
         public Subscription(Connection conn, ClientInitMessage initMessage) : base(conn, initMessage)
         {
-            _jsonModel = JObject.FromObject(SPI.ModelProvider.Current, DuetAPI.JsonHelper.DefaultSerializer);
             _mode = (initMessage as SubscribeInitMessage).SubscriptionMode;
+            
+            _jsonModel = JObject.FromObject(SPI.ModelProvider.Current, DuetAPI.JsonHelper.DefaultSerializer);
+            _lastModel = _jsonModel;
             
             _subscriptions.TryAdd(this, _mode);
         }
@@ -52,13 +55,13 @@ namespace DuetControlServer.IPC.Processors
         {
             try
             {
-                // Send over the full object model initially
-                JObject clone;
+                // Send over the full machine model initially
+                string json;
                 lock (_jsonModel)
                 {
-                    clone = (JObject)_jsonModel.DeepClone();
+                    json = _jsonModel.ToString(Formatting.None);
                 }
-                await Connection.Send(clone);
+                await Connection.Send(json + "\n");
                 
                 do
                 {
@@ -72,25 +75,28 @@ namespace DuetControlServer.IPC.Processors
                     // Wait for another update
                     await WaitForUpdate();
                     
-                    // Make a clone of the object model to avoid race conditions
-                    lock (_jsonModel)
-                    {
-                        clone = (JObject)_jsonModel.DeepClone();
-                    }
-                    
-                    // Send over the update
+                    // Send over the next update
                     if (_mode == SubscriptionMode.Full)
                     {
-                        // Send the full object model in Full mode
-                        await Connection.Send(clone);
+                        // Send the entire object model in Full mode
+                        lock (_jsonModel)
+                        {
+                            json = _jsonModel.ToString(Formatting.None);
+                        }
+                        await Connection.Send(json + "\n");
                     }
                     else
                     {
-                        // Only send the patch in Patch mode
-                        JObject patch = DuetAPI.JsonHelper.DiffObject(_lastModel, clone);
-                        _lastModel = clone;
+                        // Only create a patch in Patch mode
+                        JObject patch;
+                        lock (_jsonModel)
+                        {
+                            patch = DuetAPI.JsonHelper.DiffObject(_lastModel, _jsonModel);
+                        }
                         
-                        await Connection.Send(patch);
+                        // Send it over
+                        json = patch.ToString(Formatting.None);
+                        await Connection.Send(json + "\n");
                     }
                 } while (!Program.CancelSource.IsCancellationRequested);
             }

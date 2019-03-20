@@ -175,7 +175,8 @@ namespace DuetControlServer.IPC
                 Response<object> response = new Response<object>(obj);
                 json = JsonConvert.SerializeObject(response, JsonHelper.DefaultSettings);
             }
-            await _socket.SendAsync(Encoding.UTF8.GetBytes(json + "\n"), SocketFlags.None);
+
+            await Send(json + "\n");
         }
         
         /// <summary>
@@ -185,7 +186,17 @@ namespace DuetControlServer.IPC
         /// <returns>Asynchronous task</returns>
         public async Task Send(JObject obj)
         {
-            await _socket.SendAsync(Encoding.UTF8.GetBytes(obj.ToString(Formatting.None) + "\n"), SocketFlags.None);
+            await Send(obj.ToString(Formatting.None) + "\n");
+        }
+        
+        /// <summary>
+        /// Send a plain text to the client
+        /// </summary>
+        /// <param name="text">Text to send</param>
+        /// <returns>Asynchronous task</returns>
+        public async Task Send(string text)
+        {
+            await _socket.SendAsync(Encoding.UTF8.GetBytes(text), SocketFlags.None);
         }
 
         /// <summary>

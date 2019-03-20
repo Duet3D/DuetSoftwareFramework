@@ -2,9 +2,15 @@
 
 namespace DuetControlServer.Commands
 {
+    /// <summary>
+    /// Implementation of the SimpleCode command
+    /// </summary>
     public class SimpleCode : DuetAPI.Commands.SimpleCode
     {
-        // Convert a simple code into a regular code, execute it and return its result as string
+        /// <summary>
+        /// Converts a simple G/M/T-code to a regular Code instance, executes it and returns its result as text
+        /// </summary>
+        /// <returns>G-code result</returns>
         protected override async Task<string> Run()
         {
             Code code = new Code(Code) { SourceConnection = SourceConnection };

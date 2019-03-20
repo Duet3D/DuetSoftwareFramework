@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using DuetAPI.Connection;
 
 namespace DuetAPI.Commands
 {
@@ -53,12 +54,12 @@ namespace DuetAPI.Commands
         public string Comment { get; set; }
 
         /// <summary>
-        /// Indicates if the code has been preprocessed (see also <see cref="DuetAPI.Connection.ConnectionType.Intercept"/>)
+        /// Indicates if the code has been preprocessed (see also <see cref="ConnectionMode.Intercept"/>)
         /// </summary>
         public bool IsPreProcessed { get; set; }
         
         /// <summary>
-        /// Indicates if the code has been postprocessed (see also <see cref="DuetAPI.Connection.ConnectionType.Intercept"/>)
+        /// Indicates if the code has been postprocessed (see also <see cref="ConnectionMode.Intercept"/>)
         /// </summary>
         public bool IsPostProcessed { get; set; }
 

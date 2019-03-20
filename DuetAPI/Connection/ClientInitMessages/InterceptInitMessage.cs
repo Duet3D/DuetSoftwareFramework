@@ -33,6 +33,14 @@ namespace DuetAPI.Connection
     public class InterceptInitMessage : ClientInitMessage
     {
         /// <summary>
+        /// Creates a new init message instance
+        /// </summary>
+        public InterceptInitMessage()
+        {
+            Mode = ConnectionMode.Intercept;
+        }
+        
+        /// <summary>
         /// Intercept codes either before they are internally processed (pre)
         /// or intercept them before they are forwarded to RepRapFirmware (post)
         /// </summary>

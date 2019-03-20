@@ -26,6 +26,14 @@ namespace DuetAPI.Connection
     public class SubscribeInitMessage : ClientInitMessage
     {
         /// <summary>
+        /// Creates a new init message instance
+        /// </summary>
+        public SubscribeInitMessage()
+        {
+            Mode = ConnectionMode.Subscribe;
+        }
+
+        /// <summary>
         /// Type of the subscription
         /// </summary>
         public SubscriptionMode SubscriptionMode { get; set; }

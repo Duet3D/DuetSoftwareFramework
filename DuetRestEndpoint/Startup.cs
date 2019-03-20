@@ -43,10 +43,6 @@ namespace DuetRestEndpoint
                 });
             });
 
-            // Register service to keep the machine model up-to-date
-            Services.ModelUpdateService.SocketPath = _configuration.GetValue("SocketPath", "/tmp/duet.sock");
-            services.AddHostedService<Services.ModelUpdateService>();
-
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
         }
 
