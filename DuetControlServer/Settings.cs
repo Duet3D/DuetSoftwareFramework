@@ -9,7 +9,7 @@ namespace DuetControlServer
     /*static*/ class Settings
     {
         private static readonly string ConfigFile = Path.Combine(Directory.GetCurrentDirectory(), "config.json");
-        private static readonly RegexOptions RegexFlags =  RegexOptions.IgnoreCase | RegexOptions.Singleline;
+        private const RegexOptions RegexFlags = RegexOptions.IgnoreCase | RegexOptions.Singleline;
 
         [JsonProperty]
         public static string SocketPath { get; set; } = "/tmp/duet.sock";               // Path to the UNIX socket for IPC
@@ -80,7 +80,7 @@ namespace DuetControlServer
             }
             else
             {
-                string defaultSettings = JsonConvert.SerializeObject(new Settings());
+                string defaultSettings = JsonConvert.SerializeObject(new Settings(), Formatting.Indented);
                 System.IO.File.WriteAllText(ConfigFile, defaultSettings);
             }
         }

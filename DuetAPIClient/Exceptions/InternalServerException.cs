@@ -13,24 +13,6 @@ namespace DuetAPIClient.Exceptions
         /// <param name="command">Name of the command that failed</param>
         /// <param name="type">Type of the thrown .NET error</param>
         /// <param name="message">Message of the thrown .NET error</param>
-        public InternalServerException(string command, string type, string message) : base($"Failed to execute {command}", MakeException(type, message)) { }
-
-        /// <summary>
-        /// Generates an exception from the given type and message
-        /// </summary>
-        /// <param name="type">Type of the thrown .NET error</param>
-        /// <param name="message">Message of the thrown .NET error</param>
-        /// <returns>Generated exception</returns>
-        private static Exception MakeException(string type, string message)
-        {
-            try
-            {
-                return (Exception)Activator.CreateInstance(Type.GetType(type), message);
-            }
-            catch (MissingMethodException)
-            {
-                return new Exception($"{type}: {message}");
-            }
-        }
+        public InternalServerException(string command, string type, string message) : base($"Command {command} has reported an error:\n[{type}] {message}") { }
     }
 }

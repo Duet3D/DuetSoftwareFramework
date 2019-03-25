@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Net.WebSockets;
+using System.Text;
 using System.Threading.Tasks;
 using DuetAPIClient.Exceptions;
 using Microsoft.AspNetCore.Mvc;
@@ -89,15 +90,20 @@ namespace DuetRestEndpoint.Controllers
 
         /// <summary>
         /// POST /machine/code
-        /// Execute a G/M/T-code and return the G-code response when done.
+        /// Execute a plain G/M/T-code from the request body and return the G-code response when done.
         /// </summary>
-        /// <param name="code">G/M/T-code to execute</param>
         /// <returns>HTTP status code: (200) G-Code response as text/plain (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
-        [HttpPost]
-        public async Task<IActionResult> DoCode([FromBody] string code)
+        [HttpPost("code")]
+        public async Task<IActionResult> DoCode()
         {
+            string code = "n/a";
             try
             {
+                using (StreamReader reader = new StreamReader(Request.Body, Encoding.UTF8))
+                {
+                    code = await reader.ReadToEndAsync();
+                }
+                
                 using (DuetAPIClient.CommandConnection connection = await BuildConnection())
                 {
                     string response = await connection.PerformSimpleCode(code);
@@ -129,16 +135,16 @@ namespace DuetRestEndpoint.Controllers
         /// </summary>
         /// <param name="filename">File to download</param>
         /// <returns>HTTP status code: (200) File content (404) File not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
-        [HttpGet("file/{filename}")]
+        [HttpGet("file/{*filename}")]
         public async Task<IActionResult> DownloadFile(string filename)
         {
             string resolvedPath = "n/a";
             try
             {
                 resolvedPath = await ResolvePath(filename);
-                if (System.IO.File.Exists(resolvedPath))
+                if (!System.IO.File.Exists(resolvedPath))
                 {
-                    _logger.LogWarning($"{nameof(DownloadFile)}] Could not find file {filename} (resolved to {resolvedPath})");
+                    _logger.LogWarning($"[{nameof(DownloadFile)}] Could not find file {filename} (resolved to {resolvedPath})");
                     return NotFound(filename);
                 }
 
@@ -168,7 +174,8 @@ namespace DuetRestEndpoint.Controllers
         /// </summary>
         /// <param name="filename">Destination of the file to upload</param>
         /// <returns>HTTP status code: (201) File created (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
-        [HttpPut("file/{filename}")]
+        [DisableRequestSizeLimit]
+        [HttpPut("file/{*filename}")]
         public async Task<IActionResult> UploadFile(string filename)
         {
             string resolvedPath = "n/a";
@@ -213,7 +220,7 @@ namespace DuetRestEndpoint.Controllers
         /// </summary>
         /// <param name="filename">G-code file to analyze</param>
         /// <returns>HTTP status code: (200) File info as application/json (404) File not found (500) Generic error (502) Incompatible DCS (503) DCS is unavailable</returns>
-        [HttpGet("fileinfo/{filename}")]
+        [HttpGet("fileinfo/{*filename}")]
         public async Task<IActionResult> GetFileinfo(string filename)
         {
             string resolvedPath = "n/a";
@@ -245,7 +252,7 @@ namespace DuetRestEndpoint.Controllers
             }
             catch (Exception e)
             {
-                _logger.LogWarning(e, $"[{nameof(GetFileinfo)} Failed to retrieve file info for {filename} (resolved to {resolvedPath})");
+                _logger.LogWarning(e, $"[{nameof(GetFileinfo)}] Failed to retrieve file info for {filename} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
             }
         }
@@ -258,7 +265,7 @@ namespace DuetRestEndpoint.Controllers
         /// </summary>
         /// <param name="filename">File or directory to delete</param>
         /// <returns>HTTP status code: (204) File or directory deleted (404) File not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
-        [HttpDelete("file/{filename}")]
+        [HttpDelete("file/{*filename}")]
         public async Task<IActionResult> DeleteFileOrDirectory(string filename)
         {
             string resolvedPath = "n/a";
@@ -314,35 +321,45 @@ namespace DuetRestEndpoint.Controllers
                 source = await ResolvePath(from);
                 destination = await ResolvePath(to);
 
-                // Make sure the source path exists
-                if (!Directory.Exists(source) && !System.IO.File.Exists(source))
-                {
-                    return NotFound(source);
-                }
-                
-                // Delete destination file if applicable
-                if (System.IO.File.Exists(to) && force)
-                {
-                    System.IO.File.Delete(to);
-                }
-                
-                // Check for conflicts
-                if ((Directory.Exists(source) && Directory.Exists(destination)) || (System.IO.File.Exists(source) && System.IO.File.Exists(destination)))
-                {
-                    return Conflict();
-                }
-                
-                // Attempt to move the file or directory
+                // Deal with directories
                 if (Directory.Exists(source))
                 {
+                    if (Directory.Exists(destination))
+                    {
+                        if (force)
+                        {
+                            Directory.Delete(destination);
+                        }
+                        else
+                        {
+                            return Conflict();
+                        }
+                    }
+                    
                     Directory.Move(source, destination);
+                    return NoContent();
                 }
-                else
+                
+                // Deal with files
+                if (System.IO.File.Exists(source))
                 {
+                    if (System.IO.File.Exists(destination))
+                    {
+                        if (force)
+                        {
+                            System.IO.File.Delete(destination);
+                        }
+                        else
+                        {
+                            return Conflict();
+                        }
+                    }
+                    
                     System.IO.File.Move(source, destination);
+                    return NoContent();
                 }
 
-                return NoContent();
+                return NotFound(from);
             }
             catch (IncompatibleVersionException e)
             {
@@ -369,15 +386,16 @@ namespace DuetRestEndpoint.Controllers
         /// </summary>
         /// <param name="directory">Directory to query</param>
         /// <returns>HTTP status code: (200) File list as application/json (404) Directory not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
-        [HttpGet("directory/{directory}")]
+        [HttpGet("directory/{*directory}")]
         public async Task<IActionResult> GetFileList(string directory)
         {
             string resolvedPath = "n/a";
             try
             {
                 resolvedPath = await ResolvePath(directory);
-                if (!Directory.Exists(directory))
+                if (!Directory.Exists(resolvedPath))
                 {
+                    _logger.LogWarning($"[{nameof(GetFileList)}] Could not find directory {directory} (resolved to {resolvedPath})");
                     return NotFound(directory);
                 }
                 List<object> fileList = new List<object>();
@@ -397,7 +415,7 @@ namespace DuetRestEndpoint.Controllers
                 }
                 
                 string json = JsonConvert.SerializeObject(fileList, DuetAPI.JsonHelper.DefaultSettings);
-                return Content(json, "application/octet-stream");
+                return Content(json, "application/json");
             }
             catch (IncompatibleVersionException e)
             {
@@ -421,7 +439,7 @@ namespace DuetRestEndpoint.Controllers
         /// Create the given directory.
         /// </summary>
         /// <returns>HTTP status code: (204) Directory created (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
-        [HttpPut("directory/{directory}")]
+        [HttpPut("directory/{*directory}")]
         public async Task<IActionResult> CreateDirectory(string directory)
         {
             string resolvedPath = "n/a";

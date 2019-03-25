@@ -1,7 +1,7 @@
-using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Machine;
@@ -55,9 +55,9 @@ namespace DuetAPIClient
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Retrieved file information</returns>
         /// <seealso cref="GetFileInfo"/>
-        public Task<FileInfo> GetFileInfo(string fileName, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<ParsedFileInfo> GetFileInfo(string fileName, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return PerformCommand<FileInfo>(new GetFileInfo { FileName = fileName }, cancellationToken);
+            return PerformCommand<ParsedFileInfo>(new GetFileInfo { FileName = fileName }, cancellationToken);
         }
 
         /// <summary>

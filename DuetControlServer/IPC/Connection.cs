@@ -163,7 +163,7 @@ namespace DuetControlServer.IPC
                     e = ae.InnerException;
                 }
 
-                ErrorResponse errorResponse = new ErrorResponse(e.GetType().FullName, e.Message);
+                ErrorResponse errorResponse = new ErrorResponse(e.GetType().Name, e.Message);
                 json = JsonConvert.SerializeObject(errorResponse, JsonHelper.DefaultSettings);
             }
             else if (obj is ServerInitMessage)

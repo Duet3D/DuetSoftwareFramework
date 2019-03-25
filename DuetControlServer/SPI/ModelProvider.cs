@@ -1,6 +1,8 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
+using DuetAPI.Machine.Storages;
 
 namespace DuetControlServer.SPI
 {
@@ -43,6 +45,21 @@ namespace DuetControlServer.SPI
                         Subnet = ipInfo.IPv4Mask.ToString(),
                         // Speed = (uint)(iface.Speed / 1000000),                // Unsupported in .NET Core 2.2 on Linux
                         Type = iface.Name.StartsWith("w") ? DuetAPI.Machine.Network.InterfaceType.WiFi : DuetAPI.Machine.Network.InterfaceType.LAN
+                    });
+                }
+            }
+            
+            // Retrieve storage devices
+            foreach (DriveInfo drive in DriveInfo.GetDrives())
+            {
+                if (drive.DriveType != DriveType.Ram && drive.TotalSize > 0)
+                {
+                    Current.Storages.Add(new Storage
+                    {
+                        Capacity = (drive.DriveType == DriveType.Network) ? null : (ulong?)drive.TotalSize,
+                        Free = (drive.DriveType == DriveType.Network) ? null : (ulong?)drive.AvailableFreeSpace,
+                        Mounted = drive.IsReady,
+                        Path = drive.VolumeLabel
                     });
                 }
             }

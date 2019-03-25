@@ -31,6 +31,11 @@ namespace DuetAPI.Machine.Storages
         /// Number of currently open files or null if unknown
         /// </summary>
         public uint? OpenFiles { get; set; }
+        
+        /// <summary>
+        /// Logical path of the storage device
+        /// </summary>
+        public string Path { get; set; }
 
         /// <summary>
         /// Creates a clone of this instance
@@ -44,7 +49,8 @@ namespace DuetAPI.Machine.Storages
                 Speed = Speed,
                 Capacity = Capacity,
                 Free = Free,
-                OpenFiles = OpenFiles
+                OpenFiles = OpenFiles,
+                Path = Path
             };
         }
     }

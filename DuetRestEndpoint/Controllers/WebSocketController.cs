@@ -89,7 +89,7 @@ namespace DuetRestEndpoint.Controllers
         {
             if (webSocket.State == WebSocketState.Open)
             {
-                await webSocket.CloseAsync(WebSocketCloseStatus.EndpointUnavailable, "DCS unavailable", default(CancellationToken));
+                await webSocket.CloseAsync(WebSocketCloseStatus.EndpointUnavailable, "DCS is unavailable", default(CancellationToken));
             }
         }
     }
