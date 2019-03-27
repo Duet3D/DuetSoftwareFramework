@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace DuetControlServer
 {
-    public static partial class File
+    public static partial class FileHelper
     {
         public static async Task StartPrint(string fileName)
         {

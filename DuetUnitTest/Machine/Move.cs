@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Machine.Move;
 using NUnit.Framework;
+using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest.Machine
 {
@@ -9,9 +10,9 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
 
-            Axis axis = new Axis()
+            Axis axis = new Axis
             {
                 Drives = new uint[] { 1, 2 },
                 Homed = true,
@@ -53,7 +54,7 @@ namespace DuetUnitTest.Machine
             original.Move.Idle.Timeout = 50;
             original.Move.SpeedFactor = 1.45;
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(1, original.Move.Axes.Count);
             Assert.AreEqual(original.Move.Axes[0].Drives, clone.Move.Axes[0].Drives);

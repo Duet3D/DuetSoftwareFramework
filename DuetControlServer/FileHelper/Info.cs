@@ -10,7 +10,7 @@ using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer
 {
-    public static partial class File
+    public static partial class FileHelper
     {
         public static async Task<ParsedFileInfo> GetFileInfo(string fileName)
         {
@@ -22,7 +22,7 @@ namespace DuetControlServer
                 {
                     FileName = fileName,
                     Size = fileStream.Length,
-                    LastModified = System.IO.File.GetLastWriteTime(fileName)
+                    LastModified = File.GetLastWriteTime(fileName)
                 };
 
                 if (fileStream.Length > 0)

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using DuetRestEndpoint.FileProviders;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -68,6 +69,29 @@ namespace DuetRestEndpoint
             if (_configuration.GetValue("UseCors", true))
             {
                 app.UseCors("cors-localhost");
+            }
+            
+            // Use static files from 0:/www if applicable
+            if (_configuration.GetValue("UseStaticFiles", true))
+            {
+                // Redirect pages that could not be found to the index page
+                app.Use(async (context, next) =>
+                {
+                    await next();
+
+                    if (context.Response.StatusCode == 404 && !context.Response.HasStarted && !context.Request.Path.Value.StartsWith("/rr_") && !context.Request.Path.Value.Contains("."))
+                    {
+                        context.Request.Path = "/";
+                        await next();
+                    }
+                });
+                
+                // Provide static files from the virtual SD card (0:/www)
+                app.UseStaticFiles();
+                app.UseFileServer(new FileServerOptions
+                {
+                    FileProvider = new DuetFileProvider(_configuration)
+                });
             }
 
             // Use WebSockets and MVC architecture

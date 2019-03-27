@@ -161,6 +161,10 @@
             {
                 throw new CodeParserException("Unterminated encapsulated comment");
             }
+            if (Parameters.Count > 255)
+            {
+                throw new CodeParserException("Too many parameters (> 255)");
+            }
         }
     }
 }

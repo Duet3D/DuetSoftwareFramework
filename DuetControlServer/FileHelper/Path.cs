@@ -4,7 +4,7 @@ using DuetControlServer.SPI;
 
 namespace DuetControlServer
 {
-    public static partial class File
+    public static partial class FileHelper
     {
         /// <summary>
         /// Resolve a RepRapFirmware/FatFs-style file path to an actual UNIX file path.
@@ -21,7 +21,7 @@ namespace DuetControlServer
                 int driveNumber = int.Parse(match.Groups[1].Value);
                 if (driveNumber == 0)
                 {
-                    return Path.Combine(Settings.BaseDirectory, match.Groups[2].Value);
+                    return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
                 }
                 if (driveNumber > 0 && driveNumber < ModelProvider.Current.Storages.Count)
                 {

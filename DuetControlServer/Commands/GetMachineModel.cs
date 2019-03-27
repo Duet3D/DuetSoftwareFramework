@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using DuetAPI.Machine;
+using DuetControlServer.SPI;
 
 namespace DuetControlServer.Commands
 {
@@ -12,7 +13,7 @@ namespace DuetControlServer.Commands
         /// Retrieve the current machine model
         /// </summary>
         /// <returns>Current machine model</returns>
-        protected override Task<Model> Run() => Task.FromResult(SPI.ModelProvider.Current);
+        protected override Task<Model> Run() => Task.FromResult(ModelProvider.Current);
         #warning This should be safely accessed and cloned...
     }
 }

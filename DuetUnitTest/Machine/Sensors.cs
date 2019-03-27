@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Machine.Sensors;
 using NUnit.Framework;
+using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest.Machine
 {
@@ -9,7 +10,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
 
             Endstop endstop = new Endstop
             {
@@ -37,7 +38,7 @@ namespace DuetUnitTest.Machine
             };
             original.Sensors.Probes.Add(probe);
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(1, original.Sensors.Endstops.Count);
             Assert.AreEqual(original.Sensors.Endstops[0].Position, clone.Sensors.Endstops[0].Position);

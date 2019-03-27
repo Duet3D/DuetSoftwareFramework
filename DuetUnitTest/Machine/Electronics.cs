@@ -1,4 +1,6 @@
-﻿using NUnit.Framework;
+﻿using DuetAPI.Machine.Electronics;
+using NUnit.Framework;
+using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest.Machine
 {
@@ -8,7 +10,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
             original.Electronics.Type = "Electronics Type";
             original.Electronics.Name = "Electronics Name";
             original.Electronics.Revision = "Electronics Revision";
@@ -23,7 +25,7 @@ namespace DuetUnitTest.Machine
             original.Electronics.McuTemp.Min = 456;
             original.Electronics.McuTemp.Max = 789;
 
-            DuetAPI.Machine.Electronics.ExpansionBoard expansionBoard = new DuetAPI.Machine.Electronics.ExpansionBoard();
+            ExpansionBoard expansionBoard = new ExpansionBoard();
             expansionBoard.Name = "Expansion Name";
             expansionBoard.Revision = "Expansion Revision";
             expansionBoard.Firmware.Name = "Expansion Firmware Name";
@@ -39,7 +41,7 @@ namespace DuetUnitTest.Machine
             expansionBoard.MaxMotors = 6;
             original.Electronics.ExpansionBoards.Add(expansionBoard);
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(original.Electronics.Type, clone.Electronics.Type);
             Assert.AreEqual(original.Electronics.Name, clone.Electronics.Name);

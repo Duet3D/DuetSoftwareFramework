@@ -35,7 +35,7 @@ namespace DuetAPI.Commands
         /// Minor code number (e.g. 3 in G54.3). Defaults to -1 like in RepRapFirmware
         /// </summary>
         public int MinorNumber { get; set; } = -1;
-
+        
         /// <summary>
         /// Whether absolute coordinates must be used regardless of the current mode (see G53)
         /// </summary>
@@ -62,6 +62,16 @@ namespace DuetAPI.Commands
         /// Indicates if the code has been postprocessed (see also <see cref="ConnectionMode.Intercept"/>)
         /// </summary>
         public bool IsPostProcessed { get; set; }
+
+        /// <summary>
+        /// File position in bytes (optional)
+        /// </summary>
+        public uint FilePosition { get; set; }
+        
+        /// <summary>
+        /// Defines whether a print can be paused at this code
+        /// </summary>
+        public bool IsPausable { get; set; }
 
         /// <summary>
         /// Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!

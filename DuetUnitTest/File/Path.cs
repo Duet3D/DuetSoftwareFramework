@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using DuetControlServer;
+using NUnit.Framework;
 
 namespace DuetUnitTest.File
 {
@@ -9,8 +10,8 @@ namespace DuetUnitTest.File
         [Test]
         public void Directory()
         {
-            string sysPath = DuetControlServer.File.ResolvePath("0:/sys");
-            Assert.AreEqual("/boot/sys", sysPath);
+            string sysPath = FileHelper.ResolvePath("0:/sys");
+            Assert.AreEqual("/opt/dsf/sd/sys", sysPath);
         }
     }
 }

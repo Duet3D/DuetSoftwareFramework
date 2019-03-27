@@ -1,14 +1,16 @@
-﻿using DuetAPI.Commands;
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetControlServer.IPC.Processors;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Command = DuetControlServer.IPC.Processors.Command;
 
 namespace DuetControlServer.IPC
 {
@@ -129,14 +131,14 @@ namespace DuetControlServer.IPC
         /// <returns>Type of the command or null if none found</returns>
         private Type GetCommandType(string name)
         {
-            Type result = Processors.Command.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
+            Type result = Command.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
             if (result == null)
             {
-                result = Processors.Interception.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
+                result = Interception.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
             }
             if (result == null)
             {
-                result = Processors.Subscription.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
+                result = Subscription.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
             }
             return result;
         }

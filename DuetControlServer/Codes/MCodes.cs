@@ -1,6 +1,5 @@
-﻿using DuetAPI.Commands;
-using System.Threading.Tasks;
-using DuetAPI;
+﻿using System.Threading.Tasks;
+using DuetAPI.Commands;
 
 namespace DuetControlServer.Codes
 {
@@ -16,7 +15,7 @@ namespace DuetControlServer.Codes
                     CodeParameter pParam = code.GetParameter('P');
                     if (pParam != null)
                     {
-                        return await File.RunMacro(pParam.AsString, code);
+                        return await FileHelper.RunMacro(pParam.AsString, code);
                     }
                     return new CodeResult();
             }

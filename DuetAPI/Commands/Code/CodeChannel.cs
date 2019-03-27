@@ -4,31 +4,31 @@
     /// Enumeration of every available code channel
     /// <seealso cref="Machine.Channels.Model"/>
     /// </summary>
-    public enum CodeChannel
+    public enum CodeChannel : byte
     {
         /// <summary>
         /// Main G/M/T-code channel
         /// </summary>
-        Main,
+        Main = 0,
 
         /// <summary>
         /// Serial G/M/T-code channel (UART)
         /// </summary>
-        Serial,
+        Serial = 1,
 
         /// <summary>
         /// G/M/T-code channel for files (print jobs)
         /// </summary>
-        File,
+        File = 2,
 
         /// <summary>
         /// G/M/T-code channel for HTTP requests (DWC)
         /// </summary>
-        HTTP,
+        HTTP = 3,
 
         /// <summary>
         /// G/M/T-code channel for Telnet requests
         /// </summary>
-        Telnet
+        Telnet = 4
     }
 }

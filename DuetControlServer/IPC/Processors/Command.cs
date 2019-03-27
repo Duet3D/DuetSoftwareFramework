@@ -1,7 +1,13 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using DuetAPI.Commands;
 using DuetAPI.Connection;
+using Code = DuetControlServer.Commands.Code;
+using GetFileInfo = DuetControlServer.Commands.GetFileInfo;
+using GetMachineModel = DuetControlServer.Commands.GetMachineModel;
+using ResolvePath = DuetControlServer.Commands.ResolvePath;
+using SimpleCode = DuetControlServer.Commands.SimpleCode;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -15,12 +21,12 @@ namespace DuetControlServer.IPC.Processors
         /// </summary>
         public static readonly Type[] SupportedCommands =
         {
-            typeof(Commands.Code),
+            typeof(Code),
             //typeof(Commands.Flush),
-            typeof(Commands.GetFileInfo),
-            typeof(Commands.GetMachineModel),
-            typeof(Commands.ResolvePath),
-            typeof(Commands.SimpleCode)
+            typeof(GetFileInfo),
+            typeof(GetMachineModel),
+            typeof(ResolvePath),
+            typeof(SimpleCode)
         };
         
         /// <summary>
@@ -44,7 +50,7 @@ namespace DuetControlServer.IPC.Processors
                 try
                 {
                     // Read another command
-                    DuetAPI.Commands.BaseCommand command = await Connection.ReceiveCommand();
+                    BaseCommand command = await Connection.ReceiveCommand();
                     if (!SupportedCommands.Contains(command.GetType()))
                     {
                         throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");

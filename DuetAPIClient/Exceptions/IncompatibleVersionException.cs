@@ -10,7 +10,8 @@ namespace DuetAPIClient.Exceptions
         /// <summary>
         /// Creates a new exception instance
         /// </summary>
-        public IncompatibleVersionException() : base() { }
+        public IncompatibleVersionException()
+        { }
 
         /// <summary>
         /// Creates a new exception instance

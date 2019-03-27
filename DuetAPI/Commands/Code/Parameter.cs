@@ -1,7 +1,7 @@
 ﻿using System;
-using Newtonsoft.Json;
 using System.Globalization;
 using System.Linq;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace DuetAPI.Commands

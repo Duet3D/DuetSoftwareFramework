@@ -1,4 +1,6 @@
-﻿using NUnit.Framework;
+﻿using DuetAPI.Machine.Scanner;
+using NUnit.Framework;
+using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest.Machine
 {
@@ -8,11 +10,11 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
             original.Scanner.Progress = 12.34;
-            original.Scanner.Status = DuetAPI.Machine.Scanner.ScannerStatus.PostProcessing;
+            original.Scanner.Status = ScannerStatus.PostProcessing;
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(original.Scanner.Progress, clone.Scanner.Progress);
             Assert.AreEqual(original.Scanner.Status, clone.Scanner.Status);

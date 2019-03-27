@@ -4,7 +4,7 @@ using DuetAPI.Commands;
 
 namespace DuetControlServer
 {
-    public static partial class File
+    public static partial class FileHelper
     {
         public static async Task<CodeResult> RunMacro(string fileName, Code sourceCode)
         {

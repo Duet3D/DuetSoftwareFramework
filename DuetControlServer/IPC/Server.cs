@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
+using DuetControlServer.IPC.Processors;
 using Newtonsoft.Json.Linq;
 
 namespace DuetControlServer.IPC
@@ -19,7 +20,7 @@ namespace DuetControlServer.IPC
         public static void CreateSocket()
         {
             // Clean up socket path again in case of unclean exit
-            System.IO.File.Delete(Settings.SocketPath);
+            File.Delete(Settings.SocketPath);
             
             // Create a new UNIX socket and start listening
             try
@@ -63,7 +64,7 @@ namespace DuetControlServer.IPC
                 // Read client-side init message and switch mode
                 try
                 {
-                    Processors.Base processor = await GetConnectionProcessor(conn);
+                    Base processor = await GetConnectionProcessor(conn);
                     if (processor != null)
                     {
                         // Send success message
@@ -93,7 +94,7 @@ namespace DuetControlServer.IPC
 
         private class DeserializableInitMessage : ClientInitMessage { }
 
-        private static async Task<Processors.Base> GetConnectionProcessor(Connection conn)
+        private static async Task<Base> GetConnectionProcessor(Connection conn)
         {
             try
             {
@@ -103,15 +104,15 @@ namespace DuetControlServer.IPC
                 {
                     case ConnectionMode.Command:
                         initMessage = response.ToObject<CommandInitMessage>();
-                        return new Processors.Command(conn, initMessage);
+                        return new Command(conn, initMessage);
                     
                     case ConnectionMode.Intercept:
                         initMessage = response.ToObject<InterceptInitMessage>();
-                        return new Processors.Interception(conn, initMessage);
+                        return new Interception(conn, initMessage);
                     
                     case ConnectionMode.Subscribe:
                         initMessage = response.ToObject<SubscribeInitMessage>();
-                        return new Processors.Subscription(conn, initMessage);
+                        return new Subscription(conn, initMessage);
                     
                     default:
                         throw new ArgumentException("Invalid connection mode");
@@ -135,7 +136,7 @@ namespace DuetControlServer.IPC
 
             // Clean up again
             unixSocket.Close();
-            System.IO.File.Delete(Settings.SocketPath);
+            File.Delete(Settings.SocketPath);
         }
     }
 }

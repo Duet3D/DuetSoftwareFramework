@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using DuetAPI.Machine;
+using NUnit.Framework;
 
 namespace DuetUnitTest.Machine
 {
@@ -8,7 +9,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
 
             original.Channels.Main.RelativePositioning = true;
             original.Channels.Serial.Feedrate = 123;
@@ -16,7 +17,7 @@ namespace DuetUnitTest.Machine
             original.Channels.HTTP.RelativeExtrusion = true;
             original.Channels.Telnet.Feedrate = 45;
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(original.Channels.Main.RelativePositioning, clone.Channels.Main.RelativePositioning);
             Assert.AreEqual(original.Channels.Serial.Feedrate, clone.Channels.Serial.Feedrate);

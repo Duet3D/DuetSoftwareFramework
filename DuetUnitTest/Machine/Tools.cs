@@ -1,4 +1,5 @@
-﻿using DuetAPI.Machine.Tools;
+﻿using DuetAPI.Machine;
+using DuetAPI.Machine.Tools;
 using NUnit.Framework;
 
 namespace DuetUnitTest.Machine
@@ -9,7 +10,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
 
             Tool tool = new Tool
             {
@@ -17,7 +18,7 @@ namespace DuetUnitTest.Machine
                 Fans = new uint[] { 3 },
                 Filament = "PET-G",
                 Heaters = new uint[] { 4, 5 },
-                Mix = new double[] { 0.4, 0.6 },
+                Mix = new[] { 0.4, 0.6 },
                 Name = "Mixing Tool",
                 Number = 3,
                 Offsets = new double[] { 12, 34, 56 },
@@ -28,7 +29,7 @@ namespace DuetUnitTest.Machine
             tool.Axes.Add(new uint[] { 1 });
             original.Tools.Add(tool);
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(1, original.Tools.Count);
             Assert.AreEqual(original.Tools[0].Active, clone.Tools[0].Active);

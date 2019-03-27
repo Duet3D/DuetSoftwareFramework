@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetAPI.Machine;
+using DuetControlServer.SPI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -41,7 +43,7 @@ namespace DuetControlServer.IPC.Processors
         {
             _mode = (initMessage as SubscribeInitMessage).SubscriptionMode;
             
-            _jsonModel = JObject.FromObject(SPI.ModelProvider.Current, DuetAPI.JsonHelper.DefaultSerializer);
+            _jsonModel = JObject.FromObject(ModelProvider.Current, JsonHelper.DefaultSerializer);
             _lastModel = _jsonModel;
             
             _subscriptions.TryAdd(this, _mode);
@@ -91,7 +93,7 @@ namespace DuetControlServer.IPC.Processors
                         JObject patch;
                         lock (_jsonModel)
                         {
-                            patch = DuetAPI.JsonHelper.DiffObject(_lastModel, _jsonModel);
+                            patch = JsonHelper.DiffObject(_lastModel, _jsonModel);
                         }
                         
                         // Send it over
@@ -133,9 +135,9 @@ namespace DuetControlServer.IPC.Processors
         /// Called to notify the subscribers about a model update
         /// </summary>
         /// <param name="objectModel">Updated full object model</param>
-        public static void Update(DuetAPI.Machine.Model objectModel)
+        public static void Update(Model objectModel)
         {
-            JObject newModel = JObject.FromObject(objectModel, DuetAPI.JsonHelper.DefaultSerializer);
+            JObject newModel = JObject.FromObject(objectModel, JsonHelper.DefaultSerializer);
             if (_subscriptions.Count != 0)
             {
                 foreach (var pair in _subscriptions)

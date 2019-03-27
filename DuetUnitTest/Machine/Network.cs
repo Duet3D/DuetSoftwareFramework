@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Machine.Network;
 using NUnit.Framework;
+using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest.Machine
 {
@@ -9,10 +10,10 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
 
             NetworkInterface iface = new NetworkInterface();
-            iface.ActiveProtocols = new NetworkProtocol[] { NetworkProtocol.Telnet };
+            iface.ActiveProtocols = new[] { NetworkProtocol.Telnet };
             iface.ActualIP = "12.34.56.78";
             iface.ConfiguredIP = "34.34.56.78";
             iface.FirmwareVersion = "Firmware version";
@@ -26,7 +27,7 @@ namespace DuetUnitTest.Machine
             original.Network.Name = "Name";
             original.Network.Password = "Password";
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(1, original.Network.Interfaces.Count);
             Assert.AreEqual(original.Network.Interfaces[0].ActiveProtocols, clone.Network.Interfaces[0].ActiveProtocols);

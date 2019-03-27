@@ -2,19 +2,23 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using DuetAPI.Machine.Network;
 using DuetAPI.Machine.Storages;
+using Model = DuetAPI.Machine.Model;
+using NetworkInterface = System.Net.NetworkInformation.NetworkInterface;
 
 namespace DuetControlServer.SPI
 {
     public static class ModelProvider
     {
         // TODO: Make this thread-safe. Possibly this can be only achieved by returning clones but perhaps there is still another solution...
-        public static DuetAPI.Machine.Model Current { get; private set; }
+        public static Model Current { get; private set; }
 
         public static void Update()
         {
             // Set new machine model
-            Current = new DuetAPI.Machine.Model
+            Current = new Model
             {
                 Electronics =
                 {
@@ -33,7 +37,7 @@ namespace DuetControlServer.SPI
             foreach (NetworkInterface iface in interfaces)
             {
                 UnicastIPAddressInformation ipInfo = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                                      where unicastAddress.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+                                                      where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
                                                       select unicastAddress).FirstOrDefault();
 
                 if (ipInfo != null && ipInfo.Address.ToString() != "127.0.0.1")
@@ -44,7 +48,7 @@ namespace DuetControlServer.SPI
                         ConfiguredIP = ipInfo.Address.ToString(),
                         Subnet = ipInfo.IPv4Mask.ToString(),
                         // Speed = (uint)(iface.Speed / 1000000),                // Unsupported in .NET Core 2.2 on Linux
-                        Type = iface.Name.StartsWith("w") ? DuetAPI.Machine.Network.InterfaceType.WiFi : DuetAPI.Machine.Network.InterfaceType.LAN
+                        Type = iface.Name.StartsWith("w") ? InterfaceType.WiFi : InterfaceType.LAN
                     });
                 }
             }

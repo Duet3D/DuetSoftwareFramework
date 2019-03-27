@@ -2,8 +2,8 @@
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using DuetAPI;
-using Newtonsoft.Json;
+using DuetControlServer.IPC;
+using DuetControlServer.SPI;
 
 namespace DuetControlServer
 {
@@ -25,8 +25,7 @@ namespace DuetControlServer
             Console.Write("Loading settings... ");
             try
             {
-                Settings.Load();
-                Settings.ParseParameters(args);
+                Settings.Load(args);
                 Console.WriteLine("Done!");
             }
             catch (Exception e)
@@ -39,7 +38,7 @@ namespace DuetControlServer
             Console.Write("Initialising object model... ");
             try
             {
-                SPI.ModelProvider.Update();
+                ModelProvider.Update();
                 Console.WriteLine("Done!");
             }
             catch (Exception e)
@@ -52,7 +51,7 @@ namespace DuetControlServer
             Console.Write("Connecting to RepRapFirmware... ");
             try
             {
-                SPI.Connector.Connect();
+                Connector.Connect();
                 Console.WriteLine("Done!");
             }
             catch (Exception e)
@@ -65,7 +64,7 @@ namespace DuetControlServer
             Console.Write("Creating IPC socket... ");
             try
             {
-                IPC.Server.CreateSocket();
+                Server.CreateSocket();
                 Console.WriteLine("Done!");
             }
             catch (Exception e)
@@ -78,8 +77,8 @@ namespace DuetControlServer
             Console.WriteLine();
             
             // Run the main tasks in the background
-            Task ipcTask = IPC.Server.AcceptConnections();
-            Task rrfTask = SPI.Connector.Run();
+            Task ipcTask = Server.AcceptConnections();
+            Task rrfTask = Connector.Run();
             Task[] taskList = { ipcTask, rrfTask };
 
             // Wait for program termination
@@ -99,7 +98,7 @@ namespace DuetControlServer
             }
 
             // Stop the IPC subsystem. This has to happen here because Socket.AcceptAsync() does not have a CancellationToken parameter
-            IPC.Server.Shutdown();
+            Server.Shutdown();
 
             // Wait for all tasks to finish
             try

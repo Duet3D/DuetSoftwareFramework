@@ -1,8 +1,6 @@
-﻿using DuetAPI.Machine.Spindles;
+﻿using DuetAPI.Machine;
+using DuetAPI.Machine.Spindles;
 using NUnit.Framework;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace DuetUnitTest.Machine
 {
@@ -12,7 +10,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
 
             Spindle spindle = new Spindle
             {
@@ -21,7 +19,7 @@ namespace DuetUnitTest.Machine
             };
             original.Spindles.Add(spindle);
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(1, original.Spindles.Count);
             Assert.AreEqual(original.Spindles[0].Active, clone.Spindles[0].Active);

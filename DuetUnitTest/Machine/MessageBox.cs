@@ -1,4 +1,6 @@
-﻿using NUnit.Framework;
+﻿using DuetAPI.Machine.MessageBox;
+using NUnit.Framework;
+using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest.Machine
 {
@@ -8,13 +10,13 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
             original.MessageBox.AxisControls = new uint[] { 1, 2 };
             original.MessageBox.Message = "Message";
-            original.MessageBox.Mode = DuetAPI.Machine.MessageBox.MessageBoxMode.OkCancel;
+            original.MessageBox.Mode = MessageBoxMode.OkCancel;
             original.MessageBox.Title = "Title";
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(original.MessageBox.AxisControls, clone.MessageBox.AxisControls);
             Assert.AreEqual(original.MessageBox.Message, clone.MessageBox.Message);

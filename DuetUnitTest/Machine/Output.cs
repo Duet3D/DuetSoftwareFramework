@@ -1,4 +1,5 @@
 ﻿using DuetAPI;
+using DuetAPI.Machine;
 using NUnit.Framework;
 
 namespace DuetUnitTest.Machine
@@ -9,7 +10,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
 
             original.Messages.Add(new Message
             {
@@ -23,7 +24,7 @@ namespace DuetUnitTest.Machine
                 Type = MessageType.Error
             });
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(2, original.Messages.Count);
             Assert.AreEqual(original.Messages[0].Content, "Test 1 2 3");

@@ -1,7 +1,9 @@
-﻿using DuetAPI.Commands;
-using DuetControlServer.Codes;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetControlServer.Codes;
+using DuetControlServer.IPC.Processors;
+using DuetControlServer.SPI;
 
 namespace DuetControlServer.Commands
 {
@@ -13,28 +15,23 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Creates a new Code instance
         /// </summary>
-        public Code() : base() {}
+        public Code() { }
 
         /// <summary>
         /// Creates a new Code instance and attempts to parse the given code string
         /// </summary>
         /// <param name="code">G/M/T-Code</param>
         public Code(string code) : base(code) {}
-
+        
         /// <summary>
-        /// Internal file position when processing a file
+        /// Defines whether this code is part of config.g
         /// </summary>
-        internal long FilePosition;
-
+        public bool IsFromConfig { get; set; }
+        
         /// <summary>
-        /// Virtual extruder positions before this move
+        /// Defines whether this code is part of config-override.g
         /// </summary>
-        internal float[] VirtualExtruderPositions;
-
-        /// <summary>
-        /// Diff amount of virtual extruder positions 
-        /// </summary>
-        internal float[] VirtualExtruderAmounts;
+        public bool IsFromConfigOverride { get; set; }
 
         /// <summary>
         /// Run an arbitrary G/M/T-code
@@ -52,7 +49,7 @@ namespace DuetControlServer.Commands
             // Preprocess this code
             if (!IsPreProcessed)
             {
-                result = await IPC.Processors.Interception.Intercept(this, InterceptionMode.Pre);
+                result = await Interception.Intercept(this, InterceptionMode.Pre);
                 if (result != null)
                 {
                     return result;
@@ -84,7 +81,7 @@ namespace DuetControlServer.Commands
             // If the could not be interpreted, post-process it
             if (!IsPostProcessed)
             {
-                result = await IPC.Processors.Interception.Intercept(this, InterceptionMode.Post);
+                result = await Interception.Intercept(this, InterceptionMode.Post);
                 if (result != null)
                 {
                     return result;
@@ -93,7 +90,7 @@ namespace DuetControlServer.Commands
             }
 
             // Then have it processed by RepRapFirmware
-            return await SPI.Connector.ProcessCode(this);
+            return await Connector.ProcessCode(this);
         }
     }
 }

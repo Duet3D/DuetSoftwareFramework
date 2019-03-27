@@ -1,7 +1,6 @@
-﻿using NUnit.Framework;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using DuetAPI.Machine.Job;
+using NUnit.Framework;
+using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest.Machine
 {
@@ -11,7 +10,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
 
             original.Job.Duration = 123;
             original.Job.ExtrudedRaw = new double[] { 123, 456, 789 };
@@ -29,7 +28,7 @@ namespace DuetUnitTest.Machine
             original.Job.LastFileSimulated = true;
             original.Job.Layer = 4;
 
-            original.Job.Layers.Add(new DuetAPI.Machine.Job.Layer
+            original.Job.Layers.Add(new Layer
             {
                 Duration = 23,
                 Filament = new double[] { 12, 34, 56 },
@@ -43,7 +42,7 @@ namespace DuetUnitTest.Machine
             original.Job.TimesLeft.Layer = 345;
             original.Job.WarmUpDuration = 34;
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(original.Job.Duration, clone.Job.Duration);
             Assert.AreEqual(original.Job.ExtrudedRaw, clone.Job.ExtrudedRaw);

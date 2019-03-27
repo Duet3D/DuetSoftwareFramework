@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using DuetAPI.Commands;
+using Newtonsoft.Json;
 using NUnit.Framework;
 
 namespace DuetUnitTest.Commands
@@ -10,7 +11,7 @@ namespace DuetUnitTest.Commands
         public void ParseG54()
         {
             DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("G54.6");
-            Assert.AreEqual(DuetAPI.Commands.CodeType.GCode, code.Type);
+            Assert.AreEqual(CodeType.GCode, code.Type);
             Assert.AreEqual(54, code.MajorNumber);
             Assert.AreEqual(6, code.MinorNumber);
         }
@@ -19,7 +20,7 @@ namespace DuetUnitTest.Commands
         public void ParseM106()
         {
             DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("M106 P1 C\"Fancy \"\" Fan\" H-1 S0.5");
-            Assert.AreEqual(DuetAPI.Commands.CodeType.MCode, code.Type);
+            Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(106, code.MajorNumber);
             Assert.AreEqual(-1, code.MinorNumber);
             Assert.AreEqual(4, code.Parameters.Count);
@@ -39,7 +40,7 @@ namespace DuetUnitTest.Commands
         public void ParseM569()
         {
             DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("M569 P2 S1 T0.5");
-            Assert.AreEqual(DuetAPI.Commands.CodeType.MCode, code.Type);
+            Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(569, code.MajorNumber);
             Assert.AreEqual(-1, code.MinorNumber);
             Assert.AreEqual(false, code.EnforceAbsoluteCoordinates);
@@ -56,7 +57,7 @@ namespace DuetUnitTest.Commands
         public void ParseT3()
         {
             DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("T3 P4 S\"foo\"");
-            Assert.AreEqual(DuetAPI.Commands.CodeType.TCode, code.Type);
+            Assert.AreEqual(CodeType.TCode, code.Type);
             Assert.AreEqual(3, code.MajorNumber);
             Assert.AreEqual(-1, code.MinorNumber);
             Assert.AreEqual(false, code.EnforceAbsoluteCoordinates);

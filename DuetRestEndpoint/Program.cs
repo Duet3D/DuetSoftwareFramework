@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 
 namespace DuetRestEndpoint
 {
@@ -8,6 +9,8 @@ namespace DuetRestEndpoint
     /// </summary>
     public class Program
     {
+        private static readonly string DefaultConfigFile = "/etc/duet/http.json";
+        
         /// <summary>
         /// Called when the application is launched
         /// </summary>
@@ -18,13 +21,17 @@ namespace DuetRestEndpoint
         }
 
         /// <summary>
-        /// Creates a new WebHost
+        /// Creates a new WebHost instance
         /// </summary>
         /// <param name="args">Command-line arguments</param>
         /// <returns></returns>
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
-                .UseUrls("http://0.0.0.0:5000")
+                .ConfigureAppConfiguration((hostingContext, config) =>
+                {
+                    config.AddJsonFile(DefaultConfigFile, true, false);
+                    config.AddCommandLine(args);
+                })
                 .UseStartup<Startup>();
     }
 }

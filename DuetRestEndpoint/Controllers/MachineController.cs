@@ -5,6 +5,8 @@ using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
+using DuetAPI;
+using DuetAPIClient;
 using DuetAPIClient.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -65,7 +67,7 @@ namespace DuetRestEndpoint.Controllers
         {
             try
             {
-                using (DuetAPIClient.CommandConnection connection = await BuildConnection())
+                using (CommandConnection connection = await BuildConnection())
                 {
                     string json = await connection.GetSerializedMachineModel();
                     return Content(json, "application/json");
@@ -104,7 +106,7 @@ namespace DuetRestEndpoint.Controllers
                     code = await reader.ReadToEndAsync();
                 }
                 
-                using (DuetAPIClient.CommandConnection connection = await BuildConnection())
+                using (CommandConnection connection = await BuildConnection())
                 {
                     string response = await connection.PerformSimpleCode(code);
                     return Content(response, "text/plain");
@@ -233,10 +235,10 @@ namespace DuetRestEndpoint.Controllers
                     return NotFound(filename);
                 }
 
-                using (DuetAPIClient.CommandConnection connection = await BuildConnection())
+                using (CommandConnection connection = await BuildConnection())
                 {
                     var info = await connection.GetFileInfo(resolvedPath);
-                    string json = JsonConvert.SerializeObject(info, DuetAPI.JsonHelper.DefaultSettings);
+                    string json = JsonConvert.SerializeObject(info, JsonHelper.DefaultSettings);
                     return Content(json, "application/json");
                 }
             }
@@ -414,7 +416,7 @@ namespace DuetRestEndpoint.Controllers
                     fileList.Add(new { type = 'f', name = info.Name, size = info.Length, date = info.LastWriteTime });
                 }
                 
-                string json = JsonConvert.SerializeObject(fileList, DuetAPI.JsonHelper.DefaultSettings);
+                string json = JsonConvert.SerializeObject(fileList, JsonHelper.DefaultSettings);
                 return Content(json, "application/json");
             }
             catch (IncompatibleVersionException e)
@@ -467,16 +469,16 @@ namespace DuetRestEndpoint.Controllers
         }
         #endregion
 
-        private async Task<DuetAPIClient.CommandConnection> BuildConnection()
+        private async Task<CommandConnection> BuildConnection()
         {
-            DuetAPIClient.CommandConnection connection = new DuetAPIClient.CommandConnection();
+            CommandConnection connection = new CommandConnection();
             await connection.Connect(_configuration.GetValue("SocketPath", "/tmp/duet.sock"));
             return connection;
         }
 
         private async Task<string> ResolvePath(string path)
         {
-            using (DuetAPIClient.CommandConnection connection = await BuildConnection())
+            using (CommandConnection connection = await BuildConnection())
             {
                 return await connection.ResolvePath(path);
             }

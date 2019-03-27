@@ -1,6 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using DuetAPI.Machine.Fans;
+using DuetAPI.Machine.Spindles;
+using DuetAPI.Machine.Storages;
+using DuetAPI.Machine.Tools;
 
 namespace DuetAPI.Machine
 {
@@ -24,7 +28,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Information about the fans
         /// </summary>
-        public List<Fans.Fan> Fans { get; set; } = new List<Fans.Fan>();
+        public List<Fan> Fans { get; set; } = new List<Fan>();
         
         /// <summary>
         /// Information about the heat subsystem
@@ -70,7 +74,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Information about CNC spindles
         /// </summary>
-        public List<Spindles.Spindle> Spindles { get; set; } = new List<Spindles.Spindle>();
+        public List<Spindle> Spindles { get; set; } = new List<Spindle>();
         
         /// <summary>
         /// Information about the machine state
@@ -80,12 +84,12 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Information about the configured storage systems
         /// </summary>
-        public List<Storages.Storage> Storages { get; set; } = new List<Storages.Storage>();
+        public List<Storage> Storages { get; set; } = new List<Storage>();
         
         /// <summary>
         /// Information about configured tools
         /// </summary>
-        public List<Tools.Tool> Tools { get; set; } = new List<Tools.Tool>();
+        public List<Tool> Tools { get; set; } = new List<Tool>();
 
         /// <summary>
         /// Creates a duplicate of the full object model
@@ -97,7 +101,7 @@ namespace DuetAPI.Machine
             {
                 Channels = (Channels.Model)Channels.Clone(),
                 Electronics = (Electronics.Model)Electronics.Clone(),
-                Fans = Fans.Select(fan => (Fans.Fan)fan.Clone()).ToList(),
+                Fans = Fans.Select(fan => (Fan)fan.Clone()).ToList(),
                 Heat = (Heat.Model)Heat.Clone(),
                 Job = (Job.Model)Job.Clone(),
                 MessageBox = (MessageBox.Model)MessageBox.Clone(),
@@ -106,10 +110,10 @@ namespace DuetAPI.Machine
                 Messages = Messages.Select(item => (Message)item.Clone()).ToList(),
                 Scanner = (Scanner.Model)Scanner.Clone(),
                 Sensors = (Sensors.Model)Sensors.Clone(),
-                Spindles = Spindles.Select(spindle => (Spindles.Spindle)spindle.Clone()).ToList(),
+                Spindles = Spindles.Select(spindle => (Spindle)spindle.Clone()).ToList(),
                 State = (State.Model)State.Clone(),
-                Storages = Storages.Select(storage => (Storages.Storage)storage.Clone()).ToList(),
-                Tools = Tools.Select(tool => (Tools.Tool)tool.Clone()).ToList()
+                Storages = Storages.Select(storage => (Storage)storage.Clone()).ToList(),
+                Tools = Tools.Select(tool => (Tool)tool.Clone()).ToList()
             };
         }
     }

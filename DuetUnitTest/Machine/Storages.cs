@@ -1,8 +1,6 @@
-﻿using DuetAPI.Machine.Storages;
+﻿using DuetAPI.Machine;
+using DuetAPI.Machine.Storages;
 using NUnit.Framework;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace DuetUnitTest.Machine
 {
@@ -12,7 +10,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            Model original = new Model();
 
             Storage storage = new Storage
             {
@@ -24,7 +22,7 @@ namespace DuetUnitTest.Machine
             };
             original.Storages.Add(storage);
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            Model clone = (Model)original.Clone();
 
             Assert.AreEqual(1, original.Storages.Count);
             Assert.AreEqual(original.Storages[0].Capacity, clone.Storages[0].Capacity);

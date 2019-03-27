@@ -1,5 +1,5 @@
-﻿using DuetAPI.Commands;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using DuetAPI.Commands;
 
 namespace DuetControlServer.Codes
 {

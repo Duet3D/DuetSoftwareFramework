@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
+using DuetAPIClient;
 using DuetAPIClient.Exceptions;
 using Microsoft.Extensions.Logging;
 
@@ -25,7 +26,7 @@ namespace DuetRestEndpoint.Controllers
         /// <returns>Asynchronous task</returns>
         public static async Task Process(WebSocket webSocket, string socketPath, ILogger logger)
         {
-            using (DuetAPIClient.SubscribeConnection connection = new DuetAPIClient.SubscribeConnection())
+            using (SubscribeConnection connection = new SubscribeConnection())
             {
                 // 1. Authentication
                 // TODO

@@ -1,5 +1,3 @@
-using Newtonsoft.Json;
-
 namespace DuetAPI.Connection
 {
     /// <summary>

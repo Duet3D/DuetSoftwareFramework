@@ -10,11 +10,6 @@ namespace DuetAPI.Commands
     public class CodeResult : List<Message>
     {
         /// <summary>
-        /// Creates a new CodeResult
-        /// </summary>
-        public CodeResult() {}
-
-        /// <summary>
         /// Converts the CodeResult to a string
         /// </summary>
         /// <returns>The CodeResult as a string</returns>
