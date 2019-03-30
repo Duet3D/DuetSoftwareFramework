@@ -21,11 +21,12 @@ namespace DuetUnitTest.SPI
             
             // Header
             Assert.AreEqual(Consts.FormatCode, header.FormatCode);
-            Assert.AreEqual(Consts.ProtocolVersion, header.ProtocolVersion);
             Assert.AreEqual(4, header.NumPackets);
-            Assert.AreEqual(64863456, header.SequenceNumber);
-            Assert.AreEqual(1463, header.Length);
-            Assert.AreEqual(0, header.Checksum);
+            Assert.AreEqual(Consts.ProtocolVersion, header.ProtocolVersion);
+            Assert.AreEqual(12345, header.SequenceNumber);
+            Assert.AreEqual(1436, header.DataLength);
+            Assert.AreEqual(0, header.ChecksumData);
+            Assert.AreEqual(0, header.ChecksumHeader);
             
             // No padding
         }
@@ -38,10 +39,8 @@ namespace DuetUnitTest.SPI
             PacketHeader header = Reader.ReadPacketHeader(blob);
             
             // Header
-            Assert.AreEqual((ushort)Request.CodeReply, header.Request);
-            Assert.AreEqual(5353, header.PacketId);
+            Assert.AreEqual((ushort)Request.ObjectModel, header.Request);
             Assert.AreEqual(300, header.Length);
-            Assert.AreEqual(0, header.Checksum);
             
             // No padding
         }
@@ -70,7 +69,7 @@ namespace DuetUnitTest.SPI
             Assert.AreEqual(28, bytesRead);
             
             // Header
-            Assert.AreEqual(CodeChannel.Serial, channel);
+            Assert.AreEqual(CodeChannel.HTTP, channel);
             Assert.AreEqual(true, isCodeComplete);
             
             // Message
@@ -87,7 +86,7 @@ namespace DuetUnitTest.SPI
             Assert.AreEqual(4, bytesRead);
             
             // Header
-            Assert.AreEqual(CodeChannel.HTTP, channel);
+            Assert.AreEqual(CodeChannel.SPI, channel);
             Assert.AreEqual(true, isCodeComplete);
             
             // Message
@@ -104,7 +103,7 @@ namespace DuetUnitTest.SPI
             Assert.AreEqual(16, bytesRead);
             
             // Header
-            Assert.AreEqual(CodeChannel.HTTP, channel);
+            Assert.AreEqual(CodeChannel.SPI, channel);
             
             // Message
             Assert.AreEqual("homeall.g", filename);
@@ -119,7 +118,7 @@ namespace DuetUnitTest.SPI
             Assert.AreEqual(4, bytesRead);
             
             // Header
-            Assert.AreEqual(CodeChannel.File, channel);
+            Assert.AreEqual(CodeChannel.Telnet, channel);
             Assert.AreEqual(5, stackDepth);
         } 
                       

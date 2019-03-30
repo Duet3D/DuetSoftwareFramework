@@ -6,7 +6,11 @@ using Newtonsoft.Json;
 
 namespace DuetControlServer
 {
-    /*static*/ class Settings
+    /// <summary>
+    /// Settings provider
+    /// </summary>
+    /// <remarks>This class cannot be static because JSON.NET requires an instance for deserialization</remarks>
+    public /*static*/ class Settings
     {
         private static readonly string DefaultConfigFile = "/etc/duet/config.json";
         private const RegexOptions RegexFlags = RegexOptions.IgnoreCase | RegexOptions.Singleline;
@@ -32,13 +36,29 @@ namespace DuetControlServer
         public static string BaseDirectory { get; set; } = "/opt/dsf/sd";
 
         /// <summary>
+        /// Bus ID of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
+        /// </summary>
+        [JsonProperty]
+        public static int SpiBusID { get; set; } = 0;
+
+        /// <summary>
+        /// Chip select line of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
+        /// </summary>
+        public static int SpiChipSelectLine { get; set; } = 0;
+
+        /// <summary>
+        /// Number of the GPIO pin that is used by RepRapFirmware to flag its ready state
+        /// </summary>
+        public static int TransferReadyPin { get; set; } = 25;      // Pin 22 on the RaspPi expansion header
+
+        /// <summary>
         /// How many bytes to parse max at the beginning and end of a file to retrieve G-code file information
         /// </summary>
         [JsonProperty]
         public static uint FileInfoReadLimit { get; set; } = 32768;
 
         /// <summary>
-        /// Maximum allowed layer height
+        /// Maximum allowed layer height. Used by the file info parser
         /// </summary>
         [JsonProperty]
         public static double MaxLayerHeight { get; set; } = 0.9;

@@ -1,0 +1,1195 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>DuetControlServer</name>
+    </assembly>
+    <members>
+        <member name="T:DuetControlServer.Commands.Code">
+            <summary>
+            Implementation for G/M/T-code commands
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.#ctor">
+            <summary>
+            Creates a new Code instance
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.#ctor(System.String)">
+            <summary>
+            Creates a new Code instance and attempts to parse the given code string
+            </summary>
+            <param name="code">G/M/T-Code</param>
+        </member>
+        <member name="P:DuetControlServer.Commands.Code.IsFromConfig">
+            <summary>
+            Defines whether this code is part of config.g
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Commands.Code.IsFromConfigOverride">
+            <summary>
+            Defines whether this code is part of config-override.g
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.Run">
+            <summary>
+            Run an arbitrary G/M/T-code
+            </summary>
+            <returns>Code result instance</returns>
+        </member>
+        <member name="T:DuetControlServer.Commands.GetFileInfo">
+            <summary>
+            Implementation of the GetFileInfo command
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.GetFileInfo.Run">
+            <summary>
+            Retrieves file information from the given filename
+            </summary>
+            <returns>File info</returns>
+        </member>
+        <member name="T:DuetControlServer.Commands.GetMachineModel">
+            <summary>
+            Implementation of the GetMachineModel command
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.GetMachineModel.Run">
+            <summary>
+            Retrieve the current machine model
+            </summary>
+            <returns>Current machine model</returns>
+        </member>
+        <member name="T:DuetControlServer.Commands.ResolvePath">
+            <summary>
+            Implementation of the ResolvePath command
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.ResolvePath.Run">
+            <summary>
+            Resolve the given RepRapFirmware-style filename to an absolute path
+            </summary>
+            <returns>Absolute file path</returns>
+        </member>
+        <member name="T:DuetControlServer.Commands.SimpleCode">
+            <summary>
+            Implementation of the SimpleCode command
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.SimpleCode.Run">
+            <summary>
+            Converts a simple G/M/T-code to a regular Code instance, executes it and returns its result as text
+            </summary>
+            <returns>G-code result</returns>
+        </member>
+        <member name="M:DuetControlServer.FileHelper.ResolvePath(System.String)">
+            <summary>
+            Resolve a RepRapFirmware/FatFs-style file path to an actual UNIX file path.
+            The first drive (0:/) is reserved for usage with the base directory as
+            specified in the settings.
+            </summary>
+            <param name="filePath">File path to resolve</param>
+            <returns>Resolved file path</returns>
+        </member>
+        <member name="T:DuetControlServer.IPC.Connection">
+            <summary>
+            Wrapper around UNIX socket connections
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.IPC.Connection.IsConnected">
+            <summary>
+            Check the state of the connection
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.IPC.Connection.#ctor(System.Net.Sockets.Socket,System.Int32)">
+            <summary>
+            Constructor for new connections
+            </summary>
+            <param name="socket">New UNIX socket</param>
+            <param name="id">Connection ID</param>
+        </member>
+        <member name="M:DuetControlServer.IPC.Connection.ReceiveJson">
+            <summary>
+            Read a generic JSON object from the socket
+            </summary>
+            <returns>Abstract JObject instance for deserialization</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Connection.ReceiveCommand">
+            <summary>
+            Receive a fully-populated instance of a BaseCommand from the client
+            </summary>
+            <returns>Received command</returns>
+            <exception cref="T:System.ArgumentException"></exception>
+        </member>
+        <member name="M:DuetControlServer.IPC.Connection.GetCommandType(System.String)">
+            <summary>
+            Check the given command name
+            </summary>
+            <param name="name">Name of the command</param>
+            <returns>Type of the command or null if none found</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Connection.SendResponse(System.Object)">
+            <summary>
+            Send a standard Response, EmptyResponse or ErrorResponse asynchronously to the client.
+            Depending on the type of the object it is encapsulated in a different container.
+            </summary>
+            <param name="obj">Object to send</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Connection.Send(Newtonsoft.Json.Linq.JObject)">
+            <summary>
+            Send a JSON object to the client
+            </summary>
+            <param name="obj">Object to send</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Connection.Send(System.String)">
+            <summary>
+            Send plain text to the client
+            </summary>
+            <param name="text">Text to send</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Connection.Close">
+            <summary>
+            Close the connection
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.IPC.Connection.Dispose">
+            <summary>
+            Dispose this instance
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.IPC.Processors.Base">
+            <summary>
+            Base class for connection interpreters
+            </summary>
+            <seealso cref="T:DuetAPI.Connection.ConnectionMode"/>
+        </member>
+        <member name="P:DuetControlServer.IPC.Processors.Base.Connection">
+            <summary>
+            Connection with wrappers to ensure basic operation and convenience wrappers for JSON-style requests
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Base.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.ClientInitMessage)">
+            <summary>
+            Base constructor for connection interpreters. Invoke this from any derived class
+            </summary>
+            <param name="conn">Connection instance</param>
+            <param name="initMessage">Deserialized initialization message</param>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Base.Process">
+            <summary>
+            Worker method for a given connection.
+            No <see cref="T:System.Threading.CancellationToken"/> is passed here, use <see cref="F:DuetControlServer.Program.CancelSource"/> instead.
+            Once this task exits the connection is terminated.
+            </summary>
+            <returns>Task that represents the worker lifecycle</returns>
+            <exception cref="T:System.NotImplementedException">Thrown if this method is not overridden</exception>
+        </member>
+        <member name="T:DuetControlServer.IPC.Processors.Command">
+            <summary>
+            Command interpreter for client requests
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.IPC.Processors.Command.SupportedCommands">
+            <summary>
+            List of supported commands in this mode
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Command.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.ClientInitMessage)">
+            <summary>
+            Constructor of the command interpreter
+            </summary>
+            <param name="conn">Connection instance</param>
+            <param name="initMessage">Initialization message</param>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Command.Process">
+            <summary>
+            Reads incoming command requests and processes them. See <see cref="N:DuetAPI.Commands"/> namespace for a list
+            of supported commands. The actual implementations can be found in <see cref="N:DuetControlServer.Commands"/>.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="T:DuetControlServer.IPC.Processors.Interception">
+            <summary>
+            Interception processor that notifies clients about G/M/T-codes being processed
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.IPC.Processors.Interception.SupportedCommands">
+            <summary>
+            List of supported commands in this mode
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Interception.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.ClientInitMessage)">
+            <summary>
+            Constructor of the interception processor
+            </summary>
+            <param name="conn">Connection instance</param>
+            <param name="initMessage">Initialization message</param>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Interception.Process">
+            <summary>
+            Waits for commands to be received and enqueues them in a concurrent queue so that a <see cref="T:DuetAPI.Commands.Code"/>
+            can decide when to resume/resolve the execution.
+            </summary>
+            <returns>Task that represents the lifecycle of the connection</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Interception.EnqueueCommand(DuetAPI.Commands.BaseCommand)">
+            <summary>
+            Checks if the command request is allowed and enqueues it internally if that is the case.
+            If it is illegal, an exception is thrown that can be sent back to the client.
+            </summary>
+            <param name="command">Command to enqueue</param>
+            <returns>Task</returns>
+            <exception cref="T:System.ArgumentException">Thrown if the command type is illegal</exception>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Interception.Intercept(DuetAPI.Commands.Code)">
+            <summary>
+            Called by the <see cref="T:DuetAPI.Commands.Code"/> implementation to check if the client wants to intercept a G/M/T-code
+            </summary>
+            <param name="code">Code to intercept</param>
+            <returns>null if not intercepted or a <see cref="T:DuetAPI.Commands.CodeResult"/> instance if resolved</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Interception.Intercept(DuetAPI.Commands.Code,DuetAPI.Connection.InterceptionMode)">
+            <summary>
+            Called by the <see cref="T:DuetAPI.Commands.Code"/> class to intercept a code.
+            This method goes through each connected interception channel and notifies the clients.
+            </summary>
+            <param name="code">Code to intercept</param>
+            <param name="type">Type of the interception</param>
+            <returns>null if not intercepted and a CodeResult otherwise</returns>
+        </member>
+        <member name="T:DuetControlServer.IPC.Processors.Subscription">
+            <summary>
+            Subscription processor that notifies clients about object model changes.
+            There is no point in deserializing the object model here so only the JSON representation is kept here.
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.IPC.Processors.Subscription.SupportedCommands">
+            <summary>
+            List of supported commands in this mode
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Subscription.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.ClientInitMessage)">
+            <summary>
+            Constructor of the subscription processor
+            </summary>
+            <param name="conn">Connection instance</param>
+            <param name="initMessage">Initialization message</param>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Subscription.Process">
+            <summary>
+            Task that keeps pushing model updates to the client
+            </summary>
+            <returns>Task that represents the lifecycle of a connection</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Subscription.Update(DuetAPI.Machine.Model)">
+            <summary>
+            Called to notify the subscribers about a model update
+            </summary>
+            <param name="objectModel">Updated full object model</param>
+        </member>
+        <member name="T:DuetControlServer.Settings">
+            <summary>
+            Settings provider
+            </summary>
+            <remarks>This class cannot be static because JSON.NET requires an instance for deserialization</remarks>
+        </member>
+        <member name="P:DuetControlServer.Settings.SocketPath">
+            <summary>
+            Path to the UNIX socket for IPC
+            </summary>
+            <seealso cref="N:DuetAPI"/>
+        </member>
+        <member name="P:DuetControlServer.Settings.Backlog">
+            <summary>
+            Maximum number of pending IPC connection
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.BaseDirectory">
+            <summary>
+            Virtual SD card directory.
+            Paths starting with 0:/ are mapped to this directory
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.SpiBusID">
+            <summary>
+            Bus ID of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.SpiChipSelectLine">
+            <summary>
+            Chip select line of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.TransferReadyPin">
+            <summary>
+            Number of the GPIO pin that is used by RepRapFirmware to flag its ready state
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.FileInfoReadLimit">
+            <summary>
+            How many bytes to parse max at the beginning and end of a file to retrieve G-code file information
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.MaxLayerHeight">
+            <summary>
+            Maximum allowed layer height. Used by the file info parser
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.LayerHeightFilters">
+            <summary>
+            Regular expressions for finding the layer height (case insensitive)
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.FilamentFilters">
+            <summary>
+            Regular expressions for finding the filament consumption (case insensitive, single line)
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.GeneratedByFilters">
+            <summary>
+            Regular expressions for finding the slicer (case insensitive)
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.PrintTimeFilters">
+            <summary>
+            Regular expressions for finding the print time
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.SimulatedTimeFilters">
+            <summary>
+            Regular expressions for finding the simulated time
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Settings.Load(System.String[])">
+            <summary>
+            Load settings from the config file or create it if it does not already exist
+            </summary>
+            <param name="args">Command-line arguments</param>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.Consts">
+            <summary>
+            Static class holding SPI transfer constants
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.FormatCode">
+            <summary>
+            Unique format code for binary SPI transfers
+            </summary>
+            <remarks>Must be different from any other used format code (0x3E = DuetWiFiServer)</remarks>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.InvalidFormatCode">
+            <summary>
+            Unique format code that is not used anywhere else
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.ProtocolVersion">
+            <summary>
+            Used protocol version. This is incremented whenever the protocol details change
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.BufferSize">
+            <summary>
+            Size of a packet transfer buffer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.NumModules">
+            <summary>
+            Number of RepRapFirmware modules that can be queried via <see cref="T:DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModel"/>
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize">
+            <summary>
+            Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.DuetRequests.CodeReply">
+            <summary>
+            Response to a <see cref="T:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader"/> request
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.CodeReply.Channel">
+            <summary>
+            Channel from which this message comes
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.CodeReply.Flags">
+            <summary>
+            Flags describing the content
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.DuetRequests.CodeReplyFlags">
+            <summary>
+            Flags describing the message
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.CodeReplyFlags.Warning">
+            <summary>
+            This is a warning message
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.CodeReplyFlags.Error">
+            <summary>
+            This is an error message
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.CodeReplyFlags.Push">
+            <summary>
+            There is more to come in the next transmission
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.CodeReplyFlags.CodeComplete">
+            <summary>
+            This is a final code response
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.DuetRequests.HeightmapHeader">
+            <summary>
+            Header for heightmap reports
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.HeightmapHeader.XStart">
+            <summary>
+            X start coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.HeightmapHeader.XEnd">
+            <summary>
+            X end coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.HeightmapHeader.XSpacing">
+            <summary>
+            Spacing between the probe points in X direction
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.HeightmapHeader.YStart">
+            <summary>
+            Y start coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.HeightmapHeader.YEnd">
+            <summary>
+            Y end coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.HeightmapHeader.YSpacing">
+            <summary>
+            Spacing between the probe points in Y direction
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.DuetRequests.MacroRequest">
+            <summary>
+            Request the execution of a macro file
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.MacroRequest.Channel">
+            <summary>
+            Channel to pipe the macro content into
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.DuetRequests.ObjectModel">
+            <summary>
+            Response to a <see cref="T:DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModel"/> request
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.ObjectModel.Module">
+            <summary>
+            Number of the module that this response provides data for
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.DuetRequests.PrintPaused">
+            <summary>
+            Header for print pause events
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.PrintPaused.FilePosition">
+            <summary>
+            Position at which the file has been paused
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.DuetRequests.Request">
+            <summary>
+            Request indices for SPI transfers from the RepRapFirmware controller to the Linux board
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.Request.ReportState">
+            <summary>
+            Response to the state request
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.Request.ObjectModel">
+            <summary>
+            Response to an object model request
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.Request.CodeReply">
+            <summary>
+            Response to a G/M/T-code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.Request.MacroRequest">
+            <summary>
+            Request execution of a macro file
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.Request.FileAbortRequest">
+            <summary>
+            Request current file to be closed
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.Request.StackPushed">
+            <summary>
+            Stack has been pushed
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.Request.StackPopped">
+            <summary>
+            Stack has been popped
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.Request.PrintPaused">
+            <summary>
+            Print has been paused
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.Request.Heightmap">
+            <summary>
+            Response to a heightmap request
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.DuetRequests.StackEvent">
+            <summary>
+            Header for stack events (<see cref="F:DuetControlServer.SPI.Communication.DuetRequests.Request.StackPushed"/> and <see cref="F:DuetControlServer.SPI.Communication.DuetRequests.Request.StackPushed"/>)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.StackEvent.Channel">
+            <summary>
+            Code channel where the event occurred
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.DuetRequests.StackEvent.StackDepth">
+            <summary>
+            New depth of the stack
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags">
+            <summary>
+            Flags of a G/M/T-code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.NoMajorCommandNumber">
+            <summary>
+            No major command number set
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.NoMinorCommandNumber">
+            <summary>
+            No minor command number set
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.Pausable">
+            <summary>
+            Indicates that this code can be used for pause/resume
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.EnforceAbsolutePosition">
+            <summary>
+            Indicates that G53 was used with this code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.FromConfig">
+            <summary>
+            Indicates that this code originates from config.g
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.FromConfigOverride">
+            <summary>
+            Indicates that this code originates from config-override.g
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader">
+            <summary>
+            Header of G/M/T-codes. This is followed by NumParameters <see cref="T:DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter"/> instances,
+            which is then followed by concatenated zero-terminated UTF8-strings for each parameter where applicable.
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader.Channel">
+            <summary>
+            Target of the code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader.Flags">
+            <summary>
+            Flags of this code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader.NumParameters">
+            <summary>
+            Number of parameters following the 
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader.Letter">
+            <summary>
+            Letter of this code (G/M/T)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader.MajorCode">
+            <summary>
+            Major code number (e.g. 1 in G1)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader.MinorCode">
+            <summary>
+            Minor code number (e.g. 4 in G53.4)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader.FilePosition">
+            <summary>
+            Position from which the code was read. This is used for pausing and resuming
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.Letter">
+            <summary>
+            Letter prefix of this parameter
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.Type">
+            <summary>
+            Type of the parameter
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.IntValue">
+            <summary>
+            Value as integer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.UIntValue">
+            <summary>
+            Value as unsigned integer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.FloatValue">
+            <summary>
+            Value as float
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.DataType">
+            <summary>
+            Enum representing the allowed binary data types of parameters
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.DataType.Int">
+            <summary>
+            Parameter is a signed integer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.DataType.UInt">
+            <summary>
+            Parameter is an unsigned integer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.DataType.Float">
+            <summary>
+            Parameter is a float
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.DataType.IntArray">
+            <summary>
+            Parameter is a signed integer array
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.DataType.UIntArray">
+            <summary>
+            Parameter is an unsigned integer array
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.DataType.FloatArray">
+            <summary>
+            Parameter is a float array
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.DataType.String">
+            <summary>
+            Parameter is a UTF-8 string
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.DataType.Expression">
+            <summary>
+            Parameter is an expression
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModel">
+            <summary>
+            Request the object model of the given module
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModel.Module">
+            <summary>
+            Module index to query
+            </summary>
+            <seealso cref="F:DuetControlServer.SPI.Communication.Consts.NumModules"/>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.MacroCompleted">
+            <summary>
+            Indicate that a macro has finished its execution
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.MacroCompleted.Channel">
+            <summary>
+            Channel on which the execution was done
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.MacroCompleted.Error">
+            <summary>
+            Error flag. This is true if the file could not be found or opened
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.Request">
+            <summary>
+            Request indices for SPI transfers from the Linux board to the RepRapFirmware controller
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.RequestState">
+            <summary>
+            Request state of the GCode buffers
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.EmergencyStop">
+            <summary>
+            Perform an immediate emergency stop
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.Reset">
+            <summary>
+            Reset the controller
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.Code">
+            <summary>
+            Request the execution of a G/M/T-code
+            </summary>
+            <seealso cref="T:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader"/>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.LockMovementAndWaitForStandstill">
+            <summary>
+            Lock movement and wait for standstill
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.Unlock">
+            <summary>
+            Unlock everything again
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetObjectModel">
+            <summary>
+            Request a part of the machine's object model
+            </summary>
+            <seealso cref="T:DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModel"/>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.SetObjectModel">
+            <summary>
+            Set a value in the machine's object model (reserved)
+            </summary>
+            <seealso cref="T:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel"/>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.SetFilePrintInfo">
+            <summary>
+            Set information about the file being processed (primarily for PrintMonitor)
+            </summary>
+            <seealso cref="T:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo"/>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.ResetFilePrintInfo">
+            <summary>
+            Reset information about the file being processed indicating it has been cancelled or finished
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.MacroCompleted">
+            <summary>
+            Notify the firmware about the completion of a macro file
+            </summary>
+            <seealso cref="T:DuetControlServer.SPI.Communication.LinuxRequests.MacroCompleted"/>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetHeightMap">
+            <summary>
+            Request the heightmap coordinates as generated by G29
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo">
+            <summary>
+            Set file print info. This is followed by NumFilament floats representing
+            the filament consumption and the actual name of the file being printed.
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo.FileSize">
+            <summary>
+            Size of the file in bytes
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo.LastModifiedTime">
+            <summary>
+            Time the file was last modified (as time_t / 64-bit unsigned int).
+            This is represented as the seconds elapsed since Jan 1 1970
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo.LayerHeight">
+            <summary>
+            Height of the layers in mm
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo.FirstLayerHeight">
+            <summary>
+            Height of the first layer in mm
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo.ObjectHeight">
+            <summary>
+            Total object height in mm
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo.PrintTime">
+            <summary>
+            Total print time in seconds
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo.SimulatedTime">
+            <summary>
+            Simulated print time in seconds
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo.FilenameLength">
+            <summary>
+            Length of the filename
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo.GeneratedByLength">
+            <summary>
+            Length of the slicer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetFilePrintInfo.NumFilaments">
+            <summary>
+            Number of filaments used
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel">
+            <summary>
+            Set an arbitrary object model value that is accessible via a field path.
+            This struct is followed by the UTF-8 path to the object model value
+            and optionally the value as string / expression.
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel.Type">
+            <summary>
+            Type of the value
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel.FieldLength">
+            <summary>
+            Length of the field
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel.IntValue">
+            <summary>
+            Value as integer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel.UIntValue">
+            <summary>
+            Value as unsigned integer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel.FloatValue">
+            <summary>
+            Value as float
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.PacketHeader">
+            <summary>
+            Header used for single packets from and to the RepRapFirmware board
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.PacketHeader.Request">
+            <summary>
+            Identifier of this request
+            </summary>
+            <seealso cref="T:DuetControlServer.SPI.Communication.DuetRequests.Request"/>
+            <seealso cref="T:DuetControlServer.SPI.Communication.LinuxRequests.Request"/>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.PacketHeader.Length">
+            <summary>
+            Length of the packet in bytes
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.TransferHeader">
+            <summary>
+            Header describing the content of a full SPI transfer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferHeader.FormatCode">
+            <summary>
+            Unique number representing the format used for this type of data transfer
+            </summary>
+            <seealso cref="F:DuetControlServer.SPI.Communication.Consts.FormatCode"/>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferHeader.NumPackets">
+            <summary>
+            Number of packets in the data transfer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferHeader.ProtocolVersion">
+            <summary>
+            Version of the protocol. This is incremented whenever the protocol details change
+            </summary>
+            <seealso cref="F:DuetControlServer.SPI.Communication.Consts.ProtocolVersion"/>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferHeader.SequenceNumber">
+            <summary>
+            Sequence number (auto-incremented), used to detect resets on either side
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferHeader.DataLength">
+            <summary>
+            Total length of the data transfer in bytes
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferHeader.ChecksumData">
+            <summary>
+            CRC16 checksum of the transfer data (reserved)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferHeader.ChecksumHeader">
+            <summary>
+            CRC16 checksum of the transfer header (reserved)
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.TransferResponse">
+            <summary>
+            Result code of header and data transfers
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.Success">
+            <summary>
+            Transfer is OK
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.BadFormat">
+            <summary>
+            Bad transfer format
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.BadProtocolVersion">
+            <summary>
+            Bad protocol version
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.BadChecksum">
+            <summary>
+            Bad checksum
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.RequestStateReset">
+            <summary>
+            Request state reset
+            </summary>
+            <remarks>This must remain the last entry until checksums have been implemented</remarks>
+        </member>
+        <member name="T:DuetControlServer.SPI.Connector">
+            <summary>
+            This class accesses RepRapFirmware via SPI and deals with general communication
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.Connector.Connect">
+            <summary>
+            Initialize physical transfer and perform initial data transfer
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.DataTransfer">
+            <summary>
+            Helper class for SPI data transfers
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.Initialize">
+            <summary>
+            Set up the SPI device and the controller for the transfer ready pin
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.PerformFullTransfer">
+            <summary>
+            Perform a full data transfer
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.QueuedCode">
+            <summary>
+            Struct that represents a queued code item
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.QueuedCode.Code">
+            <summary>
+            Code item to execute
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.QueuedCode.Task">
+            <summary>
+            Task source to resolve when the code has finished
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Serialization.Reader">
+            <summary>
+            Static class for reading data from SPI transmissions.
+            It is expected that each data block occupies entire 4-byte blocks.
+            Make sure to keep the data returned by these functions only as long as the underlying buffer is actually valid!
+            </summary>
+            <remarks>Once C# 3.0 is out, the performance of this can be further improved (without relying on unsafe code) by using <c>Span.AsRef()</c></remarks>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadTransferHeader(System.Span{System.Byte})">
+            <summary>
+            Read a transfer header from a memory span
+            </summary>
+            <param name="from">Origin</param>
+            <returns>Header describing a data transfer</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadPacketHeader(System.Span{System.Byte})">
+            <summary>
+            Read a packet header from a memory span
+            </summary>
+            <param name="from">Origin</param>
+            <returns>Header describing a packet</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadObjectModel(System.Span{System.Byte},System.Int32,System.Byte@,System.String@)">
+            <summary>
+            Read an object model header plus JSON text from a memory span
+            </summary>
+            <param name="from">Origin</param>
+            <param name="packetLength">Length of the received packet</param>
+            <param name="module">Number of the module from which the JSON data originates</param>
+            <param name="json">Object model data as JSON</param>
+            <returns>Number of bytes read</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadCodeReply(System.Span{System.Byte},System.Int32,DuetAPI.Commands.CodeChannel@,DuetAPI.Message@,System.Boolean@)">
+            <summary>
+            Read a code reply from a memory span
+            </summary>
+            <param name="from">Origin</param>
+            <param name="packetLength">Length of the received packet</param>
+            <param name="channel">Channel from which this message originates</param>
+            <param name="message">Generated message</param>
+            <param name="isCodeComplete">Indicates if this the last code has finished its execution</param>
+            <returns>Number of bytes read</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadMacroRequest(System.Span{System.Byte},System.Int32,DuetAPI.Commands.CodeChannel@,System.String@)">
+            <summary>
+            Read a macro file request from a memory span
+            </summary>
+            <param name="from">Origin</param>
+            <param name="packetLength">Length of the received packet</param>
+            <param name="channel">Code channel that requested the execution</param>
+            <param name="filename">Filename of the macro to execute</param>
+            <returns>Number of bytes read</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadStackEvent(System.Span{System.Byte},DuetAPI.Commands.CodeChannel@,System.Byte@)">
+            <summary>
+            Read a stack event (<see cref="F:DuetControlServer.SPI.Communication.DuetRequests.Request.StackPushed"/> and <see cref="F:DuetControlServer.SPI.Communication.DuetRequests.Request.StackPopped"/>)
+            </summary>
+            <param name="from">Origin</param>
+            <param name="channel">Code channel where the stack event occurred</param>
+            <param name="stackDepth">New stack depth</param>
+            <returns>Number of bytes read</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadPrintPaused(System.Span{System.Byte},System.UInt32@)">
+            <summary>
+            Read a print pause event
+            </summary>
+            <param name="from">Origin</param>
+            <param name="filePosition">Position at which the print has been paused</param>
+            <returns>Number of bytes read</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadHeightmap(System.Span{System.Byte},System.Int32,DuetControlServer.SPI.Communication.DuetRequests.HeightmapHeader@,System.Span{System.Single}@)">
+            <summary>
+            Read a heightmap report
+            </summary>
+            <param name="from">Origin</param>
+            <param name="packetLength">Position at which the print has been paused</param>
+            <param name="header"></param>
+            <param name="zCoordinates"></param>
+            <returns>Number of bytes read</returns>
+        </member>
+        <member name="T:DuetControlServer.SPI.Serialization.Writer">
+            <summary>
+            Static class for writing data for SPI transmissions.
+            This class makes sure each data block is on a 4-byte boundary to guarantee efficient DMA transfers on the remote side.
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Serialization.Writer.TransmissionHeaderSize">
+            <summary>
+            Size of a transmission header
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteTransferHeader(System.Span{System.Byte},System.Byte,System.UInt16,System.UInt16,System.UInt16)">
+            <summary>
+            Write a transfer header to a memory span
+            </summary>
+            <param name="to">Destination</param>
+            <param name="numPackets">Number of packets to send</param>
+            <param name="sequenceNumber">Sequence number</param>
+            <param name="transferLength">Total length of the transfer in bytes</param>
+            <param name="dataChecksum">CRC16 checksum of the transfer data</param>
+        </member>
+        <member name="F:DuetControlServer.SPI.Serialization.Writer.PacketHeaderSize">
+            <summary>
+            Size of a packet header
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WritePacketHeader(System.Span{System.Byte},DuetControlServer.SPI.Communication.LinuxRequests.Request,System.Int32)">
+            <summary>
+            Write an arbitrary packet header to a memory span
+            </summary>
+            <param name="to">Destination</param>
+            <param name="request">Packet type</param>
+            <param name="length">Length of the packet</param>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteCode(System.Span{System.Byte},DuetControlServer.Commands.Code)">
+            <summary>
+            Write a parsed G/M/T code in binary format to a memory span
+            </summary>
+            <param name="to">Destination</param>
+            <param name="code">Code to write</param>
+            <returns>Number of bytes written</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteObjectModelRequest(System.Span{System.Byte},System.Byte)">
+            <summary>
+            Write a <see cref="T:DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModel"/> request to a memory span
+            </summary>
+            <param name="to">Destination</param>
+            <param name="module">Module to query the object model from</param>
+            <returns>Number of bytes written</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteObjectModel(System.Span{System.Byte},System.String,System.Object)">
+            <summary>
+            Request the update of an object model field to an arbitrary value via a <see cref="T:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel"/> request
+            </summary>
+            <param name="to">Destination</param>
+            <param name="field">Path to the object model field</param>
+            <param name="value">New value</param>
+            <returns>Number of bytes written</returns>
+            <remarks>value must be of type <see cref="T:DuetControlServer.SPI.Communication.LinuxRequests.DataType"/></remarks>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteFilePrintInfo(System.Span{System.Byte},DuetAPI.ParsedFileInfo)">
+            <summary>
+            Write information about the file being printed
+            </summary>
+            <param name="to">Destination</param>
+            <param name="info">Information about the file being printed</param>
+            <returns>Number of bytes written</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteMacroCompleted(System.Span{System.Byte},DuetAPI.Commands.CodeChannel,System.Boolean)">
+            <summary>
+            Write notification about a completed macro file
+            </summary>
+            <param name="span">Destination</param>
+            <param name="channel">Channel where the macro file has finished</param>
+            <param name="error">Whether an error occurred when trying to open/process the macro file</param>
+            <returns>Number of bytes written</returns>
+        </member>
+    </members>
+</doc>

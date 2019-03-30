@@ -5,7 +5,7 @@ namespace DuetControlServer.SPI.Communication
     /// <summary>
     /// Header describing the content of a full SPI transfer
     /// </summary>
-    [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 12)]
+    [StructLayout(LayoutKind.Sequential, Size = 12)]
     public struct TransferHeader
     {
         /// <summary>
@@ -15,29 +15,34 @@ namespace DuetControlServer.SPI.Communication
         public byte FormatCode;
 
         /// <summary>
+        /// Number of packets in the data transfer
+        /// </summary>
+        public byte NumPackets;
+
+        /// <summary>
         /// Version of the protocol. This is incremented whenever the protocol details change
         /// </summary>
         /// <seealso cref="Consts.ProtocolVersion"/>
         public ushort ProtocolVersion;
         
         /// <summary>
-        /// Length of the data transfer in bytes
-        /// </summary>
-        public byte NumPackets;
-
-        /// <summary>
         /// Sequence number (auto-incremented), used to detect resets on either side
         /// </summary>
-        public uint SequenceNumber;
+        public ushort SequenceNumber;
 
         /// <summary>
         /// Total length of the data transfer in bytes
         /// </summary>
-        public ushort Length;
+        public ushort DataLength;
         
+        /// <summary>
+        /// CRC16 checksum of the transfer data (reserved)
+        /// </summary>
+        public ushort ChecksumData;
+
         /// <summary>
         /// CRC16 checksum of the transfer header (reserved)
         /// </summary>
-        public ushort Checksum;
+        public ushort ChecksumHeader;
     }
 }

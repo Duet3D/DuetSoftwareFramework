@@ -46,8 +46,18 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         public uint SimulatedTime;
 
         /// <summary>
+        /// Length of the filename
+        /// </summary>
+        public byte FilenameLength;
+
+        /// <summary>
+        /// Length of the slicer
+        /// </summary>
+        public byte GeneratedByLength;
+
+        /// <summary>
         /// Number of filaments used
         /// </summary>
-        public uint NumFilaments;
+        public ushort NumFilaments;
     }
 }

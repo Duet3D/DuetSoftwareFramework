@@ -6,7 +6,7 @@ namespace DuetControlServer.SPI.Communication
     /// <summary>
     /// Header used for single packets from and to the RepRapFirmware board
     /// </summary>
-    [StructLayout(LayoutKind.Sequential, Size = 8)]
+    [StructLayout(LayoutKind.Sequential, Size = 4)]
     public struct PacketHeader
     {
         /// <summary>
@@ -17,18 +17,8 @@ namespace DuetControlServer.SPI.Communication
         public ushort Request;
 
         /// <summary>
-        /// Identifier of the packet (auto-incrementing, reset after each transmission)
-        /// </summary>
-        public ushort PacketId;
-
-        /// <summary>
         /// Length of the packet in bytes
         /// </summary>
         public ushort Length;
-
-        /// <summary>
-        /// CRC16 checksum of the packet header and payload (reserved for future use)
-        /// </summary>
-        public ushort Checksum;
     }
 }

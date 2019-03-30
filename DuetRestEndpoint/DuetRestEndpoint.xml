@@ -6,7 +6,7 @@
     <members>
         <member name="T:DuetRestEndpoint.Controllers.MachineController">
             <summary>
-            Model View Controller for /machine requests
+            MVC Controller for /machine requests
             </summary>
         </member>
         <member name="M:DuetRestEndpoint.Controllers.MachineController.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetRestEndpoint.Controllers.MachineController})">
@@ -19,69 +19,127 @@
         <member name="M:DuetRestEndpoint.Controllers.MachineController.Get">
             <summary>
             WS /machine
-            Provide WebSocket for continuous model updates. This is priarily used to keep DWC2 up-to-date
+            Provide WebSocket for continuous model updates. This is primarily used to keep DWC2 up-to-date
             </summary>
-            <returns>WebSocket, HTTP status code: (400) Bad request, WebSocket code: (1001) DCS unavailable</returns>
+            <returns>WebSocket, HTTP status code: (400) Bad request</returns>
+            <seealso cref="M:DuetRestEndpoint.Controllers.WebSocketController.Process(System.Net.WebSockets.WebSocket,System.String,Microsoft.Extensions.Logging.ILogger)"/>
         </member>
         <member name="M:DuetRestEndpoint.Controllers.MachineController.Status">
             <summary>
             GET /machine/status
             Retrieve the full object model as JSON.
             </summary>
-            <returns>Machine object model as JSON text or HTTP status code: (503) Machine model unavailable</returns>
+            <returns>HTTP status code: (200) Machine object model as application/json (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
         </member>
-        <member name="M:DuetRestEndpoint.Controllers.MachineController.DoCode(System.String)">
+        <member name="M:DuetRestEndpoint.Controllers.MachineController.DoCode">
             <summary>
-            POST machine/code
-            Execute a G/M/T-code and return the G-code response when done.
+            POST /machine/code
+            Execute a plain G/M/T-code from the request body and return the G-code response when done.
             </summary>
-            <param name="code">G/M/T-code to execute</param>
-            <returns>G-Code response or HTTP status code: (500) Generic error occurred (502) Incompatible DCS version (503) DCS unavailable</returns>
+            <returns>HTTP status code: (200) G-Code response as text/plain (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
         </member>
         <member name="M:DuetRestEndpoint.Controllers.MachineController.DownloadFile(System.String)">
             <summary>
-            GET machine/files/{filename}
+            GET /machine/file/{filename}
             Download the specified file.
             </summary>
             <param name="filename">File to download</param>
-            <returns>File content or HTTP status code: (404) File not found (500) Generic error (502) Incompatible DCS (503) DCS unavailable</returns>
+            <returns>HTTP status code: (200) File content (404) File not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
         </member>
         <member name="M:DuetRestEndpoint.Controllers.MachineController.UploadFile(System.String)">
             <summary>
-            POST machine/files/{filename}
+            PUT /machine/file/{filename}
             Upload a file from the HTTP body and create the subdirectories if necessary.
             </summary>
             <param name="filename">Destination of the file to upload</param>
-            <returns>HTTP status code: (204) File created (500) Generic error occurred (502) Incompatible DCS (503) DCS unavailable</returns>
-        </member>
-        <member name="M:DuetRestEndpoint.Controllers.MachineController.DeleteFile(System.String)">
-            <summary>
-            DELETE machine/files/{filename}
-            Delete the given file or directory.
-            </summary>
-            <param name="filename">File or directory to delete</param>
-            <returns>HTTP status code: (204) File or directory deleted (404) File not found (500) Generic error (502) Incompatible DCS (503) DCS unavailable</returns>
+            <returns>HTTP status code: (201) File created (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
         </member>
         <member name="M:DuetRestEndpoint.Controllers.MachineController.GetFileinfo(System.String)">
             <summary>
-            GET fileinfo/{filename}
-            Retrieve file info for the specified file
+            GET /machine/fileinfo/{filename}
+            Retrieve file info from the specified G-code file.
             </summary>
             <param name="filename">G-code file to analyze</param>
-            <returns>File info as JSON or HTTP status code: (404) File not found (500) Generic error (502) Incompatible DCS (503) DCS unavailable</returns>
+            <returns>HTTP status code: (200) File info as application/json (404) File not found (500) Generic error (502) Incompatible DCS (503) DCS is unavailable</returns>
         </member>
-        <member name="T:DuetRestEndpoint.Controllers.ModelSocket">
+        <member name="M:DuetRestEndpoint.Controllers.MachineController.DeleteFileOrDirectory(System.String)">
+            <summary>
+            DELETE /machine/file/{filename}
+            Delete the given file or directory.
+            </summary>
+            <param name="filename">File or directory to delete</param>
+            <returns>HTTP status code: (204) File or directory deleted (404) File not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        </member>
+        <member name="M:DuetRestEndpoint.Controllers.MachineController.MoveFileOrDirectory(System.String,System.String,System.Boolean)">
+            <summary>
+            Move a file or directory from a to b
+            </summary>
+            <param name="from">Source path</param>
+            <param name="to">Destination path</param>
+            <param name="force">Delete existing file (optional, default false)</param>
+            <returns>HTTP status code: (204) File or directory moved (404) File or directory not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        </member>
+        <member name="M:DuetRestEndpoint.Controllers.MachineController.GetFileList(System.String)">
+            <summary>
+            GET /machine/directory/{directory}
+            Get a file list of the specified directory
+            </summary>
+            <param name="directory">Directory to query</param>
+            <returns>HTTP status code: (200) File list as application/json (404) Directory not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        </member>
+        <member name="M:DuetRestEndpoint.Controllers.MachineController.CreateDirectory(System.String)">
+            <summary>
+            PUT /machine/directory/{directory}
+            Create the given directory.
+            </summary>
+            <returns>HTTP status code: (204) Directory created (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        </member>
+        <member name="T:DuetRestEndpoint.Controllers.WebSocketController">
             <summary>
             This class takes care of WebSocket-based communication.
             At the moment it is only used to provide continuous machine model updates.
             </summary>
         </member>
-        <member name="M:DuetRestEndpoint.Controllers.ModelSocket.Process(Microsoft.AspNetCore.Http.HttpContext,System.Net.WebSockets.WebSocket)">
+        <member name="M:DuetRestEndpoint.Controllers.WebSocketController.Process(System.Net.WebSockets.WebSocket,System.String,Microsoft.Extensions.Logging.ILogger)">
             <summary>
-            Deal with a newly opened WebSocket
+            Deal with a newly opened WebSocket.
+            A client may receive one of the WS codes: (1001) Endpoint unavailable (1003) Invalid command (1011) Internal error
             </summary>
-            <param name="context">HTTP context</param>
             <param name="webSocket">WebSocket connection</param>
+            <param name="socketPath">Path to the UNIX socket</param>
+            <param name="logger">Logger instance</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="T:DuetRestEndpoint.FileProviders.DuetFileProvider">
+            <summary>
+            Static file provider that uses DCS to resolve file paths
+            </summary>
+        </member>
+        <member name="M:DuetRestEndpoint.FileProviders.DuetFileProvider.#ctor(Microsoft.Extensions.Configuration.IConfiguration)">
+            <summary>
+            Creates a new file resolver instance
+            </summary>
+            <param name="configuration"></param>
+        </member>
+        <member name="M:DuetRestEndpoint.FileProviders.DuetFileProvider.GetFileInfo(System.String)">
+            <summary>
+            Gets the file info of the specified path
+            </summary>
+            <param name="subpath">Target path</param>
+            <returns></returns>
+        </member>
+        <member name="M:DuetRestEndpoint.FileProviders.DuetFileProvider.GetDirectoryContents(System.String)">
+            <summary>
+            Returns the contents of the given directory
+            </summary>
+            <param name="subpath">Target path</param>
+            <returns></returns>
+        </member>
+        <member name="M:DuetRestEndpoint.FileProviders.DuetFileProvider.Watch(System.String)">
+            <summary>
+            Creates a token that watches for changes
+            </summary>
+            <param name="filter">Watch filter</param>
             <returns></returns>
         </member>
         <member name="T:DuetRestEndpoint.Program">
@@ -97,91 +155,10 @@
         </member>
         <member name="M:DuetRestEndpoint.Program.CreateWebHostBuilder(System.String[])">
             <summary>
-            Creates a new WebHost
+            Creates a new WebHost instance
             </summary>
             <param name="args">Command-line arguments</param>
             <returns></returns>
-        </member>
-        <member name="T:DuetRestEndpoint.Services.ModelProvider">
-            <summary>
-            Static interface for retrieving and updating the serialized machine model
-            </summary>
-        </member>
-        <member name="F:DuetRestEndpoint.Services.ModelProvider.IsConnected">
-            <summary>
-            This indicates if a connection could be established by the ModelService class
-            </summary>
-        </member>
-        <member name="M:DuetRestEndpoint.Services.ModelProvider.Set(Newtonsoft.Json.Linq.JObject)">
-            <summary>
-            Assign initial state of the object model.
-            </summary>
-            <remarks>May be only called when the full machine model is initially received</remarks>
-            <param name="newModel">Full machine model</param>
-        </member>
-        <member name="M:DuetRestEndpoint.Services.ModelProvider.Update(Newtonsoft.Json.Linq.JObject)">
-            <summary>
-            Update the full machine model with a chunk of new data
-            </summary>
-            <param name="diff">Difference to the last state</param>
-        </member>
-        <member name="M:DuetRestEndpoint.Services.ModelProvider.GetFull">
-            <summary>
-            Retrieve a full object model instance. This creates a clone to avoid race conditions
-            </summary>
-            <returns>Full object model of the machine</returns>
-        </member>
-        <member name="M:DuetRestEndpoint.Services.ModelProvider.WaitForUpdate(System.Threading.CancellationToken)">
-            <summary>
-            Wait for an update to occur
-            </summary>
-            <returns>Task that completes when an update has occurred</returns>
-        </member>
-        <member name="M:DuetRestEndpoint.Services.ModelProvider.GetPatch(Newtonsoft.Json.Linq.JObject@)">
-            <summary>
-            Retrieve a partial JSON patch since the last state represented by oldModel.
-            In addition the object in oldModel is updated with the current state
-            </summary>
-            <param name="oldModel">Last known object model state</param>
-            <returns>JSON patch representing the differences between the last and new states</returns>
-        </member>
-        <member name="T:DuetRestEndpoint.Services.ModelUpdateService">
-            <summary>
-            Service worker that keeps the internal JSON-based machine model up-to-date.
-            Note that this service does not - at any point - deserialize the object model. This is due to performance reasons
-            </summary>
-        </member>
-        <member name="F:DuetRestEndpoint.Services.ModelUpdateService.SocketPath">
-            <summary>
-            Path to the UNIX socket. This is assigned by the Startup class
-            </summary>
-        </member>
-        <member name="M:DuetRestEndpoint.Services.ModelUpdateService.#ctor(Microsoft.Extensions.Logging.ILogger{DuetRestEndpoint.Services.ModelUpdateService})">
-            <summary>
-            Create a new instance of the model background service
-            </summary>
-            <param name="logger">Logger</param>
-        </member>
-        <member name="M:DuetRestEndpoint.Services.ModelUpdateService.StartAsync(System.Threading.CancellationToken)">
-            <summary>
-            Start the model service
-            </summary>
-            <param name="cancellationToken">Cancellation token</param>
-            <returns>Base task</returns>
-        </member>
-        <member name="M:DuetRestEndpoint.Services.ModelUpdateService.ExecuteAsync(System.Threading.CancellationToken)">
-            <summary>
-            Represents the full lifecycle of this service
-            </summary>
-            <param name="cancellationToken">Invoked when the service is being terminated</param>
-            <returns>Service task</returns>
-        </member>
-        <member name="M:DuetRestEndpoint.Services.ModelUpdateService.StopAsync(System.Threading.CancellationToken)">
-            <summary>
-            Stop the model service
-            </summary>
-            <param name="cancellationToken">Cancellation token</param>
-            <returns>Base task</returns>
         </member>
         <member name="T:DuetRestEndpoint.Startup">
             <summary>

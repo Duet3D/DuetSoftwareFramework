@@ -21,7 +21,7 @@ namespace DuetControlServer.SPI.Serialization
         /// Size of a transmission header
         /// </summary>
         public static readonly int TransmissionHeaderSize = Marshal.SizeOf(typeof(TransferHeader));
-        
+
         /// <summary>
         /// Write a transfer header to a memory span
         /// </summary>
@@ -29,17 +29,18 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="numPackets">Number of packets to send</param>
         /// <param name="sequenceNumber">Sequence number</param>
         /// <param name="transferLength">Total length of the transfer in bytes</param>
-        /// <param name="checksum">Checksum (unused)</param>
-        public static void WriteTransferHeader(Span<byte> to, byte numPackets, uint sequenceNumber, ushort transferLength, ushort checksum)
+        /// <param name="dataChecksum">CRC16 checksum of the transfer data</param>
+        public static void WriteTransferHeader(Span<byte> to, byte numPackets, ushort sequenceNumber, ushort transferLength, ushort dataChecksum)
         {
             TransferHeader header = new TransferHeader
             {
-                Checksum = checksum,
                 FormatCode =  Consts.FormatCode,
-                Length = transferLength,
                 NumPackets = numPackets,
                 ProtocolVersion = Consts.ProtocolVersion,
-                SequenceNumber = sequenceNumber
+                SequenceNumber = sequenceNumber,
+                DataLength = transferLength,
+                ChecksumData = dataChecksum,
+                ChecksumHeader = 0              // TODO Calculate and set this automatically (CRC16 checksum)
             };
             MemoryMarshal.Write(to, ref header);
         }
@@ -54,16 +55,13 @@ namespace DuetControlServer.SPI.Serialization
         /// </summary>
         /// <param name="to">Destination</param>
         /// <param name="request">Packet type</param>
-        /// <param name="packetId">ID of the packet</param>
         /// <param name="length">Length of the packet</param>
-        public static void WritePacketHeader(Span<byte> to, Request request, ushort packetId, int length)
+        public static void WritePacketHeader(Span<byte> to, Request request, int length)
         {
             PacketHeader header = new PacketHeader()
             {
-                Checksum = 0,        // TBD. In a future version this will be automatically determined
-                Length = (ushort)length,
-                PacketId = packetId,
-                Request = (ushort)request
+                Request = (ushort)request,
+                Length = (ushort)length
             };
             MemoryMarshal.Write(to, ref header);
         }
@@ -84,10 +82,19 @@ namespace DuetControlServer.SPI.Serialization
                 Channel = code.Source,
                 FilePosition = code.FilePosition,
                 Letter = (byte)code.Type,
-                MajorCode = code.MajorNumber,
-                MinorCode = code.MinorNumber,
+                MajorCode = code.MajorNumber ?? -1,
+                MinorCode = code.MinorNumber ?? -1,
                 NumParameters = (byte)code.Parameters.Count
             };
+
+            if (!code.MajorNumber.HasValue)
+            {
+                header.Flags |= CodeFlags.NoMajorCommandNumber;
+            }
+            if (!code.MinorNumber.HasValue)
+            {
+                header.Flags |= CodeFlags.NoMinorCommandNumber;
+            }
             if (code.IsPausable)
             {
                 header.Flags |= CodeFlags.Pausable;
@@ -201,8 +208,7 @@ namespace DuetControlServer.SPI.Serialization
                     Span<byte> asUnicode = Encoding.UTF8.GetBytes(value);
                     asUnicode.CopyTo(to.Slice(bytesWritten));
                     bytesWritten += asUnicode.Length;
-                    to[bytesWritten] = 0;
-                    bytesWritten++;
+                    bytesWritten = AddPadding(to, bytesWritten);
                 }
                 else
                 {
@@ -210,7 +216,7 @@ namespace DuetControlServer.SPI.Serialization
                 }
             }
 
-            return AddPadding(to, bytesWritten);
+            return bytesWritten;
         }
         
         /// <summary>
@@ -245,13 +251,14 @@ namespace DuetControlServer.SPI.Serialization
                 throw new ArgumentException("Value is too long", nameof(field));
             }
             
+            // First the header followed by the field path plus optional padding
             SetObjectModel request = new SetObjectModel
             {
                 FieldLength = (byte)unicodeField.Length
             };
-            int bytesWritten = Marshal.SizeOf(request) + unicodeField.Length + 1;
+            int bytesWritten = AddPadding(to, Marshal.SizeOf(request) + unicodeField.Length);
             
-            // Write object value
+            // Then the object value
             if (value is int intValue)
             {
                 request.Type = DataType.Int;
@@ -307,8 +314,7 @@ namespace DuetControlServer.SPI.Serialization
                 request.IntValue = asUnicode.Length;
                 asUnicode.CopyTo(to.Slice(bytesWritten));
                 bytesWritten += asUnicode.Length;
-                to[bytesWritten] = 0;
-                bytesWritten++;
+                bytesWritten = AddPadding(to, bytesWritten);
             }
             else
             {
@@ -318,9 +324,7 @@ namespace DuetControlServer.SPI.Serialization
             // Write request and field name
             MemoryMarshal.Write(to, ref request);
             unicodeField.CopyTo(to.Slice(Marshal.SizeOf(request)));
-            to[Marshal.SizeOf(request) + unicodeField.Length] = 0;
-            
-            return AddPadding(to, bytesWritten);
+            return bytesWritten;
         }
 
         /// <summary>
@@ -331,6 +335,18 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes written</returns>
         public static int WriteFilePrintInfo(Span<byte> to, ParsedFileInfo info)
         {
+            Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName);
+            if (unicodeFilename.Length > 254)
+            {
+                throw new ArgumentException("Value is too long", nameof(info.FileName));
+            }
+
+            Span<byte> unicodeGeneratedBy = Encoding.UTF8.GetBytes(info.GeneratedBy);
+            if (unicodeGeneratedBy.Length > 254)
+            {
+                throw new ArgumentException("Value is too long", nameof(info.GeneratedBy));
+            }
+
             // Write header
             SetFilePrintInfo header = new SetFilePrintInfo
             {
@@ -339,9 +355,11 @@ namespace DuetControlServer.SPI.Serialization
                 FirstLayerHeight = (float)info.FirstLayerHeight,
                 LastModifiedTime = info.LastModified.HasValue ? (ulong)(info.LastModified.Value - new DateTime (1970, 1, 1)).TotalSeconds : 0,
                 LayerHeight = (float)info.LayerHeight,
-                NumFilaments = (uint)info.Filament.Length,
                 ObjectHeight = (float)info.Height,
-                SimulatedTime = (uint)Math.Round(info.SimulatedTime)
+                SimulatedTime = (uint)Math.Round(info.SimulatedTime),
+                FilenameLength = (byte)unicodeFilename.Length,
+                GeneratedByLength  = (byte)unicodeGeneratedBy.Length,
+                NumFilaments = (ushort)info.Filament.Length,
             };
             MemoryMarshal.Write(to, ref header);
             int bytesWritten = Marshal.SizeOf(header);
@@ -355,33 +373,28 @@ namespace DuetControlServer.SPI.Serialization
             }
             
             // Write filename
-            Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName);
             unicodeFilename.CopyTo(to.Slice(bytesWritten));
             bytesWritten += unicodeFilename.Length;
-            to[bytesWritten] = 0;
-            bytesWritten++;
             
             // Write slicer
-            Span<byte> unicodeGeneratedBy = Encoding.UTF8.GetBytes(info.GeneratedBy);
             unicodeGeneratedBy.CopyTo(to.Slice(bytesWritten));
             bytesWritten += unicodeGeneratedBy.Length;
-            to[bytesWritten] = 0;
-            bytesWritten++;
-            
             return AddPadding(to, bytesWritten);
         }
-        
+
         /// <summary>
         /// Write notification about a completed macro file
         /// </summary>
         /// <param name="span">Destination</param>
         /// <param name="channel">Channel where the macro file has finished</param>
+        /// <param name="error">Whether an error occurred when trying to open/process the macro file</param>
         /// <returns>Number of bytes written</returns>
-        public static int WriteMacroCompleted(Span<byte> span, CodeChannel channel)
+        public static int WriteMacroCompleted(Span<byte> span, CodeChannel channel, bool error)
         {
             MacroCompleted header = new MacroCompleted
             {
-                Channel = channel
+                Channel = channel,
+                Error = (byte)(error ? 1 : 0)
             };
             MemoryMarshal.Write(span, ref header);
             return Marshal.SizeOf(header);
@@ -398,6 +411,5 @@ namespace DuetControlServer.SPI.Serialization
 
             return bytesWritten;
         }
-
     }
 }

@@ -73,7 +73,6 @@ namespace DuetControlServer
                 return;
             }
             
-            // Add an empty line so NLog can take over from here on
             Console.WriteLine();
             
             // Run the main tasks in the background

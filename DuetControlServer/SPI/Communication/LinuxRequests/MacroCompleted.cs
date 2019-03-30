@@ -13,5 +13,10 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// Channel on which the execution was done
         /// </summary>
         public CodeChannel Channel;
+
+        /// <summary>
+        /// Error flag. This is true if the file could not be found or opened
+        /// </summary>
+        public byte Error;
     }
 }

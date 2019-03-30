@@ -137,6 +137,7 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="objectModel">Updated full object model</param>
         public static void Update(Model objectModel)
         {
+            // This is probably really slow and needs to be improved!
             JObject newModel = JObject.FromObject(objectModel, JsonHelper.DefaultSerializer);
             if (_subscriptions.Count != 0)
             {

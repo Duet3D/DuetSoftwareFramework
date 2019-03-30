@@ -4,12 +4,207 @@
         <name>DuetAPIClient</name>
     </assembly>
     <members>
-        <member name="T:DuetAPIClient.CommandException">
+        <member name="T:DuetAPIClient.BaseConnection">
             <summary>
-            Wrapper around server-side exceptions
+            Base class for connections that access the control server via the Duet API using a UNIX socket
             </summary>
         </member>
-        <member name="M:DuetAPIClient.CommandException.#ctor(System.String,System.String,System.String)">
+        <member name="M:DuetAPIClient.BaseConnection.#ctor(DuetAPI.Connection.ConnectionMode)">
+            <summary>
+            Create a new connection instance
+            <param name="mode">Desired mode of the connection</param>
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.BaseConnection.Connect(DuetAPI.Connection.ClientInitMessage,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Establishes a connection to the given UNIX socket file
+            </summary>
+            <param name="initMessage">Init message to send to the server</param>
+            <param name="socketPath">Path to the UNIX socket file</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
+            <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
+        </member>
+        <member name="P:DuetAPIClient.BaseConnection.IsConnected">
+            <summary>
+            Returns true if the socket is still connected
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.BaseConnection.Close">
+            <summary>
+            Closes the current connection and disposes it
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.BaseConnection.Dispose">
+            <summary>
+            Cleans up the current connection and all resources associated to it
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.BaseConnection.PerformCommand(DuetAPI.Commands.BaseCommand,System.Threading.CancellationToken)">
+            <summary>
+            Perform an arbitrary command
+            </summary>
+            <param name="command">Command to run</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Command result</returns>
+            <exception cref="T:DuetAPIClient.Exceptions.InternalServerException">Deserialized internal error from DCS</exception>
+        </member>
+        <member name="M:DuetAPIClient.BaseConnection.PerformCommand``1(DuetAPI.Commands.BaseCommand,System.Threading.CancellationToken)">
+            <summary>
+            Perform an arbitrary command
+            </summary>
+            <param name="command">Command to run</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Command result</returns>
+            <typeparam name="T">Type of the command result</typeparam>
+            <exception cref="T:DuetAPIClient.Exceptions.InternalServerException">Deserialized internal error from DCS</exception>
+        </member>
+        <member name="M:DuetAPIClient.BaseConnection.Receive``1(System.Threading.CancellationToken)">
+            <summary>
+            Receive a deserialized object from the server
+            </summary>
+            <param name="cancellationToken"></param>
+            <typeparam name="T"></typeparam>
+            <returns></returns>
+        </member>
+        <member name="M:DuetAPIClient.BaseConnection.ReceiveJson(System.Threading.CancellationToken)">
+            <summary>
+            Receive partially deserialized object from the server
+            </summary>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Partially deserialized data</returns>
+            <exception cref="T:System.IO.IOException">No valid JSON object was received</exception>
+        </member>
+        <member name="M:DuetAPIClient.BaseConnection.ReceiveSerializedJson(System.Threading.CancellationToken)">
+            <summary>
+            Receive a serialized object from the server
+            </summary>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Plain JSON</returns>
+        </member>
+        <member name="M:DuetAPIClient.BaseConnection.ReceiveSerializedJsonResponse(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Get a serialized object from a response container from the server.
+            If an internal error is reported, the received JSON is deserialized and the reported error is thrown.
+            </summary>
+            <param name="command">Name of the previously sent command</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Plain JSON</returns>
+            <exception cref="T:DuetAPIClient.Exceptions.InternalServerException">Deserialized internal error from DCS</exception>
+        </member>
+        <member name="M:DuetAPIClient.BaseConnection.Send(System.Object)">
+            <summary>
+            Serialize an arbitrary object into JSON and send it to the server plus NL
+            </summary>
+            <param name="obj">Object to send</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="T:DuetAPIClient.CommandConnection">
+            <summary>
+            Connection class for sending commands to the control server
+            </summary>
+            <seealso cref="F:DuetAPI.Connection.ConnectionMode.Command"/>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.#ctor">
+            <summary>
+            Creates a new connection in command mode
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.#ctor(DuetAPI.Connection.ConnectionMode)">
+            <summary>
+            Protected constructor for derived modes that can issue regular commands
+            </summary>
+            <param name="mode">Connection type</param>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.Connect(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Establishes a connection to the given UNIX socket file
+            </summary>
+            <param name="socketPath">Path to the UNIX socket file</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
+            <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.GetFileInfo(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Parses a G-code file and returns file information about it
+            </summary>
+            <param name="fileName">The file to parse</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Retrieved file information</returns>
+            <seealso cref="M:DuetAPIClient.CommandConnection.GetFileInfo(System.String,System.Threading.CancellationToken)"/>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.PerformCode(DuetAPI.Commands.Code,System.Threading.CancellationToken)">
+            <summary>
+            Executes an arbitrary pre-parsed code
+            </summary>
+            <param name="code">The code to execute</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>The result of the given code</returns>
+            <seealso cref="T:DuetAPI.Commands.Code"/>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.PerformSimpleCode(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Executes an arbitrary G/M/T-code in text form and returns the result as a string
+            </summary>
+            <param name="code">The code to execute</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>The code result as a string</returns>
+            <seealso cref="T:DuetAPI.Commands.SimpleCode"/>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.GetMachineModel(System.Threading.CancellationToken)">
+            <summary>
+            Retrieves the full object model of the machine
+            In subscription mode this is the first command that has to be called once a connection has been established.
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>The current machine model</returns>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.GetSerializedMachineModel(System.Threading.CancellationToken)">
+            <summary>
+            Optimized method to query the machine model JSON in any mode.
+            May be used to get machine model patches as well.
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Machine model JSON</returns>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.ResolvePath(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Resolve a RepRapFirmware-style file path to a real file path
+            </summary>
+            <param name="path">File path to resolve</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Resolved file path</returns>
+        </member>
+        <member name="T:DuetAPIClient.Exceptions.IncompatibleVersionException">
+            <summary>
+            Exception class that is thrown if the API version of the client is incompatible to the server
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.Exceptions.IncompatibleVersionException.#ctor">
+            <summary>
+            Creates a new exception instance
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.Exceptions.IncompatibleVersionException.#ctor(System.String)">
+            <summary>
+            Creates a new exception instance
+            </summary>
+            <param name="message">Error message</param>
+        </member>
+        <member name="M:DuetAPIClient.Exceptions.IncompatibleVersionException.#ctor(System.String,System.Exception)">
+            <summary>
+            Creates a new exception instance
+            </summary>
+            <param name="message">Error message</param>
+            <param name="innerException">Inner exception</param>
+        </member>
+        <member name="T:DuetAPIClient.Exceptions.InternalServerException">
+            <summary>
+            Wrapper around internal server-side exceptions that are reported as part of command responses
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.Exceptions.InternalServerException.#ctor(System.String,System.String,System.String)">
             <summary>
             Creates a new CommandException instance
             </summary>
@@ -17,117 +212,89 @@
             <param name="type">Type of the thrown .NET error</param>
             <param name="message">Message of the thrown .NET error</param>
         </member>
-        <member name="M:DuetAPIClient.CommandException.MakeException(System.String,System.String)">
+        <member name="T:DuetAPIClient.InterceptConnection">
             <summary>
-            Generates an exception from the given type and message
+            Connection class for intercepting G/M/T-codes from the control server
             </summary>
-            <param name="type">Type of the thrown .NET error</param>
-            <param name="message">Message of the thrown .NET error</param>
-            <returns>Generated exception</returns>
+            <seealso cref="F:DuetAPI.Connection.ConnectionMode.Intercept"/>
         </member>
-        <member name="T:DuetAPIClient.Connection">
+        <member name="M:DuetAPIClient.InterceptConnection.#ctor">
             <summary>
-            Interface class for simple access to the control server via the Duet API using a UNIX socket
+            Creates a new connection in interception mode
             </summary>
         </member>
-        <member name="M:DuetAPIClient.Connection.#ctor(DuetAPI.Connection.ConnectionType)">
-            <summary>
-            Create a new connection instance
-            <param name="type">Desired mode of the connection</param>
-            <seealso cref="M:DuetAPIClient.Connection.Connect(System.String,System.Threading.CancellationToken)"/>
-            </summary>
-        </member>
-        <member name="M:DuetAPIClient.Connection.Connect(System.String,System.Threading.CancellationToken)">
+        <member name="M:DuetAPIClient.InterceptConnection.Connect(DuetAPI.Connection.InterceptionMode,System.String,System.Threading.CancellationToken)">
             <summary>
             Establishes a connection to the given UNIX socket file
             </summary>
+            <param name="mode">Interception mode</param>
             <param name="socketPath">Path to the UNIX socket file</param>
             <param name="cancellationToken">Optional cancellation token</param>
-            <exception cref="T:System.InvalidOperationException">API level is incompatible</exception>
+            <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
         </member>
-        <member name="P:DuetAPIClient.Connection.IsConnected">
+        <member name="M:DuetAPIClient.InterceptConnection.ReceiveCode(System.Threading.CancellationToken)">
             <summary>
-            Returns true if the socket is still connected
+            Wait for a code to be intercepted and read it
             </summary>
-        </member>
-        <member name="M:DuetAPIClient.Connection.Close">
-            <summary>
-            Closes the current connection and disposes it
-            </summary>
-        </member>
-        <member name="M:DuetAPIClient.Connection.Dispose">
-            <summary>
-            Cleans up the current connection and all resources associated to it
-            </summary>
-        </member>
-        <member name="M:DuetAPIClient.Connection.Flush">
-            <summary>
-            Instructs the control server to flush all pending commands and to finish all pending moves (like M400 in RepRapFirmware)
-            </summary>
-            <seealso cref="T:DuetAPI.Commands.Flush"/>
-        </member>
-        <member name="M:DuetAPIClient.Connection.GetFileInfo(System.String)">
-            <summary>
-            Parses a G-code file and returns file information about it
-            </summary>
-            <param name="fileName">The file to parse</param>
-            <returns>Retrieved file information</returns>
-            <seealso cref="M:DuetAPIClient.Connection.GetFileInfo(System.String)"/>
-        </member>
-        <member name="M:DuetAPIClient.Connection.GetMachineModel(System.Threading.CancellationToken)">
-            <summary>
-            Retrieves the full object model of the machine
-            In subscription mode this is the first command that has to be called once a connection has been established.
-            </summary>
-            <returns>The current machine model</returns>
-        </member>
-        <member name="M:DuetAPIClient.Connection.PerformCode(DuetAPI.Commands.Code)">
-            <summary>
-            Executes an arbitrary pre-parsed code
-            </summary>
-            <param name="code">The code to execute</param>
-            <returns>The result of the given code</returns>
-            <seealso cref="T:DuetAPI.Commands.Code"/>
-        </member>
-        <member name="M:DuetAPIClient.Connection.PerformSimpleCode(System.String)">
-            <summary>
-            Executes an arbitrary G/M/T-code in text form and returns the result as a string
-            </summary>
-            <param name="code">The code to execute</param>
-            <returns>The code result as a string</returns>
-            <seealso cref="T:DuetAPI.Commands.SimpleCode"/>
-        </member>
-        <member name="M:DuetAPIClient.Connection.ReceiveCode(System.Threading.CancellationToken)">
-            <summary>
-            Wait for a code to be intercepted
-            </summary>
-            <param name="cancellationToken">An optional cancellation token</param>
+            <param name="cancellationToken">Optional cancellation token</param>
             <returns>A code that can be intercepted</returns>
         </member>
-        <member name="M:DuetAPIClient.Connection.ResolvePath(System.String)">
-            <summary>
-            Resolve a RepRapFirmware-style file path to a real file path
-            </summary>
-            <param name="path">File path to resolve</param>
-            <returns>Resolved file path</returns>
-        </member>
-        <member name="M:DuetAPIClient.Connection.IgnoreCode">
+        <member name="M:DuetAPIClient.InterceptConnection.IgnoreCode(System.Threading.CancellationToken)">
             <summary>
             Instruct the control server to ignore the last received code (in intercepting mode)
             </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
             <seealso cref="T:DuetAPI.Commands.Ignore"/>
         </member>
-        <member name="M:DuetAPIClient.Connection.ResolveCode(DuetAPI.MessageType,System.String)">
+        <member name="M:DuetAPIClient.InterceptConnection.ResolveCode(DuetAPI.MessageType,System.String,System.Threading.CancellationToken)">
             <summary>
             Instruct the control server to resolve the last received code with the given message details (in intercepting mode)
             </summary>
             <param name="type">Type of the resolving message</param>
             <param name="content">Content of the resolving message</param>
+            <param name="cancellationToken">Optional cancellation token</param>
             <seealso cref="T:DuetAPI.Message"/>
             <seealso cref="T:DuetAPI.Commands.Resolve"/>
         </member>
-        <member name="M:DuetAPIClient.Connection.GetMachineModelPatch(System.Threading.CancellationToken)">
+        <member name="T:DuetAPIClient.SubscribeConnection">
+            <summary>
+            Connection class for subscribing to model updates
+            </summary>
+            <seealso cref="F:DuetAPI.Connection.ConnectionMode.Subscribe"/>
+        </member>
+        <member name="M:DuetAPIClient.SubscribeConnection.#ctor">
+            <summary>
+            Creates a new connection in intercept mode
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.SubscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Establishes a connection to the given UNIX socket file
+            </summary>
+            <param name="mode">Subscription mode</param>
+            <param name="socketPath">Path to the UNIX socket file</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
+            <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
+        </member>
+        <member name="M:DuetAPIClient.SubscribeConnection.GetMachineModel(System.Threading.CancellationToken)">
+            <summary>
+            Retrieves the full object model of the machine
+            In subscription mode this is the first command that has to be called once a connection has been established.
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>The current machine model</returns>
+        </member>
+        <member name="M:DuetAPIClient.SubscribeConnection.GetSerializedMachineModel(System.Threading.CancellationToken)">
+            <summary>
+            Optimized method to query the machine model JSON in any mode.
+            May be used to get machine model patches as well.
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Machine model JSON</returns>
+        </member>
+        <member name="M:DuetAPIClient.SubscribeConnection.GetMachineModelPatch(System.Threading.CancellationToken)">
             <summary>
             Receive a (partial) machine model update.
             If the subscription mode is set to <see cref="F:DuetAPI.Connection.SubscriptionMode.Patch"/>, new update patches of the object model
@@ -135,7 +302,7 @@
             </summary>
             <param name="cancellationToken">An optional cancellation token</param>
             <returns>The partial update JSON</returns>
-            <seealso cref="M:DuetAPIClient.Connection.GetMachineModel(System.Threading.CancellationToken)"/>
+            <seealso cref="M:DuetAPIClient.SubscribeConnection.GetMachineModel(System.Threading.CancellationToken)"/>
             <seealso cref="M:DuetAPI.JsonHelper.PatchObject(System.Object,Newtonsoft.Json.Linq.JObject)"/>
         </member>
     </members>

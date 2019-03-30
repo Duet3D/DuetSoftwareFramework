@@ -17,6 +17,11 @@ namespace DuetControlServer.SPI.Communication.DuetRequests
         /// This is an error message
         /// </summary>
         Error = 2,
+
+        /// <summary>
+        /// There is more to come in the next transmission
+        /// </summary>
+        Push = 64,
         
         /// <summary>
         /// This is a final code response

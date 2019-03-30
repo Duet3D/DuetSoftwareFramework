@@ -1,28 +1,39 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using DuetAPI.Commands;
 
 namespace DuetControlServer.SPI
 {
+    /// <summary>
+    /// This class accesses RepRapFirmware via SPI and deals with general communication
+    /// </summary>
     public static class Connector
     {
         private static ushort codeIdCounter = 0;
         private static readonly BufferBlock<BaseCommand> pendingCommands = new BufferBlock<BaseCommand>();
+        private static readonly Dictionary<CodeChannel, BufferBlock<QueuedCode>> queuedCodes = new Dictionary<CodeChannel, BufferBlock<QueuedCode>>();
         // TODO: Implement flush mechanism
 
+        /// <summary>
+        /// Initialize physical transfer and perform initial data transfer
+        /// </summary>
         public static void Connect()
         {
-            // TODO handshake and version check
+            // Initialize SPI and GPIO pin
+            DataTransfer.Initialize();
+
+            // Do one transfer to ensure both sides are using compatible versions of the data protocol
+            DataTransfer.PerformFullTransfer();
         }
 
         public static async Task Run()
         {
             // TODO:
-            // 1) Create connection
-            // 2) Run config.g/config.g.bak
-            // 3) Deal with internal code streams
-            // 4) Deal with pausing
-            // 5) Keep the model up-to-date
+            // 1) Deal with internal code streams
+            // 2) Deal with pausing
+            // 3) Keep the model up-to-date
+            // 4) When writing codes check maximum encoded size!
             await Task.Delay(-1, Program.CancelSource.Token);
         }
 

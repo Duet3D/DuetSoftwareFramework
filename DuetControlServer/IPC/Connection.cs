@@ -182,7 +182,7 @@ namespace DuetControlServer.IPC
         }
         
         /// <summary>
-        /// Send a plain JSON object to the client
+        /// Send a JSON object to the client
         /// </summary>
         /// <param name="obj">Object to send</param>
         /// <returns>Asynchronous task</returns>
@@ -192,7 +192,7 @@ namespace DuetControlServer.IPC
         }
         
         /// <summary>
-        /// Send a plain text to the client
+        /// Send plain text to the client
         /// </summary>
         /// <param name="text">Text to send</param>
         /// <returns>Asynchronous task</returns>

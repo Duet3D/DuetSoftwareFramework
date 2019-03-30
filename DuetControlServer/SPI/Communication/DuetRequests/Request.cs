@@ -6,43 +6,48 @@ namespace DuetControlServer.SPI.Communication.DuetRequests
     public enum Request : ushort
     {
         /// <summary>
+        /// Response to the state request
+        /// </summary>
+        ReportState = 0,
+
+        /// <summary>
         /// Response to an object model request
         /// </summary>
-        ObjectModel = 0,
+        ObjectModel = 1,
         
         /// <summary>
         /// Response to a G/M/T-code
         /// </summary>
-        CodeReply = 1,
+        CodeReply = 2,
         
         /// <summary>
-        /// Request the execution of a macro file
+        /// Request execution of a macro file
         /// </summary>
-        MacroRequest = 2,
+        MacroRequest = 3,
+
+        /// <summary>
+        /// Request current file to be closed
+        /// </summary>
+        FileAbortRequest = 4,
         
         /// <summary>
         /// Stack has been pushed
         /// </summary>
-        StackPushed = 3,
+        StackPushed = 5,
         
         /// <summary>
         /// Stack has been popped
         /// </summary>
-        StackPopped = 4,
+        StackPopped = 6,
         
         /// <summary>
         /// Print has been paused
         /// </summary>
-        PrintPaused = 5,
+        PrintPaused = 7,
         
         /// <summary>
         /// Response to a heightmap request
         /// </summary>
-        Heightmap = 6,
-        
-        /// <summary>
-        /// Resend a received packet (most likely because the checksum did not match)
-        /// </summary>
-        ResendPacket = 255
+        Heightmap = 8
     }
 }

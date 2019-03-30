@@ -40,15 +40,6 @@ namespace DuetAPIClient
         }
 
         /// <summary>
-        /// Instructs the control server to flush all pending commands and to finish all pending moves (like M400 in RepRapFirmware)
-        /// </summary>
-        /// <seealso cref="DuetAPI.Commands.Flush"/>
-        public async Task Flush(CancellationToken cancellationToken = default(CancellationToken))
-        {
-            await PerformCommand(new Flush(), cancellationToken);
-        }
-
-        /// <summary>
         /// Parses a G-code file and returns file information about it
         /// </summary>
         /// <param name="fileName">The file to parse</param>

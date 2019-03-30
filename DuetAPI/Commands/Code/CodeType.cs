@@ -3,7 +3,7 @@
 namespace DuetAPI.Commands
 {
     /// <summary>
-    /// Type of a generic G/M/T-code. If none is applicable, is treated as a comment
+    /// Type of a generic G/M/T-code. If none is applicable, it is treated as a comment
     /// </summary>
     [JsonConverter(typeof(CharEnumConverter))]
     public enum CodeType
