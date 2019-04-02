@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 
-namespace DuetControlServer.SPI.Communication.DuetRequests
+namespace DuetControlServer.SPI.Communication.SharedRequests
 {
     /// <summary>
-    /// Response to a <see cref="DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModel"/> request
+    /// Shared header for the <see cref="LinuxRequests.Request.GetObjectModel"/> and <see cref="FirmwareRequests.Request.ObjectModel"/> requests
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Size = 4)]
     public struct ObjectModel

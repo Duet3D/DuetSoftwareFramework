@@ -10,7 +10,7 @@ namespace DuetAPI
         /// <summary>
         /// This is a success message
         /// </summary>
-        Success,
+        Success = 0,
 
         /// <summary>
         /// This is a warning message

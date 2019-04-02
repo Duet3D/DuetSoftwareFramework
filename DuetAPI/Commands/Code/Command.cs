@@ -66,13 +66,8 @@ namespace DuetAPI.Commands
         /// <summary>
         /// File position in bytes (optional)
         /// </summary>
-        public uint FilePosition { get; set; }
+        public uint? FilePosition { get; set; }
         
-        /// <summary>
-        /// Defines whether a print can be paused at this code
-        /// </summary>
-        public bool IsPausable { get; set; }
-
         /// <summary>
         /// Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!
         /// </summary>

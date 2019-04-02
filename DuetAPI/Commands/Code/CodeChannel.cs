@@ -7,23 +7,53 @@
     public enum CodeChannel : byte
     {
         /// <summary>
-        /// G/M/T-code channel for files (print jobs)
+        /// Code channel for HTTP requests
         /// </summary>
-        File = 0,
+        HTTP = 0,
 
         /// <summary>
-        /// G/M/T-code channel for HTTP requests (DWC)
+        /// Code channel for Telnet requests
         /// </summary>
-        HTTP = 1,
+        Telnet = 1,
 
         /// <summary>
-        /// G/M/T-code channel for Telnet requests
+        /// Code channel for file prints
         /// </summary>
-        Telnet = 2,
+        File = 2,
 
         /// <summary>
-        /// Main G/M/T-code channel
+        /// Code channel for USB requests
         /// </summary>
-        SPI = 3
+        USB = 3,
+
+        /// <summary>
+        /// Code channel for serial devices (e.g. PanelDue)
+        /// </summary>
+        AUX = 4,
+
+        /// <summary>
+        /// Code channel for running triggers or config.g
+        /// </summary>
+        Daemon = 5,
+
+        /// <summary>
+        /// Code channel for the code queue that executes a couple of codes in-sync with moves
+        /// </summary>
+        CodeQueue = 6,
+
+        /// <summary>
+        /// Code channel for auxiliary LCD devices (e.g. PanelOne)
+        /// </summary>
+        LCD = 7,
+
+        /// <summary>
+        /// Default code channel for requests over SPI
+        /// </summary>
+        SPI = 8,
+
+        /// <summary>
+        /// Code channel that executes macros on power fail, heater faults and filament out
+        /// </summary>
+        AutoPause = 9
     }
 }

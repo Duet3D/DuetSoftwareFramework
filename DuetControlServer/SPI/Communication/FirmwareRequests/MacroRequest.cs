@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using DuetAPI.Commands;
 
-namespace DuetControlServer.SPI.Communication.DuetRequests
+namespace DuetControlServer.SPI.Communication.FirmwareRequests
 {
     /// <summary>
     /// Request the execution of a macro file
@@ -13,5 +13,10 @@ namespace DuetControlServer.SPI.Communication.DuetRequests
         /// Channel to pipe the macro content into
         /// </summary>
         public CodeChannel Channel;
+
+        /// <summary>
+        /// Output a warning message if the file could not be found
+        /// </summary>
+        public byte ReportMissing;
     }
 }

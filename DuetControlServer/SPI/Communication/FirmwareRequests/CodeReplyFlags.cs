@@ -1,6 +1,6 @@
 using System;
 
-namespace DuetControlServer.SPI.Communication.DuetRequests
+namespace DuetControlServer.SPI.Communication.FirmwareRequests
 {
     /// <summary>
     /// Flags describing the message

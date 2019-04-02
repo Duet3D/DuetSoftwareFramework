@@ -7,7 +7,7 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
     /// the filament consumption and the actual name of the file being printed.
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 4, Size = 36)]
-    public struct SetFilePrintInfo
+    public struct PrintStarted
     {
         /// <summary>
         /// Size of the file in bytes

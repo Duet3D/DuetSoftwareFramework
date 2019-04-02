@@ -42,16 +42,21 @@ namespace DuetUnitTest.SPI
         public void PacketHeader()
         {
             Span<byte> span = new byte[128];
+            span.Fill(0xFF);
             
-            Writer.WritePacketHeader(span, Request.Reset, 1054);
+            Writer.WritePacketHeader(span, Request.Reset, 12, 1054);
             
             // Header
             ushort request = MemoryMarshal.Read<ushort>(span.Slice(0, 2));
             Assert.AreEqual((ushort)Request.Reset, request);
-            ushort packetLength = MemoryMarshal.Read<ushort>(span.Slice(2, 2));
+            ushort packetId = MemoryMarshal.Read<ushort>(span.Slice(2, 2));
+            Assert.AreEqual(12, packetId);
+            ushort packetLength = MemoryMarshal.Read<ushort>(span.Slice(4, 2));
             Assert.AreEqual(1054, packetLength);
-            
-            // No padding
+
+            // Padding
+            Assert.AreEqual(0, span[6]);
+            Assert.AreEqual(0, span[7]);
         }
 
         [Test]

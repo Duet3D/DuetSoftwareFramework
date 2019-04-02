@@ -48,7 +48,10 @@ namespace DuetControlServer.SPI
             // Exchange transfer data
             if ((header.DataLength != 0 || bytesToWrite != 0) && ExchangeData(header.DataLength))
             {
+                // TODO clear tx buffer completely on emergency stop
                 // TODO parse packets
+                // TODO if the config.g macro is supposed to be executed, run config.bak if it does not exist
+                // TODO to find out if a code has finished, request the state after a code reply has been received
             }
         }
 

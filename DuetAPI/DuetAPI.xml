@@ -127,24 +127,54 @@
             <seealso cref="T:DuetAPI.Machine.Channels.Model"/>
             </summary>
         </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.File">
-            <summary>
-            G/M/T-code channel for files (print jobs)
-            </summary>
-        </member>
         <member name="F:DuetAPI.Commands.CodeChannel.HTTP">
             <summary>
-            G/M/T-code channel for HTTP requests (DWC)
+            Code channel for HTTP requests
             </summary>
         </member>
         <member name="F:DuetAPI.Commands.CodeChannel.Telnet">
             <summary>
-            G/M/T-code channel for Telnet requests
+            Code channel for Telnet requests
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.File">
+            <summary>
+            Code channel for file prints
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.USB">
+            <summary>
+            Code channel for USB requests
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.AUX">
+            <summary>
+            Code channel for serial devices (e.g. PanelDue)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.Daemon">
+            <summary>
+            Code channel for running triggers or config.g
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.CodeQueue">
+            <summary>
+            Code channel for the code queue that executes a couple of codes in-sync with moves
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.LCD">
+            <summary>
+            Code channel for auxiliary LCD devices (e.g. PanelOne)
             </summary>
         </member>
         <member name="F:DuetAPI.Commands.CodeChannel.SPI">
             <summary>
-            Main G/M/T-code channel
+            Default code channel for requests over SPI
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeChannel.AutoPause">
+            <summary>
+            Code channel that executes macros on power fail, heater faults and filament out
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.CodeType">
@@ -234,11 +264,6 @@
         <member name="P:DuetAPI.Commands.Code.FilePosition">
             <summary>
             File position in bytes (optional)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Commands.Code.IsPausable">
-            <summary>
-            Defines whether a print can be paused at this code
             </summary>
         </member>
         <member name="M:DuetAPI.Commands.Code.GetParameter(System.Char)">

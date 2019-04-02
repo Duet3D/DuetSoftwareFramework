@@ -1,19 +1,19 @@
-namespace DuetControlServer.SPI.Communication.DuetRequests
+namespace DuetControlServer.SPI.Communication.FirmwareRequests
 {
     /// <summary>
     /// Header for heightmap reports
     /// </summary>
-    public struct HeightmapHeader
+    public struct HeightMap
     {
         /// <summary>
         /// X start coordinate of the heightmap
         /// </summary>
-        public float XStart;
+        public float XMin;
         
         /// <summary>
         /// X end coordinate of the heightmap
         /// </summary>
-        public float XEnd;
+        public float XMax;
         
         /// <summary>
         /// Spacing between the probe points in X direction
@@ -23,16 +23,26 @@ namespace DuetControlServer.SPI.Communication.DuetRequests
         /// <summary>
         /// Y start coordinate of the heightmap
         /// </summary>
-        public float YStart;
+        public float YMin;
         
         /// <summary>
         /// Y end coordinate of the heightmap
         /// </summary>
-        public float YEnd;
+        public float YMax;
         
         /// <summary>
         /// Spacing between the probe points in Y direction
         /// </summary>
         public float YSpacing;
+
+        /// <summary>
+        /// Probing radius on delta geometries
+        /// </summary>
+        public float Radius;
+
+        /// <summary>
+        /// Number of probe points
+        /// </summary>
+        public uint NumPoints;
     }
 }

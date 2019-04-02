@@ -6,6 +6,7 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.LinuxRequests;
+using DuetControlServer.SPI.Communication.SharedRequests;
 using Code = DuetControlServer.Commands.Code;
 using CodeParameter = DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter;
 
@@ -49,19 +50,22 @@ namespace DuetControlServer.SPI.Serialization
         /// Size of a packet header
         /// </summary>
         public static readonly int PacketHeaderSize = Marshal.SizeOf(typeof(PacketHeader));
-        
+
         /// <summary>
         /// Write an arbitrary packet header to a memory span
         /// </summary>
         /// <param name="to">Destination</param>
         /// <param name="request">Packet type</param>
+        /// <param name="id">Packet ID</param>
         /// <param name="length">Length of the packet</param>
-        public static void WritePacketHeader(Span<byte> to, Request request, int length)
+        public static void WritePacketHeader(Span<byte> to, Request request, ushort id, int length)
         {
             PacketHeader header = new PacketHeader()
             {
                 Request = (ushort)request,
-                Length = (ushort)length
+                Id = id,
+                Length = (ushort)length,
+                ResendPacketId = 0
             };
             MemoryMarshal.Write(to, ref header);
         }
@@ -80,7 +84,7 @@ namespace DuetControlServer.SPI.Serialization
             CodeHeader header = new CodeHeader
             {
                 Channel = code.Source,
-                FilePosition = code.FilePosition,
+                FilePosition = code.FilePosition.HasValue ? code.FilePosition.Value : 0,
                 Letter = (byte)code.Type,
                 MajorCode = code.MajorNumber ?? -1,
                 MinorCode = code.MinorNumber ?? -1,
@@ -95,21 +99,13 @@ namespace DuetControlServer.SPI.Serialization
             {
                 header.Flags |= CodeFlags.NoMinorCommandNumber;
             }
-            if (code.IsPausable)
+            if (code.FilePosition.HasValue)
             {
-                header.Flags |= CodeFlags.Pausable;
+                header.Flags |= CodeFlags.FilePositionValid;
             }
             if (code.EnforceAbsoluteCoordinates)
             {
                 header.Flags |= CodeFlags.EnforceAbsolutePosition;
-            }
-            if (code.IsFromConfig)
-            {
-                header.Flags |= CodeFlags.FromConfig;
-            }
-            if (code.IsFromConfigOverride)
-            {
-                header.Flags |= CodeFlags.FromConfigOverride;
             }
             
             MemoryMarshal.Write(to, ref header);
@@ -220,14 +216,14 @@ namespace DuetControlServer.SPI.Serialization
         }
         
         /// <summary>
-        /// Write a <see cref="GetObjectModel"/> request to a memory span
+        /// Write a <see cref="ObjectModel"/> request to a memory span
         /// </summary>
         /// <param name="to">Destination</param>
         /// <param name="module">Module to query the object model from</param>
         /// <returns>Number of bytes written</returns>
         public static int WriteObjectModelRequest(Span<byte> to, byte module)
         {
-            GetObjectModel request = new GetObjectModel
+            ObjectModel request = new ObjectModel
             {
                 Module = module
             };
@@ -348,7 +344,7 @@ namespace DuetControlServer.SPI.Serialization
             }
 
             // Write header
-            SetFilePrintInfo header = new SetFilePrintInfo
+            PrintStarted header = new PrintStarted
             {
                 PrintTime = (uint)Math.Round(info.PrintTime),
                 FileSize = (uint)info.Size,

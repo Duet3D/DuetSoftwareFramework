@@ -10,7 +10,6 @@ namespace DuetControlServer.SPI
     /// </summary>
     public static class Connector
     {
-        private static ushort codeIdCounter = 0;
         private static readonly BufferBlock<BaseCommand> pendingCommands = new BufferBlock<BaseCommand>();
         private static readonly Dictionary<CodeChannel, BufferBlock<QueuedCode>> queuedCodes = new Dictionary<CodeChannel, BufferBlock<QueuedCode>>();
         // TODO: Implement flush mechanism
