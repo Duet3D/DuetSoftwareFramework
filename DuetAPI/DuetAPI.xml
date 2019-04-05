@@ -519,6 +519,11 @@
             Code to parse and execute
             </summary>
         </member>
+        <member name="P:DuetAPI.Commands.SimpleCode.Channel">
+            <summary>
+            Destination channel
+            </summary>
+        </member>
         <member name="T:DuetAPI.Connection.ClientInitMessage">
             <summary>
             An instance of this class is sent from the client to the server as a response to the <see cref="T:DuetAPI.Connection.ServerInitMessage"/>.
@@ -1686,6 +1691,11 @@
         <member name="T:DuetAPI.Machine.Move.Extruder">
             <summary>
             Information about an extruder drive
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.Extruder.Drives">
+            <summary>
+            Drive of this extruder
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Move.Extruder.Factor">

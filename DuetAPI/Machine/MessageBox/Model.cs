@@ -25,7 +25,7 @@ namespace DuetAPI.Machine.MessageBox
         /// <summary>
         /// Optional axis movement controls to show (axis indices)
         /// </summary>
-        public uint[] AxisControls { get; set; } = new uint[0];
+        public int[] AxisControls { get; set; } = new int[0];
 
         /// <summary>
         /// Creates a clone of this instance
@@ -38,7 +38,7 @@ namespace DuetAPI.Machine.MessageBox
                 Mode = Mode,
                 Title = (Title != null) ? string.Copy(Title) : null,
                 Message = (Message != null) ? string.Copy(Message) : null,
-                AxisControls = (uint[])AxisControls.Clone()
+                AxisControls = (int[])AxisControls.Clone()
             };
         }
     }

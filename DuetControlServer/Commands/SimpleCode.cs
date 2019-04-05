@@ -14,6 +14,7 @@ namespace DuetControlServer.Commands
         protected override async Task<string> Run()
         {
             Code code = new Code(Code) {
+                Channel = Channel,
                 SourceConnection = SourceConnection
             };
             object result = await code.Execute();

@@ -15,9 +15,9 @@ namespace DuetUnitTest.Machine
             Tool tool = new Tool
             {
                 Active = new double[] { 200, 220 },
-                Fans = new uint[] { 3 },
+                Fans = new int[] { 3 },
                 Filament = "PET-G",
-                Heaters = new uint[] { 4, 5 },
+                Heaters = new int[] { 4, 5 },
                 Mix = new[] { 0.4, 0.6 },
                 Name = "Mixing Tool",
                 Number = 3,
@@ -25,8 +25,8 @@ namespace DuetUnitTest.Machine
                 Spindle = 3,
                 Standby = new double[] { 40, 60 }
             };
-            tool.Axes.Add(new uint[] { 0 });
-            tool.Axes.Add(new uint[] { 1 });
+            tool.Axes.Add(new int[] { 0 });
+            tool.Axes.Add(new int[] { 1 });
             original.Tools.Add(tool);
 
             Model clone = (Model)original.Clone();

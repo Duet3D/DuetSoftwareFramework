@@ -11,7 +11,7 @@ namespace DuetUnitTest.Machine
         public void Clone()
         {
             Model original = new Model();
-            original.MessageBox.AxisControls = new uint[] { 1, 2 };
+            original.MessageBox.AxisControls = new int[] { 1, 2 };
             original.MessageBox.Message = "Message";
             original.MessageBox.Mode = MessageBoxMode.OkCancel;
             original.MessageBox.Title = "Title";

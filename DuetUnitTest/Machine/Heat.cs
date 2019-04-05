@@ -17,7 +17,7 @@ namespace DuetUnitTest.Machine
                 Active = new double[] { 123 },
                 Standby = new double[] { 456 },
                 Name = "Bed Name",
-                Heaters = new uint[] { 0 }
+                Heaters = new int[] { 0 }
             };
             original.Heat.Beds.Add(null);
             original.Heat.Beds.Add(bed);
@@ -27,7 +27,7 @@ namespace DuetUnitTest.Machine
                 Active = new double[] { 321 },
                 Standby = new double[] { 654 },
                 Name = "Chamber Name",
-                Heaters = new uint[] { 4, 6 }
+                Heaters = new int[] { 4, 6 }
             };
             original.Heat.Chambers.Add(null);
             original.Heat.Chambers.Add(chamber);

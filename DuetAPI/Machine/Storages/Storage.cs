@@ -15,22 +15,22 @@ namespace DuetAPI.Machine.Storages
         /// <summary>
         /// Speed of the storage device (in bytes/s or null if unknown)
         /// </summary>
-        public uint? Speed { get; set; }
+        public int? Speed { get; set; }
         
         /// <summary>
         /// Total capacity of the storage device (in bytes)
         /// </summary>
-        public ulong? Capacity { get; set; }
+        public long? Capacity { get; set; }
         
         /// <summary>
         /// How much space is still available on this device (in bytes)
         /// </summary>
-        public ulong? Free { get; set; }
+        public long? Free { get; set; }
         
         /// <summary>
         /// Number of currently open files or null if unknown
         /// </summary>
-        public uint? OpenFiles { get; set; }
+        public int? OpenFiles { get; set; }
         
         /// <summary>
         /// Logical path of the storage device

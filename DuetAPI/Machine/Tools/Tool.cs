@@ -12,7 +12,7 @@ namespace DuetAPI.Machine.Tools
         /// <summary>
         /// Number of the tool
         /// </summary>
-        public uint Number { get; set; }
+        public int Number { get; set; }
         
         /// <summary>
         /// Active temperatures of the associated heaters (in degC)
@@ -37,12 +37,12 @@ namespace DuetAPI.Machine.Tools
         /// <summary>
         /// List of associated fans (indices)
         /// </summary>
-        public uint[] Fans { get; set; } = new uint[0];
+        public int[] Fans { get; set; } = new int[0];
         
         /// <summary>
         /// List of associated heaters (indices)
         /// </summary>
-        public uint[] Heaters { get; set; } = new uint[0];
+        public int[] Heaters { get; set; } = new int[0];
         
         /// <summary>
         /// Mix ratios of the associated extruder drives
@@ -63,7 +63,7 @@ namespace DuetAPI.Machine.Tools
         ///   [1]         // Y
         /// ]
         /// </summary>
-        public List<uint[]> Axes { get; set; } = new List<uint[]>();
+        public List<int[]> Axes { get; set; } = new List<int[]>();
         
         /// <summary>
         /// Axis offsets (in mm)
@@ -85,11 +85,11 @@ namespace DuetAPI.Machine.Tools
                 Standby = (double[])Standby.Clone(),
                 Name = (Name != null) ? string.Copy(Name) : null,
                 Filament = (Filament != null) ? string.Copy(Filament) : null,
-                Fans = (uint[])Fans.Clone(),
-                Heaters = (uint[])Heaters.Clone(),
+                Fans = (int[])Fans.Clone(),
+                Heaters = (int[])Heaters.Clone(),
                 Mix = (double[])Mix.Clone(),
                 Spindle = Spindle,
-                Axes = Axes.Select(subAxes => (uint[])subAxes.Clone()).ToList(),
+                Axes = Axes.Select(subAxes => (int[])subAxes.Clone()).ToList(),
                 Offsets = (double[])Offsets.Clone()
             };
         }

@@ -42,7 +42,7 @@ namespace DuetAPI.Machine.Job
         /// <summary>
         /// Number of the current layer or 0 if none has been started yet
         /// </summary>
-        public uint? Layer { get; set; }
+        public int? Layer { get; set; }
         
         /// <summary>
         /// Time elapsed since the beginning of the current layer (in s)

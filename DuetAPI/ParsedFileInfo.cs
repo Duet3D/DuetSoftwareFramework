@@ -40,7 +40,7 @@ namespace DuetAPI
         /// <summary>
         /// Number of total layers or null if unknown
         /// </summary>
-        public uint? NumLayers { get; set; }
+        public int? NumLayers { get; set; }
         
         /// <summary>
         /// Filament consumption per extruder drive (in mm)

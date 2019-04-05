@@ -67,12 +67,13 @@ namespace DuetAPIClient
         /// Executes an arbitrary G/M/T-code in text form and returns the result as a string
         /// </summary>
         /// <param name="code">The code to execute</param>
+        /// <param name="channel">Optional destination channel of this code</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>The code result as a string</returns>
         /// <seealso cref="SimpleCode"/>
-        public Task<string> PerformSimpleCode(string code, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<string> PerformSimpleCode(string code, CodeChannel channel = CodeChannel.SPI, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return PerformCommand<string>(new SimpleCode { Code = code }, cancellationToken);
+            return PerformCommand<string>(new SimpleCode { Code = code, Channel = channel }, cancellationToken);
         }
         
         /// <summary>

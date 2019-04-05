@@ -71,12 +71,12 @@ namespace DuetControlServer.SPI.Serialization
         public static int WriteCode(Span<byte> to, Code code)
         {
             int bytesWritten = 0;
-            
+
             // Write code header
             CodeHeader header = new CodeHeader
             {
                 Channel = code.Channel,
-                FilePosition = code.FilePosition.HasValue ? code.FilePosition.Value : 0,
+                FilePosition = (uint)(code.FilePosition.HasValue ? code.FilePosition.Value : 0),
                 Letter = (byte)code.Type,
                 MajorCode = code.MajorNumber ?? -1,
                 MinorCode = code.MinorNumber ?? -1,

@@ -10,7 +10,7 @@ namespace DuetAPI.Machine.Move
         /// <summary>
         /// Microstepping value (e.g. x16)
         /// </summary>
-        public uint Value { get; set; } = 16;
+        public int Value { get; set; } = 16;
         
         /// <summary>
         /// Whether the microstepping is interpolated

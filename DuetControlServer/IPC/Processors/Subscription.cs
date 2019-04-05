@@ -56,9 +56,11 @@ namespace DuetControlServer.IPC.Processors
             _lastModel = _jsonModel;
             _subscriptions.TryAdd(this, _mode);
 
-            // Send over the full machine model initially and keep on sending updates
             try
             {
+                bool patchWasEmpty = false;
+
+                // Send over the full machine model once
                 string json;
                 lock (_jsonModel)
                 {
@@ -69,10 +71,13 @@ namespace DuetControlServer.IPC.Processors
                 do
                 {
                     // Wait for acknowledgement
-                    BaseCommand command = await Connection.ReceiveCommand();
-                    if (!SupportedCommands.Contains(command.GetType()))
+                    if (!patchWasEmpty)
                     {
-                        throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
+                        BaseCommand command = await Connection.ReceiveCommand();
+                        if (!SupportedCommands.Contains(command.GetType()))
+                        {
+                            throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
+                        }
                     }
 
                     // Wait for another update
@@ -97,9 +102,16 @@ namespace DuetControlServer.IPC.Processors
                             patch = JsonHelper.DiffObject(_lastModel, _jsonModel);
                         }
                         
-                        // Send it over
-                        json = patch.ToString(Formatting.None);
-                        await Connection.Send(json + "\n");
+                        // Send it over unless it is empty
+                        if (patch.HasValues)
+                        {
+                            json = patch.ToString(Formatting.None);
+                            await Connection.Send(json + "\n");
+                        }
+                        else
+                        {
+                            patchWasEmpty = true;
+                        }
                     }
                 } while (!Program.CancelSource.IsCancellationRequested);
             }

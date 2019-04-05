@@ -1,5 +1,4 @@
 ﻿using DuetAPI.Commands;
-using DuetControlServer.SPI.Communication.FirmwareRequests;
 using System;
 using System.Threading.Tasks;
 
@@ -41,9 +40,9 @@ namespace DuetControlServer.SPI
         public bool IsExecuting { get; set; }
 
         /// <summary>
-        /// Whether a code reply has been received for this code indicating if it can be finished
+        /// Indicates if a complete G-code reply has been received implying this code can be finished
         /// </summary>
-        public bool CanFinish { get => _gotEmptyResponse || _result.Count != 0; }
+        public bool CanFinish { get => (_gotEmptyResponse || _result.Count != 0) && !_lastMessageIncomplete; }
 
         /// <summary>
         /// Task that is resolve when the code has finished.

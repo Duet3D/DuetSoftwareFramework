@@ -20,7 +20,7 @@ namespace DuetAPI.Machine.Fans
         /// <summary>
         /// Current RPM of this fan or null if unknown/unset
         /// </summary>
-        public uint? Rpm { get; set; }
+        public int? Rpm { get; set; }
         
         /// <summary>
         /// Whether the PWM signal of this fan is inverted
@@ -55,7 +55,7 @@ namespace DuetAPI.Machine.Fans
         /// <summary>
         /// Pin number of the assigned fan or null if unknown/unset
         /// </summary>
-        public uint? Pin { get; set; }
+        public int? Pin { get; set; }
 
         /// <summary>
         /// Creates a copy of this instance

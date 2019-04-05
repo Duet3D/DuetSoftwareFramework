@@ -15,13 +15,12 @@ namespace DuetAPI.Machine.Fans
         /// <summary>
         /// The heaters to monitor (indices)
         /// </summary>
-        public uint[] Heaters { get; set; } = new uint[0];
+        public int[] Heaters { get; set; } = new int[0];
         
         /// <summary>
         /// Minimum temperature required to turn on the fan (in degC or null if unknown)
         /// </summary>
         public double? Temperature { get; set; }
-        
         
         /// <summary>
         /// Create a clone of this instance
@@ -32,7 +31,7 @@ namespace DuetAPI.Machine.Fans
             return new Thermostatic
             {
                 Control = Control,
-                Heaters = (uint[])Heaters.Clone(),
+                Heaters = (int[])Heaters.Clone(),
                 Temperature = Temperature
             };
         }

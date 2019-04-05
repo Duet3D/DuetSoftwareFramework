@@ -25,7 +25,7 @@ namespace DuetAPI.Machine.Heat
         /// <summary>
         /// Heaters controlled by this bed or chamber (indices)
         /// </summary>
-        public uint[] Heaters { get; set; } = new uint[0];
+        public int[] Heaters { get; set; } = new int[0];
 
         /// <summary>
         /// Creates a clone of this instance
@@ -38,7 +38,7 @@ namespace DuetAPI.Machine.Heat
                 Active = (double[])Active.Clone(),
                 Standby = (double[])Standby.Clone(),
                 Name = (Name != null) ? string.Copy(Name) : null,
-                Heaters = (uint[])Heaters.Clone()
+                Heaters = (int[])Heaters.Clone()
             };
         }
     }

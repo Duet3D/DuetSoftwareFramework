@@ -64,7 +64,7 @@ namespace DuetAPI.Machine.Heat
         /// <summary>
         /// Sensor number (thermistor index) of this heater or null if unknown
         /// </summary>
-        public uint? Sensor { get; set; }
+        public int? Sensor { get; set; }
 
         /// <summary>
         /// Creates a clone of this instance

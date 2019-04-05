@@ -14,7 +14,7 @@ namespace DuetUnitTest.Machine
 
             Axis axis = new Axis
             {
-                Drives = new uint[] { 1, 2 },
+                Drives = new int[] { 1, 2 },
                 Homed = true,
                 Letter = 'X',
                 MachinePosition = 123,

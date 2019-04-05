@@ -12,5 +12,10 @@
         /// Code to parse and execute
         /// </summary>
         public string Code { get; set; }
+
+        /// <summary>
+        /// Destination channel
+        /// </summary>
+        public CodeChannel Channel { get; set; } = CodeChannel.SPI;
     }
 }

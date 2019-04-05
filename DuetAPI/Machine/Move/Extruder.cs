@@ -8,6 +8,11 @@ namespace DuetAPI.Machine.Move
     public class Extruder : ICloneable
     {
         /// <summary>
+        /// Drive of this extruder
+        /// </summary>
+        public int[] Drives = new int[0];
+
+        /// <summary>
         /// Extrusion factor to use (1.0 equals 100%)
         /// </summary>
         public double Factor { get; set; } = 1.0;
@@ -25,6 +30,7 @@ namespace DuetAPI.Machine.Move
         {
             return new Extruder
             {
+                Drives = (int[])Drives.Clone(),
                 Factor = Factor,
                 Nonlinear = (ExtruderNonlinear)Nonlinear.Clone()
             };

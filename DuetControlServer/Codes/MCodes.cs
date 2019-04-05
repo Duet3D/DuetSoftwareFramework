@@ -47,6 +47,26 @@ namespace DuetControlServer.Codes
                     }
                     return new CodeResult();
 
+                // Emergency Stop
+                case 112:
+                    SPI.Interface.RequestEmergencyStop();
+                    using (await Model.Provider.AccessReadWrite())
+                    {
+                        Model.Provider.Get.State.Status = DuetAPI.Machine.State.Status.Halted;
+                    }
+                    break;
+
+                // Reset controller. Process this here only if the machine has performed an emergency stop
+                case 999:
+                    using (await Model.Provider.AccessReadOnly())
+                    {
+                        if (Model.Provider.Get.State.Status == DuetAPI.Machine.State.Status.Halted)
+                        {
+                            SPI.Interface.RequestReset();
+                            return new CodeResult();
+                        }
+                    }
+                    break;
             }
             return null;
         }

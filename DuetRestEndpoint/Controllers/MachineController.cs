@@ -108,7 +108,7 @@ namespace DuetRestEndpoint.Controllers
                 
                 using (CommandConnection connection = await BuildConnection())
                 {
-                    string response = await connection.PerformSimpleCode(code);
+                    string response = await connection.PerformSimpleCode(code, CodeChannel.HTTP);
                     return Content(response, "text/plain");
                 }
             }

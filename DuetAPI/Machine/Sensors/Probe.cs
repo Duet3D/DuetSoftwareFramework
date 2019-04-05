@@ -77,17 +77,17 @@ namespace DuetAPI.Machine.Sensors
         /// <summary>
         /// Current analog value of the probe
         /// </summary>
-        public uint Value { get; set; }
+        public int Value { get; set; }
         
         /// <summary>
         /// Secondary value(s) of the probe
         /// </summary>
-        public uint[] SecondaryValues { get; set; }
+        public int[] SecondaryValues { get; set; }
         
         /// <summary>
         /// Configured trigger threshold (0..1023)
         /// </summary>
-        public uint Threshold { get; set; } = 500;
+        public int Threshold { get; set; } = 500;
         
         /// <summary>
         /// Probe speed (in mm/s)
@@ -122,7 +122,7 @@ namespace DuetAPI.Machine.Sensors
         /// <summary>
         /// Maximum number of times to probe after a bad reading was determined
         /// </summary>
-        public uint MaxProbeCount { get; set; } = 1;
+        public int MaxProbeCount { get; set; } = 1;
         
         /// <summary>
         /// Allowed tolerance deviation between two measures (in mm)
@@ -144,7 +144,7 @@ namespace DuetAPI.Machine.Sensors
             {
                 Type = Type,
                 Value = Value,
-                SecondaryValues = (uint[])SecondaryValues.Clone(),
+                SecondaryValues = (int[])SecondaryValues.Clone(),
                 Threshold = Threshold,
                 Speed = Speed,
                 DiveHeight = DiveHeight,

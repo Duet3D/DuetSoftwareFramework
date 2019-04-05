@@ -143,11 +143,12 @@
             <returns>The result of the given code</returns>
             <seealso cref="T:DuetAPI.Commands.Code"/>
         </member>
-        <member name="M:DuetAPIClient.CommandConnection.PerformSimpleCode(System.String,System.Threading.CancellationToken)">
+        <member name="M:DuetAPIClient.CommandConnection.PerformSimpleCode(System.String,DuetAPI.CodeChannel,System.Threading.CancellationToken)">
             <summary>
             Executes an arbitrary G/M/T-code in text form and returns the result as a string
             </summary>
             <param name="code">The code to execute</param>
+            <param name="channel">Optional destination channel of this code</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>The code result as a string</returns>
             <seealso cref="T:DuetAPI.Commands.SimpleCode"/>

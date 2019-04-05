@@ -18,7 +18,7 @@ namespace DuetAPI.Machine.Move
         /// <summary>
         /// Array of the drives used (indices)
         /// </summary>
-        public uint[] Drives { get; set; } = new uint[0];
+        public int[] Drives { get; set; } = new int[0];
         
         /// <summary>
         /// Whether or not the axis is homed
@@ -54,7 +54,7 @@ namespace DuetAPI.Machine.Move
             return new Axis
             {
                 Letter = Letter,
-                Drives = (uint[])Drives.Clone(),
+                Drives = (int[])Drives.Clone(),
                 Homed = Homed,
                 MachinePosition = MachinePosition,
                 Min = Min,

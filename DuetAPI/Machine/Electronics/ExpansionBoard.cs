@@ -35,12 +35,12 @@ namespace DuetAPI.Machine.Electronics
         /// <summary>
         /// How many heaters can be attached to this board
         /// </summary>
-        public uint? MaxHeaters { get; set; }
+        public int? MaxHeaters { get; set; }
         
         /// <summary>
         /// How many drives can be attached to this board
         /// </summary>
-        public uint? MaxMotors { get; set; }
+        public int? MaxMotors { get; set; }
 
         /// <summary>
         /// Creates a clone of this instance

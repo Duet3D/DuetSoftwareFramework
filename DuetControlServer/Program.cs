@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -76,20 +77,13 @@ namespace DuetControlServer
             Console.WriteLine();
             
             // Run the main tasks in the background
-            Task ipcTask = Server.AcceptConnections();
             Task spiTask = SPI.Interface.Run();
+            Task ipcTask = Server.AcceptConnections();
             Task modelUpdateTask = Model.UpdateTask.UpdatePeriodically();
-            Task[] taskList = { ipcTask, spiTask, modelUpdateTask };
+            Task[] taskList = { spiTask, ipcTask, modelUpdateTask };
 
             // Wait for program termination
-            try
-            {
-                Task.WaitAny(taskList);
-            }
-            catch (Exception e) when (!(e is OperationCanceledException))
-            {
-                throw;
-            }
+            Task.WaitAny(taskList);
 
             // Tell other tasks to stop in case this is an abnormal program termination
             if (!CancelSource.IsCancellationRequested)
@@ -105,9 +99,15 @@ namespace DuetControlServer
             {
                 Task.WaitAll(taskList);
             }
-            catch (Exception e) when (!(e is OperationCanceledException))
+            catch (AggregateException ae)
             {
-                throw;
+                foreach (Exception e in ae.InnerExceptions)
+                {
+                    if (!(e is OperationCanceledException) && !(e is SocketException))
+                    {
+                        Console.WriteLine(e);
+                    }
+                }
             }
         }
     }

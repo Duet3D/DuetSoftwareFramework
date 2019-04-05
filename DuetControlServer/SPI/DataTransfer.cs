@@ -25,13 +25,15 @@ namespace DuetControlServer.SPI
         // General transfer variables
         private static AsyncAutoResetEvent _transferReadyEvent = new AsyncAutoResetEvent();
         private static bool _hadTimeout;
+        private static DateTime _timeConnected;
+        private static int _numTransfers;
 
         // Transfer headers
         private static readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
         private static readonly Memory<byte> _txHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
         private static Communication.TransferHeader _rxHeader;
         private static Communication.TransferHeader _txHeader;
-        private static ushort _transferNumber, _packetNumber;
+        private static ushort _transferNumber = 1, _packetNumber, _lastTransferNumber;
 
         // Transfer responses
         private static Memory<byte> _rxResponseBuffer = new byte[4];
@@ -67,13 +69,27 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Get the average number of full transfers per second
+        /// </summary>
+        /// <returns>Average number of full transfers per second</returns>
+        public static decimal GetFullTransfersPerSecond()
+        {
+            if (_numTransfers == 0)
+            {
+                return 0;
+            }
+            return _numTransfers / (decimal)(DateTime.Now - _timeConnected).TotalSeconds;
+        }
+
+        /// <summary>
         /// Perform a full data transfer
         /// </summary>
         public static async Task PerformFullTransfer()
         {
             try
             {
-                Console.WriteLine($"- Transfer {_transferNumber} -");
+                //Console.WriteLine($"- Transfer {_transferNumber} -");
+                _lastTransferNumber = _rxHeader.SequenceNumber;
 
                 // This also deals with responses
                 await ExchangeHeader();
@@ -83,7 +99,7 @@ namespace DuetControlServer.SPI
                 {
                     _txBufferIndex = (_txBufferIndex == 0) ? 1 : 0;
                     _rxPointer = _txPointer = 0;
-                    _packetNumber = 0;
+                    _packetNumber = 1;
                 }
 
                 // Everything OK
@@ -99,6 +115,16 @@ namespace DuetControlServer.SPI
                         Console.WriteLine("[info] Connection to Duet established");
                     }
                     _hadTimeout = false;
+                }
+
+                if (_numTransfers == 0)
+                {
+                    _timeConnected = DateTime.Now;
+                    _numTransfers = 1;
+                }
+                else
+                {
+                    _numTransfers++;
                 }
             }
             catch (OperationCanceledException)
@@ -128,6 +154,15 @@ namespace DuetControlServer.SPI
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Check if the controller has been reset
+        /// </summary>
+        /// <returns>Whether the controller has been reset</returns>
+        public static bool HadReset()
+        {
+            return _lastTransferNumber > _rxHeader.SequenceNumber;
         }
 
         #region Read functions
@@ -457,11 +492,12 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Notify the firmware about completed macro file
+        /// Notify the firmware about a completed macro file.
+        /// This function is only used for macro files that the firmware requested
         /// </summary>
         /// <param name="channel">Code channel of the finished macro</param>
         /// <param name="error">Whether an error occurred</param>
-        /// <returns></returns>
+        /// <returns>True if the packet could be written</returns>
         public static bool WriteMacroCompleted(CodeChannel channel, bool error)
         {
             int dataLength = Marshal.SizeOf(typeof(Communication.LinuxRequests.MacroCompleted));
@@ -478,7 +514,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Request the heightmap from the firmware
         /// </summary>
-        /// <returns></returns>
+        /// <returns>True if the packet could be written</returns>
         public static bool WriteGetHeightMap()
         {
             if (!CanWritePacket())
@@ -494,7 +530,7 @@ namespace DuetControlServer.SPI
         /// Request the movement to be locked and wait for standstill
         /// </summary>
         /// <param name="channel">Code channel that requires the lock</param>
-        /// <returns></returns>
+        /// <returns>True if the packet could be written</returns>
         public static bool WriteLockMovementAndWaitForStandstill(CodeChannel channel)
         {
             if (!CanWritePacket())
@@ -510,7 +546,7 @@ namespace DuetControlServer.SPI
         /// Release all acquired locks again
         /// </summary>
         /// <param name="channel">Code channel that releases the locks</param>
-        /// <returns></returns>
+        /// <returns>True if the packet could be written</returns>
         public static bool WriteUnlock(CodeChannel channel)
         {
             if (!CanWritePacket())

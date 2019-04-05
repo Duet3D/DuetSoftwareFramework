@@ -22,7 +22,7 @@ namespace DuetUnitTest.Machine
             fan.Max = 0.99;
             fan.Blip = 0;
             fan.Thermostatic.Control = false;
-            fan.Thermostatic.Heaters = new uint[] { 1, 2 };
+            fan.Thermostatic.Heaters = new int[] { 1, 2 };
             fan.Thermostatic.Temperature = 79;
             fan.Pin = 23;
             original.Fans.Add(fan);

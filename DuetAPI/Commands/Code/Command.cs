@@ -71,7 +71,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// File position in bytes (optional)
         /// </summary>
-        public uint? FilePosition { get; set; }
+        public long? FilePosition { get; set; }
         
         /// <summary>
         /// Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!

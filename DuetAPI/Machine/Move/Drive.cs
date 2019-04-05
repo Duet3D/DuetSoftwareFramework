@@ -20,7 +20,7 @@ namespace DuetAPI.Machine.Move
         /// <summary>
         /// Configured current of this drive (in mA)
         /// </summary>
-        public uint? Current { get; set; }
+        public int? Current { get; set; }
         
         /// <summary>
         /// Acceleration of this drive (in mm/s^2)

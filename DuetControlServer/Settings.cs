@@ -60,7 +60,7 @@ namespace DuetControlServer
         /// <summary>
         /// Time to wait after every transfer (in ms)
         /// </summary>
-        public static int SpiPollDelay { get; set; } = 1000;
+        public static int SpiPollDelay { get; set; } = 20;
 
         /// <summary>
         /// Number of the GPIO pin that is used by RepRapFirmware to flag its ready state

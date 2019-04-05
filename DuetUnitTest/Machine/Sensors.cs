@@ -27,7 +27,7 @@ namespace DuetUnitTest.Machine
                 Inverted = true,
                 MaxProbeCount = 4,
                 RecoveryTime = 0.65,
-                SecondaryValues = new uint[] { 12, 34 },
+                SecondaryValues = new int[] { 12, 34 },
                 Speed = 456,
                 Threshold = 678,
                 Tolerance = 0.42,

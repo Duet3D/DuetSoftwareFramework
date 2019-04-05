@@ -27,10 +27,9 @@ namespace DuetControlServer.SPI.Communication
         public const int BufferSize = 2048;
 
         /// <summary>
-        /// Number of RepRapFirmware modules that can be queried via <see cref="LinuxRequests.Request.GetObjectModel"/>.
-        /// This equals the number of RepRapFirmware modules minus 1 (because LinuxComm does not have an object model)
+        /// Number of RepRapFirmware modules that can be queried via <see cref="LinuxRequests.Request.GetObjectModel"/>
         /// </summary>
-        public const byte NumModules = 16;
+        public const byte NumModules = 3;
 
         /// <summary>
         /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware

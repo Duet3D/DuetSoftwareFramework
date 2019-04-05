@@ -68,7 +68,7 @@ namespace DuetAPI.Machine.Network
         /// <summary>
         /// Speed of the network interface (in MBit, null if unknown, 0 if not connected)
         /// </summary>
-        public uint? Speed { get; set; }
+        public int? Speed { get; set; }
         
         /// <summary>
         /// Signal of the WiFi adapter (only WiFi, in dBm)
@@ -103,7 +103,7 @@ namespace DuetAPI.Machine.Network
         /// <summary>
         /// Number of reconnect attempts or null if unknown
         /// </summary>
-        public uint? NumReconnects { get; set; }
+        public int? NumReconnects { get; set; }
         
         /// <summary>
         /// List of active protocols

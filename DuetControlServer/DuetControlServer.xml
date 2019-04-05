@@ -257,7 +257,7 @@
             Begin a file print
             </summary>
             <param name="fileName">File to print</param>
-            <returns></returns>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Paused(System.UInt32)">
             <summary>
@@ -535,7 +535,8 @@
         </member>
         <member name="M:DuetControlServer.Model.Updater.MergeData(System.Byte,System.String)">
             <summary>
-            Merge received data into the object model
+            Merge received data into the object model.
+            This code is temporary and will be replaced once the new object is finished
             </summary>
             <param name="module">Module that is supposed to be merged</param>
             <param name="json">JSON data</param>
@@ -676,8 +677,7 @@
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Consts.NumModules">
             <summary>
-            Number of RepRapFirmware modules that can be queried via <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetObjectModel"/>.
-            This equals the number of RepRapFirmware modules minus 1 (because LinuxComm does not have an object model)
+            Number of RepRapFirmware modules that can be queried via <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetObjectModel"/>
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize">
@@ -1551,10 +1551,22 @@
             Set up the SPI device and the controller for the transfer ready pin
             </summary>
         </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.GetFullTransfersPerSecond">
+            <summary>
+            Get the average number of full transfers per second
+            </summary>
+            <returns>Average number of full transfers per second</returns>
+        </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.PerformFullTransfer">
             <summary>
             Perform a full data transfer
             </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.HadReset">
+            <summary>
+            Check if the controller has been reset
+            </summary>
+            <returns>Whether the controller has been reset</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadPacket">
             <summary>
@@ -1691,31 +1703,32 @@
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.WriteMacroCompleted(DuetAPI.CodeChannel,System.Boolean)">
             <summary>
-            Notify the firmware about completed macro file
+            Notify the firmware about a completed macro file.
+            This function is only used for macro files that the firmware requested
             </summary>
             <param name="channel">Code channel of the finished macro</param>
             <param name="error">Whether an error occurred</param>
-            <returns></returns>
+            <returns>True if the packet could be written</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.WriteGetHeightMap">
             <summary>
             Request the heightmap from the firmware
             </summary>
-            <returns></returns>
+            <returns>True if the packet could be written</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.WriteLockMovementAndWaitForStandstill(DuetAPI.CodeChannel)">
             <summary>
             Request the movement to be locked and wait for standstill
             </summary>
             <param name="channel">Code channel that requires the lock</param>
-            <returns></returns>
+            <returns>True if the packet could be written</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.WriteUnlock(DuetAPI.CodeChannel)">
             <summary>
             Release all acquired locks again
             </summary>
             <param name="channel">Code channel that releases the locks</param>
-            <returns></returns>
+            <returns>True if the packet could be written</returns>
         </member>
         <member name="T:DuetControlServer.SPI.Interface">
             <summary>
@@ -1741,9 +1754,45 @@
             </summary>
             <param name="code">Code to execute</param>
         </member>
+        <member name="M:DuetControlServer.SPI.Interface.RequestEmergencyStop">
+            <summary>
+            Request an immediate emergency stop
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.RequestReset">
+            <summary>
+            Request a firmware reset
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.SetPrintStarted">
+            <summary>
+            Notify the firmware that a file print has started
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.SetPrintStopped(DuetControlServer.SPI.Communication.PrintStoppedReason)">
+            <summary>
+            Notify the firmware that the file print has been stopped
+            </summary>
+            <param name="stopReason"></param>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.LockMovementAndWaitForStandstill(DuetAPI.CodeChannel)">
+            <summary>
+            Lock the move module and wait for standstill
+            </summary>
+            <param name="channel">Code channel acquiring the lock</param>
+            <returns>Whether the resource could be locked</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.UnlockAll(DuetAPI.CodeChannel)">
+            <summary>
+            Unlock all resources occupied by the given channel
+            </summary>
+            <param name="channel">Channel holding the resources</param>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="M:DuetControlServer.SPI.Interface.Connect">
             <summary>
-            Initialize physical transfer and perform initial data transfer
+            Initialize physical transfer and perform initial data transfer.
+            This is only called 
             </summary>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.Run">
@@ -1777,7 +1826,7 @@
         </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.CanFinish">
             <summary>
-            Whether a code reply has been received for this code indicating if it can be finished
+            Indicates if a complete G-code reply has been received implying this code can be finished
             </summary>
         </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.Task">
@@ -1803,6 +1852,45 @@
             <summary>
             Called to resolve the task because it has finished
             </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.QueuedLockRequest">
+            <summary>
+            Queued lock/unlock request
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.QueuedLockRequest.IsLockRequest">
+            <summary>
+            Indicates if this is a lock or unlock request
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.QueuedLockRequest.IsLockRequested">
+            <summary>
+            Indicates if the lock request has been sent to the firmware
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.QueuedLockRequest.Channel">
+            <summary>
+            Code channel that is supposed to acquire/release the lock
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.QueuedLockRequest.Task">
+            <summary>
+            Awaitable task returning true if the lock could be acquired.
+            It returns false if the controller is reset or an emergency stop occurs
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.QueuedLockRequest.#ctor(System.Boolean,DuetAPI.CodeChannel)">
+            <summary>
+            Creates a new queued lock/unlock request instance
+            </summary>
+            <param name="isLockRequest">Whether the resource shall be locked</param>
+            <param name="channel">Code channel requesting the lock</param>
+        </member>
+        <member name="M:DuetControlServer.SPI.QueuedLockRequest.Resolve(System.Boolean)">
+            <summary>
+            Resolve the pending task with the given result
+            </summary>
+            <param name="lockAcquired">Whether the lock could be acquired</param>
         </member>
         <member name="T:DuetControlServer.SPI.Serialization.Reader">
             <summary>

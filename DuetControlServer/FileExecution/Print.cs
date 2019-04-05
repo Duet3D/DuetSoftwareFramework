@@ -20,7 +20,7 @@ namespace DuetControlServer.FileExecution
         /// Begin a file print
         /// </summary>
         /// <param name="fileName">File to print</param>
-        /// <returns></returns>
+        /// <returns>Asynchronous task</returns>
         public static async Task Start(string fileName)
         {
             // Initialize the file
@@ -48,12 +48,14 @@ namespace DuetControlServer.FileExecution
                 Model.Provider.Get.Job.File = info;
             }
 
-            // Start processing the file
+            // Notify RepRapFirmware and start processing the file
+            SPI.Interface.SetPrintStarted();
             RunPrint();
         }
 
         private static async void RunPrint()
         {
+            // Process every available code
             for (Code code = await _file.ReadCode(); code != null; code = await _file.ReadCode())
             {
                 // Has the file been paused? If so, rewind to the pause position and wait for it to resume
@@ -83,6 +85,9 @@ namespace DuetControlServer.FileExecution
                     }
                 }
             }
+
+            // Notify the controller that the print has finished
+            SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.NormalCompletion);
         }
 
         /// <summary>
@@ -108,8 +113,11 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         public static void Cancel()
         {
-            _file.Abort();
-            _resumeEvent.Set();
+            if (_file != null)
+            {
+                _file.Abort();
+                _resumeEvent.Set();
+            }
         }
     }
 }
