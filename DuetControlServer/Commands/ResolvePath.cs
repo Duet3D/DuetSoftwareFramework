@@ -11,6 +11,6 @@ namespace DuetControlServer.Commands
         /// Resolve the given RepRapFirmware-style filename to an absolute path
         /// </summary>
         /// <returns>Absolute file path</returns>
-        protected override Task<string> Run() => Task.FromResult(FileHelper.ResolvePath(Path));
+        protected override Task<string> Run() => FilePath.ToPhysical(Path);
     }
 }

@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using Nito.AsyncEx;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -26,8 +25,8 @@ namespace DuetControlServer.IPC.Processors
         
         private static readonly ConcurrentDictionary<Interception, InterceptionMode> _interceptors = new ConcurrentDictionary<Interception, InterceptionMode>();
         
-        private readonly BufferBlock<BaseCommand> _commandQueue = new BufferBlock<BaseCommand>();
-        private readonly SemaphoreSlim _mutex = new SemaphoreSlim(1, 1);    // like a Mutex but with async/await methods
+        private readonly AsyncCollection<BaseCommand> _commandQueue = new AsyncCollection<BaseCommand>();
+        private readonly AsyncLock _lock = new AsyncLock();
 
         /// <summary>
         /// Constructor of the interception processor
@@ -77,7 +76,7 @@ namespace DuetControlServer.IPC.Processors
         {
             if (SupportedCommands.Contains(command.GetType()) || Command.SupportedCommands.Contains(command.GetType()))
             {
-                await _commandQueue.SendAsync(command);
+                await _commandQueue.AddAsync(command);
             }
             else
             {
@@ -93,60 +92,56 @@ namespace DuetControlServer.IPC.Processors
         private async Task<CodeResult> Intercept(Code code)
         {
             // Avoid race conditions. A client can deal with only one code at once!
-            await _mutex.WaitAsync(Program.CancelSource.Token);
-            
-            // Send it to the interceptor
-            await Connection.SendResponse(code);
-            
-            // Keep on processing commands from the interceptor until a handling result is returned.
-            // This must be either an Ignore or a Resolve instruction!
-            try
+            using (await _lock.LockAsync(Program.CancelSource.Token))
             {
-                while (await _commandQueue.OutputAvailableAsync(Program.CancelSource.Token))
+                // Send it to the interceptor
+                await Connection.SendResponse(code);
+
+                // Keep on processing commands from the interceptor until a handling result is returned.
+                // This must be either an Ignore or a Resolve instruction!
+                try
                 {
-                    BaseCommand command = await _commandQueue.ReceiveAsync(Program.CancelSource.Token);
-
-                    // Code is ignored. Don't do anything with it but acknowledge the request
-                    if (command is Ignore)
+                    while (await _commandQueue.OutputAvailableAsync(Program.CancelSource.Token))
                     {
-                        await Connection.SendResponse();
-                        break;
-                    }
+                        BaseCommand command = await _commandQueue.TakeAsync(Program.CancelSource.Token);
 
-                    // Code is resolved with a given result and the request is acknowledged
-                    if (command is Resolve)
-                    {
-                        await Connection.SendResponse();
-                        _mutex.Release();
-                        return new CodeResult
+                        // Code is ignored. Don't do anything with it but acknowledge the request
+                        if (command is Ignore)
                         {
-                            new Message
+                            await Connection.SendResponse();
+                            break;
+                        }
+
+                        // Code is resolved with a given result and the request is acknowledged
+                        if (command is Resolve)
+                        {
+                            await Connection.SendResponse();
+
+                            if ((command as Resolve).Content == null)
                             {
-                                Type = (command as Resolve).Type,
-                                Content = (command as Resolve).Content
+                                return new CodeResult();
                             }
-                        };
+                            return new CodeResult((command as Resolve).Type, (command as Resolve).Content);
+                        }
+
+                        // Deal with other requests
+                        object result = command.Execute();
+                        await Connection.SendResponse(result);
                     }
-                    
-                    // Deal with other requests
-                    object result = command.Execute();
-                    await Connection.SendResponse(result);
+                }
+                catch (Exception e)
+                {
+                    if (Connection.IsConnected)
+                    {
+                        // Notify the client
+                        await Connection.SendResponse(e);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Intercept error: " + e.Message);
+                    }
                 }
             }
-            catch (Exception e)
-            {
-                if (Connection.IsConnected)
-                {
-                    // Notify the client
-                    await Connection.SendResponse(e);
-                }
-                else
-                {
-                    Console.WriteLine("Intercept error: " + e.Message);
-                }
-            }
-            
-            _mutex.Release();
             return null;
         }
         

@@ -9,7 +9,6 @@ namespace DuetAPI
     {
         /// <summary>
         /// The filename of the G-code file
-        /// TODO This should represent a relative file path starting from the RRF base path!
         /// </summary>
         public string FileName { get; set; }
         

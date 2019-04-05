@@ -36,6 +36,12 @@ namespace DuetControlServer
         public static string BaseDirectory { get; set; } = "/opt/dsf/sd";
 
         /// <summary>
+        /// Internal model update interval after which properties of the machine model from
+        /// the host controller (e.g. network information and mass storages) are updated (in ms)
+        /// </summary>
+        public static int HostUpdateInterval { get; set; } = 4000;
+
+        /// <summary>
         /// Bus ID of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
         /// </summary>
         [JsonProperty]
@@ -45,6 +51,16 @@ namespace DuetControlServer
         /// Chip select line of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
         /// </summary>
         public static int SpiChipSelectLine { get; set; } = 0;
+
+        /// <summary>
+        /// Maximum time to wait for the RepRapFirmware controller (in ms)
+        /// </summary>
+        public static int SpiTimeout { get; set; } = 500;
+
+        /// <summary>
+        /// Time to wait after every transfer (in ms)
+        /// </summary>
+        public static int SpiPollDelay { get; set; } = 1000;
 
         /// <summary>
         /// Number of the GPIO pin that is used by RepRapFirmware to flag its ready state

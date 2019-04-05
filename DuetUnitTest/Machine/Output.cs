@@ -12,17 +12,8 @@ namespace DuetUnitTest.Machine
         {
             Model original = new Model();
 
-            original.Messages.Add(new Message
-            {
-                Content = "Test 1 2 3",
-                Type = MessageType.Warning
-            });
-
-            original.Messages.Add(new Message
-            {
-                Content = "Err 3 2 1",
-                Type = MessageType.Error
-            });
+            original.Messages.Add(new Message(MessageType.Warning, "Test 1 2 3"));
+            original.Messages.Add(new Message(MessageType.Error, "Err 3 2 1"));
 
             Model clone = (Model)original.Clone();
 

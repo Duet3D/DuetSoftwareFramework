@@ -13,7 +13,9 @@ namespace DuetControlServer.Commands
         /// <returns>G-code result</returns>
         protected override async Task<string> Run()
         {
-            Code code = new Code(Code) { SourceConnection = SourceConnection };
+            Code code = new Code(Code) {
+                SourceConnection = SourceConnection
+            };
             object result = await code.Execute();
             return result.ToString();
         }

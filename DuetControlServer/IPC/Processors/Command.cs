@@ -22,7 +22,6 @@ namespace DuetControlServer.IPC.Processors
         public static readonly Type[] SupportedCommands =
         {
             typeof(Code),
-            //typeof(Commands.Flush),
             typeof(GetFileInfo),
             typeof(GetMachineModel),
             typeof(ResolvePath),

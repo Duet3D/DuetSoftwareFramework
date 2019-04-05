@@ -24,26 +24,18 @@ namespace DuetControlServer.SPI.Serialization
         public static readonly int TransmissionHeaderSize = Marshal.SizeOf(typeof(TransferHeader));
 
         /// <summary>
-        /// Write a transfer header to a memory span
+        /// Initialize a transfer header
         /// </summary>
-        /// <param name="to">Destination</param>
-        /// <param name="numPackets">Number of packets to send</param>
-        /// <param name="sequenceNumber">Sequence number</param>
-        /// <param name="transferLength">Total length of the transfer in bytes</param>
-        /// <param name="dataChecksum">CRC16 checksum of the transfer data</param>
-        public static void WriteTransferHeader(Span<byte> to, byte numPackets, ushort sequenceNumber, ushort transferLength, ushort dataChecksum)
+        /// <param name="header">Header reference to initialize</param>
+        public static void InitTransferHeader(ref TransferHeader header)
         {
-            TransferHeader header = new TransferHeader
-            {
-                FormatCode =  Consts.FormatCode,
-                NumPackets = numPackets,
-                ProtocolVersion = Consts.ProtocolVersion,
-                SequenceNumber = sequenceNumber,
-                DataLength = transferLength,
-                ChecksumData = dataChecksum,
-                ChecksumHeader = 0              // TODO Calculate and set this automatically (CRC16 checksum)
-            };
-            MemoryMarshal.Write(to, ref header);
+            header.FormatCode =  Consts.FormatCode;
+            header.NumPackets = 0;
+            header.ProtocolVersion = Consts.ProtocolVersion;
+            header.SequenceNumber = 0;
+            header.DataLength = 0;
+            header.ChecksumData = 0;
+            header.ChecksumHeader = 0;
         }
         
         /// <summary>
@@ -83,7 +75,7 @@ namespace DuetControlServer.SPI.Serialization
             // Write code header
             CodeHeader header = new CodeHeader
             {
-                Channel = code.Source,
+                Channel = code.Channel,
                 FilePosition = code.FilePosition.HasValue ? code.FilePosition.Value : 0,
                 Letter = (byte)code.Type,
                 MajorCode = code.MajorNumber ?? -1,
@@ -225,6 +217,7 @@ namespace DuetControlServer.SPI.Serialization
         {
             ObjectModel request = new ObjectModel
             {
+                Length = 0,
                 Module = module
             };
             MemoryMarshal.Write(to, ref request);
@@ -324,12 +317,12 @@ namespace DuetControlServer.SPI.Serialization
         }
 
         /// <summary>
-        /// Write information about the file being printed
+        /// Notify the firmware that a print has started
         /// </summary>
         /// <param name="to">Destination</param>
         /// <param name="info">Information about the file being printed</param>
         /// <returns>Number of bytes written</returns>
-        public static int WriteFilePrintInfo(Span<byte> to, ParsedFileInfo info)
+        public static int WritePrintStarted(Span<byte> to, ParsedFileInfo info)
         {
             Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName);
             if (unicodeFilename.Length > 254)
@@ -379,23 +372,55 @@ namespace DuetControlServer.SPI.Serialization
         }
 
         /// <summary>
+        /// Notify the firmware that a print has been stopped
+        /// </summary>
+        /// <param name="to"></param>
+        /// <param name="reason"></param>
+        /// <returns></returns>
+        public static int WritePrintStopped(Span<byte> to, PrintStoppedReason reason)
+        {
+            PrintStopped header = new PrintStopped
+            {
+                Reason = (byte)reason
+            };
+            MemoryMarshal.Write(to, ref header);
+            return Marshal.SizeOf(header);
+        }
+
+        /// <summary>
         /// Write notification about a completed macro file
         /// </summary>
-        /// <param name="span">Destination</param>
+        /// <param name="to">Destination</param>
         /// <param name="channel">Channel where the macro file has finished</param>
         /// <param name="error">Whether an error occurred when trying to open/process the macro file</param>
         /// <returns>Number of bytes written</returns>
-        public static int WriteMacroCompleted(Span<byte> span, CodeChannel channel, bool error)
+        public static int WriteMacroCompleted(Span<byte> to, CodeChannel channel, bool error)
         {
             MacroCompleted header = new MacroCompleted
             {
                 Channel = channel,
                 Error = (byte)(error ? 1 : 0)
             };
-            MemoryMarshal.Write(span, ref header);
+            MemoryMarshal.Write(to, ref header);
             return Marshal.SizeOf(header);
         }
-        
+
+        /// <summary>
+        /// Request a resource to be locked or unlocked
+        /// </summary>
+        /// <param name="to"></param>
+        /// <param name="channel"></param>
+        /// <returns></returns>
+        public static int WriteLockUnlock(Span<byte> to, CodeChannel channel)
+        {
+            LockUnlock header = new LockUnlock
+            {
+                Channel = channel
+            };
+            MemoryMarshal.Write(to, ref header);
+            return Marshal.SizeOf(header);
+        }
+
         private static int AddPadding(Span<byte> to, int bytesWritten)
         {
             int padding = 4 - bytesWritten % 4;

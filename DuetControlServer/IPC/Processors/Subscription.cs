@@ -6,10 +6,9 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
-using DuetAPI.Machine;
-using DuetControlServer.SPI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Nito.AsyncEx;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -31,8 +30,7 @@ namespace DuetControlServer.IPC.Processors
 
         private readonly SubscriptionMode _mode;
         private JObject _jsonModel, _lastModel;
-        
-        private readonly AutoResetEvent _updateEvent = new AutoResetEvent(false);
+        private AsyncAutoResetEvent _updateAvailableEvent = new AsyncAutoResetEvent();
         
         /// <summary>
         /// Constructor of the subscription processor
@@ -42,11 +40,6 @@ namespace DuetControlServer.IPC.Processors
         public Subscription(Connection conn, ClientInitMessage initMessage) : base(conn, initMessage)
         {
             _mode = (initMessage as SubscribeInitMessage).SubscriptionMode;
-            
-            _jsonModel = JObject.FromObject(ModelProvider.Current, JsonHelper.DefaultSerializer);
-            _lastModel = _jsonModel;
-            
-            _subscriptions.TryAdd(this, _mode);
         }
         
         /// <summary>
@@ -55,9 +48,17 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Task that represents the lifecycle of a connection</returns>
         public override async Task Process()
         {
+            // Initialize the machine model and register this subscriber
+            using (await Model.Provider.AccessReadOnly())
+            {
+                _jsonModel = JObject.FromObject(Model.Provider.Get, JsonHelper.DefaultSerializer);
+            }
+            _lastModel = _jsonModel;
+            _subscriptions.TryAdd(this, _mode);
+
+            // Send over the full machine model initially and keep on sending updates
             try
             {
-                // Send over the full machine model initially
                 string json;
                 lock (_jsonModel)
                 {
@@ -73,9 +74,9 @@ namespace DuetControlServer.IPC.Processors
                     {
                         throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
                     }
-                    
+
                     // Wait for another update
-                    await WaitForUpdate();
+                    await _updateAvailableEvent.WaitAsync(Program.CancelSource.Token);
                     
                     // Send over the next update
                     if (_mode == SubscriptionMode.Full)
@@ -117,33 +118,43 @@ namespace DuetControlServer.IPC.Processors
             } 
         }
 
-        private async Task WaitForUpdate()
-        {
-            await Task.Run(() => _updateEvent.WaitOne(), Program.CancelSource.Token);
-        }
-
         private void Notify(JObject newModel)
         {
             lock (_jsonModel)
             {
                 _jsonModel = newModel;
             }
-            _updateEvent.Set();
+            _updateAvailableEvent.Set();
         }
 
         /// <summary>
         /// Called to notify the subscribers about a model update
         /// </summary>
-        /// <param name="objectModel">Updated full object model</param>
-        public static void Update(Model objectModel)
+        /// <returns>Asynchronous task</returns>
+        public static async Task Update()
         {
             // This is probably really slow and needs to be improved!
-            JObject newModel = JObject.FromObject(objectModel, JsonHelper.DefaultSerializer);
+            JObject newModel;
+            using (await Model.Provider.AccessReadOnly())
+            {
+                newModel = JObject.FromObject(Model.Provider.Get, JsonHelper.DefaultSerializer);
+            }
+
+            // FIXME cache messages from the updated machine model before we get here and merge them back into newModel.
+            // Otherwise two successive model updates without a poll in between would cause messages to disappear  
+
             if (_subscriptions.Count != 0)
             {
+                // Notify subscribers
                 foreach (var pair in _subscriptions)
                 {
                     pair.Key.Notify(newModel);
+                }
+
+                // Clear messages once they have been sent out at least once
+                using (await Model.Provider.AccessReadWrite())
+                {
+                    Model.Provider.Get.Messages.Clear();
                 }
             }
         }

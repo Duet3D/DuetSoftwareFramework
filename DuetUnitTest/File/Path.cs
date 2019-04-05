@@ -8,10 +8,23 @@ namespace DuetUnitTest.File
     public class Path
     {
         [Test]
-        public void Directory()
+        public void ToPhysical()
         {
-            string sysPath = FileHelper.ResolvePath("0:/sys");
+            string sysPath = FilePath.ToPhysical("0:/sys").Result;
             Assert.AreEqual("/opt/dsf/sd/sys", sysPath);
+
+            string wwwPath = FilePath.ToPhysical("/www").Result;
+            Assert.AreEqual("/opt/dsf/sd/www", wwwPath);
+
+            string configPath = FilePath.ToPhysical("config.g", "sys").Result;
+            Assert.AreEqual("/opt/dsf/sd/sys/config.g", configPath);
+        }
+
+        [Test]
+        public void ToVirtual()
+        {
+            string sysPath = FilePath.ToVirtual("/opt/dsf/sd/sys").Result;
+            Assert.AreEqual("0:/sys", sysPath);
         }
     }
 }

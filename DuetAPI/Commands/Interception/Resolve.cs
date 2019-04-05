@@ -17,6 +17,6 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Content of the resolving message
         /// </summary>
-        public string Content { get; set; } = "";
+        public string Content { get; set; }
     }
 }

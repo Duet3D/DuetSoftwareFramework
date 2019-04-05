@@ -9,6 +9,11 @@ namespace DuetControlServer.SPI.Communication.SharedRequests
     public struct ObjectModel
     {
         /// <summary>
+        /// Length of the data in bytes
+        /// </summary>
+        public ushort Length;
+
+        /// <summary>
         /// Number of the module that this response provides data for
         /// </summary>
         public byte Module;

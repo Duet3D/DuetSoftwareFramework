@@ -23,6 +23,16 @@ namespace DuetAPI.Machine.Channels
         public bool RelativePositioning { get; set; }
 
         /// <summary>
+        /// Whether inches are being used instead of mm
+        /// </summary>
+        public bool UsingInches { get; set; }
+
+        /// <summary>
+        /// Depth of the stack
+        /// </summary>
+        public byte StackDepth;
+
+        /// <summary>
         /// Creates a clone of this instance
         /// </summary>
         /// <returns>A clone of this instance</returns>
@@ -32,7 +42,9 @@ namespace DuetAPI.Machine.Channels
             {
                 Feedrate = Feedrate,
                 RelativeExtrusion = RelativeExtrusion,
-                RelativePositioning = RelativePositioning
+                RelativePositioning = RelativePositioning,
+                UsingInches = UsingInches,
+                StackDepth = StackDepth,
             };
         }
     }

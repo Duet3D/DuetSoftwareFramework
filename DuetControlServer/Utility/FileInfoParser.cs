@@ -10,9 +10,17 @@ using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer
 {
-    public static partial class FileHelper
+    /// <summary>
+    /// Static class used to retrieve information from G-code jobs
+    /// </summary>
+    public static class FileInfoParser
     {
-        public static async Task<ParsedFileInfo> GetFileInfo(string fileName)
+        /// <summary>
+        /// Parse a G-code file
+        /// </summary>
+        /// <param name="fileName">File to analyze</param>
+        /// <returns>Information about the file</returns>
+        public static async Task<ParsedFileInfo> Parse(string fileName)
         {
             FileStream fileStream = new FileStream(fileName, FileMode.Open);
             StreamReader reader = new StreamReader(fileStream);

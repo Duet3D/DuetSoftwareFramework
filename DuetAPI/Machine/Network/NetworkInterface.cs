@@ -74,6 +74,11 @@ namespace DuetAPI.Machine.Network
         /// Signal of the WiFi adapter (only WiFi, in dBm)
         /// </summary>
         public int? Signal { get; set; }
+
+        /// <summary>
+        /// Physical address of the network adapter
+        /// </summary>
+        public string MacAddress { get; set; }
         
         /// <summary>
         /// Configured IPv4 address of the network adapter
@@ -89,6 +94,11 @@ namespace DuetAPI.Machine.Network
         /// Subnet of the network adapter
         /// </summary>
         public string Subnet { get; set; }
+
+        /// <summary>
+        /// Gateway of the network adapter
+        /// </summary>
+        public string Gateway { get; set; }
         
         /// <summary>
         /// Number of reconnect attempts or null if unknown
@@ -112,9 +122,11 @@ namespace DuetAPI.Machine.Network
                 FirmwareVersion = (FirmwareVersion != null) ? string.Copy(FirmwareVersion) : null,
                 Speed = Speed,
                 Signal = Signal,
+                MacAddress = (MacAddress != null) ? string.Copy(MacAddress) : null,
                 ConfiguredIP = (ConfiguredIP != null) ? string.Copy(ConfiguredIP) : null,
                 ActualIP = (ActualIP != null) ? string.Copy(ActualIP) : null,
                 Subnet = (Subnet != null) ? string.Copy(Subnet) : null,
+                Gateway = (Gateway != null) ? string.Copy(Gateway) : null,
                 NumReconnects = NumReconnects,
                 ActiveProtocols = (NetworkProtocol[])ActiveProtocols.Clone()
             };

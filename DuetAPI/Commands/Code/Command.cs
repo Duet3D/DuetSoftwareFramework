@@ -22,9 +22,9 @@ namespace DuetAPI.Commands
         public CodeType Type { get; set; } = CodeType.Comment;
 
         /// <summary>
-        /// Origin of this code
+        /// Code channel to send this code to
         /// </summary>
-        public CodeChannel Source { get; set; }
+        public CodeChannel Channel { get; set; } = CodeChannel.SPI;
 
         /// <summary>
         /// Major code number (e.g. 28 in G28)
@@ -32,7 +32,7 @@ namespace DuetAPI.Commands
         public int? MajorNumber { get; set; }
         
         /// <summary>
-        /// Minor code number (e.g. 3 in G54.3). Defaults to -1 like in RepRapFirmware
+        /// Minor code number (e.g. 3 in G54.3)
         /// </summary>
         public int? MinorNumber { get; set; }
         
@@ -64,6 +64,11 @@ namespace DuetAPI.Commands
         public bool IsPostProcessed { get; set; }
 
         /// <summary>
+        /// Indicates if the code comes from a macro file
+        /// </summary>
+        public bool IsFromMacro { get; set; }
+
+        /// <summary>
         /// File position in bytes (optional)
         /// </summary>
         public uint? FilePosition { get; set; }
@@ -74,6 +79,36 @@ namespace DuetAPI.Commands
         /// <param name="c">Letter of the code parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
         public CodeParameter GetParameter(char c) => Parameters.FirstOrDefault(p => p.Letter == 'C');
+
+        /// <summary>
+        /// Reconstruct an unprecedented string from the parameter list
+        /// </summary>
+        /// <returns></returns>
+        public string GetUnprecedentedString(bool quoteStrings = false)
+        {
+            string result = "";
+            foreach (CodeParameter p in Parameters)
+            {
+                if (result != "")
+                {
+                    result += " ";
+                }
+                if (p.Letter != '\0')
+                {
+                    result += p.Letter;
+                }
+                if (quoteStrings && p.Type == typeof(string))
+                {
+                    result += '"';
+                }
+                result += p.AsString;
+                if (quoteStrings && p.Type == typeof(string))
+                {
+                    result += '"';
+                }
+            }
+            return result;
+        }
 
         /// <summary>
         /// Convert the parsed code back to a text-based G/M/T-code

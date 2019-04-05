@@ -17,7 +17,7 @@ namespace DuetUnitTest.File
         public async Task Test(string fileName)
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "File/GCodes", fileName);
-            ParsedFileInfo info = await FileHelper.GetFileInfo(filePath);
+            ParsedFileInfo info = await FileInfoParser.Parse(filePath);
 
             TestContext.Out.Write(JsonConvert.SerializeObject(info, Formatting.Indented));
 

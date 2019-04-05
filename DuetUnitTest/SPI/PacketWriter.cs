@@ -18,22 +18,19 @@ namespace DuetUnitTest.SPI
         public void TransferHeader()
         {
             Span<byte> span = new byte[128];
-            
-            Writer.WriteTransferHeader(span, 4, 1234, 456, 0);
+            span.Fill(0xFF);
+
+            TransferHeader header = MemoryMarshal.Read<TransferHeader>(span);
+            Writer.InitTransferHeader(ref header);
             
             // Header
-            Assert.AreEqual(Consts.FormatCode, span[0]);
-            Assert.AreEqual(4, span[1]);        // Number of packets
-            ushort protocolVersion = MemoryMarshal.Read<ushort>(span.Slice(2, 2));
-            Assert.AreEqual(Consts.ProtocolVersion, protocolVersion);
-            ushort sequenceNumber = MemoryMarshal.Read<ushort>(span.Slice(4, 4));
-            Assert.AreEqual(1234, sequenceNumber);
-            ushort transferLength = MemoryMarshal.Read<ushort>(span.Slice(6, 2));
-            Assert.AreEqual(456, transferLength);
-            ushort dataChecksum = MemoryMarshal.Read<ushort>(span.Slice(8, 2));
-            Assert.AreEqual(0, dataChecksum);
-            ushort headerChecksum = MemoryMarshal.Read<ushort>(span.Slice(10, 2));
-            Assert.AreEqual(0, headerChecksum);
+            Assert.AreEqual(Consts.FormatCode, header.FormatCode);
+            Assert.AreEqual(0, header.NumPackets);
+            Assert.AreEqual(Consts.ProtocolVersion, header.ProtocolVersion);
+            Assert.AreEqual(0, header.SequenceNumber);
+            Assert.AreEqual(0, header.DataLength);
+            Assert.AreEqual(0, header.ChecksumData);
+            Assert.AreEqual(0, header.ChecksumHeader);
             
             // No padding
         }
@@ -66,7 +63,7 @@ namespace DuetUnitTest.SPI
 
             Code code = new Code("G53 G10")
             {
-                Source = CodeChannel.HTTP
+                Channel = CodeChannel.HTTP
             };
 
             int bytesWritten = Writer.WriteCode(span, code);
@@ -96,7 +93,7 @@ namespace DuetUnitTest.SPI
             
             Code code = new Code("G1 X4 Y23.5 Z12.2 J\"testok\" E12:3.45")
             {
-                Source = CodeChannel.File
+                Channel = CodeChannel.File
             };
 
             int bytesWritten = Writer.WriteCode(span, code);
@@ -165,13 +162,12 @@ namespace DuetUnitTest.SPI
             
             int bytesWritten = Writer.WriteObjectModelRequest(span, 5);
             Assert.AreEqual(4, bytesWritten);
-            
+
             // Header
-            Assert.AreEqual(5, span[0]);
+            ushort length = MemoryMarshal.Read<ushort>(span);
+            Assert.AreEqual(5, span[2]);
             
             // Padding
-            Assert.AreEqual(0, span[1]);
-            Assert.AreEqual(0, span[2]);
             Assert.AreEqual(0, span[3]);
         }
         
@@ -205,7 +201,7 @@ namespace DuetUnitTest.SPI
         }
         
         [Test]
-        public void SetFilePrintInfo()
+        public void PrintStarted()
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
@@ -225,7 +221,7 @@ namespace DuetUnitTest.SPI
                 SimulatedTime = 10323.4
             };
             
-            int bytesWritten = Writer.WriteFilePrintInfo(span, info);
+            int bytesWritten = Writer.WritePrintStarted(span, info);
             Assert.AreEqual(56, bytesWritten);
             
             // Header
@@ -265,6 +261,24 @@ namespace DuetUnitTest.SPI
         }
 
         [Test]
+        public void PrintStopped()
+        {
+            Span<byte> span = new byte[128];
+            span.Fill(0xFF);
+
+            int bytesWritten = Writer.WritePrintStopped(span, PrintStoppedReason.Abort);
+            Assert.AreEqual(bytesWritten, 4);
+
+            // Header
+            Assert.AreEqual((byte)PrintStoppedReason.Abort, span[0]);
+
+            // Padding
+            Assert.AreEqual(0, span[1]);
+            Assert.AreEqual(0, span[2]);
+            Assert.AreEqual(0, span[3]);
+        }
+
+        [Test]
         public void MacroCompleted()
         {
             Span<byte> span = new byte[128];
@@ -278,6 +292,24 @@ namespace DuetUnitTest.SPI
             Assert.AreEqual(0, span[1]);
             
             // Padding
+            Assert.AreEqual(0, span[2]);
+            Assert.AreEqual(0, span[3]);
+        }
+
+        [Test]
+        public void LockUnlock()
+        {
+            Span<byte> span = new byte[128];
+            span.Fill(0xFF);
+
+            int bytesWritten = Writer.WriteLockUnlock(span, CodeChannel.LCD);
+            Assert.AreEqual(4, bytesWritten);
+
+            // Header
+            Assert.AreEqual(span[0], (byte)CodeChannel.LCD);
+
+            // Padding
+            Assert.AreEqual(0, span[1]);
             Assert.AreEqual(0, span[2]);
             Assert.AreEqual(0, span[3]);
         }

@@ -2,6 +2,9 @@ using System.Runtime.InteropServices;
 
 namespace DuetControlServer.SPI.Communication.LinuxRequests
 {
+    /// <summary>
+    /// Binary representation of a code parameter
+    /// </summary>
     [StructLayout(LayoutKind.Explicit, Size = 8)]
     public struct CodeParameter
     {

@@ -1,4 +1,4 @@
-﻿namespace DuetAPI.Commands
+﻿namespace DuetAPI
 {
     /// <summary>
     /// Enumeration of every available code channel

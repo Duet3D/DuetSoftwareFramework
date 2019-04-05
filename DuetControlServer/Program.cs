@@ -3,7 +3,6 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetControlServer.IPC;
-using DuetControlServer.SPI;
 
 namespace DuetControlServer
 {
@@ -38,7 +37,7 @@ namespace DuetControlServer
             Console.Write("Initialising object model... ");
             try
             {
-                ModelProvider.Update();
+                Model.Provider.Init();
                 Console.WriteLine("Done!");
             }
             catch (Exception e)
@@ -51,7 +50,8 @@ namespace DuetControlServer
             Console.Write("Connecting to RepRapFirmware... ");
             try
             {
-                Connector.Connect();
+                SPI.Interface.Init();
+                SPI.Interface.Connect().Wait();
                 Console.WriteLine("Done!");
             }
             catch (Exception e)
@@ -77,8 +77,9 @@ namespace DuetControlServer
             
             // Run the main tasks in the background
             Task ipcTask = Server.AcceptConnections();
-            Task rrfTask = Connector.Run();
-            Task[] taskList = { ipcTask, rrfTask };
+            Task spiTask = SPI.Interface.Run();
+            Task modelUpdateTask = Model.UpdateTask.UpdatePeriodically();
+            Task[] taskList = { ipcTask, spiTask, modelUpdateTask };
 
             // Wait for program termination
             try

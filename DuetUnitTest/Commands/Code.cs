@@ -82,5 +82,23 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual('Y', code.Parameters[1].Letter);
             Assert.AreEqual(1.25, code.Parameters[1].AsFloat);
         }
+
+        [Test]
+        public void ParseQuotedM32()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M32 \"foo bar.g\"");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(32, code.MajorNumber);
+            Assert.AreEqual("foo bar.g", code.GetUnprecedentedString());
+        }
+
+        [Test]
+        public void ParseUnquotedM32()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M32 foo bar.g");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(32, code.MajorNumber);
+            Assert.AreEqual("foo bar.g", code.GetUnprecedentedString());
+        }
     }
 }

@@ -21,13 +21,13 @@ namespace DuetControlServer.Commands
         /// Creates a new Code instance and attempts to parse the given code string
         /// </summary>
         /// <param name="code">G/M/T-Code</param>
-        public Code(string code) : base(code) {}
-        
+        public Code(string code) : base(code) { }
+
         /// <summary>
         /// Defines whether this code is part of config.g
         /// </summary>
         public bool IsFromConfig { get; set; }
-        
+
         /// <summary>
         /// Defines whether this code is part of config-override.g
         /// </summary>
@@ -39,11 +39,6 @@ namespace DuetControlServer.Commands
         /// <returns>Code result instance</returns>
         protected override async Task<CodeResult> Run()
         {
-            if (Type == CodeType.Comment)
-            {
-                // Comments are discarded
-                return new CodeResult();
-            }
             CodeResult result = null;
 
             // Preprocess this code
@@ -89,8 +84,29 @@ namespace DuetControlServer.Commands
                 IsPostProcessed = true;
             }
 
-            // Then have it processed by RepRapFirmware
-            return await Connector.ProcessCode(this);
+            // Comments are handled before they are sent to the firmware
+            if (Type == CodeType.Comment)
+            {
+                return new CodeResult();
+            }
+
+            // Send it to RepRapFirmware and react to its result
+            result = await Interface.ProcessCode(this);
+            switch (Type)
+            {
+                case CodeType.GCode:
+                    await GCodes.CodeExecuted(this, result);
+                    break;
+
+                case CodeType.MCode:
+                    await MCodes.CodeExecuted(this, result);
+                    break;
+
+                case CodeType.TCode:
+                    await TCodes.CodeExecuted(this, result);
+                    break;
+            }
+            return result;
         }
     }
 }

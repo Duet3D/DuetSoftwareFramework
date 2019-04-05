@@ -10,6 +10,9 @@ using Newtonsoft.Json.Linq;
 
 namespace DuetControlServer.IPC
 {
+    /// <summary>
+    /// Static class that holds main functionality for inter-process communication
+    /// </summary>
     public static class Server
     {
         private static readonly Socket unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
@@ -17,6 +20,9 @@ namespace DuetControlServer.IPC
         private static readonly ConcurrentDictionary<Socket, int> clientSockets = new ConcurrentDictionary<Socket, int>();
         private static int LastConnectionID;
 
+        /// <summary>
+        /// Create the UNIX socket for IPC
+        /// </summary>
         public static void CreateSocket()
         {
             // Clean up socket path again in case of unclean exit
@@ -36,6 +42,11 @@ namespace DuetControlServer.IPC
             }
         }
 
+        /// <summary>
+        /// Start accepting incoming connections.
+        /// This represents the lifecycle of this class
+        /// </summary>
+        /// <returns></returns>
         public static async Task AcceptConnections()
         {
             // Keep accepting incoming connections.
@@ -126,6 +137,9 @@ namespace DuetControlServer.IPC
             return null;
         }
         
+        /// <summary>
+        /// Close every connection and clean up the UNIX socket
+        /// </summary>
         public static void Shutdown()
         {
             // Disconnect every client

@@ -65,7 +65,7 @@ namespace DuetAPIClient
         public Task ResolveCode(MessageType type, string content,
             CancellationToken cancellationToken = default(CancellationToken))
         {
-            return PerformCommand(new Resolve {Content = content, Type = type}, cancellationToken);
+            return PerformCommand(new Resolve { Content = content, Type = type }, cancellationToken);
         }
     }
 }

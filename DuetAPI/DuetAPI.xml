@@ -4,6 +4,62 @@
         <name>DuetAPI</name>
     </assembly>
     <members>
+        <member name="T:DuetAPI.CodeChannel">
+            <summary>
+            Enumeration of every available code channel
+            <seealso cref="T:DuetAPI.Machine.Channels.Model"/>
+            </summary>
+        </member>
+        <member name="F:DuetAPI.CodeChannel.HTTP">
+            <summary>
+            Code channel for HTTP requests
+            </summary>
+        </member>
+        <member name="F:DuetAPI.CodeChannel.Telnet">
+            <summary>
+            Code channel for Telnet requests
+            </summary>
+        </member>
+        <member name="F:DuetAPI.CodeChannel.File">
+            <summary>
+            Code channel for file prints
+            </summary>
+        </member>
+        <member name="F:DuetAPI.CodeChannel.USB">
+            <summary>
+            Code channel for USB requests
+            </summary>
+        </member>
+        <member name="F:DuetAPI.CodeChannel.AUX">
+            <summary>
+            Code channel for serial devices (e.g. PanelDue)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.CodeChannel.Daemon">
+            <summary>
+            Code channel for running triggers or config.g
+            </summary>
+        </member>
+        <member name="F:DuetAPI.CodeChannel.CodeQueue">
+            <summary>
+            Code channel for the code queue that executes a couple of codes in-sync with moves
+            </summary>
+        </member>
+        <member name="F:DuetAPI.CodeChannel.LCD">
+            <summary>
+            Code channel for auxiliary LCD devices (e.g. PanelOne)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.CodeChannel.SPI">
+            <summary>
+            Default code channel for requests over SPI
+            </summary>
+        </member>
+        <member name="F:DuetAPI.CodeChannel.AutoPause">
+            <summary>
+            Code channel that executes macros on power fail, heater faults and filament out
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.Acknowledge">
             <summary>
             Acknowledge a (partial) model update in subscription mode
@@ -121,62 +177,6 @@
             <param name="type">Name of the .NET error</param>
             <param name="message">Error description of the .NET error</param>
         </member>
-        <member name="T:DuetAPI.Commands.CodeChannel">
-            <summary>
-            Enumeration of every available code channel
-            <seealso cref="T:DuetAPI.Machine.Channels.Model"/>
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.HTTP">
-            <summary>
-            Code channel for HTTP requests
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.Telnet">
-            <summary>
-            Code channel for Telnet requests
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.File">
-            <summary>
-            Code channel for file prints
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.USB">
-            <summary>
-            Code channel for USB requests
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.AUX">
-            <summary>
-            Code channel for serial devices (e.g. PanelDue)
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.Daemon">
-            <summary>
-            Code channel for running triggers or config.g
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.CodeQueue">
-            <summary>
-            Code channel for the code queue that executes a couple of codes in-sync with moves
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.LCD">
-            <summary>
-            Code channel for auxiliary LCD devices (e.g. PanelOne)
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.SPI">
-            <summary>
-            Default code channel for requests over SPI
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Commands.CodeChannel.AutoPause">
-            <summary>
-            Code channel that executes macros on power fail, heater faults and filament out
-            </summary>
-        </member>
         <member name="T:DuetAPI.Commands.CodeType">
             <summary>
             Type of a generic G/M/T-code. If none is applicable, it is treated as a comment
@@ -219,9 +219,9 @@
             Type of the code. If no exact type could be determined, it is interpreted as a comment
             </summary>
         </member>
-        <member name="P:DuetAPI.Commands.Code.Source">
+        <member name="P:DuetAPI.Commands.Code.Channel">
             <summary>
-            Origin of this code
+            Code channel to send this code to
             </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.MajorNumber">
@@ -231,7 +231,7 @@
         </member>
         <member name="P:DuetAPI.Commands.Code.MinorNumber">
             <summary>
-            Minor code number (e.g. 3 in G54.3). Defaults to -1 like in RepRapFirmware
+            Minor code number (e.g. 3 in G54.3)
             </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.EnforceAbsoluteCoordinates">
@@ -261,6 +261,11 @@
             Indicates if the code has been postprocessed (see also <see cref="F:DuetAPI.Connection.ConnectionMode.Intercept"/>)
             </summary>
         </member>
+        <member name="P:DuetAPI.Commands.Code.IsFromMacro">
+            <summary>
+            Indicates if the code comes from a macro file
+            </summary>
+        </member>
         <member name="P:DuetAPI.Commands.Code.FilePosition">
             <summary>
             File position in bytes (optional)
@@ -272,6 +277,12 @@
             </summary>
             <param name="c">Letter of the code parameter to find</param>
             <returns>The parsed parameter instance or null if none could be found</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.GetUnprecedentedString(System.Boolean)">
+            <summary>
+            Reconstruct an unprecedented string from the parameter list
+            </summary>
+            <returns></returns>
         </member>
         <member name="M:DuetAPI.Commands.Code.ToString">
             <summary>
@@ -426,6 +437,18 @@
             List-based representation of a code result.
             Each item represents a <see cref="T:DuetAPI.Message"/> instance which can be easily converted to a string
             </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeResult.#ctor">
+            <summary>
+            Create a new code result
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeResult.#ctor(DuetAPI.MessageType,System.String)">
+            <summary>
+            Create a new code result with an initial message
+            </summary>
+            <param name="type">Message type</param>
+            <param name="content">Message content</param>
         </member>
         <member name="M:DuetAPI.Commands.CodeResult.ToString">
             <summary>
@@ -723,6 +746,16 @@
             Whether relative positioning is being used
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Channels.Channel.UsingInches">
+            <summary>
+            Whether inches are being used instead of mm
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Channels.Channel.StackDepth">
+            <summary>
+            Depth of the stack
+            </summary>
+        </member>
         <member name="M:DuetAPI.Machine.Channels.Channel.Clone">
             <summary>
             Creates a clone of this instance
@@ -732,22 +765,7 @@
         <member name="T:DuetAPI.Machine.Channels.Model">
             <summary>
             Information about the available G/M/T-code channels.
-            <seealso cref="T:DuetAPI.Commands.CodeChannel"/>
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Machine.Channels.Model.Main">
-            <summary>
-            Main G/M/T-code channel (default)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Machine.Channels.Model.Serial">
-            <summary>
-            G/M/T-code channel for serial lines (may be a PanelDue over UART)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Machine.Channels.Model.File">
-            <summary>
-            G/M/T-code channel for file prints
+            <seealso cref="T:DuetAPI.CodeChannel"/>
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Channels.Model.HTTP">
@@ -759,6 +777,53 @@
             <summary>
             G/M/T-code channel for Telnet requests
             </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.File">
+            <summary>
+            G/M/T-code channel for file prints
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.USB">
+            <summary>
+            G/M/T-code channel for USB
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.AUX">
+            <summary>
+            G/M/T-code channel for AUX (UART/PanelDue)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.Daemon">
+            <summary>
+            G/M/T-code channel for Daemon (deals with config.g and triggers)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.CodeQueue">
+            <summary>
+            G/M/T-code channel for the code queue
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.LCD">
+            <summary>
+            G/M/T-code channel for AUX (UART/PanelDue)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.SPI">
+            <summary>
+            Default G/M/T-code channel for generic codes
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.AutoPause">
+            <summary>
+            Default G/M/T-code channel for generic codes
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channels.Model.Item(DuetAPI.CodeChannel)">
+            <summary>
+            Index operator for simple access via the <see cref="T:DuetAPI.CodeChannel"/> enum
+            </summary>
+            <param name="key">Channel to access</param>
+            <returns></returns>
         </member>
         <member name="M:DuetAPI.Machine.Channels.Model.Clone">
             <summary>
@@ -1909,6 +1974,11 @@
             Signal of the WiFi adapter (only WiFi, in dBm)
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.MacAddress">
+            <summary>
+            Physical address of the network adapter
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Network.NetworkInterface.ConfiguredIP">
             <summary>
             Configured IPv4 address of the network adapter
@@ -1922,6 +1992,11 @@
         <member name="P:DuetAPI.Machine.Network.NetworkInterface.Subnet">
             <summary>
             Subnet of the network adapter
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.NetworkInterface.Gateway">
+            <summary>
+            Gateway of the network adapter
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Network.NetworkInterface.NumReconnects">
@@ -2501,6 +2576,18 @@
             Generic container for messages
             </summary>
         </member>
+        <member name="M:DuetAPI.Message.#ctor">
+            <summary>
+            Create a nwe message
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Message.#ctor(DuetAPI.MessageType,System.String)">
+            <summary>
+            Create a new message
+            </summary>
+            <param name="type">Message type</param>
+            <param name="content">Message content</param>
+        </member>
         <member name="P:DuetAPI.Message.Time">
             <summary>
             Time at which the message was generated
@@ -2536,7 +2623,6 @@
         <member name="P:DuetAPI.ParsedFileInfo.FileName">
             <summary>
             The filename of the G-code file
-            TODO This should represent a relative file path starting from the RRF base path!
             </summary>
         </member>
         <member name="P:DuetAPI.ParsedFileInfo.Size">

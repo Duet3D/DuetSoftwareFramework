@@ -1,7 +1,7 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
 using System.Runtime.InteropServices;
 
-namespace DuetControlServer.SPI.Communication.FirmwareRequests
+namespace DuetControlServer.SPI.Communication.SharedRequests
 {
     /// <summary>
     /// Header describing a response to a lock resource request

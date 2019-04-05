@@ -1,7 +1,7 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
 using System;
 
-namespace DuetControlServer.SPI.Communication.FirmwareRequests
+namespace DuetControlServer.SPI.Communication
 {
     /// <summary>
     /// Message type flags describing a code reply. This is equal to MessageType in RepRapFirmware.
@@ -75,7 +75,6 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         #endregion
 
         #region Special indicators (byte 4)
-
         /// <summary>
         /// This is an error message
         /// </summary>

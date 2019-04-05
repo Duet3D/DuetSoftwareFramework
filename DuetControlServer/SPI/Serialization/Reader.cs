@@ -15,19 +15,9 @@ namespace DuetControlServer.SPI.Serialization
     /// It is expected that each data block occupies entire 4-byte blocks.
     /// Make sure to keep the data returned by these functions only as long as the underlying buffer is actually valid!
     /// </summary>
-    /// <remarks>Once C# 3.0 is out, the performance of this can be further improved (without relying on unsafe code) by using <c>Span.AsRef()</c></remarks>
+    /// <remarks>Once .NET Core 3.0 is out, the performance of this can be further improved (without relying on unsafe code) by using <c>Span.AsRef()</c></remarks>
     public static class Reader
     {
-        /// <summary>
-        /// Read a transfer header from a memory span
-        /// </summary>
-        /// <param name="from">Origin</param>
-        /// <returns>Header describing a data transfer</returns>
-        public static TransferHeader ReadTransferHeader(Span<byte> from)
-        {
-            return MemoryMarshal.Read<TransferHeader>(from);
-        }
-
         /// <summary>
         /// Read a packet header from a memory span
         /// </summary>
@@ -41,23 +31,13 @@ namespace DuetControlServer.SPI.Serialization
         /// <summary>
         /// Read the current state of the code buffers
         /// </summary>
-        /// <param name="from"></param>
-        /// <param name="busyChannels"></param>
+        /// <param name="from">Origin</param>
+        /// <param name="busyChannels">Bitmap of the busy channels</param>
         /// <returns></returns>
-        public static int ReadState(Span<byte> from, out CodeChannel[] busyChannels)
+        public static int ReadState(Span<byte> from, out int busyChannels)
         {
             StateResponse header = MemoryMarshal.Read<StateResponse>(from);
-
-            List<CodeChannel> busyChannelsList = new List<CodeChannel>();
-            for (int i = 0; i < Consts.NumCodeChannels; i++)
-            {
-                if ((header.BusyChannels & (1 << i)) != 0)
-                {
-                    busyChannelsList.Add((CodeChannel)i);
-                }
-            }
-            busyChannels = busyChannelsList.ToArray();
-
+            busyChannels = (int)header.BusyChannels;
             return Marshal.SizeOf(header);
         }
 
@@ -65,100 +45,82 @@ namespace DuetControlServer.SPI.Serialization
         /// Read an object model header plus JSON text from a memory span
         /// </summary>
         /// <param name="from">Origin</param>
-        /// <param name="packetLength">Length of the received packet</param>
         /// <param name="module">Number of the module from which the JSON data originates</param>
-        /// <param name="json">Object model data as JSON</param>
+        /// <param name="json">Object model data as JSON or null if none available</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadObjectModel(Span<byte> from, int packetLength, out byte module, out string json)
+        public static int ReadObjectModel(Span<byte> from, out byte module, out string json)
         {
             ObjectModel header = MemoryMarshal.Read<ObjectModel>(from);
             int bytesRead = Marshal.SizeOf(header);
             
             module = header.Module;
-            if (packetLength > bytesRead)
+            if (header.Length > 0)
             {
-                Span<byte> unicodeJSON = from.Slice(bytesRead, packetLength - bytesRead - 1);
+                Span<byte> unicodeJSON = from.Slice(bytesRead, header.Length);
                 json = Encoding.UTF8.GetString(unicodeJSON);
+                bytesRead += header.Length;
             }
             else
             {
                 json = null;
             }
             
-            return AddPadding(packetLength);
+            return AddPadding(bytesRead);
         }
 
         /// <summary>
         /// Read a code reply from a memory span
         /// </summary>
         /// <param name="from">Origin</param>
-        /// <param name="packetLength">Length of the received packet</param>
-        /// <param name="channels">Channel destinations</param>
-        /// <param name="message">Generated message</param>
-        /// <param name="pushFlag">True if the reply has been truncated</param>
+        /// <param name="messageType">Message flags</param>
+        /// <param name="reply">Raw code reply</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadCodeReply(Span<byte> from, int packetLength, out CodeChannel[] channels, out Message message, out bool pushFlag)
+        public static int ReadCodeReply(Span<byte> from, out MessageTypeFlags messageType, out string reply)
         {
             CodeReply header = MemoryMarshal.Read<CodeReply>(from);
             int bytesRead = Marshal.SizeOf(header);
-            
-            // Read message destinations
-            List<CodeChannel> channelsList = new List<CodeChannel>();
-            for (int i = 0; i < Consts.NumCodeChannels; i++)
-            {
-                if ((header.MessageType & (1 << i)) != 0)
-                {
-                    channelsList.Add((CodeChannel)i);
-                }
-            }
-            channels = channelsList.ToArray();
+
+            // Read header
+            messageType = (MessageTypeFlags)header.MessageType;
 
             // Read message content
-            string content;
-            if (packetLength > bytesRead)
+            if (header.Length > 0)
             {
-                Span<byte> unicodeReply = from.Slice(bytesRead, packetLength - bytesRead - 1);
-                content = Encoding.UTF8.GetString(unicodeReply);
+                Span<byte> unicodeReply = from.Slice(bytesRead, header.Length);
+                reply = Encoding.UTF8.GetString(unicodeReply);
+                bytesRead += header.Length;
             }
             else
             {
-                content = "";
+                reply = "";
             }
 
-            // Read message flags
-            MessageTypeFlags type = (MessageTypeFlags)header.MessageType;
-            message = new Message
-            {
-                Content = content,
-                Time = DateTime.Now,
-                Type = type.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
-                        : (type.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
-                        : MessageType.Success)
-            };
-            pushFlag = type.HasFlag(MessageTypeFlags.PushFlag);
-            return AddPadding(packetLength);
+            return AddPadding(bytesRead);
         }
 
         /// <summary>
         /// Read a macro file request from a memory span
         /// </summary>
         /// <param name="from">Origin</param>
-        /// <param name="packetLength">Length of the received packet</param>
         /// <param name="channel">Code channel that requested the execution</param>
         /// <param name="reportMissing">Output a message if the macro cannot be found</param>
         /// <param name="filename">Filename of the macro to execute</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadMacroRequest(Span<byte> from, int packetLength, out CodeChannel channel, out bool reportMissing, out string filename)
+        public static int ReadMacroRequest(Span<byte> from, out CodeChannel channel, out bool reportMissing, out string filename)
         {
             MacroRequest header = MemoryMarshal.Read<MacroRequest>(from);
             int bytesRead = Marshal.SizeOf(header);
-            
+ 
+            // Read header
             channel = header.Channel;
             reportMissing = Convert.ToBoolean(header.ReportMissing);
-            Span<byte> unicodeFilename = from.Slice(bytesRead, packetLength - bytesRead - 1);
-            filename = Encoding.UTF8.GetString(unicodeFilename);
 
-            return AddPadding(packetLength);
+            // Read filename
+            Span<byte> unicodeFilename = from.Slice(bytesRead, header.Length);
+            filename = Encoding.UTF8.GetString(unicodeFilename);
+            bytesRead += header.Length;
+
+            return AddPadding(bytesRead);
         }
 
         /// <summary>
@@ -216,10 +178,10 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="header"></param>
         /// <param name="zCoordinates"></param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadHeightMap(Span<byte> from, out HeightMap header, out Span<float> zCoordinates)
+        public static int ReadHeightMap(Span<byte> from, out HeightMap header, out float[] zCoordinates)
         {
             header = MemoryMarshal.Read<HeightMap>(from);
-            zCoordinates = MemoryMarshal.Cast<byte, float>(from.Slice(Marshal.SizeOf(header), (int)header.NumPoints * Marshal.SizeOf(typeof(float))));
+            zCoordinates = MemoryMarshal.Cast<byte, float>(from.Slice(Marshal.SizeOf(header), (int)header.NumPoints * Marshal.SizeOf(typeof(float)))).ToArray();
             return Marshal.SizeOf(header) + zCoordinates.Length * Marshal.SizeOf(typeof(float));
         }
 

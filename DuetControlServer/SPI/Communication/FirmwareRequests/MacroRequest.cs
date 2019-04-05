@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using DuetAPI.Commands;
+using DuetAPI;
 
 namespace DuetControlServer.SPI.Communication.FirmwareRequests
 {
@@ -18,5 +18,10 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// Output a warning message if the file could not be found
         /// </summary>
         public byte ReportMissing;
+
+        /// <summary>
+        /// Length of the filename
+        /// </summary>
+        public byte Length;
     }
 }
