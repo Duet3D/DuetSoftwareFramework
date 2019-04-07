@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Heat
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about the way the heater heats up

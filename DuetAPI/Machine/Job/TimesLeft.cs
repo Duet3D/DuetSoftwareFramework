@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Job
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Estimations about the times left

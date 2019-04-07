@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace DuetControlServer.SPI.Communication.FirmwareRequests
 {
     /// <summary>
-    /// Header for print pause events
+    /// Header of print pause events
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Size = 8)]
     public struct PrintPaused

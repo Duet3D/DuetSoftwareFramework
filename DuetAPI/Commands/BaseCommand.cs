@@ -25,15 +25,15 @@ namespace DuetAPI.Commands
 
         /// <summary>
         /// The connection ID this command was received from. It is automatically overwritten by the control server
-        /// once the full command has been deserialized.
+        /// once the full command has been deserialized. If this is 0, the command comes from an internal request.
         /// </summary>
         public int SourceConnection { get; set; }
 
         /// <summary>
-        /// Reserved for internal use in the control server
+        /// Invokes the command implementation
         /// </summary>
-        /// <returns>Command result (if any)</returns>
-        public virtual Task<object> Execute()
+        /// <returns>Result of the command</returns>
+        public virtual Task<object> Invoke()
         {
             throw new NotImplementedException($"{Command} not implemented");
         }
@@ -45,43 +45,43 @@ namespace DuetAPI.Commands
     public abstract class Command : BaseCommand
     {
         /// <summary>
-        /// Reserved for internal use in the control server
+        /// Reserved for the actual command implementation in the control server
         /// </summary>
-        /// <returns>null</returns>
-        public sealed override async Task<object> Execute()
+        public virtual Task Execute()
         {
-            await Run();
-            return null;
+            throw new NotImplementedException($"{Command} not implemented");
         }
 
         /// <summary>
-        /// Reserved for internal use in the control server. This is invoked by <see cref="Execute"/>
+        /// Invokes the command implementation
         /// </summary>
-        protected virtual Task Run()
+        /// <returns></returns>
+        public override async Task<object> Invoke()
         {
-            throw new NotImplementedException($"{Command} not implemented");
+            await Execute();
+            return null;
         }
     }
     
     /// <summary>
-    /// Base class of a command that return a result
+    /// Base class of a command that returns a result
     /// </summary>
     /// <typeparam name="T">Type of the command result</typeparam>
     public abstract class Command<T> : BaseCommand
     {
         /// <summary>
-        /// Reserved for internal use in the control server
+        /// Reserved for the actual command implementation in the control server
         /// </summary>
         /// <returns>Command result</returns>
-        public sealed override async Task<object> Execute() => await Run();
-
-        /// <summary>
-        /// Reserved for internal use in the control server. This is invoked by <see cref="Execute"/>
-        /// </summary>
-        /// <returns>Command result</returns>
-        protected virtual Task<T> Run()
+        public virtual Task<T> Execute()
         {
             throw new NotImplementedException($"{Command}<{nameof(T)}> not implemented");
         }
+
+        /// <summary>
+        /// Invokes the command implementation
+        /// </summary>
+        /// <returns></returns>
+        public override async Task<object> Invoke() => await Execute();
     }
 }

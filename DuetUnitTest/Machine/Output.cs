@@ -10,12 +10,12 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            Model original = new Model();
+            MachineModel original = new MachineModel();
 
             original.Messages.Add(new Message(MessageType.Warning, "Test 1 2 3"));
             original.Messages.Add(new Message(MessageType.Error, "Err 3 2 1"));
 
-            Model clone = (Model)original.Clone();
+            MachineModel clone = (MachineModel)original.Clone();
 
             Assert.AreEqual(2, original.Messages.Count);
             Assert.AreEqual(original.Messages[0].Content, "Test 1 2 3");

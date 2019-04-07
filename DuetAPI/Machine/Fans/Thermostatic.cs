@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Fans
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Thermostatic parameters of a fan

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Move
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about an extruder drive

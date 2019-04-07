@@ -1,6 +1,7 @@
-﻿using Newtonsoft.Json;
+﻿using DuetAPI.Utility;
+using Newtonsoft.Json;
 
-namespace DuetAPI.Machine.Scanner
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Possible states of the attached 3D scanner

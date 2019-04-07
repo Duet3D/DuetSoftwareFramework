@@ -7,10 +7,20 @@ using DuetControlServer.IPC;
 
 namespace DuetControlServer
 {
+    /// <summary>
+    /// Main program class
+    /// </summary>
     static class Program
     {
+        /// <summary>
+        /// Global cancel source for program termination
+        /// </summary>
         public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
 
+        /// <summary>
+        /// Entry point of the program
+        /// </summary>
+        /// <param name="args">Command-line arguments</param>
         static void Main(string[] args)
         {
             Console.WriteLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");

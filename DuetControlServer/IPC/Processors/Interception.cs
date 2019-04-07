@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
 using Nito.AsyncEx;
 
 namespace DuetControlServer.IPC.Processors
@@ -125,7 +126,7 @@ namespace DuetControlServer.IPC.Processors
                         }
 
                         // Deal with other requests
-                        object result = command.Execute();
+                        object result = command.Invoke();
                         await Connection.SendResponse(result);
                     }
                 }

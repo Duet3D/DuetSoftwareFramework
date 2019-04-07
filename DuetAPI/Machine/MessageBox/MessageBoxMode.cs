@@ -1,4 +1,4 @@
-﻿namespace DuetAPI.Machine.MessageBox
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Supported modes of displaying a message box

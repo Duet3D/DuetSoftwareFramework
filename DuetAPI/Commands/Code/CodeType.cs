@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using DuetAPI.Utility;
+using Newtonsoft.Json;
 
 namespace DuetAPI.Commands
 {

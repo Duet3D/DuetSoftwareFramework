@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
 using DuetControlServer.IPC.Processors;
 using Newtonsoft.Json.Linq;
 

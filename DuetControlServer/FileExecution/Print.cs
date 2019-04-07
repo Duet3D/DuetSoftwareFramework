@@ -67,23 +67,7 @@ namespace DuetControlServer.FileExecution
 
                 // Execute the next command
                 CodeResult result = (CodeResult)await code.Execute();
-                foreach (DuetAPI.Message message in result)
-                {
-                    switch (message.Type)
-                    {
-                        case DuetAPI.MessageType.Success:
-                            Log.LogInfo(message.Content);
-                            break;
-
-                        case DuetAPI.MessageType.Warning:
-                            Log.LogWarning(message.Content);
-                            break;
-
-                        case DuetAPI.MessageType.Error:
-                            Log.LogError(message.Content);
-                            break;
-                    }
-                }
+                await Model.Provider.Output(result);
             }
 
             // Notify the controller that the print has finished

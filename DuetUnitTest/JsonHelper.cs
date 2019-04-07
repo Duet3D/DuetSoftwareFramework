@@ -1,11 +1,8 @@
 ﻿using DuetAPI;
-using DuetAPI.Machine.Fans;
-using DuetAPI.Machine.Heat;
-using DuetAPI.Machine.Scanner;
-using DuetAPI.Machine.State;
+using DuetAPI.Machine;
+using DuetAPI.Utility;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
-using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest
 {
@@ -22,7 +19,7 @@ namespace DuetUnitTest
         public void Read()
         {
             JObject parsedJson = JObject.Parse(ormerodJson);
-            Model model = new Model();
+            MachineModel model = new MachineModel();
             JsonHelper.PatchObject(model, parsedJson);
 
             Assert.AreEqual("duetwifi10", model.Electronics.Type);
@@ -34,7 +31,7 @@ namespace DuetUnitTest
         public void ReadAndPatch()
         {
             JObject parsedJson = JObject.Parse(ormerodJson);
-            Model model = new Model();
+            MachineModel model = new MachineModel();
             JsonHelper.PatchObject(model, parsedJson);
 
             JObject patch = JObject.Parse(ormerodJsonPatch);
@@ -49,19 +46,19 @@ namespace DuetUnitTest
         [Test]
         public void Patch()
         {
-            Model a = new Model();
+            MachineModel a = new MachineModel();
             a.Electronics.Firmware.Name = "Foobar";
             a.Heat.Beds.Add(null);
             a.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new double[] { 20 } });
             a.Heat.Beds.Add(new BedOrChamber { Name = "BED3" });
-            a.State.Status = Status.Busy;
+            a.State.Status = MachineStatus.Busy;
 
-            Model b = new Model();
+            MachineModel b = new MachineModel();
             b.Electronics.Firmware.Name = "Foobar";
             b.Heat.Beds.Add(new BedOrChamber { Name = "Bed", Active = new double[] { 100 } });
             b.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new double[] { 20 } });
             b.Fans.Add(new Fan { Value = 0.5 });
-            b.State.Status = Status.Pausing;
+            b.State.Status = MachineStatus.Pausing;
             b.Scanner.Status = ScannerStatus.PostProcessing;
 
             JObject serializedA = JObject.FromObject(a, JsonHelper.DefaultSerializer);
@@ -77,26 +74,26 @@ namespace DuetUnitTest
             Assert.AreEqual(new double[] { 20 }, a.Heat.Beds[1].Standby);
             Assert.AreEqual(1, a.Fans.Count);
             Assert.AreEqual(0.5, a.Fans[0].Value);
-            Assert.AreEqual(Status.Pausing, a.State.Status);
+            Assert.AreEqual(MachineStatus.Pausing, a.State.Status);
             Assert.AreEqual(ScannerStatus.PostProcessing, a.Scanner.Status);
         }
 
         [Test]
         public void Merge()
         {
-            Model a = new Model();
+            MachineModel a = new MachineModel();
             a.Electronics.Firmware.Name = "Foobar";
             a.Heat.Beds.Add(null);
             a.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new double[] { 20 } });
             a.Heat.Beds.Add(new BedOrChamber { Name = "BED3" });
-            a.State.Status = Status.Busy;
+            a.State.Status = MachineStatus.Busy;
 
-            Model b = new Model();
+            MachineModel b = new MachineModel();
             b.Electronics.Firmware.Name = "Foobar";
             b.Heat.Beds.Add(new BedOrChamber { Name = "Bed", Active = new double[] { 100 } });
             b.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new double[] { 20 } });
             b.Fans.Add(new Fan { Value = 0.5 });
-            b.State.Status = Status.Pausing;
+            b.State.Status = MachineStatus.Pausing;
             b.Scanner.Status = ScannerStatus.PostProcessing;
 
             JObject serializedA = JObject.FromObject(a, JsonHelper.DefaultSerializer);
@@ -104,7 +101,7 @@ namespace DuetUnitTest
             JObject patch = JsonHelper.DiffObject(serializedA, serializedB);
             JsonHelper.PatchObject(serializedA, patch);
 
-            Model newModel = serializedA.ToObject<Model>();
+            MachineModel newModel = serializedA.ToObject<MachineModel>();
 
             Assert.AreEqual("Foobar", newModel.Electronics.Firmware.Name);
             Assert.AreEqual(2, newModel.Heat.Beds.Count);
@@ -114,8 +111,8 @@ namespace DuetUnitTest
             Assert.AreEqual(new double[] { 20 }, newModel.Heat.Beds[1].Standby);
             Assert.AreEqual(1, newModel.Fans.Count);
             Assert.AreEqual(0.5, newModel.Fans[0].Value);
-            Assert.AreEqual(Status.Pausing, newModel.State.Status);
-            Assert.AreEqual(ScannerStatus.PostProcessing, newModel.Scanner.Status); ;
+            Assert.AreEqual(MachineStatus.Pausing, newModel.State.Status);
+            Assert.AreEqual(ScannerStatus.PostProcessing, newModel.Scanner.Status);
         }
     }
 }

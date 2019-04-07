@@ -1,7 +1,7 @@
 namespace DuetControlServer.SPI.Communication.FirmwareRequests
 {
     /// <summary>
-    /// Header for heightmap reports
+    /// Header of heightmap reports
     /// </summary>
     public struct HeightMap
     {

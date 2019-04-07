@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
+using DuetAPI.Utility;
 using DuetAPIClient.Exceptions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -127,7 +129,6 @@ namespace DuetAPIClient
             }
         }
 
-
         /// <summary>
         /// Perform an arbitrary command
         /// </summary>
@@ -155,7 +156,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken"></param>
         /// <typeparam name="T"></typeparam>
-        /// <returns></returns>
+        /// <returns>Received object</returns>
         protected async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
             JObject obj = await ReceiveJson(cancellationToken);

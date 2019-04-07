@@ -1,54 +1,7 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Sensors
+namespace DuetAPI.Machine
 {
-    /// <summary>
-    /// Position of a configured endstop
-    /// </summary>
-    public enum EndstopPosition
-    {
-        /// <summary>
-        /// Endstop is not configured
-        /// </summary>
-        None = 0,
-        
-        /// <summary>
-        /// Endstop is configured to be hit at the low axis end
-        /// </summary>
-        LowEnd,
-        
-        /// <summary>
-        /// Endstop is configured to be hit at the high axis end
-        /// </summary>
-        HighEnd
-    }
-
-    /// <summary>
-    /// Type of a configured endstop
-    /// </summary>
-    public enum EndstopType
-    {
-        /// <summary>
-        /// The signal of the endstop is pulled from HIGH to LOW when hit
-        /// </summary>
-        ActiveLow = 0,
-        
-        /// <summary>
-        /// The signal of the endstop is pulled from LOW to HIGH when hit
-        /// </summary>
-        ActiveHigh,
-        
-        /// <summary>
-        /// A probe is used for this endstop
-        /// </summary>
-        Probe,
-        
-        /// <summary>
-        /// Motor load detection is used for this endstop
-        /// </summary>
-        MotorLoadDetection
-    }
-
     /// <summary>
     /// Information about an endstop
     /// </summary>

@@ -1,5 +1,4 @@
 ﻿using DuetAPI.Machine;
-using DuetAPI.Machine.Fans;
 using NUnit.Framework;
 
 namespace DuetUnitTest.Machine
@@ -10,7 +9,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            Model original = new Model();
+            MachineModel original = new MachineModel();
 
             Fan fan = new Fan();
             fan.Value = 100;
@@ -27,7 +26,7 @@ namespace DuetUnitTest.Machine
             fan.Pin = 23;
             original.Fans.Add(fan);
 
-            Model clone = (Model)original.Clone();
+            MachineModel clone = (MachineModel)original.Clone();
 
             Assert.AreEqual(1, original.Fans.Count);
             Assert.AreEqual(original.Fans[0].Value, clone.Fans[0].Value);

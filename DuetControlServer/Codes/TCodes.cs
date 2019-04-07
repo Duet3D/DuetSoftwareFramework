@@ -28,13 +28,15 @@ namespace DuetControlServer.Codes
         /// <returns>Asynchronous task</returns>
         public static async Task CodeExecuted(Code code, CodeResult result)
         {
-            if (code.MajorNumber.HasValue && !result.Any(message => message.Type != DuetAPI.MessageType.Success))
+            if (!code.MajorNumber.HasValue || !result.IsSuccessful)
             {
-                // Select new tool number
-                using (await Model.Provider.AccessReadWrite())
-                {
-                    Model.Provider.Get.State.CurrentTool = Math.Max(-1, code.MajorNumber.Value);
-                }
+                return;
+            }
+
+            // Set new tool number
+            using (await Model.Provider.AccessReadWrite())
+            {
+                Model.Provider.Get.State.CurrentTool = Math.Max(-1, code.MajorNumber.Value);
             }
         }
     }

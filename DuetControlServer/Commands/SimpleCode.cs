@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using DuetAPI.Commands;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
 {
@@ -11,13 +12,13 @@ namespace DuetControlServer.Commands
         /// Converts a simple G/M/T-code to a regular Code instance, executes it and returns its result as text
         /// </summary>
         /// <returns>G-code result</returns>
-        protected override async Task<string> Run()
+        public override async Task<string> Execute()
         {
             Code code = new Code(Code) {
                 Channel = Channel,
                 SourceConnection = SourceConnection
             };
-            object result = await code.Execute();
+            CodeResult result = await code.Execute();
             return result.ToString();
         }
     }

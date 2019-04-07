@@ -4,9 +4,10 @@ namespace DuetAPI.Commands
 {
     /// <summary>
     /// Resolve the code to intercept and return the given message details for its completion.
-    /// This command is only permitted in Interception mode!
     /// </summary>
-    /// <seealso cref="ConnectionMode.Intercept"/>
+    /// <remarks>
+    /// This command is only permitted in <see cref="ConnectionMode.Intercept"/> mode
+    /// </remarks>
     public class Resolve : Command
     {
         /// <summary>

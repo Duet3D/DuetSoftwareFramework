@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -23,7 +24,7 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="initMessage">Deserialized initialization message</param>
         public Base(Connection conn, ClientInitMessage initMessage)
         {
-             Connection = conn;   
+             Connection = conn;
         }
 
         /// <summary>

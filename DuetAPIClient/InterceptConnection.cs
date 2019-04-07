@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
 using DuetAPIClient.Exceptions;
 
 namespace DuetAPIClient
@@ -17,9 +18,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Creates a new connection in interception mode
         /// </summary>
-        public InterceptConnection() : base(ConnectionMode.Command)
-        {
-        }
+        public InterceptConnection() : base(ConnectionMode.Command) { }
 
         /// <summary>
         /// Establishes a connection to the given UNIX socket file
@@ -27,6 +26,7 @@ namespace DuetAPIClient
         /// <param name="mode">Interception mode</param>
         /// <param name="socketPath">Path to the UNIX socket file</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         public Task Connect(InterceptionMode mode, string socketPath = "/tmp/duet.sock",

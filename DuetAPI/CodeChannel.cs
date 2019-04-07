@@ -2,7 +2,9 @@
 {
     /// <summary>
     /// Enumeration of every available code channel
-    /// <seealso cref="Machine.Channels.Model"/>
+    /// <seealso cref="Commands.Code"/>
+    /// <seealso cref="Commands.SimpleCode"/>
+    /// <seealso cref="Machine.Channels"/>
     /// </summary>
     public enum CodeChannel : byte
     {

@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using DuetAPI.Machine;
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -29,7 +30,7 @@ namespace DuetControlServer
 
                 using (await Model.Provider.AccessReadOnly())
                 {
-                    DuetAPI.Machine.Model model = Model.Provider.Get;
+                    MachineModel model = Model.Provider.Get;
                     if (driveNumber > 0 && driveNumber < model.Storages.Count)
                     {
                         return Path.Combine(model.Storages[driveNumber].Path, match.Groups[2].Value);
@@ -41,8 +42,7 @@ namespace DuetControlServer
             {
                 return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directory, filePath);
             }
-
-            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath);
+            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath.Substring(1) : filePath);
         }
 
         /// <summary>
@@ -55,7 +55,8 @@ namespace DuetControlServer
         {
             if (filePath.StartsWith(Settings.BaseDirectory))
             {
-                return Path.Combine("0:/", filePath.Substring(Settings.BaseDirectory.Length));
+                filePath = filePath.Substring(Settings.BaseDirectory.EndsWith('/') ? Settings.BaseDirectory.Length : (Settings.BaseDirectory.Length + 1));
+                return Path.Combine("0:/", filePath);
             }
 
             using (await Model.Provider.AccessReadOnly())

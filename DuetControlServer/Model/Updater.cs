@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using DuetAPI.Machine;
+using Newtonsoft.Json;
 using System;
 using System.Threading.Tasks;
 
@@ -135,11 +136,11 @@ namespace DuetControlServer.Model
                     Provider.Get.Fans.Clear();
                     for (int fan = 0; fan < response.Params.fanPercent.Length; fan++)
                     {
-                        Provider.Get.Fans.Add(new DuetAPI.Machine.Fans.Fan
+                        Provider.Get.Fans.Add(new Fan
                         {
                             Name = response.Params.fanNames[fan],
                             Value = response.Params.fanPercent[fan] / 100,
-                            Thermostatic = new DuetAPI.Machine.Fans.Thermostatic
+                            Thermostatic = new Thermostatic
                             {
                                 Control = (response.controllableFans & (1 << fan)) == 0
                             }
@@ -158,7 +159,7 @@ namespace DuetControlServer.Model
                     Provider.Get.Move.Axes.Clear();
                     for (int axis = 0; axis < response.coords.xyz.Length; axis++)
                     {
-                        Provider.Get.Move.Axes.Add(new DuetAPI.Machine.Move.Axis
+                        Provider.Get.Move.Axes.Add(new Axis
                         {
                             Letter = GetAxisLetter(axis),
                             Drives = new int[] { axis },
@@ -166,7 +167,7 @@ namespace DuetControlServer.Model
                             MachinePosition = response.coords.machine[axis]
                         });
 
-                        Provider.Get.Move.Drives.Add(new DuetAPI.Machine.Move.Drive
+                        Provider.Get.Move.Drives.Add(new Drive
                         {
                             Position = response.coords.xyz[axis]
                         });
@@ -176,13 +177,13 @@ namespace DuetControlServer.Model
                     Provider.Get.Move.Extruders.Clear();
                     for (int extruder = 0; extruder < response.coords.extr.Length; extruder++)
                     {
-                        Provider.Get.Move.Extruders.Add(new DuetAPI.Machine.Move.Extruder
+                        Provider.Get.Move.Extruders.Add(new Extruder
                         {
                             Drives = new int[] { response.coords.xyz.Length + extruder },
                             Factor = response.Params.extrFactors[extruder] / 100
                         });
 
-                        Provider.Get.Move.Drives.Add(new DuetAPI.Machine.Move.Drive
+                        Provider.Get.Move.Drives.Add(new Drive
                         {
                             Position = response.coords.extr[extruder]
                         });
@@ -196,7 +197,7 @@ namespace DuetControlServer.Model
                     Provider.Get.Heat.Beds.Clear();
                     if (response.temps.bed != null)
                     {
-                        Provider.Get.Heat.Beds.Add(new DuetAPI.Machine.Heat.BedOrChamber
+                        Provider.Get.Heat.Beds.Add(new BedOrChamber
                         {
                             Active = new double[] { response.temps.bed.active },
                             Standby = new double[] { response.temps.bed.standby },
@@ -208,7 +209,7 @@ namespace DuetControlServer.Model
                     Provider.Get.Heat.Beds.Clear();
                     if (response.temps.chamber != null)
                     {
-                        Provider.Get.Heat.Chambers.Add(new DuetAPI.Machine.Heat.BedOrChamber
+                        Provider.Get.Heat.Chambers.Add(new BedOrChamber
                         {
                             Active = new double[] { response.temps.chamber.active },
                             Standby = new double[] { response.temps.chamber.standby },
@@ -220,7 +221,7 @@ namespace DuetControlServer.Model
                     Provider.Get.Heat.Heaters.Clear();
                     for (int heater = 0; heater < response.temps.current.Length; heater++)
                     {
-                        Provider.Get.Heat.Heaters.Add(new DuetAPI.Machine.Heat.Heater
+                        Provider.Get.Heat.Heaters.Add(new Heater
                         {
                             Current = response.temps.current[heater],
                             Max = response.tempLimit,
@@ -233,7 +234,7 @@ namespace DuetControlServer.Model
                     Provider.Get.Heat.Extra.Clear();
                     foreach (var extra in response.temps.extra)
                     {
-                        Provider.Get.Heat.Extra.Add(new DuetAPI.Machine.Heat.ExtraHeater
+                        Provider.Get.Heat.Extra.Add(new ExtraHeater
                         {
                             Current = extra.temp,
                             Name = extra.name
@@ -242,7 +243,7 @@ namespace DuetControlServer.Model
 
                     // - Sensors -
                     Provider.Get.Sensors.Probes.Clear();
-                    Provider.Get.Sensors.Probes.Add(new DuetAPI.Machine.Sensors.Probe
+                    Provider.Get.Sensors.Probes.Add(new Probe
                     {
                         Value = response.sensors.probeValue
                     });
@@ -256,7 +257,7 @@ namespace DuetControlServer.Model
                     Provider.Get.Tools.Clear();
                     for (int tool = 0; tool < response.tools.Length; tool++)
                     {
-                        Provider.Get.Tools.Add(new DuetAPI.Machine.Tools.Tool
+                        Provider.Get.Tools.Add(new Tool
                         {
                             Active = response.temps.tools.active[tool],
                             Standby = response.temps.tools.standby[tool],
@@ -306,25 +307,25 @@ namespace DuetControlServer.Model
             }
 
             // Notify IPC subscribers
-            await IPC.Processors.Subscription.Update();
+            await IPC.Processors.Subscription.ModelUpdated();
         }
 
-        private static DuetAPI.Machine.State.Status GetStatus(string letter)
+        private static MachineStatus GetStatus(string letter)
         {
             switch (letter)
             {
-                case "F": return DuetAPI.Machine.State.Status.Updating;
-                case "O": return DuetAPI.Machine.State.Status.Off;
-                case "H": return DuetAPI.Machine.State.Status.Halted;
-                case "D": return DuetAPI.Machine.State.Status.Pausing;
-                case "S": return DuetAPI.Machine.State.Status.Paused;
-                case "R": return DuetAPI.Machine.State.Status.Resuming;
-                case "P": return DuetAPI.Machine.State.Status.Processing;
-                case "M": return DuetAPI.Machine.State.Status.Simulating;
-                case "B": return DuetAPI.Machine.State.Status.Busy;
-                case "T": return DuetAPI.Machine.State.Status.ChangingTool;
+                case "F": return MachineStatus.Updating;
+                case "O": return MachineStatus.Off;
+                case "H": return MachineStatus.Halted;
+                case "D": return MachineStatus.Pausing;
+                case "S": return MachineStatus.Paused;
+                case "R": return MachineStatus.Resuming;
+                case "P": return MachineStatus.Processing;
+                case "M": return MachineStatus.Simulating;
+                case "B": return MachineStatus.Busy;
+                case "T": return MachineStatus.ChangingTool;
             }
-            return DuetAPI.Machine.State.Status.Idle;
+            return MachineStatus.Idle;
         }
         
         // temporary - to be replaced with actual axis letter

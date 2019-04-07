@@ -1,9 +1,10 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Job
+namespace DuetAPI.Machine
 {
     /// <summary>
-    /// Information about a layer from a file being printed
+    /// Information about a layer from a file being printed.
+    /// Do not change these properties after an instance was added to the object model
     /// </summary>
     public class Layer : ICloneable
     {

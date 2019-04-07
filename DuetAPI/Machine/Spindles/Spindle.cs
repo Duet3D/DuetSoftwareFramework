@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Spindles
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about a CNC spindle

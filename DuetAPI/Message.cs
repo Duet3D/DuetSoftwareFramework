@@ -29,7 +29,7 @@ namespace DuetAPI
     public class Message : ICloneable
     {
         /// <summary>
-        /// Create a nwe message
+        /// Create a new message
         /// </summary>
         public Message() { }
 
@@ -42,6 +42,26 @@ namespace DuetAPI
         {
             Type = type;
             Content = content;
+        }
+
+        /// <summary>
+        /// Print this message to the console
+        /// </summary>
+        public void Print()
+        {
+            switch (Type)
+            {
+                case MessageType.Error:
+                    Console.Write("[err] ");
+                    break;
+                case MessageType.Warning:
+                    Console.Write("[warn] ");
+                    break;
+                case MessageType.Success:
+                    Console.Write("[info] ");
+                    break;
+            }
+            Console.WriteLine(Content);
         }
 
         /// <summary>

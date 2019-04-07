@@ -1,5 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
+using DuetAPI.Machine;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using Nito.AsyncEx;
 using System;
@@ -107,9 +108,9 @@ namespace DuetControlServer.SPI
                 {
                     using (await Model.Provider.AccessReadWrite())
                     {
-                        if (Model.Provider.Get.State.Status == DuetAPI.Machine.State.Status.Off)
+                        if (Model.Provider.Get.State.Status == MachineStatus.Off)
                         {
-                            Model.Provider.Get.State.Status = DuetAPI.Machine.State.Status.Idle;
+                            Model.Provider.Get.State.Status = MachineStatus.Idle;
                         }
                         Model.Provider.Get.Messages.Add(new Message(MessageType.Success, "Connection to Duet established"));
                         Console.WriteLine("[info] Connection to Duet established");
@@ -137,7 +138,7 @@ namespace DuetControlServer.SPI
                         bool isUpdating;
                         using (await Model.Provider.AccessReadOnly())
                         {
-                            isUpdating = (Model.Provider.Get.State.Status == DuetAPI.Machine.State.Status.Updating);
+                            isUpdating = (Model.Provider.Get.State.Status == MachineStatus.Updating);
                         }
 
                         // If this is the first unexpected timeout event, report it
@@ -146,7 +147,7 @@ namespace DuetControlServer.SPI
                             _hadTimeout = true;
                             using (await Model.Provider.AccessReadWrite())
                             {
-                                Model.Provider.Get.State.Status = DuetAPI.Machine.State.Status.Off;
+                                Model.Provider.Get.State.Status = MachineStatus.Off;
                                 Model.Provider.Get.Messages.Add(new Message(MessageType.Warning, "Lost connection to Duet"));
                                 Console.WriteLine("[warn] Lost connection to Duet");
                             }

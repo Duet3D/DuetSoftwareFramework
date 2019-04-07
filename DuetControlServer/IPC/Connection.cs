@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
+using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -165,7 +167,10 @@ namespace DuetControlServer.IPC
                     e = ae.InnerException;
                 }
 
-                ErrorResponse errorResponse = new ErrorResponse(e.GetType().Name, e.Message);
+                Console.Write("[warn] Handled exception:");
+                Console.WriteLine(e);
+
+                ErrorResponse errorResponse = new ErrorResponse(e);
                 json = JsonConvert.SerializeObject(errorResponse, JsonHelper.DefaultSettings);
             }
             else if (obj is ServerInitMessage)

@@ -3,7 +3,7 @@
 namespace DuetControlServer.SPI.Communication.LinuxRequests
 {
     /// <summary>
-    /// Header for print stop notifications
+    /// Header of print stop notifications
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Size = 4)]
     public struct PrintStopped
@@ -11,6 +11,6 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Reason why the print has been stopped
         /// </summary>
-        public byte Reason;
+        public PrintStoppedReason Reason;
     }
 }

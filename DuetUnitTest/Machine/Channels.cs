@@ -9,7 +9,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            Model original = new Model();
+            MachineModel original = new MachineModel();
 
             original.Channels.SPI.RelativePositioning = true;
             original.Channels.USB.Feedrate = 123;
@@ -19,7 +19,7 @@ namespace DuetUnitTest.Machine
             original.Channels.Telnet.Feedrate = 45;
             original.Channels[DuetAPI.CodeChannel.Telnet].StackDepth = 5;
 
-            Model clone = (Model)original.Clone();
+            MachineModel clone = (MachineModel)original.Clone();
 
             Assert.AreEqual(original.Channels.SPI.RelativePositioning, clone.Channels.SPI.RelativePositioning);
             Assert.AreEqual(original.Channels.USB.Feedrate, clone.Channels.USB.Feedrate);

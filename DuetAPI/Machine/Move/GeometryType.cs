@@ -1,4 +1,4 @@
-﻿namespace DuetAPI.Machine.Move
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// List of supported geometry types

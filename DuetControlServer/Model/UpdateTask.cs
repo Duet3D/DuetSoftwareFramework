@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DuetAPI.Machine;
+using System;
 using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
@@ -25,7 +26,7 @@ namespace DuetControlServer.Model
                 bool changedModel = false;
                 using (await Provider.AccessReadWrite())
                 {
-                    DuetAPI.Machine.Model model = Provider.Get;
+                    MachineModel model = Provider.Get;
                     changedModel |= UpdateNetwork(ref model);
                     changedModel |= UpdateStorages(ref model);
                 }
@@ -33,7 +34,7 @@ namespace DuetControlServer.Model
                 // Notify the model subscribers
                 if (changedModel)
                 {
-                    await IPC.Processors.Subscription.Update();
+                    await IPC.Processors.Subscription.ModelUpdated();
                 }
 
                 // Wait for next update schedule
@@ -44,13 +45,13 @@ namespace DuetControlServer.Model
             } while (!Program.CancelSource.IsCancellationRequested);
         }
 
-        private static bool UpdateNetwork(ref DuetAPI.Machine.Model model)
+        private static bool UpdateNetwork(ref MachineModel model)
         {
             bool changed = false;
 
             int index = 0;
-            NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
-            foreach (NetworkInterface iface in interfaces)
+            System.Net.NetworkInformation.NetworkInterface[] interfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
+            foreach (var iface in interfaces)
             {
                 UnicastIPAddressInformation ipInfo = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
                                                       where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
@@ -64,13 +65,13 @@ namespace DuetControlServer.Model
                     string gateway = (from gatewayAddress in iface.GetIPProperties().GatewayAddresses
                                       where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
                                       select gatewayAddress.Address.ToString()).FirstOrDefault();
-                    var type = iface.Name.StartsWith("w") ? DuetAPI.Machine.Network.InterfaceType.WiFi : DuetAPI.Machine.Network.InterfaceType.LAN;
+                    InterfaceType type = iface.Name.StartsWith("w") ? InterfaceType.WiFi : InterfaceType.LAN;
                     // uint speed = (uint)(iface.Speed / 1000000),                // Unsupported in .NET Core 2.2 on Linux
 
                     if (model.Network.Interfaces.Count <= index)
                     {
                         // Add new network interface
-                        model.Network.Interfaces.Add(new DuetAPI.Machine.Network.NetworkInterface
+                        model.Network.Interfaces.Add(new DuetAPI.Machine.NetworkInterface
                         {
                             MacAddress = macAddress,
                             ActualIP = ipAddress,
@@ -84,7 +85,7 @@ namespace DuetControlServer.Model
                     else
                     {
                         // Update existing entry
-                        DuetAPI.Machine.Network.NetworkInterface existing = model.Network.Interfaces[index];
+                        DuetAPI.Machine.NetworkInterface existing = model.Network.Interfaces[index];
                         if (existing.MacAddress != macAddress ||
                             existing.ActualIP != ipAddress ||
                             existing.ConfiguredIP != ipAddress ||
@@ -115,7 +116,7 @@ namespace DuetControlServer.Model
 
         // Note: Storage 0 always represents the root (/) on Linux. The following code achieves this but it
         // might need further adjustments to ensure this on every Linux distribution
-        private static bool UpdateStorages(ref DuetAPI.Machine.Model model)
+        private static bool UpdateStorages(ref MachineModel model)
         {
             bool changed = false;
 
@@ -130,7 +131,7 @@ namespace DuetControlServer.Model
                     if (model.Storages.Count <= index)
                     {
                         // Add new storage device
-                        model.Storages.Add(new DuetAPI.Machine.Storages.Storage
+                        model.Storages.Add(new Storage
                         {
                             Capacity = capacity,
                             Free = free,
@@ -142,7 +143,7 @@ namespace DuetControlServer.Model
                     }
                     else
                     {
-                        DuetAPI.Machine.Storages.Storage existing = model.Storages[index];
+                        Storage existing = model.Storages[index];
                         if (existing.Capacity != capacity ||
                             existing.Free != free ||
                             existing.Mounted != drive.IsReady ||

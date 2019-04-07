@@ -1,7 +1,8 @@
-﻿using System.IO;
-using System.Threading.Tasks;
-using DuetAPI.Commands;
+﻿using DuetAPI.Commands;
+using DuetAPI.Machine;
 using DuetControlServer.FileExecution;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes
 {
@@ -52,7 +53,7 @@ namespace DuetControlServer.Codes
                     SPI.Interface.RequestEmergencyStop();
                     using (await Model.Provider.AccessReadWrite())
                     {
-                        Model.Provider.Get.State.Status = DuetAPI.Machine.State.Status.Halted;
+                        Model.Provider.Get.State.Status = MachineStatus.Halted;
                     }
                     break;
 
@@ -60,7 +61,7 @@ namespace DuetControlServer.Codes
                 case 999:
                     using (await Model.Provider.AccessReadOnly())
                     {
-                        if (Model.Provider.Get.State.Status == DuetAPI.Machine.State.Status.Halted)
+                        if (Model.Provider.Get.State.Status == MachineStatus.Halted)
                         {
                             SPI.Interface.RequestReset();
                             return new CodeResult();
@@ -79,6 +80,11 @@ namespace DuetControlServer.Codes
         /// <returns>Asynchronous task</returns>
         public static async Task CodeExecuted(Code code, CodeResult result)
         {
+            if (!result.IsSuccessful)
+            {
+                return;
+            }
+
             switch (code.MajorNumber)
             {
                 // Absolute extrusion

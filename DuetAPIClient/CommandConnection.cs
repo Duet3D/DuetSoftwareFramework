@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
 using DuetAPI.Machine;
 using DuetAPIClient.Exceptions;
 
@@ -16,7 +17,7 @@ namespace DuetAPIClient
     public class CommandConnection : BaseConnection
     {
         /// <summary>
-        /// Creates a new connection in command mode
+        /// Create a new connection in command mode
         /// </summary>
         public CommandConnection() : base(ConnectionMode.Command) { }
         
@@ -27,20 +28,21 @@ namespace DuetAPIClient
         protected CommandConnection(ConnectionMode mode) : base(mode) { }
 
         /// <summary>
-        /// Establishes a connection to the given UNIX socket file
+        /// Establish a connection to the given UNIX socket file
         /// </summary>
         /// <param name="socketPath">Path to the UNIX socket file</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         public Task Connect(string socketPath = "/tmp/duet.sock", CancellationToken cancellationToken = default(CancellationToken))
         {
             CommandInitMessage initMessage = new CommandInitMessage();
-            return base.Connect(initMessage, socketPath, cancellationToken);
+            return Connect(initMessage, socketPath, cancellationToken);
         }
 
         /// <summary>
-        /// Parses a G-code file and returns file information about it
+        /// Parse a G-code file and returns file information about it
         /// </summary>
         /// <param name="fileName">The file to parse</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
@@ -52,11 +54,12 @@ namespace DuetAPIClient
         }
 
         /// <summary>
-        /// Executes an arbitrary pre-parsed code
+        /// Execute an arbitrary pre-parsed code
         /// </summary>
         /// <param name="code">The code to execute</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>The result of the given code</returns>
+        /// <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
         /// <seealso cref="Code"/>
         public Task<CodeResult> PerformCode(Code code, CancellationToken cancellationToken = default(CancellationToken))
         {
@@ -64,12 +67,13 @@ namespace DuetAPIClient
         }
 
         /// <summary>
-        /// Executes an arbitrary G/M/T-code in text form and returns the result as a string
+        /// Execute an arbitrary G/M/T-code in text form and return the result as a string
         /// </summary>
         /// <param name="code">The code to execute</param>
         /// <param name="channel">Optional destination channel of this code</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>The code result as a string</returns>
+        /// <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
         /// <seealso cref="SimpleCode"/>
         public Task<string> PerformSimpleCode(string code, CodeChannel channel = CodeChannel.SPI, CancellationToken cancellationToken = default(CancellationToken))
         {
@@ -77,19 +81,19 @@ namespace DuetAPIClient
         }
         
         /// <summary>
-        /// Retrieves the full object model of the machine
-        /// In subscription mode this is the first command that has to be called once a connection has been established.
+        /// Retrieve the full object model of the machine.
+        /// In subscription mode this is the first command that has to be called once a connection has been established
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>The current machine model</returns>
-        public Task<Model> GetMachineModel(CancellationToken cancellationToken = default(CancellationToken))
+        public Task<MachineModel> GetMachineModel(CancellationToken cancellationToken = default(CancellationToken))
         {
-            return PerformCommand<Model>(new GetMachineModel(), cancellationToken);
+            return PerformCommand<MachineModel>(new GetMachineModel(), cancellationToken);
         }
         
         /// <summary>
         /// Optimized method to query the machine model JSON in any mode.
-        /// May be used to get machine model patches as well.
+        /// May be used to get machine model patches as well
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Machine model JSON</returns>

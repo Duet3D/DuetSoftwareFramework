@@ -90,7 +90,7 @@
             Defines whether this code is part of config-override.g
             </summary>
         </member>
-        <member name="M:DuetControlServer.Commands.Code.Run">
+        <member name="M:DuetControlServer.Commands.Code.Execute">
             <summary>
             Run an arbitrary G/M/T-code
             </summary>
@@ -101,7 +101,7 @@
             Implementation of the GetFileInfo command
             </summary>
         </member>
-        <member name="M:DuetControlServer.Commands.GetFileInfo.Run">
+        <member name="M:DuetControlServer.Commands.GetFileInfo.Execute">
             <summary>
             Retrieves file information from the given filename
             </summary>
@@ -112,7 +112,7 @@
             Implementation of the GetMachineModel command
             </summary>
         </member>
-        <member name="M:DuetControlServer.Commands.GetMachineModel.Run">
+        <member name="M:DuetControlServer.Commands.GetMachineModel.Execute">
             <summary>
             Retrieve a copy of the current machine model
             </summary>
@@ -123,7 +123,7 @@
             Implementation of the ResolvePath command
             </summary>
         </member>
-        <member name="M:DuetControlServer.Commands.ResolvePath.Run">
+        <member name="M:DuetControlServer.Commands.ResolvePath.Execute">
             <summary>
             Resolve the given RepRapFirmware-style filename to an absolute path
             </summary>
@@ -134,7 +134,7 @@
             Implementation of the SimpleCode command
             </summary>
         </member>
-        <member name="M:DuetControlServer.Commands.SimpleCode.Run">
+        <member name="M:DuetControlServer.Commands.SimpleCode.Execute">
             <summary>
             Converts a simple G/M/T-code to a regular Code instance, executes it and returns its result as text
             </summary>
@@ -355,7 +355,7 @@
             Connection with wrappers to ensure basic operation and convenience wrappers for JSON-style requests
             </summary>
         </member>
-        <member name="M:DuetControlServer.IPC.Processors.Base.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.ClientInitMessage)">
+        <member name="M:DuetControlServer.IPC.Processors.Base.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.InitMessages.ClientInitMessage)">
             <summary>
             Base constructor for connection interpreters. Invoke this from any derived class
             </summary>
@@ -381,7 +381,7 @@
             List of supported commands in this mode
             </summary>
         </member>
-        <member name="M:DuetControlServer.IPC.Processors.Command.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.ClientInitMessage)">
+        <member name="M:DuetControlServer.IPC.Processors.Command.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.InitMessages.ClientInitMessage)">
             <summary>
             Constructor of the command interpreter
             </summary>
@@ -405,7 +405,7 @@
             List of supported commands in this mode
             </summary>
         </member>
-        <member name="M:DuetControlServer.IPC.Processors.Interception.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.ClientInitMessage)">
+        <member name="M:DuetControlServer.IPC.Processors.Interception.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.InitMessages.ClientInitMessage)">
             <summary>
             Constructor of the interception processor
             </summary>
@@ -455,7 +455,7 @@
             List of supported commands in this mode
             </summary>
         </member>
-        <member name="M:DuetControlServer.IPC.Processors.Subscription.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.ClientInitMessage)">
+        <member name="M:DuetControlServer.IPC.Processors.Subscription.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.InitMessages.ClientInitMessage)">
             <summary>
             Constructor of the subscription processor
             </summary>
@@ -468,7 +468,14 @@
             </summary>
             <returns>Task that represents the lifecycle of a connection</returns>
         </member>
-        <member name="M:DuetControlServer.IPC.Processors.Subscription.Update">
+        <member name="M:DuetControlServer.IPC.Processors.Subscription.Output(DuetAPI.Message)">
+            <summary>
+            Enqueue a generic message for output
+            </summary>
+            <param name="message">New message</param>
+            <returns>Whether the message could be stored</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Subscription.ModelUpdated">
             <summary>
             Called to notify the subscribers about a model update
             </summary>
@@ -528,6 +535,26 @@
             <seealso cref="M:DuetControlServer.Model.Provider.AccessReadOnly"/>
             <seealso cref="M:DuetControlServer.Model.Provider.AccessReadWrite"/>
         </member>
+        <member name="M:DuetControlServer.Model.Provider.Output(DuetAPI.Message)">
+            <summary>
+            Output a generic message
+            </summary>
+            <param name="message">Message to output</param>
+        </member>
+        <member name="M:DuetControlServer.Model.Provider.Output(DuetAPI.MessageType,System.String)">
+            <summary>
+            Output a generic message
+            </summary>
+            <param name="type">Type of the message</param>
+            <param name="content">Content of the message</param>
+        </member>
+        <member name="M:DuetControlServer.Model.Provider.Output(DuetAPI.Commands.CodeResult)">
+            <summary>
+            Output the result of a G/M/T-code
+            </summary>
+            <param name="codeResult">Messages to output</param>
+            <returns></returns>
+        </member>
         <member name="T:DuetControlServer.Model.Updater">
             <summary>
             Static helper class to merge the RepRapFirmware object model with ours
@@ -553,6 +580,22 @@
             This function updates host properties like network interfaces and storage devices
             </summary>
             <returns>Asynchronous task</returns>
+        </member>
+        <member name="T:DuetControlServer.Program">
+            <summary>
+            Main program class
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Program.CancelSource">
+            <summary>
+            Global cancel source for program termination
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Program.Main(System.String[])">
+            <summary>
+            Entry point of the program
+            </summary>
+            <param name="args">Command-line arguments</param>
         </member>
         <member name="T:DuetControlServer.Settings">
             <summary>
@@ -738,7 +781,7 @@
         </member>
         <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap">
             <summary>
-            Header for heightmap reports
+            Header of heightmap reports
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap.XMin">
@@ -783,7 +826,7 @@
         </member>
         <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.MacroRequest">
             <summary>
-            Request the execution of a macro file
+            Request execution of a macro file
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.MacroRequest.Channel">
@@ -803,7 +846,7 @@
         </member>
         <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.PrintPaused">
             <summary>
-            Header for print pause events
+            Header of print pause events
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.PrintPaused.FilePosition">
@@ -1144,7 +1187,7 @@
         </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.PrintStopped">
             <summary>
-            Header for print stop notifications
+            Header of print stop notifications
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStopped.Reason">
@@ -1846,7 +1889,7 @@
             <summary>
             Something went wrong while executing this code
             </summary>
-            <param name="e"></param>
+            <param name="e">Exception to return</param>
         </member>
         <member name="M:DuetControlServer.SPI.QueuedCode.SetFinished">
             <summary>
@@ -1913,7 +1956,7 @@
             </summary>
             <param name="from">Origin</param>
             <param name="busyChannels">Bitmap of the busy channels</param>
-            <returns></returns>
+            <returns>Number of bytes read</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadObjectModel(System.Span{System.Byte},System.Byte@,System.String@)">
             <summary>
@@ -1987,7 +2030,7 @@
             </summary>
             <param name="from">Origin</param>
             <param name="channel">Channel that has acquired the lock</param>
-            <returns></returns>
+            <returns>Number of bytes read</returns>
         </member>
         <member name="T:DuetControlServer.SPI.Serialization.Writer">
             <summary>
@@ -2027,6 +2070,7 @@
             <param name="to">Destination</param>
             <param name="code">Code to write</param>
             <returns>Number of bytes written</returns>
+            <exception cref="T:System.ArgumentException">Unsupported data type</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteObjectModelRequest(System.Span{System.Byte},System.Byte)">
             <summary>
@@ -2044,6 +2088,7 @@
             <param name="field">Path to the object model field</param>
             <param name="value">New value</param>
             <returns>Number of bytes written</returns>
+            <exception cref="T:System.ArgumentException">Unsupported data type</exception>
             <remarks>value must be of type <see cref="T:DuetControlServer.SPI.Communication.LinuxRequests.DataType"/></remarks>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Writer.WritePrintStarted(System.Span{System.Byte},DuetAPI.ParsedFileInfo)">
@@ -2053,14 +2098,15 @@
             <param name="to">Destination</param>
             <param name="info">Information about the file being printed</param>
             <returns>Number of bytes written</returns>
+            <exception cref="T:System.ArgumentException">One of the supplied values is too big</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Writer.WritePrintStopped(System.Span{System.Byte},DuetControlServer.SPI.Communication.PrintStoppedReason)">
             <summary>
             Notify the firmware that a print has been stopped
             </summary>
-            <param name="to"></param>
-            <param name="reason"></param>
-            <returns></returns>
+            <param name="to">Destination</param>
+            <param name="reason">Reason why the print has been stopped</param>
+            <returns>Number of bytes written</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteMacroCompleted(System.Span{System.Byte},DuetAPI.CodeChannel,System.Boolean)">
             <summary>
@@ -2075,9 +2121,9 @@
             <summary>
             Request a resource to be locked or unlocked
             </summary>
-            <param name="to"></param>
-            <param name="channel"></param>
-            <returns></returns>
+            <param name="to">Destination</param>
+            <param name="channel">Channel for the lock request</param>
+            <returns>Number of bytes written</returns>
         </member>
         <member name="T:DuetControlServer.FileInfoParser">
             <summary>
@@ -2112,29 +2158,6 @@
             </summary>
             <param name="filePath">File path to convert</param>
             <returns></returns>
-        </member>
-        <member name="T:DuetControlServer.Log">
-            <summary>
-            Static class used for message logging via the object model
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.Log.LogInfo(System.String)">
-            <summary>
-            Log an information message
-            </summary>
-            <param name="message"></param>
-        </member>
-        <member name="M:DuetControlServer.Log.LogWarning(System.String)">
-            <summary>
-            Log a warning message
-            </summary>
-            <param name="message"></param>
-        </member>
-        <member name="M:DuetControlServer.Log.LogError(System.String)">
-            <summary>
-            Log an error message
-            </summary>
-            <param name="message"></param>
         </member>
     </members>
 </doc>

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
 using Code = DuetControlServer.Commands.Code;
 using GetFileInfo = DuetControlServer.Commands.GetFileInfo;
 using GetMachineModel = DuetControlServer.Commands.GetMachineModel;
@@ -56,7 +57,7 @@ namespace DuetControlServer.IPC.Processors
                     }
                     
                     // Execute it and send back the result
-                    object result = await command.Execute();
+                    object result = await command.Invoke();
                     await Connection.SendResponse(result);
                 }
                 catch (Exception e)

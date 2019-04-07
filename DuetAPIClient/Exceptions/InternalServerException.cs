@@ -5,6 +5,7 @@ namespace DuetAPIClient.Exceptions
     /// <summary>
     /// Wrapper around internal server-side exceptions that are reported as part of command responses
     /// </summary>
+    /// <seealso cref="DuetAPI.Commands.ErrorResponse"/>
     public class InternalServerException : Exception
     {
         /// <summary>

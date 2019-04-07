@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Channels
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about a G/M/T-code channel. May be further expanded

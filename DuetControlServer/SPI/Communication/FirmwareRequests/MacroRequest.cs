@@ -4,7 +4,7 @@ using DuetAPI;
 namespace DuetControlServer.SPI.Communication.FirmwareRequests
 {
     /// <summary>
-    /// Request the execution of a macro file
+    /// Request execution of a macro file
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Size = 4)]
     public struct MacroRequest

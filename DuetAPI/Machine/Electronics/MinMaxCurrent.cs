@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Electronics
+namespace DuetAPI.Machine
 {
     /// <summary>
-    /// Set holding minimum, maximum and current information
+    /// Provides minimum, maximum and current values
     /// </summary>
     /// <typeparam name="T">Type of each value</typeparam>
     public class MinMaxCurrent<T> : ICloneable

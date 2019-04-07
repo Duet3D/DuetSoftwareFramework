@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Storages
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about a storage device

@@ -3,9 +3,10 @@
 namespace DuetAPI.Commands
 {
     /// <summary>
-    /// Ignore the code to intercept and allow it to be processed without any modifications.
-    /// This command is only permitted in Interception mode!
+    /// Ignore the code to intercept and allow it to be processed without any modifications
     /// </summary>
-    /// <seealso cref="ConnectionMode.Intercept"/>
+    /// <remarks>
+    /// This command is only permitted in <see cref="ConnectionMode.Intercept"/> mode
+    /// </remarks>
     public class Ignore : Command { }
 }

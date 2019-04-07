@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace DuetAPI.Machine.Tools
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about a configured tool
@@ -56,20 +56,21 @@ namespace DuetAPI.Machine.Tools
         
         /// <summary>
         /// Associated axes. At present only X and Y can be mapped per tool.
-        /// 
+        /// </summary>
+        /// <remarks>
         /// The order is the same as the visual axes, so by default the layout is
         /// [
         ///   [0],        // X
         ///   [1]         // Y
         /// ]
-        /// </summary>
+        /// </remarks>
         public List<int[]> Axes { get; set; } = new List<int[]>();
-        
+
         /// <summary>
         /// Axis offsets (in mm)
-        /// This list is in the same order as <see cref="DuetAPI.Machine.Move.Model.Axes"/>
+        /// This list is in the same order as <see cref="Move.Axes"/>
         /// </summary>
-        /// <seealso cref="DuetAPI.Machine.Move.Axis"/>
+        /// <seealso cref="Axis"/>
         public double[] Offsets { get; set; } = new double[0];                  // same order as Move.Axes
 
         /// <summary>

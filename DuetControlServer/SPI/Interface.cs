@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
+using DuetAPI.Machine;
 using DuetControlServer.FileExecution;
 using Code = DuetControlServer.Commands.Code;
 
@@ -374,11 +375,11 @@ namespace DuetControlServer.SPI
             // Reset everything if the controller is halted
             using (await Model.Provider.AccessReadOnly())
             {
-                if (Model.Provider.Get.State.Status == DuetAPI.Machine.State.Status.Halted)
+                if (Model.Provider.Get.State.Status == MachineStatus.Halted)
                 {
                     InvalidateData(false);
                 }
-                else if (module == 2 && Model.Provider.Get.State.Status == DuetAPI.Machine.State.Status.Processing)
+                else if (module == 2 && Model.Provider.Get.State.Status == MachineStatus.Processing)
                 {
                     _moduleToQuery = 3;
                 }
@@ -436,17 +437,11 @@ namespace DuetControlServer.SPI
                 {
                     _partialCodeReply = reply;
                 }
-                else if (flags.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag))
-                {
-                    Log.LogError(reply);
-                }
-                else if (flags.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag))
-                {
-                    Log.LogWarning(reply);
-                }
-                else
-                {
-                    Log.LogInfo(reply);
+                else {
+                    MessageType type = flags.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                        : flags.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                        : MessageType.Success;
+                    Model.Provider.Output(type, _partialCodeReply + reply);
                 }
             }
         }
@@ -466,7 +461,7 @@ namespace DuetControlServer.SPI
                 }
                 else
                 {
-                    Log.LogError($"Could not find macro files {MacroFile.ConfigFile} and {MacroFile.ConfigFileFallback}");
+                    await Model.Provider.Output(MessageType.Error, $"Could not find macro files {MacroFile.ConfigFile} and {MacroFile.ConfigFileFallback}");
                     DataTransfer.WriteMacroCompleted(channel, true);
                     return;
                 }
@@ -486,7 +481,7 @@ namespace DuetControlServer.SPI
             {
                 if (reportMissing)
                 {
-                    Log.LogError($"Could not find macro file {filename}");
+                    await Model.Provider.Output(MessageType.Error, $"Could not find macro file {filename}");
                 }
                 DataTransfer.WriteMacroCompleted(channel, true);
             }
@@ -511,7 +506,7 @@ namespace DuetControlServer.SPI
 
             using (await Model.Provider.AccessReadWrite())
             {
-                DuetAPI.Machine.Channels.Channel item = Model.Provider.Get.Channels[channel];
+                Channel item = Model.Provider.Get.Channels[channel];
                 item.StackDepth = stackDepth;
                 item.RelativeExtrusion = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.DrivesRelative);
                 item.RelativePositioning = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.AxesRelative);
@@ -532,7 +527,7 @@ namespace DuetControlServer.SPI
             // Update the object model
             using (await Model.Provider.AccessReadWrite())
             {
-                Model.Provider.Get.State.Status = DuetAPI.Machine.State.Status.Paused;
+                Model.Provider.Get.State.Status = MachineStatus.Paused;
             }
 
             // Resolve pending codes on the file channel

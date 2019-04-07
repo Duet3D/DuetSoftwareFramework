@@ -4,7 +4,9 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
 using DuetAPI.Machine;
+using DuetAPI.Utility;
 using DuetAPIClient.Exceptions;
 using Newtonsoft.Json.Linq;
 
@@ -19,7 +21,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Creates a new connection in intercept mode
         /// </summary>
-        public SubscribeConnection() : base(ConnectionMode.Command) {}
+        public SubscribeConnection() : base(ConnectionMode.Command) { }
 
         /// <summary>
         /// Establishes a connection to the given UNIX socket file
@@ -27,6 +29,7 @@ namespace DuetAPIClient
         /// <param name="mode">Subscription mode</param>
         /// <param name="socketPath">Path to the UNIX socket file</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         public Task Connect(SubscriptionMode mode, string socketPath = "/tmp/duet.sock", CancellationToken cancellationToken = default(CancellationToken))
@@ -41,9 +44,9 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>The current machine model</returns>
-        public async Task<Model> GetMachineModel(CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<MachineModel> GetMachineModel(CancellationToken cancellationToken = default(CancellationToken))
         {
-            Model model = await Receive<Model>(cancellationToken);
+            MachineModel model = await Receive<MachineModel>(cancellationToken);
             await Send(new Acknowledge());
             return model;
         }

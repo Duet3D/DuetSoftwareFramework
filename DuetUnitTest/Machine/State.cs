@@ -1,6 +1,5 @@
-﻿using DuetAPI.Machine.State;
+﻿using DuetAPI.Machine;
 using NUnit.Framework;
-using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest.Machine
 {
@@ -10,14 +9,14 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            Model original = new Model();
+            MachineModel original = new MachineModel();
 
             original.State.AtxPower = true;
             original.State.CurrentTool = 123;
-            original.State.Mode = Mode.Laser;
-            original.State.Status = Status.Processing;
+            original.State.Mode = MachineMode.Laser;
+            original.State.Status = MachineStatus.Processing;
 
-            Model clone = (Model)original.Clone();
+            MachineModel clone = (MachineModel)original.Clone();
 
             Assert.AreEqual(original.State.AtxPower, clone.State.AtxPower);
             Assert.AreEqual(original.State.CurrentTool, clone.State.CurrentTool);

@@ -1,6 +1,5 @@
-﻿using DuetAPI.Machine.Job;
+﻿using DuetAPI.Machine;
 using NUnit.Framework;
-using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest.Machine
 {
@@ -10,7 +9,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            Model original = new Model();
+            MachineModel original = new MachineModel();
 
             original.Job.Duration = 123;
             original.Job.ExtrudedRaw = new double[] { 123, 456, 789 };
@@ -42,7 +41,7 @@ namespace DuetUnitTest.Machine
             original.Job.TimesLeft.Layer = 345;
             original.Job.WarmUpDuration = 34;
 
-            Model clone = (Model)original.Clone();
+            MachineModel clone = (MachineModel)original.Clone();
 
             Assert.AreEqual(original.Job.Duration, clone.Job.Duration);
             Assert.AreEqual(original.Job.ExtrudedRaw, clone.Job.ExtrudedRaw);

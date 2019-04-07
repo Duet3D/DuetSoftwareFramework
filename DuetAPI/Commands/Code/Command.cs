@@ -8,7 +8,7 @@ namespace DuetAPI.Commands
     /// A parsed representation of a generic G/M/T-code
     /// Line number support has not yet been implemented (TODO)
     /// </summary>
-    /// <seealso cref="CodeParameter"/>
+    /// <seealso cref="CodeResult"/>
     public partial class Code : Command<CodeResult>
     {
         /// <summary>
@@ -44,13 +44,16 @@ namespace DuetAPI.Commands
         /// <summary>
         /// List of parsed code parameters (see <see cref="CodeParameter"/> for further information)
         /// </summary>
+        /// <seealso cref="CodeParameter"/>
         public List<CodeParameter> Parameters { get; } = new List<CodeParameter>();
         
         /// <summary>
-        /// Comment of the G/M/T-code. Note that the parser combines different comment styles and appends them
-        /// as a single value. So for example a code like 'G28 (Do homing) ; via G28' causes a comment like
-        /// 'Do homing via G28' to be generated in this field
+        /// Comment of the G/M/T-code
         /// </summary>
+        /// <remarks>
+        /// The parser combines different comment segments and concatenates them as a single value.
+        /// So for example a code like 'G28 (Do homing) ; via G28' causes the Comment field to be filled with 'Do homing via G28'
+        /// </remarks>
         public string Comment { get; set; }
 
         /// <summary>
@@ -83,7 +86,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Reconstruct an unprecedented string from the parameter list
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Unprecedented string</returns>
         public string GetUnprecedentedString(bool quoteStrings = false)
         {
             string result = "";

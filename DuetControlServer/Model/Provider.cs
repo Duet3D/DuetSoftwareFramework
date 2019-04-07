@@ -1,4 +1,7 @@
 using System;
+using System.Threading.Tasks;
+using DuetAPI;
+using DuetAPI.Machine;
 using Nito.AsyncEx;
 
 namespace DuetControlServer.Model
@@ -10,7 +13,6 @@ namespace DuetControlServer.Model
     /// </summary>
     public static class Provider
     {
-        private static readonly DuetAPI.Machine.Model _model = new DuetAPI.Machine.Model();
         private static readonly AsyncReaderWriterLock _lock = new AsyncReaderWriterLock();
 
         /// <summary>
@@ -19,12 +21,12 @@ namespace DuetControlServer.Model
         public static void Init()
         {
             // Initialize electronics
-            _model.Electronics.Type = "duet3";
-            _model.Electronics.Name = "Duet 3";
-            _model.Electronics.Revision = "0.5";
+            Get.Electronics.Type = "duet3";
+            Get.Electronics.Name = "Duet 3";
+            Get.Electronics.Revision = "0.5";
 
             // Initialize machine name
-            _model.Network.Name = Environment.MachineName;
+            Get.Network.Name = Environment.MachineName;
         }
         
         /// <summary>
@@ -51,6 +53,42 @@ namespace DuetControlServer.Model
         /// <returns>Current Duet machine object model</returns>
         /// <seealso cref="AccessReadOnly()"/>
         /// <seealso cref="AccessReadWrite()"/>
-        public static DuetAPI.Machine.Model Get { get => _model; }
+        public static MachineModel Get { get; } = new MachineModel();
+
+        /// <summary>
+        /// Output a generic message
+        /// </summary>
+        /// <param name="message">Message to output</param>
+        public static async Task Output(Message message)
+        {
+            message.Print();
+            if (!IPC.Processors.Subscription.Output(message))
+            {
+                using (await AccessReadWrite())
+                {
+                    Get.Messages.Add(message);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Output a generic message
+        /// </summary>
+        /// <param name="type">Type of the message</param>
+        /// <param name="content">Content of the message</param>
+        public static Task Output(MessageType type, string content) => Output(new Message(type, content));
+
+        /// <summary>
+        /// Output the result of a G/M/T-code
+        /// </summary>
+        /// <param name="codeResult">Messages to output</param>
+        /// <returns></returns>
+        public static async Task Output(DuetAPI.Commands.CodeResult codeResult)
+        {
+            foreach (Message message in codeResult)
+            {
+                await Output(message);
+            }
+        }
     }
 }

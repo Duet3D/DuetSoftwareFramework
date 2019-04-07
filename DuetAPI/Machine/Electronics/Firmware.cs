@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Electronics
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about a firmware version

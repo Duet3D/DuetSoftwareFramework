@@ -68,6 +68,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="to">Destination</param>
         /// <param name="code">Code to write</param>
         /// <returns>Number of bytes written</returns>
+        /// <exception cref="ArgumentException">Unsupported data type</exception>
         public static int WriteCode(Span<byte> to, Code code)
         {
             int bytesWritten = 0;
@@ -231,6 +232,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="field">Path to the object model field</param>
         /// <param name="value">New value</param>
         /// <returns>Number of bytes written</returns>
+        /// <exception cref="ArgumentException">Unsupported data type</exception>
         /// <remarks>value must be of type <see cref="DataType"/></remarks>
         public static int WriteObjectModel(Span<byte> to, string field, object value)
         {
@@ -322,6 +324,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="to">Destination</param>
         /// <param name="info">Information about the file being printed</param>
         /// <returns>Number of bytes written</returns>
+        /// <exception cref="ArgumentException">One of the supplied values is too big</exception>
         public static int WritePrintStarted(Span<byte> to, ParsedFileInfo info)
         {
             Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName);
@@ -374,14 +377,14 @@ namespace DuetControlServer.SPI.Serialization
         /// <summary>
         /// Notify the firmware that a print has been stopped
         /// </summary>
-        /// <param name="to"></param>
-        /// <param name="reason"></param>
-        /// <returns></returns>
+        /// <param name="to">Destination</param>
+        /// <param name="reason">Reason why the print has been stopped</param>
+        /// <returns>Number of bytes written</returns>
         public static int WritePrintStopped(Span<byte> to, PrintStoppedReason reason)
         {
             PrintStopped header = new PrintStopped
             {
-                Reason = (byte)reason
+                Reason = reason
             };
             MemoryMarshal.Write(to, ref header);
             return Marshal.SizeOf(header);
@@ -408,9 +411,9 @@ namespace DuetControlServer.SPI.Serialization
         /// <summary>
         /// Request a resource to be locked or unlocked
         /// </summary>
-        /// <param name="to"></param>
-        /// <param name="channel"></param>
-        /// <returns></returns>
+        /// <param name="to">Destination</param>
+        /// <param name="channel">Channel for the lock request</param>
+        /// <returns>Number of bytes written</returns>
         public static int WriteLockUnlock(Span<byte> to, CodeChannel channel)
         {
             LockUnlock header = new LockUnlock

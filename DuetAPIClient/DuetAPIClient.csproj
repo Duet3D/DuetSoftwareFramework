@@ -2,14 +2,16 @@
 
     <PropertyGroup>
         <TargetFramework>netcoreapp2.2</TargetFramework>
+        <Authors>Christian Hammacher</Authors>
+        <Company>Duet3D</Company>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-      <DocumentationFile>DuetAPIClient.xml</DocumentationFile>
+      <DocumentationFile></DocumentationFile>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-      <DocumentationFile>C:\Users\Christian\Source\repos\DuetSoftwareFramework\DuetAPIClient\DuetAPIClient.xml</DocumentationFile>
+      <DocumentationFile>DuetAPIClient.xml</DocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>

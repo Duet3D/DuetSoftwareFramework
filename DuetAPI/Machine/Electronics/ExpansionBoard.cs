@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Electronics
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Represents information about an attached expansion board

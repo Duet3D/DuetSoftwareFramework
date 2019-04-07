@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Machine.Move
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Idle factor parameters for automatic motor current reduction

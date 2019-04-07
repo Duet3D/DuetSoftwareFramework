@@ -12,6 +12,6 @@ namespace DuetControlServer.Commands
         /// Retrieves file information from the given filename
         /// </summary>
         /// <returns>File info</returns>
-        protected override Task<ParsedFileInfo> Run() => FileInfoParser.Parse(FileName);
+        public override Task<ParsedFileInfo> Execute() => FileInfoParser.Parse(FileName);
     }
 }

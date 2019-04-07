@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetAPI", "DuetAPI\DuetAPI.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetControlServer", "DuetControlServer\DuetControlServer.csproj", "{B93964D5-D62A-4255-97FF-C150261DC84C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetRestEndpoint", "DuetRestEndpoint\DuetRestEndpoint.csproj", "{9F8BB595-2FFB-4A1B-9069-D2916ABCD7E0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetWebServer", "DuetWebServer\DuetWebServer.csproj", "{9F8BB595-2FFB-4A1B-9069-D2916ABCD7E0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetUnitTest", "DuetUnitTest\DuetUnitTest.csproj", "{605DC6A1-6EF9-43F4-805D-9A1939AE1621}"
 EndProject

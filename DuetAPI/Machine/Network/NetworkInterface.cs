@@ -1,54 +1,7 @@
 ﻿using System;
-using System.Runtime.Serialization;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 
-namespace DuetAPI.Machine.Network
+namespace DuetAPI.Machine
 {
-    /// <summary>
-    /// Supported types of network interfaces
-    /// </summary>
-    [JsonConverter(typeof(StringEnumConverter))]
-    public enum InterfaceType
-    {
-        /// <summary>
-        /// Wireless network interface
-        /// </summary>
-        [EnumMember(Value = "wifi")]
-        WiFi,
-
-        /// <summary>
-        /// Wired network interface
-        /// </summary>
-        [EnumMember(Value = "lan")]
-        LAN
-    }
-
-    /// <summary>
-    /// Supported network protocols
-    /// </summary>
-    [JsonConverter(typeof(StringEnumConverter))]
-    public enum NetworkProtocol
-    {
-        /// <summary>
-        /// HTTP protocol
-        /// </summary>
-        [EnumMember(Value = "http")]
-        HTTP,
-
-        /// <summary>
-        /// FTP protocol
-        /// </summary>
-        [EnumMember(Value = "ftp")]
-        FTP,
-
-        /// <summary>
-        /// Telnet protocol
-        /// </summary>
-        [EnumMember(Value = "telnet")]
-        Telnet
-    }
-
     /// <summary>
     /// Information about a network interface
     /// </summary>

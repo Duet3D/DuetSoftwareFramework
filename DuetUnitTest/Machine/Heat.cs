@@ -1,6 +1,5 @@
-﻿using DuetAPI.Machine.Heat;
+﻿using DuetAPI.Machine;
 using NUnit.Framework;
-using Model = DuetAPI.Machine.Model;
 
 namespace DuetUnitTest.Machine
 {
@@ -10,7 +9,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            Model original = new Model();
+            MachineModel original = new MachineModel();
 
             BedOrChamber bed = new BedOrChamber
             {
@@ -57,7 +56,7 @@ namespace DuetUnitTest.Machine
             heater.Model.TimeConst = 32;
             original.Heat.Heaters.Add(heater);
 
-            Model clone = (Model)original.Clone();
+            MachineModel clone = (MachineModel)original.Clone();
 
             Assert.AreEqual(2, original.Heat.Beds.Count);
             Assert.AreEqual(original.Heat.Beds[0], null);

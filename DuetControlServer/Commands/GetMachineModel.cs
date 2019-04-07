@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using DuetAPI.Machine;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
 {
@@ -11,11 +12,11 @@ namespace DuetControlServer.Commands
         /// Retrieve a copy of the current machine model
         /// </summary>
         /// <returns>Clone of the current machine model</returns>
-        protected override async Task<DuetAPI.Machine.Model> Run()
+        public override async Task<MachineModel> Execute()
         {
             using (await Model.Provider.AccessReadOnly())
             {
-                return (DuetAPI.Machine.Model)Model.Provider.Get.Clone();
+                return (MachineModel)Model.Provider.Get.Clone();
             }
         }
     }

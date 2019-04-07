@@ -1,5 +1,4 @@
 ﻿using DuetAPI.Machine;
-using DuetAPI.Machine.Tools;
 using NUnit.Framework;
 
 namespace DuetUnitTest.Machine
@@ -10,7 +9,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            Model original = new Model();
+            MachineModel original = new MachineModel();
 
             Tool tool = new Tool
             {
@@ -29,7 +28,7 @@ namespace DuetUnitTest.Machine
             tool.Axes.Add(new int[] { 1 });
             original.Tools.Add(tool);
 
-            Model clone = (Model)original.Clone();
+            MachineModel clone = (MachineModel)original.Clone();
 
             Assert.AreEqual(1, original.Tools.Count);
             Assert.AreEqual(original.Tools[0].Active, clone.Tools[0].Active);

@@ -37,7 +37,7 @@ namespace DuetControlServer.Commands
         /// Run an arbitrary G/M/T-code
         /// </summary>
         /// <returns>Code result instance</returns>
-        protected override async Task<CodeResult> Run()
+        public override async Task<CodeResult> Execute()
         {
             CodeResult result = null;
 

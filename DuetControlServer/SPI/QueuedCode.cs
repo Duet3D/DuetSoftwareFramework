@@ -57,29 +57,37 @@ namespace DuetControlServer.SPI
         /// <param name="reply">Raw code reply</param>
         public void HandleReply(Communication.MessageTypeFlags messageType, string reply)
         {
-            reply = reply.Trim();
+            DuetAPI.Message message;
             if (_lastMessageIncomplete)
             {
-                _result[_result.Count - 1].Content += reply;
+                message = _result[_result.Count - 1];
+                message.Content += reply;
             }
             else if (reply != "")
             {
                 DuetAPI.MessageType type = messageType.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? DuetAPI.MessageType.Error
                             : messageType.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? DuetAPI.MessageType.Warning
                             : DuetAPI.MessageType.Success;
-                _result.Add(new DuetAPI.Message(type, reply));
+                message = new DuetAPI.Message(type, reply);
+                _result.Add(message);
             }
             else
             {
                 _gotEmptyResponse = true;
+                message = null;
             }
+
             _lastMessageIncomplete = messageType.HasFlag(Communication.MessageTypeFlags.PushFlag);
+            if (!_lastMessageIncomplete)
+            {
+                message?.Print();
+            }
         }
 
         /// <summary>
         /// Something went wrong while executing this code
         /// </summary>
-        /// <param name="e"></param>
+        /// <param name="e">Exception to return</param>
         public async void SetException(Exception e)
         {
             if (_taskSource == null)

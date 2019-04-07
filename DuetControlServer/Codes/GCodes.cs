@@ -27,6 +27,11 @@ namespace DuetControlServer.Codes
         /// <returns>Asynchronous task</returns>
         public static async Task CodeExecuted(Code code, CodeResult result)
         {
+            if (!result.IsSuccessful)
+            {
+                return;
+            }
+
             switch (code.MajorNumber)
             {
                 // Use inches

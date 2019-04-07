@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
+using DuetAPI.Utility;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Nito.AsyncEx;
@@ -29,7 +31,9 @@ namespace DuetControlServer.IPC.Processors
         private static readonly ConcurrentDictionary<Subscription, SubscriptionMode> _subscriptions = new ConcurrentDictionary<Subscription, SubscriptionMode>();
 
         private readonly SubscriptionMode _mode;
+
         private JObject _jsonModel, _lastModel;
+        private List<Message> _messages = new List<Message>();
         private AsyncAutoResetEvent _updateAvailableEvent = new AsyncAutoResetEvent();
         
         /// <summary>
@@ -64,7 +68,9 @@ namespace DuetControlServer.IPC.Processors
                 string json;
                 lock (_jsonModel)
                 {
+                    JArray originalMessages = ReadMessages();
                     json = _jsonModel.ToString(Formatting.None);
+                    _jsonModel["messages"] = originalMessages;
                 }
                 await Connection.Send(json + "\n");
                 
@@ -73,7 +79,7 @@ namespace DuetControlServer.IPC.Processors
                     // Wait for acknowledgement
                     if (!patchWasEmpty)
                     {
-                        BaseCommand command = await Connection.ReceiveCommand();
+                        var command = await Connection.ReceiveCommand();
                         if (!SupportedCommands.Contains(command.GetType()))
                         {
                             throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
@@ -89,7 +95,9 @@ namespace DuetControlServer.IPC.Processors
                         // Send the entire object model in Full mode
                         lock (_jsonModel)
                         {
+                            JArray originalMessages = ReadMessages();
                             json = _jsonModel.ToString(Formatting.None);
+                            _jsonModel["messages"] = originalMessages;
                         }
                         await Connection.Send(json + "\n");
                     }
@@ -100,6 +108,30 @@ namespace DuetControlServer.IPC.Processors
                         lock (_jsonModel)
                         {
                             patch = JsonHelper.DiffObject(_lastModel, _jsonModel);
+                        }
+
+                        // Compact layers
+                        if (patch.ContainsKey("job") && patch.ContainsKey("layers"))
+                        {
+                            JArray layersArray = patch["job"].Value<JArray>("layers");
+                            while (!layersArray[0].HasValues)
+                            {
+                                layersArray.RemoveAt(0);
+                            }
+                        }
+
+                        // Write pending messages
+                        lock (_messages)
+                        {
+                            if (_messages.Count != 0)
+                            {
+                                JArray messageArray = patch.ContainsKey("messages") ? patch.Value<JArray>("messages") : new JArray();
+                                foreach (Message message in _messages)
+                                {
+                                    messageArray.Add(JObject.FromObject(message, JsonHelper.DefaultSerializer));
+                                }
+                                patch["messages"] = messageArray;
+                            }
                         }
                         
                         // Send it over unless it is empty
@@ -130,20 +162,60 @@ namespace DuetControlServer.IPC.Processors
             } 
         }
 
-        private void Notify(JObject newModel)
+        /// <summary>
+        /// Enqueue a generic message for output
+        /// </summary>
+        /// <param name="message">New message</param>
+        /// <returns>Whether the message could be stored</returns>
+        public static bool Output(Message message)
         {
-            lock (_jsonModel)
+            if (_subscriptions.Count == 0)
             {
-                _jsonModel = newModel;
+                return false;
+            }
+
+            foreach (var pair in _subscriptions)
+            {
+                pair.Key.AddMessage(message);
+            }
+            return true;
+        }
+
+        private void AddMessage(Message message)
+        {
+            lock (_messages)
+            {
+                _messages.Add(message);
             }
             _updateAvailableEvent.Set();
+        }
+
+        private JArray ReadMessages()
+        {
+            JArray messages = _jsonModel.Value<JArray>("messages");
+            lock (_messages)
+            {
+                if (_messages.Count != 0)
+                {
+                    JArray clone = (JArray)messages.DeepClone();
+
+                    foreach (Message message in _messages)
+                    {
+                        messages.Add(JObject.FromObject(message, JsonHelper.DefaultSerializer));
+                    }
+
+                    messages = clone;
+                }
+                _messages.Clear();
+            }
+            return messages;
         }
 
         /// <summary>
         /// Called to notify the subscribers about a model update
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task Update()
+        public static async Task ModelUpdated()
         {
             // This is probably really slow and needs to be improved!
             JObject newModel;
@@ -152,15 +224,12 @@ namespace DuetControlServer.IPC.Processors
                 newModel = JObject.FromObject(Model.Provider.Get, JsonHelper.DefaultSerializer);
             }
 
-            // FIXME cache messages from the updated machine model before we get here and merge them back into newModel.
-            // Otherwise two successive model updates without a poll in between would cause messages to disappear  
-
             if (_subscriptions.Count != 0)
             {
                 // Notify subscribers
                 foreach (var pair in _subscriptions)
                 {
-                    pair.Key.Notify(newModel);
+                    pair.Key.Update(newModel);
                 }
 
                 // Clear messages once they have been sent out at least once
@@ -169,6 +238,15 @@ namespace DuetControlServer.IPC.Processors
                     Model.Provider.Get.Messages.Clear();
                 }
             }
+        }
+
+        private void Update(JObject newModel)
+        {
+            lock (_jsonModel)
+            {
+                _jsonModel = newModel;
+            }
+            _updateAvailableEvent.Set();
         }
     }
 }

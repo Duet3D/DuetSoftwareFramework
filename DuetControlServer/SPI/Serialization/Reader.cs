@@ -33,7 +33,7 @@ namespace DuetControlServer.SPI.Serialization
         /// </summary>
         /// <param name="from">Origin</param>
         /// <param name="busyChannels">Bitmap of the busy channels</param>
-        /// <returns></returns>
+        /// <returns>Number of bytes read</returns>
         public static int ReadState(Span<byte> from, out int busyChannels)
         {
             StateResponse header = MemoryMarshal.Read<StateResponse>(from);
@@ -190,11 +190,11 @@ namespace DuetControlServer.SPI.Serialization
         /// </summary>
         /// <param name="from">Origin</param>
         /// <param name="channel">Channel that has acquired the lock</param>
-        /// <returns></returns>
+        /// <returns>Number of bytes read</returns>
         public static int ReadResourceLocked(Span<byte> from, out CodeChannel channel)
         {
             LockUnlock header = MemoryMarshal.Read<LockUnlock>(from);
-            channel = (CodeChannel)header.Channel;
+            channel = header.Channel;
             return Marshal.SizeOf(header);
         }
 

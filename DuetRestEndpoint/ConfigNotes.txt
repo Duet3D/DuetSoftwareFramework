@@ -1,4 +1,0 @@
-﻿The following keys are supported by the JSON configuration:
-
-- SocketPath: Path to the DCS UNIX socket (default: /tmp/duet.sock)
-- CorsEnabled: Enable CORS requests (default: true)

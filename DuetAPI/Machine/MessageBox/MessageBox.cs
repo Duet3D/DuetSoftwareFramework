@@ -1,0 +1,45 @@
+﻿using System;
+
+namespace DuetAPI.Machine
+{
+    /// <summary>
+    /// Information about the message box to show
+    /// </summary>
+    public class MessageBox : ICloneable
+    {
+        /// <summary>
+        /// Mode of the message box to display or null if none is shown
+        /// </summary>
+        public MessageBoxMode? Mode { get; set; }
+        
+        /// <summary>
+        /// Title of the message box
+        /// </summary>
+        public string Title { get; set; }
+        
+        /// <summary>
+        /// Content of the message box
+        /// </summary>
+        public string Message { get; set; }
+        
+        /// <summary>
+        /// Optional axis movement controls to show (axis indices)
+        /// </summary>
+        public int[] AxisControls { get; set; } = new int[0];
+
+        /// <summary>
+        /// Creates a clone of this instance
+        /// </summary>
+        /// <returns>A clone of this instance</returns>
+        public object Clone()
+        {
+            return new MessageBox
+            {
+                Mode = Mode,
+                Title = (Title != null) ? string.Copy(Title) : null,
+                Message = (Message != null) ? string.Copy(Message) : null,
+                AxisControls = (int[])AxisControls.Clone()
+            };
+        }
+    }
+}

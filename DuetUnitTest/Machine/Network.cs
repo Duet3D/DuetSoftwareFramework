@@ -1,4 +1,4 @@
-﻿using DuetAPI.Machine.Network;
+﻿using DuetAPI.Machine;
 using NUnit.Framework;
 
 namespace DuetUnitTest.Machine
@@ -9,7 +9,7 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.Model original = new DuetAPI.Machine.Model();
+            MachineModel original = new MachineModel();
 
             NetworkInterface iface = new NetworkInterface();
             iface.ActiveProtocols = new[] { NetworkProtocol.Telnet };
@@ -28,7 +28,7 @@ namespace DuetUnitTest.Machine
             original.Network.Name = "Name";
             original.Network.Password = "Password";
 
-            DuetAPI.Machine.Model clone = (DuetAPI.Machine.Model)original.Clone();
+            MachineModel clone = (MachineModel)original.Clone();
 
             Assert.AreEqual(1, original.Network.Interfaces.Count);
             Assert.AreEqual(original.Network.Interfaces[0].ActiveProtocols, clone.Network.Interfaces[0].ActiveProtocols);
