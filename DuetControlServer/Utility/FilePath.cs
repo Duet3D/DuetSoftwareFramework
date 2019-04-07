@@ -50,7 +50,7 @@ namespace DuetControlServer
         /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
         /// </summary>
         /// <param name="filePath">File path to convert</param>
-        /// <returns></returns>
+        /// <returns>Resolved file path</returns>
         public static async Task<string> ToVirtual(string filePath)
         {
             if (filePath.StartsWith(Settings.BaseDirectory))

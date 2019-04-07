@@ -182,7 +182,7 @@
             <summary>
             Go to the specified position
             </summary>
-            <param name="position"></param>
+            <param name="position">Position to go to</param>
         </member>
         <member name="M:DuetControlServer.FileExecution.BaseFile.Abort">
             <summary>
@@ -224,8 +224,8 @@
             <summary>
             Abort the last file on the given channel
             </summary>
-            <param name="channel"></param>
-            <returns></returns>
+            <param name="channel">Channel of the running macro file</param>
+            <returns>If an abortion could be requested</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.MacroFile.#ctor(System.String,DuetAPI.CodeChannel,System.Int32)">
             <summary>
@@ -239,7 +239,7 @@
             <summary>
             Read another code from the file being executed
             </summary>
-            <returns></returns>
+            <returns>Next available code or null if the file has ended</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.MacroFile.RunMacro">
             <summary>
@@ -263,7 +263,7 @@
             <summary>
             Called when the file print has been paused
             </summary>
-            <param name="filePosition"></param>
+            <param name="filePosition">Position at which the file was paused</param>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Resume">
             <summary>
@@ -393,7 +393,7 @@
             Reads incoming command requests and processes them. See <see cref="N:DuetAPI.Commands"/> namespace for a list
             of supported commands. The actual implementations can be found in <see cref="N:DuetControlServer.Commands"/>.
             </summary>
-            <returns></returns>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.IPC.Processors.Interception">
             <summary>
@@ -496,7 +496,7 @@
             Start accepting incoming connections.
             This represents the lifecycle of this class
             </summary>
-            <returns></returns>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.IPC.Server.Shutdown">
             <summary>
@@ -540,6 +540,7 @@
             Output a generic message
             </summary>
             <param name="message">Message to output</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.Model.Provider.Output(DuetAPI.MessageType,System.String)">
             <summary>
@@ -547,13 +548,14 @@
             </summary>
             <param name="type">Type of the message</param>
             <param name="content">Content of the message</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.Model.Provider.Output(DuetAPI.Commands.CodeResult)">
             <summary>
             Output the result of a G/M/T-code
             </summary>
             <param name="codeResult">Messages to output</param>
-            <returns></returns>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.Model.Updater">
             <summary>
@@ -1604,6 +1606,7 @@
             <summary>
             Perform a full data transfer
             </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.HadReset">
             <summary>
@@ -1678,6 +1681,7 @@
             <summary>
             Read the content of a <see cref="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.Locked"/> packet
             </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.DumpMalformedPacket">
             <summary>
@@ -1816,7 +1820,7 @@
             <summary>
             Notify the firmware that the file print has been stopped
             </summary>
-            <param name="stopReason"></param>
+            <param name="stopReason">Reason why the print has stopped</param>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.LockMovementAndWaitForStandstill(DuetAPI.CodeChannel)">
             <summary>
@@ -1835,8 +1839,9 @@
         <member name="M:DuetControlServer.SPI.Interface.Connect">
             <summary>
             Initialize physical transfer and perform initial data transfer.
-            This is only called 
+            This is only called once on initialization
             </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.Run">
             <summary>
@@ -2157,7 +2162,7 @@
             The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
             </summary>
             <param name="filePath">File path to convert</param>
-            <returns></returns>
+            <returns>Resolved file path</returns>
         </member>
     </members>
 </doc>

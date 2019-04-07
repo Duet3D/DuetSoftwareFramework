@@ -86,6 +86,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Reconstruct an unprecedented string from the parameter list
         /// </summary>
+        /// <param name="quoteStrings">Encapsulate strings in double quotes</param>
         /// <returns>Unprecedented string</returns>
         public string GetUnprecedentedString(bool quoteStrings = false)
         {

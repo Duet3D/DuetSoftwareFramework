@@ -29,8 +29,8 @@ namespace DuetAPIClient
 
         /// <summary>
         /// Create a new connection instance
-        /// <param name="mode">Desired mode of the connection</param>
         /// </summary>
+        /// <param name="mode">Mode of the new connection</param>
         protected BaseConnection(ConnectionMode mode)
         {
             _connectionMode = mode;
@@ -42,6 +42,7 @@ namespace DuetAPIClient
         /// <param name="initMessage">Init message to send to the server</param>
         /// <param name="socketPath">Path to the UNIX socket file</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         protected async Task Connect(ClientInitMessage initMessage, string socketPath, CancellationToken cancellationToken)
@@ -154,8 +155,8 @@ namespace DuetAPIClient
         /// <summary>
         /// Receive a deserialized object from the server
         /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <typeparam name="T"></typeparam>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <typeparam name="T">Type of the received object</typeparam>
         /// <returns>Received object</returns>
         protected async Task<T> Receive<T>(CancellationToken cancellationToken)
         {

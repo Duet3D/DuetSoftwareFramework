@@ -76,7 +76,7 @@ namespace DuetControlServer.FileExecution
             {
                 return new Code(line)
                 {
-                    FilePosition = (uint?)filePosition,
+                    FilePosition = filePosition,
                     Channel = Channel
                 };
             }
@@ -90,7 +90,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Go to the specified position
         /// </summary>
-        /// <param name="position"></param>
+        /// <param name="position">Position to go to</param>
         public void Seek(long position)
         {
             _fileStream.Seek(position, SeekOrigin.Begin);

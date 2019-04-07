@@ -85,6 +85,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Perform a full data transfer
         /// </summary>
+        /// <returns>Asynchronous task</returns>
         public static async Task PerformFullTransfer()
         {
             try
@@ -269,6 +270,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the content of a <see cref="Request.Locked"/> packet
         /// </summary>
+        /// <returns>Asynchronous task</returns>
         public static void ReadResourceLocked(out CodeChannel channel)
         {
             _rxPointer += Serialization.Reader.ReadResourceLocked(_packetData, out channel);

@@ -82,7 +82,7 @@ namespace DuetAPI
         /// <summary>
         /// Converts this message to a RepRapFirmware-style message
         /// </summary>
-        /// <returns></returns>
+        /// <returns>RepRapFirmware-style message</returns>
         public override string ToString()
         {
             switch (Type)

@@ -261,4 +261,4 @@ __pycache__/
 *.pyc
 
 # Generated documentation (SHFB)
-Documentation/Help
+Documentation/Help/LastBuild.log

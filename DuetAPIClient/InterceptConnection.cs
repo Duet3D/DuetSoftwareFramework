@@ -49,6 +49,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <seealso cref="Ignore"/>
+        /// <returns>Asynchronous task</returns>
         public Task IgnoreCode(CancellationToken cancellationToken = default(CancellationToken))
         {
             return PerformCommand(new Ignore(), cancellationToken);
@@ -60,6 +61,7 @@ namespace DuetAPIClient
         /// <param name="type">Type of the resolving message</param>
         /// <param name="content">Content of the resolving message</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
         /// <seealso cref="Message"/>
         /// <seealso cref="Resolve"/>
         public Task ResolveCode(MessageType type, string content,

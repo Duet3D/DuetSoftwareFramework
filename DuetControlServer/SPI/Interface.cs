@@ -109,7 +109,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Notify the firmware that the file print has been stopped
         /// </summary>
-        /// <param name="stopReason"></param>
+        /// <param name="stopReason">Reason why the print has stopped</param>
         public static void SetPrintStopped(Communication.PrintStoppedReason stopReason)
         {
             _printStoppedReason = stopReason;
@@ -147,8 +147,9 @@ namespace DuetControlServer.SPI
 
         /// <summary>
         /// Initialize physical transfer and perform initial data transfer.
-        /// This is only called 
+        /// This is only called once on initialization
         /// </summary>
+        /// <returns>Asynchronous task</returns>
         public static Task Connect()
         {
             // Do one transfer to ensure both sides are using compatible versions of the data protocol

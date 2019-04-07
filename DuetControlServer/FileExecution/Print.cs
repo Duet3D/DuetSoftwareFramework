@@ -77,7 +77,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Called when the file print has been paused
         /// </summary>
-        /// <param name="filePosition"></param>
+        /// <param name="filePosition">Position at which the file was paused</param>
         public static void Paused(uint filePosition)
         {
             _pausePosition = filePosition;

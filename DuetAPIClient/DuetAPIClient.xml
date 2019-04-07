@@ -12,8 +12,8 @@
         <member name="M:DuetAPIClient.BaseConnection.#ctor(DuetAPI.Connection.ConnectionMode)">
             <summary>
             Create a new connection instance
-            <param name="mode">Desired mode of the connection</param>
             </summary>
+            <param name="mode">Mode of the new connection</param>
         </member>
         <member name="M:DuetAPIClient.BaseConnection.Connect(DuetAPI.Connection.InitMessages.ClientInitMessage,System.String,System.Threading.CancellationToken)">
             <summary>
@@ -22,6 +22,7 @@
             <param name="initMessage">Init message to send to the server</param>
             <param name="socketPath">Path to the UNIX socket file</param>
             <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
             <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
         </member>
@@ -63,8 +64,8 @@
             <summary>
             Receive a deserialized object from the server
             </summary>
-            <param name="cancellationToken"></param>
-            <typeparam name="T"></typeparam>
+            <param name="cancellationToken">Cancellation token</param>
+            <typeparam name="T">Type of the received object</typeparam>
             <returns>Received object</returns>
         </member>
         <member name="M:DuetAPIClient.BaseConnection.ReceiveJson(System.Threading.CancellationToken)">
@@ -252,6 +253,7 @@
             </summary>
             <param name="cancellationToken">Optional cancellation token</param>
             <seealso cref="T:DuetAPI.Commands.Ignore"/>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetAPIClient.InterceptConnection.ResolveCode(DuetAPI.MessageType,System.String,System.Threading.CancellationToken)">
             <summary>
@@ -260,6 +262,7 @@
             <param name="type">Type of the resolving message</param>
             <param name="content">Content of the resolving message</param>
             <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
             <seealso cref="T:DuetAPI.Message"/>
             <seealso cref="T:DuetAPI.Commands.Resolve"/>
         </member>

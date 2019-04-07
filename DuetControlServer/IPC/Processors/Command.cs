@@ -40,9 +40,9 @@ namespace DuetControlServer.IPC.Processors
         
         /// <summary>
         /// Reads incoming command requests and processes them. See <see cref="DuetAPI.Commands"/> namespace for a list
-        /// of supported commands. The actual implementations can be found in <see cref="DuetControlServer.Commands"/>.
+        /// of supported commands. The actual implementations can be found in <see cref="Commands"/>.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Asynchronous task</returns>
         public override async Task Process()
         {
             do

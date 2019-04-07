@@ -47,6 +47,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Reserved for the actual command implementation in the control server
         /// </summary>
+        /// <returns>Asynchronous task</returns>
         public virtual Task Execute()
         {
             throw new NotImplementedException($"{Command} not implemented");
@@ -55,7 +56,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Invokes the command implementation
         /// </summary>
-        /// <returns></returns>
+        /// <returns>null</returns>
         public override async Task<object> Invoke()
         {
             await Execute();
@@ -81,7 +82,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Invokes the command implementation
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Command result</returns>
         public override async Task<object> Invoke() => await Execute();
     }
 }

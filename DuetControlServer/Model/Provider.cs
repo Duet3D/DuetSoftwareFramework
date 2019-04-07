@@ -59,6 +59,7 @@ namespace DuetControlServer.Model
         /// Output a generic message
         /// </summary>
         /// <param name="message">Message to output</param>
+        /// <returns>Asynchronous task</returns>
         public static async Task Output(Message message)
         {
             message.Print();
@@ -76,13 +77,14 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="type">Type of the message</param>
         /// <param name="content">Content of the message</param>
+        /// <returns>Asynchronous task</returns>
         public static Task Output(MessageType type, string content) => Output(new Message(type, content));
 
         /// <summary>
         /// Output the result of a G/M/T-code
         /// </summary>
         /// <param name="codeResult">Messages to output</param>
-        /// <returns></returns>
+        /// <returns>Asynchronous task</returns>
         public static async Task Output(DuetAPI.Commands.CodeResult codeResult)
         {
             foreach (Message message in codeResult)

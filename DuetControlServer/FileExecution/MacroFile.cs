@@ -54,8 +54,8 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Abort the last file on the given channel
         /// </summary>
-        /// <param name="channel"></param>
-        /// <returns></returns>
+        /// <param name="channel">Channel of the running macro file</param>
+        /// <returns>If an abortion could be requested</returns>
         public static bool AbortLastFile(CodeChannel channel)
         {
             lock (_macroFiles)
@@ -98,7 +98,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Read another code from the file being executed
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Next available code or null if the file has ended</returns>
         public override async Task<Code> ReadCode()
         {
             Code result = await base.ReadCode();

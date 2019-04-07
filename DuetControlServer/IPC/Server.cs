@@ -47,7 +47,7 @@ namespace DuetControlServer.IPC
         /// Start accepting incoming connections.
         /// This represents the lifecycle of this class
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Asynchronous task</returns>
         public static async Task AcceptConnections()
         {
             // Keep accepting incoming connections.
