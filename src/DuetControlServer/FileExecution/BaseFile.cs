@@ -13,7 +13,11 @@ namespace DuetControlServer.FileExecution
     {
         private FileStream _fileStream;
         private StreamReader _reader;
-        private bool _isAbortRequested;
+
+        /// <summary>
+        /// Indicates if this file is supposed to be aborted
+        /// </summary>
+        protected bool isAbortRequested;
 
         /// <summary>
         /// File path to the file being executed
@@ -59,12 +63,12 @@ namespace DuetControlServer.FileExecution
         public virtual async Task<Code> ReadCode()
         {
             // Deal with abort requests
-            if (_isAbortRequested)
+            if (isAbortRequested)
             {
                 if (!IsFinished)
                 {
-                    IsFinished = true;
                     _fileStream.Close();
+                    IsFinished = true;
                 }
                 return null;
             }
@@ -94,14 +98,12 @@ namespace DuetControlServer.FileExecution
         public void Seek(long position)
         {
             _fileStream.Seek(position, SeekOrigin.Begin);
+            _reader.DiscardBufferedData();
         }
 
         /// <summary>
         /// Request cancellation of this file
         /// </summary>
-        public void Abort()
-        {
-            _isAbortRequested = true;
-        }
+        public void Abort() => isAbortRequested = true;
     }
 }

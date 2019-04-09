@@ -62,7 +62,11 @@ namespace DuetControlServer
             try
             {
                 SPI.Interface.Init();
-                SPI.Interface.Connect().Wait();
+                if (!SPI.Interface.Connect().Result)
+                {
+                    Console.WriteLine("Error: Duet is not available");
+                    return;
+                }
                 Console.WriteLine("Done!");
             }
             catch (Exception e)

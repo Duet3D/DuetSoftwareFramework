@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetControlServer.Codes;
@@ -90,8 +91,35 @@ namespace DuetControlServer.Commands
                 return new CodeResult();
             }
 
-            // Send it to RepRapFirmware and react to its result
-            result = await Interface.ProcessCode(this);
+            // Send it to RepRapFirmware. If this code comes from a system macro, do not wait for its completion but enqueue it
+            if (IsFromSystemMacro)
+            {
+                Task<CodeResult> onCodeComplete = Interface.ProcessSystemCode(this);
+                Task backgroundTask = Task.Run(async () =>
+                {
+                    try
+                    {
+                        result = await onCodeComplete;
+                        await OnCodeExecuted(result);
+                        await Model.Provider.Output(result);
+                    }
+                    catch (AggregateException ae)
+                    {
+                        await Model.Provider.Output(DuetAPI.MessageType.Error, $"{ToShortString()}: {ae.InnerException.Message}");
+                    }
+                });
+            }
+            else
+            {
+                result = await Interface.ProcessCode(this);
+                await OnCodeExecuted(result);
+            }
+
+            return result;
+        }
+
+        private async Task OnCodeExecuted(CodeResult result)
+        {
             switch (Type)
             {
                 case CodeType.GCode:
@@ -106,7 +134,6 @@ namespace DuetControlServer.Commands
                     await TCodes.CodeExecuted(this, result);
                     break;
             }
-            return result;
         }
     }
 }

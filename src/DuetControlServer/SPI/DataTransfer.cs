@@ -25,7 +25,7 @@ namespace DuetControlServer.SPI
 
         // General transfer variables
         private static AsyncAutoResetEvent _transferReadyEvent = new AsyncAutoResetEvent();
-        private static bool _hadTimeout;
+        private static bool _hadTimeout, _resetting;
         private static DateTime _timeConnected;
         private static int _numTransfers;
 
@@ -85,15 +85,15 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Perform a full data transfer
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public static async Task PerformFullTransfer()
+        /// <returns>Whether the transfer was successful</returns>
+        public static async Task<bool> PerformFullTransfer()
         {
             try
             {
                 //Console.WriteLine($"- Transfer {_transferNumber} -");
                 _lastTransferNumber = _rxHeader.SequenceNumber;
 
-                // This also deals with responses
+                // Exchange transfer headers. This also deals with transfer responses
                 await ExchangeHeader();
 
                 // Exchange transfer data or wait a moment before doing another transfer
@@ -104,7 +104,7 @@ namespace DuetControlServer.SPI
                     _packetNumber = 1;
                 }
 
-                // Everything OK
+                // Controller is back online
                 if (_hadTimeout)
                 {
                     using (await Model.Provider.AccessReadWrite())
@@ -119,6 +119,16 @@ namespace DuetControlServer.SPI
                     _hadTimeout = false;
                 }
 
+                // Deal with resets
+                if (_resetting)
+                {
+                    _numTransfers = 0;
+                    _hadTimeout = true;
+                    _resetting = false;
+                    return false;
+                }
+
+                // Everything OK. Keep track of the number of transfers
                 if (_numTransfers == 0)
                 {
                     _timeConnected = DateTime.Now;
@@ -128,34 +138,37 @@ namespace DuetControlServer.SPI
                 {
                     _numTransfers++;
                 }
+                return true;
             }
             catch (OperationCanceledException)
             {
-                if (!Program.CancelSource.IsCancellationRequested)
+                if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout && _numTransfers != 0)
                 {
-                    if (!_hadTimeout)
+                    // A timeout occurs when the firmware is being updated
+                    bool isUpdating;
+                    using (await Model.Provider.AccessReadOnly())
                     {
-                        // A timeout occurs when the firmware is being updated
-                        bool isUpdating;
-                        using (await Model.Provider.AccessReadOnly())
-                        {
-                            isUpdating = (Model.Provider.Get.State.Status == MachineStatus.Updating);
-                        }
+                        isUpdating = (Model.Provider.Get.State.Status == MachineStatus.Updating);
+                    }
 
-                        // If this is the first unexpected timeout event, report it
-                        if (!isUpdating)
+                    // If this is the first unexpected timeout event, report it
+                    if (!isUpdating)
+                    {
+                        _hadTimeout = true;
+                        using (await Model.Provider.AccessReadWrite())
                         {
-                            _hadTimeout = true;
-                            using (await Model.Provider.AccessReadWrite())
-                            {
-                                Model.Provider.Get.State.Status = MachineStatus.Off;
-                                Model.Provider.Get.Messages.Add(new Message(MessageType.Warning, "Lost connection to Duet"));
-                                Console.WriteLine("[warn] Lost connection to Duet");
-                            }
+                            Model.Provider.Get.State.Status = MachineStatus.Off;
+                            Model.Provider.Get.Messages.Add(new Message(MessageType.Warning, "Lost connection to Duet"));
+                            Console.WriteLine("[warn] Lost connection to Duet");
                         }
                     }
+
+                    // Start counting again
+                    _numTransfers = 0;
                 }
             }
+
+            return false;
         }
 
         /// <summary>
@@ -376,6 +389,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
+            _resetting = true;
             WritePacket(Communication.LinuxRequests.Request.Reset);
             return true;
         }
@@ -619,16 +633,11 @@ namespace DuetControlServer.SPI
                 _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
                 _rxHeader = MemoryMarshal.Read<Communication.TransferHeader>(_rxHeaderBuffer.Span);
 
-                // Deal with reset requests
-                while (MemoryMarshal.Read<int>(_rxHeaderBuffer.Span) == Communication.TransferResponse.RequestStateReset)
-                {
-                    await ExchangeResponse(Communication.TransferResponse.RequestStateReset);
-
-                    await WaitForTransfer();
-                    _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
-                }
-
                 // Inspect received header
+                if (_rxHeader.FormatCode == 0 || _rxHeader.FormatCode == 0xFF)
+                {
+                    throw new OperationCanceledException("Duet is offline");
+                }
                 if (_rxHeader.FormatCode != Communication.Consts.FormatCode)
                 {
                     await ExchangeResponse(Communication.TransferResponse.BadFormat);
@@ -683,7 +692,7 @@ namespace DuetControlServer.SPI
                 await WaitForTransfer();
                 _spiDevice.TransferFullDuplex(_txBuffers[_txBufferIndex].Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
 
-                // TODO Verify checksum and send back BadChecksum if it does not match
+                // TODO Verify checksum and send back BadChecksum if it does not match (unless _resetting is true)
 
                 response = await ExchangeResponse(Communication.TransferResponse.Success);
                 if (response == Communication.TransferResponse.Success)

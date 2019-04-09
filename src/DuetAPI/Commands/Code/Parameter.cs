@@ -65,12 +65,12 @@ namespace DuetAPI.Commands
                             try
                             {
                                 // If there is no dot, it could be an integer array
-                                ParsedValue = subArgs.Select(int.Parse);
+                                ParsedValue = subArgs.Select(int.Parse).ToArray();
                             }
                             catch
                             {
                                 // If that failed, attempt to parse everything as a uint array
-                                ParsedValue = subArgs.Select(uint.Parse);
+                                ParsedValue = subArgs.Select(uint.Parse).ToArray();
                             }
                         }
                     }

@@ -73,8 +73,8 @@
             Receive partially deserialized object from the server
             </summary>
             <param name="cancellationToken">Cancellation token</param>
-            <returns>Partially deserialized data</returns>
-            <exception cref="T:System.IO.IOException">No valid JSON object was received</exception>
+            <returns>Partially deserialized data or null if the connection is gone</returns>
+            <exception cref="T:System.IO.IOException">Received no or invalid JSON object</exception>
         </member>
         <member name="M:DuetAPIClient.BaseConnection.ReceiveSerializedJson(System.Threading.CancellationToken)">
             <summary>

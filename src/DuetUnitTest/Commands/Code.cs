@@ -37,6 +37,23 @@ namespace DuetUnitTest.Commands
         }
 
         [Test]
+        public void ParseM563()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M563 P0 D0:1 H1:2                             ; Define tool 0");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(563, code.MajorNumber);
+            Assert.AreEqual(null, code.MinorNumber);
+            Assert.AreEqual(3, code.Parameters.Count);
+            Assert.AreEqual('P', code.Parameters[0].Letter);
+            Assert.AreEqual(0, code.Parameters[0].AsInt);
+            Assert.AreEqual('D', code.Parameters[1].Letter);
+            Assert.AreEqual(new int[] { 0, 1 }, code.Parameters[1].AsIntArray);
+            Assert.AreEqual('H', code.Parameters[2].Letter);
+            Assert.AreEqual(new int[] { 1, 2 }, code.Parameters[2].AsIntArray);
+            Assert.AreEqual(" Define tool 0", code.Comment);
+        }
+
+        [Test]
         public void ParseM569()
         {
             DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("M569 P2 S1 T0.5");
@@ -99,6 +116,21 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(32, code.MajorNumber);
             Assert.AreEqual("foo bar.g", code.GetUnprecedentedString());
+        }
+
+        [Test]
+        public void ParseM586WithComment()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M586 P2 S0                               ; Disable Telnet");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(586, code.MajorNumber);
+            Assert.AreEqual(null, code.MinorNumber);
+            Assert.AreEqual(2, code.Parameters.Count);
+            Assert.AreEqual('P', code.Parameters[0].Letter);
+            Assert.AreEqual(2, code.Parameters[0].AsInt);
+            Assert.AreEqual('S', code.Parameters[1].Letter);
+            Assert.AreEqual(0, code.Parameters[1].AsInt);
+            Assert.AreEqual(" Disable Telnet", code.Comment);
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.Machine;
 using DuetControlServer.FileExecution;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -24,50 +25,66 @@ namespace DuetControlServer.Codes
                 case 32:
                     string file = await FilePath.ToPhysical(code.GetUnprecedentedString());
                     await Print.Start(file);
+                    return new CodeResult();
+
+                // Run Macro Fie
+                // This is only handled here if RepRapFirmware is not performing any system macros
+                case 98:
+                    if (!code.IsFromSystemMacro)
+                    {
+                        CodeParameter pParam = code.GetParameter('P');
+                        if (pParam != null)
+                        {
+                            string path = await FilePath.ToPhysical(pParam.AsString, "sys");
+                            if (File.Exists(path))
+                            {
+                                MacroFile macro = new MacroFile(path, code.Channel, false, code.SourceConnection);
+                                return await macro.RunMacro();
+                            }
+                            else
+                            {
+                                path = await FilePath.ToPhysical(pParam.AsString, "macros");
+                                if (File.Exists(path))
+                                {
+                                    MacroFile macro = new MacroFile(path, code.Channel, false, code.SourceConnection);
+                                    return await macro.RunMacro();
+                                }
+                                else
+                                {
+                                    return new CodeResult(DuetAPI.MessageType.Error, $"Could not file macro file {pParam.AsString}");
+                                }
+                            }
+                        }
+                        return new CodeResult();
+                    }
                     break;
 
-                // Run Macro File
-                case 98:
-                    CodeParameter pParam = code.GetParameter('P');
-                    if (pParam != null)
-                    {
-                        string path = await FilePath.ToPhysical(pParam.AsString);
-                        if (File.Exists(path))
-                        {
-                            MacroFile macro = new MacroFile(path, code.Channel, code.SourceConnection);
-                            return await macro.RunMacro();
-                        }
-                    }
-                    return new CodeResult();
-
                 // Return from macro
+                // This is only handled here if RepRapFirmware is not performing any system macros
                 case 99:
-                    if (!MacroFile.AbortLastFile(code.Channel))
+                    if (!code.IsFromSystemMacro)
                     {
-                        return new CodeResult(DuetAPI.MessageType.Error, "Not executing a macro file");
+                        if (!MacroFile.AbortLastFile(code.Channel))
+                        {
+                            return new CodeResult(DuetAPI.MessageType.Error, "Not executing a macro file");
+                        }
+                        return new CodeResult();
                     }
-                    return new CodeResult();
+                    break;
 
                 // Emergency Stop
                 case 112:
-                    SPI.Interface.RequestEmergencyStop();
+                    await SPI.Interface.RequestEmergencyStop();
                     using (await Model.Provider.AccessReadWrite())
                     {
                         Model.Provider.Get.State.Status = MachineStatus.Halted;
                     }
-                    break;
+                    return new CodeResult();
 
-                // Reset controller. Process this here only if the machine has performed an emergency stop
+                // Reset controller
                 case 999:
-                    using (await Model.Provider.AccessReadOnly())
-                    {
-                        if (Model.Provider.Get.State.Status == MachineStatus.Halted)
-                        {
-                            SPI.Interface.RequestReset();
-                            return new CodeResult();
-                        }
-                    }
-                    break;
+                    await SPI.Interface.RequestReset();
+                    return new CodeResult();
             }
             return null;
         }

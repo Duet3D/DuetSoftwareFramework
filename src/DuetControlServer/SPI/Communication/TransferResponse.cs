@@ -24,11 +24,5 @@
         /// Bad checksum
         /// </summary>
         public const int BadChecksum = -3;
-
-        /// <summary>
-        /// Request state reset
-        /// </summary>
-        /// <remarks>This must remain the last entry until checksums have been implemented</remarks>
-        public const int RequestStateReset = -4;
     }
 }

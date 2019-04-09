@@ -28,7 +28,7 @@ namespace DuetControlServer
             {
                 ParsedFileInfo result = new ParsedFileInfo
                 {
-                    FileName = fileName,
+                    FileName = await FilePath.ToVirtual(fileName),
                     Size = fileStream.Length,
                     LastModified = File.GetLastWriteTime(fileName)
                 };

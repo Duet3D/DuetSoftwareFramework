@@ -145,6 +145,11 @@
             Base class for files that read G-codes line by line
             </summary>
         </member>
+        <member name="F:DuetControlServer.FileExecution.BaseFile.isAbortRequested">
+            <summary>
+            Indicates if this file is supposed to be aborted
+            </summary>
+        </member>
         <member name="P:DuetControlServer.FileExecution.BaseFile.FileName">
             <summary>
             File path to the file being executed
@@ -227,12 +232,13 @@
             <param name="channel">Channel of the running macro file</param>
             <returns>If an abortion could be requested</returns>
         </member>
-        <member name="M:DuetControlServer.FileExecution.MacroFile.#ctor(System.String,DuetAPI.CodeChannel,System.Int32)">
+        <member name="M:DuetControlServer.FileExecution.MacroFile.#ctor(System.String,DuetAPI.CodeChannel,System.Boolean,System.Int32)">
             <summary>
             Create a new macro instance
             </summary>
             <param name="fileName">Filename of the macro</param>
             <param name="channel">Channel to send the codes to</param>
+            <param name="isSystemMacro">Whether the macro file is requested from the firmware</param>
             <param name="sourceConnection">Source connection of this macro</param>
         </member>
         <member name="M:DuetControlServer.FileExecution.MacroFile.ReadCode">
@@ -296,13 +302,14 @@
             <summary>
             Read a generic JSON object from the socket
             </summary>
-            <returns>Abstract JObject instance for deserialization</returns>
+            <returns>Abstract JObject instance for deserialization or null if nothing could be read</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
         </member>
         <member name="M:DuetControlServer.IPC.Connection.ReceiveCommand">
             <summary>
             Receive a fully-populated instance of a BaseCommand from the client
             </summary>
-            <returns>Received command</returns>
+            <returns>Received command or null if nothing could be read</returns>
             <exception cref="T:System.ArgumentException"></exception>
         </member>
         <member name="M:DuetControlServer.IPC.Connection.GetCommandType(System.String)">
@@ -1136,9 +1143,19 @@
             the filament consumption and the actual name of the file being printed.
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.FileSize">
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.FilenameLength">
             <summary>
-            Size of the file in bytes
+            Length of the filename
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.GeneratedByLength">
+            <summary>
+            Length of the slicer
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.NumFilaments">
+            <summary>
+            Number of filaments used
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.LastModifiedTime">
@@ -1147,14 +1164,19 @@
             This is represented as the seconds elapsed since Jan 1 1970
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.LayerHeight">
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.FileSize">
             <summary>
-            Height of the layers in mm
+            Size of the file in bytes
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.FirstLayerHeight">
             <summary>
             Height of the first layer in mm
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.LayerHeight">
+            <summary>
+            Height of the layers in mm
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.ObjectHeight">
@@ -1170,21 +1192,6 @@
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.SimulatedTime">
             <summary>
             Simulated print time in seconds
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.FilenameLength">
-            <summary>
-            Length of the filename
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.GeneratedByLength">
-            <summary>
-            Length of the slicer
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.PrintStarted.NumFilaments">
-            <summary>
-            Number of filaments used
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.PrintStopped">
@@ -1580,12 +1587,6 @@
             Bad checksum
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.RequestStateReset">
-            <summary>
-            Request state reset
-            </summary>
-            <remarks>This must remain the last entry until checksums have been implemented</remarks>
-        </member>
         <member name="T:DuetControlServer.SPI.DataTransfer">
             <summary>
             Helper class for SPI data transfers
@@ -1606,7 +1607,7 @@
             <summary>
             Perform a full data transfer
             </summary>
-            <returns>Asynchronous task</returns>
+            <returns>Whether the transfer was successful</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.HadReset">
             <summary>
@@ -1796,8 +1797,8 @@
         </member>
         <member name="M:DuetControlServer.SPI.Interface.ProcessSystemCode(DuetControlServer.Commands.Code)">
             <summary>
-            Enqueue this code to be executed but don't wait for it.
-            This is used for macro files requested from the firmware
+            Execute a system G/M/T-code and wait asynchronously for its completion.
+            This is only used for macro files requested from the firmware
             </summary>
             <param name="code">Code to execute</param>
         </member>
@@ -1872,6 +1873,11 @@
             Whether the code is already being executed
             </summary>
         </member>
+        <member name="P:DuetControlServer.SPI.QueuedCode.IsRequestedFromFirmware">
+            <summary>
+            Whether the code is part of a requested macro file
+            </summary>
+        </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.CanFinish">
             <summary>
             Indicates if a complete G-code reply has been received implying this code can be finished
@@ -1879,8 +1885,7 @@
         </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.Task">
             <summary>
-            Task that is resolve when the code has finished.
-            May be null if the code is supposed to be a firmware request
+            Task that is resolved when the code has finished
             </summary>
         </member>
         <member name="M:DuetControlServer.SPI.QueuedCode.HandleReply(DuetControlServer.SPI.Communication.MessageTypeFlags,System.String)">
@@ -1892,7 +1897,7 @@
         </member>
         <member name="M:DuetControlServer.SPI.QueuedCode.SetException(System.Exception)">
             <summary>
-            Something went wrong while executing this code
+            Report that soemthing went wrong while executing this code
             </summary>
             <param name="e">Exception to return</param>
         </member>
@@ -1900,6 +1905,12 @@
             <summary>
             Called to resolve the task because it has finished
             </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.QueuedCode.ToString">
+            <summary>
+            Convert this instance to a string
+            </summary>
+            <returns>String representation of this string</returns>
         </member>
         <member name="T:DuetControlServer.SPI.QueuedLockRequest">
             <summary>

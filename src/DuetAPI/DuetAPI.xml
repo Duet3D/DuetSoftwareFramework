@@ -201,6 +201,11 @@
             Indicates if the code comes from a macro file
             </summary>
         </member>
+        <member name="P:DuetAPI.Commands.Code.IsFromSystemMacro">
+            <summary>
+            Indicates if the code comes from a system macro file
+            </summary>
+        </member>
         <member name="P:DuetAPI.Commands.Code.FilePosition">
             <summary>
             File position in bytes (optional)

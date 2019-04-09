@@ -74,19 +74,19 @@ namespace DuetWebServer.Controllers
                     return Content(json, "application/json");
                 }
             }
-            catch (IncompatibleVersionException e)
+            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
                 _logger.LogError($"[{nameof(Status)}] Incompatible DCS version");
-                return StatusCode(502, e.Message);
+                return StatusCode(502, ae.InnerException.Message);
             }
-            catch (SocketException e)
+            catch (AggregateException ae) when (ae.InnerException is SocketException)
             {
                 _logger.LogError($"[{nameof(Status)}] DCS is unavailable");
-                return StatusCode(503, e.Message);
+                return StatusCode(503, ae.InnerException.Message);
             }
             catch (Exception e)
             {
-                _logger.LogWarning(e, $"[{nameof(Status)}] Failed to retrieve object model");
+                _logger.LogWarning(e, $"[{nameof(Status)}] Failed to retrieve status");
                 return StatusCode(500, e.Message);
             }
         }
@@ -102,26 +102,34 @@ namespace DuetWebServer.Controllers
             string code = "n/a";
             try
             {
-                using (StreamReader reader = new StreamReader(Request.Body, Encoding.UTF8))
-                {
-                    code = await reader.ReadToEndAsync();
-                }
-                
                 using (CommandConnection connection = await BuildConnection())
                 {
-                    string response = await connection.PerformSimpleCode(code, CodeChannel.HTTP);
-                    return Content(response, "text/plain");
+                    using (StreamReader reader = new StreamReader(Request.Body, Encoding.UTF8))
+                    {
+                        string response = "";
+                        do
+                        {
+                            code = await reader.ReadLineAsync();
+                            if (code == null)
+                            {
+                                return Content(response, "text/plain");
+                            }
+                            _logger.LogInformation($"[{nameof(DoCode)}] Executing code '{code}'");
+                            response += await connection.PerformSimpleCode(code, CodeChannel.HTTP);
+                        }
+                        while (true);
+                    }
                 }
             }
-            catch (IncompatibleVersionException e)
+            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
                 _logger.LogError($"[{nameof(DoCode)}] Incompatible DCS version");
-                return StatusCode(502, e.Message);
+                return StatusCode(502, ae.InnerException.Message);
             }
-            catch (SocketException e)
+            catch (AggregateException ae) when (ae.InnerException is SocketException)
             {
                 _logger.LogError($"[{nameof(DoCode)}] DCS is unavailable");
-                return StatusCode(503, e.Message);
+                return StatusCode(503, ae.InnerException.Message);
             }
             catch (Exception e)
             {
@@ -154,15 +162,15 @@ namespace DuetWebServer.Controllers
                 FileStream stream = new FileStream(resolvedPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 return File(stream, "application/octet-stream");
             }
-            catch (IncompatibleVersionException e)
+            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
                 _logger.LogError($"[{nameof(DownloadFile)}] Incompatible DCS version");
-                return StatusCode(502, e.Message);
+                return StatusCode(502, ae.InnerException.Message);
             }
-            catch (SocketException e)
+            catch (AggregateException ae) when (ae.InnerException is SocketException)
             {
                 _logger.LogError($"[{nameof(DownloadFile)}] DCS is unavailable");
-                return StatusCode(503, e.Message);
+                return StatusCode(503, ae.InnerException.Message);
             }
             catch (Exception e)
             {
@@ -200,15 +208,15 @@ namespace DuetWebServer.Controllers
                 }
                 return Created(filename, null);
             }
-            catch (IncompatibleVersionException e)
+            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
                 _logger.LogError($"[{nameof(UploadFile)}] Incompatible DCS version");
-                return StatusCode(502, e.Message);
+                return StatusCode(502, ae.InnerException.Message);
             }
-            catch (SocketException e)
+            catch (AggregateException ae) when (ae.InnerException is SocketException)
             {
                 _logger.LogError($"[{nameof(UploadFile)}] DCS is unavailable");
-                return StatusCode(503, e.Message);
+                return StatusCode(503, ae.InnerException.Message);
             }
             catch (Exception e)
             {
@@ -243,15 +251,15 @@ namespace DuetWebServer.Controllers
                     return Content(json, "application/json");
                 }
             }
-            catch (IncompatibleVersionException e)
+            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
                 _logger.LogError($"[{nameof(GetFileinfo)}] Incompatible DCS version");
-                return StatusCode(502, e.Message);
+                return StatusCode(502, ae.InnerException.Message);
             }
-            catch (SocketException e)
+            catch (AggregateException ae) when (ae.InnerException is SocketException)
             {
                 _logger.LogError($"[{nameof(GetFileinfo)}] DCS is unavailable");
-                return StatusCode(503, e.Message);
+                return StatusCode(503, ae.InnerException.Message);
             }
             catch (Exception e)
             {
@@ -291,15 +299,15 @@ namespace DuetWebServer.Controllers
                 _logger.LogWarning($"[{nameof(DeleteFileOrDirectory)} Could not find file {filename} (resolved to {resolvedPath})");
                 return NotFound(filename);
             }
-            catch (IncompatibleVersionException e)
+            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
                 _logger.LogError($"[{nameof(DeleteFileOrDirectory)}] Incompatible DCS version");
-                return StatusCode(502, e.Message);
+                return StatusCode(502, ae.InnerException.Message);
             }
-            catch (SocketException e)
+            catch (AggregateException ae) when (ae.InnerException is SocketException)
             {
                 _logger.LogError($"[{nameof(DeleteFileOrDirectory)}] DCS is unavailable");
-                return StatusCode(503, e.Message);
+                return StatusCode(503, ae.InnerException.Message);
             }
             catch (Exception e)
             {
@@ -364,15 +372,15 @@ namespace DuetWebServer.Controllers
 
                 return NotFound(from);
             }
-            catch (IncompatibleVersionException e)
+            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
                 _logger.LogError($"[{nameof(MoveFileOrDirectory)}] Incompatible DCS version");
-                return StatusCode(502, e.Message);
+                return StatusCode(502, ae.InnerException.Message);
             }
-            catch (SocketException e)
+            catch (AggregateException ae) when (ae.InnerException is SocketException)
             {
                 _logger.LogError($"[{nameof(MoveFileOrDirectory)}] DCS is unavailable");
-                return StatusCode(503, e.Message);
+                return StatusCode(503, ae.InnerException.Message);
             }
             catch (Exception e)
             {
@@ -420,15 +428,15 @@ namespace DuetWebServer.Controllers
                 string json = JsonConvert.SerializeObject(fileList, JsonHelper.DefaultSettings);
                 return Content(json, "application/json");
             }
-            catch (IncompatibleVersionException e)
+            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
                 _logger.LogError($"[{nameof(GetFileList)}] Incompatible DCS version");
-                return StatusCode(502, e.Message);
+                return StatusCode(502, ae.InnerException.Message);
             }
-            catch (SocketException e)
+            catch (AggregateException ae) when (ae.InnerException is SocketException)
             {
                 _logger.LogError($"[{nameof(GetFileList)}] DCS is unavailable");
-                return StatusCode(503, e.Message);
+                return StatusCode(503, ae.InnerException.Message);
             }
             catch (Exception e)
             {
@@ -453,15 +461,15 @@ namespace DuetWebServer.Controllers
                 Directory.CreateDirectory(resolvedPath);
                 return Created(directory, null);
             }
-            catch (IncompatibleVersionException e)
+            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
                 _logger.LogError($"[{nameof(CreateDirectory)}] Incompatible DCS version");
-                return StatusCode(502, e.Message);
+                return StatusCode(502, ae.InnerException.Message);
             }
-            catch (SocketException e)
+            catch (AggregateException ae) when (ae.InnerException is SocketException)
             {
                 _logger.LogError($"[{nameof(CreateDirectory)}] DCS is unavailable");
-                return StatusCode(503, e.Message);
+                return StatusCode(503, ae.InnerException.Message);
             }
             catch (Exception e)
             {

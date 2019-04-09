@@ -36,10 +36,10 @@ namespace DuetWebServer.Controllers
                 {
                     await connection.Connect(SubscriptionMode.Patch, socketPath);
                 }
-                catch (IncompatibleVersionException)
+                catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
                 {
                     logger.LogError($"[{nameof(WebSocketController)}] Incompatible DCS version");
-                    await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError,"Incompatible DCS version");
+                    await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, "Incompatible DCS version");
                     return;
                 }
                 catch (Exception)
@@ -80,7 +80,7 @@ namespace DuetWebServer.Controllers
                 }
                 catch (Exception e)
                 {
-                    logger.LogWarning(e, "WebSocket terminated with an exception");
+                    logger.LogError(e, "WebSocket terminated with an exception");
                     await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, e.Message);
                 }
             }

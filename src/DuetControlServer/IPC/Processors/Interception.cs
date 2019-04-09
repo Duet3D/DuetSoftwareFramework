@@ -48,21 +48,20 @@ namespace DuetControlServer.IPC.Processors
         {
             try
             {
-                BaseCommand command = await Connection.ReceiveCommand();
-                await EnqueueCommand(command);
+                do
+                {
+                    BaseCommand command = await Connection.ReceiveCommand();
+                    if (command == null)
+                    {
+                        break;
+                    }
+
+                    await EnqueueCommand(command);
+                } while (!Program.CancelSource.IsCancellationRequested);
             }
-            catch (Exception e)
+            finally
             {
-                if (Connection.IsConnected)
-                {
-                    // Inform the client about this error
-                    await Connection.SendResponse(e);
-                }
-                else
-                {
-                    _interceptors.TryRemove(this, out InterceptionMode dummy);
-                    throw;
-                }
+                _interceptors.TryRemove(this, out InterceptionMode dummy);
             }
         }
 

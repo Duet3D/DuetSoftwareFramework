@@ -12,7 +12,7 @@ namespace DuetControlServer
     /// <remarks>This class cannot be static because JSON.NET requires an instance for deserialization</remarks>
     public /*static*/ class Settings
     {
-        private static readonly string DefaultConfigFile = "/etc/duet/config.json";
+        private static readonly string DefaultConfigFile = "/opt/dsf/conf/config.json";
         private const RegexOptions RegexFlags = RegexOptions.IgnoreCase | RegexOptions.Singleline;
 
         /// <summary>

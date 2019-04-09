@@ -13,7 +13,7 @@ namespace DuetControlServer.SPI
         private CodeResult _result = new CodeResult();
         private bool _gotEmptyResponse = false;
         private bool _lastMessageIncomplete = false;        // true if the last message had the push flag set
-        private TaskCompletionSource<CodeResult> _taskSource;
+        private TaskCompletionSource<CodeResult> _taskSource = new TaskCompletionSource<CodeResult>();
 
         /// <summary>
         /// Constructor for a queued code
@@ -23,10 +23,7 @@ namespace DuetControlServer.SPI
         public QueuedCode(Commands.Code code, bool fromFirmwareRequest)
         {
             Code = code;
-            if (!fromFirmwareRequest)
-            {
-                _taskSource = new TaskCompletionSource<CodeResult>();
-            }
+            IsRequestedFromFirmware = fromFirmwareRequest;
         }
 
         /// <summary>
@@ -40,13 +37,17 @@ namespace DuetControlServer.SPI
         public bool IsExecuting { get; set; }
 
         /// <summary>
+        /// Whether the code is part of a requested macro file
+        /// </summary>
+        public bool IsRequestedFromFirmware { get; }
+
+        /// <summary>
         /// Indicates if a complete G-code reply has been received implying this code can be finished
         /// </summary>
         public bool CanFinish { get => (_gotEmptyResponse || _result.Count != 0) && !_lastMessageIncomplete; }
 
         /// <summary>
-        /// Task that is resolve when the code has finished.
-        /// May be null if the code is supposed to be a firmware request
+        /// Task that is resolved when the code has finished
         /// </summary>
         public Task<CodeResult> Task { get => _taskSource.Task; }
 
@@ -78,48 +79,23 @@ namespace DuetControlServer.SPI
             }
 
             _lastMessageIncomplete = messageType.HasFlag(Communication.MessageTypeFlags.PushFlag);
-            if (!_lastMessageIncomplete)
-            {
-                message?.Print();
-            }
         }
 
         /// <summary>
-        /// Something went wrong while executing this code
+        /// Report that soemthing went wrong while executing this code
         /// </summary>
         /// <param name="e">Exception to return</param>
-        public async void SetException(Exception e)
-        {
-            if (_taskSource == null)
-            {
-                _result.Add(new DuetAPI.Message(DuetAPI.MessageType.Error, e.Message));
-                using (await Model.Provider.AccessReadWrite())
-                {
-                    Model.Provider.Get.Messages.AddRange(_result);
-                }
-            }
-            else
-            {
-                _taskSource.SetException(e);
-            }
-        }
+        public void SetException(Exception e) => _taskSource.SetException(e);
 
         /// <summary>
         /// Called to resolve the task because it has finished
         /// </summary>
-        public async void SetFinished()
-        {
-            if (_taskSource == null)
-            {
-                using (await Model.Provider.AccessReadWrite())
-                {
-                    Model.Provider.Get.Messages.AddRange(_result);
-                }
-            }
-            else
-            {
-                _taskSource.SetResult(_result);
-            }
-        }
+        public void SetFinished() => _taskSource.SetResult(_result);
+
+        /// <summary>
+        /// Convert this instance to a string
+        /// </summary>
+        /// <returns>String representation of this string</returns>
+        public override string ToString() => Code.ToString() + $" ({(IsRequestedFromFirmware ? "requested from firmware" : "regular code")})";
     }
 }

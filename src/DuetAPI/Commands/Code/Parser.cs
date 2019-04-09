@@ -110,7 +110,7 @@
                                 throw new CodeParserException($"Failed to parse minor {Type} number ({paramValue.Trim()})");
                             }
                         }
-                        else
+                        else if (paramValue != "")
                         {
                             Parameters.Add(new CodeParameter(paramLetter, paramValue, inQuotes));
                             paramLetter = '\0';

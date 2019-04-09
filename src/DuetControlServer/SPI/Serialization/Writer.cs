@@ -342,16 +342,16 @@ namespace DuetControlServer.SPI.Serialization
             // Write header
             PrintStarted header = new PrintStarted
             {
-                PrintTime = (uint)Math.Round(info.PrintTime),
-                FileSize = (uint)info.Size,
-                FirstLayerHeight = (float)info.FirstLayerHeight,
-                LastModifiedTime = info.LastModified.HasValue ? (ulong)(info.LastModified.Value - new DateTime (1970, 1, 1)).TotalSeconds : 0,
-                LayerHeight = (float)info.LayerHeight,
-                ObjectHeight = (float)info.Height,
-                SimulatedTime = (uint)Math.Round(info.SimulatedTime),
                 FilenameLength = (byte)unicodeFilename.Length,
                 GeneratedByLength  = (byte)unicodeGeneratedBy.Length,
                 NumFilaments = (ushort)info.Filament.Length,
+                FileSize = (uint)info.Size,
+                LastModifiedTime = info.LastModified.HasValue ? (ulong)(info.LastModified.Value - new DateTime (1970, 1, 1)).TotalSeconds : 0,
+                FirstLayerHeight = (float)info.FirstLayerHeight,
+                LayerHeight = (float)info.LayerHeight,
+                ObjectHeight = (float)info.Height,
+                PrintTime = (uint)Math.Round(info.PrintTime),
+                SimulatedTime = (uint)Math.Round(info.SimulatedTime)
             };
             MemoryMarshal.Write(to, ref header);
             int bytesWritten = Marshal.SizeOf(header);

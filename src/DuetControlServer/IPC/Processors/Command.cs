@@ -51,6 +51,11 @@ namespace DuetControlServer.IPC.Processors
                 {
                     // Read another command
                     BaseCommand command = await Connection.ReceiveCommand();
+                    if (command == null)
+                    {
+                        break;
+                    }
+
                     if (!SupportedCommands.Contains(command.GetType()))
                     {
                         throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");

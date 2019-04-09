@@ -196,20 +196,22 @@ namespace DuetAPIClient
         /// Receive partially deserialized object from the server
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Partially deserialized data</returns>
-        /// <exception cref="IOException">No valid JSON object was received</exception>
+        /// <returns>Partially deserialized data or null if the connection is gone</returns>
+        /// <exception cref="IOException">Received no or invalid JSON object</exception>
         protected async Task<JObject> ReceiveJson(CancellationToken cancellationToken)
         {
             try
             {
-                await _jsonReader.ReadAsync(cancellationToken);
+                if (!await _jsonReader.ReadAsync(cancellationToken))
+                {
+                    throw new IOException("Could not read data from socket");
+                }
                 
                 JToken token = await JToken.ReadFromAsync(_jsonReader, cancellationToken);
                 if (token.Type == JTokenType.Object)
                 {
                     return (JObject)token;
                 }
-                
                 throw new IOException("Client received invalid JSON object");
             }
             catch (JsonReaderException)

@@ -75,6 +75,8 @@ namespace DuetControlServer.FileExecution
 
         private bool _isConfig;
         private bool _isConfigOverride;
+        private bool _isSystemMacro;
+        private bool _sentPush, _sentPop;
         private int _sourceConnection;
 
         /// <summary>
@@ -82,12 +84,14 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         /// <param name="fileName">Filename of the macro</param>
         /// <param name="channel">Channel to send the codes to</param>
+        /// <param name="isSystemMacro">Whether the macro file is requested from the firmware</param>
         /// <param name="sourceConnection">Source connection of this macro</param>
-        public MacroFile(string fileName, CodeChannel channel, int sourceConnection) : base(fileName, channel)
+        public MacroFile(string fileName, CodeChannel channel, bool isSystemMacro, int sourceConnection) : base(fileName, channel)
         {
             string name = Path.GetFileName(fileName);
             _isConfig = (name == ConfigFile || name == ConfigFileFallback);
             _isConfigOverride = (name == ConfigOverrideFile);
+            _isSystemMacro = isSystemMacro;
             _sourceConnection = sourceConnection;
             lock (_macroFiles)
             {
@@ -101,22 +105,52 @@ namespace DuetControlServer.FileExecution
         /// <returns>Next available code or null if the file has ended</returns>
         public override async Task<Code> ReadCode()
         {
+            // Push the stack unless the firmware requested this file
+            if (!_sentPush && !_isSystemMacro)
+            {
+                _sentPush = true;
+                return new Code
+                {
+                    Channel = Channel,
+                    IsFromMacro = true,
+                    SourceConnection = _sourceConnection,
+                    Type = CodeType.MCode,
+                    MajorNumber = 120
+                };
+            }
+
+            // Read the next code from the file
             Code result = await base.ReadCode();
             if (result != null)
             {
                 result.IsFromConfig = _isConfig;
                 result.IsFromConfigOverride = _isConfigOverride;
                 result.IsFromMacro = true;
+                result.IsFromSystemMacro = _isSystemMacro;
                 result.SourceConnection = _sourceConnection;
+                return result;
             }
-            else
+
+            // Pop the stack before completion
+            if (_sentPop && !_isSystemMacro && !isAbortRequested)
             {
-                lock (_macroFiles)
+                _sentPop = true;
+                return new Code
                 {
-                    _macroFiles.Remove(this);
-                }
+                    Channel = Channel,
+                    IsFromMacro = true,
+                    SourceConnection = _sourceConnection,
+                    Type = CodeType.MCode,
+                    MajorNumber = 121
+                };
             }
-            return result;
+
+            // Remove reference to this file again
+            lock (_macroFiles)
+            {
+                _macroFiles.Remove(this);
+            }
+            return null;
         }
 
         /// <summary>
@@ -128,7 +162,7 @@ namespace DuetControlServer.FileExecution
             CodeResult fullResult = new CodeResult();
             for (Code code = await ReadCode(); code != null; code = await ReadCode())
             {
-                CodeResult result = (CodeResult)await code.Execute();
+                CodeResult result = await code.Execute();
                 fullResult.AddRange(result);
             }
             return fullResult;

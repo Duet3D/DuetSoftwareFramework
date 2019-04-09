@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using System.IO;
 
 namespace DuetWebServer
 {
@@ -9,7 +10,7 @@ namespace DuetWebServer
     /// </summary>
     public class Program
     {
-        private static readonly string DefaultConfigFile = "/etc/duet/http.json";
+        private const string DefaultConfigFile = "/opt/dsf/conf/http.json";
         
         /// <summary>
         /// Called when the application is launched
@@ -29,7 +30,7 @@ namespace DuetWebServer
             WebHost.CreateDefaultBuilder(args)
                 .ConfigureAppConfiguration((hostingContext, config) =>
                 {
-                    config.AddJsonFile(DefaultConfigFile, true, false);
+                    config.AddJsonFile(DefaultConfigFile, false, true);
                     config.AddCommandLine(args);
                 })
                 .UseStartup<Startup>();

@@ -17,8 +17,9 @@ namespace DuetControlServer.SPI
     {
         // Requests for each code channel
         private static readonly Dictionary<CodeChannel, Queue<QueuedCode>> _pendingCodes = new Dictionary<CodeChannel, Queue<QueuedCode>>();
+        private static readonly Dictionary<CodeChannel, Stack<QueuedCode>> _pendingSystemCodes = new Dictionary<CodeChannel, Stack<QueuedCode>>();
+        private static readonly Dictionary<CodeChannel, Stack<MacroFile>> _pendingMacros = new Dictionary<CodeChannel, Stack<MacroFile>>();
         private static readonly Dictionary<CodeChannel, Queue<QueuedLockRequest>> _pendingLockRequests = new Dictionary<CodeChannel, Queue<QueuedLockRequest>>();
-        private static readonly Dictionary<CodeChannel, Queue<MacroFile>> _pendingMacros = new Dictionary<CodeChannel, Queue<MacroFile>>();
 
         // Code channels that are currently blocked because of an executing G/M/T-code
         private static int _busyChannels = 0;
@@ -45,7 +46,8 @@ namespace DuetControlServer.SPI
             foreach (CodeChannel channel in Enum.GetValues(typeof(CodeChannel)))
             {
                 _pendingCodes.Add(channel, new Queue<QueuedCode>());
-                _pendingMacros.Add(channel, new Queue<MacroFile>());
+                _pendingSystemCodes.Add(channel, new Stack<QueuedCode>());
+                _pendingMacros.Add(channel, new Stack<MacroFile>());
                 _pendingLockRequests.Add(channel, new Queue<QueuedLockRequest>());
             }
 
@@ -69,33 +71,36 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Enqueue this code to be executed but don't wait for it.
-        /// This is used for macro files requested from the firmware
+        /// Execute a system G/M/T-code and wait asynchronously for its completion.
+        /// This is only used for macro files requested from the firmware
         /// </summary>
         /// <param name="code">Code to execute</param>
-        private static void ProcessSystemCode(Code code)
+        public static Task<CodeResult> ProcessSystemCode(Code code)
         {
             QueuedCode item = new QueuedCode(code, true);
-            lock (_pendingCodes[code.Channel])
+            lock (_pendingSystemCodes[code.Channel])
             {
-                _pendingCodes[code.Channel].Enqueue(item);
+                _pendingSystemCodes[code.Channel].Push(item);
             }
+            return item.Task;
         }
 
         /// <summary>
         /// Request an immediate emergency stop
         /// </summary>
-        public static void RequestEmergencyStop()
+        public static async Task RequestEmergencyStop()
         {
             _emergencyStopRequested = true;
+            await InvalidateData("Code has been cancelled due to an emergency stop");
         }
 
         /// <summary>
         /// Request a firmware reset
         /// </summary>
-        public static void RequestReset()
+        public static async Task RequestReset()
         {
             _resetRequested = true;
+            await InvalidateData("Code has been cancelled because a firmware reset is imminent");
         }
 
         /// <summary>
@@ -150,11 +155,7 @@ namespace DuetControlServer.SPI
         /// This is only called once on initialization
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static Task Connect()
-        {
-            // Do one transfer to ensure both sides are using compatible versions of the data protocol
-            return DataTransfer.PerformFullTransfer();
-        }
+        public static Task<bool> Connect() => DataTransfer.PerformFullTransfer();
 
         /// <summary>
         /// Perform communication with the RepRapFirmware controller
@@ -164,6 +165,30 @@ namespace DuetControlServer.SPI
         {
             do
             {
+                // Check if an emergency stop has been requested
+                if (_emergencyStopRequested && DataTransfer.WriteEmergencyStop())
+                {
+                    _emergencyStopRequested = false;
+                    Console.WriteLine("[info] Emergency stop");
+                    await DataTransfer.PerformFullTransfer();
+                    continue;
+                }
+
+                // Check if a firmware reset has been performed or requested
+                if (_resetRequested && DataTransfer.WriteReset())
+                {
+                    _resetRequested = false;
+                    Console.WriteLine("[info] Resetting controller");
+                    await DataTransfer.PerformFullTransfer();
+                    continue;
+                }
+
+                // Invalidate data if a controller reset has been performed
+                if (DataTransfer.HadReset())
+                {
+                    await InvalidateData("Controller has been reset");
+                }
+
                 // Process incoming packets
                 for (Communication.PacketHeader? packet = DataTransfer.ReadPacket(); packet != null; packet = DataTransfer.ReadPacket())
                 {
@@ -178,34 +203,20 @@ namespace DuetControlServer.SPI
                     }
                 }
 
-                // Check if an emergency stop has been requested. Perform another transfer immediately because this is time-critical
-                if (_emergencyStopRequested && DataTransfer.WriteEmergencyStop())
-                {
-                    _emergencyStopRequested = false;
-                    await DataTransfer.PerformFullTransfer();
-                    InvalidateData(false);
-                }
-
-                // Check if a firmware reset has been performed or requested
-                if (DataTransfer.HadReset() || (_resetRequested && DataTransfer.WriteReset()))
-                {
-                    _resetRequested = false;
-                    InvalidateData(true);
-                }
-
                 // Process pending codes, macro files and requests for resource locks/unlocks
                 foreach (CodeChannel channel in Enum.GetValues(typeof(CodeChannel)))
                 {
                     if ((_busyChannels & (1 << (int)channel)) == 0)
                     {
-                        // Attempt to get another queued code
                         QueuedCode item = null;
-                        lock (_pendingCodes[channel])
+
+                        // Codes may request macro files from RepRapFirmware which contain more codes that override the currently-executing code
+                        lock (_pendingSystemCodes[channel])
                         {
-                            _pendingCodes[channel].TryPeek(out item);
+                            _pendingSystemCodes[channel].TryPeek(out item);
                         }
 
-                        // If there is no queued code, check if another code from a macro file can be started
+                        // If there is no code from a macro file being executed, see if another one can be read
                         if (item == null)
                         {
                             MacroFile macro = null;
@@ -214,9 +225,29 @@ namespace DuetControlServer.SPI
                                 _pendingMacros[channel].TryPeek(out macro);
                             }
 
-                            if (macro != null)
+                            if (macro == null)
                             {
-                                Code code = await macro.ReadCode();
+                                // If there is no pending code from a requested macro file and no macro file in general, deal with regular codes
+                                lock (_pendingCodes[channel])
+                                {
+                                    _pendingCodes[channel].TryPeek(out item);
+                                }
+                            }
+                            else
+                            {
+                                // Start executing the next valid G/M/T-code from the requested macro file.
+                                // Note that code.Execute() does not wait for the code's completion; this will happen in the background
+                                Code code;
+                                do
+                                {
+                                    code = await macro.ReadCode();
+                                    if (code == null)
+                                    {
+                                        break;
+                                    }
+                                    await code.Execute();
+                                } while (code.Type == CodeType.Comment);
+
                                 if (code == null)
                                 {
                                     // Macro file is complete
@@ -224,20 +255,23 @@ namespace DuetControlServer.SPI
                                     {
                                         lock (_pendingMacros[channel])
                                         {
-                                            _pendingMacros[channel].Dequeue();
+                                            _pendingMacros[channel].Pop();
                                         }
+                                        Console.WriteLine($"[info] Finished execution of macro file {macro.FileName}");
                                     }
                                 }
                                 else
                                 {
-                                    // Run the next code from the macro file
-                                    ProcessSystemCode(code);
-                                    _pendingCodes[channel].TryPeek(out item);
+                                    // Retrieve the next code. It should have been queued for further processing
+                                    lock (_pendingSystemCodes[channel])
+                                    {
+                                        _pendingSystemCodes[channel].TryPeek(out item);
+                                    }
                                 }
                             }
                         }
 
-                        // See if there is any queued code to execute
+                        // Deal with the next code to execute
                         if (item != null)
                         {
                             if (item.IsExecuting)
@@ -245,17 +279,29 @@ namespace DuetControlServer.SPI
                                 // The reply for this code may not have been received yet. Expect one to come even if it is empty - better than missing output
                                 if (item.CanFinish)
                                 {
-                                    // This code has finished
-                                    lock (_pendingCodes[channel])
+                                    // This code has finished...
+                                    if (item.IsRequestedFromFirmware)
                                     {
-                                        _pendingCodes[channel].Dequeue();
+                                        // ... and it was requested from the firmware
+                                        lock (_pendingSystemCodes[channel])
+                                        {
+                                            _pendingSystemCodes[channel].Pop();
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // ... and it is a regular code
+                                        lock (_pendingCodes[channel])
+                                        {
+                                            _pendingCodes[channel].Dequeue();
+                                        }
                                     }
                                     item.SetFinished();
                                 }
                             }
                             else
                             {
-                                // Send it to the firmware and request. This may fail if the code is too big
+                                // Send it to the firmware. This may fail if the code content is too big
                                 try
                                 {
                                     if (DataTransfer.WriteCode(item.Code))
@@ -266,27 +312,43 @@ namespace DuetControlServer.SPI
                                 }
                                 catch (Exception e)
                                 {
-                                    lock (_pendingCodes[channel])
+                                    // This code could not be written...
+                                    if (item.IsRequestedFromFirmware)
                                     {
-                                        _pendingCodes[channel].Dequeue();
+                                        // ... and it was requested from the firmware
+                                        lock (_pendingSystemCodes[channel])
+                                        {
+                                            _pendingSystemCodes[channel].Pop();
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // ... and it is a regular code
+                                        lock (_pendingCodes[channel])
+                                        {
+                                            _pendingCodes[channel].Dequeue();
+                                        }
                                     }
                                     item.SetException(e);
                                 }
                             }
                         }
                     }
-
-                    lock (_pendingLockRequests[channel])
+                    else
                     {
-                        if (_pendingLockRequests[channel].TryPeek(out QueuedLockRequest item) && !item.IsLockRequested)
+                        // Deal with lock/unlock requests. They are only permitted if no code is being executed
+                        lock (_pendingLockRequests[channel])
                         {
-                            if (item.IsLockRequest)
+                            if (_pendingLockRequests[channel].TryPeek(out QueuedLockRequest item) && !item.IsLockRequested)
                             {
-                                item.IsLockRequested = DataTransfer.WriteLockMovementAndWaitForStandstill(item.Channel);
-                            }
-                            else if (DataTransfer.WriteUnlock(item.Channel))
-                            {
-                                _pendingLockRequests[channel].Dequeue();
+                                if (item.IsLockRequest)
+                                {
+                                    item.IsLockRequested = DataTransfer.WriteLockMovementAndWaitForStandstill(item.Channel);
+                                }
+                                else if (DataTransfer.WriteUnlock(item.Channel))
+                                {
+                                    _pendingLockRequests[channel].Dequeue();
+                                }
                             }
                         }
                     }
@@ -294,7 +356,10 @@ namespace DuetControlServer.SPI
 
                 // Request the state of the GCodeBuffers and the object model after the codes have been processed
                 DataTransfer.WriteGetState();
-                DataTransfer.WriteGetObjectModel(_moduleToQuery);
+                if (IsIdle())
+                {
+                    DataTransfer.WriteGetObjectModel(_moduleToQuery);
+                }
 
                 // Check for changes of the print status
                 if (_printStarted)
@@ -313,8 +378,43 @@ namespace DuetControlServer.SPI
                 await DataTransfer.PerformFullTransfer();
 
                 // Wait a moment
-                await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
+                if (IsIdle())
+                {
+                    await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
+                }
             } while (!Program.CancelSource.IsCancellationRequested);
+        }
+
+        private static bool IsIdle()
+        {
+            foreach (CodeChannel channel in Enum.GetValues(typeof(CodeChannel)))
+            {
+                lock (_pendingCodes[channel])
+                {
+                    if (_pendingCodes[channel].Count != 0)
+                    {
+                        return false;
+                    }
+                }
+
+                lock (_pendingSystemCodes[channel])
+                {
+                    if (_pendingSystemCodes[channel].Count != 0)
+                    {
+                        return false;
+                    }
+                }
+
+                lock (_pendingMacros[channel])
+                {
+                    if (_pendingMacros[channel].Count != 0)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         private static async Task ProcessPacket(Communication.PacketHeader packet)
@@ -343,7 +443,7 @@ namespace DuetControlServer.SPI
                     break;
 
                 case Communication.FirmwareRequests.Request.AbortFile:
-                    HandleAbortFileRequest();
+                    await HandleAbortFileRequest();
                     break;
 
                 case Communication.FirmwareRequests.Request.StackEvent:
@@ -378,7 +478,7 @@ namespace DuetControlServer.SPI
             {
                 if (Model.Provider.Get.State.Status == MachineStatus.Halted)
                 {
-                    InvalidateData(false);
+                    await InvalidateData("Code has been cancelled because the firmware is halted");
                 }
                 else if (module == 2 && Model.Provider.Get.State.Status == MachineStatus.Processing)
                 {
@@ -394,7 +494,10 @@ namespace DuetControlServer.SPI
         private static void HandleCodeReply()
         {
             DataTransfer.ReadCodeReply(out Communication.MessageTypeFlags flags, out string reply);
-            //Console.WriteLine($"Got code reply [{flags}] {reply}");
+            if (!flags.HasFlag(Communication.MessageTypeFlags.PushFlag))
+            {
+                reply = reply.TrimEnd();
+            }
 
             // Check if this reply was incomplete
             if (_partialCodeReply != null)
@@ -414,12 +517,27 @@ namespace DuetControlServer.SPI
                     if (flags.HasFlag(channelFlag))
                     {
                         QueuedCode code = null;
-                        lock (_pendingCodes)
+
+                        // Is this reply for a system code (requested from a macro file)?
+                        lock (_pendingSystemCodes[channel])
+                        {
+                            _pendingSystemCodes[channel].TryPeek(out code);
+                        }
+
+                        if (code != null)
+                        {
+                            // This is a code without a wait handle, there is no point in queuing the message here
+                            code.HandleReply(flags, "");
+                            code = null;
+                        }
+
+                        // Attempt to assign this reply to an executing code
+                        lock (_pendingCodes[channel])
                         {
                             _pendingCodes[channel].TryPeek(out code);
                         }
 
-                        if (code != null)
+                        if (code != null && code.IsExecuting)
                         {
                             code.HandleReply(flags, reply);
                         }
@@ -438,11 +556,12 @@ namespace DuetControlServer.SPI
                 {
                     _partialCodeReply = reply;
                 }
-                else {
+                else if (reply != "")
+                {
                     MessageType type = flags.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                         : flags.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                         : MessageType.Success;
-                    Model.Provider.Output(type, _partialCodeReply + reply);
+                    Model.Provider.Output(type, reply);
                 }
             }
         }
@@ -452,13 +571,13 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out string filename);
 
             string path = await FilePath.ToPhysical(filename, "sys");
-            if (filename == MacroFile.ConfigFile && !File.Exists(filename))
+            if (filename == MacroFile.ConfigFile && !File.Exists(path))
             {
-                string fallback = await FilePath.ToPhysical(MacroFile.ConfigFileFallback, "sys");
-                if (File.Exists(fallback))
+                path = await FilePath.ToPhysical(MacroFile.ConfigFileFallback, "sys");
+                if (File.Exists(path))
                 {
                     // Use config.b.bak if config.g cannot be found
-                    filename = fallback;
+                    Console.WriteLine($"[warn] Using fallback file {MacroFile.ConfigFileFallback} because {MacroFile.ConfigFile} could not be found");
                 }
                 else
                 {
@@ -470,12 +589,12 @@ namespace DuetControlServer.SPI
 
             if (File.Exists(path))
             {
-                Console.WriteLine($"[info] Executing requested macro file '{filename}'");
+                Console.WriteLine($"[info] Executing requested macro file '{filename}' on channel {channel}");
 
-                MacroFile macro = new MacroFile(path, channel, 0);
+                MacroFile macro = new MacroFile(path, channel, true, 0);
                 lock (_pendingMacros[channel])
                 {
-                    _pendingMacros[channel].Enqueue(macro);
+                    _pendingMacros[channel].Push(macro);
                 }
             }
             else
@@ -488,23 +607,21 @@ namespace DuetControlServer.SPI
             }
         }
 
-        private static void HandleAbortFileRequest()
+        private static async Task HandleAbortFileRequest()
         {
             DataTransfer.ReadAbortFile(out CodeChannel channel);
-            Console.WriteLine($"Abort file on channel {channel}");
+            Console.WriteLine($"[info] Received file abort request for channel {channel}");
 
             MacroFile.AbortAllFiles(channel);
             if (channel == CodeChannel.File)
             {
-                Print.Cancel();
+                await Print.Cancel();
             }
         }
 
         private static async Task HandleStackEvent()
         {
             DataTransfer.ReadStackEvent(out CodeChannel channel, out byte stackDepth, out Communication.FirmwareRequests.StackFlags stackFlags, out float feedrate);
-            Console.WriteLine("Stack event");
-
             using (await Model.Provider.AccessReadWrite())
             {
                 Channel item = Model.Provider.Get.Channels[channel];
@@ -519,11 +636,10 @@ namespace DuetControlServer.SPI
         private static async Task HandlePrintPaused()
         {
             DataTransfer.ReadPrintPaused(out uint filePosition, out Communication.PrintPausedReason pauseReason);
-            Console.WriteLine("Print paused");
-            // pauseReason is still unused, integrate this into the object model at some point
+            Console.WriteLine($"[info] Print has been paused at file position {filePosition}. Reason: {pauseReason}");
 
             // Make the print stop and rewind back to the given file position
-            Print.Paused(filePosition);
+            await Print.Paused(filePosition);
 
             // Update the object model
             using (await Model.Provider.AccessReadWrite())
@@ -545,8 +661,6 @@ namespace DuetControlServer.SPI
         private static void HandleResourceLocked()
         {
             DataTransfer.ReadResourceLocked(out CodeChannel channel);
-            Console.WriteLine($"Resource locked on channel {channel}");
-
             lock (_pendingLockRequests[channel])
             {
                 if (_pendingLockRequests[channel].TryDequeue(out QueuedLockRequest item))
@@ -556,10 +670,10 @@ namespace DuetControlServer.SPI
             }
         }
 
-        private static void InvalidateData(bool dueToReset)
+        private static async Task InvalidateData(string codeErrorMessage)
         {
             // Close every open file. This closes the internal macro files as well
-            Print.Cancel();
+            await Print.Cancel();
             foreach (CodeChannel channel in Enum.GetValues(typeof(CodeChannel)))
             {
                 MacroFile.AbortAllFiles(channel);
@@ -570,9 +684,18 @@ namespace DuetControlServer.SPI
             {
                 lock (_pendingCodes[channel])
                 {
-                    while (_pendingCodes[channel].TryDequeue(out QueuedCode item))
+                    while (_pendingCodes[channel].Count != 0)
                     {
-                        item.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, dueToReset ? "Code has been cancelled due to a controller reset" : "Code has been cancelled ddue to an emergency stop");
+                        // Don't cancel codes from this channel if the emergency stop / reset came from here
+                        _pendingCodes[channel].TryPeek(out QueuedCode item);
+                        if (item.Code.Type == CodeType.MCode && (item.Code.MajorNumber != 112 || item.Code.MajorNumber != 999))
+                        {
+                            break;
+                        }
+
+                        // But do resolve every other code
+                        item = _pendingCodes[channel].Dequeue();
+                        item.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
                         item.SetFinished();
                     }
                 }

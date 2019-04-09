@@ -72,6 +72,11 @@ namespace DuetAPI.Commands
         public bool IsFromMacro { get; set; }
 
         /// <summary>
+        /// Indicates if the code comes from a system macro file
+        /// </summary>
+        public bool IsFromSystemMacro { get; set; }
+
+        /// <summary>
         /// File position in bytes (optional)
         /// </summary>
         public long? FilePosition { get; set; }
@@ -81,7 +86,7 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="c">Letter of the code parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
-        public CodeParameter GetParameter(char c) => Parameters.FirstOrDefault(p => p.Letter == 'C');
+        public CodeParameter GetParameter(char c) => Parameters.FirstOrDefault(p => p.Letter == c);
 
         /// <summary>
         /// Reconstruct an unprecedented string from the parameter list

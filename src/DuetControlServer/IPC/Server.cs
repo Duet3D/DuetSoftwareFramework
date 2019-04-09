@@ -91,7 +91,7 @@ namespace DuetControlServer.IPC
                     // We get here as well when the connection has been terminated (SocketException -> Broken pipe)
                     if (!(e is SocketException))
                     {
-                        Console.WriteLine($"Connection error: {e}");
+                        Console.WriteLine($"[warn] Connection error: {e}");
                     }
                 }
             }
@@ -111,6 +111,11 @@ namespace DuetControlServer.IPC
             try
             {
                 JObject response = await conn.ReceiveJson();
+                if (response == null)
+                {
+                    return null;
+                }
+
                 ClientInitMessage initMessage = response.ToObject<ClientInitMessage>();
                 switch (initMessage.Mode)
                 {

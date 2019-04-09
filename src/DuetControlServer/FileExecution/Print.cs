@@ -11,6 +11,7 @@ namespace DuetControlServer.FileExecution
     /// </summary>
     public static class Print
     {
+        private static AsyncLock _lock = new AsyncLock();
         private static BaseFile _file;
         private static bool _isPaused;
         private static long _pausePosition;
@@ -24,7 +25,7 @@ namespace DuetControlServer.FileExecution
         public static async Task Start(string fileName)
         {
             // Initialize the file
-            lock (_file)
+            using (await _lock.LockAsync())
             {
                 if (_file != null)
                 {
@@ -34,8 +35,7 @@ namespace DuetControlServer.FileExecution
                 _isPaused = false;
             }
 
-            // Reset the pause variables
-            _isPaused = false;
+            // Reset the resume event
             if (_resumeEvent.IsSet)
             {
                 await _resumeEvent.WaitAsync();
@@ -55,18 +55,30 @@ namespace DuetControlServer.FileExecution
 
         private static async void RunPrint()
         {
+            BaseFile file = _file;
+
             // Process every available code
-            for (Code code = await _file.ReadCode(); code != null; code = await _file.ReadCode())
+            for (Code code = await file.ReadCode(); code != null; code = await file.ReadCode())
             {
-                // Has the file been paused? If so, rewind to the pause position and wait for it to resume
-                if (_isPaused)
+                // Has the file been paused? If so, rewind to the pause position
+                bool paused = false;
+                using (await _lock.LockAsync())
                 {
-                    _file.Seek(_pausePosition);
+                    if (_isPaused)
+                    {
+                        file.Seek(_pausePosition);
+                        paused = true;
+                    }
+                }
+
+                // Wait for print to resume
+                if (paused)
+                {
                     await _resumeEvent.WaitAsync(Program.CancelSource.Token);
                 }
 
                 // Execute the next command
-                CodeResult result = (CodeResult)await code.Execute();
+                CodeResult result = await code.Execute();
                 await Model.Provider.Output(result);
             }
 
@@ -78,10 +90,13 @@ namespace DuetControlServer.FileExecution
         /// Called when the file print has been paused
         /// </summary>
         /// <param name="filePosition">Position at which the file was paused</param>
-        public static void Paused(uint filePosition)
+        public static async Task Paused(uint filePosition)
         {
-            _pausePosition = filePosition;
-            _isPaused = true;
+            using (await _lock.LockAsync())
+            {
+                _pausePosition = filePosition;
+                _isPaused = true;
+            }
         }
 
         /// <summary>
@@ -95,12 +110,20 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Called when the file print has been cancelled
         /// </summary>
-        public static void Cancel()
+        public static async Task Cancel()
         {
-            if (_file != null)
+            using (await _lock.LockAsync())
             {
-                _file.Abort();
-                _resumeEvent.Set();
+                if (_file != null)
+                {
+                    _file.Abort();
+                    _file = null;
+                }
+
+                if (_isPaused)
+                {
+                    Resume();
+                }
             }
         }
     }

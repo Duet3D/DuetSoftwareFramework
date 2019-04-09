@@ -63,21 +63,24 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Read a generic JSON object from the socket
         /// </summary>
-        /// <returns>Abstract JObject instance for deserialization</returns>
+        /// <returns>Abstract JObject instance for deserialization or null if nothing could be read</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         public async Task<JObject> ReceiveJson()
         {
             do
             {
                 try
                 {
-                    await _jsonReader.ReadAsync(Program.CancelSource.Token);
-                
+                    if (!await _jsonReader.ReadAsync(Program.CancelSource.Token))
+                    {
+                        return null;
+                    }
+
                     JToken token = await JToken.ReadFromAsync(_jsonReader, Program.CancelSource.Token);
                     if (token.Type == JTokenType.Object)
                     {
                         return (JObject)token;
                     }
-                    throw new JsonReaderException();
                 }
                 catch (JsonReaderException)
                 {
@@ -93,7 +96,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Receive a fully-populated instance of a BaseCommand from the client
         /// </summary>
-        /// <returns>Received command</returns>
+        /// <returns>Received command or null if nothing could be read</returns>
         /// <exception cref="ArgumentException"></exception>
         public async Task<BaseCommand> ReceiveCommand()
         {
