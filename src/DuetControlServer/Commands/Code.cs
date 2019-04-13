@@ -25,16 +25,6 @@ namespace DuetControlServer.Commands
         public Code(string code) : base(code) { }
 
         /// <summary>
-        /// Defines whether this code is part of config.g
-        /// </summary>
-        public bool IsFromConfig { get; set; }
-
-        /// <summary>
-        /// Defines whether this code is part of config-override.g
-        /// </summary>
-        public bool IsFromConfigOverride { get; set; }
-
-        /// <summary>
         /// Run an arbitrary G/M/T-code
         /// </summary>
         /// <returns>Code result instance</returns>

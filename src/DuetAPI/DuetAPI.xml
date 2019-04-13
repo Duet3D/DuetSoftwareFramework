@@ -203,7 +203,17 @@
         </member>
         <member name="P:DuetAPI.Commands.Code.IsFromSystemMacro">
             <summary>
-            Indicates if the code comes from a system macro file
+            Indicates if the code comes from a system macro file that RepRapFirmware requested
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.IsFromConfig">
+            <summary>
+            Indicates if this code is part of config.g
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.IsFromConfigOverride">
+            <summary>
+            Indicates if this code is part of config-override.g
             </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.FilePosition">

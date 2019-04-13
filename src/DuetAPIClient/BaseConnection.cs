@@ -35,6 +35,12 @@ namespace DuetAPIClient
         {
             _connectionMode = mode;
         }
+
+        /// <summary>
+        /// Identifier of this connection
+        /// </summary>
+        /// <seealso cref="BaseCommand.SourceConnection"/>
+        public int Id { get; private set; }
         
         /// <summary>
         /// Establishes a connection to the given UNIX socket file
@@ -64,6 +70,7 @@ namespace DuetAPIClient
             {
                 throw new IncompatibleVersionException($"Incompatible API version (expected {expectedMessage.Version}, got {serverMessage.Version}");
             }
+            Id = serverMessage.Id;
 
             // Switch mode
             await Send(initMessage);

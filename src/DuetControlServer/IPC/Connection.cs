@@ -22,11 +22,15 @@ namespace DuetControlServer.IPC
     public sealed class Connection : IDisposable
     {
         private readonly Socket _socket;
-        private readonly int _id;
-        
+
         private readonly NetworkStream _networkStream;
         private readonly StreamReader _streamReader;
         private JsonReader _jsonReader;
+
+        /// <summary>
+        /// Identifier of this connection
+        /// </summary>
+        public int Id { get; }
 
         /// <summary>
         /// Check the state of the connection
@@ -44,7 +48,7 @@ namespace DuetControlServer.IPC
         public Connection(Socket socket, int id)
         {
             _socket = socket;
-            _id = id;
+            Id = id;
 
             _networkStream = new NetworkStream(socket);
             _streamReader = new StreamReader(_networkStream);
@@ -89,7 +93,7 @@ namespace DuetControlServer.IPC
                 }
             }
             while (!Program.CancelSource.IsCancellationRequested);
-            
+
             throw new OperationCanceledException();
         }
 
@@ -122,10 +126,10 @@ namespace DuetControlServer.IPC
             {
                 throw new ArgumentException("Command is not of type BaseCommand");
             }
-            
+
             // Perform final deserialization and assign source identifier to this command
             command = (BaseCommand)obj.ToObject(commandType);
-            command.SourceConnection = _id;
+            command.SourceConnection = Id;
             return command;
         }
 
@@ -149,9 +153,12 @@ namespace DuetControlServer.IPC
         }
 
         /// <summary>
-        /// Send a standard Response, EmptyResponse or ErrorResponse asynchronously to the client.
-        /// Depending on the type of the object it is encapsulated in a different container.
+        /// Send a response to the client
         /// </summary>
+        /// <remarks>
+        /// Wraps the object to send either in an empty, standard or error response.
+        /// Instances of type <see cref="ServerInitMessage"/> and <see cref="Code"/> are not encapsulated.
+        /// </remarks>
         /// <param name="obj">Object to send</param>
         /// <returns>Asynchronous task</returns>
         public async Task SendResponse(object obj = null)
@@ -176,7 +183,7 @@ namespace DuetControlServer.IPC
                 ErrorResponse errorResponse = new ErrorResponse(e);
                 json = JsonConvert.SerializeObject(errorResponse, JsonHelper.DefaultSettings);
             }
-            else if (obj is ServerInitMessage)
+            else if (obj is ServerInitMessage || obj is Code)
             {
                 json = JsonConvert.SerializeObject(obj, JsonHelper.DefaultSettings);
             }

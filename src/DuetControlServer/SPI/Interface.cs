@@ -163,7 +163,6 @@ namespace DuetControlServer.SPI
             do
             {
                 // Keep on trying until it succeeds
-                Console.WriteLine("subtransfer");
                 result = await DataTransfer.PerformFullTransfer();
             } while (!result);
         }
@@ -176,7 +175,7 @@ namespace DuetControlServer.SPI
         {
             do
             {
-                Console.WriteLine($"- Transfer {DataTransfer.TransferNumber} -");
+                //Console.WriteLine($"- Transfer {DataTransfer.TransferNumber} -");
                 
                 // Check if an emergency stop has been requested
                 if (_emergencyStopRequested && DataTransfer.WriteEmergencyStop())
@@ -186,7 +185,7 @@ namespace DuetControlServer.SPI
                     await TransferData();
                 }
 
-                // Check if a firmware reset has been performed or requested
+                // Check if a firmware reset has been requested
                 if (_resetRequested && DataTransfer.WriteReset())
                 {
                     _resetRequested = false;
@@ -201,8 +200,15 @@ namespace DuetControlServer.SPI
                 }
 
                 // Process incoming packets
-                for (Communication.PacketHeader? packet = DataTransfer.ReadPacket(); packet != null; packet = DataTransfer.ReadPacket())
+                for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
+                    Communication.PacketHeader? packet = DataTransfer.ReadPacket();
+                    if (!packet.HasValue)
+                    {
+                        Console.WriteLine("[err] Read invalid packet");
+                        break;
+                    }
+
                     try
                     {
                         //Console.WriteLine($"-> Packet #{packet.Value.Id} (request {(Communication.FirmwareRequests.Request)packet.Value.Request}) length {packet.Value.Length}");

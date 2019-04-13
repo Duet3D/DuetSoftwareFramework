@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,12 +14,17 @@ namespace DuetAPIClient
     /// Connection class for intercepting G/M/T-codes from the control server
     /// </summary>
     /// <seealso cref="ConnectionMode.Intercept"/>
-    public class InterceptConnection : CommandConnection
+    public class InterceptConnection : BaseCommandConnection
     {
         /// <summary>
-        /// Creates a new connection in interception mode
+        /// Creates a new connection in intercepting mode
         /// </summary>
-        public InterceptConnection() : base(ConnectionMode.Command) { }
+        public InterceptConnection() : base(ConnectionMode.Intercept) { }
+
+        /// <summary>
+        /// Mode of the interceptor
+        /// </summary>
+        public InterceptionMode Mode { get; private set; }
 
         /// <summary>
         /// Establishes a connection to the given UNIX socket file
@@ -32,6 +38,7 @@ namespace DuetAPIClient
         public Task Connect(InterceptionMode mode, string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default(CancellationToken))
         {
             InterceptInitMessage initMessage = new InterceptInitMessage { InterceptionMode = mode };
+            Mode = mode;
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -40,7 +47,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>A code that can be intercepted</returns>
-        public Task<Code> ReceiveCode(CancellationToken cancellationToken) => Receive<Code>(cancellationToken);
+        public Task<Code> ReceiveCode(CancellationToken cancellationToken = default(CancellationToken)) => Receive<Code>(cancellationToken);
 
         /// <summary>
         /// Instruct the control server to ignore the last received code (in intercepting mode)

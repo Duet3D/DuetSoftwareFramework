@@ -25,16 +25,18 @@ namespace DuetControlServer.SPI
 
         // General transfer variables
         private static AsyncAutoResetEvent _transferReadyEvent = new AsyncAutoResetEvent();
+        private static ushort _lastTransferNumber;
         private static bool _hadTimeout, _resetting;
+
         private static DateTime _lastMeasureTime;
-        private static int _numTransfers;
+        private static int _numMeasuredTransfers;
 
         // Transfer headers
         private static readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
         private static readonly Memory<byte> _txHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
         private static Communication.TransferHeader _rxHeader;
         private static Communication.TransferHeader _txHeader;
-        private static ushort _packetNumber, _lastTransferNumber;
+        private static byte _packetId;
 
         // Transfer responses
         private static Memory<byte> _rxResponseBuffer = new byte[4];
@@ -70,9 +72,9 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Number of the current transfer
+        /// Number of written transfers
         /// </summary>
-        public static ushort TransferNumber { get; private set; } = 1;
+        public static ushort TransferNumber { get => _txHeader.SequenceNumber; }
 
         /// <summary>
         /// Get the average number of full transfers per second
@@ -80,14 +82,14 @@ namespace DuetControlServer.SPI
         /// <returns>Average number of full transfers per second</returns>
         public static decimal GetFullTransfersPerSecond()
         {
-            if (_numTransfers == 0)
+            if (_numMeasuredTransfers == 0)
             {
                 return 0;
             }
 
-            decimal result = _numTransfers / (decimal)(DateTime.Now - _lastMeasureTime).TotalSeconds;
+            decimal result = _numMeasuredTransfers / (decimal)(DateTime.Now - _lastMeasureTime).TotalSeconds;
             _lastMeasureTime = DateTime.Now;
-            Interlocked.Exchange(ref _numTransfers, 0);
+            Interlocked.Exchange(ref _numMeasuredTransfers, 0);
             return result;
         }
 
@@ -99,20 +101,23 @@ namespace DuetControlServer.SPI
         {
             try
             {
-                _lastTransferNumber = _rxHeader.SequenceNumber;
-
                 // Exchange transfer headers. This also deals with transfer responses
+                _lastTransferNumber = _rxHeader.SequenceNumber;
                 await ExchangeHeader();
 
-                // Exchange transfer data or wait a moment before doing another transfer
-                if ((_rxHeader.DataLength != 0 || _txPointer != 0) && await ExchangeData())
+                // Exchange data if there is anything to transfer
+                if (_rxHeader.DataLength != 0 || _txPointer != 0)
                 {
-                    _txBufferIndex = (_txBufferIndex == 0) ? 1 : 0;
-                    _rxPointer = _txPointer = 0;
-                    _packetNumber = 1;
+                    await ExchangeData();
                 }
 
-                // Controller is back online
+                // Reset some variables for the next transfer
+                Interlocked.Increment(ref _numMeasuredTransfers);
+                _txBufferIndex = (_txBufferIndex == 0) ? 1 : 0;
+                _rxPointer = _txPointer = 0;
+                _packetId = 0;
+
+                // Deal with timeouts
                 if (_hadTimeout)
                 {
                     using (await Model.Provider.AccessReadWrite())
@@ -124,25 +129,23 @@ namespace DuetControlServer.SPI
                         Model.Provider.Get.Messages.Add(new Message(MessageType.Success, "Connection to Duet established"));
                         Console.WriteLine("[info] Connection to Duet established");
                     }
-                    _hadTimeout = false;
+                    _hadTimeout = _resetting = false;
+                    return true;
                 }
 
                 // Deal with resets
                 if (_resetting)
                 {
-                    _numTransfers = 0;
                     _hadTimeout = true;
-                    _resetting = false;
                     return false;
                 }
 
-                // Everything OK. Keep track of the number of transfers
-                Interlocked.Increment(ref _numTransfers);
+                // Transfer OK
                 return true;
             }
             catch (OperationCanceledException)
             {
-                if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout && _numTransfers != 0)
+                if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout)
                 {
                     // A timeout occurs when the firmware is being updated
                     bool isUpdating;
@@ -162,9 +165,6 @@ namespace DuetControlServer.SPI
                             Console.WriteLine("[warn] Lost connection to Duet");
                         }
                     }
-
-                    // Start counting again
-                    _numTransfers = 0;
                 }
             }
 
@@ -181,6 +181,11 @@ namespace DuetControlServer.SPI
         }
 
         #region Read functions
+        /// <summary>
+        /// Returns the number of packets to read
+        /// </summary>
+        public static int PacketsToRead { get => _rxHeader.NumPackets; }
+
         /// <summary>
         /// Read the next packet
         /// </summary>
@@ -585,7 +590,7 @@ namespace DuetControlServer.SPI
             Communication.PacketHeader header = new Communication.PacketHeader
             {
                 Request = (ushort)request,
-                Id = _packetNumber++,
+                Id = _packetId++,
                 Length = (ushort)dataLength,
                 ResendPacketId = 0
             };
@@ -618,14 +623,15 @@ namespace DuetControlServer.SPI
 
         private static async Task ExchangeHeader()
         {
+            // Prepare headers
+            _rxHeader.FormatCode = Communication.Consts.InvalidFormatCode;
+            _txHeader.NumPackets = _packetId;
+            _txHeader.SequenceNumber++;
+            _txHeader.DataLength = (ushort)_txPointer;
+            // TODO Calculate checksums here
+
             do
             {
-                // Prepare headers
-                _rxHeader.FormatCode = Communication.Consts.InvalidFormatCode;
-                _txHeader.SequenceNumber = TransferNumber++;
-                _txHeader.DataLength = (ushort)_txPointer;
-                // TODO Calculate checksums here
-
                 // Perform SPI header transfer
                 MemoryMarshal.Write(_rxHeaderBuffer.Span, ref _rxHeader);
                 MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
@@ -690,7 +696,7 @@ namespace DuetControlServer.SPI
             return MemoryMarshal.Read<int>(_rxResponseBuffer.Span);
         }
 
-        private static async Task<bool> ExchangeData()
+        private static async Task ExchangeData()
         {
             int bytesToTransfer = Math.Max(_rxHeader.DataLength, _txPointer);
 
@@ -699,17 +705,16 @@ namespace DuetControlServer.SPI
             {
                 await WaitForTransfer();
                 _spiDevice.TransferFullDuplex(_txBuffers[_txBufferIndex].Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
-
                 // TODO Verify checksum and send back BadChecksum if it does not match (unless _resetting is true)
 
                 response = await ExchangeResponse(Communication.TransferResponse.Success);
-                if (response == Communication.TransferResponse.Success)
+                if (response == Communication.TransferResponse.Success || _resetting)
                 {
-                    return true;
+                    return;
                 }
             } while (response == Communication.TransferResponse.BadChecksum);
 
-            return false;
+            throw new ArgumentOutOfRangeException(nameof(response), $"Unexpected response {response:x2}");
         }
         #endregion
     }

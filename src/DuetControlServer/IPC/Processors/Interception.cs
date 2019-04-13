@@ -18,6 +18,9 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// List of supported commands in this mode
         /// </summary>
+        /// <remarks>
+        /// In addition to these commands, the commands of the <see cref="Command"/> interpreter are supported too
+        /// </remarks>
         public static readonly Type[] SupportedCommands =
         {
             typeof(Ignore),
@@ -61,6 +64,9 @@ namespace DuetControlServer.IPC.Processors
             }
             finally
             {
+                // When the connection is terminated, enqueue an Ignore command for safety to avoid a deadlock after an abnormal termination
+                await EnqueueCommand(new Ignore());
+
                 _interceptors.TryRemove(this, out InterceptionMode dummy);
             }
         }
@@ -156,7 +162,7 @@ namespace DuetControlServer.IPC.Processors
         {
             foreach (var pair in _interceptors)
             {
-                if (pair.Value == type)
+                if (code.SourceConnection != pair.Key.Connection.Id && pair.Value == type)
                 {
                     CodeResult result = await pair.Key.Intercept(code);
                     if (result != null)

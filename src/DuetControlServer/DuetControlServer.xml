@@ -80,16 +80,6 @@
             </summary>
             <param name="code">G/M/T-Code</param>
         </member>
-        <member name="P:DuetControlServer.Commands.Code.IsFromConfig">
-            <summary>
-            Defines whether this code is part of config.g
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.Commands.Code.IsFromConfigOverride">
-            <summary>
-            Defines whether this code is part of config-override.g
-            </summary>
-        </member>
         <member name="M:DuetControlServer.Commands.Code.Execute">
             <summary>
             Run an arbitrary G/M/T-code
@@ -286,6 +276,11 @@
             Wrapper around UNIX socket connections
             </summary>
         </member>
+        <member name="P:DuetControlServer.IPC.Connection.Id">
+            <summary>
+            Identifier of this connection
+            </summary>
+        </member>
         <member name="P:DuetControlServer.IPC.Connection.IsConnected">
             <summary>
             Check the state of the connection
@@ -321,9 +316,12 @@
         </member>
         <member name="M:DuetControlServer.IPC.Connection.SendResponse(System.Object)">
             <summary>
-            Send a standard Response, EmptyResponse or ErrorResponse asynchronously to the client.
-            Depending on the type of the object it is encapsulated in a different container.
+            Send a response to the client
             </summary>
+            <remarks>
+            Wraps the object to send either in an empty, standard or error response.
+            Instances of type <see cref="T:DuetAPI.Connection.InitMessages.ServerInitMessage"/> and <see cref="T:DuetAPI.Commands.Code"/> are not encapsulated.
+            </remarks>
             <param name="obj">Object to send</param>
             <returns>Asynchronous task</returns>
         </member>
@@ -411,6 +409,9 @@
             <summary>
             List of supported commands in this mode
             </summary>
+            <remarks>
+            In addition to these commands, the commands of the <see cref="T:DuetControlServer.IPC.Processors.Command"/> interpreter are supported too
+            </remarks>
         </member>
         <member name="M:DuetControlServer.IPC.Processors.Interception.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.InitMessages.ClientInitMessage)">
             <summary>
@@ -1604,7 +1605,7 @@
         </member>
         <member name="P:DuetControlServer.SPI.DataTransfer.TransferNumber">
             <summary>
-            Number of the current transfer
+            Number of written transfers
             </summary>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.GetFullTransfersPerSecond">
@@ -1624,6 +1625,11 @@
             Check if the controller has been reset
             </summary>
             <returns>Whether the controller has been reset</returns>
+        </member>
+        <member name="P:DuetControlServer.SPI.DataTransfer.PacketsToRead">
+            <summary>
+            Returns the number of packets to read
+            </summary>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadPacket">
             <summary>

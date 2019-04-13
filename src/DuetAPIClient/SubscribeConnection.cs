@@ -19,9 +19,14 @@ namespace DuetAPIClient
     public class SubscribeConnection : BaseConnection
     {
         /// <summary>
-        /// Creates a new connection in intercept mode
+        /// Creates a new connection in subscriber mode
         /// </summary>
         public SubscribeConnection() : base(ConnectionMode.Command) { }
+
+        /// <summary>
+        /// Mode of the subscription
+        /// </summary>
+        public SubscriptionMode Mode { get; private set; }
 
         /// <summary>
         /// Establishes a connection to the given UNIX socket file
@@ -35,7 +40,8 @@ namespace DuetAPIClient
         public Task Connect(SubscriptionMode mode, string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default(CancellationToken))
         {
             SubscribeInitMessage initMessage = new SubscribeInitMessage { SubscriptionMode = mode };
-            return base.Connect(initMessage, socketPath, cancellationToken);
+            Mode = mode;
+            return Connect(initMessage, socketPath, cancellationToken);
         }
         
         /// <summary>

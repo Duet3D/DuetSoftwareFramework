@@ -7,6 +7,7 @@ namespace CodeConsole
     {
         static void Main(string[] args)
         {
+            // Connect to DCS
             CommandConnection connection = new CommandConnection();
             if (args.Length == 0)
             {
@@ -16,7 +17,10 @@ namespace CodeConsole
             {
                 connection.Connect(args[0]).Wait();
             }
+            Console.WriteLine("Connected!");
 
+            // Start reading lines from stdin and send them to DCS as simple codes.
+            // When the code has finished, the result is printed to stdout
             string input = Console.ReadLine();
             while (connection.IsConnected && input != null && input != "exit" && input != "quit")
             {

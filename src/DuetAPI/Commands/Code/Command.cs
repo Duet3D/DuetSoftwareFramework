@@ -72,9 +72,19 @@ namespace DuetAPI.Commands
         public bool IsFromMacro { get; set; }
 
         /// <summary>
-        /// Indicates if the code comes from a system macro file
+        /// Indicates if the code comes from a system macro file that RepRapFirmware requested
         /// </summary>
         public bool IsFromSystemMacro { get; set; }
+
+        /// <summary>
+        /// Indicates if this code is part of config.g
+        /// </summary>
+        public bool IsFromConfig { get; set; }
+
+        /// <summary>
+        /// Indicates if this code is part of config-override.g
+        /// </summary>
+        public bool IsFromConfigOverride { get; set; }
 
         /// <summary>
         /// File position in bytes (optional)
