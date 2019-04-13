@@ -77,7 +77,7 @@ namespace DuetControlServer.SPI.Serialization
             CodeHeader header = new CodeHeader
             {
                 Channel = code.Channel,
-                FilePosition = (uint)(code.FilePosition.HasValue ? code.FilePosition.Value : 0),
+                FilePosition = (uint)(code.FilePosition ?? 0),
                 Letter = (byte)code.Type,
                 MajorCode = code.MajorNumber ?? -1,
                 MinorCode = code.MinorNumber ?? -1,
@@ -108,8 +108,10 @@ namespace DuetControlServer.SPI.Serialization
             List<object> extraParameters = new List<object>();
             foreach (var parameter in code.Parameters)
             {
-                CodeParameter binaryParam = new CodeParameter();
-                binaryParam.Letter = (byte)parameter.Letter;
+                CodeParameter binaryParam = new CodeParameter
+                {
+                    Letter = (byte)parameter.Letter
+                };
                 if (parameter.Type == typeof(int))
                 {
                     binaryParam.Type = DataType.Int;

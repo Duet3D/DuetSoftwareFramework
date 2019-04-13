@@ -53,6 +53,15 @@ namespace DuetAPI.Commands
         public string ErrorMessage { get; set; }
 
         /// <summary>
+        /// Creates a new response indicating a runtime error.
+        /// This constructor is only used for deserialization
+        /// </summary>
+        public ErrorResponse()
+        {
+            Success = false;
+        }
+
+        /// <summary>
         /// Creates a new response indicating a runtime error
         /// </summary>
         /// <param name="e">Exception to report</param>

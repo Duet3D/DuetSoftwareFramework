@@ -524,6 +524,12 @@
             Message of the .NET exception
             </summary>
         </member>
+        <member name="M:DuetAPI.Commands.ErrorResponse.#ctor">
+            <summary>
+            Creates a new response indicating a runtime error.
+            This constructor is only used for deserialization
+            </summary>
+        </member>
         <member name="M:DuetAPI.Commands.ErrorResponse.#ctor(System.Exception)">
             <summary>
             Creates a new response indicating a runtime error
@@ -532,11 +538,13 @@
         </member>
         <member name="T:DuetAPI.Commands.SimpleCode">
             <summary>
-            Perform a simple G/M/T-code.
+            Perform a simple G/M/T-code
+            </summary>
+            <remarks>
             Internally the code passed is populated as a full <see cref="P:DuetAPI.Commands.SimpleCode.Code"/> instance and on completion
             its CodeResult is transformed back into a basic string. This is useful for minimal extensions
             that do not require granular control of the code details
-            </summary>
+            </remarks>
         </member>
         <member name="P:DuetAPI.Commands.SimpleCode.Code">
             <summary>
@@ -576,6 +584,21 @@
             Subscription mode. In this mode object model updates are transmitted to the client after each update
             </summary>
             <seealso cref="T:DuetAPI.Connection.InitMessages.SubscribeInitMessage"/>
+        </member>
+        <member name="T:DuetAPI.Connection.Defaults">
+            <summary>
+            Static class that holds the connection defaults
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Connection.Defaults.SocketPath">
+            <summary>
+            Default path to the UNIX file socket
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Connection.Defaults.Channel">
+            <summary>
+            Default code channel to use
+            </summary>
         </member>
         <member name="T:DuetAPI.Connection.InitMessages.ClientInitMessage">
             <summary>

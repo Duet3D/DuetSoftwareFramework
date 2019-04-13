@@ -20,7 +20,7 @@ namespace DuetControlServer
         /// </summary>
         /// <seealso cref="DuetAPI"/>
         [JsonProperty]
-        public static string SocketPath { get; set; } = "/tmp/duet.sock";
+        public static string SocketPath { get; set; } = DuetAPI.Connection.Defaults.SocketPath;
 
         /// <summary>
         /// Maximum number of pending IPC connection
@@ -50,21 +50,25 @@ namespace DuetControlServer
         /// <summary>
         /// Chip select line of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
         /// </summary>
+        [JsonProperty]
         public static int SpiChipSelectLine { get; set; } = 0;
 
         /// <summary>
         /// Maximum time to wait for the RepRapFirmware controller (in ms)
         /// </summary>
+        [JsonProperty]
         public static int SpiTimeout { get; set; } = 500;
 
         /// <summary>
         /// Time to wait after every transfer (in ms)
         /// </summary>
+        [JsonProperty]
         public static int SpiPollDelay { get; set; } = 20;
 
         /// <summary>
         /// Number of the GPIO pin that is used by RepRapFirmware to flag its ready state
         /// </summary>
+        [JsonProperty]
         public static int TransferReadyPin { get; set; } = 25;      // Pin 22 on the RaspPi expansion header
 
         /// <summary>

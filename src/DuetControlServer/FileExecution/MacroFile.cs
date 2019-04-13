@@ -73,9 +73,9 @@ namespace DuetControlServer.FileExecution
             return false;
         }
 
-        private bool _isConfig;
-        private bool _isConfigOverride;
-        private bool _isSystemMacro;
+        private readonly bool _isConfig;
+        private readonly bool _isConfigOverride;
+        private readonly bool _isSystemMacro;
         private bool _sentPush, _sentPop;
         private int _sourceConnection;
 

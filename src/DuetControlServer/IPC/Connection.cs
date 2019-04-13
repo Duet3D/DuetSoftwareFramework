@@ -170,7 +170,7 @@ namespace DuetControlServer.IPC
                     e = ae.InnerException;
                 }
 
-                Console.Write("[warn] Handled exception:");
+                Console.Write("[warn] Handled exception: ");
                 Console.WriteLine(e);
 
                 ErrorResponse errorResponse = new ErrorResponse(e);

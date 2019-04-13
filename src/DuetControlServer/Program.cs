@@ -69,9 +69,9 @@ namespace DuetControlServer
                 }
                 Console.WriteLine("Done!");
             }
-            catch (Exception e)
+            catch (AggregateException ae)
             {
-                Console.WriteLine($"Error: {e.Message}");
+                Console.WriteLine($"Error: {ae.InnerException.Message}");
                 return;
             }
 
@@ -89,7 +89,7 @@ namespace DuetControlServer
             }
             
             Console.WriteLine();
-            
+
             // Run the main tasks in the background
             Task spiTask = SPI.Interface.Run();
             Task ipcTask = Server.AcceptConnections();

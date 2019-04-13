@@ -24,7 +24,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Code channel to send this code to
         /// </summary>
-        public CodeChannel Channel { get; set; } = CodeChannel.SPI;
+        public CodeChannel Channel { get; set; } = Defaults.Channel;
 
         /// <summary>
         /// Major code number (e.g. 28 in G28)

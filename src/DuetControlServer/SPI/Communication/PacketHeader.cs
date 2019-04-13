@@ -1,5 +1,4 @@
 ﻿using System.Runtime.InteropServices;
-using DuetControlServer.SPI.Communication.FirmwareRequests;
 
 namespace DuetControlServer.SPI.Communication
 {

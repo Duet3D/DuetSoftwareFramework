@@ -1582,6 +1582,11 @@
             Bad protocol version
             </summary>
         </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.BadDataLength">
+            <summary>
+            Bad data length
+            </summary>
+        </member>
         <member name="F:DuetControlServer.SPI.Communication.TransferResponse.BadChecksum">
             <summary>
             Bad checksum
@@ -1595,6 +1600,11 @@
         <member name="M:DuetControlServer.SPI.DataTransfer.Initialize">
             <summary>
             Set up the SPI device and the controller for the transfer ready pin
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.DataTransfer.TransferNumber">
+            <summary>
+            Number of the current transfer
             </summary>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.GetFullTransfersPerSecond">
@@ -1625,58 +1635,58 @@
             <summary>
             Read the result of a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetState"/> request
             </summary>
-            <param name="busyChannels"></param>
+            <param name="busyChannels">Bitmap of the busy channels</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadObjectModel(System.Byte@,System.String@)">
             <summary>
             Read the result of a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetObjectModel"/> request
             </summary>
-            <param name="module"></param>
-            <param name="json"></param>
+            <param name="module">Module described by the returned JSON data</param>
+            <param name="json">JSON data</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadCodeReply(DuetControlServer.SPI.Communication.MessageTypeFlags@,System.String@)">
             <summary>
             Read the result of a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.Code"/> request
             </summary>
-            <param name="messageType"></param>
-            <param name="reply"></param>
+            <param name="messageType">Message type flags of the reply</param>
+            <param name="reply">Code reply</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadMacroRequest(DuetAPI.CodeChannel@,System.Boolean@,System.String@)">
             <summary>
             Read the content of a <see cref="T:DuetControlServer.SPI.Communication.FirmwareRequests.MacroRequest"/> packet
             </summary>
-            <param name="channel"></param>
-            <param name="reportMissing"></param>
-            <param name="filename"></param>
+            <param name="channel">Channel requesting a macro file</param>
+            <param name="reportMissing">Write an error message if the macro is not found</param>
+            <param name="filename">Filename of the requested macro</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadAbortFile(DuetAPI.CodeChannel@)">
             <summary>
             Read the content of an <see cref="T:DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileRequest"/> packet
             </summary>
-            <param name="channel"></param>
+            <param name="channel">Code channel where all files are supposed to be aborted</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadStackEvent(DuetAPI.CodeChannel@,System.Byte@,DuetControlServer.SPI.Communication.FirmwareRequests.StackFlags@,System.Single@)">
             <summary>
             Read the content of a <see cref="T:DuetControlServer.SPI.Communication.FirmwareRequests.StackEvent"/> packet
             </summary>
-            <param name="channel"></param>
-            <param name="stackDepth"></param>
-            <param name="flags"></param>
-            <param name="feedrate"></param>
+            <param name="channel">Code channel where the event occurred</param>
+            <param name="stackDepth">New stack depth</param>
+            <param name="flags">Bitmap holding info about the stack</param>
+            <param name="feedrate">Sticky feedrate on this channel</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadPrintPaused(System.UInt32@,DuetControlServer.SPI.Communication.PrintPausedReason@)">
             <summary>
             Read the content of a <see cref="T:DuetControlServer.SPI.Communication.FirmwareRequests.PrintPaused"/> packet
             </summary>
-            <param name="filePosition"></param>
-            <param name="reason"></param>
+            <param name="filePosition">Position where the print has been paused</param>
+            <param name="reason">Reason why the print has been paused</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadHeightMap(DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap@,System.Single[]@)">
             <summary>
             Read the result of a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetHeightMap"/> request
             </summary>
-            <param name="header"></param>
-            <param name="zCoordinates"></param>
+            <param name="header">Description of the heightmap</param>
+            <param name="zCoordinates">Array of probed Z coordinates</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadResourceLocked(DuetAPI.CodeChannel@)">
             <summary>

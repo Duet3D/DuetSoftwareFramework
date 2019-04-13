@@ -26,7 +26,7 @@ namespace DuetControlServer.SPI
         // General transfer variables
         private static AsyncAutoResetEvent _transferReadyEvent = new AsyncAutoResetEvent();
         private static bool _hadTimeout, _resetting;
-        private static DateTime _timeConnected;
+        private static DateTime _lastMeasureTime;
         private static int _numTransfers;
 
         // Transfer headers
@@ -34,7 +34,7 @@ namespace DuetControlServer.SPI
         private static readonly Memory<byte> _txHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
         private static Communication.TransferHeader _rxHeader;
         private static Communication.TransferHeader _txHeader;
-        private static ushort _transferNumber = 1, _packetNumber, _lastTransferNumber;
+        private static ushort _packetNumber, _lastTransferNumber;
 
         // Transfer responses
         private static Memory<byte> _rxResponseBuffer = new byte[4];
@@ -70,6 +70,11 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Number of the current transfer
+        /// </summary>
+        public static ushort TransferNumber { get; private set; } = 1;
+
+        /// <summary>
         /// Get the average number of full transfers per second
         /// </summary>
         /// <returns>Average number of full transfers per second</returns>
@@ -79,7 +84,11 @@ namespace DuetControlServer.SPI
             {
                 return 0;
             }
-            return _numTransfers / (decimal)(DateTime.Now - _timeConnected).TotalSeconds;
+
+            decimal result = _numTransfers / (decimal)(DateTime.Now - _lastMeasureTime).TotalSeconds;
+            _lastMeasureTime = DateTime.Now;
+            Interlocked.Exchange(ref _numTransfers, 0);
+            return result;
         }
 
         /// <summary>
@@ -90,7 +99,6 @@ namespace DuetControlServer.SPI
         {
             try
             {
-                //Console.WriteLine($"- Transfer {_transferNumber} -");
                 _lastTransferNumber = _rxHeader.SequenceNumber;
 
                 // Exchange transfer headers. This also deals with transfer responses
@@ -129,15 +137,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Everything OK. Keep track of the number of transfers
-                if (_numTransfers == 0)
-                {
-                    _timeConnected = DateTime.Now;
-                    _numTransfers = 1;
-                }
-                else
-                {
-                    _numTransfers++;
-                }
+                Interlocked.Increment(ref _numTransfers);
                 return true;
             }
             catch (OperationCanceledException)
@@ -202,7 +202,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the result of a <see cref="Communication.LinuxRequests.Request.GetState"/> request
         /// </summary>
-        /// <param name="busyChannels"></param>
+        /// <param name="busyChannels">Bitmap of the busy channels</param>
         public static void ReadState(out int busyChannels)
         {
             _rxPointer += Serialization.Reader.ReadState(_packetData, out busyChannels);
@@ -211,8 +211,8 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the result of a <see cref="Communication.LinuxRequests.Request.GetObjectModel"/> request
         /// </summary>
-        /// <param name="module"></param>
-        /// <param name="json"></param>
+        /// <param name="module">Module described by the returned JSON data</param>
+        /// <param name="json">JSON data</param>
         public static void ReadObjectModel(out byte module, out string json)
         {
             _rxPointer += Serialization.Reader.ReadObjectModel(_packetData, out module, out json);
@@ -221,8 +221,8 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the result of a <see cref="Communication.LinuxRequests.Request.Code"/> request
         /// </summary>
-        /// <param name="messageType"></param>
-        /// <param name="reply"></param>
+        /// <param name="messageType">Message type flags of the reply</param>
+        /// <param name="reply">Code reply</param>
         public static void ReadCodeReply(out Communication.MessageTypeFlags messageType, out string reply)
         {
             _rxPointer += Serialization.Reader.ReadCodeReply(_packetData, out messageType, out reply);
@@ -231,9 +231,9 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the content of a <see cref="MacroRequest"/> packet
         /// </summary>
-        /// <param name="channel"></param>
-        /// <param name="reportMissing"></param>
-        /// <param name="filename"></param>
+        /// <param name="channel">Channel requesting a macro file</param>
+        /// <param name="reportMissing">Write an error message if the macro is not found</param>
+        /// <param name="filename">Filename of the requested macro</param>
         public static void ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out string filename)
         {
             _rxPointer += Serialization.Reader.ReadMacroRequest(_packetData, out channel, out reportMissing, out filename);
@@ -242,7 +242,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the content of an <see cref="AbortFileRequest"/> packet
         /// </summary>
-        /// <param name="channel"></param>
+        /// <param name="channel">Code channel where all files are supposed to be aborted</param>
         public static void ReadAbortFile(out CodeChannel channel)
         {
             _rxPointer += Serialization.Reader.ReadAbortFile(_packetData, out channel);
@@ -251,10 +251,10 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the content of a <see cref="StackEvent"/> packet
         /// </summary>
-        /// <param name="channel"></param>
-        /// <param name="stackDepth"></param>
-        /// <param name="flags"></param>
-        /// <param name="feedrate"></param>
+        /// <param name="channel">Code channel where the event occurred</param>
+        /// <param name="stackDepth">New stack depth</param>
+        /// <param name="flags">Bitmap holding info about the stack</param>
+        /// <param name="feedrate">Sticky feedrate on this channel</param>
         public static void ReadStackEvent(out CodeChannel channel, out byte stackDepth, out StackFlags flags, out float feedrate)
         {
             _rxPointer += Serialization.Reader.ReadStackEvent(_packetData, out channel, out stackDepth, out flags, out feedrate);
@@ -263,8 +263,8 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the content of a <see cref="PrintPaused"/> packet
         /// </summary>
-        /// <param name="filePosition"></param>
-        /// <param name="reason"></param>
+        /// <param name="filePosition">Position where the print has been paused</param>
+        /// <param name="reason">Reason why the print has been paused</param>
         public static void ReadPrintPaused(out uint filePosition, out Communication.PrintPausedReason reason)
         {
             _rxPointer += Serialization.Reader.ReadPrintPaused(_packetData, out filePosition, out reason);
@@ -273,8 +273,8 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the result of a <see cref="Communication.LinuxRequests.Request.GetHeightMap"/> request
         /// </summary>
-        /// <param name="header"></param>
-        /// <param name="zCoordinates"></param>
+        /// <param name="header">Description of the heightmap</param>
+        /// <param name="zCoordinates">Array of probed Z coordinates</param>
         public static void ReadHeightMap(out HeightMap header, out float[] zCoordinates)
         {
             _rxPointer += Serialization.Reader.ReadHeightMap(_packetData, out header, out zCoordinates);
@@ -622,7 +622,7 @@ namespace DuetControlServer.SPI
             {
                 // Prepare headers
                 _rxHeader.FormatCode = Communication.Consts.InvalidFormatCode;
-                _txHeader.SequenceNumber = _transferNumber++;
+                _txHeader.SequenceNumber = TransferNumber++;
                 _txHeader.DataLength = (ushort)_txPointer;
                 // TODO Calculate checksums here
 
@@ -631,9 +631,17 @@ namespace DuetControlServer.SPI
                 MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
                 await WaitForTransfer();
                 _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
-                _rxHeader = MemoryMarshal.Read<Communication.TransferHeader>(_rxHeaderBuffer.Span);
+
+                // Check for possible response code
+                int responseCode = MemoryMarshal.Read<int>(_rxHeaderBuffer.Span);
+                if (_rxHeader.FormatCode == Communication.TransferResponse.BadFormat)
+                {
+                    await WaitForTransfer();
+                    _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
+                }
 
                 // Inspect received header
+                _rxHeader = MemoryMarshal.Read<Communication.TransferHeader>(_rxHeaderBuffer.Span);
                 if (_rxHeader.FormatCode == 0 || _rxHeader.FormatCode == 0xFF)
                 {
                     throw new OperationCanceledException("Duet is offline");
@@ -650,7 +658,7 @@ namespace DuetControlServer.SPI
                 }
                 if (_rxHeader.DataLength > Communication.Consts.BufferSize)
                 {
-                    await ExchangeResponse(Communication.TransferResponse.BadChecksum);
+                    await ExchangeResponse(Communication.TransferResponse.BadDataLength);
                     throw new Exception($"Data length too big ({_rxHeader.DataLength} bytes)");
                 }
                 // TODO Verify checksums

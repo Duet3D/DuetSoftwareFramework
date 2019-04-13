@@ -32,7 +32,7 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
-        public Task Connect(SubscriptionMode mode, string socketPath = "/tmp/duet.sock", CancellationToken cancellationToken = default(CancellationToken))
+        public Task Connect(SubscriptionMode mode, string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default(CancellationToken))
         {
             SubscribeInitMessage initMessage = new SubscribeInitMessage { SubscriptionMode = mode };
             return base.Connect(initMessage, socketPath, cancellationToken);

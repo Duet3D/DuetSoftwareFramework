@@ -50,7 +50,7 @@ namespace DuetWebServer.Controllers
             if (HttpContext.WebSockets.IsWebSocketRequest)
             {
                 WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-                await WebSocketController.Process(webSocket, _configuration.GetValue("SocketPath", "/tmp/duet.sock"),_logger);
+                await WebSocketController.Process(webSocket, _configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.SocketPath),_logger);
             }
             else
             {
@@ -482,7 +482,7 @@ namespace DuetWebServer.Controllers
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new CommandConnection();
-            await connection.Connect(_configuration.GetValue("SocketPath", "/tmp/duet.sock"));
+            await connection.Connect(_configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.SocketPath));
             return connection;
         }
 

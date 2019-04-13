@@ -3,6 +3,7 @@ using DuetControlServer.Commands;
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using Zhaobang.IO;
 
 namespace DuetControlServer.FileExecution
 {
@@ -12,7 +13,7 @@ namespace DuetControlServer.FileExecution
     public class BaseFile : IDisposable
     {
         private FileStream _fileStream;
-        private StreamReader _reader;
+        private SeekableStreamReader _reader;
 
         /// <summary>
         /// Indicates if this file is supposed to be aborted
@@ -42,7 +43,7 @@ namespace DuetControlServer.FileExecution
         public BaseFile(string fileName, CodeChannel channel)
         {
             _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-            _reader = new StreamReader(_fileStream);
+            _reader = new SeekableStreamReader(_fileStream);
 
             FileName = fileName;
             Channel = channel;
@@ -74,7 +75,7 @@ namespace DuetControlServer.FileExecution
             }
 
             // Attempt to read the next line
-            long filePosition = _fileStream.Position;
+            long filePosition = _reader.Position;
             string line = await _reader.ReadLineAsync();
             if (line != null)
             {
@@ -97,8 +98,7 @@ namespace DuetControlServer.FileExecution
         /// <param name="position">Position to go to</param>
         public void Seek(long position)
         {
-            _fileStream.Seek(position, SeekOrigin.Begin);
-            _reader.DiscardBufferedData();
+            _reader.Seek(position, SeekOrigin.Begin);
         }
 
         /// <summary>

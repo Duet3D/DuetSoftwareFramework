@@ -91,10 +91,6 @@
                                 expectMinorCode = (c != '.');
                                 isMinorCode = (c == '.');
                             }
-                            else
-                            {
-                                throw new CodeParserException($"Failed to parse major {Type} number ({paramValue.Trim()})");
-                            }
                         }
                         else if (isMinorCode)
                         {

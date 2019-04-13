@@ -157,6 +157,17 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         public static Task<bool> Connect() => DataTransfer.PerformFullTransfer();
 
+        private static async Task TransferData()
+        {
+            bool result;
+            do
+            {
+                // Keep on trying until it succeeds
+                Console.WriteLine("subtransfer");
+                result = await DataTransfer.PerformFullTransfer();
+            } while (!result);
+        }
+
         /// <summary>
         /// Perform communication with the RepRapFirmware controller
         /// </summary>
@@ -165,13 +176,14 @@ namespace DuetControlServer.SPI
         {
             do
             {
+                Console.WriteLine($"- Transfer {DataTransfer.TransferNumber} -");
+                
                 // Check if an emergency stop has been requested
                 if (_emergencyStopRequested && DataTransfer.WriteEmergencyStop())
                 {
                     _emergencyStopRequested = false;
                     Console.WriteLine("[info] Emergency stop");
-                    await DataTransfer.PerformFullTransfer();
-                    continue;
+                    await TransferData();
                 }
 
                 // Check if a firmware reset has been performed or requested
@@ -179,8 +191,7 @@ namespace DuetControlServer.SPI
                 {
                     _resetRequested = false;
                     Console.WriteLine("[info] Resetting controller");
-                    await DataTransfer.PerformFullTransfer();
-                    continue;
+                    await TransferData();
                 }
 
                 // Invalidate data if a controller reset has been performed
@@ -200,6 +211,7 @@ namespace DuetControlServer.SPI
                     catch (ArgumentOutOfRangeException)
                     {
                         DataTransfer.DumpMalformedPacket();
+                        break;
                     }
                 }
 
@@ -274,6 +286,13 @@ namespace DuetControlServer.SPI
                         // Deal with the next code to execute
                         if (item != null)
                         {
+                            // FIXME From a code start to its result 4 transfers are needed:
+                            // 1) DCS writes code packet
+                            // 2) RRF reads and starts it (during this state the channel is busy under all circumstances, hence we don't get here at that time)
+                            // 3) RRF writes code response
+                            // 4) DCS reads code response
+                            // The latency for the next code can be reduced here by assigning the executing code to an "expecting response" dictionary
+                            // This way the effective number of required transfers can be reduced from 4 to 3 by skipping step 3 (in theory)
                             if (item.IsExecuting)
                             {
                                 // The reply for this code may not have been received yet. Expect one to come even if it is empty - better than missing output
@@ -375,7 +394,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Do another full SPI transfer
-                await DataTransfer.PerformFullTransfer();
+                await TransferData();
 
                 // Wait a moment
                 if (IsIdle())
@@ -499,14 +518,17 @@ namespace DuetControlServer.SPI
                 reply = reply.TrimEnd();
             }
 
-            // Check if this reply was incomplete
-            if (_partialCodeReply != null)
+            // TODO implement logging here
+
+            // Deal with generic replies. Keep this check in sync with RepRapFirmware
+            if (flags.HasFlag(Communication.MessageTypeFlags.UsbMessage) && flags.HasFlag(Communication.MessageTypeFlags.AuxMessage) &&
+                flags.HasFlag(Communication.MessageTypeFlags.HttpMessage) && flags.HasFlag(Communication.MessageTypeFlags.TelnetMessage))
             {
-                reply = _partialCodeReply + reply;
-                _partialCodeReply = null;
+                OutputGenericMessage(flags, reply);
+                return;
             }
 
-            // Try to feed the message to every destination channel
+            // This is a targeted message. Try to forward it to the corresponding code being executed
             bool replyHandled = false;
             if (flags.HasFlag(Communication.MessageTypeFlags.BinaryCodeReplyFlag))
             {
@@ -549,20 +571,31 @@ namespace DuetControlServer.SPI
                 }
             }
 
-            // If at least one channel destination could not be reached, cache it or put it into the machine model
+            // If at least one channel destination could not be reached, treat it as a generic message
             if (!replyHandled)
             {
-                if (flags.HasFlag(Communication.MessageTypeFlags.PushFlag))
-                {
-                    _partialCodeReply = reply;
-                }
-                else if (reply != "")
-                {
-                    MessageType type = flags.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
-                        : flags.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
-                        : MessageType.Success;
-                    Model.Provider.Output(type, reply);
-                }
+                OutputGenericMessage(flags, reply);
+            }
+        }
+
+        private static void OutputGenericMessage(Communication.MessageTypeFlags flags, string reply)
+        {
+            if (_partialCodeReply != null)
+            {
+                reply = _partialCodeReply + reply;
+                _partialCodeReply = null;
+            }
+
+            if (flags.HasFlag(Communication.MessageTypeFlags.PushFlag))
+            {
+                _partialCodeReply = reply;
+            }
+            else if (reply != "")
+            {
+                MessageType type = flags.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                    : flags.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                    : MessageType.Success;
+                Model.Provider.Output(type, reply);
             }
         }
 
@@ -713,7 +746,7 @@ namespace DuetControlServer.SPI
                 }
             }
 
-            // TODO invalidate object model?
+            // TODO Reset object model scope to query
         }
     }
 }

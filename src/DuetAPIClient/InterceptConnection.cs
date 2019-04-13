@@ -29,11 +29,10 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
-        public Task Connect(InterceptionMode mode, string socketPath = "/tmp/duet.sock",
-            CancellationToken cancellationToken = default(CancellationToken))
+        public Task Connect(InterceptionMode mode, string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default(CancellationToken))
         {
-            InterceptInitMessage initMessage = new InterceptInitMessage {InterceptionMode = mode};
-            return base.Connect(initMessage, socketPath, cancellationToken);
+            InterceptInitMessage initMessage = new InterceptInitMessage { InterceptionMode = mode };
+            return Connect(initMessage, socketPath, cancellationToken);
         }
 
         /// <summary>
@@ -41,8 +40,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>A code that can be intercepted</returns>
-        public async Task<Code> ReceiveCode(CancellationToken cancellationToken) =>
-            await Receive<Code>(cancellationToken);
+        public Task<Code> ReceiveCode(CancellationToken cancellationToken) => Receive<Code>(cancellationToken);
 
         /// <summary>
         /// Instruct the control server to ignore the last received code (in intercepting mode)
@@ -64,8 +62,7 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <seealso cref="Message"/>
         /// <seealso cref="Resolve"/>
-        public Task ResolveCode(MessageType type, string content,
-            CancellationToken cancellationToken = default(CancellationToken))
+        public Task ResolveCode(MessageType type, string content, CancellationToken cancellationToken = default(CancellationToken))
         {
             return PerformCommand(new Resolve { Content = content, Type = type }, cancellationToken);
         }

@@ -35,7 +35,7 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
-        public Task Connect(string socketPath = "/tmp/duet.sock", CancellationToken cancellationToken = default(CancellationToken))
+        public Task Connect(string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default(CancellationToken))
         {
             CommandInitMessage initMessage = new CommandInitMessage();
             return Connect(initMessage, socketPath, cancellationToken);
@@ -75,7 +75,7 @@ namespace DuetAPIClient
         /// <returns>The code result as a string</returns>
         /// <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
         /// <seealso cref="SimpleCode"/>
-        public Task<string> PerformSimpleCode(string code, CodeChannel channel = CodeChannel.SPI, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<string> PerformSimpleCode(string code, CodeChannel channel = Defaults.Channel, CancellationToken cancellationToken = default(CancellationToken))
         {
             return PerformCommand<string>(new SimpleCode { Code = code, Channel = channel }, cancellationToken);
         }
