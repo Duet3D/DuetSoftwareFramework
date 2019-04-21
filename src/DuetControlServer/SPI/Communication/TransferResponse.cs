@@ -8,26 +8,36 @@
         /// <summary>
         /// Transfer is OK
         /// </summary>
-        public const int Success = 1;
+        public const uint Success = 1;
 
         /// <summary>
         /// Bad transfer format
         /// </summary>
-        public const int BadFormat = 2;
+        public const uint BadFormat = 2;
 
         /// <summary>
         /// Bad protocol version
         /// </summary>
-        public const int BadProtocolVersion = 3;
+        public const uint BadProtocolVersion = 3;
 
         /// <summary>
         /// Bad data length
         /// </summary>
-        public const int BadDataLength = 4;
+        public const uint BadDataLength = 4;
 
         /// <summary>
-        /// Bad checksum
+        /// Bad header checksum
         /// </summary>
-        public const int BadChecksum = 5;
+        public const uint BadHeaderChecksum = 5;
+
+        /// <summary>
+        /// Bad header checksum
+        /// </summary>
+        public const uint BadDataChecksum = 6;
+
+        /// <summary>
+        /// Bad response. This one is special because it can follow a response exchange
+        /// </summary>
+        public const uint BadResponse = 0xFEFEFEFE;
     }
 }

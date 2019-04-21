@@ -94,17 +94,17 @@ namespace DuetControlServer.Model
                     tempLimit = 0.0,
                     tools = new[]
                     {
-                    new
-                    {
-                        number = 0,
-                        name = "",
-                        heaters = new int[0],
-                        extruders = new int[0],
-                        fan = 0,
-                        filament = "",
-                        offsets = new double[0]
-                    }
-                },
+                        new
+                        {
+                            number = 0,
+                            name = "",
+                            heaters = new int[0],
+                            extruders = new int[0],
+                            fan = 0,
+                            filament = "",
+                            offsets = new double[0]
+                        }
+                    },
                     mcutemp = new
                     {
                         min = 0.0,
@@ -206,7 +206,7 @@ namespace DuetControlServer.Model
                     }
 
                     // Rewrite chambers
-                    Provider.Get.Heat.Beds.Clear();
+                    Provider.Get.Heat.Chambers.Clear();
                     if (response.temps.chamber != null)
                     {
                         Provider.Get.Heat.Chambers.Add(new BedOrChamber

@@ -29,6 +29,7 @@ namespace DuetControlServer.Model
                     MachineModel model = Provider.Get;
                     changedModel |= UpdateNetwork(ref model);
                     changedModel |= UpdateStorages(ref model);
+                    changedModel |= ClearMessages(ref model);
                 }
 
                 // Notify the model subscribers
@@ -105,7 +106,7 @@ namespace DuetControlServer.Model
                 }
             }
 
-            for (int i = model.Network.Interfaces.Count; i > index; i--)
+            for (int i = model.Network.Interfaces.Count - 1; i > index; i--)
             {
                 model.Network.Interfaces.RemoveAt(i);
                 changed = true;
@@ -160,12 +161,26 @@ namespace DuetControlServer.Model
                 }
             }
 
-            for (int i = model.Network.Interfaces.Count; i > index; i--)
+            for (int i = model.Network.Interfaces.Count - 1; i > index; i--)
             {
                 model.Network.Interfaces.RemoveAt(i);
                 changed = true;
             }
 
+            return changed;
+        }
+
+        private static bool ClearMessages(ref MachineModel model)
+        {
+            bool changed = false;
+            for (int i = model.Messages.Count - 1; i >= 0; i--)
+            {
+                if (model.Messages[i].Time - DateTime.Now > TimeSpan.FromSeconds(Settings.MaxMessageAge))
+                {
+                    model.Messages.RemoveAt(i);
+                    changed = true;
+                }
+            }
             return changed;
         }
     }

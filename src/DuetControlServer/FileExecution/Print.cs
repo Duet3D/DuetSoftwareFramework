@@ -90,6 +90,7 @@ namespace DuetControlServer.FileExecution
         /// Called when the file print has been paused
         /// </summary>
         /// <param name="filePosition">Position at which the file was paused</param>
+        /// <returns>Asynchronous task</returns>
         public static async Task Paused(uint filePosition)
         {
             using (await _lock.LockAsync())
@@ -108,8 +109,9 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Called when the file print has been cancelled
+        /// Called when the file print is supposed to be cancelled
         /// </summary>
+        /// <returns>Asynchronous task</returns>
         public static async Task Cancel()
         {
             using (await _lock.LockAsync())

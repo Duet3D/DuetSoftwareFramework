@@ -132,7 +132,7 @@ namespace DuetControlServer.FileExecution
             }
 
             // Pop the stack before completion
-            if (_sentPop && !_isSystemMacro && !isAbortRequested)
+            if (_sentPop && !_isSystemMacro && !IsAborted)
             {
                 _sentPop = true;
                 return new Code

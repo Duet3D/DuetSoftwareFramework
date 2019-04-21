@@ -18,7 +18,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Indicates if this file is supposed to be aborted
         /// </summary>
-        protected bool isAbortRequested;
+        public bool IsAborted { get; private set; }
 
         /// <summary>
         /// File path to the file being executed
@@ -64,7 +64,7 @@ namespace DuetControlServer.FileExecution
         public virtual async Task<Code> ReadCode()
         {
             // Deal with abort requests
-            if (isAbortRequested)
+            if (IsAborted)
             {
                 if (!IsFinished)
                 {
@@ -104,6 +104,6 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Request cancellation of this file
         /// </summary>
-        public void Abort() => isAbortRequested = true;
+        public void Abort() => IsAborted = true;
     }
 }

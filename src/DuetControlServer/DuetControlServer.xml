@@ -135,7 +135,7 @@
             Base class for files that read G-codes line by line
             </summary>
         </member>
-        <member name="F:DuetControlServer.FileExecution.BaseFile.isAbortRequested">
+        <member name="P:DuetControlServer.FileExecution.BaseFile.IsAborted">
             <summary>
             Indicates if this file is supposed to be aborted
             </summary>
@@ -260,6 +260,7 @@
             Called when the file print has been paused
             </summary>
             <param name="filePosition">Position at which the file was paused</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Resume">
             <summary>
@@ -268,8 +269,9 @@
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Cancel">
             <summary>
-            Called when the file print has been cancelled
+            Called when the file print is supposed to be cancelled
             </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.IPC.Connection">
             <summary>
@@ -636,6 +638,12 @@
             the host controller (e.g. network information and mass storages) are updated (in ms)
             </summary>
         </member>
+        <member name="P:DuetControlServer.Settings.MaxMessageAge">
+            <summary>
+            Maximum time to keep messages in the object model unless client(s) pick them up (in s).
+            Note that messages are only cleared when the host update task runs.
+            </summary>
+        </member>
         <member name="P:DuetControlServer.Settings.SpiBusID">
             <summary>
             Bus ID of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
@@ -646,9 +654,14 @@
             Chip select line of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
             </summary>
         </member>
-        <member name="P:DuetControlServer.Settings.SpiTimeout">
+        <member name="P:DuetControlServer.Settings.SpiTransferTimeout">
             <summary>
-            Maximum time to wait for the RepRapFirmware controller (in ms)
+            Maximum allowed delay between data exchanges during a full transfer (in ms)
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.MaxSpiRetries">
+            <summary>
+            Maximum number of sequential transfer retries
             </summary>
         </member>
         <member name="P:DuetControlServer.Settings.SpiPollDelay">
@@ -1588,10 +1601,36 @@
             Bad data length
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.BadChecksum">
+        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.BadHeaderChecksum">
             <summary>
-            Bad checksum
+            Bad header checksum
             </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.BadDataChecksum">
+            <summary>
+            Bad header checksum
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.TransferResponse.BadResponse">
+            <summary>
+            Bad response. This one is special because it can follow a response exchange
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.CRC16">
+            <summary>
+            Functions for CRC16 calculation
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.CRC16.Calculate(System.Byte[],System.Int32)">
+            <summary>
+            Efficient CRC16 calculation based on the CRC16-IBM algorithm
+            </summary>
+            <param name="buffer">Buffer to calculate the checksum for</param>
+            <param name="length">Length of the buffer</param>
+            <returns>CRC16 Checksum</returns>
+            <remarks>
+            Original found on https://stackoverflow.com/questions/18594963/crc16-iso-13239-implementation
+            </remarks>
         </member>
         <member name="T:DuetControlServer.SPI.DataTransfer">
             <summary>
@@ -1601,11 +1640,6 @@
         <member name="M:DuetControlServer.SPI.DataTransfer.Initialize">
             <summary>
             Set up the SPI device and the controller for the transfer ready pin
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.SPI.DataTransfer.TransferNumber">
-            <summary>
-            Number of written transfers
             </summary>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.GetFullTransfersPerSecond">
@@ -1618,7 +1652,7 @@
             <summary>
             Perform a full data transfer
             </summary>
-            <returns>Whether the transfer was successful</returns>
+            <returns>Whether new data could be transferred</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.HadReset">
             <summary>
@@ -1698,6 +1732,7 @@
             <summary>
             Read the content of a <see cref="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.Locked"/> packet
             </summary>
+            <param name="channel">Code channel that has acquired the lock</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.DumpMalformedPacket">
@@ -1817,16 +1852,19 @@
             This is only used for macro files requested from the firmware
             </summary>
             <param name="code">Code to execute</param>
+            <returns>Task that completes when the code has finished</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.RequestEmergencyStop">
             <summary>
             Request an immediate emergency stop
             </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.RequestReset">
             <summary>
             Request a firmware reset
             </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.SetPrintStarted">
             <summary>

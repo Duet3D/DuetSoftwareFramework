@@ -26,7 +26,7 @@ namespace DuetControlServer.SPI
         // General transfer variables
         private static AsyncAutoResetEvent _transferReadyEvent = new AsyncAutoResetEvent();
         private static ushort _lastTransferNumber;
-        private static bool _hadTimeout, _resetting;
+        private static bool _started, _hadTimeout, _resetting;
 
         private static DateTime _lastMeasureTime;
         private static int _numMeasuredTransfers;
@@ -72,11 +72,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Number of written transfers
-        /// </summary>
-        public static ushort TransferNumber { get => _txHeader.SequenceNumber; }
-
-        /// <summary>
         /// Get the average number of full transfers per second
         /// </summary>
         /// <returns>Average number of full transfers per second</returns>
@@ -96,19 +91,21 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Perform a full data transfer
         /// </summary>
-        /// <returns>Whether the transfer was successful</returns>
+        /// <returns>Whether new data could be transferred</returns>
         public static async Task<bool> PerformFullTransfer()
         {
             try
             {
                 // Exchange transfer headers. This also deals with transfer responses
-                _lastTransferNumber = _rxHeader.SequenceNumber;
-                await ExchangeHeader();
+                if (!await ExchangeHeader())
+                {
+                    return false;
+                }
 
                 // Exchange data if there is anything to transfer
-                if (_rxHeader.DataLength != 0 || _txPointer != 0)
+                if ((_rxHeader.DataLength != 0 || _txPointer != 0) && !await ExchangeData())
                 {
-                    await ExchangeData();
+                    return false;
                 }
 
                 // Reset some variables for the next transfer
@@ -141,11 +138,12 @@ namespace DuetControlServer.SPI
                 }
 
                 // Transfer OK
+                _started = true;
                 return true;
             }
             catch (OperationCanceledException)
             {
-                if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout)
+                if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout && _started)
                 {
                     // A timeout occurs when the firmware is being updated
                     bool isUpdating;
@@ -177,7 +175,7 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the controller has been reset</returns>
         public static bool HadReset()
         {
-            return _lastTransferNumber > _rxHeader.SequenceNumber;
+            return _lastTransferNumber + 1 != _rxHeader.SequenceNumber;
         }
 
         #region Read functions
@@ -288,6 +286,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the content of a <see cref="Request.Locked"/> packet
         /// </summary>
+        /// <param name="channel">Code channel that has acquired the lock</param>
         /// <returns>Asynchronous task</returns>
         public static void ReadResourceLocked(out CodeChannel channel)
         {
@@ -617,41 +616,57 @@ namespace DuetControlServer.SPI
 
         private static Task WaitForTransfer()
         {
-            CancellationToken token = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, new CancellationTokenSource(Settings.SpiTimeout).Token).Token;
-            return _transferReadyEvent.WaitAsync(token);
+            CancellationToken timeoutToken = new CancellationTokenSource(Settings.SpiTransferTimeout).Token;
+            CancellationToken cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, timeoutToken).Token;
+            return _transferReadyEvent.WaitAsync(cancellationToken);
         }
 
-        private static async Task ExchangeHeader()
+        private static async Task<bool> ExchangeHeader()
         {
-            // Prepare headers
-            _rxHeader.FormatCode = Communication.Consts.InvalidFormatCode;
+            ushort lastTransferNumber = _rxHeader.SequenceNumber;
+
+            // Write TX header
             _txHeader.NumPackets = _packetId;
             _txHeader.SequenceNumber++;
             _txHeader.DataLength = (ushort)_txPointer;
-            // TODO Calculate checksums here
+            _txHeader.ChecksumData = CRC16.Calculate(_txBuffers[_txBufferIndex].ToArray(), _txPointer);
+            MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+            _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.ToArray(), Marshal.SizeOf(_txHeader) - Marshal.SizeOf(typeof(ushort)));
+            MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
 
-            do
+            for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
-                // Perform SPI header transfer
+                // Write invalidated RX header
+                _rxHeader.FormatCode = Communication.Consts.InvalidFormatCode;
                 MemoryMarshal.Write(_rxHeaderBuffer.Span, ref _rxHeader);
-                MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+
+                // Perform SPI header exchange
                 await WaitForTransfer();
                 _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
 
                 // Check for possible response code
-                int responseCode = MemoryMarshal.Read<int>(_rxHeaderBuffer.Span);
-                if (_rxHeader.FormatCode == Communication.TransferResponse.BadFormat)
+                uint responseCode = MemoryMarshal.Read<uint>(_rxHeaderBuffer.Span);
+                if (responseCode == Communication.TransferResponse.BadResponse)
                 {
-                    await WaitForTransfer();
-                    _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
+                    Console.WriteLine("[warn] Restarting transfer because the Duet received a bad response (header content)");
+                    return false;
                 }
 
                 // Inspect received header
                 _rxHeader = MemoryMarshal.Read<Communication.TransferHeader>(_rxHeaderBuffer.Span);
                 if (_rxHeader.FormatCode == 0 || _rxHeader.FormatCode == 0xFF)
                 {
-                    throw new OperationCanceledException("Duet is offline");
+                    throw new OperationCanceledException("Board is not available");
                 }
+
+                ushort checksum = CRC16.Calculate(_rxHeaderBuffer.ToArray(), Marshal.SizeOf(_rxHeader) - Marshal.SizeOf(typeof(ushort)));
+                if (_rxHeader.ChecksumHeader != checksum)
+                {
+                    Console.WriteLine($"[warn] Bad header checksum (0x{_rxHeader.ChecksumHeader:x4} vs 0x{checksum:x4})");
+                    await ExchangeResponse(Communication.TransferResponse.BadHeaderChecksum);
+                    continue;
+                }
+
                 if (_rxHeader.FormatCode != Communication.Consts.FormatCode)
                 {
                     await ExchangeResponse(Communication.TransferResponse.BadFormat);
@@ -667,54 +682,123 @@ namespace DuetControlServer.SPI
                     await ExchangeResponse(Communication.TransferResponse.BadDataLength);
                     throw new Exception($"Data length too big ({_rxHeader.DataLength} bytes)");
                 }
-                // TODO Verify checksums
 
                 // Acknowledge reception
-                int response = await ExchangeResponse(Communication.TransferResponse.Success);
-                if (response == Communication.TransferResponse.BadFormat)
+                uint response = await ExchangeResponse(Communication.TransferResponse.Success);
+                switch (response)
                 {
-                    throw new Exception("RepRapFirmware refused message format");
+                    case 0:
+                    case 0xFFFFFFFF:
+                        throw new OperationCanceledException("Board is not available");
+
+                    case Communication.TransferResponse.Success:
+                        _lastTransferNumber = lastTransferNumber;
+                        return true;
+
+                    case Communication.TransferResponse.BadFormat:
+                        throw new Exception("RepRapFirmware refused message format");
+
+                    case Communication.TransferResponse.BadProtocolVersion:
+                        throw new Exception("RepRapFirmware refused protocol version");
+
+                    case Communication.TransferResponse.BadDataLength:
+                        throw new Exception("RepRapFirmware refused data length");
+
+                    case Communication.TransferResponse.BadHeaderChecksum:
+                        if (_started)
+                        {
+                            Console.WriteLine("[warn] RepRapFirmware got a bad header checksum");
+                        }
+                        continue;
+
+                    case Communication.TransferResponse.BadResponse:
+                        Console.WriteLine("[warn] Restarting transfer because RepRapFirmware received a bad response (header response)");
+                        return false;
+
+                    default:
+                        Console.WriteLine("[warn] Restarting transfer because a bad response was received (header)");
+                        await ResetTransfer();
+                        return false;
                 }
-                if (response == Communication.TransferResponse.BadProtocolVersion)
-                {
-                    throw new Exception("RepRapFirmware refused protocol version");
-                }
-                if (response == Communication.TransferResponse.Success)
-                {
-                    break;
-                }
-            } while (true);
+            }
+
+            Console.WriteLine("[warn] Restarting transfer because the number of maximum retries has been exceeded");
+            await ResetTransfer();
+            return false;
         }
 
-        private static async Task<int> ExchangeResponse(int response)
+        private static async Task<uint> ExchangeResponse(uint response)
         {
             MemoryMarshal.Write(_txResponseBuffer.Span, ref response);
 
             await WaitForTransfer();
             _spiDevice.TransferFullDuplex(_txResponseBuffer.Span, _rxResponseBuffer.Span);
 
-            return MemoryMarshal.Read<int>(_rxResponseBuffer.Span);
+            return MemoryMarshal.Read<uint>(_rxResponseBuffer.Span);
         }
 
-        private static async Task ExchangeData()
+        private static async Task<bool> ExchangeData()
         {
             int bytesToTransfer = Math.Max(_rxHeader.DataLength, _txPointer);
-
-            int response;
-            do
+            for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
                 await WaitForTransfer();
                 _spiDevice.TransferFullDuplex(_txBuffers[_txBufferIndex].Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
-                // TODO Verify checksum and send back BadChecksum if it does not match (unless _resetting is true)
 
-                response = await ExchangeResponse(Communication.TransferResponse.Success);
-                if (response == Communication.TransferResponse.Success || _resetting)
+                // Check for possible response code
+                uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);
+                if (responseCode == Communication.TransferResponse.BadResponse)
                 {
-                    return;
+                    Console.WriteLine("[warn] Restarting transfer because RepRapFirmware received a bad response (data content)");
+                    return false;
                 }
-            } while (response == Communication.TransferResponse.BadChecksum);
 
-            throw new ArgumentOutOfRangeException(nameof(response), $"Unexpected response {response:x2}");
+                // Inspect received data
+                ushort checksum = CRC16.Calculate(_rxBuffer.ToArray(), _rxHeader.DataLength);
+                if (_rxHeader.ChecksumData != checksum)
+                {
+                    Console.WriteLine($"[warn] Bad data checksum (0x{_rxHeader.ChecksumData:x4} vs 0x{checksum:x4})");
+                    await ExchangeResponse(Communication.TransferResponse.BadDataChecksum);
+                    continue;
+                }
+
+                uint response = await ExchangeResponse(Communication.TransferResponse.Success);
+                switch (response)
+                {
+                    case 0:
+                    case 0xFFFFFFFF:
+                        throw new OperationCanceledException("Board is not available");
+
+                    case Communication.TransferResponse.Success:
+                        return true;
+
+                    case Communication.TransferResponse.BadDataChecksum:
+                        Console.WriteLine("[warn] RepRapFirmware got a bad data checksum");
+                        continue;
+
+                    case Communication.TransferResponse.BadResponse:
+                        Console.WriteLine("[warn] Restarting transfer because RepRapFirmware received a bad response (data response)");
+                        return false;
+
+                    default:
+                        Console.WriteLine("[warn] Restarting transfer because a bad response was received (data)");
+                        await ResetTransfer();
+                        return false;
+                }
+            }
+
+            Console.WriteLine("[warn] Restarting transfer because the number of maximum retries has been exceeded");
+            await ResetTransfer();
+            return false;
+        }
+
+        private static async Task ResetTransfer()
+        {
+            uint response = Communication.TransferResponse.BadResponse;
+            MemoryMarshal.Write(_txResponseBuffer.Span, ref response);
+
+            await WaitForTransfer();
+            _spiDevice.Write(_txResponseBuffer.Span);
         }
         #endregion
     }

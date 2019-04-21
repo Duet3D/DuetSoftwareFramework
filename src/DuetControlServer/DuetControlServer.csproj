@@ -4,8 +4,11 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.2</TargetFramework>
     <LangVersion>default</LangVersion>
-    <FileVersion>1.0.0.2</FileVersion>
-    <AssemblyVersion>1.0.0.2</AssemblyVersion>
+    <Authors>Christian Hammacher</Authors>
+    <Company>Duet3D</Company>
+    <AssemblyVersion>1.0.0.4</AssemblyVersion>
+    <FileVersion>1.0.0.4</FileVersion>
+    <TrimUnusedDependencies>true</TrimUnusedDependencies>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -26,11 +29,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
+    <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
+    <PackageReference Include="Microsoft.Packaging.Tools.Trimming" Version="1.1.0-preview1-26619-01" />
+    <DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
   </ItemGroup>
 
 </Project>

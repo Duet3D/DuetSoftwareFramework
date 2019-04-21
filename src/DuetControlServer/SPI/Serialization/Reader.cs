@@ -1,9 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI;
-using DuetAPI.Commands;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.SharedRequests;

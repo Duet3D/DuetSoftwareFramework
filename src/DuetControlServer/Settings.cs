@@ -39,7 +39,15 @@ namespace DuetControlServer
         /// Internal model update interval after which properties of the machine model from
         /// the host controller (e.g. network information and mass storages) are updated (in ms)
         /// </summary>
+        [JsonProperty]
         public static int HostUpdateInterval { get; set; } = 4000;
+
+        /// <summary>
+        /// Maximum time to keep messages in the object model unless client(s) pick them up (in s).
+        /// Note that messages are only cleared when the host update task runs.
+        /// </summary>
+        [JsonProperty]
+        public static double MaxMessageAge { get; set; } = 60.0;
 
         /// <summary>
         /// Bus ID of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
@@ -54,10 +62,16 @@ namespace DuetControlServer
         public static int SpiChipSelectLine { get; set; } = 0;
 
         /// <summary>
-        /// Maximum time to wait for the RepRapFirmware controller (in ms)
+        /// Maximum allowed delay between data exchanges during a full transfer (in ms)
         /// </summary>
         [JsonProperty]
-        public static int SpiTimeout { get; set; } = 500;
+        public static int SpiTransferTimeout { get; set; } = 500;
+
+        /// <summary>
+        /// Maximum number of sequential transfer retries
+        /// </summary>
+        [JsonProperty]
+        public static int MaxSpiRetries { get; set; } = 3;
 
         /// <summary>
         /// Time to wait after every transfer (in ms)

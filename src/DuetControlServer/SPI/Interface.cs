@@ -75,6 +75,7 @@ namespace DuetControlServer.SPI
         /// This is only used for macro files requested from the firmware
         /// </summary>
         /// <param name="code">Code to execute</param>
+        /// <returns>Task that completes when the code has finished</returns>
         public static Task<CodeResult> ProcessSystemCode(Code code)
         {
             QueuedCode item = new QueuedCode(code, true);
@@ -88,6 +89,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Request an immediate emergency stop
         /// </summary>
+        /// <returns>Asynchronous task</returns>
         public static async Task RequestEmergencyStop()
         {
             _emergencyStopRequested = true;
@@ -97,6 +99,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Request a firmware reset
         /// </summary>
+        /// <returns>Asynchronous task</returns>
         public static async Task RequestReset()
         {
             _resetRequested = true;
@@ -199,6 +202,20 @@ namespace DuetControlServer.SPI
                     await InvalidateData("Controller has been reset");
                 }
 
+                // Check for changes of the print status.
+                // The packet providing file info has be sent first because it includes a time_t value that must reside on a 64-bit boundary!
+                if (_printStarted)
+                {
+                    using (await Model.Provider.AccessReadOnly())
+                    {
+                        _printStarted = !DataTransfer.WritePrintStarted(Model.Provider.Get.Job.File);
+                    }
+                }
+                else if (_printStoppedReason.HasValue && DataTransfer.WritePrintStopped(_printStoppedReason.Value))
+                {
+                    _printStoppedReason = null;
+                }
+
                 // Process incoming packets
                 for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
@@ -273,9 +290,11 @@ namespace DuetControlServer.SPI
                                     {
                                         lock (_pendingMacros[channel])
                                         {
-                                            _pendingMacros[channel].Pop();
+                                            if (!_pendingMacros[channel].Pop().IsAborted)
+                                            {
+                                                Console.WriteLine($"[info] Finished execution of macro file {macro.FileName}");
+                                            }
                                         }
-                                        Console.WriteLine($"[info] Finished execution of macro file {macro.FileName}");
                                     }
                                 }
                                 else
@@ -384,19 +403,6 @@ namespace DuetControlServer.SPI
                 if (IsIdle())
                 {
                     DataTransfer.WriteGetObjectModel(_moduleToQuery);
-                }
-
-                // Check for changes of the print status
-                if (_printStarted)
-                {
-                    using (await Model.Provider.AccessReadOnly())
-                    {
-                        _printStarted = !DataTransfer.WritePrintStarted(Model.Provider.Get.Job.File);
-                    }
-                }
-                else if (_printStoppedReason.HasValue && DataTransfer.WritePrintStopped(_printStoppedReason.Value))
-                {
-                    _printStoppedReason = null;
                 }
 
                 // Do another full SPI transfer
@@ -718,22 +724,38 @@ namespace DuetControlServer.SPI
                 MacroFile.AbortAllFiles(channel);
             }
 
-            // Resolve pending codes
+            // Resolve pending (system) codes
             foreach (CodeChannel channel in Enum.GetValues(typeof(CodeChannel)))
             {
                 lock (_pendingCodes[channel])
                 {
-                    while (_pendingCodes[channel].Count != 0)
+                    Queue<QueuedCode> validCodes = new Queue<QueuedCode>();
+
+                    while (_pendingCodes[channel].TryDequeue(out QueuedCode item))
                     {
-                        // Don't cancel codes from this channel if the emergency stop / reset came from here
-                        _pendingCodes[channel].TryPeek(out QueuedCode item);
                         if (item.Code.Type == CodeType.MCode && (item.Code.MajorNumber != 112 || item.Code.MajorNumber != 999))
                         {
-                            break;
+                            // Don't cancel codes from this channel if the emergency stop / reset came from here
+                            validCodes.Enqueue(item);
                         }
+                        else
+                        {
+                            // But do resolve every other code
+                            item.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                            item.SetFinished();
+                        }
+                    }
 
-                        // But do resolve every other code
-                        item = _pendingCodes[channel].Dequeue();
+                    while (validCodes.TryDequeue(out QueuedCode item))
+                    {
+                        _pendingCodes[channel].Enqueue(item);
+                    }
+                }
+
+                lock (_pendingSystemCodes[channel])
+                {
+                    while (_pendingSystemCodes[channel].TryPop(out QueuedCode item))
+                    {
                         item.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
                         item.SetFinished();
                     }
@@ -751,8 +773,6 @@ namespace DuetControlServer.SPI
                     }
                 }
             }
-
-            // TODO Reset object model scope to query
         }
     }
 }

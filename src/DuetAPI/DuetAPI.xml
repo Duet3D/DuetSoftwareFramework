@@ -2733,6 +2733,22 @@
             <param name="serializer">JSON serializer</param>
             <returns>Deserialized char enum</returns>
         </member>
+        <member name="T:DuetAPI.Utility.CRC16">
+            <summary>
+            Functions for CRC16 calculation
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.CRC16.Calculate(System.Byte[],System.UInt16)">
+            <summary>
+            Efficient CRC16 calculation based on the CRC16-IBM algorithm
+            </summary>
+            <param name="buffer">Buffer to calculate the checksum for</param>
+            <param name="length">Length of the buffer</param>
+            <returns>CRC16 Checksum</returns>
+            <remarks>
+            Found on https://stackoverflow.com/questions/18594963/crc16-iso-13239-implementation
+            </remarks>
+        </member>
         <member name="T:DuetAPI.Utility.JsonHelper">
             <summary>
             Helper class for JSON serialization, deserialization, patch creation and patch application
