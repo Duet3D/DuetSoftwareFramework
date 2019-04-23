@@ -26,6 +26,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="File\GCodes\Circle.gcode">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="File\GCodes\Cura.gcode">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

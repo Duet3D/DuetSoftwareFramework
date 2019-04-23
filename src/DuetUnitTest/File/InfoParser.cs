@@ -28,9 +28,29 @@ namespace DuetUnitTest.File
             Assert.AreNotEqual(0, info.FirstLayerHeight);
             Assert.AreNotEqual(0, info.LayerHeight);
             Assert.AreNotEqual(0, info.Filament.Length);
-            Assert.IsNotNull(info.GeneratedBy);
+            Assert.AreNotEqual("", info.GeneratedBy);
             // Assert.AreNotEqual(0, info.PrintTime);
             // Assert.AreNotEqual(0, info.SimulatedTime);
+        }
+
+        [Test]
+        public async Task TestEmpty()
+        {
+            string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "File/GCodes/Circle.gcode");
+            ParsedFileInfo info = await FileInfoParser.Parse(filePath);
+
+            TestContext.Out.Write(JsonConvert.SerializeObject(info, Formatting.Indented));
+
+            Assert.IsNotNull(info.FileName);
+            Assert.AreNotEqual(0, info.Size);
+            Assert.IsNotNull(info.LastModified);
+            Assert.AreEqual(0, info.Height);
+            Assert.AreEqual(0.5, info.FirstLayerHeight);
+            Assert.AreEqual(0, info.LayerHeight);
+            Assert.AreEqual(0, info.Filament.Length);
+            Assert.AreEqual("", info.GeneratedBy);
+            Assert.AreEqual(0, info.PrintTime);
+            Assert.AreEqual(0, info.SimulatedTime);
         }
     }
 }

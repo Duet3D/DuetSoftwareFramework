@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
+using Zhaobang.IO;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer
@@ -23,7 +24,7 @@ namespace DuetControlServer
         public static async Task<ParsedFileInfo> Parse(string fileName)
         {
             FileStream fileStream = new FileStream(fileName, FileMode.Open);
-            StreamReader reader = new StreamReader(fileStream);
+            SeekableStreamReader reader = new SeekableStreamReader(fileStream);
             try
             {
                 ParsedFileInfo result = new ParsedFileInfo
@@ -36,7 +37,7 @@ namespace DuetControlServer
                 if (fileStream.Length > 0)
                 {
                     await ParseHeader(reader, result);
-                    await ParseFooter(reader, result);
+                    await ParseFooter(reader, fileStream.Length, result);
                 }
 
                 reader.Close();
@@ -51,7 +52,7 @@ namespace DuetControlServer
             }
         }
 
-        private static async Task ParseHeader(StreamReader reader, ParsedFileInfo partialFileInfo)
+        private static async Task ParseHeader(SeekableStreamReader reader, ParsedFileInfo partialFileInfo)
         {
             // Every time CTS.Token is accessed a copy is generated. Hence we cache one until this method completes
             CancellationToken token = Program.CancelSource.Token;
@@ -104,7 +105,7 @@ namespace DuetControlServer
                 {
                     gotNewInfo |= partialFileInfo.LayerHeight == 0 && FindLayerHeight(line, ref partialFileInfo);
                     gotNewInfo |= FindFilamentUsed(line, ref filamentConsumption);
-                    gotNewInfo |= partialFileInfo.GeneratedBy == null && FindGeneratedBy(line, ref partialFileInfo);
+                    gotNewInfo |= partialFileInfo.GeneratedBy == "" && FindGeneratedBy(line, ref partialFileInfo);
                     gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo);
                     gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo);
                 }
@@ -115,15 +116,15 @@ namespace DuetControlServer
                 }
                 lastLineHadInfo = gotNewInfo;
             }
-            while (reader.BaseStream.Position < Settings.FileInfoReadLimit);
+            while (reader.Position < Settings.FileInfoReadLimit);
 
             partialFileInfo.Filament = filamentConsumption.ToArray();
         }
 
-        private static async Task ParseFooter(StreamReader reader, ParsedFileInfo partialFileInfo)
+        private static async Task ParseFooter(SeekableStreamReader reader, long length, ParsedFileInfo partialFileInfo)
         {
             CancellationToken token = Program.CancelSource.Token;
-            reader.BaseStream.Seek(0, SeekOrigin.End);
+            reader.Seek(0, SeekOrigin.End);
 
             bool inRelativeMode = false, lastLineHadInfo = false;
             double? lastZ = null;
@@ -190,7 +191,7 @@ namespace DuetControlServer
                 {
                     gotNewInfo |= partialFileInfo.LayerHeight == 0 && FindLayerHeight(line, ref partialFileInfo);
                     gotNewInfo |= FindFilamentUsed(line, ref filamentConsumption);
-                    // gotNewInfo |= partialFileInfo.GeneratedBy == null) && FindSlicer(line, ref partialFileInfo);
+                    // gotNewInfo |= partialFileInfo.GeneratedBy == "") && FindGeneratedBy(line, ref partialFileInfo);
                     gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo);
                     gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo);
                 }
@@ -201,7 +202,7 @@ namespace DuetControlServer
                 }
                 lastLineHadInfo = gotNewInfo;
             }
-            while (reader.BaseStream.Length - reader.BaseStream.Position < Settings.FileInfoReadLimit);
+            while (length - reader.Position < Settings.FileInfoReadLimit);
 
             partialFileInfo.Filament = filamentConsumption.ToArray();
             if (lastZ != null && partialFileInfo.Height == 0)
@@ -210,34 +211,33 @@ namespace DuetControlServer
             }
         }
 
-        private static async Task<string> ReadLineFromEndAsync(StreamReader reader)
+        private static async Task<string> ReadLineFromEndAsync(SeekableStreamReader reader)
         {
-            const int bufferSize = 512;
+            const int bufferSize = 128;
             char[] buffer = new char[bufferSize];
 
             string line = "";
-            long startPosition = reader.BaseStream.Position, totalBytesRead = 0;
-            while (reader.BaseStream.Position > 0)
+            while (reader.Position > 0)
             {
                 // Read a chunk. Do not do this char-wise for performance reasons
-                reader.BaseStream.Seek(-Math.Min(reader.BaseStream.Position, bufferSize), SeekOrigin.Current);
-                reader.DiscardBufferedData();
+                long bytesToRead = Math.Min(reader.Position, bufferSize);
+                reader.Seek(-bytesToRead, SeekOrigin.Current);
                 int bytesRead = await reader.ReadBlockAsync(buffer);
+                reader.Seek(-bytesToRead, SeekOrigin.Current);
 
                 // Keep reading until a NL is found
-                for (int i = bytesRead - 1; i >= 0; i--)
+                for (int i = (int)Math.Min(bytesRead - 1, reader.Position); i >= 0; i--)
                 {
                     char c = buffer[i];
                     if (c == '\n')
                     {
-                        reader.BaseStream.Position = startPosition - totalBytesRead - 1;
+                        reader.Seek(i, SeekOrigin.Current);
                         return line;
                     }
                     if (c != '\r')
                     {
                         line = c + line;
                     }
-                    totalBytesRead++;
                 }
             }
             return null;
@@ -249,7 +249,7 @@ namespace DuetControlServer
                     (result.FirstLayerHeight != 0) &&
                     (result.LayerHeight != 0) &&
                     (result.Filament.Length > 0) &&
-                    (result.GeneratedBy != null);
+                    (result.GeneratedBy != "");
         }
 
         private static bool FindLayerHeight(string line, ref ParsedFileInfo fileInfo)

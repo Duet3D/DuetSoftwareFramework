@@ -52,7 +52,8 @@ namespace DuetControlServer.Model
                     sensors = new
                     {
                         probeValue = 0,
-                        fanRPM = new float[0]
+                        probeSecondary = new int[0],
+                        fanRPM = new int[0]
                     },
                     temps = new
                     {
@@ -80,12 +81,12 @@ namespace DuetControlServer.Model
                         },
                         extra = new[]
                         {
-                        new
-                        {
-                            name = "",
-                            temp = 0.0
+                            new
+                            {
+                                name = "",
+                                temp = 0.0
+                            }
                         }
-                    }
                     },
                     coldExtrudeTemp = 160.0,
                     coldRetractTemp = 90.0,
@@ -139,6 +140,7 @@ namespace DuetControlServer.Model
                         Provider.Get.Fans.Add(new Fan
                         {
                             Name = response.Params.fanNames[fan],
+                            Rpm = (response.sensors.fanRPM.Length > fan && response.sensors.fanRPM[fan] > 0) ? (int?)response.sensors.fanRPM[fan] : null,
                             Value = response.Params.fanPercent[fan] / 100,
                             Thermostatic = new Thermostatic
                             {
@@ -245,7 +247,8 @@ namespace DuetControlServer.Model
                     Provider.Get.Sensors.Probes.Clear();
                     Provider.Get.Sensors.Probes.Add(new Probe
                     {
-                        Value = response.sensors.probeValue
+                        Value = response.sensors.probeValue,
+                        SecondaryValues = response.sensors.probeSecondary
                     });
 
                     // - State -

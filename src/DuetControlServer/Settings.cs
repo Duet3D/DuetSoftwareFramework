@@ -50,6 +50,12 @@ namespace DuetControlServer
         public static double MaxMessageAge { get; set; } = 60.0;
 
         /// <summary>
+        /// Frequency to use for SPI transfers
+        /// </summary>
+        [JsonProperty]
+        public static int SpiFrequency = 500_000;
+
+        /// <summary>
         /// Bus ID of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
         /// </summary>
         [JsonProperty]
@@ -84,6 +90,12 @@ namespace DuetControlServer
         /// </summary>
         [JsonProperty]
         public static int TransferReadyPin { get; set; } = 25;      // Pin 22 on the RaspPi expansion header
+
+        /// <summary>
+        /// Maximum delay after which a status update is requested even when in burst mode (in ms)
+        /// </summary>
+        [JsonProperty]
+        public static double MaxUpdateDelay { get; set; } = 250.0;
 
         /// <summary>
         /// How many bytes to parse max at the beginning and end of a file to retrieve G-code file information

@@ -119,6 +119,7 @@ namespace DuetControlServer
                 {
                     if (!(e is OperationCanceledException) && !(e is SocketException))
                     {
+                        Console.Write("[crit] ");
                         Console.WriteLine(e);
                     }
                 }

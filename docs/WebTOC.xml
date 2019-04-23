@@ -1,29 +1,29 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <HelpTOC>
 
-  <HelpTOCNode Id="f272cffc-d4a3-403e-8292-731a9391caf6" Title="DuetAPI Namespaces" Url="html/G_DuetAPI.htm">
-    <HelpTOCNode Id="6a891b19-6070-43e0-a596-e16e04d6b92d" Title="DuetAPI" Url="html/N_DuetAPI.htm">
+  <HelpTOCNode Id="d65acaf1-6b36-42a0-985c-faeb8fc5ee4e" Title="DuetAPI Namespaces" Url="html/G_DuetAPI.htm">
+    <HelpTOCNode Id="7e250f29-a0e9-40a0-a6b2-12326ab08583" Title="DuetAPI" Url="html/N_DuetAPI.htm">
       <HelpTOCNode Title="CodeChannel Enumeration" Url="html/T_DuetAPI_CodeChannel.htm" />
-      <HelpTOCNode Id="b04ea660-4b2a-4408-8258-224f9ac4e2c2" Title="Message Class" Url="html/T_DuetAPI_Message.htm">
-        <HelpTOCNode Id="1eafe7e4-fe8e-4ceb-b452-405cb2c7978b" Title="Message Constructor " Url="html/Overload_DuetAPI_Message__ctor.htm">
+      <HelpTOCNode Id="27acecf5-b4d0-46f5-bfba-b096f2d56137" Title="Message Class" Url="html/T_DuetAPI_Message.htm">
+        <HelpTOCNode Id="46f78f0f-18b7-44ac-aa1f-ff78b90fc466" Title="Message Constructor " Url="html/Overload_DuetAPI_Message__ctor.htm">
           <HelpTOCNode Title="Message Constructor " Url="html/M_DuetAPI_Message__ctor.htm" />
           <HelpTOCNode Title="Message Constructor (MessageType, String)" Url="html/M_DuetAPI_Message__ctor_1.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="939e2235-6e24-4565-a5e8-931eb9523e8e" Title="Message Properties" Url="html/Properties_T_DuetAPI_Message.htm">
+        <HelpTOCNode Id="92a6d56a-f3e7-4821-be28-617bf15df110" Title="Message Properties" Url="html/Properties_T_DuetAPI_Message.htm">
           <HelpTOCNode Title="Content Property " Url="html/P_DuetAPI_Message_Content.htm" />
           <HelpTOCNode Title="Time Property " Url="html/P_DuetAPI_Message_Time.htm" />
           <HelpTOCNode Title="Type Property " Url="html/P_DuetAPI_Message_Type.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="2040e951-daa7-48d8-a070-49ab790f35cb" Title="Message Methods" Url="html/Methods_T_DuetAPI_Message.htm">
+        <HelpTOCNode Id="256f45a9-e2aa-4321-9a08-4b6927ad0df1" Title="Message Methods" Url="html/Methods_T_DuetAPI_Message.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Message_Clone.htm" />
           <HelpTOCNode Title="Print Method " Url="html/M_DuetAPI_Message_Print.htm" />
           <HelpTOCNode Title="ToString Method " Url="html/M_DuetAPI_Message_ToString.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="MessageType Enumeration" Url="html/T_DuetAPI_MessageType.htm" />
-      <HelpTOCNode Id="91b56a21-6c68-415f-980d-92a12eaca395" Title="ParsedFileInfo Class" Url="html/T_DuetAPI_ParsedFileInfo.htm">
+      <HelpTOCNode Id="1d68f9bd-3d1c-4028-af26-a5e88870c016" Title="ParsedFileInfo Class" Url="html/T_DuetAPI_ParsedFileInfo.htm">
         <HelpTOCNode Title="ParsedFileInfo Constructor " Url="html/M_DuetAPI_ParsedFileInfo__ctor.htm" />
-        <HelpTOCNode Id="81b4346a-2ab0-4b49-acd2-b94c79eb08f0" Title="ParsedFileInfo Properties" Url="html/Properties_T_DuetAPI_ParsedFileInfo.htm">
+        <HelpTOCNode Id="665c5ec1-05dc-4ae3-9f3b-4fb13c3bb9c1" Title="ParsedFileInfo Properties" Url="html/Properties_T_DuetAPI_ParsedFileInfo.htm">
           <HelpTOCNode Title="Filament Property " Url="html/P_DuetAPI_ParsedFileInfo_Filament.htm" />
           <HelpTOCNode Title="FileName Property " Url="html/P_DuetAPI_ParsedFileInfo_FileName.htm" />
           <HelpTOCNode Title="FirstLayerHeight Property " Url="html/P_DuetAPI_ParsedFileInfo_FirstLayerHeight.htm" />
@@ -36,40 +36,40 @@
           <HelpTOCNode Title="SimulatedTime Property " Url="html/P_DuetAPI_ParsedFileInfo_SimulatedTime.htm" />
           <HelpTOCNode Title="Size Property " Url="html/P_DuetAPI_ParsedFileInfo_Size.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="dcc985ef-e8a7-4dc8-8b46-092176969b64" Title="ParsedFileInfo Methods" Url="html/Methods_T_DuetAPI_ParsedFileInfo.htm">
+        <HelpTOCNode Id="f9361094-9e42-4961-a53d-a78e3b88e6fe" Title="ParsedFileInfo Methods" Url="html/Methods_T_DuetAPI_ParsedFileInfo.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_ParsedFileInfo_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="0cb943cd-9e89-479c-931a-6b7367e89510" Title="DuetAPI.Commands" Url="html/N_DuetAPI_Commands.htm">
-      <HelpTOCNode Id="c314eeb1-ca30-4f9a-a63c-a6e2b825be70" Title="Acknowledge Class" Url="html/T_DuetAPI_Commands_Acknowledge.htm">
+    <HelpTOCNode Id="4ea618cf-2db7-4cdb-8254-795ecaef8b11" Title="DuetAPI.Commands" Url="html/N_DuetAPI_Commands.htm">
+      <HelpTOCNode Id="7b784b22-95a5-43e7-bdec-4adec1a7387b" Title="Acknowledge Class" Url="html/T_DuetAPI_Commands_Acknowledge.htm">
         <HelpTOCNode Title="Acknowledge Constructor " Url="html/M_DuetAPI_Commands_Acknowledge__ctor.htm" />
         <HelpTOCNode Title="Acknowledge Properties" Url="html/Properties_T_DuetAPI_Commands_Acknowledge.htm" />
         <HelpTOCNode Title="Acknowledge Methods" Url="html/Methods_T_DuetAPI_Commands_Acknowledge.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="fd6e7de1-b368-433a-97b5-0a8f61794729" Title="BaseCommand Class" Url="html/T_DuetAPI_Commands_BaseCommand.htm">
+      <HelpTOCNode Id="f6f5d714-5bd8-4d7b-9df9-9d842f79299a" Title="BaseCommand Class" Url="html/T_DuetAPI_Commands_BaseCommand.htm">
         <HelpTOCNode Title="BaseCommand Constructor " Url="html/M_DuetAPI_Commands_BaseCommand__ctor.htm" />
-        <HelpTOCNode Id="47360827-364b-4540-8706-af148b01b3c0" Title="BaseCommand Properties" Url="html/Properties_T_DuetAPI_Commands_BaseCommand.htm">
+        <HelpTOCNode Id="ec10a9e6-6895-4cd7-bc41-2aec5d74d475" Title="BaseCommand Properties" Url="html/Properties_T_DuetAPI_Commands_BaseCommand.htm">
           <HelpTOCNode Title="Command Property " Url="html/P_DuetAPI_Commands_BaseCommand_Command.htm" />
           <HelpTOCNode Title="SourceConnection Property " Url="html/P_DuetAPI_Commands_BaseCommand_SourceConnection.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="a7294986-6865-40a6-8614-9ccc533898d9" Title="BaseCommand Methods" Url="html/Methods_T_DuetAPI_Commands_BaseCommand.htm">
+        <HelpTOCNode Id="5f90442c-e62b-456f-a582-3c60767e8b0f" Title="BaseCommand Methods" Url="html/Methods_T_DuetAPI_Commands_BaseCommand.htm">
           <HelpTOCNode Title="Invoke Method " Url="html/M_DuetAPI_Commands_BaseCommand_Invoke.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="d6b107a2-2cab-4c8a-86d1-bea3e9dd1a99" Title="BaseResponse Class" Url="html/T_DuetAPI_Commands_BaseResponse.htm">
+      <HelpTOCNode Id="b15e875b-fdd9-4912-9679-584affefce4c" Title="BaseResponse Class" Url="html/T_DuetAPI_Commands_BaseResponse.htm">
         <HelpTOCNode Title="BaseResponse Constructor " Url="html/M_DuetAPI_Commands_BaseResponse__ctor.htm" />
-        <HelpTOCNode Id="a09f9853-a51a-46a8-9182-59f0e1878ab7" Title="BaseResponse Properties" Url="html/Properties_T_DuetAPI_Commands_BaseResponse.htm">
+        <HelpTOCNode Id="3a38e07a-a403-4dca-8b3c-30e68d6181db" Title="BaseResponse Properties" Url="html/Properties_T_DuetAPI_Commands_BaseResponse.htm">
           <HelpTOCNode Title="Success Property " Url="html/P_DuetAPI_Commands_BaseResponse_Success.htm" />
         </HelpTOCNode>
         <HelpTOCNode Title="BaseResponse Methods" Url="html/Methods_T_DuetAPI_Commands_BaseResponse.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="ced8251e-a93f-44d0-88f9-89306c1c77a6" Title="Code Class" Url="html/T_DuetAPI_Commands_Code.htm">
-        <HelpTOCNode Id="91269299-0b95-4c92-a7cb-866a7c4f9ff9" Title="Code Constructor " Url="html/Overload_DuetAPI_Commands_Code__ctor.htm">
+      <HelpTOCNode Id="69a17309-87ab-487a-96c5-15914f5eac61" Title="Code Class" Url="html/T_DuetAPI_Commands_Code.htm">
+        <HelpTOCNode Id="e0c0086e-49b3-4c95-9d3d-9a8bb463adb5" Title="Code Constructor " Url="html/Overload_DuetAPI_Commands_Code__ctor.htm">
           <HelpTOCNode Title="Code Constructor " Url="html/M_DuetAPI_Commands_Code__ctor.htm" />
           <HelpTOCNode Title="Code Constructor (String)" Url="html/M_DuetAPI_Commands_Code__ctor_1.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="24e0bc3b-1112-4961-8115-a2d2521c882f" Title="Code Properties" Url="html/Properties_T_DuetAPI_Commands_Code.htm">
+        <HelpTOCNode Id="5ee7a499-132c-4465-89c8-a779d5e16ca0" Title="Code Properties" Url="html/Properties_T_DuetAPI_Commands_Code.htm">
           <HelpTOCNode Title="Channel Property " Url="html/P_DuetAPI_Commands_Code_Channel.htm" />
           <HelpTOCNode Title="Comment Property " Url="html/P_DuetAPI_Commands_Code_Comment.htm" />
           <HelpTOCNode Title="EnforceAbsoluteCoordinates Property " Url="html/P_DuetAPI_Commands_Code_EnforceAbsoluteCoordinates.htm" />
@@ -85,16 +85,16 @@
           <HelpTOCNode Title="Parameters Property " Url="html/P_DuetAPI_Commands_Code_Parameters.htm" />
           <HelpTOCNode Title="Type Property " Url="html/P_DuetAPI_Commands_Code_Type.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="119bf726-9137-4efd-97c4-a572336d7ad2" Title="Code Methods" Url="html/Methods_T_DuetAPI_Commands_Code.htm">
+        <HelpTOCNode Id="b04b2a64-f61c-437f-bdd1-ebf871169ed3" Title="Code Methods" Url="html/Methods_T_DuetAPI_Commands_Code.htm">
           <HelpTOCNode Title="GetParameter Method " Url="html/M_DuetAPI_Commands_Code_GetParameter.htm" />
           <HelpTOCNode Title="GetUnprecedentedString Method " Url="html/M_DuetAPI_Commands_Code_GetUnprecedentedString.htm" />
           <HelpTOCNode Title="ToShortString Method " Url="html/M_DuetAPI_Commands_Code_ToShortString.htm" />
           <HelpTOCNode Title="ToString Method " Url="html/M_DuetAPI_Commands_Code_ToString.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="d9853d5e-271f-4d86-a5d0-3c7ebfd405d4" Title="CodeParameter Class" Url="html/T_DuetAPI_Commands_CodeParameter.htm">
+      <HelpTOCNode Id="bca80dc8-106f-41fd-8fb2-50d5eb261205" Title="CodeParameter Class" Url="html/T_DuetAPI_Commands_CodeParameter.htm">
         <HelpTOCNode Title="CodeParameter Constructor " Url="html/M_DuetAPI_Commands_CodeParameter__ctor.htm" />
-        <HelpTOCNode Id="7363907c-ae0f-4aa3-bc7f-4e70f6dbcb2c" Title="CodeParameter Properties" Url="html/Properties_T_DuetAPI_Commands_CodeParameter.htm">
+        <HelpTOCNode Id="534c6d4c-ab53-45e4-a353-b793e4765e9a" Title="CodeParameter Properties" Url="html/Properties_T_DuetAPI_Commands_CodeParameter.htm">
           <HelpTOCNode Title="AsBool Property " Url="html/P_DuetAPI_Commands_CodeParameter_AsBool.htm" />
           <HelpTOCNode Title="AsFloat Property " Url="html/P_DuetAPI_Commands_CodeParameter_AsFloat.htm" />
           <HelpTOCNode Title="AsFloatArray Property " Url="html/P_DuetAPI_Commands_CodeParameter_AsFloatArray.htm" />
@@ -108,17 +108,17 @@
         </HelpTOCNode>
         <HelpTOCNode Title="CodeParameter Methods" Url="html/Methods_T_DuetAPI_Commands_CodeParameter.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="af424003-7a81-4dbc-8f27-52c64ea0a5ae" Title="CodeParameterConverter Class" Url="html/T_DuetAPI_Commands_CodeParameterConverter.htm">
+      <HelpTOCNode Id="01db6657-77de-4055-b824-ca2ebcca9934" Title="CodeParameterConverter Class" Url="html/T_DuetAPI_Commands_CodeParameterConverter.htm">
         <HelpTOCNode Title="CodeParameterConverter Constructor " Url="html/M_DuetAPI_Commands_CodeParameterConverter__ctor.htm" />
         <HelpTOCNode Title="CodeParameterConverter Properties" Url="html/Properties_T_DuetAPI_Commands_CodeParameterConverter.htm" />
-        <HelpTOCNode Id="cb40c5de-49cf-4eb2-a8ed-49e4b64298fb" Title="CodeParameterConverter Methods" Url="html/Methods_T_DuetAPI_Commands_CodeParameterConverter.htm">
+        <HelpTOCNode Id="356cd4a0-390d-4e85-b0f5-17025ce1ea68" Title="CodeParameterConverter Methods" Url="html/Methods_T_DuetAPI_Commands_CodeParameterConverter.htm">
           <HelpTOCNode Title="CanConvert Method " Url="html/M_DuetAPI_Commands_CodeParameterConverter_CanConvert.htm" />
           <HelpTOCNode Title="ReadJson Method " Url="html/M_DuetAPI_Commands_CodeParameterConverter_ReadJson.htm" />
           <HelpTOCNode Title="WriteJson Method " Url="html/M_DuetAPI_Commands_CodeParameterConverter_WriteJson.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="9c608cd5-5865-4c5e-b2a3-4b390852c6c8" Title="CodeParserException Class" Url="html/T_DuetAPI_Commands_CodeParserException.htm">
-        <HelpTOCNode Id="14db4f49-94a8-4d8b-b510-d185bc680b82" Title="CodeParserException Constructor " Url="html/Overload_DuetAPI_Commands_CodeParserException__ctor.htm">
+      <HelpTOCNode Id="332177fb-b9be-4554-aa26-0f640606962b" Title="CodeParserException Class" Url="html/T_DuetAPI_Commands_CodeParserException.htm">
+        <HelpTOCNode Id="d2fd9571-2cf2-46e0-b02e-54989b186be9" Title="CodeParserException Constructor " Url="html/Overload_DuetAPI_Commands_CodeParserException__ctor.htm">
           <HelpTOCNode Title="CodeParserException Constructor " Url="html/M_DuetAPI_Commands_CodeParserException__ctor.htm" />
           <HelpTOCNode Title="CodeParserException Constructor (String)" Url="html/M_DuetAPI_Commands_CodeParserException__ctor_1.htm" />
           <HelpTOCNode Title="CodeParserException Constructor (String, Exception)" Url="html/M_DuetAPI_Commands_CodeParserException__ctor_2.htm" />
@@ -127,99 +127,99 @@
         <HelpTOCNode Title="CodeParserException Methods" Url="html/Methods_T_DuetAPI_Commands_CodeParserException.htm" />
         <HelpTOCNode Title="CodeParserException Events" Url="html/Events_T_DuetAPI_Commands_CodeParserException.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="c1a155f0-6e59-42cc-90d5-5c935d3f7da7" Title="CodeResult Class" Url="html/T_DuetAPI_Commands_CodeResult.htm">
-        <HelpTOCNode Id="17ffab10-5d38-466f-bb4d-84475ba29feb" Title="CodeResult Constructor " Url="html/Overload_DuetAPI_Commands_CodeResult__ctor.htm">
+      <HelpTOCNode Id="e2c2880d-2b86-4131-965e-1bb2dbeabe27" Title="CodeResult Class" Url="html/T_DuetAPI_Commands_CodeResult.htm">
+        <HelpTOCNode Id="4d06a39e-2a97-4fb5-a476-0e888f513271" Title="CodeResult Constructor " Url="html/Overload_DuetAPI_Commands_CodeResult__ctor.htm">
           <HelpTOCNode Title="CodeResult Constructor " Url="html/M_DuetAPI_Commands_CodeResult__ctor.htm" />
           <HelpTOCNode Title="CodeResult Constructor (MessageType, String)" Url="html/M_DuetAPI_Commands_CodeResult__ctor_1.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="c2904de4-2cf2-4fc7-9b6e-d829e6697f0a" Title="CodeResult Properties" Url="html/Properties_T_DuetAPI_Commands_CodeResult.htm">
+        <HelpTOCNode Id="705d79d6-a20d-4c9b-9b0a-7abf23951bc7" Title="CodeResult Properties" Url="html/Properties_T_DuetAPI_Commands_CodeResult.htm">
           <HelpTOCNode Title="IsSuccessful Property " Url="html/P_DuetAPI_Commands_CodeResult_IsSuccessful.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="f869ffb3-def5-40ed-89d7-361a947a2dda" Title="CodeResult Methods" Url="html/Methods_T_DuetAPI_Commands_CodeResult.htm">
+        <HelpTOCNode Id="89f8b7be-5024-4c6d-8df6-c59b7c45a6c0" Title="CodeResult Methods" Url="html/Methods_T_DuetAPI_Commands_CodeResult.htm">
           <HelpTOCNode Title="ToString Method " Url="html/M_DuetAPI_Commands_CodeResult_ToString.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="CodeType Enumeration" Url="html/T_DuetAPI_Commands_CodeType.htm" />
-      <HelpTOCNode Id="2fab7374-1577-41df-b813-300d1f2a2186" Title="Command Class" Url="html/T_DuetAPI_Commands_Command.htm">
+      <HelpTOCNode Id="96365941-e9c0-4dd9-acc4-6cf701b0008d" Title="Command Class" Url="html/T_DuetAPI_Commands_Command.htm">
         <HelpTOCNode Title="Command Constructor " Url="html/M_DuetAPI_Commands_Command__ctor.htm" />
         <HelpTOCNode Title="Command Properties" Url="html/Properties_T_DuetAPI_Commands_Command.htm" />
-        <HelpTOCNode Id="610dfe8b-d0af-4749-ad71-3c63aa9df08f" Title="Command Methods" Url="html/Methods_T_DuetAPI_Commands_Command.htm">
+        <HelpTOCNode Id="48fa7e25-1a5a-4a33-9c1a-3b929cc815b6" Title="Command Methods" Url="html/Methods_T_DuetAPI_Commands_Command.htm">
           <HelpTOCNode Title="Execute Method " Url="html/M_DuetAPI_Commands_Command_Execute.htm" />
           <HelpTOCNode Title="Invoke Method " Url="html/M_DuetAPI_Commands_Command_Invoke.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="114f4c53-f51e-4c15-b5b5-720ded314d5f" Title="Command(T) Class" Url="html/T_DuetAPI_Commands_Command_1.htm">
+      <HelpTOCNode Id="fbd001c4-8f1f-4fdc-a13d-948621dc1075" Title="Command(T) Class" Url="html/T_DuetAPI_Commands_Command_1.htm">
         <HelpTOCNode Title="Command(T) Constructor " Url="html/M_DuetAPI_Commands_Command_1__ctor.htm" />
         <HelpTOCNode Title="Command(T) Properties" Url="html/Properties_T_DuetAPI_Commands_Command_1.htm" />
-        <HelpTOCNode Id="fe3d7f4a-63ab-4938-acb0-a9652e79cc1d" Title="Command(T) Methods" Url="html/Methods_T_DuetAPI_Commands_Command_1.htm">
+        <HelpTOCNode Id="ea176249-17ec-4330-81b8-0d6be306b5c5" Title="Command(T) Methods" Url="html/Methods_T_DuetAPI_Commands_Command_1.htm">
           <HelpTOCNode Title="Execute Method " Url="html/M_DuetAPI_Commands_Command_1_Execute.htm" />
           <HelpTOCNode Title="Invoke Method " Url="html/M_DuetAPI_Commands_Command_1_Invoke.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="432f839e-4a3f-4d9f-b2b6-0d9864821eca" Title="ErrorResponse Class" Url="html/T_DuetAPI_Commands_ErrorResponse.htm">
-        <HelpTOCNode Id="376b9bcd-d140-4138-bb96-207c4e565fda" Title="ErrorResponse Constructor " Url="html/Overload_DuetAPI_Commands_ErrorResponse__ctor.htm">
+      <HelpTOCNode Id="1c5d869f-17ff-410c-be22-ad618e1b4818" Title="ErrorResponse Class" Url="html/T_DuetAPI_Commands_ErrorResponse.htm">
+        <HelpTOCNode Id="dc8091c6-75e2-4025-9ba5-d5e4f8b73156" Title="ErrorResponse Constructor " Url="html/Overload_DuetAPI_Commands_ErrorResponse__ctor.htm">
           <HelpTOCNode Title="ErrorResponse Constructor " Url="html/M_DuetAPI_Commands_ErrorResponse__ctor.htm" />
           <HelpTOCNode Title="ErrorResponse Constructor (Exception)" Url="html/M_DuetAPI_Commands_ErrorResponse__ctor_1.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="bf2a89c6-c2a0-4e3b-8185-db3561c47a80" Title="ErrorResponse Properties" Url="html/Properties_T_DuetAPI_Commands_ErrorResponse.htm">
+        <HelpTOCNode Id="f456c611-3de2-4e33-aa1f-450ac4dbba5f" Title="ErrorResponse Properties" Url="html/Properties_T_DuetAPI_Commands_ErrorResponse.htm">
           <HelpTOCNode Title="ErrorMessage Property " Url="html/P_DuetAPI_Commands_ErrorResponse_ErrorMessage.htm" />
           <HelpTOCNode Title="ErrorType Property " Url="html/P_DuetAPI_Commands_ErrorResponse_ErrorType.htm" />
         </HelpTOCNode>
         <HelpTOCNode Title="ErrorResponse Methods" Url="html/Methods_T_DuetAPI_Commands_ErrorResponse.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="c80d28f7-f227-44c4-be2b-4ee6b750b888" Title="GetFileInfo Class" Url="html/T_DuetAPI_Commands_GetFileInfo.htm">
+      <HelpTOCNode Id="aef55328-e385-4e89-83ca-2a4ba913c387" Title="GetFileInfo Class" Url="html/T_DuetAPI_Commands_GetFileInfo.htm">
         <HelpTOCNode Title="GetFileInfo Constructor " Url="html/M_DuetAPI_Commands_GetFileInfo__ctor.htm" />
-        <HelpTOCNode Id="a094c294-a832-4f81-ade8-8d257899f5aa" Title="GetFileInfo Properties" Url="html/Properties_T_DuetAPI_Commands_GetFileInfo.htm">
+        <HelpTOCNode Id="a3004eb7-7bca-45cb-ab56-b74206db6817" Title="GetFileInfo Properties" Url="html/Properties_T_DuetAPI_Commands_GetFileInfo.htm">
           <HelpTOCNode Title="FileName Property " Url="html/P_DuetAPI_Commands_GetFileInfo_FileName.htm" />
         </HelpTOCNode>
         <HelpTOCNode Title="GetFileInfo Methods" Url="html/Methods_T_DuetAPI_Commands_GetFileInfo.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="f924bdd6-c8ce-42dc-87eb-dcd1fc027931" Title="GetMachineModel Class" Url="html/T_DuetAPI_Commands_GetMachineModel.htm">
+      <HelpTOCNode Id="330b1c29-bf10-4058-9db9-7abcb241f8fa" Title="GetMachineModel Class" Url="html/T_DuetAPI_Commands_GetMachineModel.htm">
         <HelpTOCNode Title="GetMachineModel Constructor " Url="html/M_DuetAPI_Commands_GetMachineModel__ctor.htm" />
         <HelpTOCNode Title="GetMachineModel Properties" Url="html/Properties_T_DuetAPI_Commands_GetMachineModel.htm" />
         <HelpTOCNode Title="GetMachineModel Methods" Url="html/Methods_T_DuetAPI_Commands_GetMachineModel.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="3d9e084b-082b-4fd8-bf51-efb75fe40f25" Title="Ignore Class" Url="html/T_DuetAPI_Commands_Ignore.htm">
+      <HelpTOCNode Id="da016fac-d043-4f71-8089-abdc35675e39" Title="Ignore Class" Url="html/T_DuetAPI_Commands_Ignore.htm">
         <HelpTOCNode Title="Ignore Constructor " Url="html/M_DuetAPI_Commands_Ignore__ctor.htm" />
         <HelpTOCNode Title="Ignore Properties" Url="html/Properties_T_DuetAPI_Commands_Ignore.htm" />
         <HelpTOCNode Title="Ignore Methods" Url="html/Methods_T_DuetAPI_Commands_Ignore.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="78be7fcc-bdcf-4add-b9bf-798e24dcfc09" Title="Resolve Class" Url="html/T_DuetAPI_Commands_Resolve.htm">
+      <HelpTOCNode Id="d2a224d2-b927-4b03-ad19-7fe96dbd09fe" Title="Resolve Class" Url="html/T_DuetAPI_Commands_Resolve.htm">
         <HelpTOCNode Title="Resolve Constructor " Url="html/M_DuetAPI_Commands_Resolve__ctor.htm" />
-        <HelpTOCNode Id="4fba54e3-e94e-42cc-84ac-24f89c33ba3d" Title="Resolve Properties" Url="html/Properties_T_DuetAPI_Commands_Resolve.htm">
+        <HelpTOCNode Id="a02bcee7-efd2-4302-af72-d9cccc217e6e" Title="Resolve Properties" Url="html/Properties_T_DuetAPI_Commands_Resolve.htm">
           <HelpTOCNode Title="Content Property " Url="html/P_DuetAPI_Commands_Resolve_Content.htm" />
           <HelpTOCNode Title="Type Property " Url="html/P_DuetAPI_Commands_Resolve_Type.htm" />
         </HelpTOCNode>
         <HelpTOCNode Title="Resolve Methods" Url="html/Methods_T_DuetAPI_Commands_Resolve.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="2a9fff25-8b6c-4619-ada5-30a92b1fe60b" Title="ResolvePath Class" Url="html/T_DuetAPI_Commands_ResolvePath.htm">
+      <HelpTOCNode Id="d9dd1423-b7e0-46d3-b633-ba3a02ac4c62" Title="ResolvePath Class" Url="html/T_DuetAPI_Commands_ResolvePath.htm">
         <HelpTOCNode Title="ResolvePath Constructor " Url="html/M_DuetAPI_Commands_ResolvePath__ctor.htm" />
-        <HelpTOCNode Id="f7e757bd-4c90-466a-bb09-823ffbb0a443" Title="ResolvePath Properties" Url="html/Properties_T_DuetAPI_Commands_ResolvePath.htm">
+        <HelpTOCNode Id="6fdb1383-c68c-4a45-9e0d-645d4235ba02" Title="ResolvePath Properties" Url="html/Properties_T_DuetAPI_Commands_ResolvePath.htm">
           <HelpTOCNode Title="Path Property " Url="html/P_DuetAPI_Commands_ResolvePath_Path.htm" />
         </HelpTOCNode>
         <HelpTOCNode Title="ResolvePath Methods" Url="html/Methods_T_DuetAPI_Commands_ResolvePath.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="85bcad39-35d4-4785-acbc-2063857056df" Title="Response(T) Class" Url="html/T_DuetAPI_Commands_Response_1.htm">
+      <HelpTOCNode Id="8d49b57c-4b8d-4c90-9a98-e7a3f9a151c1" Title="Response(T) Class" Url="html/T_DuetAPI_Commands_Response_1.htm">
         <HelpTOCNode Title="Response(T) Constructor " Url="html/M_DuetAPI_Commands_Response_1__ctor.htm" />
-        <HelpTOCNode Id="8ba73d26-8770-487c-85a6-936f98089cda" Title="Response(T) Properties" Url="html/Properties_T_DuetAPI_Commands_Response_1.htm">
+        <HelpTOCNode Id="76ac28a4-4c4d-496b-bb88-18b58696ee06" Title="Response(T) Properties" Url="html/Properties_T_DuetAPI_Commands_Response_1.htm">
           <HelpTOCNode Title="Result Property " Url="html/P_DuetAPI_Commands_Response_1_Result.htm" />
         </HelpTOCNode>
         <HelpTOCNode Title="Response(T) Methods" Url="html/Methods_T_DuetAPI_Commands_Response_1.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="ac342dad-a97e-4a3e-b052-4af4fd406beb" Title="SimpleCode Class" Url="html/T_DuetAPI_Commands_SimpleCode.htm">
+      <HelpTOCNode Id="6ddff2fa-cad8-4824-95f8-8bbdfe8803f9" Title="SimpleCode Class" Url="html/T_DuetAPI_Commands_SimpleCode.htm">
         <HelpTOCNode Title="SimpleCode Constructor " Url="html/M_DuetAPI_Commands_SimpleCode__ctor.htm" />
-        <HelpTOCNode Id="13311d17-53ab-4bbe-8480-30a4fa51d7e9" Title="SimpleCode Properties" Url="html/Properties_T_DuetAPI_Commands_SimpleCode.htm">
+        <HelpTOCNode Id="4058b365-5d4b-4d65-a9c0-1eb92375b86e" Title="SimpleCode Properties" Url="html/Properties_T_DuetAPI_Commands_SimpleCode.htm">
           <HelpTOCNode Title="Channel Property " Url="html/P_DuetAPI_Commands_SimpleCode_Channel.htm" />
           <HelpTOCNode Title="Code Property " Url="html/P_DuetAPI_Commands_SimpleCode_Code.htm" />
         </HelpTOCNode>
         <HelpTOCNode Title="SimpleCode Methods" Url="html/Methods_T_DuetAPI_Commands_SimpleCode.htm" />
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="eb33343c-d5c8-4bf1-a3cc-7d854b9edfd8" Title="DuetAPI.Connection Namespaces" Url="html/G_DuetAPI_Connection.htm">
-      <HelpTOCNode Id="4d54d471-5d4b-4e42-adcd-8052b9e5f8ff" Title="DuetAPI.Connection" Url="html/N_DuetAPI_Connection.htm">
+    <HelpTOCNode Id="e5dda8f7-639a-4536-a156-80b75e6315f4" Title="DuetAPI.Connection Namespaces" Url="html/G_DuetAPI_Connection.htm">
+      <HelpTOCNode Id="1c87f968-e7ba-44d0-a41a-27dd620f72a7" Title="DuetAPI.Connection" Url="html/N_DuetAPI_Connection.htm">
         <HelpTOCNode Title="ConnectionMode Enumeration" Url="html/T_DuetAPI_Connection_ConnectionMode.htm" />
-        <HelpTOCNode Id="79cecf10-ce69-4a0d-8195-e03492d91f01" Title="Defaults Class" Url="html/T_DuetAPI_Connection_Defaults.htm">
-          <HelpTOCNode Id="da4a8ea4-f970-4a2f-97b5-64ce64213747" Title="Defaults Fields" Url="html/Fields_T_DuetAPI_Connection_Defaults.htm">
+        <HelpTOCNode Id="9bf88509-624c-4c2d-bb08-ba1db262f168" Title="Defaults Class" Url="html/T_DuetAPI_Connection_Defaults.htm">
+          <HelpTOCNode Id="0d708988-1660-4b7f-9783-f649df8432b8" Title="Defaults Fields" Url="html/Fields_T_DuetAPI_Connection_Defaults.htm">
             <HelpTOCNode Title="Channel Field" Url="html/F_DuetAPI_Connection_Defaults_Channel.htm" />
             <HelpTOCNode Title="SocketPath Field" Url="html/F_DuetAPI_Connection_Defaults_SocketPath.htm" />
           </HelpTOCNode>
@@ -227,47 +227,47 @@
         <HelpTOCNode Title="InterceptionMode Enumeration" Url="html/T_DuetAPI_Connection_InterceptionMode.htm" />
         <HelpTOCNode Title="SubscriptionMode Enumeration" Url="html/T_DuetAPI_Connection_SubscriptionMode.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="97978103-72b9-4a3f-8130-f8c3816fe96c" Title="DuetAPI.Connection.InitMessages" Url="html/N_DuetAPI_Connection_InitMessages.htm">
-        <HelpTOCNode Id="8a0b11da-532e-4cb1-921f-cc7ec9bdd6cd" Title="ClientInitMessage Class" Url="html/T_DuetAPI_Connection_InitMessages_ClientInitMessage.htm">
+      <HelpTOCNode Id="5fe6773c-1286-4de9-a87f-105702f825ea" Title="DuetAPI.Connection.InitMessages" Url="html/N_DuetAPI_Connection_InitMessages.htm">
+        <HelpTOCNode Id="700bef58-5bc2-4ce3-82f8-e178e7de03b7" Title="ClientInitMessage Class" Url="html/T_DuetAPI_Connection_InitMessages_ClientInitMessage.htm">
           <HelpTOCNode Title="ClientInitMessage Constructor " Url="html/M_DuetAPI_Connection_InitMessages_ClientInitMessage__ctor.htm" />
-          <HelpTOCNode Id="3ab45397-c579-4807-ac38-b1e463dbeb11" Title="ClientInitMessage Properties" Url="html/Properties_T_DuetAPI_Connection_InitMessages_ClientInitMessage.htm">
+          <HelpTOCNode Id="2c389fa5-0e24-4c9f-a62c-13885b0aa264" Title="ClientInitMessage Properties" Url="html/Properties_T_DuetAPI_Connection_InitMessages_ClientInitMessage.htm">
             <HelpTOCNode Title="Mode Property " Url="html/P_DuetAPI_Connection_InitMessages_ClientInitMessage_Mode.htm" />
           </HelpTOCNode>
           <HelpTOCNode Title="ClientInitMessage Methods" Url="html/Methods_T_DuetAPI_Connection_InitMessages_ClientInitMessage.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="87f167ec-123a-4dcf-bc93-b9524cee022a" Title="CommandInitMessage Class" Url="html/T_DuetAPI_Connection_InitMessages_CommandInitMessage.htm">
+        <HelpTOCNode Id="1527912f-1061-47b8-b42b-3b9bf0f583ed" Title="CommandInitMessage Class" Url="html/T_DuetAPI_Connection_InitMessages_CommandInitMessage.htm">
           <HelpTOCNode Title="CommandInitMessage Constructor " Url="html/M_DuetAPI_Connection_InitMessages_CommandInitMessage__ctor.htm" />
           <HelpTOCNode Title="CommandInitMessage Properties" Url="html/Properties_T_DuetAPI_Connection_InitMessages_CommandInitMessage.htm" />
           <HelpTOCNode Title="CommandInitMessage Methods" Url="html/Methods_T_DuetAPI_Connection_InitMessages_CommandInitMessage.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="1453dd02-b1d8-481f-b568-b09a2ac283f0" Title="InterceptInitMessage Class" Url="html/T_DuetAPI_Connection_InitMessages_InterceptInitMessage.htm">
+        <HelpTOCNode Id="906086a1-585d-46c5-9ecc-b4049dc13a8c" Title="InterceptInitMessage Class" Url="html/T_DuetAPI_Connection_InitMessages_InterceptInitMessage.htm">
           <HelpTOCNode Title="InterceptInitMessage Constructor " Url="html/M_DuetAPI_Connection_InitMessages_InterceptInitMessage__ctor.htm" />
-          <HelpTOCNode Id="3b880cfc-d6fc-41bf-80d9-ed461e931d28" Title="InterceptInitMessage Properties" Url="html/Properties_T_DuetAPI_Connection_InitMessages_InterceptInitMessage.htm">
+          <HelpTOCNode Id="74664787-31c8-4e19-b459-05dd5b67c189" Title="InterceptInitMessage Properties" Url="html/Properties_T_DuetAPI_Connection_InitMessages_InterceptInitMessage.htm">
             <HelpTOCNode Title="InterceptionMode Property " Url="html/P_DuetAPI_Connection_InitMessages_InterceptInitMessage_InterceptionMode.htm" />
           </HelpTOCNode>
           <HelpTOCNode Title="InterceptInitMessage Methods" Url="html/Methods_T_DuetAPI_Connection_InitMessages_InterceptInitMessage.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="9b5ec4a0-d4e0-4c97-9d88-d7180df4baf7" Title="ServerInitMessage Class" Url="html/T_DuetAPI_Connection_InitMessages_ServerInitMessage.htm">
+        <HelpTOCNode Id="21467721-34cc-48f6-9e6f-ef7c04a90e7e" Title="ServerInitMessage Class" Url="html/T_DuetAPI_Connection_InitMessages_ServerInitMessage.htm">
           <HelpTOCNode Title="ServerInitMessage Constructor " Url="html/M_DuetAPI_Connection_InitMessages_ServerInitMessage__ctor.htm" />
-          <HelpTOCNode Id="a22f60b0-6309-4e23-9d1a-90d3e0ac9667" Title="ServerInitMessage Properties" Url="html/Properties_T_DuetAPI_Connection_InitMessages_ServerInitMessage.htm">
+          <HelpTOCNode Id="7a2eb5e5-7edc-4741-b5cf-a10b68ddbd30" Title="ServerInitMessage Properties" Url="html/Properties_T_DuetAPI_Connection_InitMessages_ServerInitMessage.htm">
             <HelpTOCNode Title="Id Property " Url="html/P_DuetAPI_Connection_InitMessages_ServerInitMessage_Id.htm" />
             <HelpTOCNode Title="Version Property " Url="html/P_DuetAPI_Connection_InitMessages_ServerInitMessage_Version.htm" />
           </HelpTOCNode>
           <HelpTOCNode Title="ServerInitMessage Methods" Url="html/Methods_T_DuetAPI_Connection_InitMessages_ServerInitMessage.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="4b8ced5d-446e-473e-9b42-897b863779e6" Title="SubscribeInitMessage Class" Url="html/T_DuetAPI_Connection_InitMessages_SubscribeInitMessage.htm">
+        <HelpTOCNode Id="b927a502-3ae3-48dc-aedc-44540d28a3a4" Title="SubscribeInitMessage Class" Url="html/T_DuetAPI_Connection_InitMessages_SubscribeInitMessage.htm">
           <HelpTOCNode Title="SubscribeInitMessage Constructor " Url="html/M_DuetAPI_Connection_InitMessages_SubscribeInitMessage__ctor.htm" />
-          <HelpTOCNode Id="8b729099-d0dd-4b28-82d8-23205c782f80" Title="SubscribeInitMessage Properties" Url="html/Properties_T_DuetAPI_Connection_InitMessages_SubscribeInitMessage.htm">
+          <HelpTOCNode Id="106c3a12-e49b-45e3-888c-cf4cb7081b95" Title="SubscribeInitMessage Properties" Url="html/Properties_T_DuetAPI_Connection_InitMessages_SubscribeInitMessage.htm">
             <HelpTOCNode Title="SubscriptionMode Property " Url="html/P_DuetAPI_Connection_InitMessages_SubscribeInitMessage_SubscriptionMode.htm" />
           </HelpTOCNode>
           <HelpTOCNode Title="SubscribeInitMessage Methods" Url="html/Methods_T_DuetAPI_Connection_InitMessages_SubscribeInitMessage.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="38ba090f-109d-43a1-968b-739908d1675f" Title="DuetAPI.Machine" Url="html/N_DuetAPI_Machine.htm">
-      <HelpTOCNode Id="5bd93a73-1af0-4e3f-808e-073850f14d3d" Title="Axis Class" Url="html/T_DuetAPI_Machine_Axis.htm">
+    <HelpTOCNode Id="520605a4-3445-4dc3-a2bb-3691afcd2db5" Title="DuetAPI.Machine" Url="html/N_DuetAPI_Machine.htm">
+      <HelpTOCNode Id="401eff1f-f799-4849-ab74-9ea304f9a2ca" Title="Axis Class" Url="html/T_DuetAPI_Machine_Axis.htm">
         <HelpTOCNode Title="Axis Constructor " Url="html/M_DuetAPI_Machine_Axis__ctor.htm" />
-        <HelpTOCNode Id="99d93118-ce56-4acc-a9ce-e9623d76e98e" Title="Axis Properties" Url="html/Properties_T_DuetAPI_Machine_Axis.htm">
+        <HelpTOCNode Id="69e00074-34ce-4325-ac33-54542f63df03" Title="Axis Properties" Url="html/Properties_T_DuetAPI_Machine_Axis.htm">
           <HelpTOCNode Title="Drives Property " Url="html/P_DuetAPI_Machine_Axis_Drives.htm" />
           <HelpTOCNode Title="Homed Property " Url="html/P_DuetAPI_Machine_Axis_Homed.htm" />
           <HelpTOCNode Title="Letter Property " Url="html/P_DuetAPI_Machine_Axis_Letter.htm" />
@@ -276,40 +276,40 @@
           <HelpTOCNode Title="Min Property " Url="html/P_DuetAPI_Machine_Axis_Min.htm" />
           <HelpTOCNode Title="Visible Property " Url="html/P_DuetAPI_Machine_Axis_Visible.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="d95f447b-2fb8-4f76-a979-a0d15ed8fe33" Title="Axis Methods" Url="html/Methods_T_DuetAPI_Machine_Axis.htm">
+        <HelpTOCNode Id="82b0fa2d-80fd-426f-803b-7a8940039908" Title="Axis Methods" Url="html/Methods_T_DuetAPI_Machine_Axis.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Axis_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="e0506e9d-6ca9-4249-8cc0-1482732d8bd1" Title="BedOrChamber Class" Url="html/T_DuetAPI_Machine_BedOrChamber.htm">
+      <HelpTOCNode Id="d93c90e4-de66-445a-ae71-f106ec7f3183" Title="BedOrChamber Class" Url="html/T_DuetAPI_Machine_BedOrChamber.htm">
         <HelpTOCNode Title="BedOrChamber Constructor " Url="html/M_DuetAPI_Machine_BedOrChamber__ctor.htm" />
-        <HelpTOCNode Id="f73336a0-63a3-4ff5-b25b-0131a62c689b" Title="BedOrChamber Properties" Url="html/Properties_T_DuetAPI_Machine_BedOrChamber.htm">
+        <HelpTOCNode Id="aed924ac-19cd-4b6e-a0ed-60f396380222" Title="BedOrChamber Properties" Url="html/Properties_T_DuetAPI_Machine_BedOrChamber.htm">
           <HelpTOCNode Title="Active Property " Url="html/P_DuetAPI_Machine_BedOrChamber_Active.htm" />
           <HelpTOCNode Title="Heaters Property " Url="html/P_DuetAPI_Machine_BedOrChamber_Heaters.htm" />
           <HelpTOCNode Title="Name Property " Url="html/P_DuetAPI_Machine_BedOrChamber_Name.htm" />
           <HelpTOCNode Title="Standby Property " Url="html/P_DuetAPI_Machine_BedOrChamber_Standby.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="f36c4d69-c7e5-4dca-9c14-5dfaa29370f9" Title="BedOrChamber Methods" Url="html/Methods_T_DuetAPI_Machine_BedOrChamber.htm">
+        <HelpTOCNode Id="af9585ad-efbf-4cf7-bb2d-367873348d76" Title="BedOrChamber Methods" Url="html/Methods_T_DuetAPI_Machine_BedOrChamber.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_BedOrChamber_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="9fa657ca-f2dc-4c7e-a52e-0a8d25fd2bb3" Title="Channel Class" Url="html/T_DuetAPI_Machine_Channel.htm">
+      <HelpTOCNode Id="df81b2f0-d5a1-4eb5-8819-66e7166774f3" Title="Channel Class" Url="html/T_DuetAPI_Machine_Channel.htm">
         <HelpTOCNode Title="Channel Constructor " Url="html/M_DuetAPI_Machine_Channel__ctor.htm" />
-        <HelpTOCNode Id="71e825ab-f208-4782-8f5e-9b2eabd33b2e" Title="Channel Properties" Url="html/Properties_T_DuetAPI_Machine_Channel.htm">
+        <HelpTOCNode Id="a808d2dc-d66d-4241-aedb-23060935a3ae" Title="Channel Properties" Url="html/Properties_T_DuetAPI_Machine_Channel.htm">
           <HelpTOCNode Title="Feedrate Property " Url="html/P_DuetAPI_Machine_Channel_Feedrate.htm" />
           <HelpTOCNode Title="RelativeExtrusion Property " Url="html/P_DuetAPI_Machine_Channel_RelativeExtrusion.htm" />
           <HelpTOCNode Title="RelativePositioning Property " Url="html/P_DuetAPI_Machine_Channel_RelativePositioning.htm" />
           <HelpTOCNode Title="UsingInches Property " Url="html/P_DuetAPI_Machine_Channel_UsingInches.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="61e5b895-192c-47d6-9409-4934b37a9c21" Title="Channel Methods" Url="html/Methods_T_DuetAPI_Machine_Channel.htm">
+        <HelpTOCNode Id="334d683a-e4f9-4153-bfc2-143887ca3521" Title="Channel Methods" Url="html/Methods_T_DuetAPI_Machine_Channel.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Channel_Clone.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="dc076242-2cfe-4e5d-8bb6-339a55502bcf" Title="Channel Fields" Url="html/Fields_T_DuetAPI_Machine_Channel.htm">
+        <HelpTOCNode Id="778d0756-ef00-4fe3-945e-a5cc0bfcbc62" Title="Channel Fields" Url="html/Fields_T_DuetAPI_Machine_Channel.htm">
           <HelpTOCNode Title="StackDepth Field" Url="html/F_DuetAPI_Machine_Channel_StackDepth.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="7a79f8ba-9e5d-4f34-ab48-c935f722c30b" Title="Channels Class" Url="html/T_DuetAPI_Machine_Channels.htm">
+      <HelpTOCNode Id="dddb435d-4d73-4638-8600-52f5c599f020" Title="Channels Class" Url="html/T_DuetAPI_Machine_Channels.htm">
         <HelpTOCNode Title="Channels Constructor " Url="html/M_DuetAPI_Machine_Channels__ctor.htm" />
-        <HelpTOCNode Id="174d0f85-0672-4571-81e6-206ceb2f4185" Title="Channels Properties" Url="html/Properties_T_DuetAPI_Machine_Channels.htm">
+        <HelpTOCNode Id="e2be9350-0e37-4840-841b-6a566c79c691" Title="Channels Properties" Url="html/Properties_T_DuetAPI_Machine_Channels.htm">
           <HelpTOCNode Title="AutoPause Property " Url="html/P_DuetAPI_Machine_Channels_AutoPause.htm" />
           <HelpTOCNode Title="AUX Property " Url="html/P_DuetAPI_Machine_Channels_AUX.htm" />
           <HelpTOCNode Title="CodeQueue Property " Url="html/P_DuetAPI_Machine_Channels_CodeQueue.htm" />
@@ -322,23 +322,23 @@
           <HelpTOCNode Title="Telnet Property " Url="html/P_DuetAPI_Machine_Channels_Telnet.htm" />
           <HelpTOCNode Title="USB Property " Url="html/P_DuetAPI_Machine_Channels_USB.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="8c222317-de77-4399-b3cb-4bab8280dece" Title="Channels Methods" Url="html/Methods_T_DuetAPI_Machine_Channels.htm">
+        <HelpTOCNode Id="85bd0dd7-6bff-40b9-acfd-0f6feb647324" Title="Channels Methods" Url="html/Methods_T_DuetAPI_Machine_Channels.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Channels_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="4e389ead-031c-4b0a-b2d7-f7c267043aec" Title="CurrentMove Class" Url="html/T_DuetAPI_Machine_CurrentMove.htm">
+      <HelpTOCNode Id="5276f02a-4b93-4504-87bc-c22c2a20b324" Title="CurrentMove Class" Url="html/T_DuetAPI_Machine_CurrentMove.htm">
         <HelpTOCNode Title="CurrentMove Constructor " Url="html/M_DuetAPI_Machine_CurrentMove__ctor.htm" />
-        <HelpTOCNode Id="ff396c5a-1721-4b7c-9f0b-c6e60151e04a" Title="CurrentMove Properties" Url="html/Properties_T_DuetAPI_Machine_CurrentMove.htm">
+        <HelpTOCNode Id="84a624ad-a86c-4599-9745-2ca78e730162" Title="CurrentMove Properties" Url="html/Properties_T_DuetAPI_Machine_CurrentMove.htm">
           <HelpTOCNode Title="RequestedSpeed Property " Url="html/P_DuetAPI_Machine_CurrentMove_RequestedSpeed.htm" />
           <HelpTOCNode Title="TopSpeed Property " Url="html/P_DuetAPI_Machine_CurrentMove_TopSpeed.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="11c32d8a-b787-4626-92aa-afd56ab93ef6" Title="CurrentMove Methods" Url="html/Methods_T_DuetAPI_Machine_CurrentMove.htm">
+        <HelpTOCNode Id="8629053e-b383-4440-85e3-c8413eec97de" Title="CurrentMove Methods" Url="html/Methods_T_DuetAPI_Machine_CurrentMove.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_CurrentMove_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="23fdcb86-8019-4be7-8633-07bdae141e7c" Title="Drive Class" Url="html/T_DuetAPI_Machine_Drive.htm">
+      <HelpTOCNode Id="b4abfb6b-cbfb-45ac-98ed-a95aef4b94de" Title="Drive Class" Url="html/T_DuetAPI_Machine_Drive.htm">
         <HelpTOCNode Title="Drive Constructor " Url="html/M_DuetAPI_Machine_Drive__ctor.htm" />
-        <HelpTOCNode Id="97bc84f3-0ff4-4a7e-b3c1-3d8a40602709" Title="Drive Properties" Url="html/Properties_T_DuetAPI_Machine_Drive.htm">
+        <HelpTOCNode Id="3419b4f4-c6f5-4816-875e-c31f3454c8de" Title="Drive Properties" Url="html/Properties_T_DuetAPI_Machine_Drive.htm">
           <HelpTOCNode Title="Acceleration Property " Url="html/P_DuetAPI_Machine_Drive_Acceleration.htm" />
           <HelpTOCNode Title="Current Property " Url="html/P_DuetAPI_Machine_Drive_Current.htm" />
           <HelpTOCNode Title="MaxSpeed Property " Url="html/P_DuetAPI_Machine_Drive_MaxSpeed.htm" />
@@ -346,23 +346,23 @@
           <HelpTOCNode Title="MinSpeed Property " Url="html/P_DuetAPI_Machine_Drive_MinSpeed.htm" />
           <HelpTOCNode Title="Position Property " Url="html/P_DuetAPI_Machine_Drive_Position.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="327cc170-cbbd-43cb-8616-5251d9e6cadc" Title="Drive Methods" Url="html/Methods_T_DuetAPI_Machine_Drive.htm">
+        <HelpTOCNode Id="dddb186a-2d3e-4f7b-a8f6-8dc7700b0cf5" Title="Drive Methods" Url="html/Methods_T_DuetAPI_Machine_Drive.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Drive_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="ce100d6b-a6de-4c7e-8966-3763f9b285a2" Title="DriveMicrostepping Class" Url="html/T_DuetAPI_Machine_DriveMicrostepping.htm">
+      <HelpTOCNode Id="4c8b7d70-b689-4a61-92cc-c44ee4361b7a" Title="DriveMicrostepping Class" Url="html/T_DuetAPI_Machine_DriveMicrostepping.htm">
         <HelpTOCNode Title="DriveMicrostepping Constructor " Url="html/M_DuetAPI_Machine_DriveMicrostepping__ctor.htm" />
-        <HelpTOCNode Id="df6d8c6c-5290-4a01-ad13-e61274eb6735" Title="DriveMicrostepping Properties" Url="html/Properties_T_DuetAPI_Machine_DriveMicrostepping.htm">
+        <HelpTOCNode Id="091d6649-56fd-4e21-8082-4a8f9234a3df" Title="DriveMicrostepping Properties" Url="html/Properties_T_DuetAPI_Machine_DriveMicrostepping.htm">
           <HelpTOCNode Title="Interpolated Property " Url="html/P_DuetAPI_Machine_DriveMicrostepping_Interpolated.htm" />
           <HelpTOCNode Title="Value Property " Url="html/P_DuetAPI_Machine_DriveMicrostepping_Value.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="d37bbb62-d23c-48f5-add7-8cefb6c1b95e" Title="DriveMicrostepping Methods" Url="html/Methods_T_DuetAPI_Machine_DriveMicrostepping.htm">
+        <HelpTOCNode Id="e18206bf-9da8-407f-8594-bfa1352e706d" Title="DriveMicrostepping Methods" Url="html/Methods_T_DuetAPI_Machine_DriveMicrostepping.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_DriveMicrostepping_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="821a9606-8c44-4b24-9950-a71d8be5bf35" Title="Electronics Class" Url="html/T_DuetAPI_Machine_Electronics.htm">
+      <HelpTOCNode Id="1655ba24-342b-4d66-89ce-2fd28c8a2fa2" Title="Electronics Class" Url="html/T_DuetAPI_Machine_Electronics.htm">
         <HelpTOCNode Title="Electronics Constructor " Url="html/M_DuetAPI_Machine_Electronics__ctor.htm" />
-        <HelpTOCNode Id="9d05157d-6d47-4872-be2d-bb93513c1e25" Title="Electronics Properties" Url="html/Properties_T_DuetAPI_Machine_Electronics.htm">
+        <HelpTOCNode Id="acc7bf3d-57eb-4ddb-8a3b-2aba22db55eb" Title="Electronics Properties" Url="html/Properties_T_DuetAPI_Machine_Electronics.htm">
           <HelpTOCNode Title="ExpansionBoards Property " Url="html/P_DuetAPI_Machine_Electronics_ExpansionBoards.htm" />
           <HelpTOCNode Title="Firmware Property " Url="html/P_DuetAPI_Machine_Electronics_Firmware.htm" />
           <HelpTOCNode Title="McuTemp Property " Url="html/P_DuetAPI_Machine_Electronics_McuTemp.htm" />
@@ -372,26 +372,26 @@
           <HelpTOCNode Title="Type Property " Url="html/P_DuetAPI_Machine_Electronics_Type.htm" />
           <HelpTOCNode Title="VIn Property " Url="html/P_DuetAPI_Machine_Electronics_VIn.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="9b87f5e6-2963-49f7-aba9-649aba28e94a" Title="Electronics Methods" Url="html/Methods_T_DuetAPI_Machine_Electronics.htm">
+        <HelpTOCNode Id="1188d46a-94e3-444c-9ada-b98aada7d71c" Title="Electronics Methods" Url="html/Methods_T_DuetAPI_Machine_Electronics.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Electronics_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="9683b701-4f3a-4466-87e8-2b880be598c4" Title="Endstop Class" Url="html/T_DuetAPI_Machine_Endstop.htm">
+      <HelpTOCNode Id="c92e145a-db7e-4e18-b34f-161b348fd82e" Title="Endstop Class" Url="html/T_DuetAPI_Machine_Endstop.htm">
         <HelpTOCNode Title="Endstop Constructor " Url="html/M_DuetAPI_Machine_Endstop__ctor.htm" />
-        <HelpTOCNode Id="27159a9f-aa46-4874-98c5-a8361f7c79f8" Title="Endstop Properties" Url="html/Properties_T_DuetAPI_Machine_Endstop.htm">
+        <HelpTOCNode Id="d1173475-67a8-4268-978c-f5f5c77a1bfb" Title="Endstop Properties" Url="html/Properties_T_DuetAPI_Machine_Endstop.htm">
           <HelpTOCNode Title="Position Property " Url="html/P_DuetAPI_Machine_Endstop_Position.htm" />
           <HelpTOCNode Title="Triggered Property " Url="html/P_DuetAPI_Machine_Endstop_Triggered.htm" />
           <HelpTOCNode Title="Type Property " Url="html/P_DuetAPI_Machine_Endstop_Type.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="da06d6e1-9279-4df9-8ccb-b41b6a9acb1b" Title="Endstop Methods" Url="html/Methods_T_DuetAPI_Machine_Endstop.htm">
+        <HelpTOCNode Id="5ec0cb7c-edca-4a33-bbf3-fb92ccd4f92f" Title="Endstop Methods" Url="html/Methods_T_DuetAPI_Machine_Endstop.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Endstop_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="EndstopPosition Enumeration" Url="html/T_DuetAPI_Machine_EndstopPosition.htm" />
       <HelpTOCNode Title="EndstopType Enumeration" Url="html/T_DuetAPI_Machine_EndstopType.htm" />
-      <HelpTOCNode Id="4b156125-29d6-4c2c-b83d-8f8dfda41543" Title="ExpansionBoard Class" Url="html/T_DuetAPI_Machine_ExpansionBoard.htm">
+      <HelpTOCNode Id="fb5c9b51-5125-42ea-a4a7-ba19c0201aec" Title="ExpansionBoard Class" Url="html/T_DuetAPI_Machine_ExpansionBoard.htm">
         <HelpTOCNode Title="ExpansionBoard Constructor " Url="html/M_DuetAPI_Machine_ExpansionBoard__ctor.htm" />
-        <HelpTOCNode Id="fd647dc3-5c9b-4e25-ad76-4d257daa7f10" Title="ExpansionBoard Properties" Url="html/Properties_T_DuetAPI_Machine_ExpansionBoard.htm">
+        <HelpTOCNode Id="3b9ebc24-8e22-46e6-94eb-f85074ef8536" Title="ExpansionBoard Properties" Url="html/Properties_T_DuetAPI_Machine_ExpansionBoard.htm">
           <HelpTOCNode Title="Firmware Property " Url="html/P_DuetAPI_Machine_ExpansionBoard_Firmware.htm" />
           <HelpTOCNode Title="MaxHeaters Property " Url="html/P_DuetAPI_Machine_ExpansionBoard_MaxHeaters.htm" />
           <HelpTOCNode Title="MaxMotors Property " Url="html/P_DuetAPI_Machine_ExpansionBoard_MaxMotors.htm" />
@@ -400,50 +400,50 @@
           <HelpTOCNode Title="Revision Property " Url="html/P_DuetAPI_Machine_ExpansionBoard_Revision.htm" />
           <HelpTOCNode Title="VIn Property " Url="html/P_DuetAPI_Machine_ExpansionBoard_VIn.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="d7628fa9-c153-459f-a12e-415ec9247de7" Title="ExpansionBoard Methods" Url="html/Methods_T_DuetAPI_Machine_ExpansionBoard.htm">
+        <HelpTOCNode Id="cbc6f7f0-b3cc-43fb-b326-055e022d7cb3" Title="ExpansionBoard Methods" Url="html/Methods_T_DuetAPI_Machine_ExpansionBoard.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_ExpansionBoard_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="972bbb29-7578-4262-8a8b-dd6865755c80" Title="ExtraHeater Class" Url="html/T_DuetAPI_Machine_ExtraHeater.htm">
+      <HelpTOCNode Id="3efafee9-100f-44ea-b320-6fd1c12aa76c" Title="ExtraHeater Class" Url="html/T_DuetAPI_Machine_ExtraHeater.htm">
         <HelpTOCNode Title="ExtraHeater Constructor " Url="html/M_DuetAPI_Machine_ExtraHeater__ctor.htm" />
-        <HelpTOCNode Id="ef6a640c-73a6-484b-be9c-a6c67b93a4ae" Title="ExtraHeater Properties" Url="html/Properties_T_DuetAPI_Machine_ExtraHeater.htm">
+        <HelpTOCNode Id="20b3588a-995c-4b92-87fa-433d159ac215" Title="ExtraHeater Properties" Url="html/Properties_T_DuetAPI_Machine_ExtraHeater.htm">
           <HelpTOCNode Title="Current Property " Url="html/P_DuetAPI_Machine_ExtraHeater_Current.htm" />
           <HelpTOCNode Title="Name Property " Url="html/P_DuetAPI_Machine_ExtraHeater_Name.htm" />
           <HelpTOCNode Title="Sensor Property " Url="html/P_DuetAPI_Machine_ExtraHeater_Sensor.htm" />
           <HelpTOCNode Title="State Property " Url="html/P_DuetAPI_Machine_ExtraHeater_State.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="3636b8fc-81e4-412e-9c0d-733749f62fd8" Title="ExtraHeater Methods" Url="html/Methods_T_DuetAPI_Machine_ExtraHeater.htm">
+        <HelpTOCNode Id="7b139f0c-5b50-482d-a855-5067c11d771a" Title="ExtraHeater Methods" Url="html/Methods_T_DuetAPI_Machine_ExtraHeater.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_ExtraHeater_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="a8cdda85-051b-4078-b034-fc370769b852" Title="Extruder Class" Url="html/T_DuetAPI_Machine_Extruder.htm">
+      <HelpTOCNode Id="737b900d-edad-4363-b857-45b2ba1c0933" Title="Extruder Class" Url="html/T_DuetAPI_Machine_Extruder.htm">
         <HelpTOCNode Title="Extruder Constructor " Url="html/M_DuetAPI_Machine_Extruder__ctor.htm" />
-        <HelpTOCNode Id="3c1c5b0a-e620-4a5d-8374-5ecf39abfdaa" Title="Extruder Properties" Url="html/Properties_T_DuetAPI_Machine_Extruder.htm">
+        <HelpTOCNode Id="2b449954-a33a-485b-956c-23e2bae5f4cd" Title="Extruder Properties" Url="html/Properties_T_DuetAPI_Machine_Extruder.htm">
           <HelpTOCNode Title="Factor Property " Url="html/P_DuetAPI_Machine_Extruder_Factor.htm" />
           <HelpTOCNode Title="Nonlinear Property " Url="html/P_DuetAPI_Machine_Extruder_Nonlinear.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="899e3c02-a61a-4c3c-96c7-d3a3df854af1" Title="Extruder Methods" Url="html/Methods_T_DuetAPI_Machine_Extruder.htm">
+        <HelpTOCNode Id="235cc18a-fa89-44f9-92bd-84c9621cda65" Title="Extruder Methods" Url="html/Methods_T_DuetAPI_Machine_Extruder.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Extruder_Clone.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="06db0442-5cd2-4c73-925b-d6c2a25fb306" Title="Extruder Fields" Url="html/Fields_T_DuetAPI_Machine_Extruder.htm">
+        <HelpTOCNode Id="296e1086-49c3-4b2d-add2-e5aae73b47aa" Title="Extruder Fields" Url="html/Fields_T_DuetAPI_Machine_Extruder.htm">
           <HelpTOCNode Title="Drives Field" Url="html/F_DuetAPI_Machine_Extruder_Drives.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="7d7ad1dc-1010-43e9-8a50-db9b66272a3c" Title="ExtruderNonlinear Class" Url="html/T_DuetAPI_Machine_ExtruderNonlinear.htm">
+      <HelpTOCNode Id="7a9a8f55-11e9-4a07-953a-86529781d9f3" Title="ExtruderNonlinear Class" Url="html/T_DuetAPI_Machine_ExtruderNonlinear.htm">
         <HelpTOCNode Title="ExtruderNonlinear Constructor " Url="html/M_DuetAPI_Machine_ExtruderNonlinear__ctor.htm" />
-        <HelpTOCNode Id="6c23cf68-815a-4812-b054-bb47027d74e9" Title="ExtruderNonlinear Properties" Url="html/Properties_T_DuetAPI_Machine_ExtruderNonlinear.htm">
+        <HelpTOCNode Id="da7c550a-d9fa-4b95-a29e-f06a0aee1124" Title="ExtruderNonlinear Properties" Url="html/Properties_T_DuetAPI_Machine_ExtruderNonlinear.htm">
           <HelpTOCNode Title="A Property " Url="html/P_DuetAPI_Machine_ExtruderNonlinear_A.htm" />
           <HelpTOCNode Title="B Property " Url="html/P_DuetAPI_Machine_ExtruderNonlinear_B.htm" />
           <HelpTOCNode Title="Temperature Property " Url="html/P_DuetAPI_Machine_ExtruderNonlinear_Temperature.htm" />
           <HelpTOCNode Title="UpperLimit Property " Url="html/P_DuetAPI_Machine_ExtruderNonlinear_UpperLimit.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="1e8b7e3b-374f-4ef0-b57f-ba50368c47ae" Title="ExtruderNonlinear Methods" Url="html/Methods_T_DuetAPI_Machine_ExtruderNonlinear.htm">
+        <HelpTOCNode Id="f43a2d8d-8947-4cac-ac4c-ac21a8a80293" Title="ExtruderNonlinear Methods" Url="html/Methods_T_DuetAPI_Machine_ExtruderNonlinear.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_ExtruderNonlinear_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="57b85a03-0a2b-4311-b261-4a783409937c" Title="Fan Class" Url="html/T_DuetAPI_Machine_Fan.htm">
+      <HelpTOCNode Id="1ec2c1c3-2d2f-489c-ba41-0eb14b777e35" Title="Fan Class" Url="html/T_DuetAPI_Machine_Fan.htm">
         <HelpTOCNode Title="Fan Constructor " Url="html/M_DuetAPI_Machine_Fan__ctor.htm" />
-        <HelpTOCNode Id="3f3c7bd7-64e7-4954-953a-26e0826dfd84" Title="Fan Properties" Url="html/Properties_T_DuetAPI_Machine_Fan.htm">
+        <HelpTOCNode Id="12e60335-145c-4f8b-9c06-ae25feda50ad" Title="Fan Properties" Url="html/Properties_T_DuetAPI_Machine_Fan.htm">
           <HelpTOCNode Title="Blip Property " Url="html/P_DuetAPI_Machine_Fan_Blip.htm" />
           <HelpTOCNode Title="Frequency Property " Url="html/P_DuetAPI_Machine_Fan_Frequency.htm" />
           <HelpTOCNode Title="Inverted Property " Url="html/P_DuetAPI_Machine_Fan_Inverted.htm" />
@@ -455,32 +455,32 @@
           <HelpTOCNode Title="Thermostatic Property " Url="html/P_DuetAPI_Machine_Fan_Thermostatic.htm" />
           <HelpTOCNode Title="Value Property " Url="html/P_DuetAPI_Machine_Fan_Value.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="458b3c0a-1d47-4d55-ba75-beff9cb1b6b1" Title="Fan Methods" Url="html/Methods_T_DuetAPI_Machine_Fan.htm">
+        <HelpTOCNode Id="3c29de73-75b9-4beb-afb7-3f1b7b58d247" Title="Fan Methods" Url="html/Methods_T_DuetAPI_Machine_Fan.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Fan_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="8dff82e0-1f5a-4fb4-bd7a-e1356c0c25dd" Title="Firmware Class" Url="html/T_DuetAPI_Machine_Firmware.htm">
+      <HelpTOCNode Id="5631a3fe-d1ce-4b3b-a74d-9b262503e7dc" Title="Firmware Class" Url="html/T_DuetAPI_Machine_Firmware.htm">
         <HelpTOCNode Title="Firmware Constructor " Url="html/M_DuetAPI_Machine_Firmware__ctor.htm" />
-        <HelpTOCNode Id="aa141286-0ae3-4700-8763-716c908cbd10" Title="Firmware Properties" Url="html/Properties_T_DuetAPI_Machine_Firmware.htm">
+        <HelpTOCNode Id="150a95c4-3e21-48ac-a1fd-0a2b1dd40a1d" Title="Firmware Properties" Url="html/Properties_T_DuetAPI_Machine_Firmware.htm">
           <HelpTOCNode Title="Date Property " Url="html/P_DuetAPI_Machine_Firmware_Date.htm" />
           <HelpTOCNode Title="Name Property " Url="html/P_DuetAPI_Machine_Firmware_Name.htm" />
           <HelpTOCNode Title="Version Property " Url="html/P_DuetAPI_Machine_Firmware_Version.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="631729b8-3e57-4f3c-aff8-89720eb5fe95" Title="Firmware Methods" Url="html/Methods_T_DuetAPI_Machine_Firmware.htm">
+        <HelpTOCNode Id="58a6f61f-0834-4ffb-a60d-90472b6bd811" Title="Firmware Methods" Url="html/Methods_T_DuetAPI_Machine_Firmware.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Firmware_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="b0c0f668-4d15-471f-ab82-ee48cbdecda9" Title="Geometry Class" Url="html/T_DuetAPI_Machine_Geometry.htm">
+      <HelpTOCNode Id="17b95c72-9332-41e3-9d2a-93b86bf84a60" Title="Geometry Class" Url="html/T_DuetAPI_Machine_Geometry.htm">
         <HelpTOCNode Title="Geometry Constructor " Url="html/M_DuetAPI_Machine_Geometry__ctor.htm" />
-        <HelpTOCNode Id="e320cbdd-eee1-43a2-a81d-707674a45ec3" Title="Geometry Properties" Url="html/Properties_T_DuetAPI_Machine_Geometry.htm">
+        <HelpTOCNode Id="e0088474-0b46-410d-8280-681ba3fbeff9" Title="Geometry Properties" Url="html/Properties_T_DuetAPI_Machine_Geometry.htm">
           <HelpTOCNode Title="Type Property " Url="html/P_DuetAPI_Machine_Geometry_Type.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="9f163971-c21f-41fb-906d-c70327babf62" Title="Geometry Methods" Url="html/Methods_T_DuetAPI_Machine_Geometry.htm">
+        <HelpTOCNode Id="b90c10de-0e00-43ac-90c1-885a798eaec4" Title="Geometry Methods" Url="html/Methods_T_DuetAPI_Machine_Geometry.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Geometry_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="7589b0fc-0796-4a6c-8fc0-37d34fbd78a1" Title="GeometryType Class" Url="html/T_DuetAPI_Machine_GeometryType.htm">
-        <HelpTOCNode Id="c705b4c2-122f-4f8f-a2dd-ce8c79307bc5" Title="GeometryType Fields" Url="html/Fields_T_DuetAPI_Machine_GeometryType.htm">
+      <HelpTOCNode Id="45092bfc-522f-4a49-8ee4-fc4ab7cdec62" Title="GeometryType Class" Url="html/T_DuetAPI_Machine_GeometryType.htm">
+        <HelpTOCNode Id="e4949494-7970-4e81-bb9d-42068879a965" Title="GeometryType Fields" Url="html/Fields_T_DuetAPI_Machine_GeometryType.htm">
           <HelpTOCNode Title="Cartesian Field" Url="html/F_DuetAPI_Machine_GeometryType_Cartesian.htm" />
           <HelpTOCNode Title="CoreXY Field" Url="html/F_DuetAPI_Machine_GeometryType_CoreXY.htm" />
           <HelpTOCNode Title="CoreXYU Field" Url="html/F_DuetAPI_Machine_GeometryType_CoreXYU.htm" />
@@ -493,9 +493,9 @@
           <HelpTOCNode Title="Scara Field" Url="html/F_DuetAPI_Machine_GeometryType_Scara.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="3cc5c9c0-90a3-4571-8733-e17a7f7c8367" Title="Heat Class" Url="html/T_DuetAPI_Machine_Heat.htm">
+      <HelpTOCNode Id="88cb0394-503d-4e47-8ce8-49e0a60f43df" Title="Heat Class" Url="html/T_DuetAPI_Machine_Heat.htm">
         <HelpTOCNode Title="Heat Constructor " Url="html/M_DuetAPI_Machine_Heat__ctor.htm" />
-        <HelpTOCNode Id="1d0f4093-5ba7-46dc-a8cc-f01c598dbfde" Title="Heat Properties" Url="html/Properties_T_DuetAPI_Machine_Heat.htm">
+        <HelpTOCNode Id="730630ee-f01c-4d58-871b-1c1dbb7710ca" Title="Heat Properties" Url="html/Properties_T_DuetAPI_Machine_Heat.htm">
           <HelpTOCNode Title="Beds Property " Url="html/P_DuetAPI_Machine_Heat_Beds.htm" />
           <HelpTOCNode Title="Chambers Property " Url="html/P_DuetAPI_Machine_Heat_Chambers.htm" />
           <HelpTOCNode Title="ColdExtrudeTemperature Property " Url="html/P_DuetAPI_Machine_Heat_ColdExtrudeTemperature.htm" />
@@ -503,13 +503,13 @@
           <HelpTOCNode Title="Extra Property " Url="html/P_DuetAPI_Machine_Heat_Extra.htm" />
           <HelpTOCNode Title="Heaters Property " Url="html/P_DuetAPI_Machine_Heat_Heaters.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="236219ac-0819-44e3-ad01-57dda964050b" Title="Heat Methods" Url="html/Methods_T_DuetAPI_Machine_Heat.htm">
+        <HelpTOCNode Id="3db46057-c5e2-4e26-9689-9614b44a8834" Title="Heat Methods" Url="html/Methods_T_DuetAPI_Machine_Heat.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Heat_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="74aa1c06-0225-4340-a3a6-da38dfe13651" Title="Heater Class" Url="html/T_DuetAPI_Machine_Heater.htm">
+      <HelpTOCNode Id="f6bb2f6a-0bb0-465e-beac-f3125197aef9" Title="Heater Class" Url="html/T_DuetAPI_Machine_Heater.htm">
         <HelpTOCNode Title="Heater Constructor " Url="html/M_DuetAPI_Machine_Heater__ctor.htm" />
-        <HelpTOCNode Id="a9d3ffce-be9c-4b93-934f-04f80bffa10b" Title="Heater Properties" Url="html/Properties_T_DuetAPI_Machine_Heater.htm">
+        <HelpTOCNode Id="a489d568-44fa-4d47-ae27-d64e01529bd6" Title="Heater Properties" Url="html/Properties_T_DuetAPI_Machine_Heater.htm">
           <HelpTOCNode Title="Current Property " Url="html/P_DuetAPI_Machine_Heater_Current.htm" />
           <HelpTOCNode Title="Max Property " Url="html/P_DuetAPI_Machine_Heater_Max.htm" />
           <HelpTOCNode Title="Model Property " Url="html/P_DuetAPI_Machine_Heater_Model.htm" />
@@ -517,37 +517,37 @@
           <HelpTOCNode Title="Sensor Property " Url="html/P_DuetAPI_Machine_Heater_Sensor.htm" />
           <HelpTOCNode Title="State Property " Url="html/P_DuetAPI_Machine_Heater_State.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="b6636cd6-3e8b-47d9-8e8e-523f94be035d" Title="Heater Methods" Url="html/Methods_T_DuetAPI_Machine_Heater.htm">
+        <HelpTOCNode Id="f4973edd-f549-4786-ae06-38c0b0b1b111" Title="Heater Methods" Url="html/Methods_T_DuetAPI_Machine_Heater.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Heater_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="d2026566-34a8-4c51-a953-f3a5ef3bfee8" Title="HeaterModel Class" Url="html/T_DuetAPI_Machine_HeaterModel.htm">
+      <HelpTOCNode Id="1ebe7eb6-97c1-4d1d-8d64-afd80e0fc90b" Title="HeaterModel Class" Url="html/T_DuetAPI_Machine_HeaterModel.htm">
         <HelpTOCNode Title="HeaterModel Constructor " Url="html/M_DuetAPI_Machine_HeaterModel__ctor.htm" />
-        <HelpTOCNode Id="975c7bfe-ae1e-4012-a542-4bf4b5c582a6" Title="HeaterModel Properties" Url="html/Properties_T_DuetAPI_Machine_HeaterModel.htm">
+        <HelpTOCNode Id="03d21104-e079-4b1d-8fd8-4a0fea82e4ca" Title="HeaterModel Properties" Url="html/Properties_T_DuetAPI_Machine_HeaterModel.htm">
           <HelpTOCNode Title="DeadTime Property " Url="html/P_DuetAPI_Machine_HeaterModel_DeadTime.htm" />
           <HelpTOCNode Title="Gain Property " Url="html/P_DuetAPI_Machine_HeaterModel_Gain.htm" />
           <HelpTOCNode Title="MaxPwm Property " Url="html/P_DuetAPI_Machine_HeaterModel_MaxPwm.htm" />
           <HelpTOCNode Title="TimeConst Property " Url="html/P_DuetAPI_Machine_HeaterModel_TimeConst.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="0fc47299-4955-4d61-a0dd-6a071a91f26a" Title="HeaterModel Methods" Url="html/Methods_T_DuetAPI_Machine_HeaterModel.htm">
+        <HelpTOCNode Id="63d7d2f3-8aae-4b65-9b99-afb0ab44e575" Title="HeaterModel Methods" Url="html/Methods_T_DuetAPI_Machine_HeaterModel.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_HeaterModel_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="HeaterState Enumeration" Url="html/T_DuetAPI_Machine_HeaterState.htm" />
-      <HelpTOCNode Id="05e14809-54c0-44a8-af59-8b5334d19e10" Title="Idle Class" Url="html/T_DuetAPI_Machine_Idle.htm">
+      <HelpTOCNode Id="8a5b98c8-c9bb-4cdd-ba7b-d8a355894014" Title="Idle Class" Url="html/T_DuetAPI_Machine_Idle.htm">
         <HelpTOCNode Title="Idle Constructor " Url="html/M_DuetAPI_Machine_Idle__ctor.htm" />
-        <HelpTOCNode Id="1aba211f-122a-4b09-a2ec-45dfd9c6c1a3" Title="Idle Properties" Url="html/Properties_T_DuetAPI_Machine_Idle.htm">
+        <HelpTOCNode Id="35bb0c25-82b1-481e-a331-922ac45413ad" Title="Idle Properties" Url="html/Properties_T_DuetAPI_Machine_Idle.htm">
           <HelpTOCNode Title="Factor Property " Url="html/P_DuetAPI_Machine_Idle_Factor.htm" />
           <HelpTOCNode Title="Timeout Property " Url="html/P_DuetAPI_Machine_Idle_Timeout.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="e282eed8-3aad-4f0f-8b3d-22d0038232f2" Title="Idle Methods" Url="html/Methods_T_DuetAPI_Machine_Idle.htm">
+        <HelpTOCNode Id="a553b6b0-1e3a-4c0c-b184-8576e9a9b3dd" Title="Idle Methods" Url="html/Methods_T_DuetAPI_Machine_Idle.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Idle_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="InterfaceType Enumeration" Url="html/T_DuetAPI_Machine_InterfaceType.htm" />
-      <HelpTOCNode Id="ee210e06-7da9-4b3c-bb0a-3ffa14308940" Title="Job Class" Url="html/T_DuetAPI_Machine_Job.htm">
+      <HelpTOCNode Id="ad46fbf0-5f8e-4c3c-bd07-ad9e16d22e75" Title="Job Class" Url="html/T_DuetAPI_Machine_Job.htm">
         <HelpTOCNode Title="Job Constructor " Url="html/M_DuetAPI_Machine_Job__ctor.htm" />
-        <HelpTOCNode Id="adecbba4-aa7a-47fe-b400-8682405aa22d" Title="Job Properties" Url="html/Properties_T_DuetAPI_Machine_Job.htm">
+        <HelpTOCNode Id="33e49d71-0d9b-4087-9f57-a807e6bcffbd" Title="Job Properties" Url="html/Properties_T_DuetAPI_Machine_Job.htm">
           <HelpTOCNode Title="Duration Property " Url="html/P_DuetAPI_Machine_Job_Duration.htm" />
           <HelpTOCNode Title="ExtrudedRaw Property " Url="html/P_DuetAPI_Machine_Job_ExtrudedRaw.htm" />
           <HelpTOCNode Title="File Property " Url="html/P_DuetAPI_Machine_Job_File.htm" />
@@ -560,26 +560,26 @@
           <HelpTOCNode Title="TimesLeft Property " Url="html/P_DuetAPI_Machine_Job_TimesLeft.htm" />
           <HelpTOCNode Title="WarmUpDuration Property " Url="html/P_DuetAPI_Machine_Job_WarmUpDuration.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="5261dba2-04ef-4800-96e4-8653dd90f53d" Title="Job Methods" Url="html/Methods_T_DuetAPI_Machine_Job.htm">
+        <HelpTOCNode Id="2afd4974-caf6-448e-a68f-2d2a0095a834" Title="Job Methods" Url="html/Methods_T_DuetAPI_Machine_Job.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Job_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="a4e9d8b8-410d-408f-ad88-f1885c16632f" Title="Layer Class" Url="html/T_DuetAPI_Machine_Layer.htm">
+      <HelpTOCNode Id="138e2525-d091-412e-9abf-968823bbf5bf" Title="Layer Class" Url="html/T_DuetAPI_Machine_Layer.htm">
         <HelpTOCNode Title="Layer Constructor " Url="html/M_DuetAPI_Machine_Layer__ctor.htm" />
-        <HelpTOCNode Id="1ada254f-9cce-4b92-9558-611abcf5f29b" Title="Layer Properties" Url="html/Properties_T_DuetAPI_Machine_Layer.htm">
+        <HelpTOCNode Id="9ed6260c-5af4-4119-aae7-fb688f26c611" Title="Layer Properties" Url="html/Properties_T_DuetAPI_Machine_Layer.htm">
           <HelpTOCNode Title="Duration Property " Url="html/P_DuetAPI_Machine_Layer_Duration.htm" />
           <HelpTOCNode Title="Filament Property " Url="html/P_DuetAPI_Machine_Layer_Filament.htm" />
           <HelpTOCNode Title="FractionPrinted Property " Url="html/P_DuetAPI_Machine_Layer_FractionPrinted.htm" />
           <HelpTOCNode Title="Height Property " Url="html/P_DuetAPI_Machine_Layer_Height.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="65fdb831-3870-4422-aa98-8f74a36a2e28" Title="Layer Methods" Url="html/Methods_T_DuetAPI_Machine_Layer.htm">
+        <HelpTOCNode Id="0f7d9cb0-ccde-4e2e-b13c-874ed146ccca" Title="Layer Methods" Url="html/Methods_T_DuetAPI_Machine_Layer.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Layer_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="MachineMode Enumeration" Url="html/T_DuetAPI_Machine_MachineMode.htm" />
-      <HelpTOCNode Id="e605cece-d66e-48b5-8b41-6e487b518301" Title="MachineModel Class" Url="html/T_DuetAPI_Machine_MachineModel.htm">
+      <HelpTOCNode Id="091b9134-e06b-41e3-8531-3770f030b079" Title="MachineModel Class" Url="html/T_DuetAPI_Machine_MachineModel.htm">
         <HelpTOCNode Title="MachineModel Constructor " Url="html/M_DuetAPI_Machine_MachineModel__ctor.htm" />
-        <HelpTOCNode Id="3a27baec-8dab-40b1-a081-29767a14b3c9" Title="MachineModel Properties" Url="html/Properties_T_DuetAPI_Machine_MachineModel.htm">
+        <HelpTOCNode Id="f0aa0c35-7bde-4e1c-93c6-d10b4a54b329" Title="MachineModel Properties" Url="html/Properties_T_DuetAPI_Machine_MachineModel.htm">
           <HelpTOCNode Title="Channels Property " Url="html/P_DuetAPI_Machine_MachineModel_Channels.htm" />
           <HelpTOCNode Title="Electronics Property " Url="html/P_DuetAPI_Machine_MachineModel_Electronics.htm" />
           <HelpTOCNode Title="Fans Property " Url="html/P_DuetAPI_Machine_MachineModel_Fans.htm" />
@@ -596,38 +596,38 @@
           <HelpTOCNode Title="Storages Property " Url="html/P_DuetAPI_Machine_MachineModel_Storages.htm" />
           <HelpTOCNode Title="Tools Property " Url="html/P_DuetAPI_Machine_MachineModel_Tools.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="48484eab-a81a-4f2d-92ea-78ca46b4be0d" Title="MachineModel Methods" Url="html/Methods_T_DuetAPI_Machine_MachineModel.htm">
+        <HelpTOCNode Id="b8468047-89bc-4f09-99f3-5a3f0939b19f" Title="MachineModel Methods" Url="html/Methods_T_DuetAPI_Machine_MachineModel.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_MachineModel_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="MachineStatus Enumeration" Url="html/T_DuetAPI_Machine_MachineStatus.htm" />
-      <HelpTOCNode Id="530c7fab-4ebf-4975-9c5f-5dfcbd6d404f" Title="MessageBox Class" Url="html/T_DuetAPI_Machine_MessageBox.htm">
+      <HelpTOCNode Id="57df9afc-e656-4a12-ab8b-cacfdfab4446" Title="MessageBox Class" Url="html/T_DuetAPI_Machine_MessageBox.htm">
         <HelpTOCNode Title="MessageBox Constructor " Url="html/M_DuetAPI_Machine_MessageBox__ctor.htm" />
-        <HelpTOCNode Id="8cd8f264-3042-4523-8bdd-c5875159b675" Title="MessageBox Properties" Url="html/Properties_T_DuetAPI_Machine_MessageBox.htm">
+        <HelpTOCNode Id="08a66461-0a69-4049-8494-0d24398c7715" Title="MessageBox Properties" Url="html/Properties_T_DuetAPI_Machine_MessageBox.htm">
           <HelpTOCNode Title="AxisControls Property " Url="html/P_DuetAPI_Machine_MessageBox_AxisControls.htm" />
           <HelpTOCNode Title="Message Property " Url="html/P_DuetAPI_Machine_MessageBox_Message.htm" />
           <HelpTOCNode Title="Mode Property " Url="html/P_DuetAPI_Machine_MessageBox_Mode.htm" />
           <HelpTOCNode Title="Title Property " Url="html/P_DuetAPI_Machine_MessageBox_Title.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="9fab24a3-a7d7-40ca-a70d-0899a59ff067" Title="MessageBox Methods" Url="html/Methods_T_DuetAPI_Machine_MessageBox.htm">
+        <HelpTOCNode Id="4477ce27-2cbd-419c-a9f6-c89792898c1c" Title="MessageBox Methods" Url="html/Methods_T_DuetAPI_Machine_MessageBox.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_MessageBox_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="MessageBoxMode Enumeration" Url="html/T_DuetAPI_Machine_MessageBoxMode.htm" />
-      <HelpTOCNode Id="fac5a533-42e1-4cdd-8a94-56e370f8a062" Title="MinMaxCurrent(T) Class" Url="html/T_DuetAPI_Machine_MinMaxCurrent_1.htm">
+      <HelpTOCNode Id="028844fd-a6ac-4a9e-9afd-a988178ea041" Title="MinMaxCurrent(T) Class" Url="html/T_DuetAPI_Machine_MinMaxCurrent_1.htm">
         <HelpTOCNode Title="MinMaxCurrent(T) Constructor " Url="html/M_DuetAPI_Machine_MinMaxCurrent_1__ctor.htm" />
-        <HelpTOCNode Id="3ca0e16b-0ef3-47e4-b128-3773350787fd" Title="MinMaxCurrent(T) Properties" Url="html/Properties_T_DuetAPI_Machine_MinMaxCurrent_1.htm">
+        <HelpTOCNode Id="327af83b-de8d-4704-9fb0-d3bc79083e27" Title="MinMaxCurrent(T) Properties" Url="html/Properties_T_DuetAPI_Machine_MinMaxCurrent_1.htm">
           <HelpTOCNode Title="Current Property " Url="html/P_DuetAPI_Machine_MinMaxCurrent_1_Current.htm" />
           <HelpTOCNode Title="Max Property " Url="html/P_DuetAPI_Machine_MinMaxCurrent_1_Max.htm" />
           <HelpTOCNode Title="Min Property " Url="html/P_DuetAPI_Machine_MinMaxCurrent_1_Min.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="3e29525f-724e-4beb-b96b-888c719f2df6" Title="MinMaxCurrent(T) Methods" Url="html/Methods_T_DuetAPI_Machine_MinMaxCurrent_1.htm">
+        <HelpTOCNode Id="a4ca7d0a-d1d5-45c7-862e-fa3c701ee6a7" Title="MinMaxCurrent(T) Methods" Url="html/Methods_T_DuetAPI_Machine_MinMaxCurrent_1.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_MinMaxCurrent_1_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="fb20440f-75f2-4a75-b821-cb3223434fed" Title="Move Class" Url="html/T_DuetAPI_Machine_Move.htm">
+      <HelpTOCNode Id="9b105b09-8ae1-48b7-bd4f-b3a594cbe622" Title="Move Class" Url="html/T_DuetAPI_Machine_Move.htm">
         <HelpTOCNode Title="Move Constructor " Url="html/M_DuetAPI_Machine_Move__ctor.htm" />
-        <HelpTOCNode Id="ea036504-9c38-4c0c-b54e-fbb5ec0f866a" Title="Move Properties" Url="html/Properties_T_DuetAPI_Machine_Move.htm">
+        <HelpTOCNode Id="a94872e4-4951-4095-a04b-60224c51ec72" Title="Move Properties" Url="html/Properties_T_DuetAPI_Machine_Move.htm">
           <HelpTOCNode Title="Axes Property " Url="html/P_DuetAPI_Machine_Move_Axes.htm" />
           <HelpTOCNode Title="BabystepZ Property " Url="html/P_DuetAPI_Machine_Move_BabystepZ.htm" />
           <HelpTOCNode Title="Compensation Property " Url="html/P_DuetAPI_Machine_Move_Compensation.htm" />
@@ -638,24 +638,24 @@
           <HelpTOCNode Title="Idle Property " Url="html/P_DuetAPI_Machine_Move_Idle.htm" />
           <HelpTOCNode Title="SpeedFactor Property " Url="html/P_DuetAPI_Machine_Move_SpeedFactor.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="989c370e-4233-4e19-8861-59a41ed7a4ef" Title="Move Methods" Url="html/Methods_T_DuetAPI_Machine_Move.htm">
+        <HelpTOCNode Id="9e938bc4-7a72-4d3c-b7d5-0ad177d3d4ab" Title="Move Methods" Url="html/Methods_T_DuetAPI_Machine_Move.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Move_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="d3713ae7-b905-4cbb-85b3-82e2cfd075dd" Title="Network Class" Url="html/T_DuetAPI_Machine_Network.htm">
+      <HelpTOCNode Id="1afd35f5-1179-42c9-aba2-adb8b80f46c3" Title="Network Class" Url="html/T_DuetAPI_Machine_Network.htm">
         <HelpTOCNode Title="Network Constructor " Url="html/M_DuetAPI_Machine_Network__ctor.htm" />
-        <HelpTOCNode Id="e5959f40-d01d-482e-9bed-1c24b910f0cd" Title="Network Properties" Url="html/Properties_T_DuetAPI_Machine_Network.htm">
+        <HelpTOCNode Id="b3edc13c-3165-4e8c-afda-4d10b80c2c26" Title="Network Properties" Url="html/Properties_T_DuetAPI_Machine_Network.htm">
           <HelpTOCNode Title="Interfaces Property " Url="html/P_DuetAPI_Machine_Network_Interfaces.htm" />
           <HelpTOCNode Title="Name Property " Url="html/P_DuetAPI_Machine_Network_Name.htm" />
           <HelpTOCNode Title="Password Property " Url="html/P_DuetAPI_Machine_Network_Password.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="6d82d58c-818b-4083-bb81-23d6a157c0ff" Title="Network Methods" Url="html/Methods_T_DuetAPI_Machine_Network.htm">
+        <HelpTOCNode Id="7a3039d0-f354-4da8-9c0b-2897339d8915" Title="Network Methods" Url="html/Methods_T_DuetAPI_Machine_Network.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Network_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="5683c4c0-fbd2-408c-a9b7-da9f9e30c76b" Title="NetworkInterface Class" Url="html/T_DuetAPI_Machine_NetworkInterface.htm">
+      <HelpTOCNode Id="911d17ab-9fdd-4edb-a5f5-3e5de5479849" Title="NetworkInterface Class" Url="html/T_DuetAPI_Machine_NetworkInterface.htm">
         <HelpTOCNode Title="NetworkInterface Constructor " Url="html/M_DuetAPI_Machine_NetworkInterface__ctor.htm" />
-        <HelpTOCNode Id="ffd0a643-3318-4610-8803-2a40fbb970a5" Title="NetworkInterface Properties" Url="html/Properties_T_DuetAPI_Machine_NetworkInterface.htm">
+        <HelpTOCNode Id="dac1b9c0-79f9-4e2f-8b92-464ef3f3c081" Title="NetworkInterface Properties" Url="html/Properties_T_DuetAPI_Machine_NetworkInterface.htm">
           <HelpTOCNode Title="ActiveProtocols Property " Url="html/P_DuetAPI_Machine_NetworkInterface_ActiveProtocols.htm" />
           <HelpTOCNode Title="ActualIP Property " Url="html/P_DuetAPI_Machine_NetworkInterface_ActualIP.htm" />
           <HelpTOCNode Title="ConfiguredIP Property " Url="html/P_DuetAPI_Machine_NetworkInterface_ConfiguredIP.htm" />
@@ -668,14 +668,14 @@
           <HelpTOCNode Title="Subnet Property " Url="html/P_DuetAPI_Machine_NetworkInterface_Subnet.htm" />
           <HelpTOCNode Title="Type Property " Url="html/P_DuetAPI_Machine_NetworkInterface_Type.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="233e6df4-e3d7-4132-b880-aad41d97bd27" Title="NetworkInterface Methods" Url="html/Methods_T_DuetAPI_Machine_NetworkInterface.htm">
+        <HelpTOCNode Id="22a9ed5b-8b8c-4633-80b3-6b31a6da6f12" Title="NetworkInterface Methods" Url="html/Methods_T_DuetAPI_Machine_NetworkInterface.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_NetworkInterface_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="NetworkProtocol Enumeration" Url="html/T_DuetAPI_Machine_NetworkProtocol.htm" />
-      <HelpTOCNode Id="4d46c3f0-606e-4a11-b669-2dcbc2ce7fcb" Title="Probe Class" Url="html/T_DuetAPI_Machine_Probe.htm">
+      <HelpTOCNode Id="8cb21768-409c-4b64-9aa5-6c06d180f93f" Title="Probe Class" Url="html/T_DuetAPI_Machine_Probe.htm">
         <HelpTOCNode Title="Probe Constructor " Url="html/M_DuetAPI_Machine_Probe__ctor.htm" />
-        <HelpTOCNode Id="1fbf0249-6ca1-44fa-8cb3-03d45244ac04" Title="Probe Properties" Url="html/Properties_T_DuetAPI_Machine_Probe.htm">
+        <HelpTOCNode Id="5067b986-70ef-4e1d-b2ac-90cb73353ef5" Title="Probe Properties" Url="html/Properties_T_DuetAPI_Machine_Probe.htm">
           <HelpTOCNode Title="DisablesBed Property " Url="html/P_DuetAPI_Machine_Probe_DisablesBed.htm" />
           <HelpTOCNode Title="DiveHeight Property " Url="html/P_DuetAPI_Machine_Probe_DiveHeight.htm" />
           <HelpTOCNode Title="Inverted Property " Url="html/P_DuetAPI_Machine_Probe_Inverted.htm" />
@@ -690,57 +690,57 @@
           <HelpTOCNode Title="Type Property " Url="html/P_DuetAPI_Machine_Probe_Type.htm" />
           <HelpTOCNode Title="Value Property " Url="html/P_DuetAPI_Machine_Probe_Value.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="8f938630-6bcf-4f19-85b7-fec0fcf93c8c" Title="Probe Methods" Url="html/Methods_T_DuetAPI_Machine_Probe.htm">
+        <HelpTOCNode Id="c9e18f09-3df8-4bbe-b80d-3f2a9a4b03b1" Title="Probe Methods" Url="html/Methods_T_DuetAPI_Machine_Probe.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Probe_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="ProbeType Enumeration" Url="html/T_DuetAPI_Machine_ProbeType.htm" />
-      <HelpTOCNode Id="02396c02-fb2f-41eb-96e8-0ece3864b7f2" Title="Scanner Class" Url="html/T_DuetAPI_Machine_Scanner.htm">
+      <HelpTOCNode Id="d2b70670-c95f-4a58-8a1b-897dab9a528c" Title="Scanner Class" Url="html/T_DuetAPI_Machine_Scanner.htm">
         <HelpTOCNode Title="Scanner Constructor " Url="html/M_DuetAPI_Machine_Scanner__ctor.htm" />
-        <HelpTOCNode Id="bbbbe55d-24b4-4af1-9bf8-7a8decbce1e0" Title="Scanner Properties" Url="html/Properties_T_DuetAPI_Machine_Scanner.htm">
+        <HelpTOCNode Id="412816b6-c022-4dfb-bf28-54b49d23d782" Title="Scanner Properties" Url="html/Properties_T_DuetAPI_Machine_Scanner.htm">
           <HelpTOCNode Title="Progress Property " Url="html/P_DuetAPI_Machine_Scanner_Progress.htm" />
           <HelpTOCNode Title="Status Property " Url="html/P_DuetAPI_Machine_Scanner_Status.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="ece842ca-8a47-442c-93bb-e2c7d463c556" Title="Scanner Methods" Url="html/Methods_T_DuetAPI_Machine_Scanner.htm">
+        <HelpTOCNode Id="68b42deb-26cd-48e9-8b0c-e4238310985f" Title="Scanner Methods" Url="html/Methods_T_DuetAPI_Machine_Scanner.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Scanner_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
       <HelpTOCNode Title="ScannerStatus Enumeration" Url="html/T_DuetAPI_Machine_ScannerStatus.htm" />
-      <HelpTOCNode Id="84ba818e-340d-4caa-a1eb-dfc75ced73c0" Title="Sensors Class" Url="html/T_DuetAPI_Machine_Sensors.htm">
+      <HelpTOCNode Id="585d55b0-fa45-4014-860a-f1b91a3e72e3" Title="Sensors Class" Url="html/T_DuetAPI_Machine_Sensors.htm">
         <HelpTOCNode Title="Sensors Constructor " Url="html/M_DuetAPI_Machine_Sensors__ctor.htm" />
-        <HelpTOCNode Id="f88e2a6b-251d-422e-b4a2-c49cbc1247dd" Title="Sensors Properties" Url="html/Properties_T_DuetAPI_Machine_Sensors.htm">
+        <HelpTOCNode Id="b2ce47a6-e9c8-4e1d-b210-6a54ed8bd62b" Title="Sensors Properties" Url="html/Properties_T_DuetAPI_Machine_Sensors.htm">
           <HelpTOCNode Title="Endstops Property " Url="html/P_DuetAPI_Machine_Sensors_Endstops.htm" />
           <HelpTOCNode Title="Probes Property " Url="html/P_DuetAPI_Machine_Sensors_Probes.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="1c9bfca5-a5ba-45f1-98da-63e531affb60" Title="Sensors Methods" Url="html/Methods_T_DuetAPI_Machine_Sensors.htm">
+        <HelpTOCNode Id="d2cece62-83ae-458f-82fc-038055596737" Title="Sensors Methods" Url="html/Methods_T_DuetAPI_Machine_Sensors.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Sensors_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="82e1186b-596e-4e0d-ab2e-1790fd01e877" Title="Spindle Class" Url="html/T_DuetAPI_Machine_Spindle.htm">
+      <HelpTOCNode Id="b5850245-c9ae-498b-98c0-0966eaf47aec" Title="Spindle Class" Url="html/T_DuetAPI_Machine_Spindle.htm">
         <HelpTOCNode Title="Spindle Constructor " Url="html/M_DuetAPI_Machine_Spindle__ctor.htm" />
-        <HelpTOCNode Id="2d5e2ba7-ef90-4c49-a996-1f583d85a561" Title="Spindle Properties" Url="html/Properties_T_DuetAPI_Machine_Spindle.htm">
+        <HelpTOCNode Id="92562d2e-0190-4832-a4a0-b50aa69bf4d6" Title="Spindle Properties" Url="html/Properties_T_DuetAPI_Machine_Spindle.htm">
           <HelpTOCNode Title="Active Property " Url="html/P_DuetAPI_Machine_Spindle_Active.htm" />
           <HelpTOCNode Title="Current Property " Url="html/P_DuetAPI_Machine_Spindle_Current.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="86207d48-1a63-4230-b288-169e77ed29c2" Title="Spindle Methods" Url="html/Methods_T_DuetAPI_Machine_Spindle.htm">
+        <HelpTOCNode Id="38f2cc7d-316f-4c16-86f2-69df64666d4c" Title="Spindle Methods" Url="html/Methods_T_DuetAPI_Machine_Spindle.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Spindle_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="205bde64-422e-4a2e-9747-5e2e27c639e0" Title="State Class" Url="html/T_DuetAPI_Machine_State.htm">
+      <HelpTOCNode Id="df011c85-2602-4792-ac7b-3709d8129df3" Title="State Class" Url="html/T_DuetAPI_Machine_State.htm">
         <HelpTOCNode Title="State Constructor " Url="html/M_DuetAPI_Machine_State__ctor.htm" />
-        <HelpTOCNode Id="a226e18d-4b63-4edc-a6ea-f788430f2b86" Title="State Properties" Url="html/Properties_T_DuetAPI_Machine_State.htm">
+        <HelpTOCNode Id="0ae3a23c-f097-4b3a-bfc0-6199c2d6211d" Title="State Properties" Url="html/Properties_T_DuetAPI_Machine_State.htm">
           <HelpTOCNode Title="AtxPower Property " Url="html/P_DuetAPI_Machine_State_AtxPower.htm" />
           <HelpTOCNode Title="CurrentTool Property " Url="html/P_DuetAPI_Machine_State_CurrentTool.htm" />
           <HelpTOCNode Title="Mode Property " Url="html/P_DuetAPI_Machine_State_Mode.htm" />
           <HelpTOCNode Title="Status Property " Url="html/P_DuetAPI_Machine_State_Status.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="ae1bd62e-59a3-4329-b1f4-ab327b812bd7" Title="State Methods" Url="html/Methods_T_DuetAPI_Machine_State.htm">
+        <HelpTOCNode Id="6460f043-4eca-4a21-89d3-b880a76fd5b0" Title="State Methods" Url="html/Methods_T_DuetAPI_Machine_State.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_State_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="a8ca92c7-b0b3-48d1-8572-3445bf8c1ab5" Title="Storage Class" Url="html/T_DuetAPI_Machine_Storage.htm">
+      <HelpTOCNode Id="3fcd9dc4-19be-49ac-896c-c4c9bfbdfc45" Title="Storage Class" Url="html/T_DuetAPI_Machine_Storage.htm">
         <HelpTOCNode Title="Storage Constructor " Url="html/M_DuetAPI_Machine_Storage__ctor.htm" />
-        <HelpTOCNode Id="6927b600-1fe4-46c5-83f4-2d8eddfba403" Title="Storage Properties" Url="html/Properties_T_DuetAPI_Machine_Storage.htm">
+        <HelpTOCNode Id="a2482fbc-19ea-4c89-b54c-a7846f894c68" Title="Storage Properties" Url="html/Properties_T_DuetAPI_Machine_Storage.htm">
           <HelpTOCNode Title="Capacity Property " Url="html/P_DuetAPI_Machine_Storage_Capacity.htm" />
           <HelpTOCNode Title="Free Property " Url="html/P_DuetAPI_Machine_Storage_Free.htm" />
           <HelpTOCNode Title="Mounted Property " Url="html/P_DuetAPI_Machine_Storage_Mounted.htm" />
@@ -748,35 +748,35 @@
           <HelpTOCNode Title="Path Property " Url="html/P_DuetAPI_Machine_Storage_Path.htm" />
           <HelpTOCNode Title="Speed Property " Url="html/P_DuetAPI_Machine_Storage_Speed.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="e9db6df9-54d6-47dc-a69d-26feb9c3c3be" Title="Storage Methods" Url="html/Methods_T_DuetAPI_Machine_Storage.htm">
+        <HelpTOCNode Id="54973531-e569-4c88-9e0e-ff414135fd1d" Title="Storage Methods" Url="html/Methods_T_DuetAPI_Machine_Storage.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Storage_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="2132b6a8-fbce-4383-9004-513fbc2ccbec" Title="Thermostatic Class" Url="html/T_DuetAPI_Machine_Thermostatic.htm">
+      <HelpTOCNode Id="41c1d4b8-b408-4fa6-a455-db2d9b8c17f0" Title="Thermostatic Class" Url="html/T_DuetAPI_Machine_Thermostatic.htm">
         <HelpTOCNode Title="Thermostatic Constructor " Url="html/M_DuetAPI_Machine_Thermostatic__ctor.htm" />
-        <HelpTOCNode Id="ab2697be-4d44-4d21-8f71-b202f767c922" Title="Thermostatic Properties" Url="html/Properties_T_DuetAPI_Machine_Thermostatic.htm">
+        <HelpTOCNode Id="74942cb8-9e0f-47b4-801a-40739844eaa1" Title="Thermostatic Properties" Url="html/Properties_T_DuetAPI_Machine_Thermostatic.htm">
           <HelpTOCNode Title="Control Property " Url="html/P_DuetAPI_Machine_Thermostatic_Control.htm" />
           <HelpTOCNode Title="Heaters Property " Url="html/P_DuetAPI_Machine_Thermostatic_Heaters.htm" />
           <HelpTOCNode Title="Temperature Property " Url="html/P_DuetAPI_Machine_Thermostatic_Temperature.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="6182faf0-ce2a-4323-8f75-45599194d54c" Title="Thermostatic Methods" Url="html/Methods_T_DuetAPI_Machine_Thermostatic.htm">
+        <HelpTOCNode Id="89430f76-91d2-4ff5-8b46-344778bbac06" Title="Thermostatic Methods" Url="html/Methods_T_DuetAPI_Machine_Thermostatic.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Thermostatic_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="acb9b5ce-7e0e-47ca-9346-7dc5a3c67c18" Title="TimesLeft Class" Url="html/T_DuetAPI_Machine_TimesLeft.htm">
+      <HelpTOCNode Id="533279ff-31bb-4452-b766-4f4b571458c1" Title="TimesLeft Class" Url="html/T_DuetAPI_Machine_TimesLeft.htm">
         <HelpTOCNode Title="TimesLeft Constructor " Url="html/M_DuetAPI_Machine_TimesLeft__ctor.htm" />
-        <HelpTOCNode Id="46dd9402-090b-46ca-b214-42b43781b350" Title="TimesLeft Properties" Url="html/Properties_T_DuetAPI_Machine_TimesLeft.htm">
+        <HelpTOCNode Id="e469a9fc-1f42-490d-8651-9865f02fb1e4" Title="TimesLeft Properties" Url="html/Properties_T_DuetAPI_Machine_TimesLeft.htm">
           <HelpTOCNode Title="Filament Property " Url="html/P_DuetAPI_Machine_TimesLeft_Filament.htm" />
           <HelpTOCNode Title="File Property " Url="html/P_DuetAPI_Machine_TimesLeft_File.htm" />
           <HelpTOCNode Title="Layer Property " Url="html/P_DuetAPI_Machine_TimesLeft_Layer.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="509a0039-2c2d-49f6-bf81-b27fd6f4978f" Title="TimesLeft Methods" Url="html/Methods_T_DuetAPI_Machine_TimesLeft.htm">
+        <HelpTOCNode Id="37ac5a7c-e13d-4b31-9ab0-6b9924dea2e6" Title="TimesLeft Methods" Url="html/Methods_T_DuetAPI_Machine_TimesLeft.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_TimesLeft_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="5d3ca52f-9630-417b-82b4-f7fb591d09dc" Title="Tool Class" Url="html/T_DuetAPI_Machine_Tool.htm">
+      <HelpTOCNode Id="743685a4-8845-495a-b73b-e913c70acbc4" Title="Tool Class" Url="html/T_DuetAPI_Machine_Tool.htm">
         <HelpTOCNode Title="Tool Constructor " Url="html/M_DuetAPI_Machine_Tool__ctor.htm" />
-        <HelpTOCNode Id="77cbbdaf-e675-40cf-8eb5-b2440bd803fd" Title="Tool Properties" Url="html/Properties_T_DuetAPI_Machine_Tool.htm">
+        <HelpTOCNode Id="87a0c510-3de1-49be-a395-4fbebbe6c328" Title="Tool Properties" Url="html/Properties_T_DuetAPI_Machine_Tool.htm">
           <HelpTOCNode Title="Active Property " Url="html/P_DuetAPI_Machine_Tool_Active.htm" />
           <HelpTOCNode Title="Axes Property " Url="html/P_DuetAPI_Machine_Tool_Axes.htm" />
           <HelpTOCNode Title="Fans Property " Url="html/P_DuetAPI_Machine_Tool_Fans.htm" />
@@ -789,47 +789,42 @@
           <HelpTOCNode Title="Spindle Property " Url="html/P_DuetAPI_Machine_Tool_Spindle.htm" />
           <HelpTOCNode Title="Standby Property " Url="html/P_DuetAPI_Machine_Tool_Standby.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="477883af-2ef8-4528-b637-650065a12b0a" Title="Tool Methods" Url="html/Methods_T_DuetAPI_Machine_Tool.htm">
+        <HelpTOCNode Id="4ca3dcd9-c084-4262-9f2e-ccc47db61672" Title="Tool Methods" Url="html/Methods_T_DuetAPI_Machine_Tool.htm">
           <HelpTOCNode Title="Clone Method " Url="html/M_DuetAPI_Machine_Tool_Clone.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="56bc3083-73f8-43a1-8503-4ad36cdeb06e" Title="DuetAPI.Utility" Url="html/N_DuetAPI_Utility.htm">
-      <HelpTOCNode Id="61feb9d2-fa27-4316-958e-d62c0a4ff6e7" Title="CharEnumConverter Class" Url="html/T_DuetAPI_Utility_CharEnumConverter.htm">
+    <HelpTOCNode Id="8cb6b08a-e3c1-409d-84f5-9a2cac82f67a" Title="DuetAPI.Utility" Url="html/N_DuetAPI_Utility.htm">
+      <HelpTOCNode Id="45265497-8d0d-4d85-af3e-36e5e7401498" Title="CharEnumConverter Class" Url="html/T_DuetAPI_Utility_CharEnumConverter.htm">
         <HelpTOCNode Title="CharEnumConverter Constructor " Url="html/M_DuetAPI_Utility_CharEnumConverter__ctor.htm" />
         <HelpTOCNode Title="CharEnumConverter Properties" Url="html/Properties_T_DuetAPI_Utility_CharEnumConverter.htm" />
-        <HelpTOCNode Id="f9e022bb-b615-4335-be24-552bbc280198" Title="CharEnumConverter Methods" Url="html/Methods_T_DuetAPI_Utility_CharEnumConverter.htm">
+        <HelpTOCNode Id="e3477e21-c8b7-452d-a2e6-e6f581e1597a" Title="CharEnumConverter Methods" Url="html/Methods_T_DuetAPI_Utility_CharEnumConverter.htm">
           <HelpTOCNode Title="CanConvert Method " Url="html/M_DuetAPI_Utility_CharEnumConverter_CanConvert.htm" />
           <HelpTOCNode Title="ReadJson Method " Url="html/M_DuetAPI_Utility_CharEnumConverter_ReadJson.htm" />
           <HelpTOCNode Title="WriteJson Method " Url="html/M_DuetAPI_Utility_CharEnumConverter_WriteJson.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="7ac1f311-f866-4da0-b1d5-0db744629436" Title="CRC16 Class" Url="html/T_DuetAPI_Utility_CRC16.htm">
-        <HelpTOCNode Id="dfcf2758-1297-48ac-b7b9-57455f88c795" Title="CRC16 Methods" Url="html/Methods_T_DuetAPI_Utility_CRC16.htm">
-          <HelpTOCNode Title="Calculate Method " Url="html/M_DuetAPI_Utility_CRC16_Calculate.htm" />
-        </HelpTOCNode>
-      </HelpTOCNode>
-      <HelpTOCNode Id="c9be04e5-f5fb-4bc0-b21b-759937cb8826" Title="JsonHelper Class" Url="html/T_DuetAPI_Utility_JsonHelper.htm">
-        <HelpTOCNode Id="b5cb8e48-ae3a-4f73-bd21-1ef2529a7f0c" Title="JsonHelper Methods" Url="html/Methods_T_DuetAPI_Utility_JsonHelper.htm">
+      <HelpTOCNode Id="fc961043-a797-4795-97e7-6576399f424d" Title="JsonHelper Class" Url="html/T_DuetAPI_Utility_JsonHelper.htm">
+        <HelpTOCNode Id="754654fc-fa77-4e79-8e55-e692d014537c" Title="JsonHelper Methods" Url="html/Methods_T_DuetAPI_Utility_JsonHelper.htm">
           <HelpTOCNode Title="DiffObject Method " Url="html/M_DuetAPI_Utility_JsonHelper_DiffObject.htm" />
-          <HelpTOCNode Id="69064f2e-ed63-413e-a70b-6b15c1f0a770" Title="PatchObject Method " Url="html/Overload_DuetAPI_Utility_JsonHelper_PatchObject.htm">
+          <HelpTOCNode Id="b73f85a1-37b0-435b-b78c-8fef85a88599" Title="PatchObject Method " Url="html/Overload_DuetAPI_Utility_JsonHelper_PatchObject.htm">
             <HelpTOCNode Title="PatchObject Method (JObject, JObject)" Url="html/M_DuetAPI_Utility_JsonHelper_PatchObject.htm" />
             <HelpTOCNode Title="PatchObject Method (Object, JObject)" Url="html/M_DuetAPI_Utility_JsonHelper_PatchObject_1.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="b0211a04-3de3-48d0-ab0c-3889885bee34" Title="JsonHelper Fields" Url="html/Fields_T_DuetAPI_Utility_JsonHelper.htm">
+        <HelpTOCNode Id="5d2d4749-af69-4d4d-9ce9-ef173a5b6abf" Title="JsonHelper Fields" Url="html/Fields_T_DuetAPI_Utility_JsonHelper.htm">
           <HelpTOCNode Title="DefaultSerializer Field" Url="html/F_DuetAPI_Utility_JsonHelper_DefaultSerializer.htm" />
           <HelpTOCNode Title="DefaultSettings Field" Url="html/F_DuetAPI_Utility_JsonHelper_DefaultSettings.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
   </HelpTOCNode>
-  <HelpTOCNode Id="29bf0b63-0851-4087-b269-a7c686b09249" Title="DuetAPIClient Namespaces" Url="html/G_DuetAPIClient.htm">
-    <HelpTOCNode Id="800834d4-8b57-46eb-ae75-ba9972d916a6" Title="DuetAPIClient" Url="html/N_DuetAPIClient.htm">
-      <HelpTOCNode Id="c1bda7ec-714c-429f-98a9-941595b8300f" Title="BaseCommandConnection Class" Url="html/T_DuetAPIClient_BaseCommandConnection.htm">
+  <HelpTOCNode Id="5b2d4fed-1459-4c2f-9d2a-9fc6dc379f0c" Title="DuetAPIClient Namespaces" Url="html/G_DuetAPIClient.htm">
+    <HelpTOCNode Id="c190f4f7-2908-4030-80a9-14880ce1389f" Title="DuetAPIClient" Url="html/N_DuetAPIClient.htm">
+      <HelpTOCNode Id="3ce3b8a9-90a9-4263-a282-e4d21371dccb" Title="BaseCommandConnection Class" Url="html/T_DuetAPIClient_BaseCommandConnection.htm">
         <HelpTOCNode Title="BaseCommandConnection Constructor " Url="html/M_DuetAPIClient_BaseCommandConnection__ctor.htm" />
         <HelpTOCNode Title="BaseCommandConnection Properties" Url="html/Properties_T_DuetAPIClient_BaseCommandConnection.htm" />
-        <HelpTOCNode Id="e8877365-18ef-4673-976c-b61826750e1f" Title="BaseCommandConnection Methods" Url="html/Methods_T_DuetAPIClient_BaseCommandConnection.htm">
+        <HelpTOCNode Id="5b517fc2-a6f6-4df4-91af-a75bb691d58e" Title="BaseCommandConnection Methods" Url="html/Methods_T_DuetAPIClient_BaseCommandConnection.htm">
           <HelpTOCNode Title="GetFileInfo Method " Url="html/M_DuetAPIClient_BaseCommandConnection_GetFileInfo.htm" />
           <HelpTOCNode Title="GetMachineModel Method " Url="html/M_DuetAPIClient_BaseCommandConnection_GetMachineModel.htm" />
           <HelpTOCNode Title="GetSerializedMachineModel Method " Url="html/M_DuetAPIClient_BaseCommandConnection_GetSerializedMachineModel.htm" />
@@ -838,17 +833,17 @@
           <HelpTOCNode Title="ResolvePath Method " Url="html/M_DuetAPIClient_BaseCommandConnection_ResolvePath.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="acfef0e6-611e-45f2-b455-af12353cac04" Title="BaseConnection Class" Url="html/T_DuetAPIClient_BaseConnection.htm">
+      <HelpTOCNode Id="72044cef-3f96-448c-947a-709224c54c60" Title="BaseConnection Class" Url="html/T_DuetAPIClient_BaseConnection.htm">
         <HelpTOCNode Title="BaseConnection Constructor " Url="html/M_DuetAPIClient_BaseConnection__ctor.htm" />
-        <HelpTOCNode Id="a5b55def-c7b0-4aee-b126-dfa76912051f" Title="BaseConnection Properties" Url="html/Properties_T_DuetAPIClient_BaseConnection.htm">
+        <HelpTOCNode Id="b0195dfb-bc36-4138-8889-d2476992246b" Title="BaseConnection Properties" Url="html/Properties_T_DuetAPIClient_BaseConnection.htm">
           <HelpTOCNode Title="Id Property " Url="html/P_DuetAPIClient_BaseConnection_Id.htm" />
           <HelpTOCNode Title="IsConnected Property " Url="html/P_DuetAPIClient_BaseConnection_IsConnected.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="6fd884f1-2ea6-4891-af51-6fa2820aff17" Title="BaseConnection Methods" Url="html/Methods_T_DuetAPIClient_BaseConnection.htm">
+        <HelpTOCNode Id="91a4158d-bd5d-4f18-ac94-1fdabf8775d4" Title="BaseConnection Methods" Url="html/Methods_T_DuetAPIClient_BaseConnection.htm">
           <HelpTOCNode Title="Close Method " Url="html/M_DuetAPIClient_BaseConnection_Close.htm" />
           <HelpTOCNode Title="Connect Method " Url="html/M_DuetAPIClient_BaseConnection_Connect.htm" />
           <HelpTOCNode Title="Dispose Method " Url="html/M_DuetAPIClient_BaseConnection_Dispose.htm" />
-          <HelpTOCNode Id="f093a52b-9dfb-4f2f-a0b0-6b03291732d5" Title="PerformCommand Method " Url="html/Overload_DuetAPIClient_BaseConnection_PerformCommand.htm">
+          <HelpTOCNode Id="2bab1cf4-32a1-4e5c-bf45-9a6553ecb82e" Title="PerformCommand Method " Url="html/Overload_DuetAPIClient_BaseConnection_PerformCommand.htm">
             <HelpTOCNode Title="PerformCommand Method (BaseCommand, CancellationToken)" Url="html/M_DuetAPIClient_BaseConnection_PerformCommand.htm" />
             <HelpTOCNode Title="PerformCommand(T) Method (BaseCommand, CancellationToken)" Url="html/M_DuetAPIClient_BaseConnection_PerformCommand__1.htm" />
           </HelpTOCNode>
@@ -859,22 +854,22 @@
           <HelpTOCNode Title="Send Method " Url="html/M_DuetAPIClient_BaseConnection_Send.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="3d053f4a-5795-422f-a9fe-6f20383d40ce" Title="CommandConnection Class" Url="html/T_DuetAPIClient_CommandConnection.htm">
+      <HelpTOCNode Id="d18fcc07-5886-4185-9f1c-a830531b537f" Title="CommandConnection Class" Url="html/T_DuetAPIClient_CommandConnection.htm">
         <HelpTOCNode Title="CommandConnection Constructor " Url="html/M_DuetAPIClient_CommandConnection__ctor.htm" />
         <HelpTOCNode Title="CommandConnection Properties" Url="html/Properties_T_DuetAPIClient_CommandConnection.htm" />
-        <HelpTOCNode Id="751fea2d-40f5-412f-bc81-cd8e408d43cb" Title="CommandConnection Methods" Url="html/Methods_T_DuetAPIClient_CommandConnection.htm">
-          <HelpTOCNode Id="e9222629-077b-4fb7-9b45-eeaec57c5388" Title="Connect Method " Url="html/Overload_DuetAPIClient_CommandConnection_Connect.htm">
+        <HelpTOCNode Id="349ca3d2-0b95-4c93-8c98-54cac6b08f1c" Title="CommandConnection Methods" Url="html/Methods_T_DuetAPIClient_CommandConnection.htm">
+          <HelpTOCNode Id="4b6ee5f7-b7cc-4a20-9f99-9da58a2cb266" Title="Connect Method " Url="html/Overload_DuetAPIClient_CommandConnection_Connect.htm">
             <HelpTOCNode Title="Connect Method (String, CancellationToken)" Url="html/M_DuetAPIClient_CommandConnection_Connect.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="2cb676a2-95f7-4c48-8018-515df4399b9a" Title="InterceptConnection Class" Url="html/T_DuetAPIClient_InterceptConnection.htm">
+      <HelpTOCNode Id="4662ac84-45a5-49bb-950a-9e2f57408837" Title="InterceptConnection Class" Url="html/T_DuetAPIClient_InterceptConnection.htm">
         <HelpTOCNode Title="InterceptConnection Constructor " Url="html/M_DuetAPIClient_InterceptConnection__ctor.htm" />
-        <HelpTOCNode Id="077e1a5c-80b6-4631-b5d2-edd34648fe3c" Title="InterceptConnection Properties" Url="html/Properties_T_DuetAPIClient_InterceptConnection.htm">
+        <HelpTOCNode Id="83c72d24-082a-42a1-bbb4-d4110a03e0ef" Title="InterceptConnection Properties" Url="html/Properties_T_DuetAPIClient_InterceptConnection.htm">
           <HelpTOCNode Title="Mode Property " Url="html/P_DuetAPIClient_InterceptConnection_Mode.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="a732a68c-3b0c-4282-987d-36ef26349c27" Title="InterceptConnection Methods" Url="html/Methods_T_DuetAPIClient_InterceptConnection.htm">
-          <HelpTOCNode Id="aa33a81e-cec9-46b4-b78e-48d636211818" Title="Connect Method " Url="html/Overload_DuetAPIClient_InterceptConnection_Connect.htm">
+        <HelpTOCNode Id="4cfd110f-f8bb-4993-bf47-8d62a05d932d" Title="InterceptConnection Methods" Url="html/Methods_T_DuetAPIClient_InterceptConnection.htm">
+          <HelpTOCNode Id="489fd64a-2a4c-40ac-8857-d236e8fd05f4" Title="Connect Method " Url="html/Overload_DuetAPIClient_InterceptConnection_Connect.htm">
             <HelpTOCNode Title="Connect Method (InterceptionMode, String, CancellationToken)" Url="html/M_DuetAPIClient_InterceptConnection_Connect.htm" />
           </HelpTOCNode>
           <HelpTOCNode Title="IgnoreCode Method " Url="html/M_DuetAPIClient_InterceptConnection_IgnoreCode.htm" />
@@ -882,13 +877,13 @@
           <HelpTOCNode Title="ResolveCode Method " Url="html/M_DuetAPIClient_InterceptConnection_ResolveCode.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="17da0aa7-2895-4ee8-becb-c27d0f6cdea3" Title="SubscribeConnection Class" Url="html/T_DuetAPIClient_SubscribeConnection.htm">
+      <HelpTOCNode Id="f3fe4232-ef44-4a10-92a2-b4376c0c9d1b" Title="SubscribeConnection Class" Url="html/T_DuetAPIClient_SubscribeConnection.htm">
         <HelpTOCNode Title="SubscribeConnection Constructor " Url="html/M_DuetAPIClient_SubscribeConnection__ctor.htm" />
-        <HelpTOCNode Id="950463b5-a64b-4037-93e3-5a73a5912a1b" Title="SubscribeConnection Properties" Url="html/Properties_T_DuetAPIClient_SubscribeConnection.htm">
+        <HelpTOCNode Id="e68af175-e732-4d4d-8332-83eead16389b" Title="SubscribeConnection Properties" Url="html/Properties_T_DuetAPIClient_SubscribeConnection.htm">
           <HelpTOCNode Title="Mode Property " Url="html/P_DuetAPIClient_SubscribeConnection_Mode.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="9de18d1d-7f98-443d-8b91-00513e30581c" Title="SubscribeConnection Methods" Url="html/Methods_T_DuetAPIClient_SubscribeConnection.htm">
-          <HelpTOCNode Id="ce88ebfc-2323-4e03-a919-27da8be7358c" Title="Connect Method " Url="html/Overload_DuetAPIClient_SubscribeConnection_Connect.htm">
+        <HelpTOCNode Id="0b4e273a-5045-4971-9b0f-01c9cf790880" Title="SubscribeConnection Methods" Url="html/Methods_T_DuetAPIClient_SubscribeConnection.htm">
+          <HelpTOCNode Id="a368ebad-3363-49f0-8b5f-f5aa0634ce63" Title="Connect Method " Url="html/Overload_DuetAPIClient_SubscribeConnection_Connect.htm">
             <HelpTOCNode Title="Connect Method (SubscriptionMode, String, CancellationToken)" Url="html/M_DuetAPIClient_SubscribeConnection_Connect.htm" />
           </HelpTOCNode>
           <HelpTOCNode Title="GetMachineModel Method " Url="html/M_DuetAPIClient_SubscribeConnection_GetMachineModel.htm" />
@@ -897,9 +892,9 @@
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="641daba0-fc92-40e0-9bd6-e5ef8c7f76bd" Title="DuetAPIClient.Exceptions" Url="html/N_DuetAPIClient_Exceptions.htm">
-      <HelpTOCNode Id="f94aa87a-67b5-49fe-b62b-84597ddc7c3c" Title="IncompatibleVersionException Class" Url="html/T_DuetAPIClient_Exceptions_IncompatibleVersionException.htm">
-        <HelpTOCNode Id="7a7fb9ce-49b8-41be-864b-aeabaec2ce89" Title="IncompatibleVersionException Constructor " Url="html/Overload_DuetAPIClient_Exceptions_IncompatibleVersionException__ctor.htm">
+    <HelpTOCNode Id="fa972729-1f43-4c8d-b422-b43e3920b251" Title="DuetAPIClient.Exceptions" Url="html/N_DuetAPIClient_Exceptions.htm">
+      <HelpTOCNode Id="2d394ca2-a0a4-49ab-9492-751d31c8c630" Title="IncompatibleVersionException Class" Url="html/T_DuetAPIClient_Exceptions_IncompatibleVersionException.htm">
+        <HelpTOCNode Id="6a9a1263-b53c-4a13-8d2a-f57c29aa375e" Title="IncompatibleVersionException Constructor " Url="html/Overload_DuetAPIClient_Exceptions_IncompatibleVersionException__ctor.htm">
           <HelpTOCNode Title="IncompatibleVersionException Constructor " Url="html/M_DuetAPIClient_Exceptions_IncompatibleVersionException__ctor.htm" />
           <HelpTOCNode Title="IncompatibleVersionException Constructor (String)" Url="html/M_DuetAPIClient_Exceptions_IncompatibleVersionException__ctor_1.htm" />
           <HelpTOCNode Title="IncompatibleVersionException Constructor (String, Exception)" Url="html/M_DuetAPIClient_Exceptions_IncompatibleVersionException__ctor_2.htm" />
@@ -908,7 +903,7 @@
         <HelpTOCNode Title="IncompatibleVersionException Methods" Url="html/Methods_T_DuetAPIClient_Exceptions_IncompatibleVersionException.htm" />
         <HelpTOCNode Title="IncompatibleVersionException Events" Url="html/Events_T_DuetAPIClient_Exceptions_IncompatibleVersionException.htm" />
       </HelpTOCNode>
-      <HelpTOCNode Id="95b6cf65-2196-4533-a54e-1b98f053ff08" Title="InternalServerException Class" Url="html/T_DuetAPIClient_Exceptions_InternalServerException.htm">
+      <HelpTOCNode Id="501b4473-b123-41cf-948d-95b446e615b8" Title="InternalServerException Class" Url="html/T_DuetAPIClient_Exceptions_InternalServerException.htm">
         <HelpTOCNode Title="InternalServerException Constructor " Url="html/M_DuetAPIClient_Exceptions_InternalServerException__ctor.htm" />
         <HelpTOCNode Title="InternalServerException Properties" Url="html/Properties_T_DuetAPIClient_Exceptions_InternalServerException.htm" />
         <HelpTOCNode Title="InternalServerException Methods" Url="html/Methods_T_DuetAPIClient_Exceptions_InternalServerException.htm" />
@@ -916,27 +911,27 @@
       </HelpTOCNode>
     </HelpTOCNode>
   </HelpTOCNode>
-  <HelpTOCNode Id="cafbb060-8c5b-4a99-8b6e-156991529255" Title="DuetControlServer Namespaces" Url="html/G_DuetControlServer.htm">
-    <HelpTOCNode Id="7a7338f6-6a4d-4db3-83dd-a1a5f4de2e68" Title="DuetControlServer" Url="html/N_DuetControlServer.htm">
-      <HelpTOCNode Id="0452ec5d-c982-4234-9bd0-b490af26851f" Title="FileInfoParser Class" Url="html/T_DuetControlServer_FileInfoParser.htm">
-        <HelpTOCNode Id="848fcc43-79ae-4b89-a5fe-a1b9e5fefa66" Title="FileInfoParser Methods" Url="html/Methods_T_DuetControlServer_FileInfoParser.htm">
+  <HelpTOCNode Id="b181cd7b-f0e9-4a2f-8f07-8906285d567d" Title="DuetControlServer Namespaces" Url="html/G_DuetControlServer.htm">
+    <HelpTOCNode Id="0b9e977f-e983-4190-b0c0-064e5dfb7437" Title="DuetControlServer" Url="html/N_DuetControlServer.htm">
+      <HelpTOCNode Id="27d25638-f2a9-4c4b-8365-45144aa82a3f" Title="FileInfoParser Class" Url="html/T_DuetControlServer_FileInfoParser.htm">
+        <HelpTOCNode Id="640d7fd6-80b8-4ecf-bf75-c506ad2495f5" Title="FileInfoParser Methods" Url="html/Methods_T_DuetControlServer_FileInfoParser.htm">
           <HelpTOCNode Title="Parse Method " Url="html/M_DuetControlServer_FileInfoParser_Parse.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="96582fb1-db26-4943-b2f7-e1b35c915e8e" Title="FilePath Class" Url="html/T_DuetControlServer_FilePath.htm">
-        <HelpTOCNode Id="a57a1016-9310-439b-a6b1-e641546febec" Title="FilePath Methods" Url="html/Methods_T_DuetControlServer_FilePath.htm">
+      <HelpTOCNode Id="fb1b2ccb-00e7-4985-8f60-c829724bb6e6" Title="FilePath Class" Url="html/T_DuetControlServer_FilePath.htm">
+        <HelpTOCNode Id="0d6aff75-91bd-44cf-b4d4-f6c2dbc4a20b" Title="FilePath Methods" Url="html/Methods_T_DuetControlServer_FilePath.htm">
           <HelpTOCNode Title="ToPhysical Method " Url="html/M_DuetControlServer_FilePath_ToPhysical.htm" />
           <HelpTOCNode Title="ToVirtual Method " Url="html/M_DuetControlServer_FilePath_ToVirtual.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="63e307f1-4a30-4a05-9653-2de82ef81989" Title="Program Class" Url="html/T_DuetControlServer_Program.htm">
-        <HelpTOCNode Id="0eba5427-40d5-46a2-9dc2-d5c7511504d2" Title="Program Fields" Url="html/Fields_T_DuetControlServer_Program.htm">
+      <HelpTOCNode Id="85f45df8-6009-4830-beda-aa0f10a01703" Title="Program Class" Url="html/T_DuetControlServer_Program.htm">
+        <HelpTOCNode Id="c97e9192-6ea8-4e7f-9b59-00a7eb51f3c0" Title="Program Fields" Url="html/Fields_T_DuetControlServer_Program.htm">
           <HelpTOCNode Title="CancelSource Field" Url="html/F_DuetControlServer_Program_CancelSource.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="4dc68dde-c816-4c09-a1aa-0424ba29b830" Title="Settings Class" Url="html/T_DuetControlServer_Settings.htm">
+      <HelpTOCNode Id="f01f5e47-b2ba-4402-9d53-2b425e25ec6b" Title="Settings Class" Url="html/T_DuetControlServer_Settings.htm">
         <HelpTOCNode Title="Settings Constructor " Url="html/M_DuetControlServer_Settings__ctor.htm" />
-        <HelpTOCNode Id="d3d0cf5a-b1ea-48c4-8579-eda0b4f32390" Title="Settings Properties" Url="html/Properties_T_DuetControlServer_Settings.htm">
+        <HelpTOCNode Id="15d8f658-4e96-4eba-ac40-90389664971f" Title="Settings Properties" Url="html/Properties_T_DuetControlServer_Settings.htm">
           <HelpTOCNode Title="Backlog Property " Url="html/P_DuetControlServer_Settings_Backlog.htm" />
           <HelpTOCNode Title="BaseDirectory Property " Url="html/P_DuetControlServer_Settings_BaseDirectory.htm" />
           <HelpTOCNode Title="FilamentFilters Property " Url="html/P_DuetControlServer_Settings_FilamentFilters.htm" />
@@ -945,7 +940,9 @@
           <HelpTOCNode Title="HostUpdateInterval Property " Url="html/P_DuetControlServer_Settings_HostUpdateInterval.htm" />
           <HelpTOCNode Title="LayerHeightFilters Property " Url="html/P_DuetControlServer_Settings_LayerHeightFilters.htm" />
           <HelpTOCNode Title="MaxLayerHeight Property " Url="html/P_DuetControlServer_Settings_MaxLayerHeight.htm" />
+          <HelpTOCNode Title="MaxMessageAge Property " Url="html/P_DuetControlServer_Settings_MaxMessageAge.htm" />
           <HelpTOCNode Title="MaxSpiRetries Property " Url="html/P_DuetControlServer_Settings_MaxSpiRetries.htm" />
+          <HelpTOCNode Title="MaxUpdateDelay Property " Url="html/P_DuetControlServer_Settings_MaxUpdateDelay.htm" />
           <HelpTOCNode Title="PrintTimeFilters Property " Url="html/P_DuetControlServer_Settings_PrintTimeFilters.htm" />
           <HelpTOCNode Title="SimulatedTimeFilters Property " Url="html/P_DuetControlServer_Settings_SimulatedTimeFilters.htm" />
           <HelpTOCNode Title="SocketPath Property " Url="html/P_DuetControlServer_Settings_SocketPath.htm" />
@@ -955,104 +952,107 @@
           <HelpTOCNode Title="SpiTransferTimeout Property " Url="html/P_DuetControlServer_Settings_SpiTransferTimeout.htm" />
           <HelpTOCNode Title="TransferReadyPin Property " Url="html/P_DuetControlServer_Settings_TransferReadyPin.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="9dd67c1f-e16e-4bb6-a42e-9ec738d4f6dd" Title="Settings Methods" Url="html/Methods_T_DuetControlServer_Settings.htm">
+        <HelpTOCNode Id="c5b1d470-dc46-4f81-91d2-19ea39dc00e1" Title="Settings Methods" Url="html/Methods_T_DuetControlServer_Settings.htm">
           <HelpTOCNode Title="Load Method " Url="html/M_DuetControlServer_Settings_Load.htm" />
+        </HelpTOCNode>
+        <HelpTOCNode Id="61a5b307-7c34-42f4-afd5-2d826b0869bb" Title="Settings Fields" Url="html/Fields_T_DuetControlServer_Settings.htm">
+          <HelpTOCNode Title="SpiFrequency Field" Url="html/F_DuetControlServer_Settings_SpiFrequency.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="a52202ef-71b4-4cda-a1c7-e3f54c408978" Title="DuetControlServer.Codes" Url="html/N_DuetControlServer_Codes.htm">
-      <HelpTOCNode Id="1e6a2c60-31b0-4d0e-bc2a-3cfefe2bafd6" Title="GCodes Class" Url="html/T_DuetControlServer_Codes_GCodes.htm">
-        <HelpTOCNode Id="c65a2cc6-cb31-45d6-b1e1-0015eaf27070" Title="GCodes Methods" Url="html/Methods_T_DuetControlServer_Codes_GCodes.htm">
+    <HelpTOCNode Id="57d0b15b-ce2f-43e9-80a5-0067d408b648" Title="DuetControlServer.Codes" Url="html/N_DuetControlServer_Codes.htm">
+      <HelpTOCNode Id="8a00daf7-1cbb-4165-ae0a-d0b8f5281412" Title="GCodes Class" Url="html/T_DuetControlServer_Codes_GCodes.htm">
+        <HelpTOCNode Id="7dc26359-949d-477f-a433-839da596396a" Title="GCodes Methods" Url="html/Methods_T_DuetControlServer_Codes_GCodes.htm">
           <HelpTOCNode Title="CodeExecuted Method " Url="html/M_DuetControlServer_Codes_GCodes_CodeExecuted.htm" />
           <HelpTOCNode Title="Process Method " Url="html/M_DuetControlServer_Codes_GCodes_Process.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="9176b6c0-ec0e-4738-a612-72eb6562bcfb" Title="MCodes Class" Url="html/T_DuetControlServer_Codes_MCodes.htm">
-        <HelpTOCNode Id="e28e77b2-6bc2-43c0-acc1-0a2f924745d8" Title="MCodes Methods" Url="html/Methods_T_DuetControlServer_Codes_MCodes.htm">
+      <HelpTOCNode Id="dbf78df9-218a-4853-adca-7773fafe3d72" Title="MCodes Class" Url="html/T_DuetControlServer_Codes_MCodes.htm">
+        <HelpTOCNode Id="503b21d4-bc08-4e74-bb23-ba0d1f57eae6" Title="MCodes Methods" Url="html/Methods_T_DuetControlServer_Codes_MCodes.htm">
           <HelpTOCNode Title="CodeExecuted Method " Url="html/M_DuetControlServer_Codes_MCodes_CodeExecuted.htm" />
           <HelpTOCNode Title="Process Method " Url="html/M_DuetControlServer_Codes_MCodes_Process.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="609e2b99-e654-4902-b6cb-e29e55c43730" Title="TCodes Class" Url="html/T_DuetControlServer_Codes_TCodes.htm">
-        <HelpTOCNode Id="e6482ee6-19a7-4b31-b773-7e39a561042f" Title="TCodes Methods" Url="html/Methods_T_DuetControlServer_Codes_TCodes.htm">
+      <HelpTOCNode Id="c4be4c53-52a6-4f79-bf0c-95f61249a79a" Title="TCodes Class" Url="html/T_DuetControlServer_Codes_TCodes.htm">
+        <HelpTOCNode Id="8d5f7fe4-3966-45e4-abe2-9714d6da43c2" Title="TCodes Methods" Url="html/Methods_T_DuetControlServer_Codes_TCodes.htm">
           <HelpTOCNode Title="CodeExecuted Method " Url="html/M_DuetControlServer_Codes_TCodes_CodeExecuted.htm" />
           <HelpTOCNode Title="Process Method " Url="html/M_DuetControlServer_Codes_TCodes_Process.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="fd829c39-199e-4d70-9991-421cb1633d46" Title="DuetControlServer.Commands" Url="html/N_DuetControlServer_Commands.htm">
-      <HelpTOCNode Id="ee42fe9f-23e2-4139-bb3c-fe8c192854cb" Title="Code Class" Url="html/T_DuetControlServer_Commands_Code.htm">
-        <HelpTOCNode Id="b4e324eb-5499-4662-8355-71066331f7d3" Title="Code Constructor " Url="html/Overload_DuetControlServer_Commands_Code__ctor.htm">
+    <HelpTOCNode Id="407447f1-42e3-489a-ac8e-fec7d48b094e" Title="DuetControlServer.Commands" Url="html/N_DuetControlServer_Commands.htm">
+      <HelpTOCNode Id="1ace213d-d25d-40f2-83b7-93220649f97f" Title="Code Class" Url="html/T_DuetControlServer_Commands_Code.htm">
+        <HelpTOCNode Id="edf948a2-384b-478d-b023-f01f48a4ed18" Title="Code Constructor " Url="html/Overload_DuetControlServer_Commands_Code__ctor.htm">
           <HelpTOCNode Title="Code Constructor " Url="html/M_DuetControlServer_Commands_Code__ctor.htm" />
           <HelpTOCNode Title="Code Constructor (String)" Url="html/M_DuetControlServer_Commands_Code__ctor_1.htm" />
         </HelpTOCNode>
         <HelpTOCNode Title="Code Properties" Url="html/Properties_T_DuetControlServer_Commands_Code.htm" />
-        <HelpTOCNode Id="095ef4c3-8392-4c91-ba66-3e4e606a80cf" Title="Code Methods" Url="html/Methods_T_DuetControlServer_Commands_Code.htm">
+        <HelpTOCNode Id="ef38e352-6072-44f0-af80-6f8dc53dc413" Title="Code Methods" Url="html/Methods_T_DuetControlServer_Commands_Code.htm">
           <HelpTOCNode Title="Execute Method " Url="html/M_DuetControlServer_Commands_Code_Execute.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="4b21acca-6420-403c-99f3-56393d7edead" Title="GetFileInfo Class" Url="html/T_DuetControlServer_Commands_GetFileInfo.htm">
+      <HelpTOCNode Id="963983c9-a61e-4c8d-8029-83f50dcbd35a" Title="GetFileInfo Class" Url="html/T_DuetControlServer_Commands_GetFileInfo.htm">
         <HelpTOCNode Title="GetFileInfo Constructor " Url="html/M_DuetControlServer_Commands_GetFileInfo__ctor.htm" />
         <HelpTOCNode Title="GetFileInfo Properties" Url="html/Properties_T_DuetControlServer_Commands_GetFileInfo.htm" />
-        <HelpTOCNode Id="439010d3-fc2f-4b4a-bb6b-6ebc7582f527" Title="GetFileInfo Methods" Url="html/Methods_T_DuetControlServer_Commands_GetFileInfo.htm">
+        <HelpTOCNode Id="6ca8605e-1c94-48f6-b485-0e203ccdfa1b" Title="GetFileInfo Methods" Url="html/Methods_T_DuetControlServer_Commands_GetFileInfo.htm">
           <HelpTOCNode Title="Execute Method " Url="html/M_DuetControlServer_Commands_GetFileInfo_Execute.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="614df1fe-5dce-4a3d-9d7e-34b8529711a4" Title="GetMachineModel Class" Url="html/T_DuetControlServer_Commands_GetMachineModel.htm">
+      <HelpTOCNode Id="f31404d7-f52d-499d-9beb-9f4b827a280c" Title="GetMachineModel Class" Url="html/T_DuetControlServer_Commands_GetMachineModel.htm">
         <HelpTOCNode Title="GetMachineModel Constructor " Url="html/M_DuetControlServer_Commands_GetMachineModel__ctor.htm" />
         <HelpTOCNode Title="GetMachineModel Properties" Url="html/Properties_T_DuetControlServer_Commands_GetMachineModel.htm" />
-        <HelpTOCNode Id="2ca21049-62c0-4ce3-acfe-47318519904d" Title="GetMachineModel Methods" Url="html/Methods_T_DuetControlServer_Commands_GetMachineModel.htm">
+        <HelpTOCNode Id="1d98cafe-1e3a-4408-b380-f177e3522d7f" Title="GetMachineModel Methods" Url="html/Methods_T_DuetControlServer_Commands_GetMachineModel.htm">
           <HelpTOCNode Title="Execute Method " Url="html/M_DuetControlServer_Commands_GetMachineModel_Execute.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="e895fa7a-d5df-43ab-8f4e-4384d651a13e" Title="ResolvePath Class" Url="html/T_DuetControlServer_Commands_ResolvePath.htm">
+      <HelpTOCNode Id="831a1ba4-3f3a-4079-871b-c3d9accc654b" Title="ResolvePath Class" Url="html/T_DuetControlServer_Commands_ResolvePath.htm">
         <HelpTOCNode Title="ResolvePath Constructor " Url="html/M_DuetControlServer_Commands_ResolvePath__ctor.htm" />
         <HelpTOCNode Title="ResolvePath Properties" Url="html/Properties_T_DuetControlServer_Commands_ResolvePath.htm" />
-        <HelpTOCNode Id="4cf8ce54-5914-4a46-b48b-f01beb30c52e" Title="ResolvePath Methods" Url="html/Methods_T_DuetControlServer_Commands_ResolvePath.htm">
+        <HelpTOCNode Id="359f1284-51be-449f-ace1-dec331f40dbb" Title="ResolvePath Methods" Url="html/Methods_T_DuetControlServer_Commands_ResolvePath.htm">
           <HelpTOCNode Title="Execute Method " Url="html/M_DuetControlServer_Commands_ResolvePath_Execute.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="69249e64-9fc3-43cc-bd7c-2f9d03ddf767" Title="SimpleCode Class" Url="html/T_DuetControlServer_Commands_SimpleCode.htm">
+      <HelpTOCNode Id="c9f3aab2-684c-4129-a26e-406fc64c6127" Title="SimpleCode Class" Url="html/T_DuetControlServer_Commands_SimpleCode.htm">
         <HelpTOCNode Title="SimpleCode Constructor " Url="html/M_DuetControlServer_Commands_SimpleCode__ctor.htm" />
         <HelpTOCNode Title="SimpleCode Properties" Url="html/Properties_T_DuetControlServer_Commands_SimpleCode.htm" />
-        <HelpTOCNode Id="e847d871-af45-4d0c-b45d-f37ec7b0f89a" Title="SimpleCode Methods" Url="html/Methods_T_DuetControlServer_Commands_SimpleCode.htm">
+        <HelpTOCNode Id="53f82305-1c89-4285-8499-1715c58e05c6" Title="SimpleCode Methods" Url="html/Methods_T_DuetControlServer_Commands_SimpleCode.htm">
           <HelpTOCNode Title="Execute Method " Url="html/M_DuetControlServer_Commands_SimpleCode_Execute.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="42a689ff-d714-4c03-a028-cf45ecc031f3" Title="DuetControlServer.FileExecution" Url="html/N_DuetControlServer_FileExecution.htm">
-      <HelpTOCNode Id="7f80af7b-e848-41f8-b63d-bac872a3cfaa" Title="BaseFile Class" Url="html/T_DuetControlServer_FileExecution_BaseFile.htm">
+    <HelpTOCNode Id="b6e68582-2036-419c-bc01-a3a37fd83432" Title="DuetControlServer.FileExecution" Url="html/N_DuetControlServer_FileExecution.htm">
+      <HelpTOCNode Id="f8fb948a-3db6-406f-9c43-35678adb8733" Title="BaseFile Class" Url="html/T_DuetControlServer_FileExecution_BaseFile.htm">
         <HelpTOCNode Title="BaseFile Constructor " Url="html/M_DuetControlServer_FileExecution_BaseFile__ctor.htm" />
-        <HelpTOCNode Id="d73e656f-a22d-4cf0-88fc-f50976e29ce0" Title="BaseFile Properties" Url="html/Properties_T_DuetControlServer_FileExecution_BaseFile.htm">
+        <HelpTOCNode Id="5569b91a-933d-42f7-9a04-7e50336f6a0c" Title="BaseFile Properties" Url="html/Properties_T_DuetControlServer_FileExecution_BaseFile.htm">
           <HelpTOCNode Title="Channel Property " Url="html/P_DuetControlServer_FileExecution_BaseFile_Channel.htm" />
           <HelpTOCNode Title="FileName Property " Url="html/P_DuetControlServer_FileExecution_BaseFile_FileName.htm" />
           <HelpTOCNode Title="IsAborted Property " Url="html/P_DuetControlServer_FileExecution_BaseFile_IsAborted.htm" />
           <HelpTOCNode Title="IsFinished Property " Url="html/P_DuetControlServer_FileExecution_BaseFile_IsFinished.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="68392003-7afc-400b-a91d-c711b762cda9" Title="BaseFile Methods" Url="html/Methods_T_DuetControlServer_FileExecution_BaseFile.htm">
+        <HelpTOCNode Id="566b91dc-3181-4052-889e-78d122686442" Title="BaseFile Methods" Url="html/Methods_T_DuetControlServer_FileExecution_BaseFile.htm">
           <HelpTOCNode Title="Abort Method " Url="html/M_DuetControlServer_FileExecution_BaseFile_Abort.htm" />
           <HelpTOCNode Title="Dispose Method " Url="html/M_DuetControlServer_FileExecution_BaseFile_Dispose.htm" />
           <HelpTOCNode Title="ReadCode Method " Url="html/M_DuetControlServer_FileExecution_BaseFile_ReadCode.htm" />
           <HelpTOCNode Title="Seek Method " Url="html/M_DuetControlServer_FileExecution_BaseFile_Seek.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="1949921f-61cd-4174-9a55-13afa9e54202" Title="MacroFile Class" Url="html/T_DuetControlServer_FileExecution_MacroFile.htm">
+      <HelpTOCNode Id="5861914a-9fe6-4a75-a40f-81efe9cc03dd" Title="MacroFile Class" Url="html/T_DuetControlServer_FileExecution_MacroFile.htm">
         <HelpTOCNode Title="MacroFile Constructor " Url="html/M_DuetControlServer_FileExecution_MacroFile__ctor.htm" />
         <HelpTOCNode Title="MacroFile Properties" Url="html/Properties_T_DuetControlServer_FileExecution_MacroFile.htm" />
-        <HelpTOCNode Id="c58a191d-4d80-4e26-babc-b73a1207d64a" Title="MacroFile Methods" Url="html/Methods_T_DuetControlServer_FileExecution_MacroFile.htm">
+        <HelpTOCNode Id="e30adada-6e20-4335-aa67-588cf7c38aae" Title="MacroFile Methods" Url="html/Methods_T_DuetControlServer_FileExecution_MacroFile.htm">
           <HelpTOCNode Title="AbortAllFiles Method " Url="html/M_DuetControlServer_FileExecution_MacroFile_AbortAllFiles.htm" />
           <HelpTOCNode Title="AbortLastFile Method " Url="html/M_DuetControlServer_FileExecution_MacroFile_AbortLastFile.htm" />
           <HelpTOCNode Title="ReadCode Method " Url="html/M_DuetControlServer_FileExecution_MacroFile_ReadCode.htm" />
           <HelpTOCNode Title="RunMacro Method " Url="html/M_DuetControlServer_FileExecution_MacroFile_RunMacro.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="95a5a68c-dcc4-4828-83b8-64e2de75bc7e" Title="MacroFile Fields" Url="html/Fields_T_DuetControlServer_FileExecution_MacroFile.htm">
+        <HelpTOCNode Id="ffc59870-b9d1-4166-a1d7-37692f44a1ee" Title="MacroFile Fields" Url="html/Fields_T_DuetControlServer_FileExecution_MacroFile.htm">
           <HelpTOCNode Title="ConfigFile Field" Url="html/F_DuetControlServer_FileExecution_MacroFile_ConfigFile.htm" />
           <HelpTOCNode Title="ConfigFileFallback Field" Url="html/F_DuetControlServer_FileExecution_MacroFile_ConfigFileFallback.htm" />
           <HelpTOCNode Title="ConfigOverrideFile Field" Url="html/F_DuetControlServer_FileExecution_MacroFile_ConfigOverrideFile.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="c34c6bb1-ddf8-4b26-b91f-8fb64e50474e" Title="Print Class" Url="html/T_DuetControlServer_FileExecution_Print.htm">
-        <HelpTOCNode Id="b2f7a051-eeab-494e-8890-c1af21f64a8c" Title="Print Methods" Url="html/Methods_T_DuetControlServer_FileExecution_Print.htm">
+      <HelpTOCNode Id="fe092eb4-6708-4eab-b791-daf97afcc4bc" Title="Print Class" Url="html/T_DuetControlServer_FileExecution_Print.htm">
+        <HelpTOCNode Id="dbbddab7-3a03-4227-b969-f5125910dfe0" Title="Print Methods" Url="html/Methods_T_DuetControlServer_FileExecution_Print.htm">
           <HelpTOCNode Title="Cancel Method " Url="html/M_DuetControlServer_FileExecution_Print_Cancel.htm" />
           <HelpTOCNode Title="Paused Method " Url="html/M_DuetControlServer_FileExecution_Print_Paused.htm" />
           <HelpTOCNode Title="Resume Method " Url="html/M_DuetControlServer_FileExecution_Print_Resume.htm" />
@@ -1060,118 +1060,118 @@
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="e2bfcc0a-dac3-4edd-875f-9c91a21b02c3" Title="DuetControlServer.IPC Namespaces" Url="html/G_DuetControlServer_IPC.htm">
-      <HelpTOCNode Id="0faa52b1-a606-4ea6-a621-bf067bac2f48" Title="DuetControlServer.IPC" Url="html/N_DuetControlServer_IPC.htm">
-        <HelpTOCNode Id="a1aa5a97-663a-4baf-b93f-cfe69483debb" Title="Connection Class" Url="html/T_DuetControlServer_IPC_Connection.htm">
+    <HelpTOCNode Id="4b29d37c-88c2-4d9b-9091-8c06c172fa7c" Title="DuetControlServer.IPC Namespaces" Url="html/G_DuetControlServer_IPC.htm">
+      <HelpTOCNode Id="4d52d11b-7704-4f9a-844e-1902203d6ac2" Title="DuetControlServer.IPC" Url="html/N_DuetControlServer_IPC.htm">
+        <HelpTOCNode Id="e4fbfa84-f53b-4071-b0f1-5bea49d5f173" Title="Connection Class" Url="html/T_DuetControlServer_IPC_Connection.htm">
           <HelpTOCNode Title="Connection Constructor " Url="html/M_DuetControlServer_IPC_Connection__ctor.htm" />
-          <HelpTOCNode Id="c6cc7e6b-ae8e-4a21-947f-5924c0862799" Title="Connection Properties" Url="html/Properties_T_DuetControlServer_IPC_Connection.htm">
+          <HelpTOCNode Id="e108c67b-5900-46dd-a285-62309c78fdf8" Title="Connection Properties" Url="html/Properties_T_DuetControlServer_IPC_Connection.htm">
             <HelpTOCNode Title="Id Property " Url="html/P_DuetControlServer_IPC_Connection_Id.htm" />
             <HelpTOCNode Title="IsConnected Property " Url="html/P_DuetControlServer_IPC_Connection_IsConnected.htm" />
           </HelpTOCNode>
-          <HelpTOCNode Id="26d7beb1-6273-4b4d-8049-ef6f0f10cbce" Title="Connection Methods" Url="html/Methods_T_DuetControlServer_IPC_Connection.htm">
+          <HelpTOCNode Id="4631b2e1-3f10-4f02-9292-9b2be9b26d25" Title="Connection Methods" Url="html/Methods_T_DuetControlServer_IPC_Connection.htm">
             <HelpTOCNode Title="Close Method " Url="html/M_DuetControlServer_IPC_Connection_Close.htm" />
             <HelpTOCNode Title="Dispose Method " Url="html/M_DuetControlServer_IPC_Connection_Dispose.htm" />
             <HelpTOCNode Title="ReceiveCommand Method " Url="html/M_DuetControlServer_IPC_Connection_ReceiveCommand.htm" />
             <HelpTOCNode Title="ReceiveJson Method " Url="html/M_DuetControlServer_IPC_Connection_ReceiveJson.htm" />
-            <HelpTOCNode Id="09fd144e-4d5d-4d17-852d-97e59a9669d6" Title="Send Method " Url="html/Overload_DuetControlServer_IPC_Connection_Send.htm">
+            <HelpTOCNode Id="44e8731a-3c8f-430b-9c09-e06acde70154" Title="Send Method " Url="html/Overload_DuetControlServer_IPC_Connection_Send.htm">
               <HelpTOCNode Title="Send Method (JObject)" Url="html/M_DuetControlServer_IPC_Connection_Send.htm" />
               <HelpTOCNode Title="Send Method (String)" Url="html/M_DuetControlServer_IPC_Connection_Send_1.htm" />
             </HelpTOCNode>
             <HelpTOCNode Title="SendResponse Method " Url="html/M_DuetControlServer_IPC_Connection_SendResponse.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="8c0c9ecf-ff90-4166-8e45-3bad5a6b97c9" Title="Server Class" Url="html/T_DuetControlServer_IPC_Server.htm">
-          <HelpTOCNode Id="98525459-9d33-4037-9dbf-72325efc8d32" Title="Server Methods" Url="html/Methods_T_DuetControlServer_IPC_Server.htm">
+        <HelpTOCNode Id="98888a41-dab4-45a7-892d-201cba2e73e2" Title="Server Class" Url="html/T_DuetControlServer_IPC_Server.htm">
+          <HelpTOCNode Id="04a03bcb-74d9-4346-bd42-9a24ac02d155" Title="Server Methods" Url="html/Methods_T_DuetControlServer_IPC_Server.htm">
             <HelpTOCNode Title="AcceptConnections Method " Url="html/M_DuetControlServer_IPC_Server_AcceptConnections.htm" />
             <HelpTOCNode Title="CreateSocket Method " Url="html/M_DuetControlServer_IPC_Server_CreateSocket.htm" />
             <HelpTOCNode Title="Shutdown Method " Url="html/M_DuetControlServer_IPC_Server_Shutdown.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="e1c12b59-698d-4ccb-9759-11d868b70213" Title="DuetControlServer.IPC.Processors" Url="html/N_DuetControlServer_IPC_Processors.htm">
-        <HelpTOCNode Id="1f3e014d-89e0-4d0a-9065-0af7e0dc8182" Title="Base Class" Url="html/T_DuetControlServer_IPC_Processors_Base.htm">
+      <HelpTOCNode Id="6d627b68-5606-478b-8fbe-dc1a655760e6" Title="DuetControlServer.IPC.Processors" Url="html/N_DuetControlServer_IPC_Processors.htm">
+        <HelpTOCNode Id="5ea9ef78-3602-4c62-bdf4-efb04407c5ba" Title="Base Class" Url="html/T_DuetControlServer_IPC_Processors_Base.htm">
           <HelpTOCNode Title="Base Constructor " Url="html/M_DuetControlServer_IPC_Processors_Base__ctor.htm" />
-          <HelpTOCNode Id="94b84871-0121-4622-8d13-ef11d8b5d17a" Title="Base Properties" Url="html/Properties_T_DuetControlServer_IPC_Processors_Base.htm">
+          <HelpTOCNode Id="b85e4fbc-d3d8-4812-8133-e2da8bb66cd0" Title="Base Properties" Url="html/Properties_T_DuetControlServer_IPC_Processors_Base.htm">
             <HelpTOCNode Title="Connection Property " Url="html/P_DuetControlServer_IPC_Processors_Base_Connection.htm" />
           </HelpTOCNode>
-          <HelpTOCNode Id="0b72a2f8-5a77-404a-856e-2603f6c190eb" Title="Base Methods" Url="html/Methods_T_DuetControlServer_IPC_Processors_Base.htm">
+          <HelpTOCNode Id="36d4ce29-d2e6-4656-880c-c970ac9b5e82" Title="Base Methods" Url="html/Methods_T_DuetControlServer_IPC_Processors_Base.htm">
             <HelpTOCNode Title="Process Method " Url="html/M_DuetControlServer_IPC_Processors_Base_Process.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="c071fcd7-c7e3-4e2e-bfe9-7c7722900b2f" Title="Command Class" Url="html/T_DuetControlServer_IPC_Processors_Command.htm">
+        <HelpTOCNode Id="7c8200fe-4aae-44f2-9982-69698c795ff8" Title="Command Class" Url="html/T_DuetControlServer_IPC_Processors_Command.htm">
           <HelpTOCNode Title="Command Constructor " Url="html/M_DuetControlServer_IPC_Processors_Command__ctor.htm" />
           <HelpTOCNode Title="Command Properties" Url="html/Properties_T_DuetControlServer_IPC_Processors_Command.htm" />
-          <HelpTOCNode Id="52d8dc9a-fc97-4d9c-be1f-dbf11dfb0702" Title="Command Methods" Url="html/Methods_T_DuetControlServer_IPC_Processors_Command.htm">
+          <HelpTOCNode Id="66c19764-eeca-4b5a-b0b6-fa902f462270" Title="Command Methods" Url="html/Methods_T_DuetControlServer_IPC_Processors_Command.htm">
             <HelpTOCNode Title="Process Method " Url="html/M_DuetControlServer_IPC_Processors_Command_Process.htm" />
           </HelpTOCNode>
-          <HelpTOCNode Id="8df63139-6bc6-4025-b1a2-7bcabd0c3dd5" Title="Command Fields" Url="html/Fields_T_DuetControlServer_IPC_Processors_Command.htm">
+          <HelpTOCNode Id="b0557d54-c348-4990-9ef2-c6b1c69116e2" Title="Command Fields" Url="html/Fields_T_DuetControlServer_IPC_Processors_Command.htm">
             <HelpTOCNode Title="SupportedCommands Field" Url="html/F_DuetControlServer_IPC_Processors_Command_SupportedCommands.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="b27b75e9-22a1-4d35-aba0-11b1dc3f6a02" Title="Interception Class" Url="html/T_DuetControlServer_IPC_Processors_Interception.htm">
+        <HelpTOCNode Id="ee6731e7-dafd-43f5-b27e-fb70e2f0fa42" Title="Interception Class" Url="html/T_DuetControlServer_IPC_Processors_Interception.htm">
           <HelpTOCNode Title="Interception Constructor " Url="html/M_DuetControlServer_IPC_Processors_Interception__ctor.htm" />
           <HelpTOCNode Title="Interception Properties" Url="html/Properties_T_DuetControlServer_IPC_Processors_Interception.htm" />
-          <HelpTOCNode Id="8d3017f9-5e21-45cd-b070-3603cd30be25" Title="Interception Methods" Url="html/Methods_T_DuetControlServer_IPC_Processors_Interception.htm">
+          <HelpTOCNode Id="9265548a-7292-462a-8208-962b62d1dc79" Title="Interception Methods" Url="html/Methods_T_DuetControlServer_IPC_Processors_Interception.htm">
             <HelpTOCNode Title="Intercept Method " Url="html/M_DuetControlServer_IPC_Processors_Interception_Intercept.htm" />
             <HelpTOCNode Title="Process Method " Url="html/M_DuetControlServer_IPC_Processors_Interception_Process.htm" />
           </HelpTOCNode>
-          <HelpTOCNode Id="d27b2352-d977-410a-adcf-93692caca45f" Title="Interception Fields" Url="html/Fields_T_DuetControlServer_IPC_Processors_Interception.htm">
+          <HelpTOCNode Id="bd289fdf-4477-4d3a-994a-ca64fd4405eb" Title="Interception Fields" Url="html/Fields_T_DuetControlServer_IPC_Processors_Interception.htm">
             <HelpTOCNode Title="SupportedCommands Field" Url="html/F_DuetControlServer_IPC_Processors_Interception_SupportedCommands.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="e5e63743-f57b-4fa9-bd32-67a282882a97" Title="Subscription Class" Url="html/T_DuetControlServer_IPC_Processors_Subscription.htm">
+        <HelpTOCNode Id="fe33714e-d543-478c-9d24-0efcb954f283" Title="Subscription Class" Url="html/T_DuetControlServer_IPC_Processors_Subscription.htm">
           <HelpTOCNode Title="Subscription Constructor " Url="html/M_DuetControlServer_IPC_Processors_Subscription__ctor.htm" />
           <HelpTOCNode Title="Subscription Properties" Url="html/Properties_T_DuetControlServer_IPC_Processors_Subscription.htm" />
-          <HelpTOCNode Id="a263bcfd-ccc1-40a2-908f-8979201c58f3" Title="Subscription Methods" Url="html/Methods_T_DuetControlServer_IPC_Processors_Subscription.htm">
+          <HelpTOCNode Id="504d64d3-a7db-4009-93f9-127c20b6ed48" Title="Subscription Methods" Url="html/Methods_T_DuetControlServer_IPC_Processors_Subscription.htm">
             <HelpTOCNode Title="ModelUpdated Method " Url="html/M_DuetControlServer_IPC_Processors_Subscription_ModelUpdated.htm" />
             <HelpTOCNode Title="Output Method " Url="html/M_DuetControlServer_IPC_Processors_Subscription_Output.htm" />
             <HelpTOCNode Title="Process Method " Url="html/M_DuetControlServer_IPC_Processors_Subscription_Process.htm" />
           </HelpTOCNode>
-          <HelpTOCNode Id="3179a2a0-58b9-4e64-ad79-1c43ab2ca9d3" Title="Subscription Fields" Url="html/Fields_T_DuetControlServer_IPC_Processors_Subscription.htm">
+          <HelpTOCNode Id="095c5da1-8a74-4a4c-b8df-c80a89fe489f" Title="Subscription Fields" Url="html/Fields_T_DuetControlServer_IPC_Processors_Subscription.htm">
             <HelpTOCNode Title="SupportedCommands Field" Url="html/F_DuetControlServer_IPC_Processors_Subscription_SupportedCommands.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="5c36b239-3364-4077-b55f-68e4a2fd79a0" Title="DuetControlServer.Model" Url="html/N_DuetControlServer_Model.htm">
-      <HelpTOCNode Id="3d3d85e5-6e83-4393-9889-1ba19ee0d6de" Title="Provider Class" Url="html/T_DuetControlServer_Model_Provider.htm">
-        <HelpTOCNode Id="70f16c91-7aea-4641-bb7f-ff0300fb9458" Title="Provider Properties" Url="html/Properties_T_DuetControlServer_Model_Provider.htm">
+    <HelpTOCNode Id="c6afa2d3-e1fa-4be9-ad20-a54ae1f48dbd" Title="DuetControlServer.Model" Url="html/N_DuetControlServer_Model.htm">
+      <HelpTOCNode Id="d3b147c5-a523-4ccf-9b20-2d41224e3feb" Title="Provider Class" Url="html/T_DuetControlServer_Model_Provider.htm">
+        <HelpTOCNode Id="dbdaa330-39cc-4195-90d6-b9af0840feda" Title="Provider Properties" Url="html/Properties_T_DuetControlServer_Model_Provider.htm">
           <HelpTOCNode Title="Get Property " Url="html/P_DuetControlServer_Model_Provider_Get.htm" />
         </HelpTOCNode>
-        <HelpTOCNode Id="bf3e3d0e-9903-4de6-8dfb-f87d461feb3c" Title="Provider Methods" Url="html/Methods_T_DuetControlServer_Model_Provider.htm">
+        <HelpTOCNode Id="ccf79265-0277-4159-9ddb-3005651b16ee" Title="Provider Methods" Url="html/Methods_T_DuetControlServer_Model_Provider.htm">
           <HelpTOCNode Title="AccessReadOnly Method " Url="html/M_DuetControlServer_Model_Provider_AccessReadOnly.htm" />
           <HelpTOCNode Title="AccessReadWrite Method " Url="html/M_DuetControlServer_Model_Provider_AccessReadWrite.htm" />
           <HelpTOCNode Title="Init Method " Url="html/M_DuetControlServer_Model_Provider_Init.htm" />
-          <HelpTOCNode Id="30e2bc81-1051-4b23-8541-c7058bd7b47f" Title="Output Method " Url="html/Overload_DuetControlServer_Model_Provider_Output.htm">
+          <HelpTOCNode Id="9fd38857-0ba1-4644-90e3-ab8c121d94a0" Title="Output Method " Url="html/Overload_DuetControlServer_Model_Provider_Output.htm">
             <HelpTOCNode Title="Output Method (CodeResult)" Url="html/M_DuetControlServer_Model_Provider_Output.htm" />
             <HelpTOCNode Title="Output Method (Message)" Url="html/M_DuetControlServer_Model_Provider_Output_1.htm" />
             <HelpTOCNode Title="Output Method (MessageType, String)" Url="html/M_DuetControlServer_Model_Provider_Output_2.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="35b34874-ba1b-4b33-aadb-757eff9089bd" Title="Updater Class" Url="html/T_DuetControlServer_Model_Updater.htm">
-        <HelpTOCNode Id="72a88af6-1a35-483a-a3d1-1650579fb4cc" Title="Updater Methods" Url="html/Methods_T_DuetControlServer_Model_Updater.htm">
+      <HelpTOCNode Id="182f4423-d2e9-43ac-8cb6-f33ce7d5a4bc" Title="Updater Class" Url="html/T_DuetControlServer_Model_Updater.htm">
+        <HelpTOCNode Id="2783aa47-2c9f-4637-be6a-d0bff7f17c4d" Title="Updater Methods" Url="html/Methods_T_DuetControlServer_Model_Updater.htm">
           <HelpTOCNode Title="MergeData Method " Url="html/M_DuetControlServer_Model_Updater_MergeData.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="166b0050-bec5-4577-ae64-d9c0848a7b6a" Title="UpdateTask Class" Url="html/T_DuetControlServer_Model_UpdateTask.htm">
-        <HelpTOCNode Id="e97c786b-58cd-4868-bb20-977b45132dc2" Title="UpdateTask Methods" Url="html/Methods_T_DuetControlServer_Model_UpdateTask.htm">
+      <HelpTOCNode Id="e686af24-25e7-49c1-aeb2-a127a0ac2f81" Title="UpdateTask Class" Url="html/T_DuetControlServer_Model_UpdateTask.htm">
+        <HelpTOCNode Id="d4096192-610d-4890-a8d0-660963c7d00f" Title="UpdateTask Methods" Url="html/Methods_T_DuetControlServer_Model_UpdateTask.htm">
           <HelpTOCNode Title="UpdatePeriodically Method " Url="html/M_DuetControlServer_Model_UpdateTask_UpdatePeriodically.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="4168d5fc-2250-4f80-ab08-d50fcd81c4a3" Title="DuetControlServer.SPI Namespaces" Url="html/G_DuetControlServer_SPI.htm">
-      <HelpTOCNode Id="389c2d4c-21d4-499c-b3ad-c354f29e1ea9" Title="DuetControlServer.SPI" Url="html/N_DuetControlServer_SPI.htm">
-        <HelpTOCNode Id="476451c5-9db8-465d-b9ec-f34313478ee0" Title="CRC16 Class" Url="html/T_DuetControlServer_SPI_CRC16.htm">
-          <HelpTOCNode Id="54c71e24-91eb-4ab3-8aa2-0c907ca8e2c8" Title="CRC16 Methods" Url="html/Methods_T_DuetControlServer_SPI_CRC16.htm">
+    <HelpTOCNode Id="63e2f115-587a-45d6-9923-c0a0dbd4c27d" Title="DuetControlServer.SPI Namespaces" Url="html/G_DuetControlServer_SPI.htm">
+      <HelpTOCNode Id="d9d06fcd-180e-4a65-844a-d2a57d9e8dbd" Title="DuetControlServer.SPI" Url="html/N_DuetControlServer_SPI.htm">
+        <HelpTOCNode Id="1a5b7b39-eae4-495c-8e19-38e61880e606" Title="CRC16 Class" Url="html/T_DuetControlServer_SPI_CRC16.htm">
+          <HelpTOCNode Id="16e4c6a8-c28e-4b4d-87c7-9ab51c9757f7" Title="CRC16 Methods" Url="html/Methods_T_DuetControlServer_SPI_CRC16.htm">
             <HelpTOCNode Title="Calculate Method " Url="html/M_DuetControlServer_SPI_CRC16_Calculate.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="eb44fe02-88a7-4467-a40c-5aa4f85a4c63" Title="DataTransfer Class" Url="html/T_DuetControlServer_SPI_DataTransfer.htm">
-          <HelpTOCNode Id="abf146ce-e4b1-47a6-bbef-e2722f70abbf" Title="DataTransfer Properties" Url="html/Properties_T_DuetControlServer_SPI_DataTransfer.htm">
+        <HelpTOCNode Id="935e4b34-5621-41bd-b570-571ff33a6813" Title="DataTransfer Class" Url="html/T_DuetControlServer_SPI_DataTransfer.htm">
+          <HelpTOCNode Id="7ee6061b-7456-4893-b2c3-ff121509f19b" Title="DataTransfer Properties" Url="html/Properties_T_DuetControlServer_SPI_DataTransfer.htm">
             <HelpTOCNode Title="PacketsToRead Property " Url="html/P_DuetControlServer_SPI_DataTransfer_PacketsToRead.htm" />
           </HelpTOCNode>
-          <HelpTOCNode Id="b40557d5-2499-4abf-826c-a631d2e75912" Title="DataTransfer Methods" Url="html/Methods_T_DuetControlServer_SPI_DataTransfer.htm">
+          <HelpTOCNode Id="aad1f356-354d-438b-8045-1981f1014b98" Title="DataTransfer Methods" Url="html/Methods_T_DuetControlServer_SPI_DataTransfer.htm">
             <HelpTOCNode Title="DumpMalformedPacket Method " Url="html/M_DuetControlServer_SPI_DataTransfer_DumpMalformedPacket.htm" />
             <HelpTOCNode Title="GetFullTransfersPerSecond Method " Url="html/M_DuetControlServer_SPI_DataTransfer_GetFullTransfersPerSecond.htm" />
             <HelpTOCNode Title="HadReset Method " Url="html/M_DuetControlServer_SPI_DataTransfer_HadReset.htm" />
@@ -1202,8 +1202,8 @@
             <HelpTOCNode Title="WriteUnlock Method " Url="html/M_DuetControlServer_SPI_DataTransfer_WriteUnlock.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="d4b51ce6-57ae-4a35-9fdf-4892893abef7" Title="Interface Class" Url="html/T_DuetControlServer_SPI_Interface.htm">
-          <HelpTOCNode Id="0757331f-13d5-4824-aeed-78b367b1c1ec" Title="Interface Methods" Url="html/Methods_T_DuetControlServer_SPI_Interface.htm">
+        <HelpTOCNode Id="eb9aa027-833e-4a98-9031-6a022f835009" Title="Interface Class" Url="html/T_DuetControlServer_SPI_Interface.htm">
+          <HelpTOCNode Id="831c7230-4b16-4316-955b-dd941ded4395" Title="Interface Methods" Url="html/Methods_T_DuetControlServer_SPI_Interface.htm">
             <HelpTOCNode Title="Connect Method " Url="html/M_DuetControlServer_SPI_Interface_Connect.htm" />
             <HelpTOCNode Title="Init Method " Url="html/M_DuetControlServer_SPI_Interface_Init.htm" />
             <HelpTOCNode Title="LockMovementAndWaitForStandstill Method " Url="html/M_DuetControlServer_SPI_Interface_LockMovementAndWaitForStandstill.htm" />
@@ -1217,38 +1217,38 @@
             <HelpTOCNode Title="UnlockAll Method " Url="html/M_DuetControlServer_SPI_Interface_UnlockAll.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="238077b8-ded4-4c67-86ad-0e97ab84a162" Title="QueuedCode Class" Url="html/T_DuetControlServer_SPI_QueuedCode.htm">
+        <HelpTOCNode Id="b2f71665-5ee6-46bc-87b3-dc081434fb57" Title="QueuedCode Class" Url="html/T_DuetControlServer_SPI_QueuedCode.htm">
           <HelpTOCNode Title="QueuedCode Constructor " Url="html/M_DuetControlServer_SPI_QueuedCode__ctor.htm" />
-          <HelpTOCNode Id="ad899d8b-8326-4f81-a354-1225a94ce37a" Title="QueuedCode Properties" Url="html/Properties_T_DuetControlServer_SPI_QueuedCode.htm">
+          <HelpTOCNode Id="156e5cdb-5a5a-4736-9a1c-e139fb9c7a5d" Title="QueuedCode Properties" Url="html/Properties_T_DuetControlServer_SPI_QueuedCode.htm">
             <HelpTOCNode Title="CanFinish Property " Url="html/P_DuetControlServer_SPI_QueuedCode_CanFinish.htm" />
             <HelpTOCNode Title="Code Property " Url="html/P_DuetControlServer_SPI_QueuedCode_Code.htm" />
             <HelpTOCNode Title="IsExecuting Property " Url="html/P_DuetControlServer_SPI_QueuedCode_IsExecuting.htm" />
             <HelpTOCNode Title="IsRequestedFromFirmware Property " Url="html/P_DuetControlServer_SPI_QueuedCode_IsRequestedFromFirmware.htm" />
             <HelpTOCNode Title="Task Property " Url="html/P_DuetControlServer_SPI_QueuedCode_Task.htm" />
           </HelpTOCNode>
-          <HelpTOCNode Id="7ea30ef5-8e5c-474a-986e-d5267ac4168e" Title="QueuedCode Methods" Url="html/Methods_T_DuetControlServer_SPI_QueuedCode.htm">
+          <HelpTOCNode Id="1ba1a193-15f0-46e8-aa62-0555261066f5" Title="QueuedCode Methods" Url="html/Methods_T_DuetControlServer_SPI_QueuedCode.htm">
             <HelpTOCNode Title="HandleReply Method " Url="html/M_DuetControlServer_SPI_QueuedCode_HandleReply.htm" />
             <HelpTOCNode Title="SetException Method " Url="html/M_DuetControlServer_SPI_QueuedCode_SetException.htm" />
             <HelpTOCNode Title="SetFinished Method " Url="html/M_DuetControlServer_SPI_QueuedCode_SetFinished.htm" />
             <HelpTOCNode Title="ToString Method " Url="html/M_DuetControlServer_SPI_QueuedCode_ToString.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="314cfe70-6a54-4912-83f1-32f516f55a5d" Title="QueuedLockRequest Class" Url="html/T_DuetControlServer_SPI_QueuedLockRequest.htm">
+        <HelpTOCNode Id="c67aa8b8-181f-4025-8d8a-ab7319e18b08" Title="QueuedLockRequest Class" Url="html/T_DuetControlServer_SPI_QueuedLockRequest.htm">
           <HelpTOCNode Title="QueuedLockRequest Constructor " Url="html/M_DuetControlServer_SPI_QueuedLockRequest__ctor.htm" />
-          <HelpTOCNode Id="661b4043-a1a0-4453-879d-3f151864bb2c" Title="QueuedLockRequest Properties" Url="html/Properties_T_DuetControlServer_SPI_QueuedLockRequest.htm">
+          <HelpTOCNode Id="cab0e00c-0430-4793-a7dd-8055dcb22158" Title="QueuedLockRequest Properties" Url="html/Properties_T_DuetControlServer_SPI_QueuedLockRequest.htm">
             <HelpTOCNode Title="Channel Property " Url="html/P_DuetControlServer_SPI_QueuedLockRequest_Channel.htm" />
             <HelpTOCNode Title="IsLockRequest Property " Url="html/P_DuetControlServer_SPI_QueuedLockRequest_IsLockRequest.htm" />
             <HelpTOCNode Title="IsLockRequested Property " Url="html/P_DuetControlServer_SPI_QueuedLockRequest_IsLockRequested.htm" />
             <HelpTOCNode Title="Task Property " Url="html/P_DuetControlServer_SPI_QueuedLockRequest_Task.htm" />
           </HelpTOCNode>
-          <HelpTOCNode Id="84d48619-d868-4bf2-bcc1-88984446c12c" Title="QueuedLockRequest Methods" Url="html/Methods_T_DuetControlServer_SPI_QueuedLockRequest.htm">
+          <HelpTOCNode Id="00819c94-a146-4612-80ef-26881ca6f1ea" Title="QueuedLockRequest Methods" Url="html/Methods_T_DuetControlServer_SPI_QueuedLockRequest.htm">
             <HelpTOCNode Title="Resolve Method " Url="html/M_DuetControlServer_SPI_QueuedLockRequest_Resolve.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="ef93a72c-9991-4274-8eda-08e89cc5b3ca" Title="DuetControlServer.SPI.Communication" Url="html/N_DuetControlServer_SPI_Communication.htm">
-        <HelpTOCNode Id="6aa176e3-d49c-45d7-a22f-3c336f77131a" Title="Consts Class" Url="html/T_DuetControlServer_SPI_Communication_Consts.htm">
-          <HelpTOCNode Id="53e2d954-5aad-45dd-80ad-ff02ccfddba7" Title="Consts Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_Consts.htm">
+      <HelpTOCNode Id="70ac66dd-e01d-4019-8228-b2b94a4e2a62" Title="DuetControlServer.SPI.Communication" Url="html/N_DuetControlServer_SPI_Communication.htm">
+        <HelpTOCNode Id="c7082535-7060-49b0-aa16-8e92aeeaaa42" Title="Consts Class" Url="html/T_DuetControlServer_SPI_Communication_Consts.htm">
+          <HelpTOCNode Id="3be7f5d1-a3b2-4a07-8dc3-c291e2905a8c" Title="Consts Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_Consts.htm">
             <HelpTOCNode Title="BufferSize Field" Url="html/F_DuetControlServer_SPI_Communication_Consts_BufferSize.htm" />
             <HelpTOCNode Title="FormatCode Field" Url="html/F_DuetControlServer_SPI_Communication_Consts_FormatCode.htm" />
             <HelpTOCNode Title="InvalidFormatCode Field" Url="html/F_DuetControlServer_SPI_Communication_Consts_InvalidFormatCode.htm" />
@@ -1258,9 +1258,9 @@
           </HelpTOCNode>
         </HelpTOCNode>
         <HelpTOCNode Title="MessageTypeFlags Enumeration" Url="html/T_DuetControlServer_SPI_Communication_MessageTypeFlags.htm" />
-        <HelpTOCNode Id="499fb053-7865-49f8-984c-3cf6cbcea53b" Title="PacketHeader Structure" Url="html/T_DuetControlServer_SPI_Communication_PacketHeader.htm">
+        <HelpTOCNode Id="8e9c5051-6d06-4f15-a5d2-97b2c030b99f" Title="PacketHeader Structure" Url="html/T_DuetControlServer_SPI_Communication_PacketHeader.htm">
           <HelpTOCNode Title="PacketHeader Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_PacketHeader.htm" />
-          <HelpTOCNode Id="ae45581c-1af1-4b4c-9eba-3e3f233802ef" Title="PacketHeader Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_PacketHeader.htm">
+          <HelpTOCNode Id="79aaff43-1685-441c-8af0-63e1e9a6be3d" Title="PacketHeader Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_PacketHeader.htm">
             <HelpTOCNode Title="Id Field" Url="html/F_DuetControlServer_SPI_Communication_PacketHeader_Id.htm" />
             <HelpTOCNode Title="Length Field" Url="html/F_DuetControlServer_SPI_Communication_PacketHeader_Length.htm" />
             <HelpTOCNode Title="Request Field" Url="html/F_DuetControlServer_SPI_Communication_PacketHeader_Request.htm" />
@@ -1269,9 +1269,9 @@
         </HelpTOCNode>
         <HelpTOCNode Title="PrintPausedReason Enumeration" Url="html/T_DuetControlServer_SPI_Communication_PrintPausedReason.htm" />
         <HelpTOCNode Title="PrintStoppedReason Enumeration" Url="html/T_DuetControlServer_SPI_Communication_PrintStoppedReason.htm" />
-        <HelpTOCNode Id="76135c25-8143-49c7-8f4c-110c95457a2a" Title="TransferHeader Structure" Url="html/T_DuetControlServer_SPI_Communication_TransferHeader.htm">
+        <HelpTOCNode Id="9cc94e42-571a-44fc-8c48-296744a46dd1" Title="TransferHeader Structure" Url="html/T_DuetControlServer_SPI_Communication_TransferHeader.htm">
           <HelpTOCNode Title="TransferHeader Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_TransferHeader.htm" />
-          <HelpTOCNode Id="05ea5568-68fe-4cbf-822c-0da449547431" Title="TransferHeader Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_TransferHeader.htm">
+          <HelpTOCNode Id="4f73699b-cd3d-4c2e-9ecc-77a62a15a9ab" Title="TransferHeader Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_TransferHeader.htm">
             <HelpTOCNode Title="ChecksumData Field" Url="html/F_DuetControlServer_SPI_Communication_TransferHeader_ChecksumData.htm" />
             <HelpTOCNode Title="ChecksumHeader Field" Url="html/F_DuetControlServer_SPI_Communication_TransferHeader_ChecksumHeader.htm" />
             <HelpTOCNode Title="DataLength Field" Url="html/F_DuetControlServer_SPI_Communication_TransferHeader_DataLength.htm" />
@@ -1281,10 +1281,10 @@
             <HelpTOCNode Title="SequenceNumber Field" Url="html/F_DuetControlServer_SPI_Communication_TransferHeader_SequenceNumber.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="253d2af6-4e99-4f6b-8bde-8d156f68784f" Title="TransferResponse Class" Url="html/T_DuetControlServer_SPI_Communication_TransferResponse.htm">
+        <HelpTOCNode Id="d96b3b2c-fc8b-4689-b64b-4bcb5459fbda" Title="TransferResponse Class" Url="html/T_DuetControlServer_SPI_Communication_TransferResponse.htm">
           <HelpTOCNode Title="TransferResponse Constructor " Url="html/M_DuetControlServer_SPI_Communication_TransferResponse__ctor.htm" />
           <HelpTOCNode Title="TransferResponse Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_TransferResponse.htm" />
-          <HelpTOCNode Id="2c09b8c4-c129-4578-9a37-350038b90d92" Title="TransferResponse Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_TransferResponse.htm">
+          <HelpTOCNode Id="0225c12c-2d81-49c8-b507-9bae42400c27" Title="TransferResponse Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_TransferResponse.htm">
             <HelpTOCNode Title="BadDataChecksum Field" Url="html/F_DuetControlServer_SPI_Communication_TransferResponse_BadDataChecksum.htm" />
             <HelpTOCNode Title="BadDataLength Field" Url="html/F_DuetControlServer_SPI_Communication_TransferResponse_BadDataLength.htm" />
             <HelpTOCNode Title="BadFormat Field" Url="html/F_DuetControlServer_SPI_Communication_TransferResponse_BadFormat.htm" />
@@ -1295,24 +1295,24 @@
           </HelpTOCNode>
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="559cdc6d-4727-4bb9-bd22-5691dc514610" Title="DuetControlServer.SPI.Communication.FirmwareRequests" Url="html/N_DuetControlServer_SPI_Communication_FirmwareRequests.htm">
-        <HelpTOCNode Id="b0ed5494-66a4-47d7-bb51-7de0f6d9c52a" Title="AbortFileRequest Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_AbortFileRequest.htm">
+      <HelpTOCNode Id="ae7ab73f-33d8-4faf-a333-9e3cbabe5835" Title="DuetControlServer.SPI.Communication.FirmwareRequests" Url="html/N_DuetControlServer_SPI_Communication_FirmwareRequests.htm">
+        <HelpTOCNode Id="54ede108-5fc3-4a01-8fd0-4e1ec8e12908" Title="AbortFileRequest Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_AbortFileRequest.htm">
           <HelpTOCNode Title="AbortFileRequest Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_FirmwareRequests_AbortFileRequest.htm" />
-          <HelpTOCNode Id="754cfbe4-b8cf-4306-884e-f3a4fc9330d4" Title="AbortFileRequest Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_AbortFileRequest.htm">
+          <HelpTOCNode Id="460ed52a-3702-4229-beda-636c2b27534a" Title="AbortFileRequest Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_AbortFileRequest.htm">
             <HelpTOCNode Title="Channel Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_AbortFileRequest_Channel.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="ba714879-4894-4f5c-b89f-7e18ca2d1834" Title="CodeReply Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_CodeReply.htm">
+        <HelpTOCNode Id="66cf35f6-5982-4117-b2b3-563b9e27c760" Title="CodeReply Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_CodeReply.htm">
           <HelpTOCNode Title="CodeReply Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_FirmwareRequests_CodeReply.htm" />
-          <HelpTOCNode Id="406d26a1-3ff4-4a0f-bea8-126ae70580ba" Title="CodeReply Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_CodeReply.htm">
+          <HelpTOCNode Id="274c1e26-de0a-49b1-b187-afe9d975222b" Title="CodeReply Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_CodeReply.htm">
             <HelpTOCNode Title="Length Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_CodeReply_Length.htm" />
             <HelpTOCNode Title="MessageType Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_CodeReply_MessageType.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
         <HelpTOCNode Title="CodeReplyFlags Enumeration" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_CodeReplyFlags.htm" />
-        <HelpTOCNode Id="fda2c85c-239a-4eb5-b293-951e6fb56dc5" Title="HeightMap Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_HeightMap.htm">
+        <HelpTOCNode Id="e82ca68a-423e-42de-ab7a-26705497f188" Title="HeightMap Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_HeightMap.htm">
           <HelpTOCNode Title="HeightMap Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_FirmwareRequests_HeightMap.htm" />
-          <HelpTOCNode Id="13605dc1-aa68-4101-88bb-9419a0e5e0e5" Title="HeightMap Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_HeightMap.htm">
+          <HelpTOCNode Id="78e3dc91-f9d2-48ee-8f58-8704ed902361" Title="HeightMap Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_HeightMap.htm">
             <HelpTOCNode Title="NumPoints Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_HeightMap_NumPoints.htm" />
             <HelpTOCNode Title="Radius Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_HeightMap_Radius.htm" />
             <HelpTOCNode Title="XMax Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_HeightMap_XMax.htm" />
@@ -1323,25 +1323,25 @@
             <HelpTOCNode Title="YSpacing Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_HeightMap_YSpacing.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="0cead988-796a-4681-8a3c-9076c83fb27b" Title="MacroRequest Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_MacroRequest.htm">
+        <HelpTOCNode Id="87eff713-5d90-4b48-9e2f-239aed9caf43" Title="MacroRequest Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_MacroRequest.htm">
           <HelpTOCNode Title="MacroRequest Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_FirmwareRequests_MacroRequest.htm" />
-          <HelpTOCNode Id="940c4d95-14c8-408f-b51a-22f4faf887a6" Title="MacroRequest Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_MacroRequest.htm">
+          <HelpTOCNode Id="beeac023-ae89-4c39-af0a-b0dcdc3bd36f" Title="MacroRequest Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_MacroRequest.htm">
             <HelpTOCNode Title="Channel Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_MacroRequest_Channel.htm" />
             <HelpTOCNode Title="Length Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_MacroRequest_Length.htm" />
             <HelpTOCNode Title="ReportMissing Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_MacroRequest_ReportMissing.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="a998d6ab-e702-41c2-880a-e0e666e966c5" Title="PrintPaused Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_PrintPaused.htm">
+        <HelpTOCNode Id="ff8d6d9b-28e8-472f-b250-08c33f439be8" Title="PrintPaused Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_PrintPaused.htm">
           <HelpTOCNode Title="PrintPaused Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_FirmwareRequests_PrintPaused.htm" />
-          <HelpTOCNode Id="475142b9-b306-48c2-81f6-00551706db55" Title="PrintPaused Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_PrintPaused.htm">
+          <HelpTOCNode Id="51efc51d-1341-4fa6-84f5-0da0a16743b9" Title="PrintPaused Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_PrintPaused.htm">
             <HelpTOCNode Title="FilePosition Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_PrintPaused_FilePosition.htm" />
             <HelpTOCNode Title="PauseReason Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_PrintPaused_PauseReason.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
         <HelpTOCNode Title="Request Enumeration" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_Request.htm" />
-        <HelpTOCNode Id="4a20b3ee-c26f-4d7c-b21e-65c44e7eb95d" Title="StackEvent Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_StackEvent.htm">
+        <HelpTOCNode Id="88a0787f-8367-4d03-8df1-5f5a157930aa" Title="StackEvent Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_StackEvent.htm">
           <HelpTOCNode Title="StackEvent Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_FirmwareRequests_StackEvent.htm" />
-          <HelpTOCNode Id="a7365fb7-2ce1-4021-a21c-5a95a058024b" Title="StackEvent Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_StackEvent.htm">
+          <HelpTOCNode Id="45a23fa8-50d2-42f8-af32-87d0ef2d1398" Title="StackEvent Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_StackEvent.htm">
             <HelpTOCNode Title="Channel Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_StackEvent_Channel.htm" />
             <HelpTOCNode Title="Feedrate Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_StackEvent_Feedrate.htm" />
             <HelpTOCNode Title="Flags Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_StackEvent_Flags.htm" />
@@ -1349,18 +1349,18 @@
           </HelpTOCNode>
         </HelpTOCNode>
         <HelpTOCNode Title="StackFlags Enumeration" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_StackFlags.htm" />
-        <HelpTOCNode Id="ab741a26-c253-4cae-9c09-c740a4ad9c2d" Title="StateResponse Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_StateResponse.htm">
+        <HelpTOCNode Id="683ad08c-81e6-4865-a19b-f94ebae3a9d2" Title="StateResponse Structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_StateResponse.htm">
           <HelpTOCNode Title="StateResponse Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_FirmwareRequests_StateResponse.htm" />
-          <HelpTOCNode Id="9f62bb10-4b88-46fb-9283-b0229ad434ca" Title="StateResponse Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_StateResponse.htm">
+          <HelpTOCNode Id="494779eb-967d-49fd-a1f6-6fea2e437a0c" Title="StateResponse Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_FirmwareRequests_StateResponse.htm">
             <HelpTOCNode Title="BusyChannels Field" Url="html/F_DuetControlServer_SPI_Communication_FirmwareRequests_StateResponse_BusyChannels.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="d260238f-9141-4f3e-a0a6-03eca86d1bc3" Title="DuetControlServer.SPI.Communication.LinuxRequests" Url="html/N_DuetControlServer_SPI_Communication_LinuxRequests.htm">
+      <HelpTOCNode Id="6beb2f03-c80d-4158-af36-e02529c4c4e0" Title="DuetControlServer.SPI.Communication.LinuxRequests" Url="html/N_DuetControlServer_SPI_Communication_LinuxRequests.htm">
         <HelpTOCNode Title="CodeFlags Enumeration" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_CodeFlags.htm" />
-        <HelpTOCNode Id="c8bc79af-0ac3-4a99-8c34-d9bae9a92942" Title="CodeHeader Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_CodeHeader.htm">
+        <HelpTOCNode Id="69ead7b0-f934-4779-872e-e257674aafe2" Title="CodeHeader Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_CodeHeader.htm">
           <HelpTOCNode Title="CodeHeader Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_LinuxRequests_CodeHeader.htm" />
-          <HelpTOCNode Id="fdf9430c-f984-4a16-af09-57c42d8d2430" Title="CodeHeader Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_CodeHeader.htm">
+          <HelpTOCNode Id="7490521a-1472-4b40-99a4-0741ae5c772e" Title="CodeHeader Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_CodeHeader.htm">
             <HelpTOCNode Title="Channel Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_CodeHeader_Channel.htm" />
             <HelpTOCNode Title="FilePosition Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_CodeHeader_FilePosition.htm" />
             <HelpTOCNode Title="Flags Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_CodeHeader_Flags.htm" />
@@ -1370,9 +1370,9 @@
             <HelpTOCNode Title="NumParameters Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_CodeHeader_NumParameters.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="63c86207-ee0d-43fe-93ee-2cad62fa999c" Title="CodeParameter Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_CodeParameter.htm">
+        <HelpTOCNode Id="2afb783b-51c6-46c6-b55d-86b021aa158c" Title="CodeParameter Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_CodeParameter.htm">
           <HelpTOCNode Title="CodeParameter Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_LinuxRequests_CodeParameter.htm" />
-          <HelpTOCNode Id="fb55e491-9eef-42b6-80d1-95db9f98204a" Title="CodeParameter Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_CodeParameter.htm">
+          <HelpTOCNode Id="5b524dcd-7918-446f-b3af-55cf74e58e2f" Title="CodeParameter Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_CodeParameter.htm">
             <HelpTOCNode Title="FloatValue Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_CodeParameter_FloatValue.htm" />
             <HelpTOCNode Title="IntValue Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_CodeParameter_IntValue.htm" />
             <HelpTOCNode Title="Letter Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_CodeParameter_Letter.htm" />
@@ -1381,16 +1381,16 @@
           </HelpTOCNode>
         </HelpTOCNode>
         <HelpTOCNode Title="DataType Enumeration" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_DataType.htm" />
-        <HelpTOCNode Id="f02f631c-d9f3-4607-98e2-13a927a22f8f" Title="MacroCompleted Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_MacroCompleted.htm">
+        <HelpTOCNode Id="316f2d3d-54d5-4846-a8ea-f95b6041c8c5" Title="MacroCompleted Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_MacroCompleted.htm">
           <HelpTOCNode Title="MacroCompleted Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_LinuxRequests_MacroCompleted.htm" />
-          <HelpTOCNode Id="30b1c87f-f64c-4c7f-b027-26ebc71a007a" Title="MacroCompleted Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_MacroCompleted.htm">
+          <HelpTOCNode Id="3cfc76e6-ad90-404f-a733-dec11826d478" Title="MacroCompleted Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_MacroCompleted.htm">
             <HelpTOCNode Title="Channel Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_MacroCompleted_Channel.htm" />
             <HelpTOCNode Title="Error Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_MacroCompleted_Error.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="a3c56ed3-b1da-406d-80f1-7aa3bfa5fbad" Title="PrintStarted Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted.htm">
+        <HelpTOCNode Id="a1cac63a-11e4-4b32-b95f-8fbbca2bfa5a" Title="PrintStarted Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted.htm">
           <HelpTOCNode Title="PrintStarted Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted.htm" />
-          <HelpTOCNode Id="f1f958e2-f103-45fe-a49a-c301ce4dcdb1" Title="PrintStarted Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted.htm">
+          <HelpTOCNode Id="016275c8-b24c-41c2-a44e-80edc4ca1891" Title="PrintStarted Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted.htm">
             <HelpTOCNode Title="FilenameLength Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted_FilenameLength.htm" />
             <HelpTOCNode Title="FileSize Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted_FileSize.htm" />
             <HelpTOCNode Title="FirstLayerHeight Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted_FirstLayerHeight.htm" />
@@ -1403,16 +1403,16 @@
             <HelpTOCNode Title="SimulatedTime Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted_SimulatedTime.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="5165db81-6ddf-44fd-b185-3afcf5dda534" Title="PrintStopped Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_PrintStopped.htm">
+        <HelpTOCNode Id="dd906792-267f-4d87-8894-169f3d2a04ed" Title="PrintStopped Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_PrintStopped.htm">
           <HelpTOCNode Title="PrintStopped Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_LinuxRequests_PrintStopped.htm" />
-          <HelpTOCNode Id="39d1f05f-3c14-4422-890d-b82bfb004640" Title="PrintStopped Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_PrintStopped.htm">
+          <HelpTOCNode Id="f47a5f6b-1639-4a81-84aa-6d974c221cc4" Title="PrintStopped Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_PrintStopped.htm">
             <HelpTOCNode Title="Reason Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_PrintStopped_Reason.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
         <HelpTOCNode Title="Request Enumeration" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_Request.htm" />
-        <HelpTOCNode Id="896e3810-ce1d-47e1-9e8a-373541921201" Title="SetObjectModel Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_SetObjectModel.htm">
+        <HelpTOCNode Id="94801941-c2cd-45f1-9625-30896c2b393f" Title="SetObjectModel Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_SetObjectModel.htm">
           <HelpTOCNode Title="SetObjectModel Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_LinuxRequests_SetObjectModel.htm" />
-          <HelpTOCNode Id="e5ec70b8-60ee-4a22-a740-c4ec227cc41e" Title="SetObjectModel Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_SetObjectModel.htm">
+          <HelpTOCNode Id="a5612170-5547-46a2-90fe-92431e53e893" Title="SetObjectModel Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_SetObjectModel.htm">
             <HelpTOCNode Title="FieldLength Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_SetObjectModel_FieldLength.htm" />
             <HelpTOCNode Title="FloatValue Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_SetObjectModel_FloatValue.htm" />
             <HelpTOCNode Title="IntValue Field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_SetObjectModel_IntValue.htm" />
@@ -1421,24 +1421,24 @@
           </HelpTOCNode>
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="df4111a2-ef73-4682-973a-6d5d20cce61c" Title="DuetControlServer.SPI.Communication.SharedRequests" Url="html/N_DuetControlServer_SPI_Communication_SharedRequests.htm">
-        <HelpTOCNode Id="6f0e902c-d3fb-405e-b40a-43a869e92f43" Title="LockUnlock Structure" Url="html/T_DuetControlServer_SPI_Communication_SharedRequests_LockUnlock.htm">
+      <HelpTOCNode Id="e1606a1d-1f2d-4d48-b9b5-8f6e8f5654a6" Title="DuetControlServer.SPI.Communication.SharedRequests" Url="html/N_DuetControlServer_SPI_Communication_SharedRequests.htm">
+        <HelpTOCNode Id="e6e6cb40-164b-4b26-8356-ab5cad232065" Title="LockUnlock Structure" Url="html/T_DuetControlServer_SPI_Communication_SharedRequests_LockUnlock.htm">
           <HelpTOCNode Title="LockUnlock Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_SharedRequests_LockUnlock.htm" />
-          <HelpTOCNode Id="76fbdbd4-93fa-46db-b7ad-084c534db7ae" Title="LockUnlock Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_SharedRequests_LockUnlock.htm">
+          <HelpTOCNode Id="851d5436-c112-4e3c-af57-368a8ded3f5a" Title="LockUnlock Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_SharedRequests_LockUnlock.htm">
             <HelpTOCNode Title="Channel Field" Url="html/F_DuetControlServer_SPI_Communication_SharedRequests_LockUnlock_Channel.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="ba05b56d-d5ef-47d9-9a7f-43407448597e" Title="ObjectModel Structure" Url="html/T_DuetControlServer_SPI_Communication_SharedRequests_ObjectModel.htm">
+        <HelpTOCNode Id="2c61e8c7-5bad-4563-9d6d-cbce22a35cb6" Title="ObjectModel Structure" Url="html/T_DuetControlServer_SPI_Communication_SharedRequests_ObjectModel.htm">
           <HelpTOCNode Title="ObjectModel Methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_SharedRequests_ObjectModel.htm" />
-          <HelpTOCNode Id="436d8483-8a5d-4f15-970b-7c4d80c53a72" Title="ObjectModel Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_SharedRequests_ObjectModel.htm">
+          <HelpTOCNode Id="2db5f827-74e5-4128-839b-d78d0cff5914" Title="ObjectModel Fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_SharedRequests_ObjectModel.htm">
             <HelpTOCNode Title="Length Field" Url="html/F_DuetControlServer_SPI_Communication_SharedRequests_ObjectModel_Length.htm" />
             <HelpTOCNode Title="Module Field" Url="html/F_DuetControlServer_SPI_Communication_SharedRequests_ObjectModel_Module.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="9ea251d8-f72e-4974-afac-0e9193a82fa6" Title="DuetControlServer.SPI.Serialization" Url="html/N_DuetControlServer_SPI_Serialization.htm">
-        <HelpTOCNode Id="aab379bd-0e4d-473d-8b88-96531f5cd556" Title="Reader Class" Url="html/T_DuetControlServer_SPI_Serialization_Reader.htm">
-          <HelpTOCNode Id="dabbd722-4da4-49f5-9fcc-0fa4b163ad26" Title="Reader Methods" Url="html/Methods_T_DuetControlServer_SPI_Serialization_Reader.htm">
+      <HelpTOCNode Id="3a4c969f-7943-4b2b-bd48-2ddb10883480" Title="DuetControlServer.SPI.Serialization" Url="html/N_DuetControlServer_SPI_Serialization.htm">
+        <HelpTOCNode Id="22c60246-7dd6-402a-932b-fad89db9c59e" Title="Reader Class" Url="html/T_DuetControlServer_SPI_Serialization_Reader.htm">
+          <HelpTOCNode Id="7a6fe36c-d03d-4fc3-9f19-0cd2ad3b749d" Title="Reader Methods" Url="html/Methods_T_DuetControlServer_SPI_Serialization_Reader.htm">
             <HelpTOCNode Title="ReadAbortFile Method " Url="html/M_DuetControlServer_SPI_Serialization_Reader_ReadAbortFile.htm" />
             <HelpTOCNode Title="ReadCodeReply Method " Url="html/M_DuetControlServer_SPI_Serialization_Reader_ReadCodeReply.htm" />
             <HelpTOCNode Title="ReadHeightMap Method " Url="html/M_DuetControlServer_SPI_Serialization_Reader_ReadHeightMap.htm" />
@@ -1451,8 +1451,8 @@
             <HelpTOCNode Title="ReadState Method " Url="html/M_DuetControlServer_SPI_Serialization_Reader_ReadState.htm" />
           </HelpTOCNode>
         </HelpTOCNode>
-        <HelpTOCNode Id="031676ad-6d45-4eee-b8cb-ffb232c8d96f" Title="Writer Class" Url="html/T_DuetControlServer_SPI_Serialization_Writer.htm">
-          <HelpTOCNode Id="888e30a8-0732-44e8-93af-ec0f64a0fd78" Title="Writer Methods" Url="html/Methods_T_DuetControlServer_SPI_Serialization_Writer.htm">
+        <HelpTOCNode Id="5a945dd2-3724-469b-936e-f0b66c72cdfb" Title="Writer Class" Url="html/T_DuetControlServer_SPI_Serialization_Writer.htm">
+          <HelpTOCNode Id="d2704242-e843-4e0d-a059-bdd56b146ece" Title="Writer Methods" Url="html/Methods_T_DuetControlServer_SPI_Serialization_Writer.htm">
             <HelpTOCNode Title="InitTransferHeader Method " Url="html/M_DuetControlServer_SPI_Serialization_Writer_InitTransferHeader.htm" />
             <HelpTOCNode Title="WriteCode Method " Url="html/M_DuetControlServer_SPI_Serialization_Writer_WriteCode.htm" />
             <HelpTOCNode Title="WriteLockUnlock Method " Url="html/M_DuetControlServer_SPI_Serialization_Writer_WriteLockUnlock.htm" />
@@ -1463,7 +1463,7 @@
             <HelpTOCNode Title="WritePrintStarted Method " Url="html/M_DuetControlServer_SPI_Serialization_Writer_WritePrintStarted.htm" />
             <HelpTOCNode Title="WritePrintStopped Method " Url="html/M_DuetControlServer_SPI_Serialization_Writer_WritePrintStopped.htm" />
           </HelpTOCNode>
-          <HelpTOCNode Id="17c4f368-0e44-49ff-899e-102e1bf3d8c3" Title="Writer Fields" Url="html/Fields_T_DuetControlServer_SPI_Serialization_Writer.htm">
+          <HelpTOCNode Id="297bdbd9-95ec-41a5-a5e7-6d55a86fef3a" Title="Writer Fields" Url="html/Fields_T_DuetControlServer_SPI_Serialization_Writer.htm">
             <HelpTOCNode Title="PacketHeaderSize Field" Url="html/F_DuetControlServer_SPI_Serialization_Writer_PacketHeaderSize.htm" />
             <HelpTOCNode Title="TransmissionHeaderSize Field" Url="html/F_DuetControlServer_SPI_Serialization_Writer_TransmissionHeaderSize.htm" />
           </HelpTOCNode>
@@ -1471,27 +1471,27 @@
       </HelpTOCNode>
     </HelpTOCNode>
   </HelpTOCNode>
-  <HelpTOCNode Id="aed2e1c0-0ba6-4702-adec-419190b4dbea" Title="DuetWebServer Namespaces" Url="html/G_DuetWebServer.htm">
-    <HelpTOCNode Id="f2258db7-0f69-4380-b9de-fa8eb1562c77" Title="DuetWebServer" Url="html/N_DuetWebServer.htm">
-      <HelpTOCNode Id="22c717f8-c6b4-4f6d-8ba1-0a025c59f37e" Title="Program Class" Url="html/T_DuetWebServer_Program.htm">
+  <HelpTOCNode Id="72993e89-701d-4570-9c52-591310bcd48c" Title="DuetWebServer Namespaces" Url="html/G_DuetWebServer.htm">
+    <HelpTOCNode Id="360680cf-77f0-4a8f-81c9-e22af049557c" Title="DuetWebServer" Url="html/N_DuetWebServer.htm">
+      <HelpTOCNode Id="35258a36-8a03-4ee4-a8b3-2f483d5b1fc6" Title="Program Class" Url="html/T_DuetWebServer_Program.htm">
         <HelpTOCNode Title="Program Constructor " Url="html/M_DuetWebServer_Program__ctor.htm" />
-        <HelpTOCNode Id="abda1541-cbb4-4c54-84fb-617cd16d8db1" Title="Program Methods" Url="html/Methods_T_DuetWebServer_Program.htm">
+        <HelpTOCNode Id="4d85796b-3754-4793-b8a3-7d31f481cebc" Title="Program Methods" Url="html/Methods_T_DuetWebServer_Program.htm">
           <HelpTOCNode Title="CreateWebHostBuilder Method " Url="html/M_DuetWebServer_Program_CreateWebHostBuilder.htm" />
           <HelpTOCNode Title="Main Method " Url="html/M_DuetWebServer_Program_Main.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="b19d5474-ede4-484c-9b3a-0c6d0898df38" Title="Startup Class" Url="html/T_DuetWebServer_Startup.htm">
+      <HelpTOCNode Id="c4f7762a-8fba-409e-a590-414c4289e5c1" Title="Startup Class" Url="html/T_DuetWebServer_Startup.htm">
         <HelpTOCNode Title="Startup Constructor " Url="html/M_DuetWebServer_Startup__ctor.htm" />
-        <HelpTOCNode Id="12868974-c81b-4a69-89e0-916ab7f3603b" Title="Startup Methods" Url="html/Methods_T_DuetWebServer_Startup.htm">
+        <HelpTOCNode Id="c835fbd9-401b-4756-8316-d7990f429f83" Title="Startup Methods" Url="html/Methods_T_DuetWebServer_Startup.htm">
           <HelpTOCNode Title="Configure Method " Url="html/M_DuetWebServer_Startup_Configure.htm" />
           <HelpTOCNode Title="ConfigureServices Method " Url="html/M_DuetWebServer_Startup_ConfigureServices.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="38caa434-2103-4acd-ba97-437ab5984950" Title="DuetWebServer.Controllers" Url="html/N_DuetWebServer_Controllers.htm">
-      <HelpTOCNode Id="cb18c885-74bf-44b6-ae58-ac8c1df46e8f" Title="MachineController Class" Url="html/T_DuetWebServer_Controllers_MachineController.htm">
+    <HelpTOCNode Id="6421d7b3-f9af-4bf9-ad7b-7d0b73c70a89" Title="DuetWebServer.Controllers" Url="html/N_DuetWebServer_Controllers.htm">
+      <HelpTOCNode Id="482b9b6b-ac36-44bb-a176-46dfbd32f177" Title="MachineController Class" Url="html/T_DuetWebServer_Controllers_MachineController.htm">
         <HelpTOCNode Title="MachineController Constructor " Url="html/M_DuetWebServer_Controllers_MachineController__ctor.htm" />
-        <HelpTOCNode Id="7c093f82-7acb-4180-b579-5a5873af646b" Title="MachineController Methods" Url="html/Methods_T_DuetWebServer_Controllers_MachineController.htm">
+        <HelpTOCNode Id="e5eb5ce7-5d61-4a16-9026-4c1538e719c7" Title="MachineController Methods" Url="html/Methods_T_DuetWebServer_Controllers_MachineController.htm">
           <HelpTOCNode Title="CreateDirectory Method " Url="html/M_DuetWebServer_Controllers_MachineController_CreateDirectory.htm" />
           <HelpTOCNode Title="DeleteFileOrDirectory Method " Url="html/M_DuetWebServer_Controllers_MachineController_DeleteFileOrDirectory.htm" />
           <HelpTOCNode Title="DoCode Method " Url="html/M_DuetWebServer_Controllers_MachineController_DoCode.htm" />
@@ -1504,16 +1504,16 @@
           <HelpTOCNode Title="UploadFile Method " Url="html/M_DuetWebServer_Controllers_MachineController_UploadFile.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
-      <HelpTOCNode Id="8735d3db-e369-4f9e-ae41-a10c681ff744" Title="WebSocketController Class" Url="html/T_DuetWebServer_Controllers_WebSocketController.htm">
-        <HelpTOCNode Id="4611f798-693d-47aa-a17c-f9338eb5f919" Title="WebSocketController Methods" Url="html/Methods_T_DuetWebServer_Controllers_WebSocketController.htm">
+      <HelpTOCNode Id="184508e9-a05d-4b11-8855-de0784af67d3" Title="WebSocketController Class" Url="html/T_DuetWebServer_Controllers_WebSocketController.htm">
+        <HelpTOCNode Id="b69aef35-21ce-464a-b90b-546da60287df" Title="WebSocketController Methods" Url="html/Methods_T_DuetWebServer_Controllers_WebSocketController.htm">
           <HelpTOCNode Title="Process Method " Url="html/M_DuetWebServer_Controllers_WebSocketController_Process.htm" />
         </HelpTOCNode>
       </HelpTOCNode>
     </HelpTOCNode>
-    <HelpTOCNode Id="b559aae2-5f5e-4c0e-902a-2552d4a8e838" Title="DuetWebServer.FileProviders" Url="html/N_DuetWebServer_FileProviders.htm">
-      <HelpTOCNode Id="d20a1ae4-bad9-441b-b95a-72a8f972e442" Title="DuetFileProvider Class" Url="html/T_DuetWebServer_FileProviders_DuetFileProvider.htm">
+    <HelpTOCNode Id="d7533e46-6d90-4917-a5a0-8b8515417a2a" Title="DuetWebServer.FileProviders" Url="html/N_DuetWebServer_FileProviders.htm">
+      <HelpTOCNode Id="8a872789-c871-4af1-b8c0-b5b4a526d213" Title="DuetFileProvider Class" Url="html/T_DuetWebServer_FileProviders_DuetFileProvider.htm">
         <HelpTOCNode Title="DuetFileProvider Constructor " Url="html/M_DuetWebServer_FileProviders_DuetFileProvider__ctor.htm" />
-        <HelpTOCNode Id="aae7b512-ceef-4b18-b2e1-97c94e9bd1f1" Title="DuetFileProvider Methods" Url="html/Methods_T_DuetWebServer_FileProviders_DuetFileProvider.htm">
+        <HelpTOCNode Id="9683b90c-b45c-4611-b3ab-e6021741b101" Title="DuetFileProvider Methods" Url="html/Methods_T_DuetWebServer_FileProviders_DuetFileProvider.htm">
           <HelpTOCNode Title="GetDirectoryContents Method " Url="html/M_DuetWebServer_FileProviders_DuetFileProvider_GetDirectoryContents.htm" />
           <HelpTOCNode Title="GetFileInfo Method " Url="html/M_DuetWebServer_FileProviders_DuetFileProvider_GetFileInfo.htm" />
           <HelpTOCNode Title="Watch Method " Url="html/M_DuetWebServer_FileProviders_DuetFileProvider_Watch.htm" />

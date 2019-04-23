@@ -51,7 +51,7 @@ namespace DuetAPI.Utility
                 string key = char.ToLowerInvariant(pair.Key[0]) + pair.Key.Substring(1);
                 if (to.TryGetValue(key, StringComparison.InvariantCultureIgnoreCase, out JToken value))
                 {
-                    if (value.Type == JTokenType.Object)
+                    if (pair.Value.Type == JTokenType.Object && value.Type == JTokenType.Object)
                     {
                         JToken subDiff = DiffObject((JObject)pair.Value, (JObject)value);
                         if (subDiff.HasValues)
@@ -59,7 +59,7 @@ namespace DuetAPI.Utility
                             diff[key] = subDiff;
                         }
                     }
-                    else if (value.Type == JTokenType.Array)
+                    else if (pair.Value.Type == JTokenType.Array && value.Type == JTokenType.Array)
                     {
                         JArray subDiff = DiffArray((JArray)pair.Value, (JArray)value, out bool foundDiffs);
                         if (foundDiffs)

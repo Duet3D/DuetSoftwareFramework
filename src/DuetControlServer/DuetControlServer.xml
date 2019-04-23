@@ -644,6 +644,11 @@
             Note that messages are only cleared when the host update task runs.
             </summary>
         </member>
+        <member name="F:DuetControlServer.Settings.SpiFrequency">
+            <summary>
+            Frequency to use for SPI transfers
+            </summary>
+        </member>
         <member name="P:DuetControlServer.Settings.SpiBusID">
             <summary>
             Bus ID of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
@@ -672,6 +677,11 @@
         <member name="P:DuetControlServer.Settings.TransferReadyPin">
             <summary>
             Number of the GPIO pin that is used by RepRapFirmware to flag its ready state
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.MaxUpdateDelay">
+            <summary>
+            Maximum delay after which a status update is requested even when in burst mode (in ms)
             </summary>
         </member>
         <member name="P:DuetControlServer.Settings.FileInfoReadLimit">

@@ -27,6 +27,9 @@ namespace DuetControlServer.SPI
         // Number of the module of the object model being queried (TODO fully implement this)
         private static byte _moduleToQuery = 2;
 
+        // Time when the object model was queried the last time
+        private static DateTime _lastQueryTime = DateTime.Now;
+
         // Special requests
         private static bool _emergencyStopRequested, _resetRequested, _printStarted;
         private static Communication.PrintStoppedReason? _printStoppedReason;
@@ -271,7 +274,7 @@ namespace DuetControlServer.SPI
                             else
                             {
                                 // Start executing the next valid G/M/T-code from the requested macro file.
-                                // Note that code.Execute() does not wait for the code's completion; this will happen in the background
+                                // Note that code.Execute() does not wait for the code's completion; this will happen in the background as via _pendingSystemCodes
                                 Code code;
                                 do
                                 {
@@ -293,6 +296,7 @@ namespace DuetControlServer.SPI
                                             if (!_pendingMacros[channel].Pop().IsAborted)
                                             {
                                                 Console.WriteLine($"[info] Finished execution of macro file {macro.FileName}");
+                                                continue;
                                             }
                                         }
                                     }
@@ -400,9 +404,10 @@ namespace DuetControlServer.SPI
 
                 // Request the state of the GCodeBuffers and the object model after the codes have been processed
                 DataTransfer.WriteGetState();
-                if (IsIdle())
+                if (IsIdle() || DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.MaxUpdateDelay))
                 {
                     DataTransfer.WriteGetObjectModel(_moduleToQuery);
+                    _lastQueryTime = DateTime.Now;
                 }
 
                 // Do another full SPI transfer

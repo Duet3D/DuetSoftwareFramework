@@ -46,11 +46,11 @@ namespace DuetAPI
         /// Filament consumption per extruder drive (in mm)
         /// </summary>
         public double[] Filament { get; set; } = new double[0];
-        
+
         /// <summary>
         /// Name of the application that generated this file
         /// </summary>
-        public string GeneratedBy { get; set; }
+        public string GeneratedBy { get; set; } = "";
         
         /// <summary>
         /// Estimated print time (in s)
@@ -78,7 +78,7 @@ namespace DuetAPI
                 LayerHeight = LayerHeight,
                 NumLayers = NumLayers,
                 Filament = (double[])Filament.Clone(),
-                GeneratedBy = (GeneratedBy != null) ? string.Copy(GeneratedBy) : null,
+                GeneratedBy = string.Copy(GeneratedBy),
                 PrintTime = PrintTime,
                 SimulatedTime = SimulatedTime
             };

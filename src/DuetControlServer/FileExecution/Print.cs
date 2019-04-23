@@ -57,8 +57,8 @@ namespace DuetControlServer.FileExecution
         {
             BaseFile file = _file;
 
-            // Process every available code
-            for (Code code = await file.ReadCode(); code != null; code = await file.ReadCode())
+            // Process the file
+            do
             {
                 // Has the file been paused? If so, rewind to the pause position
                 bool paused = false;
@@ -78,12 +78,24 @@ namespace DuetControlServer.FileExecution
                 }
 
                 // Execute the next command
+                Code code = await file.ReadCode();
+                if (code == null)
+                {
+                    break;
+                }
+
                 CodeResult result = await code.Execute();
                 await Model.Provider.Output(result);
             }
+            while (!Program.CancelSource.IsCancellationRequested);
 
-            // Notify the controller that the print has finished
-            SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.NormalCompletion);
+            // Notify the controller that the print has stopped
+            SPI.Communication.PrintStoppedReason stopReason = !file.IsAborted ? SPI.Communication.PrintStoppedReason.NormalCompletion
+                : (_isPaused ? SPI.Communication.PrintStoppedReason.UserCancelled : SPI.Communication.PrintStoppedReason.Abort);
+            SPI.Interface.SetPrintStopped(stopReason);
+
+            // Invalidate the file being printed
+            _file = null;
         }
 
         /// <summary>

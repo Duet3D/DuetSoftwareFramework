@@ -16,6 +16,8 @@ namespace DuetWebServer.Controllers
     /// </summary>
     public static class WebSocketController
     {
+        private static readonly byte[] PONG = Encoding.UTF8.GetBytes("PONG\n");
+
         /// <summary>
         /// Deal with a newly opened WebSocket.
         /// A client may receive one of the WS codes: (1001) Endpoint unavailable (1003) Invalid command (1011) Internal error
@@ -65,7 +67,14 @@ namespace DuetWebServer.Controllers
                         await webSocket.ReceiveAsync(receivedBytes, default(CancellationToken));
                         string receivedData = Encoding.UTF8.GetString(receivedBytes);
 
-                        // 3d. Check if the client has acknowledged the received data
+                        // 3d. Deal with PING requests
+                        if (receivedData.Equals("PING\n", StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, default(CancellationToken));
+                            continue;
+                        }
+
+                        // 3e. Check if the client has acknowledged the received data
                         if (!receivedData.Equals("OK\n", StringComparison.InvariantCultureIgnoreCase))
                         {
                             // Terminate the connection if anything else than "OK" is received
@@ -73,7 +82,7 @@ namespace DuetWebServer.Controllers
                             break;
                         }
 
-                        // 3e. Check for another update and send it to the client
+                        // 3f. Check for another update and send it to the client
                         json = await connection.GetSerializedMachineModel();
                         await webSocket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, default(CancellationToken));
                     } while (webSocket.State == WebSocketState.Open);
