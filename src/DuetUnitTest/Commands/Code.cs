@@ -8,6 +8,18 @@ namespace DuetUnitTest.Commands
     public class Code
     {
         [Test]
+        public void ParseG28()
+        {
+            DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("G28 X Y");
+            Assert.AreEqual(CodeType.GCode, code.Type);
+            Assert.AreEqual(28, code.MajorNumber);
+            Assert.AreEqual(null, code.MinorNumber);
+            Assert.AreEqual(2, code.Parameters.Count);
+            Assert.AreEqual('X', code.Parameters[0].Letter);
+            Assert.AreEqual('Y', code.Parameters[1].Letter);
+        }
+
+        [Test]
         public void ParseG54()
         {
             DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("G54.6");

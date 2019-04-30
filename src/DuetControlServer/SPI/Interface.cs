@@ -328,6 +328,7 @@ namespace DuetControlServer.SPI
                                 if (item.CanFinish)
                                 {
                                     // This code has finished...
+                                    Console.WriteLine($"Finished {item.Code}");
                                     if (item.IsRequestedFromFirmware)
                                     {
                                         // ... and it was requested from the firmware
@@ -354,6 +355,7 @@ namespace DuetControlServer.SPI
                                 {
                                     if (DataTransfer.WriteCode(item.Code))
                                     {
+                                        Console.WriteLine($"Executing {item.Code}");
                                         item.IsExecuting = true;
                                         _busyChannels |= (1 << (int)channel);
                                     }
@@ -545,7 +547,7 @@ namespace DuetControlServer.SPI
                 return;
             }
 
-            // This is a targeted message. Try to forward it to the corresponding code being executed
+            // Check if this is a targeted message. If yes, send it to the code being executed
             bool replyHandled = false;
             if (flags.HasFlag(Communication.MessageTypeFlags.BinaryCodeReplyFlag))
             {
@@ -565,12 +567,11 @@ namespace DuetControlServer.SPI
 
                         if (code != null)
                         {
-                            // This is a code without a wait handle, there is no point in queuing the message here
-                            code.HandleReply(flags, "");
-                            code = null;
+                            code.HandleReply(flags, reply);
+                            continue;
                         }
 
-                        // Attempt to assign this reply to an executing code
+                        // Is this reply for a regular code?
                         lock (_pendingCodes[channel])
                         {
                             _pendingCodes[channel].TryPeek(out code);
@@ -620,6 +621,7 @@ namespace DuetControlServer.SPI
         {
             DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out string filename);
 
+            // Locate the macro file
             string path = await FilePath.ToPhysical(filename, "sys");
             if (filename == MacroFile.ConfigFile && !File.Exists(path))
             {
@@ -637,6 +639,7 @@ namespace DuetControlServer.SPI
                 }
             }
 
+            // Start it
             if (File.Exists(path))
             {
                 Console.WriteLine($"[info] Executing requested macro file '{filename}' on channel {channel}");
@@ -653,6 +656,12 @@ namespace DuetControlServer.SPI
                 {
                     await Model.Provider.Output(MessageType.Error, $"Could not find macro file {filename}");
                 }
+                else
+                {
+                    Console.WriteLine($"[info] Requested macro file '{filename}' not found");
+                }
+
+                _busyChannels |= (1 << (int)channel);
                 DataTransfer.WriteMacroCompleted(channel, true);
             }
         }
@@ -672,9 +681,18 @@ namespace DuetControlServer.SPI
         private static async Task HandleStackEvent()
         {
             DataTransfer.ReadStackEvent(out CodeChannel channel, out byte stackDepth, out Communication.FirmwareRequests.StackFlags stackFlags, out float feedrate);
+
             using (await Model.Provider.AccessReadWrite())
             {
                 Channel item = Model.Provider.Get.Channels[channel];
+                if (stackDepth > item.StackDepth)
+                {
+                    Console.WriteLine($"Push on {channel} level = {stackDepth}");
+                }
+                else if (stackDepth < item.StackDepth)
+                {
+                    Console.WriteLine($"Pop on {channel} level = {stackDepth}");
+                }
                 item.StackDepth = stackDepth;
                 item.RelativeExtrusion = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.DrivesRelative);
                 item.RelativePositioning = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.AxesRelative);

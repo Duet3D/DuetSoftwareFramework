@@ -19,7 +19,7 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task MergeData(byte module, string json)
         {
-            //Console.WriteLine($"Got object model for module {module}: {json}");
+            // Console.WriteLine($"Got object model for module {module}: {json}");
 
             if (module == 2)
             {
@@ -280,32 +280,33 @@ namespace DuetControlServer.Model
             {
                 var printResponseDefinition = new
                 {
-                    duration = 0.0,
 					layer = 0,
 					layerTime = 0.0,
+                    filePosition = 0,
+                    extrudedRaw = new double[0],
+                    printDuration = 0.0,
 					warmUpDuration = 0.0,
 					timesLeft = new
                     {
                         file = 0.0,
 						filament = 0.0,
 						layer = 0.0
-                    },
-                    filePosition = 0,
-                    extrudedRaw = new double[0]
+                    }
                 };
 
                 var printResponse = JsonConvert.DeserializeAnonymousType(json, printResponseDefinition);
                 using (await Provider.AccessReadWrite())
                 {
                     // FIXME layer estimations don't work yet
-                    Provider.Get.Job.Duration =  printResponse.duration;
                     Provider.Get.Job.Layer = printResponse.layer;
                     Provider.Get.Job.LayerTime = printResponse.layerTime;
+                    Provider.Get.Job.FilePosition = printResponse.filePosition;
+                    Provider.Get.Job.ExtrudedRaw = printResponse.extrudedRaw;
+                    Provider.Get.Job.Duration =  printResponse.printDuration;
+                    Provider.Get.Job.WarmUpDuration = printResponse.warmUpDuration;
                     Provider.Get.Job.TimesLeft.File = printResponse.timesLeft.file;
                     Provider.Get.Job.TimesLeft.Filament = printResponse.timesLeft.filament;
                     Provider.Get.Job.TimesLeft.Layer = printResponse.timesLeft.layer;
-                    Provider.Get.Job.FilePosition = printResponse.filePosition;
-                    Provider.Get.Job.ExtrudedRaw = printResponse.extrudedRaw;
                 }
             }
 

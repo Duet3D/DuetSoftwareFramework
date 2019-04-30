@@ -308,7 +308,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         public static void DumpMalformedPacket()
         {
-            string dump = "Received malformed packet:\n";
+            string dump = "[err] Received malformed packet:\n";
             dump += $"=== Packet #{_lastPacket.Id} request {_lastPacket.Request} (length {_lastPacket.Length}) ===\n";
             string data = System.Text.Encoding.UTF8.GetString(_packetData);
             foreach(char c in data)
@@ -322,6 +322,7 @@ namespace DuetControlServer.SPI
             }
             dump += "\n";
             dump += "====================";
+            Console.WriteLine(dump);
         }
         #endregion
 

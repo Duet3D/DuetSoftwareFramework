@@ -71,14 +71,13 @@ namespace DuetControlServer.SPI
                             : DuetAPI.MessageType.Success;
                 message = new DuetAPI.Message(type, reply);
                 _result.Add(message);
+
+                _lastMessageIncomplete = messageType.HasFlag(Communication.MessageTypeFlags.PushFlag);
             }
-            else
+            else if (!messageType.HasFlag(Communication.MessageTypeFlags.PushFlag))
             {
                 _gotEmptyResponse = true;
-                message = null;
             }
-
-            _lastMessageIncomplete = messageType.HasFlag(Communication.MessageTypeFlags.PushFlag);
         }
 
         /// <summary>

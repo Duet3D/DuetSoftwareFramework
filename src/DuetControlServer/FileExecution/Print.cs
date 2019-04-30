@@ -1,6 +1,7 @@
 ﻿using DuetAPI.Commands;
 using Nito.AsyncEx;
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -11,7 +12,7 @@ namespace DuetControlServer.FileExecution
     /// </summary>
     public static class Print
     {
-        private static AsyncLock _lock = new AsyncLock();
+        private static readonly AsyncLock _lock = new AsyncLock();
         private static BaseFile _file;
         private static bool _isPaused;
         private static long _pausePosition;
@@ -57,7 +58,23 @@ namespace DuetControlServer.FileExecution
         {
             BaseFile file = _file;
 
-            // Process the file
+            // Process "start.g" at the beginning of a print
+            string startPath = await FilePath.ToPhysical("sys/start.g");
+            if (File.Exists(startPath))
+            {
+                MacroFile startMacro = new MacroFile(startPath, DuetAPI.CodeChannel.File, false, 0);
+                do
+                {
+                    Code code = await startMacro.ReadCode();
+                    if (code == null)
+                    {
+                        break;
+                    }
+                    await code.Execute();
+                } while (!Program.CancelSource.IsCancellationRequested);
+            }
+
+            // Process the job file
             do
             {
                 // Has the file been paused? If so, rewind to the pause position
@@ -103,7 +120,7 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         /// <param name="filePosition">Position at which the file was paused</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Paused(uint filePosition)
+        public static async Task Paused(long filePosition)
         {
             using (await _lock.LockAsync())
             {

@@ -83,8 +83,12 @@ namespace DuetControlServer.Codes
 
                 // Reset controller
                 case 999:
-                    await SPI.Interface.RequestReset();
-                    return new CodeResult();
+                    if (code.Parameters.Count == 0)
+                    {
+                        await SPI.Interface.RequestReset();
+                        return new CodeResult();
+                    }
+                    break;
             }
             return null;
         }
