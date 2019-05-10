@@ -1,6 +1,9 @@
 ﻿using DuetAPI.Machine;
 using Newtonsoft.Json;
+using Nito.AsyncEx;
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Model
@@ -10,6 +13,35 @@ namespace DuetControlServer.Model
     /// </summary>
     public static class Updater
     {
+        private static byte _lastUpdatedModule;
+        private static AsyncManualResetEvent[] _moduleUpdateEvents = new AsyncManualResetEvent[SPI.Communication.Consts.NumModules];
+
+        /// <summary>
+        /// Initialize this class
+        /// </summary>
+        public static void Init()
+        {
+            for (int i = 0; i < SPI.Communication.Consts.NumModules; i++)
+            {
+                _moduleUpdateEvents[i] = new AsyncManualResetEvent();
+            }
+        }
+
+        /// <summary>
+        /// Wait for the model to be fully updated from RepRapFirmware
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static async Task WaitForFullUpdate()
+        {
+            byte module;
+            lock (_moduleUpdateEvents)
+            {
+                module = _lastUpdatedModule;
+            }
+
+            await _moduleUpdateEvents[module].WaitAsync();
+        }
+
         /// <summary>
         /// Merge received data into the object model.
         /// This code is temporary and will be replaced once the new object is finished
@@ -36,8 +68,8 @@ namespace DuetControlServer.Model
                     },
                     speeds = new
                     {
-                        requested = 0.0,
-                        top = 0.0
+                        requested = 0.0F,
+                        top = 0.0F
                     },
                     currentTool = -1,
                     Params = new
@@ -45,9 +77,9 @@ namespace DuetControlServer.Model
                         atxPower = 0,
                         fanPercent = new float[0],
                         fanNames = new string[0],
-                        speedFactor = 0.0,
+                        speedFactor = 0.0F,
                         extrFactors = new float[0],
-                        babystep = 0.0
+                        babystep = 0.0F
                     },
                     sensors = new
                     {
@@ -59,15 +91,15 @@ namespace DuetControlServer.Model
                     {
                         bed = new
                         {
-                            active = 0.0,
-                            standby = 0.0,
+                            active = 0.0F,
+                            standby = 0.0F,
                             state = 0,
                             heater = 0
                         },
                         chamber = new
                         {
-                            active = 0.0,
-                            standby = 0.0,
+                            active = 0.0F,
+                            standby = 0.0F,
                             state = 0,
                             heater = 0
                         },
@@ -76,23 +108,23 @@ namespace DuetControlServer.Model
                         names = new string[0],
                         tools = new
                         {
-                            active = new[] { new double[0] },
-                            standby = new[] { new double[0] }
+                            active = new[] { new float[0] },
+                            standby = new[] { new float[0] }
                         },
                         extra = new[]
                         {
                             new
                             {
                                 name = "",
-                                temp = 0.0
+                                temp = 0.0F
                             }
                         }
                     },
-                    coldExtrudeTemp = 160.0,
-                    coldRetractTemp = 90.0,
+                    coldExtrudeTemp = 160.0F,
+                    coldRetractTemp = 90.0F,
                     compensation = "",
                     controllableFans = 0,
-                    tempLimit = 0.0,
+                    tempLimit = 0.0F,
                     tools = new[]
                     {
                         new
@@ -103,20 +135,20 @@ namespace DuetControlServer.Model
                             extruders = new int[0],
                             fan = 0,
                             filament = "",
-                            offsets = new double[0]
+                            offsets = new float[0]
                         }
                     },
                     mcutemp = new
                     {
-                        min = 0.0,
-                        cur = 0.0,
-                        max = 0.0
+                        min = 0.0F,
+                        cur = 0.0F,
+                        max = 0.0F
                     },
                     vin = new
                     {
-                        min = 0.0,
-                        cur = 0.0,
-                        max = 0.0
+                        min = 0.0F,
+                        cur = 0.0F,
+                        max = 0.0F
                     },
                     firmwareName = ""
                 };
@@ -201,8 +233,8 @@ namespace DuetControlServer.Model
                     {
                         Provider.Get.Heat.Beds.Add(new BedOrChamber
                         {
-                            Active = new double[] { response.temps.bed.active },
-                            Standby = new double[] { response.temps.bed.standby },
+                            Active = new float[] { response.temps.bed.active },
+                            Standby = new float[] { response.temps.bed.standby },
                             Heaters = new int[] { response.temps.bed.heater }
                         });
                     }
@@ -213,8 +245,8 @@ namespace DuetControlServer.Model
                     {
                         Provider.Get.Heat.Chambers.Add(new BedOrChamber
                         {
-                            Active = new double[] { response.temps.chamber.active },
-                            Standby = new double[] { response.temps.chamber.standby },
+                            Active = new float[] { response.temps.chamber.active },
+                            Standby = new float[] { response.temps.chamber.standby },
                             Heaters = new int[] { response.temps.chamber.heater }
                         });
                     }
@@ -281,16 +313,16 @@ namespace DuetControlServer.Model
                 var printResponseDefinition = new
                 {
 					layer = 0,
-					layerTime = 0.0,
+					layerTime = 0,
                     filePosition = 0,
-                    extrudedRaw = new double[0],
-                    printDuration = 0.0,
-					warmUpDuration = 0.0,
+                    extrudedRaw = new float[0],
+                    printDuration = 0.0F,
+					warmUpDuration = 0.0F,
 					timesLeft = new
                     {
-                        file = 0.0,
-						filament = 0.0,
-						layer = 0.0
+                        file = 0.0F,
+						filament = 0.0F,
+						layer = 0.0F
                     }
                 };
 
@@ -312,6 +344,14 @@ namespace DuetControlServer.Model
 
             // Notify IPC subscribers
             await IPC.Processors.Subscription.ModelUpdated();
+
+            // Notify waiting threads
+            _moduleUpdateEvents[module].Set();
+            _moduleUpdateEvents[module].Reset();
+            lock (_moduleUpdateEvents)
+            {
+                _lastUpdatedModule = module;
+            }
         }
 
         private static MachineStatus GetStatus(string letter)

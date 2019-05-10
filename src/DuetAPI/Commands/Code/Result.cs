@@ -11,7 +11,7 @@ namespace DuetAPI.Commands
     public class CodeResult : List<Message>
     {
         /// <summary>
-        /// Create a new code result
+        /// Create a new code result indicating success
         /// </summary>
         public CodeResult() { }
 
@@ -22,8 +22,23 @@ namespace DuetAPI.Commands
         /// <param name="content">Message content</param>
         public CodeResult(MessageType type, string content)
         {
+            Add(type, content);
+        }
+
+        /// <summary>
+        /// Add another message
+        /// </summary>
+        /// <param name="type">Message type</param>
+        /// <param name="content">Message content</param>
+        public void Add(MessageType type, string content)
+        {
             Add(new Message(type, content));
         }
+
+        /// <summary>
+        /// Indicates if the code could complete without an error
+        /// </summary>
+        public bool IsSuccessful => !this.Any(item => item.Type == MessageType.Error);
 
         /// <summary>
         /// Converts the CodeResult to a string
@@ -38,10 +53,5 @@ namespace DuetAPI.Commands
             }
             return builder.ToString();
         }
-
-        /// <summary>
-        /// Indicates if the code could complete without an error
-        /// </summary>
-        public bool IsSuccessful => !this.Any(item => item.Type == MessageType.Error);
     }
 }

@@ -20,6 +20,18 @@ namespace DuetUnitTest.Commands
         }
 
         [Test]
+        public void ParseG29()
+        {
+            DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("G29 S1 ; load heightmap");
+            Assert.AreEqual(CodeType.GCode, code.Type);
+            Assert.AreEqual(29, code.MajorNumber);
+            Assert.AreEqual(null, code.MinorNumber);
+            Assert.AreEqual(1, code.Parameters.Count);
+            Assert.AreEqual('S', code.Parameters[0].Letter);
+            Assert.IsTrue(code.Parameter('S', 0) == 1);
+        }
+
+        [Test]
         public void ParseG54()
         {
             DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("G54.6");
@@ -37,15 +49,15 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual(null, code.MinorNumber);
             Assert.AreEqual(4, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
-            Assert.AreEqual(1, code.Parameters[0].AsInt);
+            Assert.AreEqual(1, (int)code.Parameters[0]);
             Assert.AreEqual('C', code.Parameters[1].Letter);
-            Assert.AreEqual("Fancy \" Fan", code.Parameters[1].AsString);
+            Assert.AreEqual("Fancy \" Fan", (string)code.Parameters[1]);
             Assert.AreEqual('H', code.Parameters[2].Letter);
-            Assert.AreEqual(-1, code.Parameters[2].AsInt);
+            Assert.AreEqual(-1, (int)code.Parameters[2]);
             Assert.AreEqual('S', code.Parameters[3].Letter);
+            Assert.AreEqual(0.5, code.Parameters[3], 0.0001);
 
             TestContext.Out.Write(JsonConvert.SerializeObject(code, Formatting.Indented));
-            Assert.AreEqual(0.5, code.Parameters[3].AsFloat);
         }
 
         [Test]
@@ -57,11 +69,11 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual(null, code.MinorNumber);
             Assert.AreEqual(3, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
-            Assert.AreEqual(0, code.Parameters[0].AsInt);
+            Assert.AreEqual(0, (int)code.Parameters[0]);
             Assert.AreEqual('D', code.Parameters[1].Letter);
-            Assert.AreEqual(new int[] { 0, 1 }, code.Parameters[1].AsIntArray);
+            Assert.AreEqual(new int[] { 0, 1 }, (int[])code.Parameters[1]);
             Assert.AreEqual('H', code.Parameters[2].Letter);
-            Assert.AreEqual(new int[] { 1, 2 }, code.Parameters[2].AsIntArray);
+            Assert.AreEqual(new int[] { 1, 2 }, (int[])code.Parameters[2]);
             Assert.AreEqual(" Define tool 0", code.Comment);
         }
 
@@ -75,11 +87,11 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual(false, code.EnforceAbsoluteCoordinates);
             Assert.AreEqual(3, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
-            Assert.AreEqual(2, code.Parameters[0].AsInt);
+            Assert.AreEqual(2, (int)code.Parameters[0]);
             Assert.AreEqual('S', code.Parameters[1].Letter);
-            Assert.AreEqual(1, code.Parameters[1].AsInt);
+            Assert.AreEqual(1, (int)code.Parameters[1]);
             Assert.AreEqual('T', code.Parameters[2].Letter);
-            Assert.AreEqual(0.5, code.Parameters[2].AsFloat);
+            Assert.AreEqual(0.5, code.Parameters[2], 0.0001);
         }
 
         [Test]
@@ -92,9 +104,9 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual(false, code.EnforceAbsoluteCoordinates);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
-            Assert.AreEqual(4, code.Parameters[0].AsInt);
+            Assert.AreEqual(4, (int)code.Parameters[0]);
             Assert.AreEqual('S', code.Parameters[1].Letter);
-            Assert.AreEqual("foo", code.Parameters[1].AsString);
+            Assert.AreEqual("foo", (string)code.Parameters[1]);
             Assert.AreEqual("T3 P4 S\"foo\"", code.ToString());
         }
 
@@ -107,9 +119,9 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual(null, code.MinorNumber);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('X', code.Parameters[0].Letter);
-            Assert.AreEqual(3, code.Parameters[0].AsInt);
+            Assert.AreEqual(3, (int)code.Parameters[0]);
             Assert.AreEqual('Y', code.Parameters[1].Letter);
-            Assert.AreEqual(1.25, code.Parameters[1].AsFloat);
+            Assert.AreEqual(1.25, code.Parameters[1], 0.0001);
         }
 
         [Test]
@@ -139,9 +151,9 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual(null, code.MinorNumber);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
-            Assert.AreEqual(2, code.Parameters[0].AsInt);
+            Assert.AreEqual(2, (int)code.Parameters[0]);
             Assert.AreEqual('S', code.Parameters[1].Letter);
-            Assert.AreEqual(0, code.Parameters[1].AsInt);
+            Assert.AreEqual(0, (int)code.Parameters[1]);
             Assert.AreEqual(" Disable Telnet", code.Comment);
         }
     }

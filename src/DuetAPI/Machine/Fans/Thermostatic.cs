@@ -20,7 +20,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Minimum temperature required to turn on the fan (in degC or null if unknown)
         /// </summary>
-        public double? Temperature { get; set; }
+        public float? Temperature { get; set; }
         
         /// <summary>
         /// Create a clone of this instance

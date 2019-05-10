@@ -10,12 +10,12 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Requested speed of the current move (in mm/s)
         /// </summary>
-        public double RequestedSpeed { get; set; }
+        public float RequestedSpeed { get; set; }
         
         /// <summary>
         /// Top speed of the current move (in mm/s)
         /// </summary>
-        public double TopSpeed { get; set; }
+        public float TopSpeed { get; set; }
 
         /// <summary>
         /// Creates a clone of this instance

@@ -42,12 +42,6 @@ namespace DuetAPI.Commands
         public bool EnforceAbsoluteCoordinates { get; set; }
         
         /// <summary>
-        /// List of parsed code parameters (see <see cref="CodeParameter"/> for further information)
-        /// </summary>
-        /// <seealso cref="CodeParameter"/>
-        public List<CodeParameter> Parameters { get; } = new List<CodeParameter>();
-        
-        /// <summary>
         /// Comment of the G/M/T-code
         /// </summary>
         /// <remarks>
@@ -90,13 +84,27 @@ namespace DuetAPI.Commands
         /// File position in bytes (optional)
         /// </summary>
         public long? FilePosition { get; set; }
+
+        /// <summary>
+        /// List of parsed code parameters (see <see cref="CodeParameter"/> for further information)
+        /// </summary>
+        /// <seealso cref="CodeParameter"/>
+        public List<CodeParameter> Parameters { get; } = new List<CodeParameter>();
         
         /// <summary>
         /// Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!
         /// </summary>
-        /// <param name="c">Letter of the code parameter to find</param>
+        /// <param name="c">Letter of the parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
-        public CodeParameter GetParameter(char c) => Parameters.FirstOrDefault(p => p.Letter == c);
+        public CodeParameter Parameter(char c) => Parameters.FirstOrDefault(p => p.Letter == c);
+
+        /// <summary>
+        /// Retrieve the parameter whose letter equals c or generate a default parameter
+        /// </summary>
+        /// <param name="c">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default parameter value</param>
+        /// <returns>The parsed parameter instance or null if none could be found</returns>
+        public CodeParameter Parameter(char c, object defaultValue) => Parameter(c) ?? new CodeParameter(c, defaultValue);
 
         /// <summary>
         /// Reconstruct an unprecedented string from the parameter list
@@ -120,7 +128,7 @@ namespace DuetAPI.Commands
                 {
                     result += '"';
                 }
-                result += p.AsString;
+                result += p;
                 if (quoteStrings && p.Type == typeof(string))
                 {
                     result += '"';
@@ -149,11 +157,11 @@ namespace DuetAPI.Commands
             {
                 if (parameter.Type == typeof(string))
                 {
-                    result += $" {parameter.Letter}\"{parameter.AsString.Replace("\"", "\"\"")}\"";
+                    result += $" {parameter.Letter}\"{((string)parameter).Replace("\"", "\"\"")}\"";
                 }
                 else
                 {
-                    result += $" {parameter.Letter}{parameter.AsString}";
+                    result += $" {parameter.Letter}{(string)parameter}";
                 }
             }
 

@@ -5,7 +5,9 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Machine;
+using DuetAPI.Utility;
 using DuetControlServer.FileExecution;
+using Nito.AsyncEx;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.SPI
@@ -16,6 +18,7 @@ namespace DuetControlServer.SPI
     public static class Interface
     {
         // Requests for each code channel
+        // TODO Replace CodeChannel with a pseudo-enum (via consts) and replace the following with simple arrays
         private static readonly Dictionary<CodeChannel, Queue<QueuedCode>> _pendingCodes = new Dictionary<CodeChannel, Queue<QueuedCode>>();
         private static readonly Dictionary<CodeChannel, Stack<QueuedCode>> _pendingSystemCodes = new Dictionary<CodeChannel, Stack<QueuedCode>>();
         private static readonly Dictionary<CodeChannel, Stack<MacroFile>> _pendingMacros = new Dictionary<CodeChannel, Stack<MacroFile>>();
@@ -30,11 +33,18 @@ namespace DuetControlServer.SPI
         // Time when the object model was queried the last time
         private static DateTime _lastQueryTime = DateTime.Now;
 
+        // Heightmap requests
+        private static AsyncLock _heightmapLock = new AsyncLock();
+        private static TaskCompletionSource<Heightmap> _getHeightmapRequest;
+        private static bool _heightmapRequested;
+        private static TaskCompletionSource<object> _setHeightmapRequest;
+        private static Heightmap _heightmapToSet;
+
         // Special requests
         private static bool _emergencyStopRequested, _resetRequested, _printStarted;
         private static Communication.PrintStoppedReason? _printStoppedReason;
 
-        // Partial message (if any)
+        // Partial generic message (if any)
         private static string _partialCodeReply;
 
         /// <summary>
@@ -56,6 +66,42 @@ namespace DuetControlServer.SPI
 
             // Request buffer states immediately
             DataTransfer.WriteGetState();
+        }
+
+        /// <summary>
+        /// Retrieve the current heightmap from the firmware
+        /// </summary>
+        /// <returns>Heightmap in use</returns>
+        /// <exception cref="OperationCanceledException">Operation could not finish</exception>
+        public static async Task<Heightmap> GetHeightmap()
+        {
+            lock (await _heightmapLock.LockAsync())
+            {
+                if (_getHeightmapRequest == null)
+                {
+                    _getHeightmapRequest = new TaskCompletionSource<Heightmap>();
+                }
+            }
+            return await _getHeightmapRequest.Task;
+        }
+
+        /// <summary>
+        /// Set the current heightmap to use
+        /// </summary>
+        /// <param name="map">Heightmap to set</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation could not finish</exception>
+        public static async Task SetHeightmap(Heightmap map)
+        {
+            lock (await _heightmapLock.LockAsync())
+            {
+                if (_setHeightmapRequest == null)
+                {
+                    _setHeightmapRequest = new TaskCompletionSource<object>();
+                }
+                _heightmapToSet = map;
+            }
+            await _setHeightmapRequest.Task;
         }
 
         /// <summary>
@@ -219,6 +265,26 @@ namespace DuetControlServer.SPI
                     _printStoppedReason = null;
                 }
 
+                using (await _heightmapLock.LockAsync())
+                {
+                    // Check if the heightmap is supposed to be set
+                    if (_heightmapToSet != null)
+                    {
+                        if (DataTransfer.WriteHeightMap(_heightmapToSet))
+                        {
+                            _heightmapToSet = null;
+                            _setHeightmapRequest.SetResult(null);
+                            _setHeightmapRequest = null;
+                        }
+                    }
+
+                    // Check if the heightmap is requested
+                    if (_getHeightmapRequest != null && !_heightmapRequested)
+                    {
+                        _heightmapRequested = DataTransfer.WriteGetHeightMap();
+                    }
+                }
+
                 // Process incoming packets
                 for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
@@ -234,9 +300,11 @@ namespace DuetControlServer.SPI
                         //Console.WriteLine($"-> Packet #{packet.Value.Id} (request {(Communication.FirmwareRequests.Request)packet.Value.Request}) length {packet.Value.Length}");
                         await ProcessPacket(packet.Value);
                     }
-                    catch (ArgumentOutOfRangeException)
+                    catch (ArgumentOutOfRangeException e)
                     {
                         DataTransfer.DumpMalformedPacket();
+                        Console.Write("[perr] ");
+                        Console.WriteLine(e);
                         break;
                     }
                 }
@@ -255,7 +323,7 @@ namespace DuetControlServer.SPI
                         }
 
                         // If there is no code from a macro file being executed, see if another one can be read
-                        if (item == null)
+                        if (item == null || item.DoingNestedMacro)
                         {
                             MacroFile macro = null;
                             lock (_pendingMacros[channel])
@@ -291,6 +359,15 @@ namespace DuetControlServer.SPI
                                     // Macro file is complete
                                     if (DataTransfer.WriteMacroCompleted(channel, false))
                                     {
+                                        lock (_pendingSystemCodes[channel])
+                                        {
+                                            _pendingSystemCodes[channel].TryPeek(out item);
+                                        }
+                                        if (item != null)
+                                        {
+                                            item.DoingNestedMacro = false;
+                                        }
+
                                         lock (_pendingMacros[channel])
                                         {
                                             if (!_pendingMacros[channel].Pop().IsAborted)
@@ -493,9 +570,20 @@ namespace DuetControlServer.SPI
                     break;
 
                 case Communication.FirmwareRequests.Request.HeightMap:
-                    DataTransfer.ReadHeightMap(out Communication.FirmwareRequests.HeightMap header, out float[] zCoordinates);
-                    // TODO implement handling via own HeightMap class
-                    Console.WriteLine("Got heightmap");
+                    DataTransfer.ReadHeightMap(out Heightmap map);
+                    lock (_getHeightmapRequest)
+                    {
+                        _heightmapRequested = false;
+                        if (_getHeightmapRequest == null)
+                        {
+                            Console.WriteLine("[err] Got heightmap response although it was not requested");
+                        }
+                        else
+                        {
+                            _getHeightmapRequest.SetResult(map);
+                            _getHeightmapRequest = null;
+                        }
+                    }
                     break;
 
                 case Communication.FirmwareRequests.Request.Locked:
@@ -538,6 +626,7 @@ namespace DuetControlServer.SPI
             }
 
             // TODO implement logging here
+            // TODO check for "File %s will print in %" PRIu32 "h %" PRIu32 "m plus heating time" and modify simulation time
 
             // Deal with generic replies. Keep this check in sync with RepRapFirmware
             if (flags.HasFlag(Communication.MessageTypeFlags.UsbMessage) && flags.HasFlag(Communication.MessageTypeFlags.AuxMessage) &&
@@ -644,10 +733,22 @@ namespace DuetControlServer.SPI
             {
                 Console.WriteLine($"[info] Executing requested macro file '{filename}' on channel {channel}");
 
+                // Enqueue the macro file
                 MacroFile macro = new MacroFile(path, channel, true, 0);
                 lock (_pendingMacros[channel])
                 {
                     _pendingMacros[channel].Push(macro);
+                }
+
+                // Deal with nested macros
+                QueuedCode item;
+                lock (_pendingSystemCodes[channel])
+                {
+                    _pendingSystemCodes[channel].TryPeek(out item);
+                }
+                if (item != null)
+                {
+                    item.DoingNestedMacro = true;
                 }
             }
             else
@@ -707,7 +808,7 @@ namespace DuetControlServer.SPI
             Console.WriteLine($"[info] Print has been paused at file position {filePosition}. Reason: {pauseReason}");
 
             // Make the print stop and rewind back to the given file position
-            await Print.Paused(filePosition);
+            await Print.OnPause(filePosition);
 
             // Update the object model
             using (await Model.Provider.AccessReadWrite())
@@ -783,6 +884,16 @@ namespace DuetControlServer.SPI
                         item.SetFinished();
                     }
                 }
+            }
+
+            // Resolve pending heightmap requests
+            using (await _heightmapLock.LockAsync())
+            {
+                _getHeightmapRequest?.SetException(new OperationCanceledException(codeErrorMessage));
+                _heightmapRequested = false;
+
+                _setHeightmapRequest?.SetException(new OperationCanceledException(codeErrorMessage));
+                _heightmapToSet = null;
             }
 
             // Resolve pending lock/unlock requests

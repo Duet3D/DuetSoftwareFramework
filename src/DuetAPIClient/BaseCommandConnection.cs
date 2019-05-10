@@ -26,7 +26,7 @@ namespace DuetAPIClient
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Retrieved file information</returns>
         /// <seealso cref="GetFileInfo"/>
-        public Task<ParsedFileInfo> GetFileInfo(string fileName, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<ParsedFileInfo> GetFileInfo(string fileName, CancellationToken cancellationToken = default)
         {
             return PerformCommand<ParsedFileInfo>(new GetFileInfo { FileName = fileName }, cancellationToken);
         }
@@ -39,7 +39,7 @@ namespace DuetAPIClient
         /// <returns>The result of the given code</returns>
         /// <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
         /// <seealso cref="Code"/>
-        public Task<CodeResult> PerformCode(Code code, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<CodeResult> PerformCode(Code code, CancellationToken cancellationToken = default)
         {
             return PerformCommand<CodeResult>(code, cancellationToken);
         }
@@ -53,7 +53,7 @@ namespace DuetAPIClient
         /// <returns>The code result as a string</returns>
         /// <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
         /// <seealso cref="SimpleCode"/>
-        public Task<string> PerformSimpleCode(string code, CodeChannel channel = Defaults.Channel, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<string> PerformSimpleCode(string code, CodeChannel channel = Defaults.Channel, CancellationToken cancellationToken = default)
         {
             return PerformCommand<string>(new SimpleCode { Code = code, Channel = channel }, cancellationToken);
         }
@@ -64,7 +64,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>The current machine model</returns>
-        public Task<MachineModel> GetMachineModel(CancellationToken cancellationToken = default(CancellationToken))
+        public Task<MachineModel> GetMachineModel(CancellationToken cancellationToken = default)
         {
             return PerformCommand<MachineModel>(new GetMachineModel(), cancellationToken);
         }
@@ -75,7 +75,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Machine model JSON</returns>
-        public async Task<string> GetSerializedMachineModel(CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<string> GetSerializedMachineModel(CancellationToken cancellationToken = default)
         {
             await Send(new GetMachineModel());
             return await ReceiveSerializedJsonResponse(nameof(GetMachineModel), cancellationToken);
@@ -87,9 +87,19 @@ namespace DuetAPIClient
         /// <param name="path">File path to resolve</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Resolved file path</returns>
-        public Task<string> ResolvePath(string path, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<string> ResolvePath(string path, CancellationToken cancellationToken = default)
         {
             return PerformCommand<string>(new ResolvePath { Path = path }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Wait for the full machine model to be updated from RepRapFirmware
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        public Task SyncMachineModel(CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new SyncMachineModel(), cancellationToken);
         }
     }
 }

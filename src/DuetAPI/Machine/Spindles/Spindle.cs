@@ -10,12 +10,12 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Active RPM
         /// </summary>
-        public double Active { get; set; }
+        public float Active { get; set; }
         
         /// <summary>
         /// Current RPM
         /// </summary>
-        public double Current { get; set; }
+        public float Current { get; set; }
         
         /// <summary>
         /// Creates a clone of this instance

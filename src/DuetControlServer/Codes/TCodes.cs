@@ -25,19 +25,30 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="code">Code processed by RepRapFirmware</param>
         /// <param name="result">Result that it generated</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task CodeExecuted(Code code, CodeResult result)
+        /// <returns>Result to output</returns>
+        public static async Task<CodeResult> CodeExecuted(Code code, CodeResult result)
         {
             if (!code.MajorNumber.HasValue || !result.IsSuccessful)
             {
-                return;
+                return result;
             }
 
             // Set new tool number
             using (await Model.Provider.AccessReadWrite())
             {
-                Model.Provider.Get.State.CurrentTool = Math.Max(-1, code.MajorNumber.Value);
+                if (Model.Provider.Get.Tools.Any(tool => tool.Number == code.MajorNumber))
+                {
+                    // Make sure the chosen tool actually exists
+                    Model.Provider.Get.State.CurrentTool = code.MajorNumber.Value;
+                }
+                else
+                {
+                    // Deselect the current tool if it does not exist
+                    Model.Provider.Get.State.CurrentTool = -1;
+                }
             }
+
+            return result;
         }
     }
 }

@@ -37,12 +37,12 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Input voltage details of the main board (in V or null if unknown)
         /// </summary>
-        public MinMaxCurrent<double?> VIn { get; set; } = new MinMaxCurrent<double?>();
+        public MinMaxCurrent<float?> VIn { get; set; } = new MinMaxCurrent<float?>();
         
         /// <summary>
         /// MCU temperature details of the main board (in degC or null if unknown)
         /// </summary>
-        public MinMaxCurrent<double?> McuTemp { get; set; } = new MinMaxCurrent<double?>();
+        public MinMaxCurrent<float?> McuTemp { get; set; } = new MinMaxCurrent<float?>();
         
         /// <summary>
         /// Information about attached expansion boards
@@ -63,8 +63,8 @@ namespace DuetAPI.Machine
                 Revision = (Revision != null) ? string.Copy(Revision) : null,
                 Firmware = (Firmware)Firmware.Clone(),
                 ProcessorID = (ProcessorID != null) ? string.Copy(ProcessorID) : null,
-                VIn = (MinMaxCurrent<double?>)VIn.Clone(),
-                McuTemp = (MinMaxCurrent<double?>)McuTemp.Clone(),
+                VIn = (MinMaxCurrent<float?>)VIn.Clone(),
+                McuTemp = (MinMaxCurrent<float?>)McuTemp.Clone(),
                 ExpansionBoards = ExpansionBoards.Select(board => (ExpansionBoard)board.Clone()).ToList()
             };
         }

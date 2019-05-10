@@ -15,14 +15,14 @@ namespace DuetAPI.Machine
         public int Number { get; set; }
         
         /// <summary>
-        /// Active temperatures of the associated heaters (in degC)
+        /// Active temperatures of the associated heaters (in C)
         /// </summary>
-        public double[] Active { get; set; } = new double[0];
+        public float[] Active { get; set; } = new float[0];
         
         /// <summary>
-        /// Standby temperatures of the associated heaters (in degC)
+        /// Standby temperatures of the associated heaters (in C)
         /// </summary>
-        public double[] Standby { get; set; } = new double[0];
+        public float[] Standby { get; set; } = new float[0];
         
         /// <summary>
         /// Name of the tool or null if unset
@@ -47,7 +47,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Mix ratios of the associated extruder drives
         /// </summary>
-        public double[] Mix { get; set; } = new double[0];
+        public float[] Mix { get; set; } = new float[0];
         
         /// <summary>
         /// Associated spindle (index)
@@ -71,7 +71,12 @@ namespace DuetAPI.Machine
         /// This list is in the same order as <see cref="Move.Axes"/>
         /// </summary>
         /// <seealso cref="Axis"/>
-        public double[] Offsets { get; set; } = new double[0];                  // same order as Move.Axes
+        public float[] Offsets { get; set; } = new float[0];                    // same order as Move.Axes
+
+        /// <summary>
+        /// Bitmap of the probed axis offsets
+        /// </summary>
+        public int OffsetsProbed { get; set; }
 
         /// <summary>
         /// Creates a clone of this instance
@@ -82,16 +87,16 @@ namespace DuetAPI.Machine
             return new Tool
             {
                 Number = Number,
-                Active = (double[])Active.Clone(),
-                Standby = (double[])Standby.Clone(),
+                Active = (float[])Active.Clone(),
+                Standby = (float[])Standby.Clone(),
                 Name = (Name != null) ? string.Copy(Name) : null,
                 Filament = (Filament != null) ? string.Copy(Filament) : null,
                 Fans = (int[])Fans.Clone(),
                 Heaters = (int[])Heaters.Clone(),
-                Mix = (double[])Mix.Clone(),
+                Mix = (float[])Mix.Clone(),
                 Spindle = Spindle,
                 Axes = Axes.Select(subAxes => (int[])subAxes.Clone()).ToList(),
-                Offsets = (double[])Offsets.Clone()
+                Offsets = (float[])Offsets.Clone()
             };
         }
     }

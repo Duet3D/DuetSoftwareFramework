@@ -67,7 +67,7 @@ namespace DuetControlServer.IPC.Processors
                 // When the connection is terminated, enqueue an Ignore command for safety to avoid a deadlock after an abnormal termination
                 await EnqueueCommand(new Ignore());
 
-                _interceptors.TryRemove(this, out InterceptionMode dummy);
+                _interceptors.TryRemove(this, out _);
             }
         }
 

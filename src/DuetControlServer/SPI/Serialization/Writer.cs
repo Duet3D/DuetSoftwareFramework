@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI;
-using DuetAPI.Commands;
+using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.LinuxRequests;
 using DuetControlServer.SPI.Communication.SharedRequests;
@@ -115,42 +115,42 @@ namespace DuetControlServer.SPI.Serialization
                 if (parameter.Type == typeof(int))
                 {
                     binaryParam.Type = DataType.Int;
-                    binaryParam.IntValue = parameter.AsInt;
+                    binaryParam.IntValue = parameter;
                 }
                 else if (parameter.Type == typeof(uint))
                 {
                     binaryParam.Type = DataType.UInt;
-                    binaryParam.UIntValue = parameter.AsUInt;
+                    binaryParam.UIntValue = parameter;
                 }
                 else if (parameter.Type == typeof(float))
                 {
                     binaryParam.Type = DataType.Float;
-                    binaryParam.FloatValue = parameter.AsFloat;
+                    binaryParam.FloatValue = parameter;
                 }
                 else if (parameter.Type == typeof(int[]))
                 {
                     binaryParam.Type = DataType.IntArray;
-                    int[] array = parameter.AsIntArray;
+                    int[] array = parameter;
                     binaryParam.IntValue = array.Length;
                     extraParameters.Add(array);
                 }
                 else if (parameter.Type == typeof(uint[]))
                 {
                     binaryParam.Type = DataType.UIntArray;
-                    uint[] array = parameter.AsUIntArray;
+                    uint[] array = parameter;
                     binaryParam.IntValue = array.Length;
                     extraParameters.Add(array);
                 }
                 else if (parameter.Type == typeof(float[]))
                 {
                     binaryParam.Type = DataType.FloatArray;
-                    float[] array = parameter.AsFloatArray;
+                    float[] array = parameter;
                     binaryParam.IntValue = array.Length;
                     extraParameters.Add(array);
                 }
                 else if (parameter.Type == typeof(string))
                 {
-                    string value = parameter.AsString;
+                    string value = parameter;
                     binaryParam.Type = (value.Contains('[') && value.Contains(']')) ? DataType.Expression : DataType.String;
                     binaryParam.IntValue = value.Length;
                     extraParameters.Add(value);
@@ -349,11 +349,11 @@ namespace DuetControlServer.SPI.Serialization
                 NumFilaments = (ushort)info.Filament.Length,
                 FileSize = (uint)info.Size,
                 LastModifiedTime = info.LastModified.HasValue ? (ulong)(info.LastModified.Value - new DateTime (1970, 1, 1)).TotalSeconds : 0,
-                FirstLayerHeight = (float)info.FirstLayerHeight,
-                LayerHeight = (float)info.LayerHeight,
-                ObjectHeight = (float)info.Height,
-                PrintTime = (uint)Math.Round(info.PrintTime),
-                SimulatedTime = (uint)Math.Round(info.SimulatedTime)
+                FirstLayerHeight = info.FirstLayerHeight,
+                LayerHeight = info.LayerHeight,
+                ObjectHeight = info.Height,
+                PrintTime = (uint)info.PrintTime,
+                SimulatedTime = (uint)info.SimulatedTime
             };
             MemoryMarshal.Write(to, ref header);
             int bytesWritten = Marshal.SizeOf(header);
@@ -408,6 +408,38 @@ namespace DuetControlServer.SPI.Serialization
             };
             MemoryMarshal.Write(to, ref header);
             return Marshal.SizeOf(header);
+        }
+
+
+        /// <summary>
+        /// Write a heightmap as read by G29 S1
+        /// </summary>
+        /// <param name="span"></param>
+        /// <param name="header"></param>
+        /// <param name="zCoordinates"></param>
+        public static int WriteHeightMap(Span<byte> to, Heightmap map)
+        {
+            HeightMap header = new HeightMap
+            {
+                XMin = map.XMin,
+                XMax = map.XMax,
+                XSpacing = map.XSpacing,
+                YMin = map.YMin,
+                YMax = map.YMax,
+                YSpacing = map.YSpacing,
+                Radius = map.Radius,
+                NumX = (ushort)map.NumX,
+                NumY = (ushort)map.NumY
+            };
+            MemoryMarshal.Write(to, ref header);
+
+            Span<float> coords = MemoryMarshal.Cast<byte, float>(to.Slice(Marshal.SizeOf(header)));
+            for (int i = 0; i < map.NumX * map.NumY; i++)
+            {
+                coords[i] = map.ZCoordinates[i];
+            }
+
+            return Marshal.SizeOf(header) + Marshal.SizeOf(typeof(float)) * map.NumX * map.NumY;
         }
 
         /// <summary>

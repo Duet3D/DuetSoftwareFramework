@@ -25,12 +25,12 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Set of the minimum, maximum and current input voltage (in V or null if unknown)
         /// </summary>
-        public MinMaxCurrent<double?> VIn { get; set; } = new MinMaxCurrent<double?>();
+        public MinMaxCurrent<float?> VIn { get; set; } = new MinMaxCurrent<float?>();
         
         /// <summary>
         /// Set of the minimum, maximum and current MCU temperature (in degC or null if unknown)
         /// </summary>
-        public MinMaxCurrent<double?> McuTemp { get; set; } = new MinMaxCurrent<double?>();
+        public MinMaxCurrent<float?> McuTemp { get; set; } = new MinMaxCurrent<float?>();
         
         /// <summary>
         /// How many heaters can be attached to this board
@@ -53,8 +53,8 @@ namespace DuetAPI.Machine
                 Name = (Name != null) ? string.Copy(Name) : null,
                 Revision = (Revision != null) ? string.Copy(Revision) : null,
                 Firmware = (Firmware)Firmware.Clone(),
-                VIn = (MinMaxCurrent<double?>)VIn.Clone(),
-                McuTemp = McuTemp,
+                VIn = (MinMaxCurrent<float?>)VIn.Clone(),
+                McuTemp = (MinMaxCurrent<float?>)McuTemp.Clone(),
                 MaxHeaters = MaxHeaters,
                 MaxMotors = MaxMotors
             };

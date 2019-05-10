@@ -9,7 +9,7 @@ using DuetControlServer.SPI;
 namespace DuetControlServer.Commands
 {
     /// <summary>
-    /// Implementation for G/M/T-code commands
+    /// Implementation of the <see cref="DuetAPI.Commands.Code"/> command
     /// </summary>
     public class Code : DuetAPI.Commands.Code
     {
@@ -102,28 +102,26 @@ namespace DuetControlServer.Commands
             else
             {
                 result = await Interface.ProcessCode(this);
-                await OnCodeExecuted(result);
+                result = await OnCodeExecuted(result);
             }
 
             return result;
         }
 
-        private async Task OnCodeExecuted(CodeResult result)
+        private Task<CodeResult> OnCodeExecuted(CodeResult result)
         {
             switch (Type)
             {
                 case CodeType.GCode:
-                    await GCodes.CodeExecuted(this, result);
-                    break;
+                    return GCodes.CodeExecuted(this, result);
 
                 case CodeType.MCode:
-                    await MCodes.CodeExecuted(this, result);
-                    break;
+                    return MCodes.CodeExecuted(this, result);
 
                 case CodeType.TCode:
-                    await TCodes.CodeExecuted(this, result);
-                    break;
+                    return TCodes.CodeExecuted(this, result);
             }
+            return Task.FromResult(result);
         }
     }
 }

@@ -171,12 +171,6 @@
             Whether absolute coordinates must be used regardless of the current mode (see G53)
             </summary>
         </member>
-        <member name="P:DuetAPI.Commands.Code.Parameters">
-            <summary>
-            List of parsed code parameters (see <see cref="T:DuetAPI.Commands.CodeParameter"/> for further information)
-            </summary>
-            <seealso cref="T:DuetAPI.Commands.CodeParameter"/>
-        </member>
         <member name="P:DuetAPI.Commands.Code.Comment">
             <summary>
             Comment of the G/M/T-code
@@ -221,11 +215,25 @@
             File position in bytes (optional)
             </summary>
         </member>
-        <member name="M:DuetAPI.Commands.Code.GetParameter(System.Char)">
+        <member name="P:DuetAPI.Commands.Code.Parameters">
+            <summary>
+            List of parsed code parameters (see <see cref="T:DuetAPI.Commands.CodeParameter"/> for further information)
+            </summary>
+            <seealso cref="T:DuetAPI.Commands.CodeParameter"/>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.Parameter(System.Char)">
             <summary>
             Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!
             </summary>
-            <param name="c">Letter of the code parameter to find</param>
+            <param name="c">Letter of the parameter to find</param>
+            <returns>The parsed parameter instance or null if none could be found</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.Parameter(System.Char,System.Object)">
+            <summary>
+            Retrieve the parameter whose letter equals c or generate a default parameter
+            </summary>
+            <param name="c">Letter of the parameter to find</param>
+            <param name="defaultValue">Default parameter value</param>
             <returns>The parsed parameter instance or null if none could be found</returns>
         </member>
         <member name="M:DuetAPI.Commands.Code.GetUnprecedentedString(System.Boolean)">
@@ -266,12 +274,12 @@
             Letter of the code parameter (e.g. P in M106 P3)
             </summary>
         </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsString">
+        <member name="F:DuetAPI.Commands.CodeParameter._stringValue">
             <summary>
             Unparsed string representation of the code parameter or an empty string if none present
             </summary>
         </member>
-        <member name="F:DuetAPI.Commands.CodeParameter.ParsedValue">
+        <member name="F:DuetAPI.Commands.CodeParameter._parsedValue">
             <summary>
             Internal parsed representation of the string value (one of string, int, uint, float, int[], uint[] or float[])
             </summary>
@@ -281,54 +289,112 @@
             Creates a new CodeParameter instance and parses value to a native data type if applicable
             </summary>
             <param name="letter">Letter of the code parameter</param>
-            <param name="value">String representation of the value (also stored in <see cref="P:DuetAPI.Commands.CodeParameter.AsString"/>)</param>
+            <param name="value">String representation of the value (also stored in <see cref="!:AsString"/>)</param>
             <param name="isString">Whether this is a string. This is set to true if the parameter was inside quotation marks.</param>
-        </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsFloat">
-            <summary>
-            Float representation of the parsed value
-            </summary>
-            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
-        </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsInt">
-            <summary>
-            Integer representation of the parsed value
-            </summary>
-            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
-        </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsUInt">
-            <summary>
-            Unsigned integer representation of the parsed value
-            </summary>
-            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
-        </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsBool">
-            <summary>
-            Boolean representation of the parsed value
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsFloatArray">
-            <summary>
-            Float array representation of the parsed value
-            </summary>
-            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
-        </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsIntArray">
-            <summary>
-            Integer array representation of the parsed value
-            </summary>
-            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
-        </member>
-        <member name="P:DuetAPI.Commands.CodeParameter.AsUIntArray">
-            <summary>
-            Unsigned integer array representation of the parsed value
-            </summary>
-            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+            <remarks>This constructor does not parsed long (aka int64) values because RRF cannot handle them</remarks>
         </member>
         <member name="P:DuetAPI.Commands.CodeParameter.Type">
             <summary>
             Data type of the internally parsed value
             </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Single">
+            <summary>
+            Implicit conversion operator to float
+            </summary>
+            <param name="codeParameter">Target object</param>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Int32">
+            <summary>
+            Implicit conversion operator to int
+            </summary>
+            <param name="codeParameter">Target object</param>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.UInt32">
+            <summary>
+            Implicit conversion operator to uint
+            </summary>
+            <param name="codeParameter">Target object</param>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Int64">
+            <summary>
+            Implicit conversion operator to long
+            </summary>
+            <param name="codeParameter">Target object</param>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Boolean">
+            <summary>
+            Implicit conversion operator to bool
+            </summary>
+            <param name="codeParameter">Target object</param>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.String">
+            <summary>
+            Implicit conversion operator to string
+            </summary>
+            <param name="codeParameter">Target object</param>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Single[]">
+            <summary>
+            Implicit conversion operator to float array
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Int32[]">
+            <summary>
+            Implicit conversion operator to integer array
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.UInt32[]">
+            <summary>
+            Implicit conversion operator to unsigned integer array
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Int64[]">
+            <summary>
+            Implicit conversion operator to long array
+            </summary>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Equality(DuetAPI.Commands.CodeParameter,System.Object)">
+            <summary>
+            Equality operator
+            </summary>
+            <param name="a">Code parameter</param>
+            <param name="b">Other object</param>
+            <returns>True if both objects are equal</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Inequality(DuetAPI.Commands.CodeParameter,System.Object)">
+            <summary>
+            Inequality operator
+            </summary>
+            <param name="a">Code parameter</param>
+            <param name="b">Other object</param>
+            <returns>True if both objects are not equal</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.Equals(System.Object)">
+            <summary>
+            Checks if the other obj equals this instance
+            </summary>
+            <param name="obj"></param>
+            <returns></returns>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.GetHashCode">
+            <summary>
+            Returns the hash code of this instance
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.ToString">
+            <summary>
+            Converts this parameter to a string
+            </summary>
+            <returns>String representation</returns>
         </member>
         <member name="T:DuetAPI.Commands.CodeParameterConverter">
             <summary>
@@ -391,7 +457,7 @@
         </member>
         <member name="M:DuetAPI.Commands.CodeResult.#ctor">
             <summary>
-            Create a new code result
+            Create a new code result indicating success
             </summary>
         </member>
         <member name="M:DuetAPI.Commands.CodeResult.#ctor(DuetAPI.MessageType,System.String)">
@@ -401,16 +467,23 @@
             <param name="type">Message type</param>
             <param name="content">Message content</param>
         </member>
-        <member name="M:DuetAPI.Commands.CodeResult.ToString">
+        <member name="M:DuetAPI.Commands.CodeResult.Add(DuetAPI.MessageType,System.String)">
             <summary>
-            Converts the CodeResult to a string
+            Add another message
             </summary>
-            <returns>The CodeResult as a string</returns>
+            <param name="type">Message type</param>
+            <param name="content">Message content</param>
         </member>
         <member name="P:DuetAPI.Commands.CodeResult.IsSuccessful">
             <summary>
             Indicates if the code could complete without an error
             </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeResult.ToString">
+            <summary>
+            Converts the CodeResult to a string
+            </summary>
+            <returns>The CodeResult as a string</returns>
         </member>
         <member name="T:DuetAPI.Commands.CodeType">
             <summary>
@@ -1069,12 +1142,12 @@
         </member>
         <member name="P:DuetAPI.Machine.BedOrChamber.Active">
             <summary>
-            Active temperatures (in degC)
+            Active temperatures (in C)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.BedOrChamber.Standby">
             <summary>
-            Standby temperatures (in degC)
+            Standby temperatures (in C)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.BedOrChamber.Name">
@@ -1152,12 +1225,12 @@
         </member>
         <member name="P:DuetAPI.Machine.Heat.ColdExtrudeTemperature">
             <summary>
-            Minimum required temperature for extrusion moves (in degC)
+            Minimum required temperature for extrusion moves (in C)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Heat.ColdRetractTemperature">
             <summary>
-            Minimum required temperature for retraction moves (in degC)
+            Minimum required temperature for retraction moves (in C)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Heat.Extra">
@@ -1185,7 +1258,7 @@
         </member>
         <member name="P:DuetAPI.Machine.Heater.Current">
             <summary>
-            Current temperature of the heater (in degC)
+            Current temperature of the heater (in C)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Heater.Name">
@@ -1205,7 +1278,7 @@
         </member>
         <member name="P:DuetAPI.Machine.Heater.Max">
             <summary>
-            Maximum allowed temperature for this heater (in degC)
+            Maximum allowed temperature for this heater (in C)
             </summary>
             <remarks>
             This is only temporary and should be replaced by a representation of the heater protection as in RRF
@@ -1232,7 +1305,7 @@
             Gain value or null if unknown
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.HeaterModel.TimeConst">
+        <member name="P:DuetAPI.Machine.HeaterModel.TimeConstant">
             <summary>
             Time constant or null if unknown
             </summary>
@@ -1245,6 +1318,36 @@
         <member name="P:DuetAPI.Machine.HeaterModel.MaxPwm">
             <summary>
             Maximum PWM or null if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.HeaterModel.StandardVoltage">
+            <summary>
+            Standard voltage of this heater or null if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.HeaterModel.UsePID">
+            <summary>
+            Indicates if PID control is being used
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.HeaterModel.CustomPID">
+            <summary>
+            Indicates if custom PID values are used
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.HeaterModel.P">
+            <summary>
+            Proportional value of the PID regulator
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.HeaterModel.I">
+            <summary>
+            Integral value of the PID regulator
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.HeaterModel.D">
+            <summary>
+            Derivative value of the PID regulator
             </summary>
         </member>
         <member name="M:DuetAPI.Machine.HeaterModel.Clone">
@@ -1586,9 +1689,19 @@
             Minimum travel of this axis (in mm or null if unknown/unset)
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Axis.MinProbed">
+            <summary>
+            Whether the axis minimum was probed
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Axis.Max">
             <summary>
             Maximum travel of this axis (in mm or null if unknown/unset)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Axis.MaxProbed">
+            <summary>
+            Whether the axis maximum was probed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Axis.Visible">
@@ -1756,6 +1869,46 @@
             </summary>
             <seealso cref="T:DuetAPI.Machine.GeometryType"/>
         </member>
+        <member name="P:DuetAPI.Machine.Geometry.Anchors">
+            <summary>
+            Hangprinter A, B, C, Dz anchors
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Geometry.PrintRadius">
+            <summary>
+            Print radius for Hangprinter and Delta geometries in mm
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Geometry.Diagonals">
+            <summary>
+            Delta diagonals
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Geometry.Radius">
+            <summary>
+            Delta radius in mm
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Geometry.HomedHeight">
+            <summary>
+            Homed height of a delta printer in mm
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Geometry.AngleCorrections">
+            <summary>
+            ABC angle corrections for delta geometries
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Geometry.EndstopAdjustments">
+            <summary>
+            Endstop adjustments of the XYZ axes in mm
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Geometry.Tilt">
+            <summary>
+            Tilt values of the XY axes
+            </summary>
+        </member>
         <member name="M:DuetAPI.Machine.Geometry.Clone">
             <summary>
             Creates a clone of this instance
@@ -1889,6 +2042,16 @@
         <member name="P:DuetAPI.Machine.Move.SpeedFactor">
             <summary>
             Speed factor applied to every regular move (1.0 equals 100%)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.CurrentWorkplace">
+            <summary>
+            Index of the currently selected workspace
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Move.WorkplaceCoordinates">
+            <summary>
+            Axis offsets of each available workspace (in mm)
             </summary>
         </member>
         <member name="M:DuetAPI.Machine.Move.Clone">
@@ -2196,6 +2359,11 @@
             Dive height (in mm)
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Probe.Offset">
+            <summary>
+            X+Y offsets (in mm)
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Probe.TriggerHeight">
             <summary>
             Z height at which the probe is triggered (in mm)
@@ -2229,6 +2397,11 @@
         <member name="P:DuetAPI.Machine.Probe.DisablesBed">
             <summary>
             Whether probing disables the bed heater(s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Probe.Persistent">
+            <summary>
+            Indicates if the probe parameters are supposed to be saved to config-override.g
             </summary>
         </member>
         <member name="M:DuetAPI.Machine.Probe.Clone">
@@ -2505,12 +2678,12 @@
         </member>
         <member name="P:DuetAPI.Machine.Tool.Active">
             <summary>
-            Active temperatures of the associated heaters (in degC)
+            Active temperatures of the associated heaters (in C)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Tool.Standby">
             <summary>
-            Standby temperatures of the associated heaters (in degC)
+            Standby temperatures of the associated heaters (in C)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Tool.Name">
@@ -2561,6 +2734,11 @@
             This list is in the same order as <see cref="P:DuetAPI.Machine.Move.Axes"/>
             </summary>
             <seealso cref="T:DuetAPI.Machine.Axis"/>
+        </member>
+        <member name="P:DuetAPI.Machine.Tool.OffsetsProbed">
+            <summary>
+            Bitmap of the probed axis offsets
+            </summary>
         </member>
         <member name="M:DuetAPI.Machine.Tool.Clone">
             <summary>
@@ -2732,6 +2910,76 @@
             <param name="existingValue">Existing value</param>
             <param name="serializer">JSON serializer</param>
             <returns>Deserialized char enum</returns>
+        </member>
+        <member name="T:DuetAPI.Utility.Heightmap">
+            <summary>
+            Class representing a heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Utility.Heightmap.XMin">
+            <summary>
+            X start coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Utility.Heightmap.XMax">
+            <summary>
+            X end coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Utility.Heightmap.XSpacing">
+            <summary>
+            Spacing between the probe points in X direction
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Utility.Heightmap.YMin">
+            <summary>
+            Y start coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Utility.Heightmap.YMax">
+            <summary>
+            Y end coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Utility.Heightmap.YSpacing">
+            <summary>
+            Spacing between the probe points in Y direction
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Utility.Heightmap.Radius">
+            <summary>
+            Probing radius on delta geometries
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Utility.Heightmap.NumX">
+            <summary>
+            Number of probe points in X direction
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Utility.Heightmap.NumY">
+            <summary>
+            Number of probe points in Y direction
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Utility.Heightmap.ZCoordinates">
+            <summary>
+            Z coordinate of each probe point
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.Heightmap.Load(System.String)">
+            <summary>
+            Load a new heightmap from the given CSV file
+            </summary>
+            <param name="filename">Path to the file</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.IO.IOException">Invalid file</exception>
+        </member>
+        <member name="M:DuetAPI.Utility.Heightmap.Save(System.String)">
+            <summary>
+            Save a heightmap to the given CSV file
+            </summary>
+            <param name="filename">Filename of the heightmap</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetAPI.Utility.JsonHelper">
             <summary>

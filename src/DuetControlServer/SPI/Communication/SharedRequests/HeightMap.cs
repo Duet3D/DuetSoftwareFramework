@@ -1,7 +1,7 @@
-namespace DuetControlServer.SPI.Communication.FirmwareRequests
+namespace DuetControlServer.SPI.Communication.SharedRequests
 {
     /// <summary>
-    /// Header of heightmap reports
+    /// Header of G29 heightmaps
     /// </summary>
     public struct HeightMap
     {
@@ -41,8 +41,13 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         public float Radius;
 
         /// <summary>
-        /// Number of probe points
+        /// Number of probe points in X direction
         /// </summary>
-        public uint NumPoints;
+        public ushort NumX;
+
+        /// <summary>
+        /// Number of probe points in Y direction
+        /// </summary>
+        public ushort NumY;
     }
 }

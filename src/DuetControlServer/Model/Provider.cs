@@ -44,6 +44,7 @@ namespace DuetControlServer.Model
         /// <returns>Disposable lock object to be used with a using directive</returns>
         public static AwaitableDisposable<IDisposable> AccessReadWrite()
         {
+            // FIXME: Whenevever the underlying lock is released, it is safe to assume an update can be triggered
             return _lock.WriterLockAsync();
         }
 

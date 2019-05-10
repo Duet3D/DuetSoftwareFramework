@@ -3,7 +3,7 @@
 namespace DuetControlServer.Commands
 {
     /// <summary>
-    /// Implementation of the ResolvePath command
+    /// Implementation of the <see cref="DuetAPI.Commands.ResolvePath"/> command
     /// </summary>
     public class ResolvePath : DuetAPI.Commands.ResolvePath
     {

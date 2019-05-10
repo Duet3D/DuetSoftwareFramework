@@ -21,7 +21,7 @@ namespace DuetUnitTest.Machine
                 Min = -789
             };
             original.Move.Axes.Add(axis);
-            original.Move.BabystepZ = 0.34;
+            original.Move.BabystepZ = 0.34F;
             original.Move.Compensation = "Compensation";
             original.Move.CurrentMove.RequestedSpeed = 45;
             original.Move.CurrentMove.TopSpeed = 30;
@@ -40,7 +40,7 @@ namespace DuetUnitTest.Machine
 
             Extruder extruder = new Extruder
             {
-                Factor = 1.23
+                Factor = 1.23F
             };
             extruder.Nonlinear.A = 1;
             extruder.Nonlinear.B = 2;
@@ -49,9 +49,9 @@ namespace DuetUnitTest.Machine
             original.Move.Extruders.Add(extruder);
 
             original.Move.Geometry.Type = "delta";
-            original.Move.Idle.Factor = 0.8;
+            original.Move.Idle.Factor = 0.8F;
             original.Move.Idle.Timeout = 50;
-            original.Move.SpeedFactor = 1.45;
+            original.Move.SpeedFactor = 1.45F;
 
             MachineModel clone = (MachineModel)original.Clone();
 

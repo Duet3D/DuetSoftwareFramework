@@ -1,14 +1,8 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using DuetAPI.Commands;
-using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
-using Code = DuetControlServer.Commands.Code;
-using GetFileInfo = DuetControlServer.Commands.GetFileInfo;
-using GetMachineModel = DuetControlServer.Commands.GetMachineModel;
-using ResolvePath = DuetControlServer.Commands.ResolvePath;
-using SimpleCode = DuetControlServer.Commands.SimpleCode;
+using DuetControlServer.Commands;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -26,7 +20,8 @@ namespace DuetControlServer.IPC.Processors
             typeof(GetFileInfo),
             typeof(GetMachineModel),
             typeof(ResolvePath),
-            typeof(SimpleCode)
+            typeof(SimpleCode),
+            typeof(SyncMachineModel)
         };
         
         /// <summary>
@@ -50,7 +45,7 @@ namespace DuetControlServer.IPC.Processors
                 try
                 {
                     // Read another command
-                    BaseCommand command = await Connection.ReceiveCommand();
+                    DuetAPI.Commands.BaseCommand command = await Connection.ReceiveCommand();
                     if (command == null)
                     {
                         break;

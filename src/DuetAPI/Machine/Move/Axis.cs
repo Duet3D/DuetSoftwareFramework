@@ -28,17 +28,27 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Current machine position (in mm or null if unknown/unset)
         /// </summary>
-        public double? MachinePosition { get; set; }
+        public float? MachinePosition { get; set; }
         
         /// <summary>
         /// Minimum travel of this axis (in mm or null if unknown/unset)
         /// </summary>
-        public double? Min { get; set; }
+        public float? Min { get; set; }
+
+        /// <summary>
+        /// Whether the axis minimum was probed
+        /// </summary>
+        public bool MinProbed { get; set; }
         
         /// <summary>
         /// Maximum travel of this axis (in mm or null if unknown/unset)
         /// </summary>
-        public double? Max { get; set; }
+        public float? Max { get; set; }
+
+        /// <summary>
+        /// Whether the axis maximum was probed
+        /// </summary>
+        public bool MaxProbed { get; set; }
         
         /// <summary>
         /// Whether or not the axis is visible

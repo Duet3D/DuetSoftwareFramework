@@ -31,7 +31,7 @@ namespace DuetControlServer
             Console.WriteLine("Written by Christian Hammacher for Duet3D");
             Console.WriteLine("Licensed under the terms of the GNU Public License Version 3");
             Console.WriteLine();
-            
+
             // Deal with program termination requests (SIGTERM)
             AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) => CancelSource.Cancel();
 
@@ -47,12 +47,28 @@ namespace DuetControlServer
                 Console.WriteLine($"Error: {e.Message}");
                 return;
             }
-            
+
+            // Check if another instance is already running
+            using (DuetAPIClient.CommandConnection testConnection = new DuetAPIClient.CommandConnection())
+            {
+                try
+                {
+                    testConnection.Connect(Settings.SocketPath, CancelSource.Token).Wait();
+                    Console.WriteLine("Error: Another instance is already running. Stopping.");
+                    return;
+                }
+                catch
+                {
+                    // expected
+                }
+            }
+
             // Initialise object model
             Console.Write("Initialising object model... ");
             try
             {
                 Model.Provider.Init();
+                Model.Updater.Init();
                 Console.WriteLine("Done!");
             }
             catch (Exception e)

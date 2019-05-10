@@ -10,7 +10,7 @@ namespace DuetUnitTest.Machine
         public void Clone()
         {
             MachineModel original = new MachineModel();
-            original.Scanner.Progress = 12.34;
+            original.Scanner.Progress = 12.34F;
             original.Scanner.Status = ScannerStatus.PostProcessing;
 
             MachineModel clone = (MachineModel)original.Clone();

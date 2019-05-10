@@ -4,7 +4,7 @@ using DuetAPI.Utility;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 
-namespace DuetUnitTest
+namespace DuetUnitTest.Utility
 {
     [TestFixture]
     public class Json
@@ -38,9 +38,9 @@ namespace DuetUnitTest
             JsonHelper.PatchObject(model, patch);
 
             Assert.AreEqual(3, model.Heat.Heaters.Count);
-            Assert.AreEqual(23.4, model.Heat.Heaters[0].Current);
-            Assert.AreEqual(22.1, model.Heat.Heaters[1].Current);
-            Assert.AreEqual(21.5, model.Heat.Heaters[2].Current);
+            Assert.AreEqual(23.4, model.Heat.Heaters[0].Current, 0.0001);
+            Assert.AreEqual(22.1, model.Heat.Heaters[1].Current, 0.0001);
+            Assert.AreEqual(21.5, model.Heat.Heaters[2].Current, 0.0001);
         }
 
         [Test]
@@ -49,15 +49,15 @@ namespace DuetUnitTest
             MachineModel a = new MachineModel();
             a.Electronics.Firmware.Name = "Foobar";
             a.Heat.Beds.Add(null);
-            a.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new double[] { 20 } });
+            a.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new float[] { 20F } });
             a.Heat.Beds.Add(new BedOrChamber { Name = "BED3" });
             a.State.Status = MachineStatus.Busy;
 
             MachineModel b = new MachineModel();
             b.Electronics.Firmware.Name = "Foobar";
-            b.Heat.Beds.Add(new BedOrChamber { Name = "Bed", Active = new double[] { 100 } });
-            b.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new double[] { 20 } });
-            b.Fans.Add(new Fan { Value = 0.5 });
+            b.Heat.Beds.Add(new BedOrChamber { Name = "Bed", Active = new float[] { 100F } });
+            b.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new float[] { 20F } });
+            b.Fans.Add(new Fan { Value = 0.5F });
             b.State.Status = MachineStatus.Pausing;
             b.Scanner.Status = ScannerStatus.PostProcessing;
 
@@ -84,15 +84,15 @@ namespace DuetUnitTest
             MachineModel a = new MachineModel();
             a.Electronics.Firmware.Name = "Foobar";
             a.Heat.Beds.Add(null);
-            a.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new double[] { 20 } });
+            a.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new float[] { 20F } });
             a.Heat.Beds.Add(new BedOrChamber { Name = "BED3" });
             a.State.Status = MachineStatus.Busy;
 
             MachineModel b = new MachineModel();
             b.Electronics.Firmware.Name = "Foobar";
-            b.Heat.Beds.Add(new BedOrChamber { Name = "Bed", Active = new double[] { 100 } });
-            b.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new double[] { 20 } });
-            b.Fans.Add(new Fan { Value = 0.5 });
+            b.Heat.Beds.Add(new BedOrChamber { Name = "Bed", Active = new float[] { 100F } });
+            b.Heat.Beds.Add(new BedOrChamber { Name = "BED2", Standby = new float[] { 20F } });
+            b.Fans.Add(new Fan { Value = 0.5F });
             b.State.Status = MachineStatus.Pausing;
             b.Scanner.Status = ScannerStatus.PostProcessing;
 

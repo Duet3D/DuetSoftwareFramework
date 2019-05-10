@@ -14,7 +14,6 @@ namespace DuetControlServer.FileExecution
     {
         private static readonly AsyncLock _lock = new AsyncLock();
         private static BaseFile _file;
-        private static bool _isPaused;
         private static long _pausePosition;
         private static AsyncAutoResetEvent _resumeEvent = new AsyncAutoResetEvent();
 
@@ -33,7 +32,7 @@ namespace DuetControlServer.FileExecution
                     throw new InvalidOperationException("A file is already being printed");
                 }
                 _file = new BaseFile(fileName, DuetAPI.CodeChannel.File);
-                _isPaused = false;
+                IsPaused = false;
             }
 
             // Reset the resume event
@@ -81,9 +80,9 @@ namespace DuetControlServer.FileExecution
                 bool paused = false;
                 using (await _lock.LockAsync())
                 {
-                    if (_isPaused)
+                    if (IsPaused)
                     {
-                        file.Seek(_pausePosition);
+                        file.Position = _pausePosition;
                         paused = true;
                     }
                 }
@@ -108,7 +107,7 @@ namespace DuetControlServer.FileExecution
 
             // Notify the controller that the print has stopped
             SPI.Communication.PrintStoppedReason stopReason = !file.IsAborted ? SPI.Communication.PrintStoppedReason.NormalCompletion
-                : (_isPaused ? SPI.Communication.PrintStoppedReason.UserCancelled : SPI.Communication.PrintStoppedReason.Abort);
+                : (IsPaused ? SPI.Communication.PrintStoppedReason.UserCancelled : SPI.Communication.PrintStoppedReason.Abort);
             SPI.Interface.SetPrintStopped(stopReason);
 
             // Invalidate the file being printed
@@ -116,16 +115,39 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
+        /// Reports the current file position
+        /// </summary>
+        public static long Position {
+            get => _file.Position;
+            set => _file.Position = value;
+        }
+
+        /// <summary>
+        /// Returns the length of the file being printed in bytes
+        /// </summary>
+        public static long Length { get => _file.Length; }
+
+        /// <summary>
+        /// Indicates if a print is going on
+        /// </summary>
+        public static bool IsPrinting { get => _file != null; }
+
+        /// <summary>
+        /// Indicates if the file print has been paused
+        /// </summary>
+        public static bool IsPaused { get; private set; }
+
+        /// <summary>
         /// Called when the file print has been paused
         /// </summary>
         /// <param name="filePosition">Position at which the file was paused</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Paused(long filePosition)
+        public static async Task OnPause(long filePosition)
         {
             using (await _lock.LockAsync())
             {
                 _pausePosition = filePosition;
-                _isPaused = true;
+                IsPaused = true;
             }
         }
 
@@ -134,6 +156,7 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         public static void Resume()
         {
+            IsPaused = false;
             _resumeEvent.Set();
         }
 
@@ -151,7 +174,7 @@ namespace DuetControlServer.FileExecution
                     _file = null;
                 }
 
-                if (_isPaused)
+                if (IsPaused)
                 {
                     Resume();
                 }

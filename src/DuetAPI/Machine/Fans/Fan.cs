@@ -10,7 +10,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Value of the fan on a scale between 0 to 1
         /// </summary>
-        public double Value { get; set; }
+        public float Value { get; set; }
         
         /// <summary>
         /// Name of the fan
@@ -30,22 +30,22 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Frequency of the fan (in Hz) or null if unknown/unset
         /// </summary>
-        public double? Frequency { get; set; }
+        public float? Frequency { get; set; }
         
         /// <summary>
         /// Minimum value of this fan on a scale between 0 to 1
         /// </summary>
-        public double Min { get; set; }
+        public float Min { get; set; }
         
         /// <summary>
         /// Maximum value of this fan on a scale between 0 to 1
         /// </summary>
-        public double Max { get; set; } = 1.0;
+        public float Max { get; set; } = 1.0F;
         
         /// <summary>
         /// Blip value indicating how long the fan is supposed to run at 100% when turning it on to get it started (in s)
         /// </summary>
-        public double Blip { get; set; } = 0.1;                                             // seconds
+        public float Blip { get; set; } = 0.1F;
         
         /// <summary>
         /// Thermostatic control parameters

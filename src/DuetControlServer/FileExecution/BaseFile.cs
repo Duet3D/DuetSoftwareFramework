@@ -16,11 +16,6 @@ namespace DuetControlServer.FileExecution
         private SeekableStreamReader _reader;
 
         /// <summary>
-        /// Indicates if this file is supposed to be aborted
-        /// </summary>
-        public bool IsAborted { get; private set; }
-
-        /// <summary>
         /// File path to the file being executed
         /// </summary>
         public string FileName { get; }
@@ -29,6 +24,29 @@ namespace DuetControlServer.FileExecution
         /// Channel to send the codes to
         /// </summary>
         public CodeChannel Channel { get; }
+
+        /// <summary>
+        /// Gets or sets the current file position in bytes
+        /// </summary>
+        public long Position {
+            get => _fileStream.Position;
+            set => _fileStream.Seek(value, SeekOrigin.Begin);
+        }
+
+        /// <summary>
+        /// Returns the length of the file in bytes
+        /// </summary>
+        public long Length { get => _fileStream.Length; }
+
+        /// <summary>
+        /// Indicates if this file is supposed to be aborted
+        /// </summary>
+        public bool IsAborted { get; private set; }
+
+        /// <summary>
+        /// Request cancellation of this file
+        /// </summary>
+        public void Abort() => IsAborted = true;
 
         /// <summary>
         /// Indicates if the file has been finished
@@ -47,14 +65,6 @@ namespace DuetControlServer.FileExecution
 
             FileName = fileName;
             Channel = channel;
-        }
-
-        /// <summary>
-        /// Dispose this instance
-        /// </summary>
-        public void Dispose()
-        {
-            _fileStream.Dispose();
         }
 
         /// <summary>
@@ -93,17 +103,11 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Go to the specified position
+        /// Dispose this instance
         /// </summary>
-        /// <param name="position">Position to go to</param>
-        public void Seek(long position)
+        public void Dispose()
         {
-            _reader.Seek(position, SeekOrigin.Begin);
+            _fileStream.Dispose();
         }
-
-        /// <summary>
-        /// Request cancellation of this file
-        /// </summary>
-        public void Abort() => IsAborted = true;
     }
 }

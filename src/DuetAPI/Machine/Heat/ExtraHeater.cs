@@ -10,7 +10,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Current temperature (in degC)
         /// </summary>
-        public double Current { get; set; }
+        public float Current { get; set; }
         
         /// <summary>
         /// Name of the extra heater

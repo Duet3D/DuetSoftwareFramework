@@ -1,12 +1,13 @@
 ﻿using DuetAPI;
-using DuetAPI.Commands;
 using DuetAPI.Machine;
+using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using Nito.AsyncEx;
 using System;
 using System.Device.Gpio;
 using System.Device.Spi;
 using System.Device.Spi.Drivers;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -48,6 +49,7 @@ namespace DuetControlServer.SPI
         private static int _txBufferIndex;
         private static int _rxPointer, _txPointer;
         private static Communication.PacketHeader _lastPacket;
+        private static ReadOnlyMemory<byte> _packetData;
 
         /// <summary>
         /// Set up the SPI device and the controller for the transfer ready pin
@@ -197,12 +199,17 @@ namespace DuetControlServer.SPI
                 return null;
             }
 
+            // Header
             _lastPacket = Serialization.Reader.ReadPacketHeader(_rxBuffer.Slice(_rxPointer).Span);
             _rxPointer += Marshal.SizeOf(_lastPacket);
+
+            // Packet data
+            _packetData = _rxBuffer.Slice(_rxPointer, _lastPacket.Length);
+            int padding = 4 - (_lastPacket.Length % 4);
+            _rxPointer += _lastPacket.Length + ((padding == 4) ? 0 : padding);
+
             return _lastPacket;
         }
-
-        private static Span<byte> _packetData { get => _rxBuffer.Slice(_rxPointer, _lastPacket.Length).Span; }
 
         /// <summary>
         /// Read the result of a <see cref="Communication.LinuxRequests.Request.GetState"/> request
@@ -210,7 +217,7 @@ namespace DuetControlServer.SPI
         /// <param name="busyChannels">Bitmap of the busy channels</param>
         public static void ReadState(out int busyChannels)
         {
-            _rxPointer += Serialization.Reader.ReadState(_packetData, out busyChannels);
+            Serialization.Reader.ReadState(_packetData.Span, out busyChannels);
         }
 
         /// <summary>
@@ -220,7 +227,7 @@ namespace DuetControlServer.SPI
         /// <param name="json">JSON data</param>
         public static void ReadObjectModel(out byte module, out string json)
         {
-            _rxPointer += Serialization.Reader.ReadObjectModel(_packetData, out module, out json);
+            Serialization.Reader.ReadObjectModel(_packetData.Span, out module, out json);
         }
 
         /// <summary>
@@ -230,7 +237,7 @@ namespace DuetControlServer.SPI
         /// <param name="reply">Code reply</param>
         public static void ReadCodeReply(out Communication.MessageTypeFlags messageType, out string reply)
         {
-            _rxPointer += Serialization.Reader.ReadCodeReply(_packetData, out messageType, out reply);
+            Serialization.Reader.ReadCodeReply(_packetData.Span, out messageType, out reply);
         }
 
         /// <summary>
@@ -241,7 +248,7 @@ namespace DuetControlServer.SPI
         /// <param name="filename">Filename of the requested macro</param>
         public static void ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out string filename)
         {
-            _rxPointer += Serialization.Reader.ReadMacroRequest(_packetData, out channel, out reportMissing, out filename);
+            Serialization.Reader.ReadMacroRequest(_packetData.Span, out channel, out reportMissing, out filename);
         }
 
         /// <summary>
@@ -250,7 +257,7 @@ namespace DuetControlServer.SPI
         /// <param name="channel">Code channel where all files are supposed to be aborted</param>
         public static void ReadAbortFile(out CodeChannel channel)
         {
-            _rxPointer += Serialization.Reader.ReadAbortFile(_packetData, out channel);
+            Serialization.Reader.ReadAbortFile(_packetData.Span, out channel);
         }
 
         /// <summary>
@@ -262,7 +269,7 @@ namespace DuetControlServer.SPI
         /// <param name="feedrate">Sticky feedrate on this channel</param>
         public static void ReadStackEvent(out CodeChannel channel, out byte stackDepth, out StackFlags flags, out float feedrate)
         {
-            _rxPointer += Serialization.Reader.ReadStackEvent(_packetData, out channel, out stackDepth, out flags, out feedrate);
+            Serialization.Reader.ReadStackEvent(_packetData.Span, out channel, out stackDepth, out flags, out feedrate);
         }
 
         /// <summary>
@@ -272,7 +279,7 @@ namespace DuetControlServer.SPI
         /// <param name="reason">Reason why the print has been paused</param>
         public static void ReadPrintPaused(out uint filePosition, out Communication.PrintPausedReason reason)
         {
-            _rxPointer += Serialization.Reader.ReadPrintPaused(_packetData, out filePosition, out reason);
+            Serialization.Reader.ReadPrintPaused(_packetData.Span, out filePosition, out reason);
         }
 
         /// <summary>
@@ -280,9 +287,9 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="header">Description of the heightmap</param>
         /// <param name="zCoordinates">Array of probed Z coordinates</param>
-        public static void ReadHeightMap(out HeightMap header, out float[] zCoordinates)
+        public static void ReadHeightMap(out Heightmap map)
         {
-            _rxPointer += Serialization.Reader.ReadHeightMap(_packetData, out header, out zCoordinates);
+            Serialization.Reader.ReadHeightMap(_packetData.Span, out map);
         }
 
         /// <summary>
@@ -292,15 +299,7 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         public static void ReadResourceLocked(out CodeChannel channel)
         {
-            _rxPointer += Serialization.Reader.ReadResourceLocked(_packetData, out channel);
-        }
-
-        private static Span<byte> ReadPacketData(int length)
-        {
-            Span<byte> span = _rxBuffer.Slice(_rxPointer, length).Span;
-            int padding = 4 - (length % 4);
-            _rxPointer += length + ((padding == 4) ? 0 : padding);
-            return span;
+            Serialization.Reader.ReadResourceLocked(_packetData.Span, out channel);
         }
 
         /// <summary>
@@ -309,20 +308,25 @@ namespace DuetControlServer.SPI
         public static void DumpMalformedPacket()
         {
             string dump = "[err] Received malformed packet:\n";
-            dump += $"=== Packet #{_lastPacket.Id} request {_lastPacket.Request} (length {_lastPacket.Length}) ===\n";
-            string data = System.Text.Encoding.UTF8.GetString(_packetData);
-            foreach(char c in data)
+            dump += $"=== Packet #{_lastPacket.Id} from offset {_rxPointer} request {_lastPacket.Request} (length {_lastPacket.Length}) ===\n";
+            foreach(byte c in _packetData.Span)
             {
                 dump += ((int)c).ToString("x2");
             }
             dump += "\n";
-            foreach(char c in data)
+            string str = System.Text.Encoding.UTF8.GetString(_packetData.Span);
+            foreach(char c in str)
             {
                 dump += char.IsLetterOrDigit(c) ? c : '.';
             }
             dump += "\n";
             dump += "====================";
             Console.WriteLine(dump);
+
+            using (FileStream stream = new FileStream(Path.Combine(Directory.GetCurrentDirectory(), "transferDump.bin"), FileMode.Create, FileAccess.Write))
+            {
+                stream.Write(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+            }
         }
         #endregion
 
@@ -547,6 +551,24 @@ namespace DuetControlServer.SPI
             }
 
             WritePacket(Communication.LinuxRequests.Request.GetHeightMap);
+            return true;
+        }
+        
+        public static bool WriteHeightMap(Heightmap map)
+        {
+            // Serialize the requqest first to see how much space it requires
+            Span<byte> span = new byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
+            int dataLength = Serialization.Writer.WriteHeightMap(span, map);
+
+            // See if the request fits into the buffer
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            // Write it
+            WritePacket(Communication.LinuxRequests.Request.SetHeightMap, dataLength);
+            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 

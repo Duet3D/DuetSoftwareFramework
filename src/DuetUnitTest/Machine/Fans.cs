@@ -17,8 +17,8 @@ namespace DuetUnitTest.Machine
             fan.Rpm = 1234;
             fan.Inverted = true;
             fan.Frequency = 20000;
-            fan.Min = 0.01;
-            fan.Max = 0.99;
+            fan.Min = 0.01F;
+            fan.Max = 0.99F;
             fan.Blip = 0;
             fan.Thermostatic.Control = false;
             fan.Thermostatic.Heaters = new int[] { 1, 2 };

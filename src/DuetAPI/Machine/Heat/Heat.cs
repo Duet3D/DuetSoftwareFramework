@@ -28,14 +28,14 @@ namespace DuetAPI.Machine
         public List<BedOrChamber> Chambers { get; set; } = new List<BedOrChamber>();
         
         /// <summary>
-        /// Minimum required temperature for extrusion moves (in degC)
+        /// Minimum required temperature for extrusion moves (in C)
         /// </summary>
-        public double ColdExtrudeTemperature { get; set; } = 160;
+        public float ColdExtrudeTemperature { get; set; } = 160F;
         
         /// <summary>
-        /// Minimum required temperature for retraction moves (in degC)
+        /// Minimum required temperature for retraction moves (in C)
         /// </summary>
-        public double ColdRetractTemperature { get; set; } = 90;
+        public float ColdRetractTemperature { get; set; } = 90F;
         
         /// <summary>
         /// List of configured extra heaters

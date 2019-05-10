@@ -37,6 +37,11 @@ namespace DuetControlServer.SPI
         public bool IsExecuting { get; set; }
 
         /// <summary>
+        /// Indicates if RepRapFirmware requested a macro file for execution as part of this code
+        /// </summary>
+        public bool DoingNestedMacro { get; set; }
+
+        /// <summary>
         /// Whether the code is part of a requested macro file
         /// </summary>
         public bool IsRequestedFromFirmware { get; }
@@ -58,25 +63,31 @@ namespace DuetControlServer.SPI
         /// <param name="reply">Raw code reply</param>
         public void HandleReply(Communication.MessageTypeFlags messageType, string reply)
         {
-            DuetAPI.Message message;
-            if (_lastMessageIncomplete)
-            {
-                message = _result[_result.Count - 1];
-                message.Content += reply;
-            }
-            else if (reply != "")
-            {
-                DuetAPI.MessageType type = messageType.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? DuetAPI.MessageType.Error
-                            : messageType.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? DuetAPI.MessageType.Warning
-                            : DuetAPI.MessageType.Success;
-                message = new DuetAPI.Message(type, reply);
-                _result.Add(message);
+            Code.Comment = null;
+            Console.WriteLine($"[{Code} - {messageType}] {reply}");
 
-                _lastMessageIncomplete = messageType.HasFlag(Communication.MessageTypeFlags.PushFlag);
-            }
-            else if (!messageType.HasFlag(Communication.MessageTypeFlags.PushFlag))
+            DuetAPI.Message message;
+            if (reply == "")
             {
                 _gotEmptyResponse = true;
+                _lastMessageIncomplete = false;
+            }
+            else
+            {
+                if (_lastMessageIncomplete)
+                {
+                    message = _result[_result.Count - 1];
+                    message.Content += reply;
+                }
+                else
+                {
+                    DuetAPI.MessageType type = messageType.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? DuetAPI.MessageType.Error
+                                : messageType.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? DuetAPI.MessageType.Warning
+                                : DuetAPI.MessageType.Success;
+                    message = new DuetAPI.Message(type, reply);
+                    _result.Add(message);
+                }
+                _lastMessageIncomplete = messageType.HasFlag(Communication.MessageTypeFlags.PushFlag);
             }
         }
 

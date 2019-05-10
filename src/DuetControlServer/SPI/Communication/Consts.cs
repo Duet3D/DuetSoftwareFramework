@@ -29,7 +29,7 @@ namespace DuetControlServer.SPI.Communication
         /// <summary>
         /// Number of RepRapFirmware modules that can be queried via <see cref="LinuxRequests.Request.GetObjectModel"/>
         /// </summary>
-        public const byte NumModules = 3;
+        public const byte NumModules = 4;
 
         /// <summary>
         /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware

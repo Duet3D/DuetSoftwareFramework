@@ -13,7 +13,7 @@ namespace DuetAPI.Machine
         /// <remarks>
         /// Previous status responses used a scale of 0..100
         /// </remarks>
-        public double Progress { get; set; }
+        public float Progress { get; set; }
         
         /// <summary>
         /// Status of the 3D scanner

@@ -4,7 +4,7 @@ using DuetAPI;
 namespace DuetControlServer.Commands
 {
     /// <summary>
-    /// Implementation of the GetFileInfo command
+    /// Implementation of the <see cref="DuetAPI.Commands.GetFileInfo"/> command
     /// </summary>
     public class GetFileInfo : DuetAPI.Commands.GetFileInfo
     {

@@ -10,17 +10,17 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Time left based on file progress (in s or null)
         /// </summary>
-        public double? File { get; set; }
+        public float? File { get; set; }
         
         /// <summary>
         /// Time left based on filament consumption (in s or null)
         /// </summary>
-        public double? Filament { get; set; }
+        public float? Filament { get; set; }
         
         /// <summary>
         /// Time left based on the layer progress (in s or null)
         /// </summary>
-        public double? Layer { get; set; }
+        public float? Layer { get; set; }
 
         /// <summary>
         /// Creates a clone of this instance

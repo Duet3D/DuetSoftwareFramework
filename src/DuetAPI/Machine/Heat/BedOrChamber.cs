@@ -8,14 +8,14 @@ namespace DuetAPI.Machine
     public class BedOrChamber : ICloneable
     {
         /// <summary>
-        /// Active temperatures (in degC)
+        /// Active temperatures (in C)
         /// </summary>
-        public double[] Active { get; set; } = new double[0];
+        public float[] Active { get; set; } = new float[0];
         
         /// <summary>
-        /// Standby temperatures (in degC)
+        /// Standby temperatures (in C)
         /// </summary>
-        public double[] Standby { get; set; } = new double[0];
+        public float[] Standby { get; set; } = new float[0];
         
         /// <summary>
         /// Name of the bed or chamber or null if unset
@@ -35,8 +35,8 @@ namespace DuetAPI.Machine
         {
             return new BedOrChamber
             {
-                Active = (double[])Active.Clone(),
-                Standby = (double[])Standby.Clone(),
+                Active = (float[])Active.Clone(),
+                Standby = (float[])Standby.Clone(),
                 Name = (Name != null) ? string.Copy(Name) : null,
                 Heaters = (int[])Heaters.Clone()
             };

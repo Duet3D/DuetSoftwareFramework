@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 namespace DuetControlServer.Commands
 {
     /// <summary>
-    /// Implementation of the SimpleCode command
+    /// Implementation of the <see cref="DuetAPI.Commands.SimpleCode"/> command
     /// </summary>
     public class SimpleCode : DuetAPI.Commands.SimpleCode
     {

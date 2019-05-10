@@ -32,12 +32,12 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Virtual amounts of extruded filament according to the G-code file (in mm)
         /// </summary>
-        public double[] ExtrudedRaw { get; set; } = new double[0];
+        public float[] ExtrudedRaw { get; set; } = new float[0];
         
         /// <summary>
         /// Total duration of the current job (in s)
         /// </summary>
-        public double? Duration { get; set; }
+        public float? Duration { get; set; }
         
         /// <summary>
         /// Number of the current layer or 0 if none has been started yet
@@ -47,7 +47,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Time elapsed since the beginning of the current layer (in s)
         /// </summary>
-        public double? LayerTime { get; set; }
+        public float? LayerTime { get; set; }
         
         /// <summary>
         /// Information about the past layers
@@ -58,7 +58,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Time needed to heat up the heaters (in s)
         /// </summary>
-        public double? WarmUpDuration { get; set; }
+        public float? WarmUpDuration { get; set; }
         
         /// <summary>
         /// Estimated times left
@@ -77,7 +77,7 @@ namespace DuetAPI.Machine
                 FilePosition = FilePosition,
                 LastFileName = (LastFileName != null) ? string.Copy(LastFileName) : null,
                 LastFileSimulated = LastFileSimulated,
-                ExtrudedRaw = (double[])ExtrudedRaw.Clone(),
+                ExtrudedRaw = (float[])ExtrudedRaw.Clone(),
                 Duration = Duration,
                 Layer = Layer,
                 LayerTime = LayerTime,

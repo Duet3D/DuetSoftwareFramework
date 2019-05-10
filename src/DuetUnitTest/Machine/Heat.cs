@@ -13,8 +13,8 @@ namespace DuetUnitTest.Machine
 
             BedOrChamber bed = new BedOrChamber
             {
-                Active = new double[] { 123 },
-                Standby = new double[] { 456 },
+                Active = new float[] { 123F },
+                Standby = new float[] { 456F },
                 Name = "Bed Name",
                 Heaters = new int[] { 0 }
             };
@@ -23,16 +23,16 @@ namespace DuetUnitTest.Machine
 
             BedOrChamber chamber = new BedOrChamber
             {
-                Active = new double[] { 321 },
-                Standby = new double[] { 654 },
+                Active = new float[] { 321F },
+                Standby = new float[] { 654F },
                 Name = "Chamber Name",
                 Heaters = new int[] { 4, 6 }
             };
             original.Heat.Chambers.Add(null);
             original.Heat.Chambers.Add(chamber);
 
-            original.Heat.ColdExtrudeTemperature = 678;
-            original.Heat.ColdRetractTemperature = 987;
+            original.Heat.ColdExtrudeTemperature = 678F;
+            original.Heat.ColdRetractTemperature = 987F;
 
             ExtraHeater extraHeater = new ExtraHeater
             {
@@ -52,8 +52,8 @@ namespace DuetUnitTest.Machine
             };
             heater.Model.DeadTime = 322;
             heater.Model.Gain = 673;
-            heater.Model.MaxPwm = 0.45;
-            heater.Model.TimeConst = 32;
+            heater.Model.MaxPwm = 0.45F;
+            heater.Model.TimeConstant = 32;
             original.Heat.Heaters.Add(heater);
 
             MachineModel clone = (MachineModel)original.Clone();
@@ -89,7 +89,7 @@ namespace DuetUnitTest.Machine
             Assert.AreEqual(original.Heat.Heaters[0].Model.DeadTime, clone.Heat.Heaters[0].Model.DeadTime);
             Assert.AreEqual(original.Heat.Heaters[0].Model.Gain, clone.Heat.Heaters[0].Model.Gain);
             Assert.AreEqual(original.Heat.Heaters[0].Model.MaxPwm, clone.Heat.Heaters[0].Model.MaxPwm);
-            Assert.AreEqual(original.Heat.Heaters[0].Model.TimeConst, clone.Heat.Heaters[0].Model.TimeConst);
+            Assert.AreEqual(original.Heat.Heaters[0].Model.TimeConstant, clone.Heat.Heaters[0].Model.TimeConstant);
             
             Assert.AreNotSame(original.Heat.Beds[1].Active, clone.Heat.Beds[1].Active);
             Assert.AreNotSame(original.Heat.Beds[1].Standby, clone.Heat.Beds[1].Standby);
@@ -116,7 +116,7 @@ namespace DuetUnitTest.Machine
             Assert.AreNotSame(original.Heat.Heaters[0].Model.DeadTime, clone.Heat.Heaters[0].Model.DeadTime);
             Assert.AreNotSame(original.Heat.Heaters[0].Model.Gain, clone.Heat.Heaters[0].Model.Gain);
             Assert.AreNotSame(original.Heat.Heaters[0].Model.MaxPwm, clone.Heat.Heaters[0].Model.MaxPwm);
-            Assert.AreNotSame(original.Heat.Heaters[0].Model.TimeConst, clone.Heat.Heaters[0].Model.TimeConst);
+            Assert.AreNotSame(original.Heat.Heaters[0].Model.TimeConstant, clone.Heat.Heaters[0].Model.TimeConstant);
         }
     }
 }

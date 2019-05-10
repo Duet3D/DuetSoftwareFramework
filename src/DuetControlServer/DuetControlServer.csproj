@@ -6,9 +6,13 @@
     <LangVersion>default</LangVersion>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D</Company>
-    <AssemblyVersion>1.0.0.6</AssemblyVersion>
-    <FileVersion>1.0.0.6</FileVersion>
+    <AssemblyVersion>1.0.0.7</AssemblyVersion>
+    <FileVersion>1.0.0.7</FileVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.Globalization.Invariant" Value="true" />
+  </ItemGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DocumentationFile></DocumentationFile>
@@ -21,14 +25,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Iot.Device.Bindings" Version="0.1.0-prerelease.19226.2" />
+    <PackageReference Include="Iot.Device.Bindings" Version="0.1.0-prerelease.19251.2" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
     <PackageReference Include="Nito.AsyncEx" Version="5.0.0" />
-    <PackageReference Include="System.Device.Gpio" Version="0.1.0-prerelease.19226.2" />
+    <PackageReference Include="System.Device.Gpio" Version="0.1.0-prerelease.19251.2" />
     <PackageReference Include="Zhaobang.IO.SeekableStreamReader" Version="1.0.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
     <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
   </ItemGroup>
 

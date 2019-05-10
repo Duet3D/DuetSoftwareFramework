@@ -22,16 +22,16 @@ namespace DuetUnitTest.Machine
             Probe probe = new Probe
             {
                 DisablesBed = true,
-                DiveHeight = 45.6,
+                DiveHeight = 45.6F,
                 Inverted = true,
                 MaxProbeCount = 4,
-                RecoveryTime = 0.65,
+                RecoveryTime = 0.65F,
                 SecondaryValues = new int[] { 12, 34 },
                 Speed = 456,
                 Threshold = 678,
-                Tolerance = 0.42,
+                Tolerance = 0.42F,
                 TravelSpeed = 500,
-                TriggerHeight = 1.23,
+                TriggerHeight = 1.23F,
                 Type = ProbeType.E1Switch,
                 Value = 45
             };

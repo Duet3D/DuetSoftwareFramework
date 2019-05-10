@@ -157,7 +157,7 @@ namespace DuetControlServer.IPC.Processors
             }
             finally
             {
-                _subscriptions.TryRemove(this, out SubscriptionMode dummy);
+                _subscriptions.TryRemove(this, out _);
             }
         }
 

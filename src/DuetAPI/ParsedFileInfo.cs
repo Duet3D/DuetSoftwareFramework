@@ -25,17 +25,17 @@ namespace DuetAPI
         /// <summary>
         /// Build height of the G-code job or 0 if not found (in mm)
         /// </summary>
-        public double Height { get; set; }
+        public float Height { get; set; }
         
         /// <summary>
         /// Height of the first layer or 0 if not found (in mm)
         /// </summary>
-        public double FirstLayerHeight { get; set; }
+        public float FirstLayerHeight { get; set; }
         
         /// <summary>
         /// Height of each other layer or 0 if not found (in mm)
         /// </summary>
-        public double LayerHeight { get; set; }
+        public float LayerHeight { get; set; }
         
         /// <summary>
         /// Number of total layers or null if unknown
@@ -45,7 +45,7 @@ namespace DuetAPI
         /// <summary>
         /// Filament consumption per extruder drive (in mm)
         /// </summary>
-        public double[] Filament { get; set; } = new double[0];
+        public float[] Filament { get; set; } = new float[0];
 
         /// <summary>
         /// Name of the application that generated this file
@@ -55,12 +55,12 @@ namespace DuetAPI
         /// <summary>
         /// Estimated print time (in s)
         /// </summary>
-        public double PrintTime { get; set; }
+        public long PrintTime { get; set; }
         
         /// <summary>
         /// Estimated print time from G-code simulation (in s)
         /// </summary>
-        public double SimulatedTime { get; set; }
+        public long SimulatedTime { get; set; }
 
         /// <summary>
         /// Creates a clone of this instance
@@ -77,7 +77,7 @@ namespace DuetAPI
                 FirstLayerHeight = FirstLayerHeight,
                 LayerHeight = LayerHeight,
                 NumLayers = NumLayers,
-                Filament = (double[])Filament.Clone(),
+                Filament = (float[])Filament.Clone(),
                 GeneratedBy = string.Copy(GeneratedBy),
                 PrintTime = PrintTime,
                 SimulatedTime = SimulatedTime

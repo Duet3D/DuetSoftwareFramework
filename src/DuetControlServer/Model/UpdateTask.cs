@@ -40,9 +40,6 @@ namespace DuetControlServer.Model
 
                 // Wait for next update schedule
                 await Task.Delay(Settings.HostUpdateInterval, Program.CancelSource.Token);
-
-                // DEBUG
-                Console.WriteLine($"[info] Average number of full transfers per second: {SPI.DataTransfer.GetFullTransfersPerSecond():F2}");
             } while (!Program.CancelSource.IsCancellationRequested);
         }
 

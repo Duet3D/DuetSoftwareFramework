@@ -57,7 +57,7 @@ namespace DuetControlServer
             // Every time CTS.Token is accessed a copy is generated. Hence we cache one until this method completes
             CancellationToken token = Program.CancelSource.Token;
 
-            List<double> filamentConsumption = new List<double>();
+            List<float> filamentConsumption = new List<float>();
             bool inRelativeMode = false, lastLineHadInfo = false;
             do
             {
@@ -89,10 +89,10 @@ namespace DuetControlServer
                     else if (code.MajorNumber == 0 || code.MajorNumber == 1)
                     {
                         // G0/G1 is a move, see if there is a Z parameter present
-                        CodeParameter param = code.Parameters.Find(item => item.Letter == 'Z');
-                        if (param != null)
+                        CodeParameter zParam = code.Parameter('Z');
+                        if (zParam != null)
                         {
-                            float z = param.AsFloat;
+                            float z = zParam;
                             if (z <= Settings.MaxLayerHeight)
                             {
                                 partialFileInfo.FirstLayerHeight = z;
@@ -127,8 +127,8 @@ namespace DuetControlServer
             reader.Seek(0, SeekOrigin.End);
 
             bool inRelativeMode = false, lastLineHadInfo = false;
-            double? lastZ = null;
-            List<double> filamentConsumption = new List<double>(partialFileInfo.Filament);
+            float? lastZ = null;
+            List<float> filamentConsumption = new List<float>(partialFileInfo.Filament);
 
             do
             {
@@ -163,17 +163,17 @@ namespace DuetControlServer
                         // G0/G1 is a move, see if there is a Z parameter present
                         // Users tend to place their own lift Z code at the end, so attempt to read two G0/G1 Z
                         // codes and check the height differene between them
-                        CodeParameter param = code.Parameters.Find(item => item.Letter == 'Z');
-                        if (param != null && (code.Comment == null || !code.Comment.TrimStart().StartsWith("E")))
+                        CodeParameter zParam = code.Parameter('Z');
+                        if (zParam != null && (code.Comment == null || !code.Comment.TrimStart().StartsWith("E")))
                         {
                             gotNewInfo = true;
                             if (lastZ == null)
                             {
-                                lastZ = param.AsFloat;
+                                lastZ = zParam;
                             }
                             else
                             {
-                                double z = param.AsFloat;
+                                float z = zParam;
                                 if (lastZ - z > Settings.MaxLayerHeight)
                                 {
                                     partialFileInfo.Height = z;
@@ -263,7 +263,7 @@ namespace DuetControlServer
                     {
                         if (grp.Name == "mm")
                         {
-                            fileInfo.LayerHeight = double.Parse(grp.Value);
+                            fileInfo.LayerHeight = float.Parse(grp.Value);
                             return true;
                         }
                     }
@@ -272,7 +272,7 @@ namespace DuetControlServer
             return false;
         }
 
-        private static bool FindFilamentUsed(string line, ref List<double> filaments)
+        private static bool FindFilamentUsed(string line, ref List<float> filaments)
         {
             bool hadMatch = false;
             foreach (Regex item in Settings.FilamentFilters)
@@ -286,7 +286,7 @@ namespace DuetControlServer
                         {
                             foreach (Capture c in grp.Captures)
                             {
-                                filaments.Add(double.Parse(c.Value));
+                                filaments.Add(float.Parse(c.Value));
                             }
                             hadMatch = true;
                         }
@@ -294,7 +294,7 @@ namespace DuetControlServer
                         {
                             foreach (Capture c in grp.Captures)
                             {
-                                filaments.Add(double.Parse(c.Value) * 1000);
+                                filaments.Add(float.Parse(c.Value) * 1000);
                             }
                             hadMatch = true;
                         }
@@ -325,7 +325,7 @@ namespace DuetControlServer
                 Match match = item.Match(line);
                 if (match.Success)
                 {
-                    double time = 0;
+                    long seconds = 0;
                     foreach (Group grp in match.Groups)
                     {
                         if (!string.IsNullOrEmpty(grp.Value))
@@ -333,18 +333,18 @@ namespace DuetControlServer
                             switch (grp.Name)
                             {
                                 case "h":
-                                    time += double.Parse(grp.Value) * 3600;
+                                    seconds += long.Parse(grp.Value) * 3600;
                                     break;
                                 case "m":
-                                    time += double.Parse(grp.Value) * 60;
+                                    seconds += long.Parse(grp.Value) * 60;
                                     break;
                                 case "s":
-                                    time += double.Parse(grp.Value);
+                                    seconds += long.Parse(grp.Value);
                                     break;
                             }
                         }
                     }
-                    fileInfo.PrintTime = time;
+                    fileInfo.PrintTime = seconds;
                     return true;
                 }
             }
@@ -358,7 +358,7 @@ namespace DuetControlServer
                 Match match = item.Match(line);
                 if (match.Success)
                 {
-                    double time = 0;
+                    long seconds = 0;
                     foreach (Group grp in match.Groups)
                     {
                         if (!string.IsNullOrEmpty(grp.Value))
@@ -366,18 +366,18 @@ namespace DuetControlServer
                             switch (grp.Name)
                             {
                                 case "h":
-                                    time += double.Parse(grp.Value) * 3600;
+                                    seconds += long.Parse(grp.Value) * 3600;
                                     break;
                                 case "m":
-                                    time += double.Parse(grp.Value) * 60;
+                                    seconds += long.Parse(grp.Value) * 60;
                                     break;
                                 case "s":
-                                    time += double.Parse(grp.Value);
+                                    seconds += long.Parse(grp.Value);
                                     break;
                             }
                         }
                     }
-                    fileInfo.SimulatedTime = time;
+                    fileInfo.SimulatedTime = seconds;
                     return true;
                 }
             }

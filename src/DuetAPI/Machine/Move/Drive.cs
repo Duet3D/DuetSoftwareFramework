@@ -10,7 +10,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Current user position of this drive (in mm)
         /// </summary>
-        public double? Position { get; set; }
+        public float? Position { get; set; }
         
         /// <summary>
         /// Information about the configured microstepping
@@ -25,17 +25,17 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Acceleration of this drive (in mm/s^2)
         /// </summary>
-        public double? Acceleration { get; set; }
+        public float? Acceleration { get; set; }
         
         /// <summary>
         /// Minimum allowed speed for this drive (in mm/s)
         /// </summary>
-        public double? MinSpeed { get; set; }
+        public float? MinSpeed { get; set; }
         
         /// <summary>
         /// Maximum allowed speed for this drive (in mm/s)
         /// </summary>
-        public double? MaxSpeed { get; set; }
+        public float? MaxSpeed { get; set; }
 
         /// <summary>
         /// Creates a clone of this instance

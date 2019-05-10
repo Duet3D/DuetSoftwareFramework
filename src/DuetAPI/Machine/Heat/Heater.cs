@@ -8,9 +8,9 @@ namespace DuetAPI.Machine
     public class Heater : ICloneable
     {
         /// <summary>
-        /// Current temperature of the heater (in degC)
+        /// Current temperature of the heater (in C)
         /// </summary>
-        public double Current { get; set; }
+        public float Current { get; set; }
         
         /// <summary>
         /// Name of the heater or null if unset
@@ -28,12 +28,12 @@ namespace DuetAPI.Machine
         public HeaterModel Model { get; set; } = new HeaterModel();
         
         /// <summary>
-        /// Maximum allowed temperature for this heater (in degC)
+        /// Maximum allowed temperature for this heater (in C)
         /// </summary>
         /// <remarks>
         /// This is only temporary and should be replaced by a representation of the heater protection as in RRF
         /// </remarks>
-        public double? Max { get; set; }
+        public float? Max { get; set; }
         
         /// <summary>
         /// Sensor number (thermistor index) of this heater or null if unknown

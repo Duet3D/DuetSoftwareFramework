@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using DuetAPI;
 using DuetAPI.Commands;
+using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Serialization;
@@ -60,7 +61,7 @@ namespace DuetUnitTest.SPI
         }
 
         [Test]
-        public void ReadState()
+        public void State()
         {
             Span<byte> blob = GetBlob("state.bin");
 
@@ -72,7 +73,7 @@ namespace DuetUnitTest.SPI
         }
 
         [Test]
-        public void ReadObjectModel()
+        public void ObjectModel()
         {
             Span<byte> blob = GetBlob("objectModel.bin");
             
@@ -87,7 +88,7 @@ namespace DuetUnitTest.SPI
         }
 
         [Test]
-        public void ReadCodeReply()
+        public void CodeReply()
         {
             Span<byte> blob = GetBlob("codeReply.bin");
 
@@ -107,7 +108,7 @@ namespace DuetUnitTest.SPI
         }
         
         [Test]
-        public void ReadEmptyCodeReply()
+        public void EmptyCodeReply()
         {
             Span<byte> blob = GetBlob("emptyCodeReply.bin");
 
@@ -122,7 +123,7 @@ namespace DuetUnitTest.SPI
         }
         
         [Test]
-        public void ReadMacroRequest()
+        public void MacroRequest()
         {
             Span<byte> blob = GetBlob("macroRequest.bin");
             
@@ -138,7 +139,7 @@ namespace DuetUnitTest.SPI
         }
 
         [Test]
-        public void ReadAbortFile()
+        public void AbortFile()
         {
             Span<byte> blob = GetBlob("abortFile.bin");
 
@@ -150,7 +151,7 @@ namespace DuetUnitTest.SPI
         }
 
         [Test]
-        public void ReadStackEvent()
+        public void StackEvent()
         {
             Span<byte> blob = GetBlob("stackEvent.bin");
             
@@ -165,7 +166,7 @@ namespace DuetUnitTest.SPI
         } 
                       
         [Test]
-        public void ReadPrintPaused()
+        public void PrintPaused()
         {
             Span<byte> blob = GetBlob("printPaused.bin");
             
@@ -178,35 +179,34 @@ namespace DuetUnitTest.SPI
         } 
         
         [Test]
-        public void ReadHeightmap()
+        public void Heightmap()
         {
             Span<byte> blob = GetBlob("heightmap.bin");
-            
-            int bytesRead = Reader.ReadHeightMap(blob, out HeightMap header, out float[] zCoordinates);
+
+            int bytesRead = Reader.ReadHeightMap(blob, out Heightmap map);
             Assert.AreEqual(80, bytesRead);
             
             // Header
-            Assert.AreEqual(20, header.XMin, 0.0001);
-            Assert.AreEqual(180, header.XMax, 0.0001);
-            Assert.AreEqual(40, header.XSpacing, 0.0001);
-            Assert.AreEqual(50, header.YMin, 0.0001);
-            Assert.AreEqual(150, header.YMax, 0.0001);
-            Assert.AreEqual(50, header.YSpacing, 0.0001);
-            Assert.AreEqual(12, header.NumPoints, 0.0001);
-            Assert.AreEqual(50, header.YSpacing, 0.0001);
-            Assert.AreEqual(0, header.Radius, 0.0001);
-            Assert.AreEqual(12, header.NumPoints);
+            Assert.AreEqual(20, map.XMin, 0.0001);
+            Assert.AreEqual(180, map.XMax, 0.0001);
+            Assert.AreEqual(40, map.XSpacing, 0.0001);
+            Assert.AreEqual(50, map.YMin, 0.0001);
+            Assert.AreEqual(150, map.YMax, 0.0001);
+            Assert.AreEqual(50, map.YSpacing, 0.0001);
+            Assert.AreEqual(0, map.Radius, 0.0001);
+            Assert.AreEqual(3, map.NumX);
+            Assert.AreEqual(4, map.NumY);
             
             // Points
-            Assert.AreEqual(12, zCoordinates.Length);
-            for (int i = 0; i < zCoordinates.Length; i++)
+            Assert.AreEqual(12, map.ZCoordinates.Length);
+            for (int i = 0; i < map.ZCoordinates.Length; i++)
             {
-                Assert.AreEqual(zCoordinates[i], 10 * i + 10, 0.0001);
+                Assert.AreEqual(map.ZCoordinates[i], 10 * i + 10, 0.0001);
             }
         }
 
         [Test]
-        public void ReadResourceLocked()
+        public void ResourceLocked()
         {
             Span<byte> blob = GetBlob("resourceLocked.bin");
 

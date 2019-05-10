@@ -22,14 +22,15 @@
             </summary>
             <param name="code">Code processed by RepRapFirmware</param>
             <param name="result">Result that it generated</param>
-            <returns>Asynchronous task</returns>
+            <returns>Result to output</returns>
+            <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
         </member>
         <member name="T:DuetControlServer.Codes.MCodes">
             <summary>
             Static class that processes M-codes in the control server
             </summary>
         </member>
-        <member name="M:DuetControlServer.Codes.MCodes.Process(DuetAPI.Commands.Code)">
+        <member name="M:DuetControlServer.Codes.MCodes.Process(DuetControlServer.Commands.Code)">
             <summary>
             Process an M-code that should be interpreted by the control server
             </summary>
@@ -42,7 +43,8 @@
             </summary>
             <param name="code">Code processed by RepRapFirmware</param>
             <param name="result">Result that it generated</param>
-            <returns>Asynchronous task</returns>
+            <returns>Result to output</returns>
+            <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
         </member>
         <member name="T:DuetControlServer.Codes.TCodes">
             <summary>
@@ -62,7 +64,7 @@
             </summary>
             <param name="code">Code processed by RepRapFirmware</param>
             <param name="result">Result that it generated</param>
-            <returns>Asynchronous task</returns>
+            <returns>Result to output</returns>
         </member>
         <member name="T:DuetControlServer.Commands.Code">
             <summary>
@@ -135,11 +137,6 @@
             Base class for files that read G-codes line by line
             </summary>
         </member>
-        <member name="P:DuetControlServer.FileExecution.BaseFile.IsAborted">
-            <summary>
-            Indicates if this file is supposed to be aborted
-            </summary>
-        </member>
         <member name="P:DuetControlServer.FileExecution.BaseFile.FileName">
             <summary>
             File path to the file being executed
@@ -148,6 +145,26 @@
         <member name="P:DuetControlServer.FileExecution.BaseFile.Channel">
             <summary>
             Channel to send the codes to
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.BaseFile.Position">
+            <summary>
+            Gets or sets the current file position in bytes
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.BaseFile.Length">
+            <summary>
+            Returns the length of the file in bytes
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.BaseFile.IsAborted">
+            <summary>
+            Indicates if this file is supposed to be aborted
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.BaseFile.Abort">
+            <summary>
+            Request cancellation of this file
             </summary>
         </member>
         <member name="P:DuetControlServer.FileExecution.BaseFile.IsFinished">
@@ -162,26 +179,15 @@
             <param name="fileName">Name of the file to process</param>
             <param name="channel">Channel to send the codes to</param>
         </member>
-        <member name="M:DuetControlServer.FileExecution.BaseFile.Dispose">
-            <summary>
-            Dispose this instance
-            </summary>
-        </member>
         <member name="M:DuetControlServer.FileExecution.BaseFile.ReadCode">
             <summary>
             Read the next available code
             </summary>
             <returns>Read code or null if none found</returns>
         </member>
-        <member name="M:DuetControlServer.FileExecution.BaseFile.Seek(System.Int64)">
+        <member name="M:DuetControlServer.FileExecution.BaseFile.Dispose">
             <summary>
-            Go to the specified position
-            </summary>
-            <param name="position">Position to go to</param>
-        </member>
-        <member name="M:DuetControlServer.FileExecution.BaseFile.Abort">
-            <summary>
-            Request cancellation of this file
+            Dispose this instance
             </summary>
         </member>
         <member name="T:DuetControlServer.FileExecution.MacroFile">
@@ -255,7 +261,27 @@
             <param name="fileName">File to print</param>
             <returns>Asynchronous task</returns>
         </member>
-        <member name="M:DuetControlServer.FileExecution.Print.Paused(System.UInt32)">
+        <member name="P:DuetControlServer.FileExecution.Print.Position">
+            <summary>
+            Reports the current file position
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.Print.Length">
+            <summary>
+            Returns the length of the file being printed in bytes
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.Print.IsPrinting">
+            <summary>
+            Indicates if a print is going on
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.Print.IsPaused">
+            <summary>
+            Indicates if the file print has been paused
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.Print.OnPause(System.Int64)">
             <summary>
             Called when the file print has been paused
             </summary>
@@ -812,51 +838,6 @@
             This is a final code response
             </summary>
         </member>
-        <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap">
-            <summary>
-            Header of heightmap reports
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap.XMin">
-            <summary>
-            X start coordinate of the heightmap
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap.XMax">
-            <summary>
-            X end coordinate of the heightmap
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap.XSpacing">
-            <summary>
-            Spacing between the probe points in X direction
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap.YMin">
-            <summary>
-            Y start coordinate of the heightmap
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap.YMax">
-            <summary>
-            Y end coordinate of the heightmap
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap.YSpacing">
-            <summary>
-            Spacing between the probe points in Y direction
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap.Radius">
-            <summary>
-            Probing radius on delta geometries
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap.NumPoints">
-            <summary>
-            Number of probe points
-            </summary>
-        </member>
         <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.MacroRequest">
             <summary>
             Request execution of a macro file
@@ -1286,7 +1267,12 @@
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetHeightMap">
             <summary>
-            Request the heightmap coordinates as generated by G29
+            Request the heightmap coordinates as generated by G29 S0
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.SetHeightMap">
+            <summary>
+            Set the heightmap coordinates via G29 S1
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.LockMovementAndWaitForStandstill">
@@ -1519,6 +1505,56 @@
             Print has been aborted
             </summary>
         </member>
+        <member name="T:DuetControlServer.SPI.Communication.SharedRequests.HeightMap">
+            <summary>
+            Header of G29 heightmaps
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.SharedRequests.HeightMap.XMin">
+            <summary>
+            X start coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.SharedRequests.HeightMap.XMax">
+            <summary>
+            X end coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.SharedRequests.HeightMap.XSpacing">
+            <summary>
+            Spacing between the probe points in X direction
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.SharedRequests.HeightMap.YMin">
+            <summary>
+            Y start coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.SharedRequests.HeightMap.YMax">
+            <summary>
+            Y end coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.SharedRequests.HeightMap.YSpacing">
+            <summary>
+            Spacing between the probe points in Y direction
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.SharedRequests.HeightMap.Radius">
+            <summary>
+            Probing radius on delta geometries
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.SharedRequests.HeightMap.NumX">
+            <summary>
+            Number of probe points in X direction
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.SharedRequests.HeightMap.NumY">
+            <summary>
+            Number of probe points in Y direction
+            </summary>
+        </member>
         <member name="T:DuetControlServer.SPI.Communication.SharedRequests.LockUnlock">
             <summary>
             Header describing a response to a lock resource request
@@ -1731,7 +1767,7 @@
             <param name="filePosition">Position where the print has been paused</param>
             <param name="reason">Reason why the print has been paused</param>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.ReadHeightMap(DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap@,System.Single[]@)">
+        <member name="M:DuetControlServer.SPI.DataTransfer.ReadHeightMap(DuetAPI.Utility.Heightmap@)">
             <summary>
             Read the result of a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetHeightMap"/> request
             </summary>
@@ -1848,6 +1884,21 @@
             <summary>
             Initialize the SPI interface but do not connect yet
             </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.GetHeightmap">
+            <summary>
+            Retrieve the current heightmap from the firmware
+            </summary>
+            <returns>Heightmap in use</returns>
+            <exception cref="T:System.OperationCanceledException">Operation could not finish</exception>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.SetHeightmap(DuetAPI.Utility.Heightmap)">
+            <summary>
+            Set the current heightmap to use
+            </summary>
+            <param name="map">Heightmap to set</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation could not finish</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.ProcessCode(DuetControlServer.Commands.Code)">
             <summary>
@@ -2095,13 +2146,12 @@
             <param name="reason">Reason why the print has been paused</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadHeightMap(System.Span{System.Byte},DuetControlServer.SPI.Communication.FirmwareRequests.HeightMap@,System.Single[]@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadHeightMap(System.Span{System.Byte},DuetAPI.Utility.Heightmap@)">
             <summary>
             Read a heightmap report
             </summary>
             <param name="from">Origin</param>
-            <param name="header"></param>
-            <param name="zCoordinates"></param>
+            <param name="map">Deserialized heightmap</param>
             <returns>Number of bytes read</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked(System.Span{System.Byte},DuetAPI.CodeChannel@)">
@@ -2197,6 +2247,14 @@
             <param name="error">Whether an error occurred when trying to open/process the macro file</param>
             <returns>Number of bytes written</returns>
         </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteHeightMap(System.Span{System.Byte},DuetAPI.Utility.Heightmap)">
+            <summary>
+            Write a heightmap as read by G29 S1
+            </summary>
+            <param name="span"></param>
+            <param name="header"></param>
+            <param name="zCoordinates"></param>
+        </member>
         <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock(System.Span{System.Byte},DuetAPI.CodeChannel)">
             <summary>
             Request a resource to be locked or unlocked
@@ -2204,6 +2262,17 @@
             <param name="to">Destination</param>
             <param name="channel">Channel for the lock request</param>
             <returns>Number of bytes written</returns>
+        </member>
+        <member name="T:DuetControlServer.Utility.ConfigOverride">
+            <summary>
+            Static class holding values for config-override.g
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Utility.ConfigOverride.Save(DuetControlServer.Commands.Code)">
+            <summary>
+            Save the current non-volatile parameters to config-override.g
+            </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.FileInfoParser">
             <summary>

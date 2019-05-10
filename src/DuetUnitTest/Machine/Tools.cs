@@ -13,16 +13,16 @@ namespace DuetUnitTest.Machine
 
             Tool tool = new Tool
             {
-                Active = new double[] { 200, 220 },
+                Active = new float[] { 200F, 220F },
                 Fans = new int[] { 3 },
                 Filament = "PET-G",
                 Heaters = new int[] { 4, 5 },
-                Mix = new[] { 0.4, 0.6 },
+                Mix = new float[] { 0.4F, 0.6F },
                 Name = "Mixing Tool",
                 Number = 3,
-                Offsets = new double[] { 12, 34, 56 },
+                Offsets = new float[] { 12F, 34F, 56F },
                 Spindle = 3,
-                Standby = new double[] { 40, 60 }
+                Standby = new float[] { 40F, 60F }
             };
             tool.Axes.Add(new int[] { 0 });
             tool.Axes.Add(new int[] { 1 });

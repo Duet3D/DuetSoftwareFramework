@@ -18,7 +18,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Current babystep amount in Z direction (in mm)
         /// </summary>
-        public double BabystepZ { get; set; }
+        public float BabystepZ { get; set; }
         
         /// <summary>
         /// Information about the current move
@@ -55,7 +55,17 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Speed factor applied to every regular move (1.0 equals 100%)
         /// </summary>
-        public double SpeedFactor { get; set; } = 1.0;
+        public float SpeedFactor { get; set; } = 1.0F;
+
+        /// <summary>
+        /// Index of the currently selected workspace
+        /// </summary>
+        public int CurrentWorkplace { get; set; }
+
+        /// <summary>
+        /// Axis offsets of each available workspace (in mm)
+        /// </summary>
+        public float[,] WorkplaceCoordinates = new float[0, 0];
 
         /// <summary>
         /// Creates a clone of this instance

@@ -10,22 +10,22 @@ namespace DuetAPI.Machine
         /// <summary>
         /// A coefficient in the extrusion formula
         /// </summary>
-        public double A { get; set; }
+        public float A { get; set; }
         
         /// <summary>
         /// B coefficient in the extrusion formula
         /// </summary>
-        public double B { get; set; }
+        public float B { get; set; }
         
         /// <summary>
         /// Upper limit of the nonlinear extrusion compensation
         /// </summary>
-        public double UpperLimit { get; set; } = 0.2;
+        public float UpperLimit { get; set; } = 0.2F;
         
         /// <summary>
         /// Reserved for future use, for the temperature at which these values are valid (in degC)
         /// </summary>
-        public double Temperature { get; set; }
+        public float Temperature { get; set; }
 
         /// <summary>
         /// Creates a clone of this instance

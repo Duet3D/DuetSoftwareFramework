@@ -15,7 +15,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Extrusion factor to use (1.0 equals 100%)
         /// </summary>
-        public double Factor { get; set; } = 1.0;
+        public float Factor { get; set; } = 1.0F;
         
         /// <summary>
         /// Nonlinear extrusion parameters (see M592)

@@ -9,12 +9,12 @@ namespace DuetUnitTest.Machine
         [Test]
         public void Clone()
         {
-            DuetAPI.Machine.MachineModel original = new DuetAPI.Machine.MachineModel();
+            MachineModel original = new MachineModel();
 
             Spindle spindle = new Spindle
             {
-                Active = 123.45,
-                Current = 45.678
+                Active = 123.45F,
+                Current = 45.678F
             };
             original.Spindles.Add(spindle);
 
