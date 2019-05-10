@@ -20,6 +20,7 @@ namespace DuetControlServer.Codes
             switch (code.MajorNumber)
             {
                 // Load heightmap
+                // FIXME Obtain the movement lock before sending the heightmap
                 case 29:
                     if (code.Parameter('S', 0) == 1)
                     {
@@ -29,9 +30,7 @@ namespace DuetControlServer.Codes
                         {
                             Heightmap map = new Heightmap();
                             await map.Load(file);
-                            Console.WriteLine("heightmap loaded");
                             await SPI.Interface.SetHeightmap(map);
-                            Console.WriteLine("heightmap set");
                             return new CodeResult();
                         }
                         catch (AggregateException ae)

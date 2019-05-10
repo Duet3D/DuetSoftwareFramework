@@ -75,7 +75,7 @@ namespace DuetControlServer.SPI
         /// <exception cref="OperationCanceledException">Operation could not finish</exception>
         public static async Task<Heightmap> GetHeightmap()
         {
-            lock (await _heightmapLock.LockAsync())
+            using (await _heightmapLock.LockAsync())
             {
                 if (_getHeightmapRequest == null)
                 {
@@ -93,7 +93,7 @@ namespace DuetControlServer.SPI
         /// <exception cref="OperationCanceledException">Operation could not finish</exception>
         public static async Task SetHeightmap(Heightmap map)
         {
-            lock (await _heightmapLock.LockAsync())
+            using (await _heightmapLock.LockAsync())
             {
                 if (_setHeightmapRequest == null)
                 {
@@ -207,17 +207,7 @@ namespace DuetControlServer.SPI
         /// This is only called once on initialization
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static Task<bool> Connect() => DataTransfer.PerformFullTransfer();
-
-        private static async Task TransferData()
-        {
-            bool result;
-            do
-            {
-                // Keep on trying until it succeeds
-                result = await DataTransfer.PerformFullTransfer();
-            } while (!result);
-        }
+        public static Task<bool> Connect() => DataTransfer.PerformFullTransfer(false);
 
         /// <summary>
         /// Perform communication with the RepRapFirmware controller
@@ -227,14 +217,12 @@ namespace DuetControlServer.SPI
         {
             do
             {
-                //Console.WriteLine($"- Transfer {DataTransfer.TransferNumber} -");
-                
                 // Check if an emergency stop has been requested
                 if (_emergencyStopRequested && DataTransfer.WriteEmergencyStop())
                 {
                     _emergencyStopRequested = false;
                     Console.WriteLine("[info] Emergency stop");
-                    await TransferData();
+                    await DataTransfer.PerformFullTransfer();
                 }
 
                 // Check if a firmware reset has been requested
@@ -242,7 +230,7 @@ namespace DuetControlServer.SPI
                 {
                     _resetRequested = false;
                     Console.WriteLine("[info] Resetting controller");
-                    await TransferData();
+                    await DataTransfer.PerformFullTransfer();
                 }
 
                 // Invalidate data if a controller reset has been performed
@@ -265,17 +253,15 @@ namespace DuetControlServer.SPI
                     _printStoppedReason = null;
                 }
 
+                // Deal with heightmap requests
                 using (await _heightmapLock.LockAsync())
                 {
                     // Check if the heightmap is supposed to be set
-                    if (_heightmapToSet != null)
+                    if (_heightmapToSet != null && DataTransfer.WriteHeightMap(_heightmapToSet))
                     {
-                        if (DataTransfer.WriteHeightMap(_heightmapToSet))
-                        {
-                            _heightmapToSet = null;
-                            _setHeightmapRequest.SetResult(null);
-                            _setHeightmapRequest = null;
-                        }
+                        _heightmapToSet = null;
+                        _setHeightmapRequest.SetResult(null);
+                        _setHeightmapRequest = null;
                     }
 
                     // Check if the heightmap is requested
@@ -288,25 +274,24 @@ namespace DuetControlServer.SPI
                 // Process incoming packets
                 for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
-                    Communication.PacketHeader? packet = DataTransfer.ReadPacket();
-                    if (!packet.HasValue)
-                    {
-                        Console.WriteLine("[err] Read invalid packet");
-                        break;
-                    }
+                    Communication.PacketHeader? packet;
 
                     try
                     {
-                        //Console.WriteLine($"-> Packet #{packet.Value.Id} (request {(Communication.FirmwareRequests.Request)packet.Value.Request}) length {packet.Value.Length}");
-                        await ProcessPacket(packet.Value);
+                        packet = DataTransfer.ReadPacket();
+                        if (!packet.HasValue)
+                        {
+                            Console.WriteLine("[err] Read invalid packet");
+                            break;
+                        }
                     }
-                    catch (ArgumentOutOfRangeException e)
+                    catch (ArgumentOutOfRangeException)
                     {
                         DataTransfer.DumpMalformedPacket();
-                        Console.Write("[perr] ");
-                        Console.WriteLine(e);
-                        break;
+                        throw;
                     }
+
+                    await ProcessPacket(packet.Value);
                 }
 
                 // Process pending codes, macro files and requests for resource locks/unlocks
@@ -490,7 +475,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Do another full SPI transfer
-                await TransferData();
+                await DataTransfer.PerformFullTransfer();
 
                 // Wait a moment
                 if (IsIdle())
@@ -571,7 +556,7 @@ namespace DuetControlServer.SPI
 
                 case Communication.FirmwareRequests.Request.HeightMap:
                     DataTransfer.ReadHeightMap(out Heightmap map);
-                    lock (_getHeightmapRequest)
+                    using (await _heightmapLock.LockAsync())
                     {
                         _heightmapRequested = false;
                         if (_getHeightmapRequest == null)
@@ -759,7 +744,7 @@ namespace DuetControlServer.SPI
                 }
                 else
                 {
-                    Console.WriteLine($"[info] Requested macro file '{filename}' not found");
+                    Console.WriteLine($"[info] Optional macro file '{filename}' not found");
                 }
 
                 _busyChannels |= (1 << (int)channel);

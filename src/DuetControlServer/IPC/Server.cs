@@ -70,12 +70,12 @@ namespace DuetControlServer.IPC
             // Deal with the connection
             using (Connection conn = new Connection(socket, id))
             {
-                // Send server-side init message to the client
-                await conn.SendResponse(new ServerInitMessage { Id = id });
-                
-                // Read client-side init message and switch mode
                 try
                 {
+                    // Send server-side init message to the client
+                    await conn.SendResponse(new ServerInitMessage { Id = id });
+
+                    // Read client-side init message and switch mode
                     Base processor = await GetConnectionProcessor(conn);
                     if (processor != null)
                     {
@@ -95,9 +95,9 @@ namespace DuetControlServer.IPC
                     }
                 }
             }
-            
+
             // Remove this connection again
-            clientSockets.TryRemove(socket, out id);
+            clientSockets.TryRemove(socket, out _);
             if (socket.Connected)
             {
                 socket.Disconnect(true);
