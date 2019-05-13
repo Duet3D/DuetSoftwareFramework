@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using DuetAPI.Utility;
 using Newtonsoft.Json;
 
 namespace DuetControlServer
@@ -190,6 +191,11 @@ namespace DuetControlServer
             if (File.Exists(config))
             {
                 string fileContent = File.ReadAllText(config);
+                LayerHeightFilters.Clear();
+                FilamentFilters.Clear();
+                GeneratedByFilters.Clear();
+                PrintTimeFilters.Clear();
+                SimulatedTimeFilters.Clear();
                 JsonConvert.DeserializeObject<Settings>(fileContent);
             }
             else

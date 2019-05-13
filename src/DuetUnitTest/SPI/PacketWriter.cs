@@ -80,8 +80,8 @@ namespace DuetUnitTest.SPI
             Assert.AreEqual(10, majorCode);
             int minorCode = MemoryMarshal.Read<int>(span.Slice(8, 4));
             Assert.AreEqual(-1, minorCode);
-            int filePosition = MemoryMarshal.Read<int>(span.Slice(12, 4));
-            Assert.AreEqual(0, filePosition);
+            uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
+            Assert.AreEqual(0xFFFFFFFF, filePosition);
             
             // No padding
         }
@@ -109,8 +109,8 @@ namespace DuetUnitTest.SPI
             Assert.AreEqual(1, majorCode);
             int minorCode = MemoryMarshal.Read<int>(span.Slice(8, 4));
             Assert.AreEqual(-1, minorCode);
-            int filePosition = MemoryMarshal.Read<int>(span.Slice(12, 4));
-            Assert.AreEqual(0, filePosition);
+            uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
+            Assert.AreEqual(0xFFFFFFFF, filePosition);
             
             // First parameter (X4)
             Assert.AreEqual((byte)'X', span[16]);

@@ -63,7 +63,6 @@ namespace DuetControlServer.SPI
         /// <param name="reply">Raw code reply</param>
         public void HandleReply(Communication.MessageTypeFlags messageType, string reply)
         {
-            Code.Comment = null;
             Console.WriteLine($"[{Code} - {messageType}] {reply}");
 
             DuetAPI.Message message;

@@ -123,6 +123,7 @@ namespace DuetControlServer.FileExecution
             Code result = await base.ReadCode();
             if (result != null)
             {
+                result.FilePosition = null;
                 result.IsFromConfig = _isConfig;
                 result.IsFromConfigOverride = _isConfigOverride;
                 result.IsFromMacro = true;

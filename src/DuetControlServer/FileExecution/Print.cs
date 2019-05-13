@@ -21,15 +21,15 @@ namespace DuetControlServer.FileExecution
         /// Begin a file print
         /// </summary>
         /// <param name="fileName">File to print</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task Start(string fileName)
+        /// <returns>Code result</returns>
+        public static async Task<CodeResult> Start(string fileName)
         {
             // Initialize the file
             using (await _lock.LockAsync())
             {
                 if (_file != null)
                 {
-                    throw new InvalidOperationException("A file is already being printed");
+                    return new CodeResult(DuetAPI.MessageType.Error, "A file is already being printed");
                 }
                 _file = new BaseFile(fileName, DuetAPI.CodeChannel.File);
                 IsPaused = false;
@@ -45,12 +45,14 @@ namespace DuetControlServer.FileExecution
             DuetAPI.ParsedFileInfo info = await FileInfoParser.Parse(fileName);
             using (await Model.Provider.AccessReadWrite())
             {
+                Model.Provider.Get.Channels[DuetAPI.CodeChannel.File].VolumetricExtrusion = false;
                 Model.Provider.Get.Job.File = info;
             }
 
             // Notify RepRapFirmware and start processing the file
             SPI.Interface.SetPrintStarted();
             RunPrint();
+            return new CodeResult();
         }
 
         private static async void RunPrint()
@@ -138,6 +140,17 @@ namespace DuetControlServer.FileExecution
         public static bool IsPaused { get; private set; }
 
         /// <summary>
+        /// Called when the print is being paused
+        /// </summary>
+        public static async Task Pause()
+        {
+            using (await _lock.LockAsync())
+            {
+                IsPaused = true;
+            }
+        }
+
+        /// <summary>
         /// Called when the file print has been paused
         /// </summary>
         /// <param name="filePosition">Position at which the file was paused</param>
@@ -147,7 +160,14 @@ namespace DuetControlServer.FileExecution
             using (await _lock.LockAsync())
             {
                 _pausePosition = filePosition;
-                IsPaused = true;
+                if (IsPaused)
+                {
+                    _file.Position = filePosition;
+                }
+                else
+                {
+                    IsPaused = true;
+                }
             }
         }
 

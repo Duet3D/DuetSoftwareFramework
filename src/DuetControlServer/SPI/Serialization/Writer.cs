@@ -77,7 +77,7 @@ namespace DuetControlServer.SPI.Serialization
             CodeHeader header = new CodeHeader
             {
                 Channel = code.Channel,
-                FilePosition = (uint)(code.FilePosition ?? 0),
+                FilePosition = (uint)(code.FilePosition ?? 0xFFFFFFFF),
                 Letter = (byte)code.Type,
                 MajorCode = code.MajorNumber ?? -1,
                 MinorCode = code.MinorNumber ?? -1,

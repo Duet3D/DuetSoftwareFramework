@@ -16,14 +16,19 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         DrivesRelative = 1,
 
         /// <summary>
+        /// Whether volumetric extrusion is being used
+        /// </summary>
+        VolumetricExtrusion = 2,
+
+        /// <summary>
         /// Whether the axes are driven in relative mode
         /// </summary>
-        AxesRelative = 2,
+        AxesRelative = 4,
 
         /// <summary>
         /// Whether the configured unit is set to inches
         /// </summary>
-        UsingInches = 4
+        UsingInches = 8
     }
 
     /// <summary>

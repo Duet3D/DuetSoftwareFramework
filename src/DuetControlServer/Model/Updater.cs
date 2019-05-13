@@ -58,7 +58,7 @@ namespace DuetControlServer.Model
                 // Deserialize extended response (temporary)
                 var responseDefinition = new
                 {
-                    status = "I",
+                    status = 'I',
                     coords = new
                     {
                         axesHomed = new byte[0],
@@ -260,7 +260,8 @@ namespace DuetControlServer.Model
                             Current = response.temps.current[heater],
                             Max = response.tempLimit,
                             Name = response.temps.names[heater],
-                            Sensor = heater
+                            Sensor = heater,
+                            State = (HeaterState)response.temps.state[heater]
                         });
                     }
 
@@ -312,33 +313,33 @@ namespace DuetControlServer.Model
             {
                 var printResponseDefinition = new
                 {
-					layer = 0,
-					layerTime = 0,
-                    filePosition = 0,
-                    extrudedRaw = new float[0],
-                    printDuration = 0.0F,
-					warmUpDuration = 0.0F,
+                    currentLayer = 0,
+                    currentLayerTime = 0F,
+                    filePosition = 0L,
+                    firstLayerDuration = 0F,
+                    extrRaw = new float[0],
+                    printDuration = 0F,
+					warmUpDuration = 0F,
 					timesLeft = new
                     {
-                        file = 0.0F,
-						filament = 0.0F,
-						layer = 0.0F
+                        file = 0F,
+						filament = 0F,
+						layer = 0F
                     }
                 };
 
                 var printResponse = JsonConvert.DeserializeAnonymousType(json, printResponseDefinition);
                 using (await Provider.AccessReadWrite())
                 {
-                    // FIXME layer estimations don't work yet
-                    Provider.Get.Job.Layer = printResponse.layer;
-                    Provider.Get.Job.LayerTime = printResponse.layerTime;
+                    Provider.Get.Job.Layer = printResponse.currentLayer;
+                    Provider.Get.Job.LayerTime = (printResponse.currentLayer == 1) ? printResponse.firstLayerDuration : printResponse.currentLayerTime;
                     Provider.Get.Job.FilePosition = printResponse.filePosition;
-                    Provider.Get.Job.ExtrudedRaw = printResponse.extrudedRaw;
+                    Provider.Get.Job.ExtrudedRaw = printResponse.extrRaw;
                     Provider.Get.Job.Duration =  printResponse.printDuration;
                     Provider.Get.Job.WarmUpDuration = printResponse.warmUpDuration;
-                    Provider.Get.Job.TimesLeft.File = printResponse.timesLeft.file;
-                    Provider.Get.Job.TimesLeft.Filament = printResponse.timesLeft.filament;
-                    Provider.Get.Job.TimesLeft.Layer = printResponse.timesLeft.layer;
+                    Provider.Get.Job.TimesLeft.File = (printResponse.timesLeft.file > 0F) ? (float?)printResponse.timesLeft.file : null;
+                    Provider.Get.Job.TimesLeft.Filament = (printResponse.timesLeft.filament > 0F) ? (float?)printResponse.timesLeft.filament : null;
+                    Provider.Get.Job.TimesLeft.Layer = (printResponse.timesLeft.layer > 0F) ? (float?)printResponse.timesLeft.layer : null;
                 }
             }
 
@@ -354,20 +355,20 @@ namespace DuetControlServer.Model
             }
         }
 
-        private static MachineStatus GetStatus(string letter)
+        private static MachineStatus GetStatus(char letter)
         {
             switch (letter)
             {
-                case "F": return MachineStatus.Updating;
-                case "O": return MachineStatus.Off;
-                case "H": return MachineStatus.Halted;
-                case "D": return MachineStatus.Pausing;
-                case "S": return MachineStatus.Paused;
-                case "R": return MachineStatus.Resuming;
-                case "P": return MachineStatus.Processing;
-                case "M": return MachineStatus.Simulating;
-                case "B": return MachineStatus.Busy;
-                case "T": return MachineStatus.ChangingTool;
+                case 'F': return MachineStatus.Updating;
+                case 'O': return MachineStatus.Off;
+                case 'H': return MachineStatus.Halted;
+                case 'D': return MachineStatus.Pausing;
+                case 'S': return MachineStatus.Paused;
+                case 'R': return MachineStatus.Resuming;
+                case 'P': return MachineStatus.Processing;
+                case 'M': return MachineStatus.Simulating;
+                case 'B': return MachineStatus.Busy;
+                case 'T': return MachineStatus.ChangingTool;
             }
             return MachineStatus.Idle;
         }

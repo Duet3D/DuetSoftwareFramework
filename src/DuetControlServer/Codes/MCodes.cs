@@ -26,6 +26,15 @@ namespace DuetControlServer.Codes
         {
             switch (code.MajorNumber)
             {
+                // Cancel print
+                case 0:
+                case 1:
+                    if (Print.IsPrinting)
+                    {
+                        await Print.Cancel();
+                    }
+                    break;
+
                 // Select a file to print
                 case 23:
                 {
@@ -40,16 +49,26 @@ namespace DuetControlServer.Codes
 
                 // Resume a file print
                 case 24:
-                    if (Print.IsPaused)
+                    if (!Print.IsPaused)
                     {
-                        Print.Resume();
+                        if (string.IsNullOrEmpty(_fileToPrint))
+                        {
+                            return new CodeResult(DuetAPI.MessageType.Error, "Cannot print, because no file is selected!");
+                        }
+
+                        // FIXME Emulate Marlin via "File opened\nFile selected". IMHO this should happen via a CodeChannel property
+                        return await Print.Start(_fileToPrint);
                     }
-                    else if (string.IsNullOrEmpty(_fileToPrint))
+                    break;
+
+                // Pause print
+                case 25:
+                case 226:
+                    if (Print.IsPrinting && !Print.IsPaused)
                     {
-                        return new CodeResult(DuetAPI.MessageType.Error, "Cannot print, because no file is selected!");
+                        // Stop sending file instructions to the firmware
+                        await Print.Pause();
                     }
-                    // FIXME Emulate Marlin via "File opened\nFile selected". IMHO this should happen via a CodeChannel property
-                    await Print.Start(_fileToPrint);
                     break;
 
                 // Set SD position
@@ -90,11 +109,11 @@ namespace DuetControlServer.Codes
                 // Start a file print
                 case 32:
                     _fileToPrint = await FilePath.ToPhysical(code.GetUnprecedentedString());
-                    await Print.Start(_fileToPrint);
-                    return new CodeResult();
+                    return await Print.Start(_fileToPrint);
 
                 // Return file information
                 case 36:
+                    if (code.Parameters.Count > 0)
                     {
                         try
                         {
@@ -109,6 +128,14 @@ namespace DuetControlServer.Codes
                             return new CodeResult(DuetAPI.MessageType.Success, "{\"err\":1}");
                         }
                     }
+                    break;
+
+                // Simulate file
+                case 37:
+                    // TODO: Check if file exists
+                    // TODO: Execute and await pseudo-M37 with IsPreProcessed = true so the firmware enters the right simulation state
+                    // TODO: Start file print
+                    return new CodeResult(MessageType.Warning, "M37 is not supported yet");
 
                 // Compute SHA1 hash of target file
                 case 38:
@@ -352,6 +379,15 @@ namespace DuetControlServer.Codes
 
             switch (code.MajorNumber)
             {
+                // Resume print
+                case 24:
+                    if (Print.IsPaused)
+                    {
+                        // Resume sending file instructions to the firmware
+                        Print.Resume();
+                    }
+                    break;
+
                 // Absolute extrusion
                 case 82:
                     using (await Model.Provider.AccessReadWrite())
@@ -366,6 +402,11 @@ namespace DuetControlServer.Codes
                     {
                         Model.Provider.Get.Channels[code.Channel].RelativeExtrusion = false;
                     }
+                    break;
+
+                // Diagnostics
+                case 122:
+                    SPI.Interface.Diagnostics(result);
                     break;
             }
             return result;

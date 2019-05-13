@@ -17,6 +17,12 @@ namespace DuetAPI.Machine
         /// </summary>
         public bool RelativeExtrusion { get; set; } = true;
 
+
+        /// <summary>
+        /// Whether volumetric extrusion is being used
+        /// </summary>
+        public bool VolumetricExtrusion { get; set; }
+
         /// <summary>
         /// Whether relative positioning is being used
         /// </summary>

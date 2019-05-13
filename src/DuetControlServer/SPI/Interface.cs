@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -66,6 +67,45 @@ namespace DuetControlServer.SPI
 
             // Request buffer states immediately
             DataTransfer.WriteGetState();
+        }
+
+        public static void Diagnostics(CodeResult result)
+        {
+            StringBuilder builder = new StringBuilder();
+
+            builder.AppendLine("=== Linux ===");
+            builder.AppendLine($"Full transfers per second: {DataTransfer.GetFullTransfersPerSecond():F2}");
+            foreach (CodeChannel channel in Enum.GetValues(typeof(CodeChannel)))
+            {
+                lock (_pendingSystemCodes[channel])
+                {
+                    if (_pendingSystemCodes[channel].TryPeek(out QueuedCode item))
+                    {
+                        builder.AppendLine($"{channel} is {(item.IsExecuting ? "executing" : "waiting for")} system code {item.Code}");
+                        continue;
+                    }
+                }
+
+                lock (_pendingMacros[channel])
+                {
+                    if (_pendingMacros[channel].TryPeek(out MacroFile macro))
+                    {
+                        builder.AppendLine($"{channel} is doing system macro {macro.FileName}");
+                        continue;
+                    }
+                }
+
+                lock (_pendingCodes[channel])
+                {
+                    if (_pendingCodes[channel].TryPeek(out QueuedCode item))
+                    {
+                        builder.AppendLine($"{channel} is {(item.IsExecuting ? "executing" : "waiting for")} code {item.Code}");
+                        continue;
+                    }
+                }
+            }
+
+            result.Add(MessageType.Success, builder.ToString().TrimEnd());
         }
 
         /// <summary>
@@ -417,7 +457,9 @@ namespace DuetControlServer.SPI
                                 {
                                     if (DataTransfer.WriteCode(item.Code))
                                     {
+                                        item.Code.Comment = null;
                                         Console.WriteLine($"Executing {item.Code}");
+
                                         item.IsExecuting = true;
                                         _busyChannels |= (1 << (int)channel);
                                     }
@@ -781,6 +823,7 @@ namespace DuetControlServer.SPI
                 }
                 item.StackDepth = stackDepth;
                 item.RelativeExtrusion = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.DrivesRelative);
+                item.VolumetricExtrusion = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.VolumetricExtrusion);
                 item.RelativePositioning = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.AxesRelative);
                 item.UsingInches = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.UsingInches);
                 item.Feedrate = feedrate;
@@ -842,7 +885,7 @@ namespace DuetControlServer.SPI
 
                     while (_pendingCodes[channel].TryDequeue(out QueuedCode item))
                     {
-                        if (item.Code.Type == CodeType.MCode && (item.Code.MajorNumber != 112 || item.Code.MajorNumber != 999))
+                        if (item.Code.Type == CodeType.MCode && (item.Code.MajorNumber == 112 || (item.Code.MajorNumber == 999 && item.Code.Parameter('P') == null)))
                         {
                             // Don't cancel codes from this channel if the emergency stop / reset came from here
                             validCodes.Enqueue(item);

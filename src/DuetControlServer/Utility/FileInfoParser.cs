@@ -38,6 +38,11 @@ namespace DuetControlServer
                 {
                     await ParseHeader(reader, result);
                     await ParseFooter(reader, fileStream.Length, result);
+
+                    if (result.FirstLayerHeight + result.LayerHeight > 0F && result.Height > 0F)
+                    {
+                        result.NumLayers = (int?)(Math.Round((result.Height - result.FirstLayerHeight) / result.LayerHeight) + 1);
+                    }
                 }
 
                 reader.Close();

@@ -25,11 +25,13 @@ namespace DuetControlServer.SPI
         private static GpioController _pinController;
 
         // General transfer variables
+#if false
         private static AsyncAutoResetEvent _transferReadyEvent = new AsyncAutoResetEvent();
+#endif
         private static ushort _lastTransferNumber;
         private static bool _started, _hadTimeout, _resetting;
 
-        private static DateTime _lastMeasureTime;
+        private static DateTime _lastMeasureTime = DateTime.Now;
         private static int _numMeasuredTransfers;
 
         // Transfer headers
@@ -40,8 +42,8 @@ namespace DuetControlServer.SPI
         private static byte _packetId;
 
         // Transfer responses
-        private static Memory<byte> _rxResponseBuffer = new byte[4];
-        private static Memory<byte> _txResponseBuffer = new byte[4];
+        private static readonly Memory<byte> _rxResponseBuffer = new byte[4];
+        private static readonly Memory<byte> _txResponseBuffer = new byte[4];
 
         // Transfer data. Keep two TX buffers so resend requests can be processed
         private static readonly Memory<byte> _rxBuffer = new byte[Communication.Consts.BufferSize];
@@ -66,11 +68,13 @@ namespace DuetControlServer.SPI
             _pinController = new GpioController(PinNumberingScheme.Logical);
             _pinController.OpenPin(Settings.TransferReadyPin);
             _pinController.SetPinMode(Settings.TransferReadyPin, PinMode.InputPullDown);
+#if false
             _pinController.RegisterCallbackForPinValueChangedEvent(Settings.TransferReadyPin, PinEventTypes.Rising, OnTransferReady);
             if (_pinController.Read(Settings.TransferReadyPin) == PinValue.High)
             {
                 _transferReadyEvent.Set();
             }
+#endif
         }
 
         /// <summary>
@@ -139,6 +143,12 @@ namespace DuetControlServer.SPI
                     }
 
                     // Deal with resets
+                    if (!_started)
+                    {
+                        _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
+                        _started = true;
+                    }
+
                     if (_resetting)
                     {
                         _hadTimeout = true;
@@ -147,7 +157,7 @@ namespace DuetControlServer.SPI
 
                     // Transfer OK
                     _txHeader.SequenceNumber++;
-                    success = _started = true;
+                    success = true;
                     break;
                 }
                 catch (OperationCanceledException)
@@ -174,7 +184,7 @@ namespace DuetControlServer.SPI
                         }
                     }
                 }
-            } while (mustSucceed);
+            } while (mustSucceed && !Program.CancelSource.IsCancellationRequested);
 
             return success;
         }
@@ -185,10 +195,10 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the controller has been reset</returns>
         public static bool HadReset()
         {
-            return (_lastTransferNumber + 1 != _rxHeader.SequenceNumber);
+            return _started && ((ushort)(_lastTransferNumber + 1) != _rxHeader.SequenceNumber);
         }
 
-        #region Read functions
+#region Read functions
         /// <summary>
         /// Returns the number of packets to read
         /// </summary>
@@ -334,9 +344,9 @@ namespace DuetControlServer.SPI
             dump += "====================";
             Console.WriteLine(dump);
         }
-        #endregion
+#endregion
 
-        #region Write functions
+#region Write functions
         /// <summary>
         /// Resend a packet back to the firmware
         /// </summary>
@@ -640,17 +650,30 @@ namespace DuetControlServer.SPI
         #endregion
 
         #region Functions for data transfers
+#if false
         private static void OnTransferReady(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
         {
             _transferReadyEvent.Set();
         }
+#endif
 
-        private static Task WaitForTransfer()
+        private static Task WaitForTransfer() => Task.Run(() =>
         {
+#if true
+            DateTime startTime = DateTime.Now;
+            while (_pinController.Read(Settings.TransferReadyPin) != PinValue.High)
+            {
+                if (Program.CancelSource.IsCancellationRequested || (DateTime.Now - startTime).TotalMilliseconds > Settings.SpiTransferTimeout)
+                {
+                    throw new OperationCanceledException();
+                }
+            }
+#else
             CancellationToken timeoutToken = new CancellationTokenSource(Settings.SpiTransferTimeout).Token;
             CancellationToken cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, timeoutToken).Token;
             return _transferReadyEvent.WaitAsync(cancellationToken);
-        }
+#endif
+        });
 
         private static async Task<bool> ExchangeHeader()
         {
@@ -815,6 +838,6 @@ namespace DuetControlServer.SPI
             await ExchangeResponse(Communication.TransferResponse.BadResponse);
             return false;
         }
-        #endregion
+#endregion
     }
 }
