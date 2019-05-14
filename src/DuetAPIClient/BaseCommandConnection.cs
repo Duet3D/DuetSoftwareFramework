@@ -20,6 +20,17 @@ namespace DuetAPIClient
         protected BaseCommandConnection(ConnectionMode mode) : base(mode) { }
 
         /// <summary>
+        /// Wait for all pending codes of the given channel to finish
+        /// </summary>
+        /// <param name="channel">Code channel to wait for</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        public Task Flush(CodeChannel channel = CodeChannel.SPI, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new Flush() { Channel = channel }, cancellationToken);
+        }
+
+        /// <summary>
         /// Parse a G-code file and returns file information about it
         /// </summary>
         /// <param name="fileName">The file to parse</param>

@@ -33,7 +33,7 @@ namespace DuetAPI.Commands
         /// Creates a new CodeParameter instance and parses value to a native data type if applicable
         /// </summary>
         /// <param name="letter">Letter of the code parameter</param>
-        /// <param name="value">String representation of the value (also stored in <see cref="AsString"/>)</param>
+        /// <param name="value">String representation of the value</param>
         /// <param name="isString">Whether this is a string. This is set to true if the parameter was inside quotation marks.</param>
         /// <remarks>This constructor does not parsed long (aka int64) values because RRF cannot handle them</remarks>
         public CodeParameter(char letter, string value, bool isString)
@@ -105,6 +105,11 @@ namespace DuetAPI.Commands
             }
         }
 
+        /// <summary>
+        /// Creates a new CodeParameter instance and with the given value
+        /// </summary>
+        /// <param name="letter">Letter of the code parameter</param>
+        /// <param name="value">Value of this parameter</param>
         public CodeParameter(char letter, object value)
         {
             Letter = letter;
@@ -122,6 +127,7 @@ namespace DuetAPI.Commands
         /// Implicit conversion operator to float
         /// </summary>
         /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator float(CodeParameter codeParameter)
         {
@@ -136,6 +142,7 @@ namespace DuetAPI.Commands
         /// Implicit conversion operator to int
         /// </summary>
         /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator int(CodeParameter codeParameter)
         {
@@ -151,6 +158,7 @@ namespace DuetAPI.Commands
         /// Implicit conversion operator to uint
         /// </summary>
         /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator uint(CodeParameter codeParameter)
         {
@@ -165,6 +173,8 @@ namespace DuetAPI.Commands
         /// Implicit conversion operator to long
         /// </summary>
         /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator long(CodeParameter codeParameter)
         {
             if (codeParameter._parsedValue is uint || codeParameter._parsedValue is int || codeParameter._parsedValue is float)
@@ -178,17 +188,22 @@ namespace DuetAPI.Commands
         /// Implicit conversion operator to bool
         /// </summary>
         /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator bool(CodeParameter codeParameter) => codeParameter > 0;
 
         /// <summary>
         /// Implicit conversion operator to string
         /// </summary>
         /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
         public static implicit operator string(CodeParameter codeParameter) => codeParameter._stringValue;
 
         /// <summary>
         /// Implicit conversion operator to float array
         /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator float[](CodeParameter codeParameter)
         {
@@ -210,6 +225,8 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Implicit conversion operator to integer array
         /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator int[] (CodeParameter codeParameter)
         {
@@ -227,6 +244,8 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Implicit conversion operator to unsigned integer array
         /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator uint[] (CodeParameter codeParameter)
         {
@@ -244,6 +263,8 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Implicit conversion operator to long array
         /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator long[] (CodeParameter codeParameter)
         {
@@ -288,14 +309,14 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Checks if the other obj equals this instance
         /// </summary>
-        /// <param name="obj"></param>
-        /// <returns></returns>
+        /// <param name="obj">Other object</param>
+        /// <returns>True if both objects are not equal</returns>
         public override bool Equals(object obj) => this == obj;
 
         /// <summary>
         /// Returns the hash code of this instance
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Computed hash code</returns>
         public override int GetHashCode()
         {
             return HashCode.Combine(Letter, _parsedValue);

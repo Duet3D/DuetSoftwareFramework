@@ -19,6 +19,7 @@ namespace DuetControlServer.IPC.Processors
             typeof(Code),
             typeof(GetFileInfo),
             typeof(GetMachineModel),
+            typeof(Flush),
             typeof(ResolvePath),
             typeof(SimpleCode),
             typeof(SyncMachineModel)

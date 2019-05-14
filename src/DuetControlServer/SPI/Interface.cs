@@ -24,6 +24,7 @@ namespace DuetControlServer.SPI
         private static readonly Dictionary<CodeChannel, Stack<QueuedCode>> _pendingSystemCodes = new Dictionary<CodeChannel, Stack<QueuedCode>>();
         private static readonly Dictionary<CodeChannel, Stack<MacroFile>> _pendingMacros = new Dictionary<CodeChannel, Stack<MacroFile>>();
         private static readonly Dictionary<CodeChannel, Queue<QueuedLockRequest>> _pendingLockRequests = new Dictionary<CodeChannel, Queue<QueuedLockRequest>>();
+        private static readonly Dictionary<CodeChannel, Queue<TaskCompletionSource<object>>> _flushRequests = new Dictionary<CodeChannel, Queue<TaskCompletionSource<object>>>();
 
         // Code channels that are currently blocked because of an executing G/M/T-code
         private static int _busyChannels = 0;
@@ -63,12 +64,17 @@ namespace DuetControlServer.SPI
                 _pendingSystemCodes.Add(channel, new Stack<QueuedCode>());
                 _pendingMacros.Add(channel, new Stack<MacroFile>());
                 _pendingLockRequests.Add(channel, new Queue<QueuedLockRequest>());
+                _flushRequests.Add(channel, new Queue<TaskCompletionSource<object>>());
             }
 
             // Request buffer states immediately
             DataTransfer.WriteGetState();
         }
 
+        /// <summary>
+        /// Print diagnostics of this class
+        /// </summary>
+        /// <param name="result">Message storage</param>
         public static void Diagnostics(CodeResult result)
         {
             StringBuilder builder = new StringBuilder();
@@ -173,6 +179,21 @@ namespace DuetControlServer.SPI
                 _pendingSystemCodes[code.Channel].Push(item);
             }
             return item.Task;
+        }
+
+        /// <summary>
+        /// Wait for all pending codes to finish
+        /// </summary>
+        /// <param name="channel">Code channel to wait for</param>
+        /// <returns>Asynchronous task</returns>
+        public static Task Flush(CodeChannel channel)
+        {
+            TaskCompletionSource<object> source = new TaskCompletionSource<object>();
+            lock (_flushRequests[channel])
+            {
+                _flushRequests[channel].Enqueue(source);
+            }
+            return source.Task;
         }
 
         /// <summary>
@@ -487,21 +508,34 @@ namespace DuetControlServer.SPI
                                 }
                             }
                         }
-                    }
-                    else
-                    {
-                        // Deal with lock/unlock requests. They are only permitted if no code is being executed
-                        lock (_pendingLockRequests[channel])
+                        else
                         {
-                            if (_pendingLockRequests[channel].TryPeek(out QueuedLockRequest item) && !item.IsLockRequested)
+                            // No code is being executed or resolved on this channel. Deal with lock/unlock requests
+                            QueuedLockRequest lockRequest;
+                            lock (_pendingLockRequests[channel])
                             {
-                                if (item.IsLockRequest)
+                                if (_pendingLockRequests[channel].TryPeek(out lockRequest) && !lockRequest.IsLockRequested)
                                 {
-                                    item.IsLockRequested = DataTransfer.WriteLockMovementAndWaitForStandstill(item.Channel);
+                                    if (lockRequest.IsLockRequest)
+                                    {
+                                        lockRequest.IsLockRequested = DataTransfer.WriteLockMovementAndWaitForStandstill(lockRequest.Channel);
+                                    }
+                                    else if (DataTransfer.WriteUnlock(lockRequest.Channel))
+                                    {
+                                        _pendingLockRequests[channel].Dequeue();
+                                    }
                                 }
-                                else if (DataTransfer.WriteUnlock(item.Channel))
+                            }
+
+                            // If there is no pending lock/unlock request, this code channel is idle
+                            if (lockRequest == null)
+                            {
+                                lock (_flushRequests[channel])
                                 {
-                                    _pendingLockRequests[channel].Dequeue();
+                                    if (_flushRequests[channel].TryDequeue(out TaskCompletionSource<object> source))
+                                    {
+                                        source.SetResult(null);
+                                    }
                                 }
                             }
                         }
@@ -550,6 +584,14 @@ namespace DuetControlServer.SPI
                 lock (_pendingMacros[channel])
                 {
                     if (_pendingMacros[channel].Count != 0)
+                    {
+                        return false;
+                    }
+                }
+
+                lock (_flushRequests[channel])
+                {
+                    if (_flushRequests[channel].Count != 0)
                     {
                         return false;
                     }
@@ -876,7 +918,7 @@ namespace DuetControlServer.SPI
                 MacroFile.AbortAllFiles(channel);
             }
 
-            // Resolve pending (system) codes
+            // Resolve pending (system) codes and flush requests
             foreach (CodeChannel channel in Enum.GetValues(typeof(CodeChannel)))
             {
                 lock (_pendingCodes[channel])
@@ -910,6 +952,14 @@ namespace DuetControlServer.SPI
                     {
                         item.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
                         item.SetFinished();
+                    }
+                }
+
+                lock (_flushRequests[channel])
+                {
+                    while (_flushRequests[channel].TryDequeue(out TaskCompletionSource<object> source))
+                    {
+                        source.SetException(new OperationCanceledException(codeErrorMessage));
                     }
                 }
             }

@@ -103,6 +103,23 @@ namespace DuetControlServer.SPI
         {
             _lastTransferNumber = _rxHeader.SequenceNumber;
 
+            // Reset RX transfer header
+            _rxHeader.FormatCode = Communication.Consts.InvalidFormatCode;
+            _rxHeader.NumPackets = 0;
+            _rxHeader.ProtocolVersion = 0;
+            _rxHeader.DataLength = 0;
+            _rxHeader.ChecksumData = 0;
+            _rxHeader.ChecksumHeader = 0;
+
+            // Set up TX transfer header
+            _txHeader.NumPackets = _packetId;
+            _txHeader.SequenceNumber++;
+            _txHeader.DataLength = (ushort)_txPointer;
+            _txHeader.ChecksumData = CRC16.Calculate(_txBuffers[_txBufferIndex].ToArray(), _txPointer);
+            MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+            _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.ToArray(), Marshal.SizeOf(_txHeader) - Marshal.SizeOf(typeof(ushort)));
+            MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+
             bool success = false;
             do
             {
@@ -156,7 +173,6 @@ namespace DuetControlServer.SPI
                     }
 
                     // Transfer OK
-                    _txHeader.SequenceNumber++;
                     success = true;
                     break;
                 }
@@ -301,8 +317,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read the result of a <see cref="Communication.LinuxRequests.Request.GetHeightMap"/> request
         /// </summary>
-        /// <param name="header">Description of the heightmap</param>
-        /// <param name="zCoordinates">Array of probed Z coordinates</param>
+        /// <param name="map">Received heightmap</param>
         public static void ReadHeightMap(out Heightmap map)
         {
             Serialization.Reader.ReadHeightMap(_packetData.Span, out map);
@@ -570,6 +585,11 @@ namespace DuetControlServer.SPI
             return true;
         }
         
+        /// <summary>
+        /// Write a heightmap to the firmware
+        /// </summary>
+        /// <param name="map">Heightmap to send</param>
+        /// <returns>True if the packet could be written</returns>
         public static bool WriteHeightMap(Heightmap map)
         {
             // Serialize the requqest first to see how much space it requires
@@ -677,20 +697,8 @@ namespace DuetControlServer.SPI
 
         private static async Task<bool> ExchangeHeader()
         {
-            // Write TX header
-            _txHeader.NumPackets = _packetId;
-            _txHeader.DataLength = (ushort)_txPointer;
-            _txHeader.ChecksumData = CRC16.Calculate(_txBuffers[_txBufferIndex].ToArray(), _txPointer);
-            MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-            _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.ToArray(), Marshal.SizeOf(_txHeader) - Marshal.SizeOf(typeof(ushort)));
-            MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
-                // Write invalidated RX header
-                _rxHeader.FormatCode = Communication.Consts.InvalidFormatCode;
-                MemoryMarshal.Write(_rxHeaderBuffer.Span, ref _rxHeader);
-
                 // Perform SPI header exchange
                 await WaitForTransfer();
                 _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);

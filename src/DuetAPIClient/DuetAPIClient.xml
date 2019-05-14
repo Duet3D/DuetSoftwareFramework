@@ -16,6 +16,14 @@
             </summary>
             <param name="mode">Connection type</param>
         </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.Flush(DuetAPI.CodeChannel,System.Threading.CancellationToken)">
+            <summary>
+            Wait for all pending codes of the given channel to finish
+            </summary>
+            <param name="channel">Code channel to wait for</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.GetFileInfo(System.String,System.Threading.CancellationToken)">
             <summary>
             Parse a G-code file and returns file information about it
@@ -69,6 +77,13 @@
             <param name="path">File path to resolve</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Resolved file path</returns>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.SyncMachineModel(System.Threading.CancellationToken)">
+            <summary>
+            Wait for the full machine model to be updated from RepRapFirmware
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetAPIClient.BaseConnection">
             <summary>

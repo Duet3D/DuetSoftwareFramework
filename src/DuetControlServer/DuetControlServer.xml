@@ -68,7 +68,7 @@
         </member>
         <member name="T:DuetControlServer.Commands.Code">
             <summary>
-            Implementation for G/M/T-code commands
+            Implementation of the <see cref="T:DuetAPI.Commands.Code"/> command
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.Code.#ctor">
@@ -88,9 +88,20 @@
             </summary>
             <returns>Code result instance</returns>
         </member>
+        <member name="T:DuetControlServer.Commands.Flush">
+            <summary>
+            Implementation of the <see cref="T:DuetAPI.Commands.Flush"/> command
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.Flush.Execute">
+            <summary>
+            Wait for all pending codes of the given channel to finish
+            </summary>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="T:DuetControlServer.Commands.GetFileInfo">
             <summary>
-            Implementation of the GetFileInfo command
+            Implementation of the <see cref="T:DuetAPI.Commands.GetFileInfo"/> command
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.GetFileInfo.Execute">
@@ -101,7 +112,7 @@
         </member>
         <member name="T:DuetControlServer.Commands.GetMachineModel">
             <summary>
-            Implementation of the GetMachineModel command
+            Implementation of the <see cref="T:DuetAPI.Commands.GetMachineModel"/> command
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.GetMachineModel.Execute">
@@ -112,7 +123,7 @@
         </member>
         <member name="T:DuetControlServer.Commands.ResolvePath">
             <summary>
-            Implementation of the ResolvePath command
+            Implementation of the <see cref="T:DuetAPI.Commands.ResolvePath"/> command
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.ResolvePath.Execute">
@@ -123,7 +134,7 @@
         </member>
         <member name="T:DuetControlServer.Commands.SimpleCode">
             <summary>
-            Implementation of the SimpleCode command
+            Implementation of the <see cref="T:DuetAPI.Commands.SimpleCode"/> command
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.SimpleCode.Execute">
@@ -131,6 +142,17 @@
             Converts a simple G/M/T-code to a regular Code instance, executes it and returns its result as text
             </summary>
             <returns>G-code result</returns>
+        </member>
+        <member name="T:DuetControlServer.Commands.SyncMachineModel">
+            <summary>
+            Implementation of the <see cref="T:DuetAPI.Commands.SyncMachineModel"/> command
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.SyncMachineModel.Execute">
+            <summary>
+            Waits for the machine model to be fully updated from RepRapFirmware
+            </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.FileExecution.BaseFile">
             <summary>
@@ -254,12 +276,13 @@
             Implementation of a file being printed
             </summary>
         </member>
-        <member name="M:DuetControlServer.FileExecution.Print.Start(System.String)">
+        <member name="M:DuetControlServer.FileExecution.Print.Start(System.String,DuetAPI.CodeChannel)">
             <summary>
             Begin a file print
             </summary>
             <param name="fileName">File to print</param>
-            <returns>Asynchronous task</returns>
+            <param name="source">Channel that requested the file to be printed</param>
+            <returns>Code result</returns>
         </member>
         <member name="P:DuetControlServer.FileExecution.Print.Position">
             <summary>
@@ -280,6 +303,12 @@
             <summary>
             Indicates if the file print has been paused
             </summary>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.Print.Pause">
+            <summary>
+            Called when the print is being paused
+            </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.OnPause(System.Int64)">
             <summary>
@@ -597,6 +626,17 @@
             <summary>
             Static helper class to merge the RepRapFirmware object model with ours
             </summary>
+        </member>
+        <member name="M:DuetControlServer.Model.Updater.Init">
+            <summary>
+            Initialize this class
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Model.Updater.WaitForFullUpdate">
+            <summary>
+            Wait for the model to be fully updated from RepRapFirmware
+            </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.Model.Updater.MergeData(System.Byte,System.String)">
             <summary>
@@ -938,6 +978,11 @@
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.StackFlags.DrivesRelative">
             <summary>
             Whether the extruder drives are driven in relative mode
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.StackFlags.VolumetricExtrusion">
+            <summary>
+            Whether volumetric extrusion is being used
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.StackFlags.AxesRelative">
@@ -1694,10 +1739,11 @@
             </summary>
             <returns>Average number of full transfers per second</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.PerformFullTransfer">
+        <member name="M:DuetControlServer.SPI.DataTransfer.PerformFullTransfer(System.Boolean)">
             <summary>
             Perform a full data transfer
             </summary>
+            <param name="mustSucceed">Keep retrying until the transfer succeeds</param>
             <returns>Whether new data could be transferred</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.HadReset">
@@ -1771,8 +1817,7 @@
             <summary>
             Read the result of a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetHeightMap"/> request
             </summary>
-            <param name="header">Description of the heightmap</param>
-            <param name="zCoordinates">Array of probed Z coordinates</param>
+            <param name="map">Received heightmap</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadResourceLocked(DuetAPI.CodeChannel@)">
             <summary>
@@ -1861,6 +1906,13 @@
             </summary>
             <returns>True if the packet could be written</returns>
         </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.WriteHeightMap(DuetAPI.Utility.Heightmap)">
+            <summary>
+            Write a heightmap to the firmware
+            </summary>
+            <param name="map">Heightmap to send</param>
+            <returns>True if the packet could be written</returns>
+        </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.WriteLockMovementAndWaitForStandstill(DuetAPI.CodeChannel)">
             <summary>
             Request the movement to be locked and wait for standstill
@@ -1884,6 +1936,12 @@
             <summary>
             Initialize the SPI interface but do not connect yet
             </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.Diagnostics(DuetAPI.Commands.CodeResult)">
+            <summary>
+            Print diagnostics of this class
+            </summary>
+            <param name="result">Message storage</param>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.GetHeightmap">
             <summary>
@@ -1914,6 +1972,13 @@
             </summary>
             <param name="code">Code to execute</param>
             <returns>Task that completes when the code has finished</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.Flush(DuetAPI.CodeChannel)">
+            <summary>
+            Wait for all pending codes to finish
+            </summary>
+            <param name="channel">Code channel to wait for</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.RequestEmergencyStop">
             <summary>
@@ -1986,6 +2051,11 @@
         <member name="P:DuetControlServer.SPI.QueuedCode.IsExecuting">
             <summary>
             Whether the code is already being executed
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.QueuedCode.DoingNestedMacro">
+            <summary>
+            Indicates if RepRapFirmware requested a macro file for execution as part of this code
             </summary>
         </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.IsRequestedFromFirmware">
@@ -2074,14 +2144,14 @@
             </summary>
             <remarks>Once .NET Core 3.0 is out, the performance of this can be further improved (without relying on unsafe code) by using <c>Span.AsRef()</c></remarks>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadPacketHeader(System.Span{System.Byte})">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadPacketHeader(System.ReadOnlySpan{System.Byte})">
             <summary>
             Read a packet header from a memory span
             </summary>
             <param name="from">Origin</param>
             <returns>Header describing a packet</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadState(System.Span{System.Byte},System.Int32@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadState(System.ReadOnlySpan{System.Byte},System.Int32@)">
             <summary>
             Read the current state of the code buffers
             </summary>
@@ -2089,7 +2159,7 @@
             <param name="busyChannels">Bitmap of the busy channels</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadObjectModel(System.Span{System.Byte},System.Byte@,System.String@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadObjectModel(System.ReadOnlySpan{System.Byte},System.Byte@,System.String@)">
             <summary>
             Read an object model header plus JSON text from a memory span
             </summary>
@@ -2098,7 +2168,7 @@
             <param name="json">Object model data as JSON or null if none available</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadCodeReply(System.Span{System.Byte},DuetControlServer.SPI.Communication.MessageTypeFlags@,System.String@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadCodeReply(System.ReadOnlySpan{System.Byte},DuetControlServer.SPI.Communication.MessageTypeFlags@,System.String@)">
             <summary>
             Read a code reply from a memory span
             </summary>
@@ -2107,7 +2177,7 @@
             <param name="reply">Raw code reply</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadMacroRequest(System.Span{System.Byte},DuetAPI.CodeChannel@,System.Boolean@,System.String@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadMacroRequest(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.Boolean@,System.String@)">
             <summary>
             Read a macro file request from a memory span
             </summary>
@@ -2117,7 +2187,7 @@
             <param name="filename">Filename of the macro to execute</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadAbortFile(System.Span{System.Byte},DuetAPI.CodeChannel@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadAbortFile(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)">
             <summary>
             Read information about an abort file request 
             </summary>
@@ -2125,7 +2195,7 @@
             <param name="channel">Code channel running the file</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadStackEvent(System.Span{System.Byte},DuetAPI.CodeChannel@,System.Byte@,DuetControlServer.SPI.Communication.FirmwareRequests.StackFlags@,System.Single@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadStackEvent(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.Byte@,DuetControlServer.SPI.Communication.FirmwareRequests.StackFlags@,System.Single@)">
             <summary>
             Read a stack event
             </summary>
@@ -2137,7 +2207,7 @@
             <returns>Number of bytes read</returns>
             <seealso cref="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.StackEvent"/>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadPrintPaused(System.Span{System.Byte},System.UInt32@,DuetControlServer.SPI.Communication.PrintPausedReason@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadPrintPaused(System.ReadOnlySpan{System.Byte},System.UInt32@,DuetControlServer.SPI.Communication.PrintPausedReason@)">
             <summary>
             Read a print pause event
             </summary>
@@ -2146,7 +2216,7 @@
             <param name="reason">Reason why the print has been paused</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadHeightMap(System.Span{System.Byte},DuetAPI.Utility.Heightmap@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadHeightMap(System.ReadOnlySpan{System.Byte},DuetAPI.Utility.Heightmap@)">
             <summary>
             Read a heightmap report
             </summary>
@@ -2154,7 +2224,7 @@
             <param name="map">Deserialized heightmap</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked(System.Span{System.Byte},DuetAPI.CodeChannel@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)">
             <summary>
             Read a lock confirmation
             </summary>
@@ -2251,9 +2321,9 @@
             <summary>
             Write a heightmap as read by G29 S1
             </summary>
-            <param name="span"></param>
-            <param name="header"></param>
-            <param name="zCoordinates"></param>
+            <param name="to">Destination</param>
+            <param name="map">Heightmap to write</param>
+            <returns>Number of bytes written</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock(System.Span{System.Byte},DuetAPI.CodeChannel)">
             <summary>
@@ -2272,6 +2342,7 @@
             <summary>
             Save the current non-volatile parameters to config-override.g
             </summary>
+            <param name="code">Code that invoked this method</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.FileInfoParser">

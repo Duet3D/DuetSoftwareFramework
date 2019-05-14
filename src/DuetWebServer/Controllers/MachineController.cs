@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 using DuetAPI;
 using DuetAPI.Utility;
 using DuetAPIClient;
@@ -149,6 +150,8 @@ namespace DuetWebServer.Controllers
         [HttpGet("file/{*filename}")]
         public async Task<IActionResult> DownloadFile(string filename)
         {
+            filename = HttpUtility.UrlDecode(filename);
+
             string resolvedPath = "n/a";
             try
             {
@@ -156,7 +159,7 @@ namespace DuetWebServer.Controllers
                 if (!System.IO.File.Exists(resolvedPath))
                 {
                     _logger.LogWarning($"[{nameof(DownloadFile)}] Could not find file {filename} (resolved to {resolvedPath})");
-                    return NotFound(filename);
+                    return NotFound(HttpUtility.UrlPathEncode(filename));
                 }
 
                 FileStream stream = new FileStream(resolvedPath, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -189,6 +192,8 @@ namespace DuetWebServer.Controllers
         [HttpPut("file/{*filename}")]
         public async Task<IActionResult> UploadFile(string filename)
         {
+            filename = HttpUtility.UrlDecode(filename);
+
             string resolvedPath = "n/a";
             try
             {
@@ -206,7 +211,7 @@ namespace DuetWebServer.Controllers
                 {
                     await Request.Body.CopyToAsync(stream);
                 }
-                return Created(filename, null);
+                return Created(HttpUtility.UrlPathEncode(filename), null);
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
@@ -234,6 +239,8 @@ namespace DuetWebServer.Controllers
         [HttpGet("fileinfo/{*filename}")]
         public async Task<IActionResult> GetFileinfo(string filename)
         {
+            filename = HttpUtility.UrlDecode(filename);
+
             string resolvedPath = "n/a";
             try
             {
@@ -241,7 +248,7 @@ namespace DuetWebServer.Controllers
                 if (!System.IO.File.Exists(resolvedPath))
                 {
                     _logger.LogWarning($"[{nameof(GetFileinfo)}] Could not find file {filename} (resolved to {resolvedPath})");
-                    return NotFound(filename);
+                    return NotFound(HttpUtility.UrlPathEncode(filename));
                 }
 
                 using (CommandConnection connection = await BuildConnection())
@@ -279,6 +286,8 @@ namespace DuetWebServer.Controllers
         [HttpDelete("file/{*filename}")]
         public async Task<IActionResult> DeleteFileOrDirectory(string filename)
         {
+            filename = HttpUtility.UrlDecode(filename);
+
             string resolvedPath = "n/a";
             try
             {
@@ -297,7 +306,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 _logger.LogWarning($"[{nameof(DeleteFileOrDirectory)} Could not find file {filename} (resolved to {resolvedPath})");
-                return NotFound(filename);
+                return NotFound(HttpUtility.UrlPathEncode(filename));
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
@@ -370,7 +379,7 @@ namespace DuetWebServer.Controllers
                     return NoContent();
                 }
 
-                return NotFound(from);
+                return NotFound(HttpUtility.UrlPathEncode(from));
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
@@ -400,6 +409,8 @@ namespace DuetWebServer.Controllers
         [HttpGet("directory/{*directory}")]
         public async Task<IActionResult> GetFileList(string directory)
         {
+            directory = HttpUtility.UrlDecode(directory);
+
             string resolvedPath = "n/a";
             try
             {
@@ -407,7 +418,7 @@ namespace DuetWebServer.Controllers
                 if (!Directory.Exists(resolvedPath))
                 {
                     _logger.LogWarning($"[{nameof(GetFileList)}] Could not find directory {directory} (resolved to {resolvedPath})");
-                    return NotFound(directory);
+                    return NotFound(HttpUtility.UrlPathEncode(directory));
                 }
                 List<object> fileList = new List<object>();
 
@@ -454,12 +465,14 @@ namespace DuetWebServer.Controllers
         [HttpPut("directory/{*directory}")]
         public async Task<IActionResult> CreateDirectory(string directory)
         {
+            directory = HttpUtility.UrlDecode(directory);
+
             string resolvedPath = "n/a";
             try
             {
                 resolvedPath = await ResolvePath(directory);
                 Directory.CreateDirectory(resolvedPath);
-                return Created(directory, null);
+                return Created(HttpUtility.UrlPathEncode(directory), null);
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {

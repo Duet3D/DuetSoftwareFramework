@@ -54,39 +54,39 @@
     <SdkLinkTarget>Blank</SdkLinkTarget>
     <NamespaceSummaries>
       <NamespaceSummaryItem name="DuetAPI" isDocumented="True">Main structures used by the Duet Software Framework API</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPI.Commands" isDocumented="True">Commands that can be sent to the control server</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPI.Connection" isDocumented="True">Structures used for connections</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPI.Machine" isDocumented="True">Various classes holding information about the machine. See MachineModel for more details</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPIClient" isDocumented="True">Main structures used by the Duet Software Framework API client</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPI.Machine.Channels" isDocumented="True">Channel-related data providers</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetWebServer" isDocumented="True">Main classes used by the ASP.NET Core application</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPIClient.Exceptions" isDocumented="True">Custom exceptions used by the API client</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer" isDocumented="True">Main structures used by the Duet Control Server</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.Codes" isDocumented="True">Code processors for G/M/T-codes</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.Commands" isDocumented="True">Implementations of the supported API commands</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.IPC (Group)" isGroup="True" isDocumented="True">Inter-process communication</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.IPC" isDocumented="True">Main structures used for Inter-process communication</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.IPC.Processors" isDocumented="True">Different modes of inter-process communication</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.SPI (Group)" isGroup="True" isDocumented="True">Communication structures to deal with RepRapFirmware</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.SPI" isDocumented="True">Main classes used for data transfers via SPI</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.SPI.Communication" isDocumented="True">Communication classes for dealing with RepRapFirmware</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.SPI.Communication.LinuxRequests" isDocumented="True">Wrappers for requests that come from the Linux server</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.SPI.Communication.SharedRequests" isDocumented="True">Wrappers for requests that may be used from both sides</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.SPI.Serialization" isDocumented="True">Serialization helpers for binary data transfers</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetRestEndpoint.FileProviders" isDocumented="True">Provides access to physical files using the name resolution as provided by Duet Control Server</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPI (Group)" isGroup="True" isDocumented="True">Main namespace of the Duet Software Framework API</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPI.Connection (Group)" isGroup="True" isDocumented="True">Provides functionality for initiating connections to the control server</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPI.Connection.InitMessages" isDocumented="True">Initialization messages that are sent from the client to the server or vice versa</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPI.Utility" isDocumented="True">Some helper classes (e.g. for JSON serialization and deserialization)</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetAPIClient (Group)" isGroup="True" isDocumented="True">Main namespace for the .NET API client for direct communication over a UNIX socket</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer (Group)" isGroup="True" isDocumented="True">Core application that controls the communication to IPC clients and to the RepRapFirmware board</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.FileExecution" isDocumented="True">Classes for file-based G-code operations like file prints and macros</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.Model" isDocumented="True">Global information store that provides access to the object model</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetControlServer.SPI.Communication.FirmwareRequests" isDocumented="True">Wrappers for requests that come from the control server</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetWebServer (Group)" isGroup="True" isDocumented="True">Web-based API provider for serving RESTful HTTP commands and WebSockets to Duet Web Control 2</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetWebServer.Controllers" isDocumented="True">Namespace for ASP.NET MVC controllers</NamespaceSummaryItem>
-      <NamespaceSummaryItem name="DuetWebServer.FileProviders" isDocumented="True">Namespace for functions that provide access to files and directories</NamespaceSummaryItem>
-    </NamespaceSummaries>
+<NamespaceSummaryItem name="DuetAPI.Commands" isDocumented="True">Commands that can be sent to the control server</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetAPI.Connection" isDocumented="True">Structures used for connections</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetAPI.Machine" isDocumented="True">Various classes holding information about the machine. See MachineModel for more details</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetAPIClient" isDocumented="True">Main structures used by the Duet Software Framework API client</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetAPI.Machine.Channels" isDocumented="True">Channel-related data providers</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetWebServer" isDocumented="True">Main classes used by the ASP.NET Core application</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetAPIClient.Exceptions" isDocumented="True">Custom exceptions used by the API client</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer" isDocumented="True">Main structures used by the Duet Control Server</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.Codes" isDocumented="True">Code processors for G/M/T-codes</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.Commands" isDocumented="True">Implementations of the supported API commands</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.IPC (Group)" isGroup="True" isDocumented="True">Inter-process communication</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.IPC" isDocumented="True">Main structures used for Inter-process communication</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.IPC.Processors" isDocumented="True">Different modes of inter-process communication</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.SPI (Group)" isGroup="True" isDocumented="True">Communication structures to deal with RepRapFirmware</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.SPI" isDocumented="True">Main classes used for data transfers via SPI</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.SPI.Communication" isDocumented="True">Communication classes for dealing with RepRapFirmware</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.SPI.Communication.LinuxRequests" isDocumented="True">Wrappers for requests that come from the Linux server</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.SPI.Communication.SharedRequests" isDocumented="True">Wrappers for requests that may be used from both sides</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.SPI.Serialization" isDocumented="True">Serialization helpers for binary data transfers</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetRestEndpoint.FileProviders" isDocumented="True">Provides access to physical files using the name resolution as provided by Duet Control Server</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetAPI (Group)" isGroup="True" isDocumented="True">Main namespace of the Duet Software Framework API</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetAPI.Connection (Group)" isGroup="True" isDocumented="True">Provides functionality for initiating connections to the control server</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetAPI.Connection.InitMessages" isDocumented="True">Initialization messages that are sent from the client to the server or vice versa</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetAPI.Utility" isDocumented="True">Some helper classes (e.g. for JSON serialization and deserialization)</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetAPIClient (Group)" isGroup="True" isDocumented="True">Main namespace for the .NET API client for direct communication over a UNIX socket</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer (Group)" isGroup="True" isDocumented="True">Core application that controls the communication to IPC clients and to the RepRapFirmware board</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.FileExecution" isDocumented="True">Classes for file-based G-code operations like file prints and macros</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.Model" isDocumented="True">Global information store that provides access to the object model</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.SPI.Communication.FirmwareRequests" isDocumented="True">Wrappers for requests that come from the control server</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetWebServer (Group)" isGroup="True" isDocumented="True">Web-based API provider for serving RESTful HTTP commands and WebSockets to Duet Web Control 2</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetWebServer.Controllers" isDocumented="True">Namespace for ASP.NET MVC controllers</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetWebServer.FileProviders" isDocumented="True">Namespace for functions that provide access to files and directories</NamespaceSummaryItem>
+<NamespaceSummaryItem name="DuetControlServer.Utility" isDocumented="True">Utility classes for the control server</NamespaceSummaryItem></NamespaceSummaries>
     <RootNamespaceTitle>API Reference</RootNamespaceTitle>
     <PlugInConfigurations>
       <PlugInConfig id="Assembly Binding Redirection" enabled="True">

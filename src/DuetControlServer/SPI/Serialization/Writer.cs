@@ -414,9 +414,9 @@ namespace DuetControlServer.SPI.Serialization
         /// <summary>
         /// Write a heightmap as read by G29 S1
         /// </summary>
-        /// <param name="span"></param>
-        /// <param name="header"></param>
-        /// <param name="zCoordinates"></param>
+        /// <param name="to">Destination</param>
+        /// <param name="map">Heightmap to write</param>
+        /// <returns>Number of bytes written</returns>
         public static int WriteHeightMap(Span<byte> to, Heightmap map)
         {
             HeightMap header = new HeightMap

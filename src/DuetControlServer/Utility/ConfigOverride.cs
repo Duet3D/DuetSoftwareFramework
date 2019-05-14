@@ -17,6 +17,7 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Save the current non-volatile parameters to config-override.g
         /// </summary>
+        /// <param name="code">Code that invoked this method</param>
         /// <returns>Asynchronous task</returns>
         public static async Task Save(Code code)
         {

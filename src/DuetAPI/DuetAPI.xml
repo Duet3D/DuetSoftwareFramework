@@ -7,10 +7,10 @@
         <member name="T:DuetAPI.CodeChannel">
             <summary>
             Enumeration of every available code channel
+            </summary>
             <seealso cref="T:DuetAPI.Commands.Code"/>
             <seealso cref="T:DuetAPI.Commands.SimpleCode"/>
             <seealso cref="T:DuetAPI.Machine.Channels"/>
-            </summary>
         </member>
         <member name="F:DuetAPI.CodeChannel.HTTP">
             <summary>
@@ -289,9 +289,16 @@
             Creates a new CodeParameter instance and parses value to a native data type if applicable
             </summary>
             <param name="letter">Letter of the code parameter</param>
-            <param name="value">String representation of the value (also stored in <see cref="!:AsString"/>)</param>
+            <param name="value">String representation of the value</param>
             <param name="isString">Whether this is a string. This is set to true if the parameter was inside quotation marks.</param>
             <remarks>This constructor does not parsed long (aka int64) values because RRF cannot handle them</remarks>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.#ctor(System.Char,System.Object)">
+            <summary>
+            Creates a new CodeParameter instance and with the given value
+            </summary>
+            <param name="letter">Letter of the code parameter</param>
+            <param name="value">Value of this parameter</param>
         </member>
         <member name="P:DuetAPI.Commands.CodeParameter.Type">
             <summary>
@@ -303,6 +310,7 @@
             Implicit conversion operator to float
             </summary>
             <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Int32">
@@ -310,6 +318,7 @@
             Implicit conversion operator to int
             </summary>
             <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.UInt32">
@@ -317,6 +326,7 @@
             Implicit conversion operator to uint
             </summary>
             <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Int64">
@@ -324,41 +334,54 @@
             Implicit conversion operator to long
             </summary>
             <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Boolean">
             <summary>
             Implicit conversion operator to bool
             </summary>
             <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
+            <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.String">
             <summary>
             Implicit conversion operator to string
             </summary>
             <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Single[]">
             <summary>
             Implicit conversion operator to float array
             </summary>
+            <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Int32[]">
             <summary>
             Implicit conversion operator to integer array
             </summary>
+            <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.UInt32[]">
             <summary>
             Implicit conversion operator to unsigned integer array
             </summary>
+            <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Int64[]">
             <summary>
             Implicit conversion operator to long array
             </summary>
+            <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
             <exception cref="T:System.ArgumentException">Data type is not convertible</exception>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.op_Equality(DuetAPI.Commands.CodeParameter,System.Object)">
@@ -381,14 +404,14 @@
             <summary>
             Checks if the other obj equals this instance
             </summary>
-            <param name="obj"></param>
-            <returns></returns>
+            <param name="obj">Other object</param>
+            <returns>True if both objects are not equal</returns>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.GetHashCode">
             <summary>
             Returns the hash code of this instance
             </summary>
-            <returns></returns>
+            <returns>Computed hash code</returns>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.ToString">
             <summary>
@@ -508,6 +531,17 @@
         <member name="F:DuetAPI.Commands.CodeType.TCode">
             <summary>
             T-code
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.Flush">
+            <summary>
+            Wait for all pending codes of the given channel to finish
+            </summary>
+            <remarks>At present, this command only waits for codes interacting with the firmware.</remarks>
+        </member>
+        <member name="P:DuetAPI.Commands.Flush.Channel">
+            <summary>
+            Code channel to wait for
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.GetFileInfo">
@@ -637,6 +671,11 @@
         <member name="P:DuetAPI.Commands.SimpleCode.Channel">
             <summary>
             Destination channel
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.SyncMachineModel">
+            <summary>
+            Wait for the machine model to be fully updated from RepRapFirmware
             </summary>
         </member>
         <member name="T:DuetAPI.Connection.ConnectionMode">
@@ -805,6 +844,11 @@
         <member name="P:DuetAPI.Machine.Channel.RelativeExtrusion">
             <summary>
             Whether relative extrusion is being used
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channel.VolumetricExtrusion">
+            <summary>
+            Whether volumetric extrusion is being used
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Channel.RelativePositioning">

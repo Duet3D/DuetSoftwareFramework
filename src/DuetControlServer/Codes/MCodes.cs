@@ -4,6 +4,7 @@ using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.FileExecution;
 using Newtonsoft.Json;
+using Nito.AsyncEx;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -15,6 +16,7 @@ namespace DuetControlServer.Codes
     /// </summary>
     public static class MCodes
     {
+        private static AsyncLock _fileToPrintLock = new AsyncLock();
         private static string _fileToPrint;
 
         /// <summary>
@@ -37,27 +39,36 @@ namespace DuetControlServer.Codes
 
                 // Select a file to print
                 case 23:
-                {
-                    string file = await FilePath.ToPhysical(code.GetUnprecedentedString(), "gcodes");
-                    if (File.Exists(file))
                     {
-                        _fileToPrint = file;
-                        return new CodeResult(DuetAPI.MessageType.Success, $"File {_fileToPrint} selected for printing");
+                        string file = await FilePath.ToPhysical(code.GetUnprecedentedString(), "gcodes");
+                        if (File.Exists(file))
+                        {
+                            using (await _fileToPrintLock.LockAsync())
+                            {
+                                _fileToPrint = file;
+                            }
+                            return new CodeResult(DuetAPI.MessageType.Success, $"File {file} selected for printing");
+                        }
+                        return new CodeResult(DuetAPI.MessageType.Error, $"Could not find file {file}");
                     }
-                    return new CodeResult(DuetAPI.MessageType.Error, $"Could not find file {file}");
-                }
 
                 // Resume a file print
                 case 24:
                     if (!Print.IsPaused)
                     {
-                        if (string.IsNullOrEmpty(_fileToPrint))
+                        string file;
+                        using (await _fileToPrintLock.LockAsync())
+                        {
+                            file = string.Copy(_fileToPrint);
+                        }
+
+                        if (string.IsNullOrEmpty(file))
                         {
                             return new CodeResult(DuetAPI.MessageType.Error, "Cannot print, because no file is selected!");
                         }
 
                         // FIXME Emulate Marlin via "File opened\nFile selected". IMHO this should happen via a CodeChannel property
-                        return await Print.Start(_fileToPrint);
+                        return await Print.Start(file, code.Channel);
                     }
                     break;
 
@@ -73,15 +84,15 @@ namespace DuetControlServer.Codes
 
                 // Set SD position
                 case 26:
-                {
-                    CodeParameter sParam = code.Parameter('S');
-                    if (sParam != null)
                     {
-                        Print.Position = sParam;
+                        CodeParameter sParam = code.Parameter('S');
+                        if (sParam != null)
+                        {
+                            Print.Position = sParam;
+                        }
+                        // P is not supported yet
+                        return new CodeResult();
                     }
-                    // P is not supported yet
-                    return new CodeResult();
-                }
 
                 // Report SD print status
                 case 27:
@@ -108,8 +119,14 @@ namespace DuetControlServer.Codes
 
                 // Start a file print
                 case 32:
-                    _fileToPrint = await FilePath.ToPhysical(code.GetUnprecedentedString());
-                    return await Print.Start(_fileToPrint);
+                    {
+                        string file = await FilePath.ToPhysical(code.GetUnprecedentedString());
+                        using (await _fileToPrintLock.LockAsync())
+                        {
+                            _fileToPrint = file;
+                        }
+                        return await Print.Start(file, code.Channel);
+                    }
 
                 // Return file information
                 case 36:

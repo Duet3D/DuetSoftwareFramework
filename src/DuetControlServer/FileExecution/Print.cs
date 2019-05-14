@@ -1,4 +1,5 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
+using DuetAPI.Commands;
 using Nito.AsyncEx;
 using System;
 using System.IO;
@@ -21,19 +22,24 @@ namespace DuetControlServer.FileExecution
         /// Begin a file print
         /// </summary>
         /// <param name="fileName">File to print</param>
+        /// <param name="source">Channel that requested the file to be printed</param>
         /// <returns>Code result</returns>
-        public static async Task<CodeResult> Start(string fileName)
+        public static async Task<CodeResult> Start(string fileName, CodeChannel source)
         {
             // Initialize the file
             using (await _lock.LockAsync())
             {
                 if (_file != null)
                 {
-                    return new CodeResult(DuetAPI.MessageType.Error, "A file is already being printed");
+                    return new CodeResult(MessageType.Error, "A file is already being printed");
                 }
-                _file = new BaseFile(fileName, DuetAPI.CodeChannel.File);
+
+                _file = new BaseFile(fileName, CodeChannel.File);
                 IsPaused = false;
             }
+
+            // Wait for all pending firmware codes on the source channel to finish first
+            await SPI.Interface.Flush(source);
 
             // Reset the resume event
             if (_resumeEvent.IsSet)
@@ -45,7 +51,7 @@ namespace DuetControlServer.FileExecution
             DuetAPI.ParsedFileInfo info = await FileInfoParser.Parse(fileName);
             using (await Model.Provider.AccessReadWrite())
             {
-                Model.Provider.Get.Channels[DuetAPI.CodeChannel.File].VolumetricExtrusion = false;
+                Model.Provider.Get.Channels[CodeChannel.File].VolumetricExtrusion = false;
                 Model.Provider.Get.Job.File = info;
             }
 
@@ -63,7 +69,7 @@ namespace DuetControlServer.FileExecution
             string startPath = await FilePath.ToPhysical("sys/start.g");
             if (File.Exists(startPath))
             {
-                MacroFile startMacro = new MacroFile(startPath, DuetAPI.CodeChannel.File, false, 0);
+                MacroFile startMacro = new MacroFile(startPath, CodeChannel.File, false, 0);
                 do
                 {
                     Code code = await startMacro.ReadCode();
@@ -142,6 +148,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Called when the print is being paused
         /// </summary>
+        /// <returns>Asynchronous task</returns>
         public static async Task Pause()
         {
             using (await _lock.LockAsync())
