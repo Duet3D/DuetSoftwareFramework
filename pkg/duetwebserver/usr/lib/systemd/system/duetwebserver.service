@@ -1,0 +1,12 @@
+[Unit]
+Description=Duet Web Server
+Wants=duetcontrolserver.service
+After=network.target duetcontrolserver.service
+
+[Service]
+ExecStart=/opt/dsf/bin/DuetWebServer
+TimeoutStopSec=15
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

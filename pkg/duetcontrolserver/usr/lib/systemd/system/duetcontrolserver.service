@@ -1,0 +1,12 @@
+[Unit]
+Description=Duet Control Server
+
+[Service]
+ExecStart=/opt/dsf/bin/DuetControlServer
+TimeoutStopSec=15
+Restart=always
+RestartSec=5
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

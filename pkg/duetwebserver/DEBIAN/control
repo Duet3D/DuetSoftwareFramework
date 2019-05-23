@@ -1,0 +1,10 @@
+Package: duetwebserver
+Version: DWSVER
+Section: electronics
+Priority: optional
+Architecture: armhf
+Depends: duetcontrolserver (= DCSVER)
+Maintainer: RepRapFirmware <package@reprapfirmware.org>
+Homepage: https://reprapfirmware.org
+Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git
+Description: Optional web server for Duet 3 series

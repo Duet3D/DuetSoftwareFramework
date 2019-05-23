@@ -1,0 +1,17 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information"
+    }
+  },
+  "Kestrel": {
+    "Endpoints": {
+      "Http": {
+        "Url": "http://0.0.0.0"
+      }
+    }
+  },
+  "UseCors": true,
+  "UseStaticFiles": true,
+  "SocketPath": "/var/run/duet.sock"
+}

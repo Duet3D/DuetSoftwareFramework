@@ -1,0 +1,8 @@
+Package: duetsd
+Architecture: all
+Maintainer: RepRapFirmware <package@reprapfirmware.org>
+Depends: duetcontrolserver
+Suggests: duetwebcontrol
+Priority: standard
+Version: 1.0.0
+Description: Virtual SD card directory for the Duet software framework
