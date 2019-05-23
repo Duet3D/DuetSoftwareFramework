@@ -37,6 +37,10 @@ namespace DuetControlServer.Codes
                         {
                             return new CodeResult(DuetAPI.MessageType.Error, $"Failed to load height map from file {file}: {ae.InnerException.Message}");
                         }
+                        catch (Exception e)
+                        {
+                            return new CodeResult(DuetAPI.MessageType.Error, $"Failed to load height map from file {file}: {e.Message}");
+                        }
                     }
                     break;
             }

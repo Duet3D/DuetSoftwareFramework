@@ -122,6 +122,10 @@ namespace DuetControlServer
             // Tell other tasks to stop in case this is an abnormal program termination
             if (!CancelSource.IsCancellationRequested)
             {
+                Console.WriteLine("[crit] Abnormal program termination:");
+                if (spiTask.IsCompleted) { Console.WriteLine("SPI task terminated");  }
+                if (ipcTask.IsCompleted) { Console.WriteLine("IPC task terminated");  }
+                if (modelUpdateTask.IsCompleted) { Console.WriteLine("Model task terminated");  }
                 CancelSource.Cancel();
             }
 

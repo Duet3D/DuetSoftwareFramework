@@ -36,11 +36,12 @@ namespace DuetControlServer.Commands
             if (!IsPreProcessed)
             {
                 result = await Interception.Intercept(this, InterceptionMode.Pre);
+                IsPreProcessed = true;
+
                 if (result != null)
                 {
-                    return result;
+                    return await OnCodeExecuted(result);
                 }
-                IsPreProcessed = true;
             }
 
             // Attempt to process the code internally
@@ -61,67 +62,50 @@ namespace DuetControlServer.Commands
 
             if (result != null)
             {
-                return result;
+                return await OnCodeExecuted(result);
             }
 
             // If the could not be interpreted, post-process it
             if (!IsPostProcessed)
             {
                 result = await Interception.Intercept(this, InterceptionMode.Post);
+                IsPostProcessed = true;
+
                 if (result != null)
                 {
-                    return result;
+                    return await OnCodeExecuted(result);
                 }
-                IsPostProcessed = true;
             }
 
-            // Comments are handled before they are sent to the firmware
-            if (Type == CodeType.Comment)
-            {
-                return new CodeResult();
-            }
-
-            // Send it to RepRapFirmware. If this code comes from a system macro, do not wait for its completion but enqueue it
-            if (IsFromSystemMacro)
-            {
-                Task<CodeResult> onCodeComplete = Interface.ProcessSystemCode(this);
-                Task backgroundTask = Task.Run(async () =>
-                {
-                    try
-                    {
-                        result = await onCodeComplete;
-                        await OnCodeExecuted(result);
-                        await Model.Provider.Output(result);
-                    }
-                    catch (AggregateException ae)
-                    {
-                        await Model.Provider.Output(DuetAPI.MessageType.Error, $"{ToShortString()}: {ae.InnerException.Message}");
-                    }
-                });
-            }
-            else
+            // Send it to RepRapFirmware unless it is a comment
+            if (Type != CodeType.Comment)
             {
                 result = await Interface.ProcessCode(this);
-                result = await OnCodeExecuted(result);
             }
 
-            return result;
+            return await OnCodeExecuted(result);
         }
 
-        private Task<CodeResult> OnCodeExecuted(CodeResult result)
+        private async Task<CodeResult> OnCodeExecuted(CodeResult result)
         {
+            // Process code result
             switch (Type)
             {
                 case CodeType.GCode:
-                    return GCodes.CodeExecuted(this, result);
+                    result = await GCodes.CodeExecuted(this, result);
+                    break;
 
                 case CodeType.MCode:
-                    return MCodes.CodeExecuted(this, result);
+                    result = await MCodes.CodeExecuted(this, result);
+                    break;
 
                 case CodeType.TCode:
-                    return TCodes.CodeExecuted(this, result);
+                    result = await TCodes.CodeExecuted(this, result);
+                    break;
             }
-            return Task.FromResult(result);
+
+            // Finished. Optionally an "Executed" interceptor could be called here, but that would only make sense if the code reply was included
+            return result ?? new CodeResult();
         }
     }
 }

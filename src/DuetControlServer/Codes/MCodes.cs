@@ -16,7 +16,7 @@ namespace DuetControlServer.Codes
     /// </summary>
     public static class MCodes
     {
-        private static AsyncLock _fileToPrintLock = new AsyncLock();
+        private static readonly AsyncLock _fileToPrintLock = new AsyncLock();
         private static string _fileToPrint;
 
         /// <summary>
@@ -47,9 +47,9 @@ namespace DuetControlServer.Codes
                             {
                                 _fileToPrint = file;
                             }
-                            return new CodeResult(DuetAPI.MessageType.Success, $"File {file} selected for printing");
+                            return new CodeResult(MessageType.Success, $"File {file} selected for printing");
                         }
-                        return new CodeResult(DuetAPI.MessageType.Error, $"Could not find file {file}");
+                        return new CodeResult(MessageType.Error, $"Could not find file {file}");
                     }
 
                 // Resume a file print
@@ -64,7 +64,7 @@ namespace DuetControlServer.Codes
 
                         if (string.IsNullOrEmpty(file))
                         {
-                            return new CodeResult(DuetAPI.MessageType.Error, "Cannot print, because no file is selected!");
+                            return new CodeResult(MessageType.Error, "Cannot print, because no file is selected!");
                         }
 
                         // FIXME Emulate Marlin via "File opened\nFile selected". IMHO this should happen via a CodeChannel property
@@ -98,9 +98,9 @@ namespace DuetControlServer.Codes
                 case 27:
                     if (Print.IsPrinting)
                     {
-                        return new CodeResult(DuetAPI.MessageType.Success, $"SD printing byte {Print.Position}/{Print.Length}");
+                        return new CodeResult(MessageType.Success, $"SD printing byte {Print.Position}/{Print.Length}");
                     }
-                    return new CodeResult(DuetAPI.MessageType.Success, "Not SD printing.");
+                    return new CodeResult(MessageType.Success, "Not SD printing.");
 
                 // Delete a file on the SD card
                 case 30:
@@ -113,7 +113,7 @@ namespace DuetControlServer.Codes
                         }
                         catch (Exception e)
                         {
-                            return new CodeResult(DuetAPI.MessageType.Error, $"Failed to delete file {file}: {e.Message}");
+                            return new CodeResult(MessageType.Error, $"Failed to delete file {file}: {e.Message}");
                         }
                     }
 
@@ -142,7 +142,7 @@ namespace DuetControlServer.Codes
                         }
                         catch
                         {
-                            return new CodeResult(DuetAPI.MessageType.Success, "{\"err\":1}");
+                            return new CodeResult(MessageType.Success, "{\"err\":1}");
                         }
                     }
                     break;
@@ -163,7 +163,7 @@ namespace DuetControlServer.Codes
                             using (FileStream stream = new FileStream(file, FileMode.Open, FileAccess.Read))
                             {
                                 var sha1 = System.Security.Cryptography.SHA1.Create();
-                                byte[] hash = await Task.Run(() => sha1.ComputeHash(stream));
+                                byte[] hash = await Task.Run(() => sha1.ComputeHash(stream), Program.CancelSource.Token);
                                 return new CodeResult(MessageType.Success, BitConverter.ToString(hash).Replace("-", ""));
                             }
                         }
@@ -212,14 +212,19 @@ namespace DuetControlServer.Codes
                     }
 
                 // Run Macro Fie
-                // This is only handled here if RepRapFirmware is not performing any system macros
                 case 98:
-                    if (!code.IsFromSystemMacro)
+                    CodeParameter pParam = code.Parameter('P');
+                    if (pParam != null)
                     {
-                        CodeParameter pParam = code.Parameter('P');
-                        if (pParam != null)
+                        string path = await FilePath.ToPhysical(pParam, "sys");
+                        if (File.Exists(path))
                         {
-                            string path = await FilePath.ToPhysical(pParam, "sys");
+                            MacroFile macro = new MacroFile(path, code.Channel, false, code.SourceConnection);
+                            return await macro.RunMacro();
+                        }
+                        else
+                        {
+                            path = await FilePath.ToPhysical(pParam, "macros");
                             if (File.Exists(path))
                             {
                                 MacroFile macro = new MacroFile(path, code.Channel, false, code.SourceConnection);
@@ -227,34 +232,19 @@ namespace DuetControlServer.Codes
                             }
                             else
                             {
-                                path = await FilePath.ToPhysical(pParam, "macros");
-                                if (File.Exists(path))
-                                {
-                                    MacroFile macro = new MacroFile(path, code.Channel, false, code.SourceConnection);
-                                    return await macro.RunMacro();
-                                }
-                                else
-                                {
-                                    return new CodeResult(DuetAPI.MessageType.Error, $"Could not file macro file {pParam}");
-                                }
+                                return new CodeResult(MessageType.Error, $"Could not file macro file {pParam}");
                             }
                         }
-                        return new CodeResult();
                     }
-                    break;
+                    return new CodeResult();
 
                 // Return from macro
-                // This is only handled here if RepRapFirmware is not performing any system macros
                 case 99:
-                    if (!code.IsFromSystemMacro)
+                    if (!MacroFile.AbortLastFile(code.Channel))
                     {
-                        if (!MacroFile.AbortLastFile(code.Channel))
-                        {
-                            return new CodeResult(DuetAPI.MessageType.Error, "Not executing a macro file");
-                        }
-                        return new CodeResult();
+                        return new CodeResult(MessageType.Error, "Not executing a macro file");
                     }
-                    break;
+                    return new CodeResult();
 
                 // Emergency Stop
                 case 112:
@@ -274,11 +264,11 @@ namespace DuetControlServer.Codes
                         {
                             Heightmap map = await SPI.Interface.GetHeightmap();
                             await map.Save(await FilePath.ToPhysical(file, "sys"));
-                            return new CodeResult(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
+                            return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
                         }
                         catch (AggregateException ae)
                         {
-                            return new CodeResult(DuetAPI.MessageType.Error, $"Failed to save height map to file {file}: {ae.InnerException.Message}");
+                            return new CodeResult(MessageType.Error, $"Failed to save height map to file {file}: {ae.InnerException.Message}");
                         }
                     }
 
@@ -296,7 +286,7 @@ namespace DuetControlServer.Codes
                         }
                         catch (AggregateException ae)
                         {
-                            return new CodeResult(DuetAPI.MessageType.Error, $"Failed to load height map from file {file}: {ae.InnerException.Message}");
+                            return new CodeResult(MessageType.Error, $"Failed to load height map from file {file}: {ae.InnerException.Message}");
                         }
                     }
 
@@ -423,7 +413,7 @@ namespace DuetControlServer.Codes
 
                 // Diagnostics
                 case 122:
-                    SPI.Interface.Diagnostics(result);
+                    await SPI.Interface.Diagnostics(result);
                     break;
             }
             return result;

@@ -16,8 +16,7 @@ namespace DuetAPI.Connection
         Pre,
 
         /// <summary>
-        /// Intercept codes after the initial processing of the control server but before they are forwarded
-        /// to the RepRapFirmware controller
+        /// Intercept codes after the initial processing of the control server but before they are forwarded to the RepRapFirmware controller
         /// </summary>
         Post
     }

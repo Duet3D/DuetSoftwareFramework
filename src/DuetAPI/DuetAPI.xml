@@ -811,8 +811,7 @@
         </member>
         <member name="F:DuetAPI.Connection.InterceptionMode.Post">
             <summary>
-            Intercept codes after the initial processing of the control server but before they are forwarded
-            to the RepRapFirmware controller
+            Intercept codes after the initial processing of the control server but before they are forwarded to the RepRapFirmware controller
             </summary>
         </member>
         <member name="T:DuetAPI.Connection.SubscriptionMode">

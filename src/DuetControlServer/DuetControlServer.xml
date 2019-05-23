@@ -1942,6 +1942,7 @@
             Print diagnostics of this class
             </summary>
             <param name="result">Message storage</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.GetHeightmap">
             <summary>
@@ -1960,18 +1961,10 @@
         </member>
         <member name="M:DuetControlServer.SPI.Interface.ProcessCode(DuetControlServer.Commands.Code)">
             <summary>
-            Execute a G/M/T-code and wait asynchronously for its completion
+            Execute a G/M/T-code asynchronously
             </summary>
             <param name="code">Code to execute</param>
             <returns>Asynchronous task</returns>
-        </member>
-        <member name="M:DuetControlServer.SPI.Interface.ProcessSystemCode(DuetControlServer.Commands.Code)">
-            <summary>
-            Execute a system G/M/T-code and wait asynchronously for its completion.
-            This is only used for macro files requested from the firmware
-            </summary>
-            <param name="code">Code to execute</param>
-            <returns>Task that completes when the code has finished</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.Flush(DuetAPI.CodeChannel)">
             <summary>
@@ -2036,12 +2029,11 @@
             There is no need to serialize/deserialize data, so no properties in here 
             </summary>
         </member>
-        <member name="M:DuetControlServer.SPI.QueuedCode.#ctor(DuetControlServer.Commands.Code,System.Boolean)">
+        <member name="M:DuetControlServer.SPI.QueuedCode.#ctor(DuetControlServer.Commands.Code)">
             <summary>
             Constructor for a queued code
             </summary>
             <param name="code">Code to execute</param>
-            <param name="fromFirmwareRequest">Whether this code comes from a firmware request</param>
         </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.Code">
             <summary>
@@ -2050,17 +2042,12 @@
         </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.IsExecuting">
             <summary>
-            Whether the code is already being executed
+            Whether the code is being executed internally or by the firmware
             </summary>
         </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.DoingNestedMacro">
             <summary>
             Indicates if RepRapFirmware requested a macro file for execution as part of this code
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.SPI.QueuedCode.IsRequestedFromFirmware">
-            <summary>
-            Whether the code is part of a requested macro file
             </summary>
         </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.CanFinish">
@@ -2080,6 +2067,12 @@
             <param name="messageType">Message type flags</param>
             <param name="reply">Raw code reply</param>
         </member>
+        <member name="M:DuetControlServer.SPI.QueuedCode.HandleReply(DuetAPI.Commands.CodeResult)">
+            <summary>
+            Process a code reply
+            </summary>
+            <param name="result">Code reply</param>
+        </member>
         <member name="M:DuetControlServer.SPI.QueuedCode.SetException(System.Exception)">
             <summary>
             Report that soemthing went wrong while executing this code
@@ -2090,12 +2083,6 @@
             <summary>
             Called to resolve the task because it has finished
             </summary>
-        </member>
-        <member name="M:DuetControlServer.SPI.QueuedCode.ToString">
-            <summary>
-            Convert this instance to a string
-            </summary>
-            <returns>String representation of this string</returns>
         </member>
         <member name="T:DuetControlServer.SPI.QueuedLockRequest">
             <summary>

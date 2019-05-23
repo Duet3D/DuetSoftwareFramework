@@ -109,7 +109,6 @@ namespace DuetControlServer.SPI
             _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.ToArray(), Marshal.SizeOf(_txHeader) - Marshal.SizeOf(typeof(ushort)));
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
 
-            bool success = false;
             do
             {
                 try
@@ -141,56 +140,47 @@ namespace DuetControlServer.SPI
                         _hadTimeout = _resetting = false;
                     }
 
-                    // Deal with the first transmission and reset requests
+                    // Deal with the first transmission
                     if (!_started)
                     {
                         _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
                         _started = true;
                     }
 
-                    if (_resetting)
-                    {
-                        _hadTimeout = true;
-                        continue;
-                    }
-
-                    // Reset some variables for the next transfer
+                    // Transfer OK
                     Interlocked.Increment(ref _numMeasuredTransfers);
                     _txBufferIndex = (_txBufferIndex == 0) ? 1 : 0;
                     _rxPointer = _txPointer = 0;
                     _packetId = 0;
 
-                    // Transfer OK
-                    success = true;
-                    break;
+                    // Deal with reset requests
+                    if (_resetting)
+                    {
+                        _hadTimeout = true;
+                        return await PerformFullTransfer(mustSucceed);
+                    }
+                    return true;
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException e)
                 {
                     if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout && _started)
                     {
-                        // A timeout occurs when the firmware is being updated
-                        bool isUpdating;
-                        using (await Model.Provider.AccessReadOnly())
+                        // If this is the first unexpected timeout event, report it unless the firmware is being updated
+                        using (await Model.Provider.AccessReadWrite())
                         {
-                            isUpdating = (Model.Provider.Get.State.Status == MachineStatus.Updating);
-                        }
-
-                        // If this is the first unexpected timeout event, report it
-                        if (!isUpdating)
-                        {
-                            _hadTimeout = true;
-                            using (await Model.Provider.AccessReadWrite())
+                            if (Model.Provider.Get.State.Status == MachineStatus.Updating)
                             {
+                                _hadTimeout = true;
                                 Model.Provider.Get.State.Status = MachineStatus.Off;
-                                Model.Provider.Get.Messages.Add(new Message(MessageType.Warning, "Lost connection to Duet"));
-                                Console.WriteLine("[warn] Lost connection to Duet");
+                                Model.Provider.Get.Messages.Add(new Message(MessageType.Warning, $"Lost connection to Duet ({e.Message})"));
+                                Console.WriteLine($"[warn] Lost connection to Duet ({e.Message})");
                             }
                         }
                     }
                 }
             } while (mustSucceed && !Program.CancelSource.IsCancellationRequested);
 
-            return success;
+            return false;
         }
 
         /// <summary>
@@ -663,9 +653,13 @@ namespace DuetControlServer.SPI
             DateTime startTime = DateTime.Now;
             while (_pinController.Read(Settings.TransferReadyPin) != PinValue.High)
             {
-                if (Program.CancelSource.IsCancellationRequested || (DateTime.Now - startTime).TotalMilliseconds > Settings.SpiTransferTimeout)
+                if (Program.CancelSource.IsCancellationRequested)
                 {
-                    throw new OperationCanceledException();
+                    throw new OperationCanceledException("Program termination");
+                }
+                if ((DateTime.Now - startTime).TotalMilliseconds > Settings.SpiTransferTimeout)
+                {
+                    throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                 }
                 await Task.Yield();
             }
@@ -747,7 +741,7 @@ namespace DuetControlServer.SPI
                         return false;
 
                     default:
-                        Console.WriteLine("[warn] Restarting transfer because a bad response was received (header)");
+                        Console.WriteLine($"[warn] Restarting transfer because a bad header response was received (0x{response:x8})");
                         await ExchangeResponse(Communication.TransferResponse.BadResponse);
                         return false;
                 }
@@ -812,7 +806,7 @@ namespace DuetControlServer.SPI
                         return false;
 
                     default:
-                        Console.WriteLine("[warn] Restarting transfer because a bad response was received (data)");
+                        Console.WriteLine($"[warn] Restarting transfer because a bad data response was received (0x{response:x8})");
                         await ExchangeResponse(Communication.TransferResponse.BadResponse);
                         return false;
                 }

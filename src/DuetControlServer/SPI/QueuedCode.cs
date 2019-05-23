@@ -10,20 +10,18 @@ namespace DuetControlServer.SPI
     /// </summary>
     public class QueuedCode
     {
-        private CodeResult _result = new CodeResult();
+        private readonly CodeResult _result = new CodeResult();
+        private readonly TaskCompletionSource<CodeResult> _taskSource = new TaskCompletionSource<CodeResult>();
         private bool _gotEmptyResponse = false;
         private bool _lastMessageIncomplete = false;        // true if the last message had the push flag set
-        private TaskCompletionSource<CodeResult> _taskSource = new TaskCompletionSource<CodeResult>();
 
         /// <summary>
         /// Constructor for a queued code
         /// </summary>
         /// <param name="code">Code to execute</param>
-        /// <param name="fromFirmwareRequest">Whether this code comes from a firmware request</param>
-        public QueuedCode(Commands.Code code, bool fromFirmwareRequest)
+        public QueuedCode(Commands.Code code)
         {
             Code = code;
-            IsRequestedFromFirmware = fromFirmwareRequest;
         }
 
         /// <summary>
@@ -32,7 +30,7 @@ namespace DuetControlServer.SPI
         public Commands.Code Code { get; }
 
         /// <summary>
-        /// Whether the code is already being executed
+        /// Whether the code is being executed internally or by the firmware
         /// </summary>
         public bool IsExecuting { get; set; }
 
@@ -40,11 +38,6 @@ namespace DuetControlServer.SPI
         /// Indicates if RepRapFirmware requested a macro file for execution as part of this code
         /// </summary>
         public bool DoingNestedMacro { get; set; }
-
-        /// <summary>
-        /// Whether the code is part of a requested macro file
-        /// </summary>
-        public bool IsRequestedFromFirmware { get; }
 
         /// <summary>
         /// Indicates if a complete G-code reply has been received implying this code can be finished
@@ -63,7 +56,9 @@ namespace DuetControlServer.SPI
         /// <param name="reply">Raw code reply</param>
         public void HandleReply(Communication.MessageTypeFlags messageType, string reply)
         {
+#if DEBUG
             Console.WriteLine($"[{Code} - {messageType}] {reply}");
+#endif
 
             DuetAPI.Message message;
             if (reply == "")
@@ -91,6 +86,23 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Process a code reply
+        /// </summary>
+        /// <param name="result">Code reply</param>
+        public void HandleReply(CodeResult result)
+        {
+#if DEBUG
+            Console.WriteLine($"[{Code}] {result}");
+#endif
+
+            if (result != null)
+            {
+                _result.AddRange(result);
+            }
+            _gotEmptyResponse = true;
+        }
+
+        /// <summary>
         /// Report that soemthing went wrong while executing this code
         /// </summary>
         /// <param name="e">Exception to return</param>
@@ -100,11 +112,5 @@ namespace DuetControlServer.SPI
         /// Called to resolve the task because it has finished
         /// </summary>
         public void SetFinished() => _taskSource.SetResult(_result);
-
-        /// <summary>
-        /// Convert this instance to a string
-        /// </summary>
-        /// <returns>String representation of this string</returns>
-        public override string ToString() => Code.ToString() + $" ({(IsRequestedFromFirmware ? "requested from firmware" : "regular code")})";
     }
 }

@@ -77,7 +77,16 @@ namespace DuetControlServer.FileExecution
                     {
                         break;
                     }
-                    await code.Execute();
+
+                    try
+                    {
+                        CodeResult result = await code.Execute();
+                        await Model.Provider.Output(result);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"[err] {code} -> {e}");
+                    }
                 } while (!Program.CancelSource.IsCancellationRequested);
             }
 
@@ -108,8 +117,15 @@ namespace DuetControlServer.FileExecution
                     break;
                 }
 
-                CodeResult result = await code.Execute();
-                await Model.Provider.Output(result);
+                try
+                {
+                    CodeResult result = await code.Execute();
+                    await Model.Provider.Output(result);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"[err] {code} -> {e}");
+                }
             }
             while (!Program.CancelSource.IsCancellationRequested);
 
