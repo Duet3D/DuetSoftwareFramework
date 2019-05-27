@@ -677,7 +677,7 @@ namespace DuetControlServer.SPI
                 CancellationToken token = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token,
                         new CancellationTokenSource(Settings.SpiTransferTimeout).Token).Token;
                 waitingForTransfer = true;
-                await Task.Yield();
+                Thread.SpinWait(Settings.SpiSpinIterations);
                 if (_pinController.Read(Settings.TransferReadyPin) != PinValue.High)
                 {
                     await _transferReadyEvent.WaitAsync(token);
@@ -708,7 +708,7 @@ namespace DuetControlServer.SPI
                     {
                         throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                     }
-                    await Task.Yield();
+                    Thread.SpinWait(Settings.SpiSpinIterations);
                 } while (_pinController.Read(Settings.TransferReadyPin) != PinValue.High);
             }
 

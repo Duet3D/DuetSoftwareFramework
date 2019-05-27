@@ -54,7 +54,7 @@ namespace DuetControlServer
         /// Frequency to use for SPI transfers
         /// </summary>
         [JsonProperty]
-        public static int SpiFrequency = 500_000;
+        public static int SpiFrequency = 2_000_000;
 
         /// <summary>
         /// Bus ID of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
@@ -67,6 +67,11 @@ namespace DuetControlServer
         /// </summary>
         [JsonProperty]
         public static int SpiChipSelectLine { get; set; } = 0;
+
+        /// <summary>
+        /// Number of iterations to spin-wait before the transfer ready pin is polled
+        /// </summary>
+        public static int SpiSpinIterations { get; set; } = 3000;
 
         /// <summary>
         /// Maximum allowed delay between data exchanges during a full transfer (in ms)
