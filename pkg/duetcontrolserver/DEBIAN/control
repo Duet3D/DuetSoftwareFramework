@@ -1,0 +1,10 @@
+Package: duetcontrolserver
+Version: DCSVER
+Section: electronics
+Priority: standard
+Architecture: armhf
+Depends: duetruntime (= DCSVER)
+Maintainer: RepRapFirmware <package@reprapfirmware.org>
+Homepage: https://reprapfirmware.org
+Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git
+Description: Control server application for Duet 3 series

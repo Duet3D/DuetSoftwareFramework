@@ -1,0 +1,10 @@
+Package: duetruntime
+Version: DCSVER
+Section: electronics
+Priority: standard
+Architecture: armhf
+Depends: libunwind8, gettext, apt-transport-https
+Maintainer: RepRapFirmware <package@reprapfirmware.org>
+Homepage: https://reprapfirmware.org
+Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git
+Description: .NET Core runtime libraries for the Duet software framework
