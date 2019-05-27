@@ -7,6 +7,8 @@ using Newtonsoft.Json;
 using Nito.AsyncEx;
 using System;
 using System.IO;
+using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes
@@ -220,7 +222,7 @@ namespace DuetControlServer.Codes
                         if (File.Exists(path))
                         {
                             MacroFile macro = new MacroFile(path, code.Channel, false, code.SourceConnection);
-                            return await macro.RunMacro();
+                            await macro.RunMacro();
                         }
                         else
                         {
@@ -228,7 +230,7 @@ namespace DuetControlServer.Codes
                             if (File.Exists(path))
                             {
                                 MacroFile macro = new MacroFile(path, code.Channel, false, code.SourceConnection);
-                                return await macro.RunMacro();
+                                await macro.RunMacro();
                             }
                             else
                             {
@@ -413,10 +415,23 @@ namespace DuetControlServer.Codes
 
                 // Diagnostics
                 case 122:
-                    await SPI.Interface.Diagnostics(result);
+                    await Diagnostics(result);
                     break;
             }
             return result;
+        }
+
+        private static async Task Diagnostics(CodeResult result)
+        {
+            StringBuilder builder = new StringBuilder();
+
+            builder.AppendLine("=== Duet Control Server ===");
+            builder.AppendLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
+            await SPI.Interface.Diagnostics(builder);
+            MacroFile.Diagnostics(builder);
+            await Print.Diagnostics(builder);
+
+            result.Add(MessageType.Success, builder.ToString().TrimEnd());
         }
     }
 }

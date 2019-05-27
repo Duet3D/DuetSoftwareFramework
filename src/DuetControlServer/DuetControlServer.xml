@@ -269,7 +269,7 @@
             <summary>
             Execute the full macro file
             </summary>
-            <returns>Results of the execution</returns>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.FileExecution.Print">
             <summary>

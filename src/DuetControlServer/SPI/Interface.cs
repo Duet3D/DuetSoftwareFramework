@@ -19,7 +19,6 @@ namespace DuetControlServer.SPI
     public static class Interface
     {
         // Requests for each code channel
-        // TODO Replace CodeChannel with a pseudo-enum (via consts) and replace the following with simple arrays
         private static readonly Dictionary<CodeChannel, AsyncLock> _channelLock = new Dictionary<CodeChannel, AsyncLock>();
         private static readonly Dictionary<CodeChannel, Queue<QueuedCode>> _pendingCodes = new Dictionary<CodeChannel, Queue<QueuedCode>>();
         private static readonly Dictionary<CodeChannel, Stack<QueuedCode>> _pendingSystemCodes = new Dictionary<CodeChannel, Stack<QueuedCode>>();
@@ -76,13 +75,10 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Print diagnostics of this class
         /// </summary>
-        /// <param name="result">Message storage</param>
+        /// <param name="builder">String builder</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Diagnostics(CodeResult result)
+        public static async Task Diagnostics(StringBuilder builder)
         {
-            StringBuilder builder = new StringBuilder();
-
-            builder.AppendLine("=== Linux ===");
             builder.AppendLine($"Full transfers per second: {DataTransfer.GetFullTransfersPerSecond():F2}");
             foreach (CodeChannel channel in Enum.GetValues(typeof(CodeChannel)))
             {
@@ -107,8 +103,6 @@ namespace DuetControlServer.SPI
                     }
                 }
             }
-
-            result.Add(MessageType.Success, builder.ToString().TrimEnd());
         }
 
         /// <summary>
@@ -429,9 +423,6 @@ namespace DuetControlServer.SPI
                     // Expect one to come even if it is empty - better than missing output
                     if (item.CanFinish)
                     {
-#if DEBUG
-                        Console.WriteLine($"Finished *{item.Code}");
-#endif
                         _pendingSystemCodes[channel].Pop();
                         item.SetFinished();
                     }
@@ -443,19 +434,12 @@ namespace DuetControlServer.SPI
                     {
                         if (DataTransfer.WriteCode(item.Code))
                         {
-#if DEBUG
-                            item.Code.Comment = null;
-                            Console.WriteLine($"Executing *{item.Code}");
-#endif
                             item.IsExecuting = true;
                             _busyChannels |= (1 << (int)channel);
                         }
                     }
                     catch (Exception e)
                     {
-#if DEBUG
-                        Console.WriteLine($"Fail *{item.Code}: {e.Message}");
-#endif
                         _pendingSystemCodes[channel].Pop();
                         item.SetException(e);
                     }
@@ -470,7 +454,7 @@ namespace DuetControlServer.SPI
                     code = await macro.ReadCode();
                     if (code?.Type == CodeType.Comment)
                     {
-                        // Execute command codes so that interceptors can parse comments
+                        // Execute comments like codes so interceptors can parse them
                         await code.Execute();
                         continue;
                     }
@@ -490,15 +474,13 @@ namespace DuetControlServer.SPI
                             CodeResult result = await code.Execute();
                             if (!code.IsPostProcessed)
                             {
-#if DEBUG
-                                item.Code.Comment = null;
-                                Console.WriteLine($"Executing **{item.Code}");
-#endif
                                 item.IsExecuting = true;
                                 item.HandleReply(result);
                             }
-                            // FIXME: Should the code result be appended to the code that invoked this macro file? M98 does that
-                            await Model.Provider.Output(result);
+                            if (!macro.IsAborted)
+                            {
+                                await Model.Provider.Output(result);
+                            }
                         }
                         catch (AggregateException ae)
                         {
@@ -517,7 +499,7 @@ namespace DuetControlServer.SPI
                         }
 
                         bool aborted = _pendingMacros[channel].Pop().IsAborted;
-                        Console.WriteLine($"[info] {(aborted ? "Aborted" : "Finished")} execution of macro file {macro.FileName}");
+                        Console.WriteLine($"[info] {(aborted ? "Aborted" : "Finished")} execution of macro file '{macro.FileName}'");
                         // Do not return true here and let the firmware process this event first
                     }
                 }
@@ -542,9 +524,6 @@ namespace DuetControlServer.SPI
                     // Expect one to come even if it is empty - better than missing output
                     if (item.CanFinish)
                     {
-#if DEBUG
-                        Console.WriteLine($"Finished {item.Code}");
-#endif
                         _pendingCodes[channel].Dequeue();
                         item.SetFinished();
                     }
@@ -556,19 +535,12 @@ namespace DuetControlServer.SPI
                     {
                         if (DataTransfer.WriteCode(item.Code))
                         {
-#if DEBUG
-                            item.Code.Comment = null;
-                            Console.WriteLine($"Executing {item.Code}");
-#endif
                             item.IsExecuting = true;
                             _busyChannels |= (1 << (int)channel);
                         }
                     }
                     catch (Exception e)
                     {
-#if DEBUG
-                        Console.WriteLine($"Fail {item.Code}: {e.Message}");
-#endif
                         _pendingCodes[channel].Dequeue();
                         item.SetException(e);
                     }
@@ -768,8 +740,6 @@ namespace DuetControlServer.SPI
             // Start it
             if (File.Exists(path))
             {
-                Console.WriteLine($"[info] Executing requested macro file '{filename}' on channel {channel}");
-
                 MacroFile macro = new MacroFile(path, channel, true, 0);
                 using (await _channelLock[channel].LockAsync())
                 {
@@ -818,16 +788,6 @@ namespace DuetControlServer.SPI
             using (await Model.Provider.AccessReadWrite())
             {
                 Channel item = Model.Provider.Get.Channels[channel];
-#if DEBUG
-                if (stackDepth > item.StackDepth)
-                {
-                    Console.WriteLine($"Push on {channel} level = {stackDepth}");
-                }
-                else if (stackDepth < item.StackDepth)
-                {
-                    Console.WriteLine($"Pop on {channel} level = {stackDepth}");
-                }
-#endif
                 item.StackDepth = stackDepth;
                 item.RelativeExtrusion = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.DrivesRelative);
                 item.VolumetricExtrusion = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.VolumetricExtrusion);
@@ -840,7 +800,7 @@ namespace DuetControlServer.SPI
         private static async Task HandlePrintPaused()
         {
             DataTransfer.ReadPrintPaused(out uint filePosition, out Communication.PrintPausedReason pauseReason);
-            Console.WriteLine($"[info] Print has been paused at file position {filePosition}. Reason: {pauseReason}");
+            Console.WriteLine($"[info] Print paused at file position {filePosition}. Reason: {pauseReason}");
 
             // Make the print stop and rewind back to the given file position
             await Print.OnPause(filePosition);

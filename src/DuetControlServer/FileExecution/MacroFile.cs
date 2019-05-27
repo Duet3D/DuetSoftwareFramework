@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -32,6 +33,20 @@ namespace DuetControlServer.FileExecution
         /// List of macro files being executed
         /// </summary>
         private static List<MacroFile> _macroFiles = new List<MacroFile>();
+
+        /// <summary>
+        /// Indicates if a file macro is being done
+        /// </summary>
+        public static bool DoingMacroFile
+        {
+            get
+            {
+                lock (_macroFiles)
+                {
+                    return _macroFiles.Count != 0;
+                }
+            }
+        }
 
         /// <summary>
         /// Abort files on the given channel (probably because the firmware requested this)
@@ -97,6 +112,23 @@ namespace DuetControlServer.FileExecution
             {
                 _macroFiles.Add(this);
             }
+
+            Console.WriteLine($"[info] Executing {(isSystemMacro ? "system" : "regular")} macro file '{fileName}' on channel {channel}");
+        }
+
+        /// <summary>
+        /// Print diagnostics of this class
+        /// </summary>
+        /// <param name="builder">String builder</param>
+        public static void Diagnostics(StringBuilder builder)
+        {
+            lock (_macroFiles)
+            {
+                foreach (MacroFile file in _macroFiles)
+                {
+                    builder.AppendLine($"Executing {(file._isSystemMacro ? "system" : "regular")} macro file '{file.FileName}' on channel {file.Channel}");
+                }
+            }
         }
 
         /// <summary>
@@ -105,7 +137,7 @@ namespace DuetControlServer.FileExecution
         /// <returns>Next available code or null if the file has ended</returns>
         public override async Task<Code> ReadCode()
         {
-            // Push the stack unless the firmware requested this file
+            // Push the stack unless the firmware requested this file (M120)
             if (!_sentPush && !_isSystemMacro)
             {
                 _sentPush = true;
@@ -132,7 +164,7 @@ namespace DuetControlServer.FileExecution
                 return result;
             }
 
-            // Pop the stack before completion
+            // Pop the stack before regular completion (M121)
             if (_sentPop && !_isSystemMacro && !IsAborted)
             {
                 _sentPop = true;
@@ -157,16 +189,19 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Execute the full macro file
         /// </summary>
-        /// <returns>Results of the execution</returns>
-        public async Task<CodeResult> RunMacro()
+        /// <returns>Asynchronous task</returns>
+        public async Task RunMacro()
         {
-            CodeResult fullResult = new CodeResult();
             for (Code code = await ReadCode(); code != null; code = await ReadCode())
             {
                 CodeResult result = await code.Execute();
-                fullResult.AddRange(result);
+                if (!IsAborted)
+                {
+                    await Model.Provider.Output(result);
+                }
             }
-            return fullResult;
+
+            Console.WriteLine($"[info] {(IsAborted ? "Aborted" : "Finished")} execution of macro file '{FileName}'");
         }
     }
 }

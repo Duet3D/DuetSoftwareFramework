@@ -288,6 +288,11 @@ namespace DuetControlServer.Model
                     Provider.Get.State.AtxPower = response.Params.atxPower != 0;
                     Provider.Get.State.CurrentTool = response.currentTool;
                     Provider.Get.State.Status = GetStatus(response.status);
+                    if (Provider.Get.State.Status == MachineStatus.Idle && FileExecution.MacroFile.DoingMacroFile)
+                    {
+                        // RRF does not always know whether a macro file is being executed
+                        Provider.Get.State.Status = MachineStatus.Busy;
+                    }
 
                     // - Tools -
                     Provider.Get.Tools.Clear();

@@ -23,11 +23,7 @@ namespace DuetControlServer
         /// <param name="args">Command-line arguments</param>
         static void Main(string[] args)
         {
-#if DEBUG
-            Console.WriteLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version} (debug)");
-#else
             Console.WriteLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
-#endif
             Console.WriteLine("Written by Christian Hammacher for Duet3D");
             Console.WriteLine("Licensed under the terms of the GNU Public License Version 3");
             Console.WriteLine();

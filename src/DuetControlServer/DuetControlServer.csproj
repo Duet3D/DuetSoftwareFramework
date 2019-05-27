@@ -6,8 +6,8 @@
     <LangVersion>default</LangVersion>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D</Company>
-    <AssemblyVersion>1.0.0.10</AssemblyVersion>
-    <FileVersion>1.0.0.10</FileVersion>
+    <AssemblyVersion>1.0.0.11</AssemblyVersion>
+    <FileVersion>1.0.0.11</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,10 +25,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="IoT.Device.Bindings" Version="0.1.0-prerelease.19251.2" />
+    <PackageReference Include="IoT.Device.Bindings" Version="0.1.0-prerelease.19274.1" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
     <PackageReference Include="Nito.AsyncEx" Version="5.0.0" />
-    <PackageReference Include="System.Device.Gpio" Version="0.1.0-prerelease.19251.2" />
+    <PackageReference Include="System.Device.Gpio" Version="0.1.0-prerelease.19274.1" />
     <PackageReference Include="Zhaobang.IO.SeekableStreamReader" Version="1.0.0" />
   </ItemGroup>
 

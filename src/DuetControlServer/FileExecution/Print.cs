@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using Nito.AsyncEx;
 using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -17,6 +18,22 @@ namespace DuetControlServer.FileExecution
         private static BaseFile _file;
         private static long _pausePosition;
         private static AsyncAutoResetEvent _resumeEvent = new AsyncAutoResetEvent();
+
+        /// <summary>
+        /// Print diagnostics of this class
+        /// </summary>
+        /// <param name="builder">String builder</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task Diagnostics(StringBuilder builder)
+        {
+            using (await _lock.LockAsync())
+            {
+                if (_file != null)
+                {
+                    builder.AppendLine($"Processing print job {_file.FileName}");
+                }
+            }
+        }
 
         /// <summary>
         /// Begin a file print
@@ -48,7 +65,7 @@ namespace DuetControlServer.FileExecution
             }
 
             // Analyze it and update the object model
-            DuetAPI.ParsedFileInfo info = await FileInfoParser.Parse(fileName);
+            ParsedFileInfo info = await FileInfoParser.Parse(fileName);
             using (await Model.Provider.AccessReadWrite())
             {
                 Model.Provider.Get.Channels[CodeChannel.File].VolumetricExtrusion = false;
@@ -56,6 +73,7 @@ namespace DuetControlServer.FileExecution
             }
 
             // Notify RepRapFirmware and start processing the file
+            Console.WriteLine($"[info] Printing file '{fileName}'");
             SPI.Interface.SetPrintStarted();
             RunPrint();
             return new CodeResult();
@@ -66,7 +84,7 @@ namespace DuetControlServer.FileExecution
             BaseFile file = _file;
 
             // Process "start.g" at the beginning of a print
-            string startPath = await FilePath.ToPhysical("sys/start.g");
+            string startPath = await FilePath.ToPhysical("start.g", "sys");
             if (File.Exists(startPath))
             {
                 MacroFile startMacro = new MacroFile(startPath, CodeChannel.File, false, 0);
