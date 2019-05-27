@@ -79,7 +79,6 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         public static async Task Diagnostics(StringBuilder builder)
         {
-            builder.AppendLine($"Full transfers per second: {DataTransfer.GetFullTransfersPerSecond():F2}");
             foreach (CodeChannel channel in Enum.GetValues(typeof(CodeChannel)))
             {
                 using (await _channelLock[channel].LockAsync())

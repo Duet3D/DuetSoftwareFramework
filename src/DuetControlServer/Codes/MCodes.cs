@@ -428,6 +428,7 @@ namespace DuetControlServer.Codes
             builder.AppendLine("=== Duet Control Server ===");
             builder.AppendLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
             await SPI.Interface.Diagnostics(builder);
+            SPI.DataTransfer.Diagnostics(builder);
             MacroFile.Diagnostics(builder);
             await Print.Diagnostics(builder);
 

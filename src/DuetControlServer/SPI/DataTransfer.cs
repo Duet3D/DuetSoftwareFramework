@@ -9,6 +9,7 @@ using System.Device.Spi;
 using System.Device.Spi.Drivers;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
@@ -24,6 +25,7 @@ namespace DuetControlServer.SPI
         private static SpiDevice _spiDevice;
         private static GpioController _pinController;
         private static readonly AsyncManualResetEvent _transferReadyEvent = new AsyncManualResetEvent();
+        private static volatile bool waitingForTransfer;
 
         // General transfer variables
         private static ushort _lastTransferNumber;
@@ -68,7 +70,10 @@ namespace DuetControlServer.SPI
             _pinController.SetPinMode(Settings.TransferReadyPin, PinMode.InputPullDown);
             _pinController.RegisterCallbackForPinValueChangedEvent(Settings.TransferReadyPin, PinEventTypes.Rising, (sender, pinValueChangedEventArgs) =>
             {
-                _transferReadyEvent.Set();
+                if (waitingForTransfer)
+                {
+                    _transferReadyEvent.Set();
+                }
             });
             if (_pinController.Read(Settings.TransferReadyPin) == PinValue.High)
             {
@@ -76,11 +81,7 @@ namespace DuetControlServer.SPI
             }
         }
 
-        /// <summary>
-        /// Get the average number of full transfers per second
-        /// </summary>
-        /// <returns>Average number of full transfers per second</returns>
-        public static decimal GetFullTransfersPerSecond()
+        private static decimal GetFullTransfersPerSecond()
         {
             if (_numMeasuredTransfers == 0)
             {
@@ -91,6 +92,12 @@ namespace DuetControlServer.SPI
             _lastMeasureTime = DateTime.Now;
             Interlocked.Exchange(ref _numMeasuredTransfers, 0);
             return result;
+        }
+
+        public static void Diagnostics(StringBuilder builder)
+        {
+            builder.AppendLine($"SPI speed: {_spiDevice.ConnectionSettings.ClockFrequency} Hz");
+            builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}");
         }
 
         /// <summary>
@@ -662,39 +669,52 @@ namespace DuetControlServer.SPI
         #endregion
 
         #region Functions for data transfers
-        private static async Task WaitForTransfer()
+        private static async Task WaitForTransfer(bool startingTransfer)
         {
-#if true
-            CancellationToken token = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token,
-                    new CancellationTokenSource(Settings.SpiTransferTimeout).Token).Token;
-            await _transferReadyEvent.WaitAsync(token);
-            _transferReadyEvent.Reset();
-            if (Program.CancelSource.IsCancellationRequested)
+            if (startingTransfer)
             {
-                throw new OperationCanceledException("Program termination");
-            }
-            if (token.IsCancellationRequested)
-            {
-                throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
-            }
-#else
-            DateTime startTime = DateTime.Now;
-            while (_pinController.Read(Settings.TransferReadyPin) != PinValue.High)
-            {
+                // Slightly slower but less CPU-intense
+                CancellationToken token = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token,
+                        new CancellationTokenSource(Settings.SpiTransferTimeout).Token).Token;
+                waitingForTransfer = true;
+                await Task.Yield();
+                if (_pinController.Read(Settings.TransferReadyPin) != PinValue.High)
+                {
+                    await _transferReadyEvent.WaitAsync(token);
+                }
+                waitingForTransfer = false;
+                _transferReadyEvent.Reset();
+
                 if (Program.CancelSource.IsCancellationRequested)
                 {
                     throw new OperationCanceledException("Program termination");
                 }
-                if ((DateTime.Now - startTime).TotalMilliseconds > Settings.SpiTransferTimeout)
+                if (token.IsCancellationRequested)
                 {
                     throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                 }
-                await Task.Yield();
             }
-#endif
+            else
+            {
+                // Definitely faster but very CPU-intense
+                DateTime startTime = DateTime.Now;
+                do
+                {
+                    if (Program.CancelSource.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException("Program termination");
+                    }
+                    if ((DateTime.Now - startTime).TotalMilliseconds > Settings.SpiTransferTimeout)
+                    {
+                        throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
+                    }
+                    await Task.Yield();
+                } while (_pinController.Read(Settings.TransferReadyPin) != PinValue.High);
+            }
+
             if (_pinController.Read(Settings.TransferReadyPin) != PinValue.High)
             {
-                Console.WriteLine("[warn] WaitForTransfer completed but the transfer pin is not high");
+                Console.WriteLine($"[warn] WaitForTransfer completed but the transfer pin is not high (starting transfer? {startingTransfer})");
             }
         }
 
@@ -703,7 +723,7 @@ namespace DuetControlServer.SPI
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
                 // Perform SPI header exchange
-                await WaitForTransfer();
+                await WaitForTransfer(retry == 0);
                 _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
 
                 // Check for possible response code
@@ -789,7 +809,7 @@ namespace DuetControlServer.SPI
         {
             MemoryMarshal.Write(_txResponseBuffer.Span, ref response);
 
-            await WaitForTransfer();
+            await WaitForTransfer(false);
             _spiDevice.TransferFullDuplex(_txResponseBuffer.Span, _rxResponseBuffer.Span);
 
             return MemoryMarshal.Read<uint>(_rxResponseBuffer.Span);
@@ -804,7 +824,7 @@ namespace DuetControlServer.SPI
             int bytesToTransfer = Math.Max(_rxHeader.DataLength, _txPointer);
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
-                await WaitForTransfer();
+                await WaitForTransfer(false);
                 _spiDevice.TransferFullDuplex(_txBuffers[_txBufferIndex].Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
 
                 // Check for possible response code
