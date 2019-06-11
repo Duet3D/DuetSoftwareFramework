@@ -17,7 +17,7 @@ namespace DuetControlServer.FileExecution
         private static readonly AsyncLock _lock = new AsyncLock();
         private static BaseFile _file;
         private static long _pausePosition;
-        private static AsyncAutoResetEvent _resumeEvent = new AsyncAutoResetEvent();
+        private static readonly AsyncAutoResetEvent _resumeEvent = new AsyncAutoResetEvent();
 
         /// <summary>
         /// Print diagnostics of this class
@@ -66,7 +66,7 @@ namespace DuetControlServer.FileExecution
 
             // Analyze it and update the object model
             ParsedFileInfo info = await FileInfoParser.Parse(fileName);
-            using (await Model.Provider.AccessReadWrite())
+            using (await Model.Provider.AccessReadWriteAsync())
             {
                 Model.Provider.Get.Channels[CodeChannel.File].VolumetricExtrusion = false;
                 Model.Provider.Get.Job.File = info;
@@ -90,7 +90,7 @@ namespace DuetControlServer.FileExecution
                 MacroFile startMacro = new MacroFile(startPath, CodeChannel.File, false, 0);
                 do
                 {
-                    Code code = await startMacro.ReadCode();
+                    Code code = await startMacro.ReadCodeAsync();
                     if (code == null)
                     {
                         break;
@@ -129,7 +129,7 @@ namespace DuetControlServer.FileExecution
                 }
 
                 // Execute the next command
-                Code code = await file.ReadCode();
+                Code code = await file.ReadCodeAsync();
                 if (code == null)
                 {
                     break;

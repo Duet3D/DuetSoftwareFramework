@@ -87,10 +87,6 @@ namespace DuetControlServer.SPI
         /// <param name="result">Code reply</param>
         public void HandleReply(CodeResult result)
         {
-#if DEBUG
-            Console.WriteLine($"[{Code}] {result}");
-#endif
-
             if (result != null)
             {
                 _result.AddRange(result);

@@ -78,7 +78,7 @@ namespace DuetControlServer
             try
             {
                 SPI.Interface.Init();
-                if (!SPI.Interface.Connect().Result)
+                if (!SPI.Interface.Connect())
                 {
                     Console.WriteLine("Error: Duet is not available");
                     return;
@@ -107,7 +107,7 @@ namespace DuetControlServer
             Console.WriteLine();
 
             // Run the main tasks in the background
-            Task spiTask = SPI.Interface.Run();
+            Task spiTask = Task.Run(SPI.Interface.Run);
             Task ipcTask = Server.AcceptConnections();
             Task modelUpdateTask = Model.UpdateTask.UpdatePeriodically();
             Task[] taskList = { spiTask, ipcTask, modelUpdateTask };

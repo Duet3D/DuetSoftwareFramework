@@ -1,9 +1,6 @@
 ﻿using DuetAPI.Machine;
 using Newtonsoft.Json;
 using Nito.AsyncEx;
-using System;
-using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Model
@@ -13,8 +10,9 @@ namespace DuetControlServer.Model
     /// </summary>
     public static class Updater
     {
+        private static volatile bool _updating;
         private static byte _lastUpdatedModule;
-        private static AsyncManualResetEvent[] _moduleUpdateEvents = new AsyncManualResetEvent[SPI.Communication.Consts.NumModules];
+        private static readonly AsyncManualResetEvent[] _moduleUpdateEvents = new AsyncManualResetEvent[SPI.Communication.Consts.NumModules];
 
         /// <summary>
         /// Initialize this class
@@ -49,7 +47,19 @@ namespace DuetControlServer.Model
         /// <param name="module">Module that is supposed to be merged</param>
         /// <param name="json">JSON data</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task MergeData(byte module, string json)
+        public static async void MergeData(byte module, string json)
+        {
+            if (_updating)
+            {
+                return;
+            }
+
+            _updating = true;
+            await DoMerge(module, json);
+            _updating = false;
+        }
+
+        private static async Task DoMerge(byte module, string json)
         {
             // Console.WriteLine($"Got object model for module {module}: {json}");
 
@@ -154,7 +164,7 @@ namespace DuetControlServer.Model
                 };
 
                 var response = JsonConvert.DeserializeAnonymousType(json, responseDefinition);
-                using (await Provider.AccessReadWrite())
+                using (await Provider.AccessReadWriteAsync())
                 {
                     // - Electronics -
                     Provider.Get.Electronics.Firmware.Name = response.firmwareName;
@@ -334,7 +344,7 @@ namespace DuetControlServer.Model
                 };
 
                 var printResponse = JsonConvert.DeserializeAnonymousType(json, printResponseDefinition);
-                using (await Provider.AccessReadWrite())
+                using (await Provider.AccessReadWriteAsync())
                 {
                     Provider.Get.Job.Layer = printResponse.currentLayer;
                     Provider.Get.Job.LayerTime = (printResponse.currentLayer == 1) ? printResponse.firstLayerDuration : printResponse.currentLayerTime;
@@ -345,6 +355,15 @@ namespace DuetControlServer.Model
                     Provider.Get.Job.TimesLeft.File = (printResponse.timesLeft.file > 0F) ? (float?)printResponse.timesLeft.file : null;
                     Provider.Get.Job.TimesLeft.Filament = (printResponse.timesLeft.filament > 0F) ? (float?)printResponse.timesLeft.filament : null;
                     Provider.Get.Job.TimesLeft.Layer = (printResponse.timesLeft.layer > 0F) ? (float?)printResponse.timesLeft.layer : null;
+                }
+            }
+
+            // Reset everything if the controller is halted
+            using (await Provider.AccessReadOnlyAsync())
+            {
+                if (Provider.Get.State.Status == MachineStatus.Halted)
+                {
+                    await SPI.Interface.InvalidateData("Code cancelled because the firmware is halted");
                 }
             }
 

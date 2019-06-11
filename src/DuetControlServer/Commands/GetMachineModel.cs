@@ -14,7 +14,7 @@ namespace DuetControlServer.Commands
         /// <returns>Clone of the current machine model</returns>
         public override async Task<MachineModel> Execute()
         {
-            using (await Model.Provider.AccessReadOnly())
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
                 return (MachineModel)Model.Provider.Get.Clone();
             }

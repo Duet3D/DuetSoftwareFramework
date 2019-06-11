@@ -2,17 +2,16 @@
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
-using Nito.AsyncEx;
 using System;
-using System.Device.Gpio;
-using System.Device.Spi;
-using System.Device.Spi.Drivers;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
+using Unosquare.RaspberryIO;
+using Unosquare.RaspberryIO.Abstractions;
+using Unosquare.WiringPi;
+using Nito.AsyncEx;
 
 namespace DuetControlServer.SPI
 {
@@ -21,32 +20,28 @@ namespace DuetControlServer.SPI
     /// </summary>
     public static class DataTransfer
     {
-        // Physical devices and transfer helpers
-        private static SpiDevice _spiDevice;
-        private static GpioController _pinController;
-        private static readonly AsyncManualResetEvent _transferReadyEvent = new AsyncManualResetEvent();
-        private static volatile bool waitingForTransfer;
-
         // General transfer variables
+        private static ISpiChannel _spiChannel;
+        private static readonly AsyncManualResetEvent _transferReadyEvent = new AsyncManualResetEvent();
+        private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting;
         private static ushort _lastTransferNumber;
-        private static bool _started, _hadTimeout, _resetting;
 
         private static DateTime _lastMeasureTime = DateTime.Now;
         private static int _numMeasuredTransfers;
 
         // Transfer headers
-        private static readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
+        private static Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
         private static readonly Memory<byte> _txHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
         private static Communication.TransferHeader _rxHeader;
         private static Communication.TransferHeader _txHeader;
         private static byte _packetId;
 
         // Transfer responses
-        private static readonly Memory<byte> _rxResponseBuffer = new byte[4];
+        private static Memory<byte> _rxResponseBuffer = new byte[4];
         private static readonly Memory<byte> _txResponseBuffer = new byte[4];
 
         // Transfer data. Keep two TX buffers so resend requests can be processed
-        private static readonly Memory<byte> _rxBuffer = new byte[Communication.Consts.BufferSize];
+        private static Memory<byte> _rxBuffer = new byte[Communication.Consts.BufferSize];
         private static readonly Memory<byte>[] _txBuffers = { new byte[Communication.Consts.BufferSize], new byte[Communication.Consts.BufferSize] };
         private static int _txBufferIndex;
         private static int _rxPointer, _txPointer;
@@ -61,24 +56,25 @@ namespace DuetControlServer.SPI
             // Initialize TX header. This only needs to happen once
             Serialization.Writer.InitTransferHeader(ref _txHeader);
 
-            // Initialize SPI subsystem
-            _spiDevice = new UnixSpiDevice(new SpiConnectionSettings(Settings.SpiBusID, Settings.SpiChipSelectLine) { ClockFrequency = Settings.SpiFrequency });
-
-            // Initialize transfer ready pin
-            _pinController = new GpioController(PinNumberingScheme.Logical);
-            _pinController.OpenPin(Settings.TransferReadyPin);
-            _pinController.SetPinMode(Settings.TransferReadyPin, PinMode.InputPullDown);
-            _pinController.RegisterCallbackForPinValueChangedEvent(Settings.TransferReadyPin, PinEventTypes.Rising, (sender, pinValueChangedEventArgs) =>
+            // Initialize WiringPi
+            Pi.Init<BootstrapWiringPi>();
+            Pi.Gpio[Settings.TransferReadyPin].PinMode = GpioPinDriveMode.Input;
+            Pi.Gpio[Settings.TransferReadyPin].InputPullMode = GpioPinResistorPullMode.PullDown;
+            if (Settings.SpiBusID == 0)
             {
-                if (waitingForTransfer)
-                {
-                    _transferReadyEvent.Set();
-                }
-            });
-            if (_pinController.Read(Settings.TransferReadyPin) == PinValue.High)
-            {
-                _transferReadyEvent.Set();
+                Pi.Spi.Channel0Frequency = Settings.SpiFrequency;
+                _spiChannel = Pi.Spi.Channel0;
             }
+            else
+            {
+                Pi.Spi.Channel1Frequency = Settings.SpiFrequency;
+                _spiChannel = Pi.Spi.Channel1;
+            }
+            Pi.Gpio[Settings.TransferReadyPin].RegisterInterruptCallback(EdgeDetection.FallingAndRisingEdge, () => _transferReadyEvent.Set());
+
+            // Debug
+            Pi.Gpio[BcmPin.Gpio24].PinMode = GpioPinDriveMode.Output;
+            Pi.Gpio[BcmPin.Gpio24].Value = false;
         }
 
         private static decimal GetFullTransfersPerSecond()
@@ -96,16 +92,16 @@ namespace DuetControlServer.SPI
 
         public static void Diagnostics(StringBuilder builder)
         {
-            builder.AppendLine($"SPI speed: {_spiDevice.ConnectionSettings.ClockFrequency} Hz");
+            builder.AppendLine($"SPI speed: {_spiChannel.Frequency} Hz");
             builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}");
         }
 
         /// <summary>
-        /// Perform a full data transfer
+        /// Perform a full data transfer synchronously
         /// </summary>
         /// <param name="mustSucceed">Keep retrying until the transfer succeeds</param>
         /// <returns>Whether new data could be transferred</returns>
-        public static async Task<bool> PerformFullTransfer(bool mustSucceed = true)
+        public static bool PerformFullTransfer(bool mustSucceed = true)
         {
             _lastTransferNumber = _rxHeader.SequenceNumber;
 
@@ -121,9 +117,9 @@ namespace DuetControlServer.SPI
             _txHeader.NumPackets = _packetId;
             _txHeader.SequenceNumber++;
             _txHeader.DataLength = (ushort)_txPointer;
-            _txHeader.ChecksumData = CRC16.Calculate(_txBuffers[_txBufferIndex].ToArray(), _txPointer);
+            _txHeader.ChecksumData = CRC16.Calculate(_txBuffers[_txBufferIndex].Slice(0, _txPointer).Span);
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-            _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.ToArray(), Marshal.SizeOf(_txHeader) - Marshal.SizeOf(typeof(ushort)));
+            _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf(typeof(ushort))).Span);
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
 
             do
@@ -131,21 +127,22 @@ namespace DuetControlServer.SPI
                 try
                 {
                     // Exchange transfer headers. This also deals with transfer responses
-                    if (!await ExchangeHeader())
+                    if (!ExchangeHeader())
                     {
                         continue;
                     }
 
                     // Exchange data if there is anything to transfer
-                    if ((_rxHeader.DataLength != 0 || _txPointer != 0) && !await ExchangeData())
+                    if ((_rxHeader.DataLength != 0 || _txPointer != 0) && !ExchangeData())
                     {
                         continue;
                     }
+                    Pi.Gpio[BcmPin.Gpio24].Value = false;
 
                     // Deal with timeouts
                     if (_hadTimeout)
                     {
-                        using (await Model.Provider.AccessReadWrite())
+                        using (Model.Provider.AccessReadWrite())
                         {
                             if (Model.Provider.Get.State.Status == MachineStatus.Off)
                             {
@@ -173,8 +170,8 @@ namespace DuetControlServer.SPI
                     // Deal with reset requests
                     if (_resetting)
                     {
-                        _hadTimeout = true;
-                        return await PerformFullTransfer(mustSucceed);
+                        _waitingForFirstTransfer = _hadTimeout = true;
+                        return PerformFullTransfer(mustSucceed);
                     }
                     return true;
                 }
@@ -183,11 +180,11 @@ namespace DuetControlServer.SPI
                     if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout && _started)
                     {
                         // If this is the first unexpected timeout event, report it unless the firmware is being updated
-                        using (await Model.Provider.AccessReadWrite())
+                        using (Model.Provider.AccessReadWrite())
                         {
                             if (Model.Provider.Get.State.Status == MachineStatus.Updating)
                             {
-                                _hadTimeout = true;
+                                _waitingForFirstTransfer = _hadTimeout = true;
                                 Model.Provider.Get.State.Status = MachineStatus.Off;
                                 Model.Provider.Get.Messages.Add(new Message(MessageType.Warning, $"Lost connection to Duet ({e.Message})"));
                                 Console.WriteLine($"[warn] Lost connection to Duet ({e.Message})");
@@ -669,62 +666,35 @@ namespace DuetControlServer.SPI
         #endregion
 
         #region Functions for data transfers
-        private static async Task WaitForTransfer(bool startingTransfer)
+        private static void WaitForTransfer()
         {
-            if (startingTransfer)
+            if (_waitingForFirstTransfer)
             {
-                // Slightly slower but less CPU-intense
-                CancellationToken token = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token,
-                        new CancellationTokenSource(Settings.SpiTransferTimeout).Token).Token;
-                waitingForTransfer = true;
-                Thread.SpinWait(Settings.SpiSpinIterations);
-                if (_pinController.Read(Settings.TransferReadyPin) != PinValue.High)
+                if (!Pi.Gpio[Settings.TransferReadyPin].WaitForValue(GpioPinValue.High, Settings.SpiTransferTimeout))
                 {
-                    await _transferReadyEvent.WaitAsync(token);
+                    throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                 }
-                waitingForTransfer = false;
-                _transferReadyEvent.Reset();
-
                 if (Program.CancelSource.IsCancellationRequested)
                 {
                     throw new OperationCanceledException("Program termination");
                 }
-                if (token.IsCancellationRequested)
-                {
-                    throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
-                }
+                _waitingForFirstTransfer = false;
             }
             else
             {
-                // Definitely faster but very CPU-intense
-                DateTime startTime = DateTime.Now;
-                do
-                {
-                    if (Program.CancelSource.IsCancellationRequested)
-                    {
-                        throw new OperationCanceledException("Program termination");
-                    }
-                    if ((DateTime.Now - startTime).TotalMilliseconds > Settings.SpiTransferTimeout)
-                    {
-                        throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
-                    }
-                    Thread.SpinWait(Settings.SpiSpinIterations);
-                } while (_pinController.Read(Settings.TransferReadyPin) != PinValue.High);
+                CancellationToken token = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, (new CancellationTokenSource(Settings.SpiTransferTimeout)).Token).Token;
+                _transferReadyEvent.Wait(token);
             }
-
-            if (_pinController.Read(Settings.TransferReadyPin) != PinValue.High)
-            {
-                Console.WriteLine($"[warn] WaitForTransfer completed but the transfer pin is not high (starting transfer? {startingTransfer})");
-            }
+            _transferReadyEvent.Reset();
         }
 
-        private static async Task<bool> ExchangeHeader()
+        private static bool ExchangeHeader()
         {
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
                 // Perform SPI header exchange
-                await WaitForTransfer(retry == 0);
-                _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
+                WaitForTransfer();
+                _rxHeaderBuffer = _spiChannel.SendReceive(_txHeaderBuffer.ToArray());
 
                 // Check for possible response code
                 uint responseCode = MemoryMarshal.Read<uint>(_rxHeaderBuffer.Span);
@@ -741,32 +711,42 @@ namespace DuetControlServer.SPI
                     throw new OperationCanceledException("Board is not available (no header)");
                 }
 
-                ushort checksum = CRC16.Calculate(_rxHeaderBuffer.ToArray(), Marshal.SizeOf(_rxHeader) - Marshal.SizeOf(typeof(ushort)));
+                ushort checksum = CRC16.Calculate(_rxHeaderBuffer.Slice(0, Marshal.SizeOf(_rxHeader) - Marshal.SizeOf(typeof(ushort))).Span);
                 if (_rxHeader.ChecksumHeader != checksum)
                 {
-                    Console.WriteLine($"[warn] Bad header checksum (expected 0x{checksum:x4}, got 0x{_rxHeader.ChecksumHeader:x4})");
-                    await ExchangeResponse(Communication.TransferResponse.BadHeaderChecksum);
+                    Pi.Gpio[BcmPin.Gpio24].Value = true;
+                    Console.WriteLine($"[warn] Bad header checksum (expected 0x{_rxHeader.ChecksumHeader:x4}, got 0x{checksum:x4})");
+                    responseCode = ExchangeResponse(Communication.TransferResponse.BadHeaderChecksum);
+                    if (responseCode == Communication.TransferResponse.BadResponse)
+                    {
+                        Console.WriteLine("[warn] Restarting transfer because the Duet received a bad response (header response)");
+                        return false;
+                    }
+                    if (responseCode != Communication.TransferResponse.Success)
+                    {
+                        Console.WriteLine($"[warn] Note: RepRapFirmware didn't receive valid data either (code 0x{responseCode:x8})");
+                    }
                     continue;
                 }
 
                 if (_rxHeader.FormatCode != Communication.Consts.FormatCode)
                 {
-                    await ExchangeResponse(Communication.TransferResponse.BadFormat);
+                    ExchangeResponse(Communication.TransferResponse.BadFormat);
                     throw new Exception($"Invalid format code {_rxHeader.FormatCode:x2}");
                 }
                 if (_rxHeader.ProtocolVersion != Communication.Consts.ProtocolVersion)
                 {
-                    await ExchangeResponse(Communication.TransferResponse.BadProtocolVersion);
+                    ExchangeResponse(Communication.TransferResponse.BadProtocolVersion);
                     throw new Exception($"Invalid protocol version {_rxHeader.ProtocolVersion}");
                 }
                 if (_rxHeader.DataLength > Communication.Consts.BufferSize)
                 {
-                    await ExchangeResponse(Communication.TransferResponse.BadDataLength);
+                    ExchangeResponse(Communication.TransferResponse.BadDataLength);
                     throw new Exception($"Data too long ({_rxHeader.DataLength} bytes)");
                 }
 
                 // Acknowledge reception
-                uint response = await ExchangeResponse(Communication.TransferResponse.Success);
+                uint response = ExchangeResponse(Communication.TransferResponse.Success);
                 switch (response)
                 {
                     case 0:
@@ -795,37 +775,33 @@ namespace DuetControlServer.SPI
 
                     default:
                         Console.WriteLine($"[warn] Restarting transfer because a bad header response was received (0x{response:x8})");
-                        await ExchangeResponse(Communication.TransferResponse.BadResponse);
+                        ExchangeResponse(Communication.TransferResponse.BadResponse);
                         return false;
                 }
             }
 
             Console.WriteLine("[warn] Restarting transfer because the number of maximum retries has been exceeded");
-            await ExchangeResponse(Communication.TransferResponse.BadResponse);
+            ExchangeResponse(Communication.TransferResponse.BadResponse);
             return false;
         }
 
-        private static async Task<uint> ExchangeResponse(uint response)
+        private static uint ExchangeResponse(uint response)
         {
             MemoryMarshal.Write(_txResponseBuffer.Span, ref response);
 
-            await WaitForTransfer(false);
-            _spiDevice.TransferFullDuplex(_txResponseBuffer.Span, _rxResponseBuffer.Span);
+            WaitForTransfer();
+            _rxResponseBuffer = _spiChannel.SendReceive(_txResponseBuffer.ToArray());
 
             return MemoryMarshal.Read<uint>(_rxResponseBuffer.Span);
         }
 
-        private static readonly Memory<byte> errorData = new byte[Communication.Consts.BufferSize];
-
-        private static async Task<bool> ExchangeData()
+        private static bool ExchangeData()
         {
-            bool recordSuccessfulTransfer = false;
-
             int bytesToTransfer = Math.Max(_rxHeader.DataLength, _txPointer);
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
-                await WaitForTransfer(false);
-                _spiDevice.TransferFullDuplex(_txBuffers[_txBufferIndex].Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
+                WaitForTransfer();
+                _rxBuffer = _spiChannel.SendReceive(_txBuffers[_txBufferIndex].Slice(0, bytesToTransfer).ToArray());
 
                 // Check for possible response code
                 uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);
@@ -836,18 +812,25 @@ namespace DuetControlServer.SPI
                 }
 
                 // Inspect received data
-                ushort checksum = CRC16.Calculate(_rxBuffer.ToArray(), _rxHeader.DataLength);
+                ushort checksum = CRC16.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
                 if (_rxHeader.ChecksumData != checksum)
                 {
-                    recordSuccessfulTransfer = true;
-                    _rxBuffer.CopyTo(errorData);
-
-                    Console.WriteLine($"[warn] Bad data checksum (expected 0x{checksum:x4}, got 0x{_rxHeader.ChecksumData:x4})");
-                    await ExchangeResponse(Communication.TransferResponse.BadDataChecksum);
+                    Pi.Gpio[BcmPin.Gpio24].Value = true;
+                    Console.WriteLine($"[warn] Bad data checksum (expected 0x{_rxHeader.ChecksumData:x4}, got 0x{checksum:x4})");
+                    responseCode = ExchangeResponse(Communication.TransferResponse.BadDataChecksum);
+                    if (responseCode == Communication.TransferResponse.BadResponse)
+                    {
+                        Console.WriteLine("[warn] Restarting transfer because the Duet received a bad response (data response)");
+                        return false;
+                    }
+                    if (responseCode != Communication.TransferResponse.Success)
+                    {
+                        Console.WriteLine($"[warn] Note: RepRapFirmware didn't receive valid data either (code 0x{responseCode:x8})");
+                    }
                     continue;
                 }
 
-                uint response = await ExchangeResponse(Communication.TransferResponse.Success);
+                uint response = ExchangeResponse(Communication.TransferResponse.Success);
                 switch (response)
                 {
                     case 0:
@@ -855,12 +838,6 @@ namespace DuetControlServer.SPI
                         throw new OperationCanceledException("Board is not available (no data response)");
 
                     case Communication.TransferResponse.Success:
-                        if (recordSuccessfulTransfer)
-                        {
-                            SaveBuffer(_rxHeaderBuffer, _rxHeaderBuffer.Length, "header.bin");
-                            SaveBuffer(errorData, _rxHeader.DataLength, "errorData.bin");
-                            SaveBuffer(_rxBuffer, _rxHeader.DataLength, "successData.bin");
-                        }
                         return true;
 
                     case Communication.TransferResponse.BadDataChecksum:
@@ -873,26 +850,15 @@ namespace DuetControlServer.SPI
 
                     default:
                         Console.WriteLine($"[warn] Restarting transfer because a bad data response was received (0x{response:x8})");
-                        await ExchangeResponse(Communication.TransferResponse.BadResponse);
+                        ExchangeResponse(Communication.TransferResponse.BadResponse);
                         return false;
                 }
             }
 
-            SaveBuffer(_rxHeaderBuffer, _rxHeaderBuffer.Length, "restartHeader.bin");
-            SaveBuffer(_rxBuffer, _rxHeader.DataLength, "restartData.bin");
-
             Console.WriteLine("[warn] Restarting transfer because the number of maximum retries has been exceeded");
-            await ExchangeResponse(Communication.TransferResponse.BadResponse);
+            ExchangeResponse(Communication.TransferResponse.BadResponse);
             return false;
         }
-
-        private static void SaveBuffer(Memory<byte> buffer, int length, string filename)
-        {
-            using (FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.Write))
-            {
-                fs.Write(buffer.Slice(0, length).Span);
-            }
-        }
-#endregion
+        #endregion
     }
 }

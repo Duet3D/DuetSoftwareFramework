@@ -1,4 +1,6 @@
-﻿namespace DuetControlServer.SPI
+﻿using System;
+
+namespace DuetControlServer.SPI
 {
     /// <summary>
     /// Functions for CRC16 calculation
@@ -14,7 +16,7 @@
         /// <remarks>
         /// Original found on https://stackoverflow.com/questions/18594963/crc16-iso-13239-implementation
         /// </remarks>
-        public static ushort Calculate(byte[] buffer, int length)
+        public static ushort Calculate(ReadOnlySpan<byte> buffer)
         {
             ushort[] crc_table = {
                 0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
@@ -53,7 +55,7 @@
 
             ushort Crc = 65535;
             ushort x;
-            for (int i = 0; i < length; i++)
+            for (int i = 0; i < buffer.Length; i++)
             {
                 x = (ushort)(Crc ^ buffer[i]);
                 Crc = (ushort)((Crc >> 8) ^ crc_table[x & 0x00FF]);

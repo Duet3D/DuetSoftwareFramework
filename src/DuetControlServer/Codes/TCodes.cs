@@ -34,7 +34,7 @@ namespace DuetControlServer.Codes
             }
 
             // Set new tool number
-            using (await Model.Provider.AccessReadWrite())
+            using (await Model.Provider.AccessReadWriteAsync())
             {
                 if (Model.Provider.Get.Tools.Any(tool => tool.Number == code.MajorNumber))
                 {

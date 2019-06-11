@@ -127,6 +127,13 @@
                     // Deal with comments
                     else if (c == ';' || c == '(')
                     {
+                        if (paramLetter != '\0' || paramValue != "")
+                        {
+                            Parameters.Add(new CodeParameter(paramLetter, paramValue, inQuotes));
+                            paramLetter = '\0';
+                            paramValue = "";
+                        }
+
                         if (Comment == null)
                         {
                             Comment = "";

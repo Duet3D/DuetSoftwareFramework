@@ -177,7 +177,7 @@ namespace DuetControlServer.Codes
 
                 // Report SD card information
                 case 39:
-                    using (await Model.Provider.AccessReadOnly())
+                    using (await Model.Provider.AccessReadOnlyAsync())
                     {
                         int index = code.Parameter('P', 0);
                         if (code.Parameter('S', 0) == 2)
@@ -251,7 +251,7 @@ namespace DuetControlServer.Codes
                 // Emergency Stop
                 case 112:
                     await SPI.Interface.RequestEmergencyStop();
-                    using (await Model.Provider.AccessReadWrite())
+                    using (await Model.Provider.AccessReadWriteAsync())
                     {
                         Model.Provider.Get.State.Status = MachineStatus.Halted;
                     }
@@ -399,7 +399,7 @@ namespace DuetControlServer.Codes
 
                 // Absolute extrusion
                 case 82:
-                    using (await Model.Provider.AccessReadWrite())
+                    using (await Model.Provider.AccessReadWriteAsync())
                     {
                         Model.Provider.Get.Channels[code.Channel].RelativeExtrusion = false;
                     }
@@ -407,7 +407,7 @@ namespace DuetControlServer.Codes
 
                 // Relative extrusion
                 case 83:
-                    using (await Model.Provider.AccessReadWrite())
+                    using (await Model.Provider.AccessReadWriteAsync())
                     {
                         Model.Provider.Get.Channels[code.Channel].RelativeExtrusion = false;
                     }

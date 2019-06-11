@@ -1,10 +1,7 @@
 ﻿using DuetAPI.Commands;
 using DuetControlServer.FileExecution;
 using NUnit.Framework;
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 
 namespace DuetUnitTest.File
 {
@@ -19,15 +16,15 @@ namespace DuetUnitTest.File
             Code code;
 
             // Line 1
-            code = file.ReadCode().Result;
+            code = file.ReadCode();
             Assert.AreEqual(0, code.FilePosition);
 
             // Line 2
-            code = file.ReadCode().Result;
+            code = file.ReadCodeAsync().Result;
             Assert.AreEqual(15, code.FilePosition);
 
             // Line 3
-            code = file.ReadCode().Result;
+            code = file.ReadCode();
             Assert.AreEqual(26, code.FilePosition);
         }
     }

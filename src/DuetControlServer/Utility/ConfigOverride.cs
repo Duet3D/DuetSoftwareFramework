@@ -43,7 +43,7 @@ namespace DuetControlServer.Utility
 
         private static async Task WriteCalibrationParameters(StreamWriter writer)
         {
-            using (await Model.Provider.AccessReadOnly())
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
                 Geometry geo = Model.Provider.Get.Move.Geometry;
                 if (geo.Type == GeometryType.Hangprinter)
@@ -72,7 +72,7 @@ namespace DuetControlServer.Utility
         private static async Task WriteModelParameters(StreamWriter writer)
         {
             await writer.WriteLineAsync("; Heater model parameters");
-            using (await Model.Provider.AccessReadOnly())
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
                 for (int heater = 0; heater < Model.Provider.Get.Heat.Heaters.Count; heater++)
                 {
@@ -94,7 +94,7 @@ namespace DuetControlServer.Utility
 
         private static async Task WriteAxisLimits(StreamWriter writer)
         {
-            using (await Model.Provider.AccessReadOnly())
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
                 if (Model.Provider.Get.Move.Axes.Any(axis => axis.MinProbed || axis.MaxProbed))
                 {
@@ -123,7 +123,7 @@ namespace DuetControlServer.Utility
 
         private static async Task WriteProbeValues(StreamWriter writer)
         {
-            using (await Model.Provider.AccessReadOnly())
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
                 if (Model.Provider.Get.Sensors.Probes.Count > 0)
                 {
@@ -138,7 +138,7 @@ namespace DuetControlServer.Utility
 
         private static async Task WriteToolParameters(StreamWriter writer)
         {
-            using (await Model.Provider.AccessReadOnly())
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
                 if (Model.Provider.Get.Tools.Any(tool => tool.OffsetsProbed != 0))
                 {
@@ -165,7 +165,7 @@ namespace DuetControlServer.Utility
 
         private static async Task WriteWorkplaceCoordinates(StreamWriter writer)
         {
-            using (await Model.Provider.AccessReadOnly())
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
                 await writer.WriteLineAsync("; Workplace coordinates");
                 for (int i = 0; i < Model.Provider.Get.Move.WorkplaceCoordinates.GetLength(0); i++)

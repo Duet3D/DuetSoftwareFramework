@@ -53,7 +53,7 @@ namespace DuetControlServer.IPC.Processors
         public override async Task Process()
         {
             // Initialize the machine model and register this subscriber
-            using (await Model.Provider.AccessReadOnly())
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
                 _jsonModel = JObject.FromObject(Model.Provider.Get, JsonHelper.DefaultSerializer);
                 _messages.AddRange(Model.Provider.Get.Messages);
@@ -197,7 +197,7 @@ namespace DuetControlServer.IPC.Processors
         {
             // This is probably really slow and needs to be improved!
             JObject newModel;
-            using (await Model.Provider.AccessReadOnly())
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
                 newModel = JObject.FromObject(Model.Provider.Get, JsonHelper.DefaultSerializer);
                 newModel.Remove("messages");

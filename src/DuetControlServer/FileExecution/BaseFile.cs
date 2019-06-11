@@ -12,8 +12,8 @@ namespace DuetControlServer.FileExecution
     /// </summary>
     public class BaseFile : IDisposable
     {
-        private FileStream _fileStream;
-        private SeekableStreamReader _reader;
+        private readonly FileStream _fileStream;
+        private readonly SeekableStreamReader _reader;
 
         /// <summary>
         /// File path to the file being executed
@@ -71,7 +71,42 @@ namespace DuetControlServer.FileExecution
         /// Read the next available code
         /// </summary>
         /// <returns>Read code or null if none found</returns>
-        public virtual async Task<Code> ReadCode()
+        public virtual Code ReadCode()
+        {
+            // Deal with abort requests
+            if (IsAborted)
+            {
+                if (!IsFinished)
+                {
+                    _fileStream.Close();
+                    IsFinished = true;
+                }
+                return null;
+            }
+
+            // Attempt to read the next line
+            long filePosition = _reader.Position;
+            string line = _reader.ReadLine();
+            if (line != null)
+            {
+                return new Code(line)
+                {
+                    FilePosition = filePosition,
+                    Channel = Channel
+                };
+            }
+
+            // End of file
+            IsFinished = true;
+            _fileStream.Close();
+            return null;
+        }
+
+        /// <summary>
+        /// Read the next available code asynchronously
+        /// </summary>
+        /// <returns>Read code or null if none found</returns>
+        public virtual async Task<Code> ReadCodeAsync()
         {
             // Deal with abort requests
             if (IsAborted)

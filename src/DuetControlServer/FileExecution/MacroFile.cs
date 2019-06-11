@@ -32,7 +32,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// List of macro files being executed
         /// </summary>
-        private static List<MacroFile> _macroFiles = new List<MacroFile>();
+        private static readonly List<MacroFile> _macroFiles = new List<MacroFile>();
 
         /// <summary>
         /// Indicates if a file macro is being done
@@ -75,7 +75,7 @@ namespace DuetControlServer.FileExecution
         {
             lock (_macroFiles)
             {
-                for (int i = _macroFiles.Count; i >= 0; i--)
+                for (int i = _macroFiles.Count - 1; i >= 0; i--)
                 {
                     MacroFile file = _macroFiles[i];
                     if (file.Channel == channel)
@@ -92,7 +92,7 @@ namespace DuetControlServer.FileExecution
         private readonly bool _isConfigOverride;
         private readonly bool _isSystemMacro;
         private bool _sentPush, _sentPop;
-        private int _sourceConnection;
+        private readonly int _sourceConnection;
 
         /// <summary>
         /// Create a new macro instance
@@ -132,10 +132,10 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Read another code from the file being executed
+        /// Read another code from the file being executed asynchronously
         /// </summary>
         /// <returns>Next available code or null if the file has ended</returns>
-        public override async Task<Code> ReadCode()
+        public override Code ReadCode()
         {
             // Push the stack unless the firmware requested this file (M120)
             if (!_sentPush && !_isSystemMacro)
@@ -152,7 +152,62 @@ namespace DuetControlServer.FileExecution
             }
 
             // Read the next code from the file
-            Code result = await base.ReadCode();
+            Code result = base.ReadCode();
+            if (result != null)
+            {
+                result.FilePosition = null;
+                result.IsFromConfig = _isConfig;
+                result.IsFromConfigOverride = _isConfigOverride;
+                result.IsFromMacro = true;
+                result.IsFromSystemMacro = _isSystemMacro;
+                result.SourceConnection = _sourceConnection;
+                return result;
+            }
+
+            // Pop the stack before regular completion (M121)
+            if (_sentPop && !_isSystemMacro && !IsAborted)
+            {
+                _sentPop = true;
+                return new Code
+                {
+                    Channel = Channel,
+                    IsFromMacro = true,
+                    SourceConnection = _sourceConnection,
+                    Type = CodeType.MCode,
+                    MajorNumber = 121
+                };
+            }
+
+            // Remove reference to this file again
+            lock (_macroFiles)
+            {
+                _macroFiles.Remove(this);
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Read another code from the file being executed asynchronously
+        /// </summary>
+        /// <returns>Next available code or null if the file has ended</returns>
+        public override async Task<Code> ReadCodeAsync()
+        {
+            // Push the stack unless the firmware requested this file (M120)
+            if (!_sentPush && !_isSystemMacro)
+            {
+                _sentPush = true;
+                return new Code
+                {
+                    Channel = Channel,
+                    IsFromMacro = true,
+                    SourceConnection = _sourceConnection,
+                    Type = CodeType.MCode,
+                    MajorNumber = 120
+                };
+            }
+
+            // Read the next code from the file
+            Code result = await base.ReadCodeAsync();
             if (result != null)
             {
                 result.FilePosition = null;
@@ -192,7 +247,7 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public async Task RunMacro()
         {
-            for (Code code = await ReadCode(); code != null; code = await ReadCode())
+            for (Code code = await ReadCodeAsync(); code != null; code = await ReadCodeAsync())
             {
                 CodeResult result = await code.Execute();
                 if (!IsAborted)

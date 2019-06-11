@@ -28,7 +28,7 @@ namespace DuetControlServer
                     return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
                 }
 
-                using (await Model.Provider.AccessReadOnly())
+                using (await Model.Provider.AccessReadOnlyAsync())
                 {
                     MachineModel model = Model.Provider.Get;
                     if (driveNumber > 0 && driveNumber < model.Storages.Count)
@@ -59,7 +59,7 @@ namespace DuetControlServer
                 return Path.Combine("0:/", filePath);
             }
 
-            using (await Model.Provider.AccessReadOnly())
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
                 foreach (var storage in Model.Provider.Get.Storages)
                 {

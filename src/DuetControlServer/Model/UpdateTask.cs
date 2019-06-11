@@ -24,7 +24,7 @@ namespace DuetControlServer.Model
             {
                 // Run another update cycle
                 bool changedModel = false;
-                using (await Provider.AccessReadWrite())
+                using (await Provider.AccessReadWriteAsync())
                 {
                     MachineModel model = Provider.Get;
                     changedModel |= UpdateNetwork(ref model);

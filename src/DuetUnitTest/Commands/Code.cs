@@ -95,6 +95,24 @@ namespace DuetUnitTest.Commands
         }
 
         [Test]
+        public void ParseM574()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M574 Y2 S1 P\"io1.in\";comment");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(574, code.MajorNumber);
+            Assert.AreEqual(null, code.MinorNumber);
+            Assert.AreEqual(false, code.EnforceAbsoluteCoordinates);
+            Assert.AreEqual(3, code.Parameters.Count);
+            Assert.AreEqual('Y', code.Parameters[0].Letter);
+            Assert.AreEqual(2, (int)code.Parameters[0]);
+            Assert.AreEqual('S', code.Parameters[1].Letter);
+            Assert.AreEqual(1, (int)code.Parameters[1]);
+            Assert.AreEqual('P', code.Parameters[2].Letter);
+            Assert.AreEqual("io1.in", (string)code.Parameters[2]);
+            Assert.AreEqual("comment", code.Comment);
+        }
+
+        [Test]
         public void ParseT3()
         {
             DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("T3 P4 S\"foo\"");

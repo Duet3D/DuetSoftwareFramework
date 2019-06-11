@@ -69,7 +69,7 @@ namespace DuetControlServer.Codes
                     CodeParameter feedrate = code.Parameter('F');
                     if (feedrate != null)
                     {
-                        using (await Model.Provider.AccessReadWrite())
+                        using (await Model.Provider.AccessReadWriteAsync())
                         {
                             if (Model.Provider.Get.Channels[code.Channel].UsingInches)
                             {
@@ -85,7 +85,7 @@ namespace DuetControlServer.Codes
 
                 // Use inches
                 case 20:
-                    using (await Model.Provider.AccessReadWrite())
+                    using (await Model.Provider.AccessReadWriteAsync())
                     {
                         Model.Provider.Get.Channels[code.Channel].UsingInches = true;
                     }
@@ -93,7 +93,7 @@ namespace DuetControlServer.Codes
 
                 // Use millimetres
                 case 21:
-                    using (await Model.Provider.AccessReadWrite())
+                    using (await Model.Provider.AccessReadWriteAsync())
                     {
                         Model.Provider.Get.Channels[code.Channel].UsingInches = false;
                     }
@@ -120,7 +120,7 @@ namespace DuetControlServer.Codes
 
                 // Absolute positioning
                 case 90:
-                    using (await Model.Provider.AccessReadWrite())
+                    using (await Model.Provider.AccessReadWriteAsync())
                     {
                         Model.Provider.Get.Channels[code.Channel].RelativePositioning = false;
                     }
@@ -128,7 +128,7 @@ namespace DuetControlServer.Codes
 
                 // Relative positioning
                 case 91:
-                    using (await Model.Provider.AccessReadWrite())
+                    using (await Model.Provider.AccessReadWriteAsync())
                     {
                         Model.Provider.Get.Channels[code.Channel].RelativePositioning = true;
                     }

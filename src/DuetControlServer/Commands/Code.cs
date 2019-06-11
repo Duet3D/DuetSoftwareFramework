@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetControlServer.Codes;
@@ -104,8 +105,27 @@ namespace DuetControlServer.Commands
                     break;
             }
 
+            // Make sure to return a result. If none is given, assume success
+            if (result == null)
+            {
+                result = new CodeResult();
+            }
+
+            // RepRapFirmware generally prefixes error messages with the code itself.
+            // Do this only for error messages that come either from a print or from a macro
+            if (IsFromMacro || Channel == CodeChannel.File)
+            {
+                foreach (Message msg in result)
+                {
+                    if (msg.Type == MessageType.Error)
+                    {
+                        msg.Content = ToShortString() + ": " + msg.Content;
+                    }
+                }
+            }
+
             // Finished. Optionally an "Executed" interceptor could be called here, but that would only make sense if the code reply was included
-            return result ?? new CodeResult();
+            return result;
         }
     }
 }

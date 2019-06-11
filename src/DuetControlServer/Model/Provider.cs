@@ -28,21 +28,30 @@ namespace DuetControlServer.Model
             // Initialize machine name
             Get.Network.Name = Environment.MachineName;
         }
-        
+
         /// <summary>
         /// Access the machine model for read operations only
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static AwaitableDisposable<IDisposable> AccessReadOnly()
-        {
-            return _lock.ReaderLockAsync();
-        }
+        public static IDisposable AccessReadOnly() => _lock.ReaderLock();
+        
+        /// <summary>
+        /// Access the machine model asynchronously for read operations only
+        /// </summary>
+        /// <returns>Disposable lock object to be used with a using directive</returns>
+        public static AwaitableDisposable<IDisposable> AccessReadOnlyAsync() => _lock.ReaderLockAsync();
 
         /// <summary>
         /// Access the machine model for read/write operations
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static AwaitableDisposable<IDisposable> AccessReadWrite()
+        public static IDisposable AccessReadWrite() => _lock.WriterLock();
+
+        /// <summary>
+        /// Access the machine model asynchronously for read/write operations
+        /// </summary>
+        /// <returns>Disposable lock object to be used with a using directive</returns>
+        public static AwaitableDisposable<IDisposable> AccessReadWriteAsync()
         {
             // FIXME: Whenevever the underlying lock is released, it is safe to assume an update can be triggered
             return _lock.WriterLockAsync();
@@ -52,8 +61,8 @@ namespace DuetControlServer.Model
         /// Get the machine model. Make sure to call the acquire the corresponding lock first!
         /// </summary>
         /// <returns>Current Duet machine object model</returns>
-        /// <seealso cref="AccessReadOnly()"/>
-        /// <seealso cref="AccessReadWrite()"/>
+        /// <seealso cref="AccessReadOnlyAsync()"/>
+        /// <seealso cref="AccessReadWriteAsync()"/>
         public static MachineModel Get { get; } = new MachineModel();
 
         /// <summary>
@@ -66,7 +75,7 @@ namespace DuetControlServer.Model
             message.Print();
             if (!IPC.Processors.Subscription.Output(message))
             {
-                using (await AccessReadWrite())
+                using (await AccessReadWriteAsync())
                 {
                     Get.Messages.Add(message);
                 }
