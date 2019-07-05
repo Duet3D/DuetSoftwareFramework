@@ -9,16 +9,22 @@ dcsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" ../sr
 dwsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" ../src/DuetWebServer/DuetWebServer.csproj)
 sdver=$(cat $pwd/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
 
+export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
+
 build() {
 	echo "Building $1 configuration (DCS $dcsver and DWS $dwsver),,,"
-
-	# TODO: Replace this with actual dotnet publish commands once .NET Core SDK 2.2.300 is available on Arch Linux x64
 	rm -rf /tmp/duet/files
 	mkdir /tmp/duet/files
-	cp -r /mnt/Christian/Source/repos/DuetSoftwareFramework/bin/$1/* /tmp/duet/files
-	chmod 644 /tmp/duet/files/*
-	chmod +x /tmp/duet/files/DuetControlServer
-	chmod +x /tmp/duet/files/DuetWebServer
+
+	echo "- Building packages..."
+	cd $pwd/../src/DuetControlServer
+	dotnet publish -r linux-arm -c $1 -o /tmp/duet/files
+	cd $pwd/../src/DuetWebServer
+	dotnet publish -r linux-arm -c $1 -o /tmp/duet/files
+	cd $pwd/../examples/CodeConsole
+	dotnet publish -r linux-arm -c $1 -o /tmp/duet/files
+	cd $pwd/../examples/CodeLogger
+	dotnet publish -r linux-arm -c $1 -o /tmp/duet/files
 
 	echo "- Arranging files..."
 	mkdir -p /tmp/duet/duetcontrolserver_$dcsver/opt/dsf/bin
@@ -36,6 +42,13 @@ build() {
 	mv /tmp/duet/files/appsettings.* /tmp/duet/duetwebserver_$dwsver/opt/dsf/bin
 	mv /tmp/duet/files/web.config /tmp/duet/duetwebserver_$dwsver/opt/dsf/bin
 
+	mkdir -p /tmp/duet/duettools_$dcsver/opt/dsf/bin
+	cp -r $pwd/duettools/* /tmp/duet/duettools_$dcsver
+	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duettools_$dcsver/DEBIAN/control
+	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duettools_$dcsver/DEBIAN/changelog
+	mv /tmp/duet/files/CodeConsole* /tmp/duet/duettools_$dcsver/opt/dsf/bin
+	mv /tmp/duet/files/CodeLogger* /tmp/duet/duettools_$dcsver/opt/dsf/bin
+
 	mkdir -p /tmp/duet/duetruntime_$dcsver/opt/dsf/bin
 	cp -r $pwd/duetruntime/* /tmp/duet/duetruntime_$dcsver
 	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duetruntime_$dcsver/DEBIAN/control
@@ -47,6 +60,7 @@ build() {
 	cd /tmp/duet
 	dpkg-deb --build duetcontrolserver_$dcsver
 	dpkg-deb --build duetwebserver_$dwsver
+	dpkg-deb --build duettools_$dcsver
 	dpkg-deb --build duetruntime_$dcsver
 }
 
