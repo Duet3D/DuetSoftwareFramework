@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using DuetAPI;
-using DuetAPI.Commands;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
@@ -61,18 +60,6 @@ namespace DuetUnitTest.SPI
         }
 
         [Test]
-        public void State()
-        {
-            Span<byte> blob = GetBlob("state.bin");
-
-            int bytesRead = Reader.ReadState(blob, out int busyChannels);
-            Assert.AreEqual(bytesRead, 4);
-
-            // Header
-            Assert.AreEqual((1 << (int)CodeChannel.USB) | (1 << (int)CodeChannel.AUX), busyChannels);
-        }
-
-        [Test]
         public void ObjectModel()
         {
             Span<byte> blob = GetBlob("objectModel.bin");
@@ -85,6 +72,18 @@ namespace DuetUnitTest.SPI
             
             // JSON
             Assert.AreEqual("{\"hello\":\"json!\"}", json);
+        }
+
+        [Test]
+        public void CodeBufferUpdate()
+        {
+            Span<byte> blob = GetBlob("codeBufferUpdate.bin");
+
+            int bytesRead = Reader.ReadCodeBufferUpdate(blob, out ushort bufferSpace);
+            Assert.AreEqual(4, bytesRead);
+
+            // Header
+            Assert.AreEqual(787, bufferSpace);
         }
 
         [Test]
@@ -127,12 +126,13 @@ namespace DuetUnitTest.SPI
         {
             Span<byte> blob = GetBlob("macroRequest.bin");
             
-            int bytesRead = Reader.ReadMacroRequest(blob, out CodeChannel channel, out bool reportMissing, out string filename);
+            int bytesRead = Reader.ReadMacroRequest(blob, out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename);
             Assert.AreEqual(16, bytesRead);
             
             // Header
             Assert.AreEqual(CodeChannel.USB, channel);
             Assert.AreEqual(false, reportMissing);
+            Assert.AreEqual(true, fromCode);
             
             // Message
             Assert.AreEqual("homeall.g", filename);

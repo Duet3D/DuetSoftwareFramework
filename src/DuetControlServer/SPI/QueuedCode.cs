@@ -12,7 +12,6 @@ namespace DuetControlServer.SPI
     {
         private readonly CodeResult _result = new CodeResult();
         private readonly TaskCompletionSource<CodeResult> _taskSource = new TaskCompletionSource<CodeResult>();
-        private bool _gotEmptyResponse = false;
         private bool _lastMessageIncomplete = false;        // true if the last message had the push flag set
 
         /// <summary>
@@ -30,19 +29,29 @@ namespace DuetControlServer.SPI
         public Commands.Code Code { get; }
 
         /// <summary>
-        /// Whether the code is being executed internally or by the firmware
+        /// Indicates if the code is ready to be sent to the firmware
         /// </summary>
-        public bool IsExecuting { get; set; }
+        public bool IsReadyToSend { get; set; }
+
+        /// <summary>
+        /// Indicates if this code is currently suspended
+        /// </summary>
+        public bool IsSuspended { get; set; }
+
+        /// <summary>
+        /// Indicates if the code has been finished because of a G-code reply
+        /// </summary>
+        public bool IsFinished { get; private set; }
+
+        /// <summary>
+        /// Size of this code in binary representation
+        /// </summary>
+        public int BinarySize { get; set; }
 
         /// <summary>
         /// Indicates if RepRapFirmware requested a macro file for execution as part of this code
         /// </summary>
         public bool DoingNestedMacro { get; set; }
-
-        /// <summary>
-        /// Indicates if a complete G-code reply has been received implying this code can be finished
-        /// </summary>
-        public bool CanFinish { get => (_gotEmptyResponse || _result.Count != 0) && !_lastMessageIncomplete; }
 
         /// <summary>
         /// Task that is resolved when the code has finished
@@ -56,17 +65,18 @@ namespace DuetControlServer.SPI
         /// <param name="reply">Raw code reply</param>
         public void HandleReply(Communication.MessageTypeFlags messageType, string reply)
         {
-            DuetAPI.Message message;
             if (reply == "")
             {
-                _gotEmptyResponse = true;
-                _lastMessageIncomplete = false;
+                if (_result.Count == 0)
+                {
+                    _result.Add(DuetAPI.MessageType.Success, "");
+                }
             }
             else
             {
                 if (_lastMessageIncomplete)
                 {
-                    message = _result[_result.Count - 1];
+                    DuetAPI.Message message = _result[_result.Count - 1];
                     message.Content += reply;
                 }
                 else
@@ -74,10 +84,19 @@ namespace DuetControlServer.SPI
                     DuetAPI.MessageType type = messageType.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? DuetAPI.MessageType.Error
                                 : messageType.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? DuetAPI.MessageType.Warning
                                 : DuetAPI.MessageType.Success;
-                    message = new DuetAPI.Message(type, reply);
-                    _result.Add(message);
+                    _result.Add(type, reply);
                 }
-                _lastMessageIncomplete = messageType.HasFlag(Communication.MessageTypeFlags.PushFlag);
+            }
+
+            _lastMessageIncomplete = messageType.HasFlag(Communication.MessageTypeFlags.PushFlag);
+            if (!_lastMessageIncomplete)
+            {
+                foreach (DuetAPI.Message msg in _result)
+                {
+                    msg.Content = msg.Content.TrimEnd();
+                }
+
+                SetFinished();
             }
         }
 
@@ -91,18 +110,32 @@ namespace DuetControlServer.SPI
             {
                 _result.AddRange(result);
             }
-            _gotEmptyResponse = true;
+            SetFinished();
         }
 
         /// <summary>
         /// Report that soemthing went wrong while executing this code
         /// </summary>
         /// <param name="e">Exception to return</param>
-        public void SetException(Exception e) => _taskSource.SetException(e);
+        public void SetException(Exception e)
+        {
+            IsFinished = true;
+            _taskSource.SetException(e);
+        }
 
         /// <summary>
         /// Called to resolve the task because it has finished
         /// </summary>
-        public void SetFinished() => _taskSource.SetResult(_result);
+        public void SetFinished()
+        {
+            IsFinished = true;
+            _taskSource.SetResult(_result);
+        }
+
+        /// <summary>
+        /// Convert this instance to a string
+        /// </summary>
+        /// <returns>String representation</returns>
+        public override string ToString() => Code.ToString();
     }
 }

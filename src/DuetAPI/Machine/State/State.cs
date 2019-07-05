@@ -8,9 +8,9 @@ namespace DuetAPI.Machine
     public class State : ICloneable
     {
         /// <summary>
-        /// Whether or not ATX power is on
+        /// State of the ATX power pin (if controlled)
         /// </summary>
-        public bool AtxPower { get; set; }
+        public bool? AtxPower { get; set; }
         
         /// <summary>
         /// Number of the currently selected tool or -1 if none is selected

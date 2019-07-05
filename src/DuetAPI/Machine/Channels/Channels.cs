@@ -54,7 +54,7 @@ namespace DuetAPI.Machine
         public Channel SPI { get; set; } = new Channel();
 
         /// <summary>
-        /// Default G/M/T-code channel for generic codes
+        /// GM/T-code chanel for auto pause events
         /// </summary>
         public Channel AutoPause { get; set; } = new Channel();
 
@@ -62,7 +62,7 @@ namespace DuetAPI.Machine
         /// Index operator for simple access via the <see cref="CodeChannel"/> enum
         /// </summary>
         /// <param name="key">Channel to access</param>
-        /// <returns></returns>
+        /// <returns>Channel instance</returns>
         public Channel this[CodeChannel key]
         {
             get

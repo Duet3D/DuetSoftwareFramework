@@ -11,15 +11,24 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Converts a simple G/M/T-code to a regular Code instance, executes it and returns its result as text
         /// </summary>
-        /// <returns>G-code result</returns>
+        /// <returns>G-code result as text</returns>
         public override async Task<string> Execute()
         {
-            Code code = new Code(Code) {
+            Code code = new Code(Code)
+            {
                 Channel = Channel,
                 SourceConnection = SourceConnection
             };
+
+            // Send diagnostics request always over the Daemon channel.
+            // This way, diagnotics can be output even if a code is blocking everything else
+            if (code.Type == CodeType.MCode && code.MajorNumber == 122)
+            {
+                code.Channel = DuetAPI.CodeChannel.Daemon;
+            }
+
             CodeResult result = await code.Execute();
-            return result.ToString();
+            return (result != null) ? result.ToString() : "";
         }
     }
 }

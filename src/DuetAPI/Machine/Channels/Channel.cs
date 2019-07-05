@@ -3,7 +3,7 @@
 namespace DuetAPI.Machine
 {
     /// <summary>
-    /// Information about a G/M/T-code channel. May be further expanded
+    /// Information about a G/M/T-code channel
     /// </summary>
     public class Channel : ICloneable
     {
@@ -16,7 +16,6 @@ namespace DuetAPI.Machine
         /// Whether relative extrusion is being used
         /// </summary>
         public bool RelativeExtrusion { get; set; } = true;
-
 
         /// <summary>
         /// Whether volumetric extrusion is being used
@@ -39,6 +38,11 @@ namespace DuetAPI.Machine
         public byte StackDepth;
 
         /// <summary>
+        /// Number of the current line
+        /// </summary>
+        public long LineNumber;
+
+        /// <summary>
         /// Creates a clone of this instance
         /// </summary>
         /// <returns>A clone of this instance</returns>
@@ -51,6 +55,7 @@ namespace DuetAPI.Machine
                 RelativePositioning = RelativePositioning,
                 UsingInches = UsingInches,
                 StackDepth = StackDepth,
+                LineNumber = LineNumber
             };
         }
     }

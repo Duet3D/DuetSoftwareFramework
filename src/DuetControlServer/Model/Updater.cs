@@ -1,6 +1,7 @@
 ﻿using DuetAPI.Machine;
 using Newtonsoft.Json;
 using Nito.AsyncEx;
+using System;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Model
@@ -295,7 +296,7 @@ namespace DuetControlServer.Model
                     });
 
                     // - State -
-                    Provider.Get.State.AtxPower = response.Params.atxPower != 0;
+                    Provider.Get.State.AtxPower = (response.Params.atxPower == -1) ? null : (bool?)(response.Params.atxPower != 0);
                     Provider.Get.State.CurrentTool = response.currentTool;
                     Provider.Get.State.Status = GetStatus(response.status);
                     if (Provider.Get.State.Status == MachineStatus.Idle && FileExecution.MacroFile.DoingMacroFile)

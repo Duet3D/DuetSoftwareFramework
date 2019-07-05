@@ -84,23 +84,23 @@ namespace DuetControlServer.SPI.Serialization
                 NumParameters = (byte)code.Parameters.Count
             };
 
-            if (!code.MajorNumber.HasValue)
+            if (code.MajorNumber.HasValue)
             {
-                header.Flags |= CodeFlags.NoMajorCommandNumber;
+                header.Flags |= SpiCodeFlags.HasMajorCommandNumber;
             }
-            if (!code.MinorNumber.HasValue)
+            if (code.MinorNumber.HasValue)
             {
-                header.Flags |= CodeFlags.NoMinorCommandNumber;
+                header.Flags |= SpiCodeFlags.HasMinorCommandNumber;
             }
             if (code.FilePosition.HasValue)
             {
-                header.Flags |= CodeFlags.FilePositionValid;
+                header.Flags |= SpiCodeFlags.HasFilePosition;
             }
-            if (code.EnforceAbsoluteCoordinates)
+            if (code.Flags.HasFlag(DuetAPI.Commands.CodeFlags.EnforceAbsolutePosition))
             {
-                header.Flags |= CodeFlags.EnforceAbsolutePosition;
+                header.Flags |= SpiCodeFlags.EnforceAbsolutePosition;
             }
-            
+
             MemoryMarshal.Write(to, ref header);
             bytesWritten += Marshal.SizeOf(header);
             
@@ -151,7 +151,7 @@ namespace DuetControlServer.SPI.Serialization
                 else if (parameter.Type == typeof(string))
                 {
                     string value = parameter;
-                    binaryParam.Type = (value.Contains('[') && value.Contains(']')) ? DataType.Expression : DataType.String;
+                    binaryParam.Type = parameter.IsExpression ? DataType.Expression : DataType.String;
                     binaryParam.IntValue = value.Length;
                     extraParameters.Add(value);
                 }

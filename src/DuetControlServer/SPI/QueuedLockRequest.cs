@@ -21,11 +21,6 @@ namespace DuetControlServer.SPI
         public bool IsLockRequested { get; set; }
 
         /// <summary>
-        /// Code channel that is supposed to acquire/release the lock
-        /// </summary>
-        public CodeChannel Channel { get; }
-
-        /// <summary>
         /// Awaitable task returning true if the lock could be acquired.
         /// It returns false if the controller is reset or an emergency stop occurs
         /// </summary>
@@ -36,10 +31,9 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="isLockRequest">Whether the resource shall be locked</param>
         /// <param name="channel">Code channel requesting the lock</param>
-        public QueuedLockRequest(bool isLockRequest, CodeChannel channel)
+        public QueuedLockRequest(bool isLockRequest)
         {
             IsLockRequest = isLockRequest;
-            Channel = channel;
         }
 
         /// <summary>

@@ -30,8 +30,17 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         public long Position {
             get => _fileStream.Position;
-            set => _fileStream.Seek(value, SeekOrigin.Begin);
+            set
+            {
+                // FIXME: Update LineNumber here
+                _fileStream.Seek(value, SeekOrigin.Begin);
+            }
         }
+
+        /// <summary>
+        /// Number of the current line
+        /// </summary>
+        public long LineNumber { get; set; }
 
         /// <summary>
         /// Returns the length of the file in bytes
@@ -78,7 +87,6 @@ namespace DuetControlServer.FileExecution
             {
                 if (!IsFinished)
                 {
-                    _fileStream.Close();
                     IsFinished = true;
                 }
                 return null;
@@ -89,16 +97,26 @@ namespace DuetControlServer.FileExecution
             string line = _reader.ReadLine();
             if (line != null)
             {
-                return new Code(line)
+                Code result = new Code(line)
                 {
                     FilePosition = filePosition,
                     Channel = Channel
                 };
+
+                if (result.LineNumber.HasValue)
+                {
+                    LineNumber = result.LineNumber.Value;
+                }
+                else
+                {
+                    result.LineNumber = LineNumber++;
+                }
+
+                return result;
             }
 
             // End of file
             IsFinished = true;
-            _fileStream.Close();
             return null;
         }
 
@@ -108,12 +126,11 @@ namespace DuetControlServer.FileExecution
         /// <returns>Read code or null if none found</returns>
         public virtual async Task<Code> ReadCodeAsync()
         {
-            // Deal with abort requests
-            if (IsAborted)
+            // Deal with closed files
+            if (IsFinished || IsAborted)
             {
                 if (!IsFinished)
                 {
-                    _fileStream.Close();
                     IsFinished = true;
                 }
                 return null;
@@ -124,16 +141,26 @@ namespace DuetControlServer.FileExecution
             string line = await _reader.ReadLineAsync();
             if (line != null)
             {
-                return new Code(line)
+                Code result = new Code(line)
                 {
                     FilePosition = filePosition,
                     Channel = Channel
                 };
+
+                if (result.LineNumber.HasValue)
+                {
+                    LineNumber = result.LineNumber.Value;
+                }
+                else
+                {
+                    result.LineNumber = LineNumber++;
+                }
+
+                return result;
             }
 
             // End of file
             IsFinished = true;
-            _fileStream.Close();
             return null;
         }
 

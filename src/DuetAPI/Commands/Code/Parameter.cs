@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json;
@@ -18,6 +17,11 @@ namespace DuetAPI.Commands
         /// Letter of the code parameter (e.g. P in M106 P3)
         /// </summary>
         public char Letter { get; }
+
+        /// <summary>
+        /// Indicates if this parameter is an expression that can be evaluated
+        /// </summary>
+        public bool IsExpression { get; }
 
         /// <summary>
         /// Unparsed string representation of the code parameter or an empty string if none present
@@ -50,10 +54,15 @@ namespace DuetAPI.Commands
             {
                 // It is not encapsulated...
                 value = value.Trim();
-                
-                // If it contains colons, it is most likely an array
-                if (value.Contains(':'))
+
+                if (value.StartsWith('{') && value.EndsWith('}'))
                 {
+                    // It is an expression
+                    IsExpression = true;
+                }
+                else if (value.Contains(':'))
+                {
+                    // It is an array (or a string)
                     string[] subArgs = value.Split(':');
                     try
                     {

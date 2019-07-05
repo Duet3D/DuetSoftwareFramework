@@ -27,19 +27,6 @@ namespace DuetControlServer.SPI.Serialization
         }
 
         /// <summary>
-        /// Read the current state of the code buffers
-        /// </summary>
-        /// <param name="from">Origin</param>
-        /// <param name="busyChannels">Bitmap of the busy channels</param>
-        /// <returns>Number of bytes read</returns>
-        public static int ReadState(ReadOnlySpan<byte> from, out int busyChannels)
-        {
-            StateResponse header = MemoryMarshal.Read<StateResponse>(from);
-            busyChannels = (int)header.BusyChannels;
-            return Marshal.SizeOf(header);
-        }
-
-        /// <summary>
         /// Read an object model header plus JSON text from a memory span
         /// </summary>
         /// <param name="from">Origin</param>
@@ -64,6 +51,22 @@ namespace DuetControlServer.SPI.Serialization
             }
             
             return AddPadding(bytesRead);
+        }
+
+        /// <summary>
+        /// Read a code buffer update from a memory span
+        /// </summary>
+        /// <param name="from">Origin</param>
+        /// <param name="bufferSpace">Buffer space</param>
+        /// <returns>Number of bytes read</returns>
+        public static int ReadCodeBufferUpdate(ReadOnlySpan<byte> from, out ushort bufferSpace)
+        {
+            CodeBufferUpdate header = MemoryMarshal.Read<CodeBufferUpdate>(from);
+
+            // Read header
+            bufferSpace = header.BufferSpace;
+
+            return Marshal.SizeOf(header);
         }
 
         /// <summary>
@@ -104,7 +107,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="reportMissing">Output a message if the macro cannot be found</param>
         /// <param name="filename">Filename of the macro to execute</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadMacroRequest(ReadOnlySpan<byte> from, out CodeChannel channel, out bool reportMissing, out string filename)
+        public static int ReadMacroRequest(ReadOnlySpan<byte> from, out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename)
         {
             MacroRequest header = MemoryMarshal.Read<MacroRequest>(from);
             int bytesRead = Marshal.SizeOf(header);
@@ -112,6 +115,7 @@ namespace DuetControlServer.SPI.Serialization
             // Read header
             channel = header.Channel;
             reportMissing = Convert.ToBoolean(header.ReportMissing);
+            fromCode = Convert.ToBoolean(header.FromCode);
 
             // Read filename
             ReadOnlySpan<byte> unicodeFilename = from.Slice(bytesRead, header.Length);

@@ -2,6 +2,7 @@
 using DuetAPI.Commands;
 using Nito.AsyncEx;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -87,7 +88,7 @@ namespace DuetControlServer.FileExecution
             string startPath = await FilePath.ToPhysical("start.g", "sys");
             if (File.Exists(startPath))
             {
-                MacroFile startMacro = new MacroFile(startPath, CodeChannel.File, false, 0);
+                MacroFile startMacro = new MacroFile(startPath, CodeChannel.File, null);
                 do
                 {
                     Code code = await startMacro.ReadCodeAsync();
@@ -109,13 +110,15 @@ namespace DuetControlServer.FileExecution
             }
 
             // Process the job file
+            Queue<Code> codes = new Queue<Code>();
+            Queue<Task<CodeResult>> codeTasks = new Queue<Task<CodeResult>>();
             do
             {
                 // Has the file been paused? If so, rewind to the pause position
                 bool paused = false;
                 using (await _lock.LockAsync())
                 {
-                    if (IsPaused)
+                    if (!file.IsFinished && IsPaused)
                     {
                         file.Position = _pausePosition;
                         paused = true;
@@ -125,27 +128,61 @@ namespace DuetControlServer.FileExecution
                 // Wait for print to resume
                 if (paused)
                 {
+                    codes.Clear();
+                    codeTasks.Clear();
+
                     await _resumeEvent.WaitAsync(Program.CancelSource.Token);
                 }
 
-                // Execute the next command
-                Code code = await file.ReadCodeAsync();
-                if (code == null)
+                // Fill up the code buffer
+                Code code;
+                while (codeTasks.Count == 0 || codeTasks.Count < Settings.BufferedPrintCodes)
                 {
-                    break;
+                    code = await file.ReadCodeAsync();
+                    if (code == null)
+                    {
+                        break;
+                    }
+
+                    // The trick here is that Code.Enqueue runs synchronously and returns a
+                    // task instance that completes when a code result is available...
+                    codes.Enqueue(code);
+                    codeTasks.Enqueue(code.Enqueue());
                 }
 
-                try
+                // Is there anything to do?
+                if (codes.TryDequeue(out code))
                 {
-                    CodeResult result = await code.Execute();
-                    await Model.Provider.Output(result);
+                    // Keep track of the next file position so we know where to resume in case the print is paused while a macro is being performed 
+                    if (codes.TryPeek(out Code nextCode))
+                    {
+                        LastFilePosition = nextCode.FilePosition;
+                    }
+                    else
+                    {
+                        LastFilePosition = file.Position;
+                    }
+
+                    // Process the next code
+                    try
+                    {
+                        CodeResult result = await codeTasks.Dequeue();
+                        await Model.Provider.Output(result);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"[err] {code} -> {e}");
+                    }
                 }
-                catch (Exception e)
+                else
                 {
-                    Console.WriteLine($"[err] {code} -> {e}");
+                    // No more codes available - print must have finished
+                    break;
                 }
             }
             while (!Program.CancelSource.IsCancellationRequested);
+
+            Console.WriteLine("[info] DCS has finished printing");
 
             // Notify the controller that the print has stopped
             SPI.Communication.PrintStoppedReason stopReason = !file.IsAborted ? SPI.Communication.PrintStoppedReason.NormalCompletion
@@ -154,6 +191,7 @@ namespace DuetControlServer.FileExecution
 
             // Invalidate the file being printed
             _file = null;
+            LastFilePosition = null;
         }
 
         /// <summary>
@@ -163,6 +201,11 @@ namespace DuetControlServer.FileExecution
             get => _file.Position;
             set => _file.Position = value;
         }
+
+        /// <summary>
+        /// Holds the file position after the current code being executed
+        /// </summary>
+        public static long? LastFilePosition { get; private set; }
 
         /// <summary>
         /// Returns the length of the file being printed in bytes
@@ -210,6 +253,8 @@ namespace DuetControlServer.FileExecution
                     IsPaused = true;
                 }
             }
+
+            await Model.Provider.Output(MessageType.Success, $"Print has been paused at byte {filePosition}");
         }
 
         /// <summary>

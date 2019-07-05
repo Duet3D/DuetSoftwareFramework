@@ -6,25 +6,25 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
     /// Flags of a G/M/T-code
     /// </summary>
     [Flags]
-    public enum CodeFlags : byte
+    public enum SpiCodeFlags : byte
     {
         /// <summary>
-        /// No major command number set
+        /// This code has a valid major code
         /// </summary>
-        NoMajorCommandNumber = 1,
+        HasMajorCommandNumber = 1,
 
         /// <summary>
-        /// No minor command number set
+        /// This code has a valid minor code
         /// </summary>
-        NoMinorCommandNumber = 2,
+        HasMinorCommandNumber = 2,
 
         /// <summary>
-        /// Indicates if the file position is valid
+        /// This code has a valid file position (for pausing)
         /// </summary>
-        FilePositionValid = 4,
-        
+        HasFilePosition = 4,
+
         /// <summary>
-        /// Indicates that G53 was used with this code
+        /// Indicates that G53 was used with this code (absolute positioning)
         /// </summary>
         EnforceAbsolutePosition = 8
     }

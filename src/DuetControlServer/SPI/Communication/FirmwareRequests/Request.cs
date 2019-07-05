@@ -12,14 +12,14 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         ResendPacket = 0,
 
         /// <summary>
-        /// Response to the state request
-        /// </summary>
-        ReportState = 1,
-
-        /// <summary>
         /// Response to an object model request
         /// </summary>
-        ObjectModel = 2,
+        ObjectModel = 1,
+
+        /// <summary>
+        /// Update about the available code buffer size
+        /// </summary>
+        CodeBufferUpdate = 2,
         
         /// <summary>
         /// Response to a G/M/T-code

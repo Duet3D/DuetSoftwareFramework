@@ -71,10 +71,6 @@ namespace DuetControlServer.SPI
                 _spiChannel = Pi.Spi.Channel1;
             }
             Pi.Gpio[Settings.TransferReadyPin].RegisterInterruptCallback(EdgeDetection.FallingAndRisingEdge, () => _transferReadyEvent.Set());
-
-            // Debug
-            Pi.Gpio[BcmPin.Gpio24].PinMode = GpioPinDriveMode.Output;
-            Pi.Gpio[BcmPin.Gpio24].Value = false;
         }
 
         private static decimal GetFullTransfersPerSecond()
@@ -137,7 +133,6 @@ namespace DuetControlServer.SPI
                     {
                         continue;
                     }
-                    Pi.Gpio[BcmPin.Gpio24].Value = false;
 
                     // Deal with timeouts
                     if (_hadTimeout)
@@ -236,15 +231,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Read the result of a <see cref="Communication.LinuxRequests.Request.GetState"/> request
-        /// </summary>
-        /// <param name="busyChannels">Bitmap of the busy channels</param>
-        public static void ReadState(out int busyChannels)
-        {
-            Serialization.Reader.ReadState(_packetData.Span, out busyChannels);
-        }
-
-        /// <summary>
         /// Read the result of a <see cref="Communication.LinuxRequests.Request.GetObjectModel"/> request
         /// </summary>
         /// <param name="module">Module described by the returned JSON data</param>
@@ -252,6 +238,15 @@ namespace DuetControlServer.SPI
         public static void ReadObjectModel(out byte module, out string json)
         {
             Serialization.Reader.ReadObjectModel(_packetData.Span, out module, out json);
+        }
+
+        /// <summary>
+        /// Read a code buffer update
+        /// </summary>
+        /// <param name="bufferSpace">Buffer space</param>
+        public static void ReadCodeBufferUpdate(out ushort bufferSpace)
+        {
+            Serialization.Reader.ReadCodeBufferUpdate(_packetData.Span, out bufferSpace);
         }
 
         /// <summary>
@@ -269,10 +264,11 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Channel requesting a macro file</param>
         /// <param name="reportMissing">Write an error message if the macro is not found</param>
+        /// <param name="isSystemMacro">Indicates if this code is not bound to a code being executed (e.g. when a trigger macro is requested)</param>
         /// <param name="filename">Filename of the requested macro</param>
-        public static void ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out string filename)
+        public static void ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out bool isSystemMacro, out string filename)
         {
-            Serialization.Reader.ReadMacroRequest(_packetData.Span, out channel, out reportMissing, out filename);
+            Serialization.Reader.ReadMacroRequest(_packetData.Span, out channel, out reportMissing, out isSystemMacro, out filename);
         }
 
         /// <summary>
@@ -383,21 +379,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Request the GCodeBuffer states from the firmware
-        /// </summary>
-        /// <returns>True if the packet could be written</returns>
-        public static bool WriteGetState()
-        {
-            if (!CanWritePacket())
-            {
-                return false;
-            }
-
-            WritePacket(Communication.LinuxRequests.Request.GetState);
-            return true;
-        }
-
-        /// <summary>
         /// Request an emergency stop
         /// </summary>
         /// <returns>True if the packet could be written</returns>
@@ -426,6 +407,24 @@ namespace DuetControlServer.SPI
             _resetting = true;
             WritePacket(Communication.LinuxRequests.Request.Reset);
             return true;
+        }
+
+        /// <summary>
+        /// Figure out the size of a binary G/M/T-code
+        /// </summary>
+        /// <param name="code">Code to write</param>
+        /// <returns>Code size in bytes</returns>
+        public static int GetCodeSize(Code code)
+        {
+            Span<byte> span = /*stackalloc*/ new byte[Communication.Consts.MaxCodeBufferSize];
+            try
+            {
+                return Serialization.Writer.WriteCode(span, code);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                throw new ArgumentException("Value is too big", nameof(code));
+            }
         }
 
         /// <summary>
@@ -631,7 +630,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.UnlockAll);
+            WritePacket(Communication.LinuxRequests.Request.Unlock);
             Serialization.Writer.WriteLockUnlock(GetWriteBuffer(dataLength), channel);
             return true;
         }
@@ -714,7 +713,6 @@ namespace DuetControlServer.SPI
                 ushort checksum = CRC16.Calculate(_rxHeaderBuffer.Slice(0, Marshal.SizeOf(_rxHeader) - Marshal.SizeOf(typeof(ushort))).Span);
                 if (_rxHeader.ChecksumHeader != checksum)
                 {
-                    Pi.Gpio[BcmPin.Gpio24].Value = true;
                     Console.WriteLine($"[warn] Bad header checksum (expected 0x{_rxHeader.ChecksumHeader:x4}, got 0x{checksum:x4})");
                     responseCode = ExchangeResponse(Communication.TransferResponse.BadHeaderChecksum);
                     if (responseCode == Communication.TransferResponse.BadResponse)
@@ -815,7 +813,6 @@ namespace DuetControlServer.SPI
                 ushort checksum = CRC16.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
                 if (_rxHeader.ChecksumData != checksum)
                 {
-                    Pi.Gpio[BcmPin.Gpio24].Value = true;
                     Console.WriteLine($"[warn] Bad data checksum (expected 0x{_rxHeader.ChecksumData:x4}, got 0x{checksum:x4})");
                     responseCode = ExchangeResponse(Communication.TransferResponse.BadDataChecksum);
                     if (responseCode == Communication.TransferResponse.BadResponse)

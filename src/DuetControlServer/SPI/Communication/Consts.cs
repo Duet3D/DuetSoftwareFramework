@@ -32,8 +32,18 @@ namespace DuetControlServer.SPI.Communication
         public const byte NumModules = 4;
 
         /// <summary>
-        /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware
+        /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
         /// </summary>
         public const int MaxCodeBufferSize = 192;
+
+        /// <summary>
+        /// Size of the header prefixing a buffered code
+        /// </summary>
+        public const int BufferedCodeHeaderSize = 4;
+
+        /// <summary>
+        /// Value used by RepRapFirmware to represent an invalid file position
+        /// </summary>
+        public const uint NoFilePosition = 0xFFFFFFFF;
     }
 }

@@ -6,7 +6,6 @@ namespace DuetAPI.Commands
 {
     /// <summary>
     /// A parsed representation of a generic G/M/T-code
-    /// Line number support has not yet been implemented (TODO)
     /// </summary>
     /// <seealso cref="CodeResult"/>
     public partial class Code : Command<CodeResult>
@@ -27,6 +26,26 @@ namespace DuetAPI.Commands
         public CodeChannel Channel { get; set; } = Defaults.Channel;
 
         /// <summary>
+        /// Line number of this code
+        /// </summary>
+        public long? LineNumber { get; set; }
+
+        /// <summary>
+        /// Number of whitespaces prefixing the command content
+        /// </summary>
+        public byte Indent { get; set; }
+
+        /// <summary>
+        /// Type of conditional G-code (if any)
+        /// </summary>
+        public KeywordType Keyword { get; set; } = KeywordType.None;
+
+        /// <summary>
+        /// Argument of the conditional G-code (if any)
+        /// </summary>
+        public string KeywordArgument { get; set; }
+
+        /// <summary>
         /// Major code number (e.g. 28 in G28)
         /// </summary>
         public int? MajorNumber { get; set; }
@@ -34,12 +53,12 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Minor code number (e.g. 3 in G54.3)
         /// </summary>
-        public int? MinorNumber { get; set; }
-        
+        public sbyte? MinorNumber { get; set; }
+
         /// <summary>
-        /// Whether absolute coordinates must be used regardless of the current mode (see G53)
+        /// Flags of this code
         /// </summary>
-        public bool EnforceAbsoluteCoordinates { get; set; }
+        public CodeFlags Flags { get; set; } = CodeFlags.None;
         
         /// <summary>
         /// Comment of the G/M/T-code
@@ -49,36 +68,6 @@ namespace DuetAPI.Commands
         /// So for example a code like 'G28 (Do homing) ; via G28' causes the Comment field to be filled with 'Do homing via G28'
         /// </remarks>
         public string Comment { get; set; }
-
-        /// <summary>
-        /// Indicates if the code has been preprocessed (see also <see cref="ConnectionMode.Intercept"/>)
-        /// </summary>
-        public bool IsPreProcessed { get; set; }
-        
-        /// <summary>
-        /// Indicates if the code has been postprocessed (see also <see cref="ConnectionMode.Intercept"/>)
-        /// </summary>
-        public bool IsPostProcessed { get; set; }
-
-        /// <summary>
-        /// Indicates if the code comes from a macro file
-        /// </summary>
-        public bool IsFromMacro { get; set; }
-
-        /// <summary>
-        /// Indicates if the code comes from a system macro file that RepRapFirmware requested
-        /// </summary>
-        public bool IsFromSystemMacro { get; set; }
-
-        /// <summary>
-        /// Indicates if this code is part of config.g
-        /// </summary>
-        public bool IsFromConfig { get; set; }
-
-        /// <summary>
-        /// Indicates if this code is part of config-override.g
-        /// </summary>
-        public bool IsFromConfigOverride { get; set; }
 
         /// <summary>
         /// File position in bytes (optional)
@@ -102,7 +91,7 @@ namespace DuetAPI.Commands
         /// Retrieve the parameter whose letter equals c or generate a default parameter
         /// </summary>
         /// <param name="c">Letter of the parameter to find</param>
-        /// <param name="defaultValue">Default parameter value</param>
+        /// <param name="defaultValue">Default parameter value (no expression)</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
         public CodeParameter Parameter(char c, object defaultValue) => Parameter(c) ?? new CodeParameter(c, defaultValue);
 

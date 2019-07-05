@@ -72,7 +72,7 @@ namespace DuetUnitTest.SPI
 
             // Header
             Assert.AreEqual((byte)CodeChannel.HTTP, span[0]);
-            Assert.AreEqual((byte)(CodeFlags.NoMinorCommandNumber | CodeFlags.EnforceAbsolutePosition), span[1]);
+            Assert.AreEqual((byte)(SpiCodeFlags.HasMajorCommandNumber | SpiCodeFlags.EnforceAbsolutePosition), span[1]);
             Assert.AreEqual(0, span[2]);                    // Number of parameters
             byte codeLetter = (byte)'G';
             Assert.AreEqual(codeLetter, span[3]);
@@ -102,7 +102,7 @@ namespace DuetUnitTest.SPI
             
             // Header
             Assert.AreEqual((byte)CodeChannel.File, span[0]);
-            Assert.AreEqual((byte)CodeFlags.NoMinorCommandNumber, span[1]);
+            Assert.AreEqual((byte)SpiCodeFlags.HasMajorCommandNumber, span[1]);
             Assert.AreEqual(5, span[2]);                    // Number of parameters
             Assert.AreEqual((byte)'G', span[3]);            // Code letter
             int majorCode = MemoryMarshal.Read<int>(span.Slice(4, 4));
@@ -165,9 +165,9 @@ namespace DuetUnitTest.SPI
             Assert.AreEqual(4, bytesWritten);
 
             // Header
-            ushort length = MemoryMarshal.Read<ushort>(span);
-            Assert.AreEqual(5, span[2]);
-            
+            Assert.AreEqual(0, MemoryMarshal.Read<ushort>(span));   // Length
+            Assert.AreEqual(5, span[2]);                            // Module
+
             // Padding
             Assert.AreEqual(0, span[3]);
         }

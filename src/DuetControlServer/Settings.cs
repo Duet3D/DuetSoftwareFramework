@@ -170,6 +170,18 @@ namespace DuetControlServer
         };
 
         /// <summary>
+        /// Number of codes to buffer in the internal print subsystem
+        /// </summary>
+        [JsonProperty]
+        public static int BufferedPrintCodes { get; set; } = 32;
+
+        /// <summary>
+        /// Number of codes to buffer per macro
+        /// </summary>
+        [JsonProperty]
+        public static int BufferedMacroCodes { get; set; } = 16;
+
+        /// <summary>
         /// Load settings from the config file or create it if it does not already exist
         /// </summary>
         /// <param name="args">Command-line arguments</param>

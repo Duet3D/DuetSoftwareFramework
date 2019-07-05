@@ -72,12 +72,16 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Output(Message message)
         {
-            message.Print();
-            if (!IPC.Processors.Subscription.Output(message))
+            if (message.Content.Trim() != "")
             {
-                using (await AccessReadWriteAsync())
+                message.Print();
+
+                if (!IPC.Processors.Subscription.Output(message))
                 {
-                    Get.Messages.Add(message);
+                    using (await AccessReadWriteAsync())
+                    {
+                        Get.Messages.Add(message);
+                    }
                 }
             }
         }
@@ -97,9 +101,12 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Output(DuetAPI.Commands.CodeResult codeResult)
         {
-            foreach (Message message in codeResult)
+            if (codeResult != null)
             {
-                await Output(message);
+                foreach (Message message in codeResult)
+                {
+                    await Output(message);
+                }
             }
         }
     }

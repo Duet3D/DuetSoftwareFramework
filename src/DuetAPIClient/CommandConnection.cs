@@ -26,7 +26,7 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
-        public Task Connect(string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default(CancellationToken))
+        public Task Connect(string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default)
         {
             CommandInitMessage initMessage = new CommandInitMessage();
             return Connect(initMessage, socketPath, cancellationToken);

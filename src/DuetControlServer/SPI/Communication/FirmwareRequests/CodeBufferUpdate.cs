@@ -6,11 +6,11 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
     /// Request abort of the currently executing files
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Size = 4)]
-    public struct AbortFileRequest
+    public struct CodeBufferUpdate
     {
         /// <summary>
-        /// Code channel running the file(s)
+        /// Bytes available for storing buffered codes
         /// </summary>
-        public byte Channel;
+        public ushort BufferSpace;
     }
 }

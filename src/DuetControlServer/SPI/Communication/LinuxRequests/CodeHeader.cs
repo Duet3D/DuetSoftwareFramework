@@ -19,7 +19,7 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Flags of this code
         /// </summary>
-        public CodeFlags Flags;
+        public SpiCodeFlags Flags;
 
         /// <summary>
         /// Number of parameters following the 

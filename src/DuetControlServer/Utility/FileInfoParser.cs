@@ -219,7 +219,7 @@ namespace DuetControlServer
         private static async Task<string> ReadLineFromEndAsync(SeekableStreamReader reader)
         {
             const int bufferSize = 128;
-            char[] buffer = new char[bufferSize];
+            char[] buffer = /*stackalloc*/ new char[bufferSize];
 
             string line = "";
             while (reader.Position > 0)
@@ -228,7 +228,7 @@ namespace DuetControlServer
                 long bytesToRead = Math.Min(reader.Position, bufferSize);
                 reader.Seek(-bytesToRead, SeekOrigin.Current);
                 int bytesRead = await reader.ReadBlockAsync(buffer);
-                reader.Seek(-bytesToRead, SeekOrigin.Current);
+                reader.Seek(-bytesRead, SeekOrigin.Current);
 
                 // Keep reading until a NL is found
                 for (int i = (int)Math.Min(bytesRead - 1, reader.Position); i >= 0; i--)

@@ -122,7 +122,7 @@ namespace DuetControlServer.Codes
                 // Start a file print
                 case 32:
                     {
-                        string file = await FilePath.ToPhysical(code.GetUnprecedentedString());
+                        string file = await FilePath.ToPhysical(code.GetUnprecedentedString(), "gcodes");
                         using (await _fileToPrintLock.LockAsync())
                         {
                             _fileToPrint = file;
@@ -213,33 +213,6 @@ namespace DuetControlServer.Codes
                         }
                     }
 
-                // Run Macro Fie
-                case 98:
-                    CodeParameter pParam = code.Parameter('P');
-                    if (pParam != null)
-                    {
-                        string path = await FilePath.ToPhysical(pParam, "sys");
-                        if (File.Exists(path))
-                        {
-                            MacroFile macro = new MacroFile(path, code.Channel, false, code.SourceConnection);
-                            await macro.RunMacro();
-                        }
-                        else
-                        {
-                            path = await FilePath.ToPhysical(pParam, "macros");
-                            if (File.Exists(path))
-                            {
-                                MacroFile macro = new MacroFile(path, code.Channel, false, code.SourceConnection);
-                                await macro.RunMacro();
-                            }
-                            else
-                            {
-                                return new CodeResult(MessageType.Error, $"Could not file macro file {pParam}");
-                            }
-                        }
-                    }
-                    return new CodeResult();
-
                 // Return from macro
                 case 99:
                     if (!MacroFile.AbortLastFile(code.Channel))
@@ -256,6 +229,16 @@ namespace DuetControlServer.Codes
                         Model.Provider.Get.State.Status = MachineStatus.Halted;
                     }
                     return new CodeResult();
+
+                // Immediate DSF diagnostics
+                case 122:
+                    if (code.GetUnprecedentedString() == "DSF")
+                    {
+                        CodeResult result = new CodeResult();
+                        await Diagnostics(result);
+                        return result;
+                    }
+                    break;
 
                 // Save heightmap
                 case 374:
@@ -415,7 +398,10 @@ namespace DuetControlServer.Codes
 
                 // Diagnostics
                 case 122:
-                    await Diagnostics(result);
+                    if (code.GetUnprecedentedString() != "DSF")
+                    {
+                        await Diagnostics(result);
+                    }
                     break;
             }
             return result;

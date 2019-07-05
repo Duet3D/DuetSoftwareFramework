@@ -13,8 +13,8 @@
             char paramLetter = '\0';
             string paramValue = "";
 
-            bool inQuotes = false, inEncapsulatedComment = false, inFinalComment = false;
-            bool isMajorCode = false, expectMinorCode = false, isMinorCode = false;
+            bool inQuotes = false, wasQuoted = false, inEncapsulatedComment = false, inFinalComment = false;
+            bool isCondition = false, isLineNumber = false, isMajorCode = false, expectMinorCode = false, isMinorCode = false;
             for (int i = 0; i <= codeString.Length; i++)
             {
                 char c = (i == codeString.Length) ? '\0' : codeString[i];
@@ -33,6 +33,7 @@
                         {
                             // No longer in an escaped parameter
                             inQuotes = false;
+                            wasQuoted = true;
                         }
                     }
                     else
@@ -65,22 +66,57 @@
                 }
                 else
                 {
+                    // Line numbers prefix the major code
+                    if (!MajorNumber.HasValue && !LineNumber.HasValue && c == 'N')
+                    {
+                        isLineNumber = true;
+                    }
+                    // Read the condition body. Except for comments this is expected to fill the entire line
+                    else if (isCondition)
+                    {
+                        switch (c)
+                        {
+                            case '\0':
+                                // Ignore terminating zero
+                                break;
+                            case ';':
+                                inFinalComment = true;
+                                break;
+                            case '(':
+                                inEncapsulatedComment = true;
+                                break;
+                            default:
+                                KeywordArgument += c;
+                                break;
+                        }
+                    }
                     // Get the code type. T-codes can follow M-codes so allow them as potential parameters
                     // Also allow major numbers after G53 to support enforcement of absolute positions
-                    if ((!MajorNumber.HasValue || MajorNumber == 53) && (c == 'G' || c == 'M' || c == 'T'))
+                    else if ((!MajorNumber.HasValue || MajorNumber == 53) && (c == 'G' || c == 'M' || c == 'T'))
                     {
                         if (Type == CodeType.GCode && MajorNumber == 53)
                         {
-                            MajorNumber = 0;
-                            EnforceAbsoluteCoordinates = true;
+                            MajorNumber = null;
+                            Flags |= CodeFlags.EnforceAbsolutePosition;
                         }
                         Type = (CodeType)c;
                         isMajorCode = true;
+                        isCondition = false;
                     }
                     // Null characters, white spaces or dots following the major code indicate an end of the current chunk
                     else if (c == '\0' || char.IsWhiteSpace(c) || (c == '.' && isMajorCode))
                     {
-                        if (isMajorCode)
+                        if (isLineNumber)
+                        {
+                            if (long.TryParse(paramValue.Trim(), out long lineNumber))
+                            {
+                                LineNumber = lineNumber;
+                                paramValue = "";
+
+                                isLineNumber = false;
+                            }
+                        }
+                        else if (isMajorCode)
                         {
                             if (int.TryParse(paramValue.Trim(), out int majorCode))
                             {
@@ -94,7 +130,7 @@
                         }
                         else if (isMinorCode)
                         {
-                            if (int.TryParse(paramValue.Trim(), out int minorCode))
+                            if (sbyte.TryParse(paramValue.Trim(), out sbyte minorCode))
                             {
                                 MinorNumber = minorCode;
                                 paramValue = "";
@@ -108,9 +144,75 @@
                         }
                         else if (paramLetter != '\0' || paramValue != "")
                         {
-                            Parameters.Add(new CodeParameter(paramLetter, paramValue, inQuotes));
+                            if (!MajorNumber.HasValue && Keyword == KeywordType.None && !wasQuoted)
+                            {
+                                // Check if this is a conditional G-code
+                                if (paramLetter == 'i' && paramValue == "f")
+                                {
+                                    Keyword = KeywordType.If;
+                                    isCondition = true;
+                                }
+                                else if (paramLetter == 'e' && paramValue == "lif")
+                                {
+                                    Keyword = KeywordType.ElseIf;
+                                    isCondition = true;
+                                }
+                                else if (paramLetter == 'e' && paramValue == "lse")
+                                {
+                                    Keyword = KeywordType.Else;
+                                }
+                                else if (paramLetter == 'w' && paramValue == "hile")
+                                {
+                                    Keyword = KeywordType.While;
+                                    isCondition = true;
+                                }
+                                else if (paramLetter == 'b' && paramValue == "reak")
+                                {
+                                    Keyword = KeywordType.Break;
+                                    isCondition = true;
+                                }
+                                else if (paramLetter == 'r' && paramValue == "eturn")
+                                {
+                                    Keyword = KeywordType.Return;
+                                    isCondition = true;
+                                }
+                                else if (paramLetter == 'a' && paramValue == "bort")
+                                {
+                                    Keyword = KeywordType.Abort;
+                                    isCondition = true;
+                                }
+                                else if (paramLetter == 'v' && paramValue == "ar")
+                                {
+                                    Keyword = KeywordType.Var;
+                                    isCondition = true;
+                                }
+                                else if (paramLetter == 's' && paramValue == "et")
+                                {
+                                    Keyword = KeywordType.Set;
+                                    isCondition = true;
+                                }
+                                else
+                                {
+                                    Parameters.Add(new CodeParameter(paramLetter, paramValue, false));
+                                }
+
+                                if (isCondition)
+                                {
+                                    KeywordArgument = "";
+                                }
+                            }
+                            else
+                            {
+                                Parameters.Add(new CodeParameter(paramLetter, paramValue, wasQuoted));
+                                wasQuoted = false;
+                            }
+
                             paramLetter = '\0';
                             paramValue = "";
+                        }
+                        else if (!MajorNumber.HasValue && char.IsWhiteSpace(c))
+                        {
+                            Indent++;
                         }
                     }
                     // If the optional minor code number is expected to follow, read it once a dot is seen
@@ -129,7 +231,9 @@
                     {
                         if (paramLetter != '\0' || paramValue != "")
                         {
-                            Parameters.Add(new CodeParameter(paramLetter, paramValue, inQuotes));
+                            Parameters.Add(new CodeParameter(paramLetter, paramValue, wasQuoted));
+                            wasQuoted = false;
+
                             paramLetter = '\0';
                             paramValue = "";
                         }
@@ -142,7 +246,7 @@
                         inEncapsulatedComment = (c == '(');
                     }
                     // Start new parameter on demand
-                    else if (paramLetter == '\0' && !isMajorCode && !isMinorCode)
+                    else if (paramLetter == '\0' && !isLineNumber && !isMajorCode && !isMinorCode)
                     {
                         expectMinorCode = false;
                         paramLetter = c;
@@ -163,6 +267,14 @@
             if (inEncapsulatedComment)
             {
                 throw new CodeParserException("Unterminated encapsulated comment");
+            }
+            if (KeywordArgument != null)
+            {
+                KeywordArgument = KeywordArgument.Trim();
+                if (KeywordArgument.Length > 255)
+                {
+                    throw new CodeParserException("Keyword argument too long (> 255)");
+                }
             }
             if (Parameters.Count > 255)
             {
