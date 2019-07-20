@@ -1,5 +1,5 @@
 {
-  "SpiFrequency": 500000,
+  "SpiFrequency": 1000000,
   "SocketPath": "/var/run/duet.sock",
   "Backlog": 4,
   "BaseDirectory": "/opt/dsf/sd",
@@ -9,7 +9,7 @@
   "SpiChipSelectLine": 0,
   "SpiTransferTimeout": 500,
   "MaxSpiRetries": 3,
-  "SpiPollDelay": 20,
+  "SpiPollDelay": 25,
   "TransferReadyPin": 25,
   "MaxUpdateDelay": 250.0,
   "FileInfoReadLimit": 32768,
@@ -99,5 +99,7 @@
       "Pattern": "; Simulated print time\\D+(?<s>(\\d+\\.?\\d*))",
       "Options": 17
     }
-  ]
+  ],
+  "BufferedPrintCodes": 32,
+  "BufferedMacroCodes": 16
 }

@@ -4,3 +4,4 @@ Maintainer: RepRapFirmware <package@reprapfirmware.org>
 Priority: optional
 Version: DWCVER
 Description: Official web interface for Duet electronics
+Vcs-Git: https://github.com/chrishamm/DuetWebControl.git

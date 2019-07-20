@@ -3,7 +3,7 @@ Version: DCSVER
 Section: electronics
 Priority: standard
 Architecture: armhf
-Depends: duetcontrolserver, duetwebserver, duetsd, duetwebcontrol
+Depends: duetcontrolserver, duetsd, duettools, duetwebserver, duetwebcontrol
 Maintainer: RepRapFirmware <package@reprapfirmware.org>
 Homepage: https://reprapfirmware.org
 Description: Meta package for the full Duet software framework
