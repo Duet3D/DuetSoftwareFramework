@@ -1,7 +1,11 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI;
+using DuetAPI.Machine;
+using DuetAPI.Utility;
 using Newtonsoft.Json;
 using Nito.AsyncEx;
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Model
@@ -24,6 +28,74 @@ namespace DuetControlServer.Model
             {
                 _moduleUpdateEvents[i] = new AsyncManualResetEvent();
             }
+
+            using (Provider.AccessReadWrite())
+            {
+                foreach (CodeChannel channel in (CodeChannel[])Enum.GetValues(typeof(CodeChannel)))
+                {
+                    Provider.Get.Channels[channel].PropertyChanged += PropertyHasChanged;
+                }
+                Provider.Get.Electronics.PropertyChanged += PropertyHasChanged;
+                Provider.Get.Electronics.ExpansionBoards.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Fans.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Heat.Beds.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Heat.Chambers.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Job.PropertyChanged += PropertyHasChanged;
+                Provider.Get.Job.Layers.CollectionChanged += CollectionHasChanged;
+                Provider.Get.MessageBox.PropertyChanged += PropertyHasChanged;
+                //Provider.Get.Messages.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Move.PropertyChanged += PropertyHasChanged;
+                Provider.Get.Move.Extruders.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Move.Geometry.PropertyChanged += PropertyHasChanged;
+                Provider.Get.Move.Geometry.Anchors.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Move.Geometry.AngleCorrections.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Move.Idle.PropertyChanged += PropertyHasChanged;
+                Provider.Get.Move.WorkplaceCoordinates.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Network.PropertyChanged += PropertyHasChanged;
+                Provider.Get.Network.Interfaces.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Scanner.PropertyChanged += PropertyHasChanged;
+                Provider.Get.Sensors.Endstops.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Sensors.Probes.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Spindles.CollectionChanged += CollectionHasChanged;
+                Provider.Get.State.PropertyChanged += PropertyHasChanged;
+                Provider.Get.Storages.CollectionChanged += CollectionHasChanged;
+                Provider.Get.Tools.CollectionChanged += CollectionHasChanged;
+                Provider.Get.UserVariables.CollectionChanged += CollectionHasChanged;
+            }
+        }
+
+        private static void CollectionHasChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            if (e.OldItems != null)
+            {
+                for (int i = 0; i < e.OldItems.Count; i++)
+                {
+                    if (e.OldItems[i] is INotifyPropertyChanged obj)
+                    {
+                        // Unsubscribe from existing items in order to prevent a memory leak...
+                        obj.PropertyChanged -= PropertyHasChanged;
+                    }
+                }
+            }
+
+            if (e.NewItems != null)
+            {
+                for (int i = 0; i < e.NewItems.Count; i++)
+                {
+                    if (e.NewItems[i] is INotifyPropertyChanged obj)
+                    {
+                        // Subscribe for potential updates again.
+                        // We do not subscribe to sub-collections/sub-types yet so it is possible that this has to be changed again...
+                        obj.PropertyChanged += PropertyHasChanged;
+                    }
+                }
+            }
+        }
+
+        private static void PropertyHasChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            // Notify clients about new data
+            IPC.Processors.Subscription.ModelUpdated();
         }
 
         /// <summary>
@@ -83,6 +155,20 @@ namespace DuetControlServer.Model
                         top = 0.0F
                     },
                     currentTool = -1,
+                    output = new
+                    {
+                        beepDuration = 0,
+                        beepFrequency = 0,
+                        message = "",
+                        msgBox = new
+                        {
+                            msg = "",
+                            title = "",
+                            seq = 0,
+                            timeout = 0,
+                            controls = 0
+                        }
+                    },
                     Params = new
                     {
                         atxPower = 0,
@@ -164,6 +250,7 @@ namespace DuetControlServer.Model
                     firmwareName = ""
                 };
 
+                // FIXME: I bet this call causes a memory leak for some reason:
                 var response = JsonConvert.DeserializeAnonymousType(json, responseDefinition);
                 using (await Provider.AccessReadWriteAsync())
                 {
@@ -177,20 +264,19 @@ namespace DuetControlServer.Model
                     Provider.Get.Electronics.VIn.Max = response.vin.max;
 
                     // - Fans -
-                    Provider.Get.Fans.Clear();
+                    Fan[] fans = new Fan[response.Params.fanPercent.Length];
                     for (int fan = 0; fan < response.Params.fanPercent.Length; fan++)
                     {
-                        Provider.Get.Fans.Add(new Fan
+                        Fan fanObj = new Fan
                         {
                             Name = response.Params.fanNames[fan],
                             Rpm = (response.sensors.fanRPM.Length > fan && response.sensors.fanRPM[fan] > 0) ? (int?)response.sensors.fanRPM[fan] : null,
-                            Value = response.Params.fanPercent[fan] / 100,
-                            Thermostatic = new Thermostatic
-                            {
-                                Control = (response.controllableFans & (1 << fan)) == 0
-                            }
-                        });
+                            Value = response.Params.fanPercent[fan] / 100
+                        };
+                        fanObj.Thermostatic.Control = (response.controllableFans & (1 << fan)) == 0;
+                        fans[fan] = fanObj;
                     }
+                    ListHelpers.AssignList(Provider.Get.Fans, fans);
 
                     // - Move -
                     Provider.Get.Move.Compensation = response.compensation;
@@ -198,105 +284,152 @@ namespace DuetControlServer.Model
                     Provider.Get.Move.CurrentMove.TopSpeed = response.speeds.top;
                     Provider.Get.Move.SpeedFactor = response.Params.speedFactor / 100;
                     Provider.Get.Move.BabystepZ = response.Params.babystep;
-                    Provider.Get.Move.Drives.Clear();
 
-                    // Rewrite axes
-                    Provider.Get.Move.Axes.Clear();
+                    Drive[] drives = new Drive[response.coords.xyz.Length + response.coords.extr.Length];
+
+                    // Update axes
+                    Axis[] axes = new Axis[response.coords.xyz.Length];
                     for (int axis = 0; axis < response.coords.xyz.Length; axis++)
                     {
-                        Provider.Get.Move.Axes.Add(new Axis
+                        Axis axisObj = new Axis
                         {
                             Letter = GetAxisLetter(axis),
-                            Drives = new int[] { axis },
                             Homed = response.coords.axesHomed[axis] != 0,
                             MachinePosition = response.coords.machine[axis]
-                        });
+                        };
+                        axisObj.Drives.Add(axis);
+                        axes[axis] = axisObj;
 
-                        Provider.Get.Move.Drives.Add(new Drive
+                        drives[axis] = new Drive
                         {
                             Position = response.coords.xyz[axis]
-                        });
+                        };
                     }
+                    ListHelpers.AssignList(Provider.Get.Move.Axes, axes);
 
-                    // Rewrite extruder drives
-                    Provider.Get.Move.Extruders.Clear();
+                    // Update extruder drives
+                    Extruder[] extruders = new Extruder[response.coords.extr.Length];
                     for (int extruder = 0; extruder < response.coords.extr.Length; extruder++)
                     {
-                        Provider.Get.Move.Extruders.Add(new Extruder
+                        Extruder extruderObj = new Extruder
                         {
-                            Drives = new int[] { response.coords.xyz.Length + extruder },
                             Factor = response.Params.extrFactors[extruder] / 100
-                        });
+                        };
+                        extruderObj.Drives.Add(response.coords.xyz.Length + extruder);
+                        extruders[extruder] = extruderObj;
 
-                        Provider.Get.Move.Drives.Add(new Drive
+                        drives[response.coords.xyz.Length + extruder] = new Drive
                         {
                             Position = response.coords.extr[extruder]
-                        });
+                        };
                     }
+                    ListHelpers.AssignList(Provider.Get.Move.Extruders, extruders);
+
+                    ListHelpers.AssignList(Provider.Get.Move.Drives, drives);
 
                     // - Heat -
                     Provider.Get.Heat.ColdExtrudeTemperature = response.coldExtrudeTemp;
                     Provider.Get.Heat.ColdRetractTemperature = response.coldRetractTemp;
 
-                    // Rewrite beds
-                    Provider.Get.Heat.Beds.Clear();
+                    // Update beds
+                    BedOrChamber[] beds;
                     if (response.temps.bed != null)
                     {
-                        Provider.Get.Heat.Beds.Add(new BedOrChamber
-                        {
-                            Active = new float[] { response.temps.bed.active },
-                            Standby = new float[] { response.temps.bed.standby },
-                            Heaters = new int[] { response.temps.bed.heater }
-                        });
-                    }
+                        beds = new BedOrChamber[1];
 
-                    // Rewrite chambers
-                    Provider.Get.Heat.Chambers.Clear();
+                        BedOrChamber bed = new BedOrChamber();
+                        bed.Active.Add(response.temps.bed.active);
+                        bed.Standby.Add(response.temps.bed.standby);
+                        bed.Heaters.Add(response.temps.bed.heater);
+                        beds[0] = bed;
+                    }
+                    else
+                    {
+                        beds = new BedOrChamber[0];
+                    }
+                    ListHelpers.AssignList(Provider.Get.Heat.Beds, beds);
+
+                    // Update chambers
+                    BedOrChamber[] chambers;
                     if (response.temps.chamber != null)
                     {
-                        Provider.Get.Heat.Chambers.Add(new BedOrChamber
-                        {
-                            Active = new float[] { response.temps.chamber.active },
-                            Standby = new float[] { response.temps.chamber.standby },
-                            Heaters = new int[] { response.temps.chamber.heater }
-                        });
-                    }
+                        chambers = new BedOrChamber[1];
 
-                    // Rewrite heaters
-                    Provider.Get.Heat.Heaters.Clear();
+                        BedOrChamber chamber = new BedOrChamber();
+                        chamber.Active.Add(response.temps.chamber.active);
+                        chamber.Standby.Add(response.temps.chamber.standby);
+                        chamber.Heaters.Add(response.temps.chamber.heater);
+                        chambers[0] = chamber;
+                    }
+                    else
+                    {
+                        chambers = new BedOrChamber[0];
+                    }
+                    ListHelpers.AssignList(Provider.Get.Heat.Chambers, chambers);
+
+                    // Update heaters
+                    Heater[] heaters = new Heater[response.temps.current.Length];
                     for (int heater = 0; heater < response.temps.current.Length; heater++)
                     {
-                        Provider.Get.Heat.Heaters.Add(new Heater
+                        heaters[heater] = new Heater
                         {
                             Current = response.temps.current[heater],
                             Max = response.tempLimit,
                             Name = response.temps.names[heater],
                             Sensor = heater,
                             State = (HeaterState)response.temps.state[heater]
-                        });
+                        };
                     }
+                    ListHelpers.AssignList(Provider.Get.Heat.Heaters, heaters);
 
-                    // Rewrite extra heaters
-                    Provider.Get.Heat.Extra.Clear();
-                    foreach (var extra in response.temps.extra)
+                    // Update extra heaters
+                    ExtraHeater[] extraHeaters = new ExtraHeater[response.temps.extra.Length];
+                    for (int extra = 0; extra < response.temps.extra.Length; extra++)
                     {
-                        Provider.Get.Heat.Extra.Add(new ExtraHeater
+                        extraHeaters[extra] = new ExtraHeater
                         {
-                            Current = extra.temp,
-                            Name = extra.name
-                        });
+                            Current = response.temps.extra[extra].temp,
+                            Name = response.temps.extra[extra].name
+                        };
                     }
+                    ListHelpers.AssignList(Provider.Get.Heat.Extra, extraHeaters);
 
                     // - Sensors -
-                    Provider.Get.Sensors.Probes.Clear();
-                    Provider.Get.Sensors.Probes.Add(new Probe
+                    Probe[] probes = new Probe[1];
+                    Probe probe = new Probe()
                     {
-                        Value = response.sensors.probeValue,
-                        SecondaryValues = response.sensors.probeSecondary
-                    });
+                        Value = response.sensors.probeValue
+                    };
+                    if (response.sensors.probeSecondary != null)
+                    {
+                        foreach (int secondaryValue in response.sensors.probeSecondary)
+                        {
+                            probe.SecondaryValues.Add(secondaryValue);
+                        }
+                    }
+                    probes[0] = probe;
+                    ListHelpers.AssignList(Provider.Get.Sensors.Probes, probes);
 
                     // - State -
                     Provider.Get.State.AtxPower = (response.Params.atxPower == -1) ? null : (bool?)(response.Params.atxPower != 0);
+                    if (response.output != null)
+                    {
+                        if (response.output.beepFrequency != 0 && response.output.beepDuration != 0)
+                        {
+                            Provider.Get.State.Beep.Frequency = response.output.beepFrequency;
+                            Provider.Get.State.Beep.Duration = response.output.beepDuration;
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(response.output.beepDuration);
+                                using (await Provider.AccessReadWriteAsync())
+                                {
+                                    Provider.Get.State.Beep.Duration = 0;
+                                    Provider.Get.State.Beep.Frequency = 0;
+                                }
+                            }, Program.CancelSource.Token);
+                        }
+                        Provider.Get.State.DisplayMessage = response.output.message;
+                    }
                     Provider.Get.State.CurrentTool = response.currentTool;
                     Provider.Get.State.Status = GetStatus(response.status);
                     if (Provider.Get.State.Status == MachineStatus.Idle && FileExecution.MacroFile.DoingMacroFile)
@@ -306,21 +439,38 @@ namespace DuetControlServer.Model
                     }
 
                     // - Tools -
-                    Provider.Get.Tools.Clear();
+                    Tool[] tools = new Tool[response.tools.Length];
                     for (int tool = 0; tool < response.tools.Length; tool++)
                     {
-                        Provider.Get.Tools.Add(new Tool
+                        Tool toolObj = new Tool
                         {
-                            Active = response.temps.tools.active[tool],
-                            Standby = response.temps.tools.standby[tool],
-                            Fans = new int[] { response.tools[tool].fan },
                             Filament = response.tools[tool].filament,
-                            Heaters = response.tools[tool].heaters,
                             Name = (response.tools[tool].name == "") ? null : response.tools[tool].name,
-                            Number = response.tools[tool].number,
-                            Offsets = response.tools[tool].offsets
-                        });
+                            Number = response.tools[tool].number
+                        };
+                        foreach (float active in response.temps.tools.active[tool])
+                        {
+                            toolObj.Active.Add(active);
+                        }
+                        foreach (float standby in response.temps.tools.standby[tool])
+                        {
+                            toolObj.Standby.Add(standby);
+                        }
+                        if (response.tools[tool].fan >= 0)
+                        {
+                            toolObj.Fans.Add(response.tools[tool].fan);
+                        }
+                        foreach (int heater in response.tools[tool].heaters)
+                        {
+                            toolObj.Heaters.Add(heater);
+                        }
+                        foreach (float offset in response.tools[tool].offsets)
+                        {
+                            toolObj.Offsets.Add(offset);
+                        }
+                        tools[tool] = toolObj;
                     }
+                    ListHelpers.AssignList(Provider.Get.Tools, tools);
                 }
             }
 
@@ -350,7 +500,7 @@ namespace DuetControlServer.Model
                     Provider.Get.Job.Layer = printResponse.currentLayer;
                     Provider.Get.Job.LayerTime = (printResponse.currentLayer == 1) ? printResponse.firstLayerDuration : printResponse.currentLayerTime;
                     Provider.Get.Job.FilePosition = printResponse.filePosition;
-                    Provider.Get.Job.ExtrudedRaw = printResponse.extrRaw;
+                    ListHelpers.SetList(Provider.Get.Job.ExtrudedRaw, printResponse.extrRaw);
                     Provider.Get.Job.Duration =  printResponse.printDuration;
                     Provider.Get.Job.WarmUpDuration = printResponse.warmUpDuration;
                     Provider.Get.Job.TimesLeft.File = (printResponse.timesLeft.file > 0F) ? (float?)printResponse.timesLeft.file : null;
@@ -364,14 +514,11 @@ namespace DuetControlServer.Model
             {
                 if (Provider.Get.State.Status == MachineStatus.Halted)
                 {
-                    await SPI.Interface.InvalidateData("Code cancelled because the firmware is halted");
+                    await SPI.Interface.InvalidateData("Firmware halted");
                 }
             }
 
-            // Notify IPC subscribers
-            await IPC.Processors.Subscription.ModelUpdated();
-
-            // Notify waiting threads
+            // Notify waiting threads about the last module updated
             _moduleUpdateEvents[module].Set();
             _moduleUpdateEvents[module].Reset();
             lock (_moduleUpdateEvents)

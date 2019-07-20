@@ -210,7 +210,6 @@ namespace DuetUnitTest.SPI
             ParsedFileInfo info = new ParsedFileInfo
             {
                 Size = 452432,
-                Filament = new float[] { 123.45F, 678.9F },
                 FileName = "0:/gcodes/test.g",
                 FirstLayerHeight = 0.3F,
                 GeneratedBy = "Slic3r",
@@ -221,6 +220,8 @@ namespace DuetUnitTest.SPI
                 PrintTime = 12355,
                 SimulatedTime = 10323
             };
+            info.Filament.Add(123.45F);
+            info.Filament.Add(678.9F);
             
             int bytesWritten = Writer.WritePrintStarted(span, info);
             Assert.AreEqual(72, bytesWritten);
@@ -272,7 +273,6 @@ namespace DuetUnitTest.SPI
             ParsedFileInfo info = new ParsedFileInfo
             {
                 Size = 4180,
-                Filament = new float[0],
                 FileName = "0:/gcodes/circle.g",
                 FirstLayerHeight = 0.5F,
                 GeneratedBy = "",

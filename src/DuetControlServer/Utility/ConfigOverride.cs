@@ -131,7 +131,7 @@ namespace DuetControlServer.Utility
                     Probe probe = Model.Provider.Get.Sensors.Probes[0];
 
                     await writer.WriteLineAsync("; Z probe parameters");
-                    await writer.WriteLineAsync($"G31 T{probe.Type} P{probe.Threshold} X{probe.Offset[0]:F1} Y{probe.Offset[2]:F1} Z{probe.TriggerHeight:F2}");
+                    await writer.WriteLineAsync($"G31 T{probe.Type} P{probe.Threshold} X{probe.Offsets[0]:F1} Y{probe.Offsets[2]:F1} Z{probe.TriggerHeight:F2}");
                 }
             }
         }
@@ -168,7 +168,7 @@ namespace DuetControlServer.Utility
             using (await Model.Provider.AccessReadOnlyAsync())
             {
                 await writer.WriteLineAsync("; Workplace coordinates");
-                for (int i = 0; i < Model.Provider.Get.Move.WorkplaceCoordinates.GetLength(0); i++)
+                for (int i = 0; i < Model.Provider.Get.Move.WorkplaceCoordinates.Count; i++)
                 {
                     List<string> values = new List<string>();
                     for (int axisIndex = 0; axisIndex < Model.Provider.Get.Move.Axes.Count; axisIndex++)
@@ -176,8 +176,7 @@ namespace DuetControlServer.Utility
                         Axis axis = Model.Provider.Get.Move.Axes[axisIndex];
                         if (axis.Visible)
                         {
-                            values.Add($"{axis.Letter}{Model.Provider.Get.Move.WorkplaceCoordinates[i, axisIndex]:F2}");
-
+                            values.Add($"{axis.Letter}{Model.Provider.Get.Move.WorkplaceCoordinates[i][axisIndex]:F2}");
                         }
                     }
                     await writer.WriteLineAsync($"G10 L2 P{i} {string.Join(' ', values)}");

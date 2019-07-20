@@ -1,32 +1,115 @@
-﻿using System;
+﻿using DuetAPI.Utility;
+using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace DuetAPI.Machine
 {
     /// <summary>
-    /// Information about a layer from a file being printed.
-    /// Do not change these properties after an instance was added to the object model
+    /// Information about a layer from a file being printed
     /// </summary>
-    public class Layer : ICloneable
+    public sealed class Layer : IAssignable, ICloneable, INotifyPropertyChanged
     {
+        /// <summary>
+        /// Event to trigger when a property has changed
+        /// </summary>
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         /// <summary>
         /// Duration of the layer (in s or null if unknown)
         /// </summary>
-        public float? Duration { get; set; }
+        public float? Duration
+        {
+            get => _duration;
+            set
+            {
+                if (_duration != value)
+                {
+                    _duration = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private float? _duration;
 
         /// <summary>
         /// Height of the layer (in mm or null if unknown)
         /// </summary>
-        public float? Height { get; set; }
+        public float? Height
+        {
+            get => _height;
+            set
+            {
+                if (_height != value)
+                {
+                    _height = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private float? _height;
 
         /// <summary>
         /// Actual amount of filament extruded during this layer (in mm)
         /// </summary>
-        public float[] Filament { get; set; } = new float[0];
+        public float[] Filament
+        {
+            get => _filament;
+            set
+            {
+                if (_filament != value)
+                {
+                    _filament = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private float[] _filament = new float[0];
 
         /// <summary>
         /// Fraction of the file printed during this layer (0..1 or null if unknown)
         /// </summary>
-        public float? FractionPrinted { get; set; }
+        public float? FractionPrinted
+        {
+            get => _fractionPrinted;
+            set
+            {
+                if (_fractionPrinted != value)
+                {
+                    _fractionPrinted = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private float? _fractionPrinted;
+
+        /// <summary>
+        /// Assigns every property from another instance
+        /// </summary>
+        /// <param name="from">Object to assign from</param>
+        /// <exception cref="ArgumentNullException">other is null</exception>
+        /// <exception cref="ArgumentException">Types do not match</exception>
+        public void Assign(object from)
+        {
+            if (from == null)
+            {
+                throw new ArgumentNullException();
+            }
+            if (!(from is Layer other))
+            {
+                throw new ArgumentException("Invalid type");
+            }
+
+            Duration = other.Duration;
+            Height = other.Height;
+            Filament = (float[])other.Filament.Clone();
+            FractionPrinted = other.FractionPrinted;
+        }
 
         /// <summary>
         /// Creates a clone of this instance

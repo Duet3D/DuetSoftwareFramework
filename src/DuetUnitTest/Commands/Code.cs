@@ -1,6 +1,8 @@
 ﻿using DuetAPI.Commands;
 using Newtonsoft.Json;
 using NUnit.Framework;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace DuetUnitTest.Commands
 {
@@ -10,7 +12,7 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseG28()
         {
-            DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("G28 X Y");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G28 X Y");
             Assert.AreEqual(CodeType.GCode, code.Type);
             Assert.AreEqual(28, code.MajorNumber);
             Assert.AreEqual(null, code.MinorNumber);
@@ -22,19 +24,19 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseG29()
         {
-            DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("G29 S1 ; load heightmap");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G29 S1 ; load heightmap");
             Assert.AreEqual(CodeType.GCode, code.Type);
             Assert.AreEqual(29, code.MajorNumber);
             Assert.AreEqual(null, code.MinorNumber);
             Assert.AreEqual(1, code.Parameters.Count);
             Assert.AreEqual('S', code.Parameters[0].Letter);
-            Assert.IsTrue(code.Parameter('S', 0) == 1);
+            Assert.AreEqual(1, (int)code.Parameter('S', 0));
         }
 
         [Test]
         public void ParseG53()
         {
-            DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("G53");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G53");
             Assert.AreEqual(CodeType.GCode, code.Type);
             Assert.AreEqual(53, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
@@ -43,7 +45,7 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseG54()
         {
-            DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("G54.6");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G54.6");
             Assert.AreEqual(CodeType.GCode, code.Type);
             Assert.AreEqual(54, code.MajorNumber);
             Assert.AreEqual(6, code.MinorNumber);
@@ -52,7 +54,7 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseM106()
         {
-            DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("M106 P1 C\"Fancy \"\" Fan\" H-1 S0.5");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M106 P1 C\"Fancy \"\" Fan\" H-1 S0.5");
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(106, code.MajorNumber);
             Assert.AreEqual(null, code.MinorNumber);
@@ -89,7 +91,7 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseM569()
         {
-            DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("M569 P2 S1 T0.5");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M569 P2 S1 T0.5");
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(569, code.MajorNumber);
             Assert.AreEqual(null, code.MinorNumber);
@@ -124,7 +126,7 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseT3()
         {
-            DuetAPI.Commands.Code code = new DuetControlServer.Commands.Code("T3 P4 S\"foo\"");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("T3 P4 S\"foo\"");
             Assert.AreEqual(CodeType.TCode, code.Type);
             Assert.AreEqual(3, code.MajorNumber);
             Assert.AreEqual(null, code.MinorNumber);
@@ -189,15 +191,15 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseExpression()
         {
-            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G1 X{machine.axes[0].maximum-10} Y{machine.axes[1].maximum-10}");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G1 X{machine.axes[0].maximum - 10} Y{machine.axes[1].maximum - 10}");
             Assert.AreEqual(CodeType.GCode, code.Type);
             Assert.AreEqual(1, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('X', code.Parameters[0].Letter);
-            Assert.AreEqual("{machine.axes[0].maximum-10}", (string)code.Parameters[0]);
+            Assert.AreEqual("{machine.axes[0].maximum - 10}", (string)code.Parameters[0]);
             Assert.AreEqual('Y', code.Parameters[1].Letter);
-            Assert.AreEqual("{machine.axes[1].maximum-10}", (string)code.Parameters[1]);
+            Assert.AreEqual("{machine.axes[1].maximum - 10}", (string)code.Parameters[1]);
         }
 
         [Test]
@@ -219,10 +221,10 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseKeywords()
         {
-            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("  if machine.autocal.stddev <= 0.03 (some nice) ; comment");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("  if machine.tool.is.great <= 0.03 (some nice) ; comment");
             Assert.AreEqual(2, code.Indent);
             Assert.AreEqual(KeywordType.If, code.Keyword);
-            Assert.AreEqual("machine.autocal.stddev <= 0.03", code.KeywordArgument);
+            Assert.AreEqual("machine.tool.is.great <= 0.03", code.KeywordArgument);
             Assert.AreEqual("some nice comment", code.Comment);
 
             code = new DuetAPI.Commands.Code("  elif true");
@@ -261,6 +263,58 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual(2, code.Indent);
             Assert.AreEqual(KeywordType.Set, code.Keyword);
             Assert.AreEqual("asdf=\"meh\"", code.KeywordArgument);
+        }
+
+        [Test]
+        public void ParseMultipleCodesSpace()
+        {
+            List<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.Code.ParseMultiple("G91 G1 X5 Y2").ToList();
+
+            Assert.AreEqual(2, codes.Count);
+
+            Assert.AreEqual(CodeType.GCode, codes[0].Type);
+            Assert.AreEqual(91, codes[0].MajorNumber);
+
+            Assert.AreEqual(CodeType.GCode, codes[1].Type);
+            Assert.AreEqual(1, codes[1].MajorNumber);
+            Assert.AreEqual(2, codes[1].Parameters.Count);
+            Assert.AreEqual('X', codes[1].Parameters[0].Letter);
+            Assert.AreEqual(5, (int)codes[1].Parameters[0]);
+            Assert.AreEqual('Y', codes[1].Parameters[1].Letter);
+            Assert.AreEqual(2, (int)codes[1].Parameters[1]);
+        }
+
+        [Test]
+        public void ParseMultipleCodesNL()
+        {
+            List<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.Code.ParseMultiple("G91\nG1 X5 Y2").ToList();
+
+            Assert.AreEqual(2, codes.Count);
+
+            Assert.AreEqual(CodeType.GCode, codes[0].Type);
+            Assert.AreEqual(91, codes[0].MajorNumber);
+
+            Assert.AreEqual(CodeType.GCode, codes[1].Type);
+            Assert.AreEqual(1, codes[1].MajorNumber);
+            Assert.AreEqual(2, codes[1].Parameters.Count);
+            Assert.AreEqual('X', codes[1].Parameters[0].Letter);
+            Assert.AreEqual(5, (int)codes[1].Parameters[0]);
+            Assert.AreEqual('Y', codes[1].Parameters[1].Letter);
+            Assert.AreEqual(2, (int)codes[1].Parameters[1]);
+        }
+
+        [Test]
+        public void ParseCompactCode()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M302D\"dummy\"P1");
+
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(302, code.MajorNumber);
+            Assert.AreEqual(2, code.Parameters.Count);
+            Assert.AreEqual('D', code.Parameters[0].Letter);
+            Assert.AreEqual("dummy", (string)code.Parameters[0]);
+            Assert.AreEqual('P', code.Parameters[1].Letter);
+            Assert.AreEqual(1, (int)code.Parameters[1]);
         }
     }
 }

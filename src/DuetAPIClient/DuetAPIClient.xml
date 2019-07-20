@@ -39,7 +39,7 @@
             </summary>
             <param name="code">The code to execute</param>
             <param name="cancellationToken">Optional cancellation token</param>
-            <returns>The result of the given code</returns>
+            <returns>Result of the given code or null if the code was never executed (buffer cleared)</returns>
             <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
             <seealso cref="T:DuetAPI.Commands.Code"/>
         </member>

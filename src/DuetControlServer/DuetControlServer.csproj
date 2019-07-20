@@ -6,8 +6,8 @@
     <LangVersion>default</LangVersion>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D</Company>
-    <AssemblyVersion>1.0.1.0</AssemblyVersion>
-    <FileVersion>1.0.1.0</FileVersion>
+    <AssemblyVersion>1.0.2.0</AssemblyVersion>
+    <FileVersion>1.0.2.0</FileVersion>
     <Version>1.0.1</Version>
   </PropertyGroup>
 
@@ -28,7 +28,7 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
     <PackageReference Include="Nito.AsyncEx" Version="5.0.0" />
-    <PackageReference Include="Unosquare.Raspberry.IO" Version="0.21.0" />
+    <PackageReference Include="Unosquare.Raspberry.IO" Version="0.23.0" />
     <PackageReference Include="Unosquare.WiringPi" Version="0.3.1" />
     <PackageReference Include="Zhaobang.IO.SeekableStreamReader" Version="1.0.0" />
   </ItemGroup>

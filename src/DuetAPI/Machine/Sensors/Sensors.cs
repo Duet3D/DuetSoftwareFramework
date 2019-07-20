@@ -1,27 +1,48 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using DuetAPI.Utility;
+using System;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about sensors
     /// </summary>
-    public class Sensors : ICloneable
+    public sealed class Sensors : IAssignable, ICloneable
     {
         /// <summary>
         /// List of configured endstops
         /// </summary>
         /// <seealso cref="Endstop"/>
-        public List<Endstop> Endstops { get; set; } = new List<Endstop>();
+        public ObservableCollection<Endstop> Endstops { get; set; } = new ObservableCollection<Endstop>();
         
         /// <summary>
         /// List of configured probes
         /// </summary>
         /// <seealso cref="Probe"/>
-        public List<Probe> Probes { get; set; } = new List<Probe>();
+        public ObservableCollection<Probe> Probes { get; set; } = new ObservableCollection<Probe>();
 
         // TODO add Sensors here holding info about thermistors
+
+        /// <summary>
+        /// Assigns every property of another instance of this one
+        /// </summary>
+        /// <param name="from">Object to assign from</param>
+        /// <exception cref="ArgumentNullException">other is null</exception>
+        /// <exception cref="ArgumentException">Types do not match</exception>
+        public void Assign(object from)
+        {
+            if (from == null)
+            {
+                throw new ArgumentNullException();
+            }
+            if (!(from is Sensors other))
+            {
+                throw new ArgumentException("Invalid type");
+            }
+
+            ListHelpers.AssignList(Endstops, other.Endstops);
+            ListHelpers.AssignList(Probes, other.Probes);
+        }
 
         /// <summary>
         /// Creates a clone of this instance
@@ -29,11 +50,12 @@ namespace DuetAPI.Machine
         /// <returns>A clone of this instance</returns>
         public object Clone()
         {
-            return new Sensors
-            {
-                Endstops = Endstops.Select(endstop => (Endstop)endstop.Clone()).ToList(),
-                Probes = Probes.Select(probe => (Probe)probe.Clone()).ToList()
-            };
+            Sensors clone = new Sensors();
+
+            ListHelpers.CloneItems(clone.Endstops, Endstops);
+            ListHelpers.CloneItems(clone.Probes, Probes);
+
+            return clone;
         }
     }
 }

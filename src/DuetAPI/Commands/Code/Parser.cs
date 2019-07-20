@@ -1,285 +1,394 @@
-﻿namespace DuetAPI.Commands
+﻿using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace DuetAPI.Commands
 {
     public partial class Code
     {
+        // Numeric parameters may hold only characters of this string 
+        private const string NumericParameterChars = "01234567890+-.e:";
+
         /// <summary>
-        /// Create a parsed code representation from a text-based string
-        /// This constructor parses the whole code and fills the class members where applicable
+        /// Parse the next available G/M/T-code from the given stream
         /// </summary>
-        /// <param name="codeString">The text-based G/M/T-code</param>
+        /// <param name="reader">Input to read from</param>
+        /// <param name="result">Code to fill</param>
+        /// <returns>Whether anything could be read</returns>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
-        public Code(string codeString)
+        public static bool Parse(TextReader reader, Code result)
         {
-            char paramLetter = '\0';
-            string paramValue = "";
+            bool contentRead = false;
 
-            bool inQuotes = false, wasQuoted = false, inEncapsulatedComment = false, inFinalComment = false;
-            bool isCondition = false, isLineNumber = false, isMajorCode = false, expectMinorCode = false, isMinorCode = false;
-            for (int i = 0; i <= codeString.Length; i++)
+            char letter = '\0', c;
+            string value = "";
+
+            bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
+            bool readingAtStart = true, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false, wasQuoted = false;
+
+            do
             {
-                char c = (i == codeString.Length) ? '\0' : codeString[i];
-
-                if (inQuotes)
+                int currentChar = reader.Read();
+                if (currentChar == '\n' && !hadLineNumber && result.LineNumber.HasValue)
                 {
-                    if (c == '"')
+                    // Keep track of the line number (if possible)
+                    result.LineNumber++;
+                }
+
+                c = (currentChar < 0) ? '\n' : (char)currentChar;
+                if (c == '\r')
+                {
+                    // Ignore CR
+                    continue;
+                }
+
+                if (inFinalComment)
+                {
+                    // Reading a comment ending the current line
+                    if (c != '\n')
                     {
-                        if (i < codeString.Length - 1 && codeString[i + 1] == '"')
-                        {
-                            // Treat subsequent dobule quotes as a single quote char
-                            paramValue += '"';
-                            i++;
-                        }
-                        else
-                        {
-                            // No longer in an escaped parameter
-                            inQuotes = false;
-                            wasQuoted = true;
-                        }
+                        // Add next character to the comment unless it is the "artificial" 0-character termination
+                        result.Comment += c;
+                    }
+                    continue;
+                }
+
+                if (inEncapsulatedComment)
+                {
+                    // Reading an encapsulated comment in braces
+                    if (c != ')')
+                    {
+                        // Add next character to the comment
+                        result.Comment += c;
                     }
                     else
-                    {
-                        // Add next character to the parameter value
-                        paramValue += c;
-                    }
-                }
-                else if (inEncapsulatedComment)
-                {
-                    if (c == ')')
                     {
                         // Even though RepRapFirmware treats comments in braces differently,
                         // the correct approach should be to switch back to reading mode when the comment tag is closed
                         inEncapsulatedComment = false;
                     }
-                    else
+                    continue;
+                }
+
+                if (inCondition)
+                {
+                    switch (c)
                     {
-                        // Add next character to the comment
-                        Comment += c;
+                        case '\n':
+                            // Ignore final NL
+                            break;
+                        case ';':
+                            inCondition = false;
+                            inFinalComment = true;
+                            break;
+                        case '(':
+                            inCondition = false;
+                            inEncapsulatedComment = true;
+                            break;
+                        default:
+                            if (!char.IsWhiteSpace(c) || result.KeywordArgument != "")
+                            {
+                                // In fact, it should be possible to leave out whitespaces here but we here don't check for quoted strings yet
+                                result.KeywordArgument += c;
+                            }
+                            break;
+                    }
+
+                    if (inCondition)
+                    {
+                        continue;
                     }
                 }
-                else if (inFinalComment)
+
+                if (inChunk)
                 {
-                    if (c != '\0')
+                    if (!endingChunk && value == "")
                     {
-                        // Add next character to the comment unless it is the "artificial" 0-character termination
-                        Comment += c;
-                    }
-                }
-                else
-                {
-                    // Line numbers prefix the major code
-                    if (!MajorNumber.HasValue && !LineNumber.HasValue && c == 'N')
-                    {
-                        isLineNumber = true;
-                    }
-                    // Read the condition body. Except for comments this is expected to fill the entire line
-                    else if (isCondition)
-                    {
-                        switch (c)
+                        if (char.IsWhiteSpace(c))
                         {
-                            case '\0':
-                                // Ignore terminating zero
-                                break;
-                            case ';':
-                                inFinalComment = true;
-                                break;
-                            case '(':
-                                inEncapsulatedComment = true;
-                                break;
-                            default:
-                                KeywordArgument += c;
-                                break;
+                            // Parameter is empty
+                            endingChunk = true;
+                        }
+                        else if (c == '"')
+                        {
+                            // Parameter is quoted
+                            inQuotes = true;
+                            isNumericParameter = false;
+                        }
+                        else if (c == '{')
+                        {
+                            // Parameter is an expression
+                            value = "{";
+                            inExpression = true;
+                            isNumericParameter = false;
+                        }
+                        else
+                        {
+                            // Starting numeric or string parameter
+                            value += c;
+                            isNumericParameter = (c != 'e') && (NumericParameterChars.Contains(c));
                         }
                     }
-                    // Get the code type. T-codes can follow M-codes so allow them as potential parameters
-                    // Also allow major numbers after G53 to support enforcement of absolute positions
-                    else if ((!MajorNumber.HasValue || MajorNumber == 53) && (c == 'G' || c == 'M' || c == 'T'))
+                    else if (inQuotes)
                     {
-                        if (Type == CodeType.GCode && MajorNumber == 53)
+                        if (c == '"')
                         {
-                            MajorNumber = null;
-                            Flags |= CodeFlags.EnforceAbsolutePosition;
-                        }
-                        Type = (CodeType)c;
-                        isMajorCode = true;
-                        isCondition = false;
-                    }
-                    // Null characters, white spaces or dots following the major code indicate an end of the current chunk
-                    else if (c == '\0' || char.IsWhiteSpace(c) || (c == '.' && isMajorCode))
-                    {
-                        if (isLineNumber)
-                        {
-                            if (long.TryParse(paramValue.Trim(), out long lineNumber))
+                            if (reader.Peek() == '"')
                             {
-                                LineNumber = lineNumber;
-                                paramValue = "";
-
-                                isLineNumber = false;
-                            }
-                        }
-                        else if (isMajorCode)
-                        {
-                            if (int.TryParse(paramValue.Trim(), out int majorCode))
-                            {
-                                MajorNumber = majorCode;
-                                paramValue = "";
-
-                                isMajorCode = false;
-                                expectMinorCode = (c != '.');
-                                isMinorCode = (c == '.');
-                            }
-                        }
-                        else if (isMinorCode)
-                        {
-                            if (sbyte.TryParse(paramValue.Trim(), out sbyte minorCode))
-                            {
-                                MinorNumber = minorCode;
-                                paramValue = "";
-
-                                isMinorCode = false;
+                                // Treat subsequent double quotes as a single quote char
+                                value += '"';
+                                reader.Read();
                             }
                             else
                             {
-                                throw new CodeParserException($"Failed to parse minor {Type} number ({paramValue.Trim()})");
+                                // No longer in an escaped parameter
+                                inQuotes = false;
+                                wasQuoted = true;
+                                endingChunk = true;
                             }
                         }
-                        else if (paramLetter != '\0' || paramValue != "")
+                        else
                         {
-                            if (!MajorNumber.HasValue && Keyword == KeywordType.None && !wasQuoted)
+                            // Add next character to the parameter value
+                            value += c;
+                        }
+                    }
+                    else if (inExpression)
+                    {
+                        if (c == '}')
+                        {
+                            // No longer in an expression
+                            inExpression = false;
+                            endingChunk = true;
+                        }
+                        value += c;
+                    }
+                    else if (endingChunk || char.IsWhiteSpace(c) || (isNumericParameter && !NumericParameterChars.Contains(c)))
+                    {
+                        // Parameter has ended
+                        inChunk = endingChunk = false;
+                    }
+                    else
+                    {
+                        // Reading more of the current chunk
+                        value += c;
+                    }
+
+                    if (endingChunk && c == '\n')
+                    {
+                        // Last character - process the last parameter being read
+                        inChunk = endingChunk = false;
+                    }
+                }
+
+                if (readingAtStart)
+                {
+                    isLineNumber = (char.ToUpperInvariant(c) == 'N');
+                    if (char.IsWhiteSpace(c) && c != '\n')
+                    {
+                        result.Indent++;
+                    }
+                    else
+                    {
+                        readingAtStart = false;
+                    }
+                }
+
+                if (!inChunk && !readingAtStart)
+                {
+                    if (letter != '\0' || value != "" || wasQuoted)
+                    {
+                        // Chunk is complete
+                        char upperLetter = char.ToUpperInvariant(letter);
+                        if (isLineNumber)
+                        {
+                            // Process line number
+                            if (int.TryParse(value, out int lineNumber))
                             {
-                                // Check if this is a conditional G-code
-                                if (paramLetter == 'i' && paramValue == "f")
+                                result.LineNumber = lineNumber;
+                            }
+                            isLineNumber = false;
+                            hadLineNumber = true;
+                        }
+                        else if ((upperLetter == 'G' || upperLetter == 'M' || upperLetter == 'T') &&
+                                 (result.MajorNumber == null || (result.Type == CodeType.GCode && result.MajorNumber == 53)))
+                        {
+                            // Process G/M/T identifier(s)
+                            if (result.Type == CodeType.GCode && result.MajorNumber == 53)
+                            {
+                                result.MajorNumber = null;
+                                result.Flags |= CodeFlags.EnforceAbsolutePosition;
+                            }
+
+                            result.Type = (CodeType)letter;
+                            if (value.Contains('.'))
+                            {
+                                string[] args = value.Split('.');
+                                if (int.TryParse(args[0], out int majorNumber))
                                 {
-                                    Keyword = KeywordType.If;
-                                    isCondition = true;
-                                }
-                                else if (paramLetter == 'e' && paramValue == "lif")
-                                {
-                                    Keyword = KeywordType.ElseIf;
-                                    isCondition = true;
-                                }
-                                else if (paramLetter == 'e' && paramValue == "lse")
-                                {
-                                    Keyword = KeywordType.Else;
-                                }
-                                else if (paramLetter == 'w' && paramValue == "hile")
-                                {
-                                    Keyword = KeywordType.While;
-                                    isCondition = true;
-                                }
-                                else if (paramLetter == 'b' && paramValue == "reak")
-                                {
-                                    Keyword = KeywordType.Break;
-                                    isCondition = true;
-                                }
-                                else if (paramLetter == 'r' && paramValue == "eturn")
-                                {
-                                    Keyword = KeywordType.Return;
-                                    isCondition = true;
-                                }
-                                else if (paramLetter == 'a' && paramValue == "bort")
-                                {
-                                    Keyword = KeywordType.Abort;
-                                    isCondition = true;
-                                }
-                                else if (paramLetter == 'v' && paramValue == "ar")
-                                {
-                                    Keyword = KeywordType.Var;
-                                    isCondition = true;
-                                }
-                                else if (paramLetter == 's' && paramValue == "et")
-                                {
-                                    Keyword = KeywordType.Set;
-                                    isCondition = true;
+                                    result.MajorNumber = majorNumber;
                                 }
                                 else
                                 {
-                                    Parameters.Add(new CodeParameter(paramLetter, paramValue, false));
+                                    throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({args[0]})");
                                 }
-
-                                if (isCondition)
+                                if (sbyte.TryParse(args[1], out sbyte minorNumber) && minorNumber >= 0)
                                 {
-                                    KeywordArgument = "";
+                                    result.MinorNumber = minorNumber;
                                 }
+                                else
+                                {
+                                    throw new CodeParserException($"Failed to parse minor {char.ToUpperInvariant((char)result.Type)}-code number ({args[1]})");
+                                }
+                            }
+                            else if (int.TryParse(value, out int majorNumber))
+                            {
+                                result.MajorNumber = majorNumber;
                             }
                             else
                             {
-                                Parameters.Add(new CodeParameter(paramLetter, paramValue, wasQuoted));
-                                wasQuoted = false;
+                                throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})");
                             }
-
-                            paramLetter = '\0';
-                            paramValue = "";
                         }
-                        else if (!MajorNumber.HasValue && char.IsWhiteSpace(c))
+                        else if (!result.MajorNumber.HasValue && result.Keyword == KeywordType.None && !wasQuoted)
                         {
-                            Indent++;
+                            // Check for conditional G-code
+                            if (letter == 'i' && value == "f")
+                            {
+                                result.Keyword = KeywordType.If;
+                                inCondition = true;
+                                result.KeywordArgument = "";
+                            }
+                            else if (letter == 'e' && value == "lif")
+                            {
+                                result.Keyword = KeywordType.ElseIf;
+                                result.KeywordArgument = "";
+                                inCondition = true;
+                            }
+                            else if (letter == 'e' && value == "lse")
+                            {
+                                result.Keyword = KeywordType.Else;
+                            }
+                            else if (letter == 'w' && value == "hile")
+                            {
+                                result.Keyword = KeywordType.While;
+                                result.KeywordArgument = "";
+                                inCondition = true;
+                            }
+                            else if (letter == 'b' && value == "reak")
+                            {
+                                result.Keyword = KeywordType.Break;
+                                inCondition = true;
+                            }
+                            else if (letter == 'r' && value == "eturn")
+                            {
+                                result.Keyword = KeywordType.Return;
+                                result.KeywordArgument = "";
+                                inCondition = true;
+                            }
+                            else if (letter == 'a' && value == "bort")
+                            {
+                                result.Keyword = KeywordType.Abort;
+                                inCondition = true;
+                            }
+                            else if (letter == 'v' && value == "ar")
+                            {
+                                result.Keyword = KeywordType.Var;
+                                result.KeywordArgument = "";
+                                inCondition = true;
+                            }
+                            else if (letter == 's' && value == "et")
+                            {
+                                result.Keyword = KeywordType.Set;
+                                result.KeywordArgument = "";
+                                inCondition = true;
+                            }
+                            else if (result.Parameter(letter) == null)
+                            {
+                                // Add parsed parameter
+                                result.Parameters.Add(new CodeParameter(letter, value, false));
+                            }
+                            else
+                            {
+                                throw new CodeParserException($"Duplicate {letter} parameter");
+                            }
                         }
-                    }
-                    // If the optional minor code number is expected to follow, read it once a dot is seen
-                    else if (expectMinorCode && c == '.')
-                    {
-                        expectMinorCode = false;
-                        isMinorCode = true;
-                    }
-                    // Deal with escaped string parameters
-                    else if (c == '"')
-                    {
-                        inQuotes = true;
-                    }
-                    // Deal with comments
-                    else if (c == ';' || c == '(')
-                    {
-                        if (paramLetter != '\0' || paramValue != "")
+                        else if (letter == '\0' || result.Parameter(letter) == null)
                         {
-                            Parameters.Add(new CodeParameter(paramLetter, paramValue, wasQuoted));
-                            wasQuoted = false;
-
-                            paramLetter = '\0';
-                            paramValue = "";
+                            // Add parsed parameter
+                            result.Parameters.Add(new CodeParameter(letter, value, wasQuoted));
                         }
-
-                        if (Comment == null)
+                        else
                         {
-                            Comment = "";
+                            throw new CodeParserException($"Duplicate {letter} parameter");
                         }
-                        inFinalComment = (c == ';');
-                        inEncapsulatedComment = (c == '(');
+
+                        letter = '\0';
+                        value = "";
+                        wasQuoted = false;
                     }
-                    // Start new parameter on demand
-                    else if (paramLetter == '\0' && !isLineNumber && !isMajorCode && !isMinorCode)
+
+                    if (c == ';')
                     {
-                        expectMinorCode = false;
-                        paramLetter = c;
+                        // Starting final comment
+                        contentRead = inFinalComment = true;
                     }
-                    // Add the next letter to the current chunk
-                    else
+                    else if (c == '(')
                     {
-                        paramValue += c;
+                        // Starting encapsulated comment
+                        contentRead = inEncapsulatedComment = true;
+                    }
+                    else if (!char.IsWhiteSpace(c))
+                    {
+                        // Starting a new parameter
+                        contentRead = inChunk = true;
+                        inQuotes = (c == '"');
+                        letter = inQuotes ? '\0' : c;
                     }
                 }
-            }
+
+                if (!inFinalComment && !inEncapsulatedComment && !inCondition && !inChunk)
+                {
+                    // Stop if another G/M/T code is coming up and this one is complete
+                    int next = reader.Peek();
+                    char nextChar = (next == -1) ? '\n' : char.ToUpperInvariant((char)next);
+                    if (result.MajorNumber.HasValue && result.MajorNumber != 53 && (nextChar == 'G' || nextChar == 'M' || nextChar == 'T') &&
+                        (nextChar == 'M' || result.Type != CodeType.MCode || result.Parameters.Any(item => item.Letter == nextChar)))
+                    {
+                        // Note that M-codes may have G or T parameters but only one
+                        break;
+                    }
+                }
+            } while (c != '\n');
 
             // Do not allow malformed codes
-            if (inQuotes)
-            {
-                throw new CodeParserException("Unterminated string parameter");
-            }
             if (inEncapsulatedComment)
             {
                 throw new CodeParserException("Unterminated encapsulated comment");
             }
-            if (KeywordArgument != null)
+            if (inQuotes)
             {
-                KeywordArgument = KeywordArgument.Trim();
-                if (KeywordArgument.Length > 255)
+                throw new CodeParserException("Unterminated string");
+            }
+            if (inExpression)
+            {
+                throw new CodeParserException("Unterminated expression");
+            }
+            if (result.KeywordArgument != null)
+            {
+                result.KeywordArgument = result.KeywordArgument.Trim();
+                if (result.KeywordArgument.Length > 255)
                 {
                     throw new CodeParserException("Keyword argument too long (> 255)");
                 }
             }
-            if (Parameters.Count > 255)
+            if (result.Parameters.Count > 255)
             {
                 throw new CodeParserException("Too many parameters (> 255)");
             }
+
+            // End
+            return contentRead;
         }
     }
 }

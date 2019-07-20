@@ -22,5 +22,4 @@ namespace DuetAPI.Machine
         [EnumMember(Value = "lan")]
         LAN
     }
-
 }

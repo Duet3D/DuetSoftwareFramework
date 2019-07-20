@@ -23,7 +23,7 @@ namespace DuetControlServer.SPI
         // General transfer variables
         private static ISpiChannel _spiChannel;
         private static readonly AsyncManualResetEvent _transferReadyEvent = new AsyncManualResetEvent();
-        private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting;
+        private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting, _updating;
         private static ushort _lastTransferNumber;
 
         private static DateTime _lastMeasureTime = DateTime.Now;
@@ -86,6 +86,10 @@ namespace DuetControlServer.SPI
             return result;
         }
 
+        /// <summary>
+        /// Print diagnostics to the given string builder
+        /// </summary>
+        /// <param name="builder">Target to write to</param>
         public static void Diagnostics(StringBuilder builder)
         {
             builder.AppendLine($"SPI speed: {_spiChannel.Frequency} Hz");
@@ -155,6 +159,7 @@ namespace DuetControlServer.SPI
                         _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
                         _started = true;
                     }
+                    _updating = false;
 
                     // Transfer OK
                     Interlocked.Increment(ref _numMeasuredTransfers);
@@ -172,7 +177,7 @@ namespace DuetControlServer.SPI
                 }
                 catch (OperationCanceledException e)
                 {
-                    if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout && _started)
+                    if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout && _started && !_updating)
                     {
                         // If this is the first unexpected timeout event, report it unless the firmware is being updated
                         using (Model.Provider.AccessReadWrite())
@@ -635,6 +640,107 @@ namespace DuetControlServer.SPI
             return true;
         }
 
+        /// <summary>
+        /// Write another segment of the IAP binary
+        /// </summary>
+        /// <param name="stream">IAP binary</param>
+        /// <returns>Whether another segment could be written</returns>
+        public static bool WriteIapSegment(Stream stream)
+        {
+            _updating = true;
+
+            Span<byte> data = /*stackalloc*/ new byte[Communication.Consts.IapSegmentSize];
+            int bytesRead = stream.Read(data);
+            if (bytesRead <= 0)
+            {
+                return false;
+            }
+
+            WritePacket(Communication.LinuxRequests.Request.WriteIap, bytesRead);
+            data.Slice(0, bytesRead).CopyTo(GetWriteBuffer(bytesRead));
+            return true;
+        }
+
+        /// <summary>
+        /// Instruct the firmware to start the IAP binary
+        /// </summary>
+        public static void StartIap()
+        {
+            // Tell the firmware to boot the IAP program
+            WritePacket(Communication.LinuxRequests.Request.StartIap);
+            PerformFullTransfer(false);
+
+            // Wait for IAP to start...
+            Thread.Sleep(Communication.Consts.IapBootDelay);
+            Pi.Gpio[Settings.TransferReadyPin].WaitForValue(GpioPinValue.High, int.MaxValue);
+            _transferReadyEvent.Set();
+        }
+
+        /// <summary>
+        /// Flash another segment of the firmware via the IAP binary
+        /// </summary>
+        /// <param name="stream"></param>
+        /// <returns>Whether another segment could be sent</returns>
+        public static bool FlashFirmwareSegment(Stream stream)
+        {
+            Span<byte> segment = /*stackalloc*/ new byte[Communication.Consts.FirmwareSegmentSize];
+            int bytesRead = stream.Read(segment);
+            if (bytesRead <= 0)
+            {
+                return false;
+            }
+
+            if (bytesRead != Communication.Consts.FirmwareSegmentSize)
+            {
+                // Fill up the remaining space with 0xFF. The IAP program does the same once complete
+                segment.Slice(bytesRead).Fill(0xFF);
+            }
+
+            // In theory the response of this could be checked to consist only of 0x1A bytes
+            WaitForTransfer();
+            _spiChannel.Write(segment.ToArray());
+            return true;
+        }
+
+        /// <summary>
+        /// Send the CRC16 checksum of the firmware binary to the IAP program and verify the written data
+        /// </summary>
+        /// <param name="firmwareLength">Length of the written firmware in bytes</param>
+        /// <param name="crc16">CRC16 checksum of the firmware</param>
+        /// <returns>Whether the firmware has been written successfully</returns>
+        public static bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
+        {
+            // At this point IAP expects another segment so wait for it to be ready first. After that, wait a moment for IAP to acknowledge we're done
+            WaitForTransfer();
+            Thread.Sleep(Communication.Consts.FirmwareFinishedDelay);
+
+            // Send the final firmware size plus CRC16 checksum to IAP
+            Communication.LinuxRequests.FlashVerifyRequest verifyRequest = new Communication.LinuxRequests.FlashVerifyRequest
+            {
+                firmwareLength = (uint)firmwareLength,
+                crc16 = crc16
+            };
+            byte[] transferData = /*stackalloc*/ new byte[Marshal.SizeOf(typeof(Communication.LinuxRequests.FlashVerifyRequest))];
+            MemoryMarshal.Write(transferData, ref verifyRequest);
+            WaitForTransfer();
+            _spiChannel.Write(transferData);
+
+            // Check if the IAP can confirm our CRC16 checksum
+            byte[] writeOk = /*stackalloc*/ new byte[1];
+            WaitForTransfer();
+            writeOk = _spiChannel.SendReceive(writeOk);
+            return (writeOk[0] == 0x0C);
+        }
+
+        /// <summary>
+        /// Wait for the IAP program to reset the controller
+        /// </summary>
+        public static void WaitForIapReset()
+        {
+            Thread.Sleep(Communication.Consts.IapRebootDelay);
+            _waitingForFirstTransfer = true;
+        }
+
         private static bool CanWritePacket(int dataLength = 0)
         {
             return _txPointer + Marshal.SizeOf(typeof(Communication.PacketHeader)) + dataLength <= Communication.Consts.BufferSize;
@@ -669,7 +775,7 @@ namespace DuetControlServer.SPI
         {
             if (_waitingForFirstTransfer)
             {
-                if (!Pi.Gpio[Settings.TransferReadyPin].WaitForValue(GpioPinValue.High, Settings.SpiTransferTimeout))
+                if (!Pi.Gpio[Settings.TransferReadyPin].WaitForValue(GpioPinValue.High, _updating ? int.MaxValue : Settings.SpiTransferTimeout))
                 {
                     throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                 }
@@ -678,6 +784,10 @@ namespace DuetControlServer.SPI
                     throw new OperationCanceledException("Program termination");
                 }
                 _waitingForFirstTransfer = false;
+            }
+            else if (_updating)
+            {
+                _transferReadyEvent.Wait(Program.CancelSource.Token);
             }
             else
             {

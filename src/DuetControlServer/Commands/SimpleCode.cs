@@ -1,4 +1,6 @@
 ﻿using DuetAPI.Commands;
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -9,26 +11,52 @@ namespace DuetControlServer.Commands
     public class SimpleCode : DuetAPI.Commands.SimpleCode
     {
         /// <summary>
-        /// Converts a simple G/M/T-code to a regular Code instance, executes it and returns its result as text
+        /// Converts simple G/M/T-codes to a regular Code instances, executes them and returns the result as text
         /// </summary>
         /// <returns>G-code result as text</returns>
         public override async Task<string> Execute()
         {
-            Code code = new Code(Code)
-            {
-                Channel = Channel,
-                SourceConnection = SourceConnection
-            };
+            IList<Code> codes;
+            Queue<Task<CodeResult>> codeTasks = new Queue<Task<CodeResult>>();
 
-            // Send diagnostics request always over the Daemon channel.
-            // This way, diagnotics can be output even if a code is blocking everything else
-            if (code.Type == CodeType.MCode && code.MajorNumber == 122)
+            CodeResult result = new CodeResult();
+            try
             {
-                code.Channel = DuetAPI.CodeChannel.Daemon;
+                codes = Commands.Code.ParseMultiple(Code);
+                foreach (Code code in codes)
+                {
+                    code.Channel = Channel;
+                    code.SourceConnection = SourceConnection;
+
+                    codeTasks.Enqueue(code.Enqueue());
+                }
+            }
+            catch (CodeParserException e)
+            {
+                return $"Error: {e.Message}]\n";
             }
 
-            CodeResult result = await code.Execute();
-            return (result != null) ? result.ToString() : "";
+            while (codeTasks.TryDequeue(out Task<CodeResult> task))
+            {
+                Code code = codes[0];
+                codes.RemoveAt(0);
+
+                try
+                {
+                    CodeResult codeResult = await task;
+                    if (codeResult != null && !codeResult.IsEmpty)
+                    {
+                        result.AddRange(codeResult);
+                    }
+                }
+                catch (AggregateException ae)
+                {
+                    // FIXME: Should this terminate the code(s) being executed?
+                    Console.WriteLine($"[err] {code} -> {ae.InnerException.Message}");
+                }
+            }
+
+            return result.ToString();
         }
     }
 }

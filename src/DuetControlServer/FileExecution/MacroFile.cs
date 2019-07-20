@@ -116,7 +116,6 @@ namespace DuetControlServer.FileExecution
         /// <param name="fileName">Filename of the macro</param>
         /// <param name="channel">Channel to send the codes to</param>
         /// <param name="startCode">Which code is starting this macro file</param>
-        /// <param name="sourceConnection">Source connection of this macro</param>
         public MacroFile(string fileName, CodeChannel channel, QueuedCode startCode) : base(fileName, channel)
         {
             string name = Path.GetFileName(fileName);
@@ -154,33 +153,6 @@ namespace DuetControlServer.FileExecution
         {
             // Read the next code from the file
             Code result = base.ReadCode();
-            if (result != null)
-            {
-                result.FilePosition = null;
-                result.Flags |= CodeFlags.IsFromMacro;
-                if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
-                if (IsConfigOverride) { result.Flags |= CodeFlags.IsFromConfigOverride; }
-                if (StartCode != null) { result.Flags |= CodeFlags.IsNestedMacro; }
-                result.SourceConnection = (StartCode != null) ? StartCode.Code.SourceConnection : 0;
-                return result;
-            }
-
-            // Remove reference to this file again
-            lock (_macroFiles)
-            {
-                _macroFiles.Remove(this);
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Read another code from the file being executed asynchronously
-        /// </summary>
-        /// <returns>Next available code or null if the file has ended</returns>
-        public override async Task<Code> ReadCodeAsync()
-        {
-            // Read the next code from the file
-            Code result = await base.ReadCodeAsync();
             if (result != null)
             {
                 result.FilePosition = null;

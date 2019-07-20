@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -38,6 +39,7 @@ namespace DuetControlServer.SPI
         // Special requests
         private static bool _emergencyStopRequested, _resetRequested, _printStarted;
         private static Communication.PrintStoppedReason? _printStoppedReason;
+        private static Stream _iapStream, _firmwareStream;
 
         // Partial generic message (if any)
         private static string _partialCodeReply;
@@ -168,7 +170,7 @@ namespace DuetControlServer.SPI
         public static async Task RequestEmergencyStop()
         {
             _emergencyStopRequested = true;
-            await InvalidateData("Code has been cancelled due to an emergency stop");
+            await InvalidateData("Firmware halted");
         }
 
         /// <summary>
@@ -178,7 +180,7 @@ namespace DuetControlServer.SPI
         public static async Task RequestReset()
         {
             _resetRequested = true;
-            await InvalidateData("Code has been cancelled because a firmware reset is imminent");
+            await InvalidateData("Firmware reset imminent");
         }
 
         /// <summary>
@@ -229,6 +231,88 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Perform an update of the main firmware via IAP
+        /// </summary>
+        /// <param name="iapStream">IAP binary</param>
+        /// <param name="firmwareStream">Firmware binary</param>
+        public static void UpdateFirmware(Stream iapStream, Stream firmwareStream)
+        {
+            _iapStream = iapStream;
+            _firmwareStream = firmwareStream;
+        }
+
+        private static async Task PerformFirmwareUpdate()
+        {
+            // Notify clients that we are now installing a firmware update
+            using (await Model.Provider.AccessReadWriteAsync())
+            {
+                Model.Provider.Get.State.Status = MachineStatus.Updating;
+            }
+
+            // Get the CRC16 checksum of the firmware binary
+            byte[] firmwareBlob = /*stackalloc*/ new byte[_firmwareStream.Length];
+            _firmwareStream.Read(firmwareBlob);
+            ushort crc16 = CRC16.Calculate(firmwareBlob);
+
+            // Send the IAP binary to the firmware
+            Console.Write("[info] Flashing IAP binary");
+            bool dataSent;
+            do
+            {
+                dataSent = DataTransfer.WriteIapSegment(_iapStream);
+                DataTransfer.PerformFullTransfer();
+                Console.Write('.');
+            } while (dataSent);
+            Console.WriteLine();
+
+            _iapStream.Close();
+            _iapStream = null;
+
+            // Start the IAP binary
+            DataTransfer.StartIap();
+
+            // Send the firmware binary to the IAP program
+            int numRetries = 0;
+            do
+            {
+                if (numRetries != 0)
+                {
+                    Console.WriteLine("Error");
+                }
+
+                Console.Write("[info] Flashing RepRapFirmware");
+                _firmwareStream.Seek(0, SeekOrigin.Begin);
+                while (DataTransfer.FlashFirmwareSegment(_firmwareStream))
+                {
+                    Console.Write('.');
+                }
+                Console.WriteLine();
+
+                Console.Write("[info] Verifying checksum... ");
+            } while (++numRetries < 3 && !DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
+
+            if (numRetries == 3)
+            {
+                Console.WriteLine("Error");
+
+                // Failed to flash the firmware
+                await Model.Provider.Output(MessageType.Error, "Could not flash the firmware binary after 3 attempts. Please install it manually via bossac.");
+                Program.CancelSource.Cancel();
+            }
+            else
+            {
+                Console.WriteLine("OK");
+
+                // Wait for the IAP binary to restart the controller
+                DataTransfer.WaitForIapReset();
+                Console.WriteLine("[info] Firmware update successful!");
+            }
+
+            _firmwareStream.Close();
+            _firmwareStream = null;
+        }
+
+        /// <summary>
         /// Initialize physical transfer and perform initial data transfer.
         /// This is only called once on initialization
         /// </summary>
@@ -259,11 +343,18 @@ namespace DuetControlServer.SPI
                     DataTransfer.PerformFullTransfer();
                 }
 
+                // Check if a firmware update is supposed to be performed
+                if (_iapStream != null && _firmwareStream != null)
+                {
+                    await InvalidateData("Firmware update imminent");
+                    await PerformFirmwareUpdate();
+                }
+
                 // Invalidate data if a controller reset has been performed
                 if (DataTransfer.HadReset())
                 {
                     Console.WriteLine("[info] Controller has been reset");
-                    InvalidateData("Controller has been reset").Wait();
+                    await InvalidateData("Controller reset");
                 }
 
                 // Check for changes of the print status.
@@ -377,12 +468,15 @@ namespace DuetControlServer.SPI
             try
             {
                 int codeLength = Communication.Consts.BufferedCodeHeaderSize + DataTransfer.GetCodeSize(queuedCode.Code);
-                if (_bufferSpace > codeLength && DataTransfer.WriteCode(queuedCode.Code))
+                if (_bufferSpace > codeLength && Channels[queuedCode.Code.Channel].BytesBuffered + codeLength <= Settings.MaxBufferSpacePerChannel &&
+                    DataTransfer.WriteCode(queuedCode.Code))
                 {
-                    Console.WriteLine($"[info] Sent {queuedCode.Code}, remaining space {_bufferSpace}, need {codeLength}");
                     _bytesReserved += codeLength;
                     _bufferSpace -= codeLength;
+                    queuedCode.BinarySize = codeLength;
+                    Channels[queuedCode.Code.Channel].BytesBuffered += codeLength;
                     Channels[queuedCode.Code.Channel].BufferedCodes.Add(queuedCode);
+                    Console.WriteLine($"[info] Sent {queuedCode.Code}, remaining space {Settings.MaxBufferSpacePerChannel - Channels[queuedCode.Code.Channel].BytesBuffered} ({_bufferSpace} total), needed {codeLength}");
                     return true;
                 }
             }
@@ -514,9 +608,9 @@ namespace DuetControlServer.SPI
                 }
             }
 
-            if (!replyHandled)
+            if (!replyHandled && !flags.HasFlag(Communication.MessageTypeFlags.CodeQueueMessage))
             {
-                // If the message could not be processed, output a warning. Should never happen
+                // If the message could not be processed, output a warning. Should never happen except for queued codes
                 Console.WriteLine($"[warn] Received out-of-sync code reply ({flags}: {reply.TrimEnd()})");
             }
         }

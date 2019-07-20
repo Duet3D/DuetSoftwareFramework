@@ -105,6 +105,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="from">Origin</param>
         /// <param name="channel">Code channel that requested the execution</param>
         /// <param name="reportMissing">Output a message if the macro cannot be found</param>
+        /// <param name="fromCode">Whether the macro request came from the G/M/T-code being executed</param>
         /// <param name="filename">Filename of the macro to execute</param>
         /// <returns>Number of bytes read</returns>
         public static int ReadMacroRequest(ReadOnlySpan<byte> from, out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename)

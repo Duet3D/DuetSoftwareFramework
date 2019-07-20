@@ -45,5 +45,30 @@ namespace DuetControlServer.SPI.Communication
         /// Value used by RepRapFirmware to represent an invalid file position
         /// </summary>
         public const uint NoFilePosition = 0xFFFFFFFF;
+
+        /// <summary>
+        /// Size of each transmitted IAP binary segment (must be a multiple of IFLASH_PAGE_SIZE)
+        /// </summary>
+        public const int IapSegmentSize = 1536;
+
+        /// <summary>
+        /// Time to wait when the IAP reboots to the main firmware
+        /// </summary>
+        public const int IapBootDelay = 500;
+
+        /// <summary>
+        /// Size of each transmitted firmware binary segment (must be equal to blockReadSize in the IAP project)
+        /// </summary>
+        public const int FirmwareSegmentSize = 2048;
+
+        /// <summary>
+        /// Delay to await after the last firmware segment has been written (in ms)
+        /// </summary>
+        public const int FirmwareFinishedDelay = 500;
+
+        /// <summary>
+        /// Time to wait when the IAP reboots to the main firmware
+        /// </summary>
+        public const int IapRebootDelay = 2000;
     }
 }

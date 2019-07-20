@@ -30,7 +30,6 @@ namespace DuetControlServer.SPI
         /// Creates a new queued lock/unlock request instance
         /// </summary>
         /// <param name="isLockRequest">Whether the resource shall be locked</param>
-        /// <param name="channel">Code channel requesting the lock</param>
         public QueuedLockRequest(bool isLockRequest)
         {
             IsLockRequest = isLockRequest;

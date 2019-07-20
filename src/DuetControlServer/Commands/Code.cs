@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -15,67 +18,40 @@ namespace DuetControlServer.Commands
     public class Code : DuetAPI.Commands.Code
     {
         /// <summary>
-        /// Creates a new Code instance
+        /// Create an empty Code instance
         /// </summary>
         public Code() { }
 
         /// <summary>
-        /// Creates a new Code instance and attempts to parse the given code string
+        /// Create a new Code instance and attempt to parse the given code string
         /// </summary>
         /// <param name="code">G/M/T-Code</param>
         public Code(string code) : base(code) { }
 
-        private async Task<CodeResult> ExecuteInternally()
+        /// <summary>
+        /// Parse multiple codes from the given input string
+        /// </summary>
+        /// <param name="codeString">Codes to parse</param>
+        /// <returns>Enumeration of parsed G/M/T-codes</returns>
+        public static IList<Code> ParseMultiple(string codeString)
         {
-            CodeResult result = null;
-
-            // Preprocess this code
-            if (!Flags.HasFlag(CodeFlags.IsPreProcessed))
+            // NB: Even though "yield return" seems like a good idea, it is a good idea
+            // to parse all the codes before any is actually started...
+            List<Code> codes = new List<Code>();
+            using (MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(codeString)))
             {
-                result = await Interception.Intercept(this, InterceptionMode.Pre);
-                Flags |= CodeFlags.IsPreProcessed;
-
-                if (result != null)
+                using (StreamReader reader = new StreamReader(stream))
                 {
-                    return await OnCodeExecuted(result);
+                    while (!reader.EndOfStream)
+                    {
+                        Code code = new Code();
+                        // FIXME: G53 may apply to multiple codes on the same line...
+                        Parse(reader, code);
+                        codes.Add(code);
+                    }
                 }
             }
-
-            // Attempt to process the code internally
-            switch (Type)
-            {
-                case CodeType.GCode:
-                    result = await GCodes.Process(this);
-                    break;
-
-                case CodeType.MCode:
-                    result = await MCodes.Process(this);
-                    break;
-
-                case CodeType.TCode:
-                    result = await TCodes.Process(this);
-                    break;
-            }
-
-            if (result != null)
-            {
-                return await OnCodeExecuted(result);
-            }
-
-            // If the could not be interpreted, post-process it
-            if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
-            {
-                result = await Interception.Intercept(this, InterceptionMode.Post);
-                Flags |= CodeFlags.IsPostProcessed;
-
-                if (result != null)
-                {
-                    return await OnCodeExecuted(result);
-                }
-            }
-
-            // Code has not been interpreted yet
-            return null;
+            return codes;
         }
 
         /// <summary>
@@ -142,6 +118,59 @@ namespace DuetControlServer.Commands
                 return codeTask.ContinueWith((task) => OnCodeExecuted(task.Result).Result);
             }
             return OnCodeExecuted(result);
+        }
+
+        private async Task<CodeResult> ExecuteInternally()
+        {
+            CodeResult result = null;
+
+            // Preprocess this code
+            if (!Flags.HasFlag(CodeFlags.IsPreProcessed))
+            {
+                result = await Interception.Intercept(this, InterceptionMode.Pre);
+                Flags |= CodeFlags.IsPreProcessed;
+
+                if (result != null)
+                {
+                    return await OnCodeExecuted(result);
+                }
+            }
+
+            // Attempt to process the code internally
+            switch (Type)
+            {
+                case CodeType.GCode:
+                    result = await GCodes.Process(this);
+                    break;
+
+                case CodeType.MCode:
+                    result = await MCodes.Process(this);
+                    break;
+
+                case CodeType.TCode:
+                    result = await TCodes.Process(this);
+                    break;
+            }
+
+            if (result != null)
+            {
+                return await OnCodeExecuted(result);
+            }
+
+            // If the could not be interpreted, post-process it
+            if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
+            {
+                result = await Interception.Intercept(this, InterceptionMode.Post);
+                Flags |= CodeFlags.IsPostProcessed;
+
+                if (result != null)
+                {
+                    return await OnCodeExecuted(result);
+                }
+            }
+
+            // Code has not been interpreted yet
+            return null;
         }
 
         private async Task<CodeResult> OnCodeExecuted(CodeResult result)

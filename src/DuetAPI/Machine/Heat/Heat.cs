@@ -1,14 +1,26 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using DuetAPI.Utility;
+using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about the heat subsystem
     /// </summary>
-    public class Heat : ICloneable
+    public sealed class Heat : IAssignable, ICloneable, INotifyPropertyChanged
     {
+        /// <summary>
+        /// Event to trigger when a property has changed
+        /// </summary>
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         /// <summary>
         /// List of configured beds
         /// </summary>
@@ -16,7 +28,7 @@ namespace DuetAPI.Machine
         /// This may contain null items
         /// </remarks>
         /// <seealso cref="BedOrChamber"/>
-        public List<BedOrChamber> Beds { get; set; } = new List<BedOrChamber>();
+        public ObservableCollection<BedOrChamber> Beds { get; } = new ObservableCollection<BedOrChamber>();
         
         /// <summary>
         /// List of configured chambers 
@@ -25,29 +37,78 @@ namespace DuetAPI.Machine
         /// This may contain null items
         /// </remarks>
         /// <seealso cref="BedOrChamber"/>
-        public List<BedOrChamber> Chambers { get; set; } = new List<BedOrChamber>();
+        public ObservableCollection<BedOrChamber> Chambers { get; } = new ObservableCollection<BedOrChamber>();
         
         /// <summary>
         /// Minimum required temperature for extrusion moves (in C)
         /// </summary>
-        public float ColdExtrudeTemperature { get; set; } = 160F;
+        public float ColdExtrudeTemperature
+        {
+            get => _coldExtrudeTemperature;
+            set
+            {
+                if (_coldExtrudeTemperature != value)
+                {
+                    _coldExtrudeTemperature = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private float _coldExtrudeTemperature = 160.0F;
         
         /// <summary>
         /// Minimum required temperature for retraction moves (in C)
         /// </summary>
-        public float ColdRetractTemperature { get; set; } = 90F;
+        public float ColdRetractTemperature
+        {
+            get => _coldRetractTemperature;
+            set
+            {
+                if (_coldRetractTemperature != value)
+                {
+                    _coldRetractTemperature = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private float _coldRetractTemperature = 90.0F;
         
         /// <summary>
         /// List of configured extra heaters
         /// </summary>
         /// <seealso cref="ExtraHeater"/>
-        public List<ExtraHeater> Extra { get; set; } = new List<ExtraHeater>();
+        public ObservableCollection<ExtraHeater> Extra { get; } = new ObservableCollection<ExtraHeater>();
         
         /// <summary>
         /// List of configured heaters
         /// </summary>
         /// <seealso cref="Heater"/>
-        public List<Heater> Heaters { get; set; } = new List<Heater>();
+        public ObservableCollection<Heater> Heaters { get; } = new ObservableCollection<Heater>();
+
+        /// <summary>
+        /// Assigns every property from another instance
+        /// </summary>
+        /// <param name="from">Object to assign from</param>
+        /// <exception cref="ArgumentNullException">other is null</exception>
+        /// <exception cref="ArgumentException">Types do not match</exception>
+        public void Assign(object from)
+        {
+            if (from == null)
+            {
+                throw new ArgumentNullException();
+            }
+            if (!(from is Heat other))
+            {
+                throw new ArgumentException("Invalid type");
+            }
+
+            ListHelpers.AssignList(Beds, other.Beds);
+            ListHelpers.AssignList(Chambers, other.Chambers);
+            ColdExtrudeTemperature = other.ColdExtrudeTemperature;
+            ColdRetractTemperature = other.ColdRetractTemperature;
+            ListHelpers.AssignList(Extra, other.Extra);
+            ListHelpers.AssignList(Heaters, other.Heaters);
+        }
 
         /// <summary>
         /// Creates a copy of this instance
@@ -55,15 +116,18 @@ namespace DuetAPI.Machine
         /// <returns>A copy of this instance</returns>
         public object Clone()
         {
-            return new Heat
+            Heat clone = new Heat
             {
-                Beds = Beds.Select(bed => (BedOrChamber)bed?.Clone()).ToList(),
-                Chambers = Chambers.Select(chamber => (BedOrChamber)chamber?.Clone()).ToList(),
                 ColdExtrudeTemperature = ColdExtrudeTemperature,
-                ColdRetractTemperature = ColdRetractTemperature,
-                Extra = Extra.Select(extra => (ExtraHeater)extra.Clone()).ToList(),
-                Heaters = Heaters.Select(heater => (Heater)heater.Clone()).ToList()
+                ColdRetractTemperature = ColdRetractTemperature
             };
+
+            ListHelpers.CloneItems(clone.Beds, Beds);
+            ListHelpers.CloneItems(clone.Chambers, Chambers);
+            ListHelpers.CloneItems(clone.Extra, Extra);
+            ListHelpers.CloneItems(clone.Heaters, Heaters);
+
+            return clone;
         }
     }
 }

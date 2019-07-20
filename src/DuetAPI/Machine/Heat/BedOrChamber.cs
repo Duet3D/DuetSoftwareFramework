@@ -1,31 +1,80 @@
-﻿using System;
+﻿using DuetAPI.Utility;
+using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about a bed or chamber heater
     /// </summary>
-    public class BedOrChamber : ICloneable
+    public sealed class BedOrChamber : IAssignable, ICloneable, INotifyPropertyChanged
     {
+        /// <summary>
+        /// Event to trigger when a property has changed
+        /// </summary>
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         /// <summary>
         /// Active temperatures (in C)
         /// </summary>
-        public float[] Active { get; set; } = new float[0];
-        
+        public ObservableCollection<float> Active { get; } = new ObservableCollection<float>();
+
         /// <summary>
         /// Standby temperatures (in C)
         /// </summary>
-        public float[] Standby { get; set; } = new float[0];
+        public ObservableCollection<float> Standby { get; } = new ObservableCollection<float>();
         
         /// <summary>
         /// Name of the bed or chamber or null if unset
         /// </summary>
-        public string Name { get; set; }
-        
+        public string Name
+        {
+            get => _name;
+            set
+            {
+                if (_name != value)
+                {
+                    _name = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private string _name;
+
         /// <summary>
-        /// Heaters controlled by this bed or chamber (indices)
+        /// Indices of the heaters controlled by this bed or chamber
         /// </summary>
-        public int[] Heaters { get; set; } = new int[0];
+        public ObservableCollection<int> Heaters { get; } = new ObservableCollection<int>();
+
+        /// <summary>
+        /// Assigns every property from another instance
+        /// </summary>
+        /// <param name="from">Object to assign from</param>
+        /// <exception cref="ArgumentNullException">other is null</exception>
+        /// <exception cref="ArgumentException">Types do not match</exception>
+        public void Assign(object from)
+        {
+            if (from == null)
+            {
+                throw new ArgumentNullException();
+            }
+            if (!(from is BedOrChamber other))
+            {
+                throw new ArgumentException("Invalid type");
+            }
+
+            ListHelpers.SetList(Active, other.Active);
+            ListHelpers.SetList(Standby, other.Standby);
+            Name = (other.Name != null) ? string.Copy(other.Name) : null;
+            ListHelpers.SetList(Heaters, other.Heaters);
+        }
 
         /// <summary>
         /// Creates a clone of this instance
@@ -33,13 +82,16 @@ namespace DuetAPI.Machine
         /// <returns>A clone of this instance</returns>
         public object Clone()
         {
-            return new BedOrChamber
+            BedOrChamber clone = new BedOrChamber
             {
-                Active = (float[])Active.Clone(),
-                Standby = (float[])Standby.Clone(),
-                Name = (Name != null) ? string.Copy(Name) : null,
-                Heaters = (int[])Heaters.Clone()
+                Name = (Name != null) ? string.Copy(Name) : null
             };
+
+            ListHelpers.AddItems(clone.Active, Active);
+            ListHelpers.AddItems(clone.Standby, Standby);
+            ListHelpers.AddItems(clone.Heaters, Heaters);
+
+            return clone;
         }
     }
 }

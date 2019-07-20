@@ -70,7 +70,7 @@ namespace DuetControlServer.FileExecution
             using (await Model.Provider.AccessReadWriteAsync())
             {
                 Model.Provider.Get.Channels[CodeChannel.File].VolumetricExtrusion = false;
-                Model.Provider.Get.Job.File = info;
+                Model.Provider.Get.Job.File.Assign(info);
             }
 
             // Notify RepRapFirmware and start processing the file
@@ -91,7 +91,7 @@ namespace DuetControlServer.FileExecution
                 MacroFile startMacro = new MacroFile(startPath, CodeChannel.File, null);
                 do
                 {
-                    Code code = await startMacro.ReadCodeAsync();
+                    Code code = startMacro.ReadCode();
                     if (code == null)
                     {
                         break;
@@ -138,7 +138,7 @@ namespace DuetControlServer.FileExecution
                 Code code;
                 while (codeTasks.Count == 0 || codeTasks.Count < Settings.BufferedPrintCodes)
                 {
-                    code = await file.ReadCodeAsync();
+                    code = file.ReadCode();
                     if (code == null)
                     {
                         break;

@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using DuetAPI.Connection;
 
 namespace DuetAPI.Commands
@@ -14,6 +16,21 @@ namespace DuetAPI.Commands
         /// Create an empty Code representation
         /// </summary>
         public Code() { }
+
+        /// <summary>
+        /// Create a new Code instance and attempt to parse the given code string
+        /// </summary>
+        /// <param name="code">G/M/T-Code</param>
+        public Code(string code)
+        {
+            using (MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(code)))
+            {
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    Parse(reader, this);
+                }
+            }
+        }
 
         /// <summary>
         /// Type of the code. If no exact type could be determined, it is interpreted as a comment
@@ -79,13 +96,17 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <seealso cref="CodeParameter"/>
         public List<CodeParameter> Parameters { get; } = new List<CodeParameter>();
-        
+
         /// <summary>
         /// Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!
         /// </summary>
         /// <param name="c">Letter of the parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
-        public CodeParameter Parameter(char c) => Parameters.FirstOrDefault(p => p.Letter == c);
+        public CodeParameter Parameter(char c)
+        {
+            c = char.ToUpperInvariant(c);
+            return Parameters.FirstOrDefault(p => char.ToUpperInvariant(p.Letter) == c);
+        }
 
         /// <summary>
         /// Retrieve the parameter whose letter equals c or generate a default parameter
@@ -134,7 +155,7 @@ namespace DuetAPI.Commands
         {
             if (Type == CodeType.Comment)
             {
-                return (Comment == null) ? "" : (";" + Comment);
+                return ";" + Comment;
             }
 
             // Because it is neither always feasible nor reasonable to keep track of the original code,

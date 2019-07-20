@@ -82,50 +82,6 @@ namespace DuetControlServer.FileExecution
         /// <returns>Read code or null if none found</returns>
         public virtual Code ReadCode()
         {
-            // Deal with abort requests
-            if (IsAborted)
-            {
-                if (!IsFinished)
-                {
-                    IsFinished = true;
-                }
-                return null;
-            }
-
-            // Attempt to read the next line
-            long filePosition = _reader.Position;
-            string line = _reader.ReadLine();
-            if (line != null)
-            {
-                Code result = new Code(line)
-                {
-                    FilePosition = filePosition,
-                    Channel = Channel
-                };
-
-                if (result.LineNumber.HasValue)
-                {
-                    LineNumber = result.LineNumber.Value;
-                }
-                else
-                {
-                    result.LineNumber = LineNumber++;
-                }
-
-                return result;
-            }
-
-            // End of file
-            IsFinished = true;
-            return null;
-        }
-
-        /// <summary>
-        /// Read the next available code asynchronously
-        /// </summary>
-        /// <returns>Read code or null if none found</returns>
-        public virtual async Task<Code> ReadCodeAsync()
-        {
             // Deal with closed files
             if (IsFinished || IsAborted)
             {
@@ -136,32 +92,29 @@ namespace DuetControlServer.FileExecution
                 return null;
             }
 
-            // Attempt to read the next line
-            long filePosition = _reader.Position;
-            string line = await _reader.ReadLineAsync();
-            if (line != null)
+            // Read the next available non-empty code and keep track of the line number
+            Code code = new Code()
             {
-                Code result = new Code(line)
-                {
-                    FilePosition = filePosition,
-                    Channel = Channel
-                };
+                Channel = Channel,
+                LineNumber = LineNumber,
+                FilePosition = _reader.Position
+            };
 
-                if (result.LineNumber.HasValue)
-                {
-                    LineNumber = result.LineNumber.Value;
-                }
-                else
-                {
-                    result.LineNumber = LineNumber++;
-                }
+            bool codeRead;
+            do
+            {
+                // FIXME: G53 may apply to multiple codes on the same line...
+                codeRead = DuetAPI.Commands.Code.Parse(_reader, code);
+                LineNumber = code.LineNumber.Value;
+            } while (!codeRead && _reader.Position != _fileStream.Length);
 
-                return result;
+            // Return it
+            if (!codeRead)
+            {
+                IsFinished = true;
+                return null;
             }
-
-            // End of file
-            IsFinished = true;
-            return null;
+            return code;
         }
 
         /// <summary>

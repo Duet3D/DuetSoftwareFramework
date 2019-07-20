@@ -11,7 +11,6 @@ namespace DuetControlServer.SPI
         /// Efficient CRC16 calculation based on the CRC16-IBM algorithm
         /// </summary>
         /// <param name="buffer">Buffer to calculate the checksum for</param>
-        /// <param name="length">Length of the buffer</param>
         /// <returns>CRC16 Checksum</returns>
         /// <remarks>
         /// Original found on https://stackoverflow.com/questions/18594963/crc16-iso-13239-implementation

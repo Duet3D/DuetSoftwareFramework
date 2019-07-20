@@ -73,20 +73,34 @@
         </member>
         <member name="M:DuetControlServer.Commands.Code.#ctor">
             <summary>
-            Creates a new Code instance
+            Create an empty Code instance
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.Code.#ctor(System.String)">
             <summary>
-            Creates a new Code instance and attempts to parse the given code string
+            Create a new Code instance and attempt to parse the given code string
             </summary>
             <param name="code">G/M/T-Code</param>
         </member>
+        <member name="M:DuetControlServer.Commands.Code.ParseMultiple(System.String)">
+            <summary>
+            Parse multiple codes from the given input string
+            </summary>
+            <param name="codeString">Codes to parse</param>
+            <returns>Enumeration of parsed G/M/T-codes</returns>
+        </member>
         <member name="M:DuetControlServer.Commands.Code.Execute">
             <summary>
-            Run an arbitrary G/M/T-code
+            Run an arbitrary G/M/T-code and wait for it to finish
             </summary>
             <returns>Code result instance</returns>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.Enqueue">
+            <summary>
+            Start an arbitrary G/M/T-code and get the task that is resolved when RRF finishes its execution.
+            This is an internal alternative to the <see cref="F:DuetAPI.Commands.CodeFlags.Asynchronous"/> flag.
+            </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.Commands.Flush">
             <summary>
@@ -139,9 +153,9 @@
         </member>
         <member name="M:DuetControlServer.Commands.SimpleCode.Execute">
             <summary>
-            Converts a simple G/M/T-code to a regular Code instance, executes it and returns its result as text
+            Converts simple G/M/T-codes to a regular Code instances, executes them and returns the result as text
             </summary>
-            <returns>G-code result</returns>
+            <returns>G-code result as text</returns>
         </member>
         <member name="T:DuetControlServer.Commands.SyncMachineModel">
             <summary>
@@ -172,6 +186,11 @@
         <member name="P:DuetControlServer.FileExecution.BaseFile.Position">
             <summary>
             Gets or sets the current file position in bytes
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.BaseFile.LineNumber">
+            <summary>
+            Number of the current line
             </summary>
         </member>
         <member name="P:DuetControlServer.FileExecution.BaseFile.Length">
@@ -237,11 +256,17 @@
             List of macro files being executed
             </summary>
         </member>
+        <member name="P:DuetControlServer.FileExecution.MacroFile.DoingMacroFile">
+            <summary>
+            Indicates if a file macro is being done
+            </summary>
+        </member>
         <member name="M:DuetControlServer.FileExecution.MacroFile.AbortAllFiles(DuetAPI.CodeChannel)">
             <summary>
             Abort files on the given channel (probably because the firmware requested this)
             </summary>
             <param name="channel">Channel on which macros are supposed to be cancelled</param>
+            <returns>If an abortion could be requested</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.MacroFile.AbortLastFile(DuetAPI.CodeChannel)">
             <summary>
@@ -250,31 +275,52 @@
             <param name="channel">Channel of the running macro file</param>
             <returns>If an abortion could be requested</returns>
         </member>
-        <member name="M:DuetControlServer.FileExecution.MacroFile.#ctor(System.String,DuetAPI.CodeChannel,System.Boolean,System.Int32)">
+        <member name="P:DuetControlServer.FileExecution.MacroFile.IsConfig">
+            <summary>
+            Whether this file is config.g or config.g.bak
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.MacroFile.IsConfigOverride">
+            <summary>
+            Whether this file is config-override.g
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.MacroFile.StartCode">
+            <summary>
+            The queued code which originally started this macro file or null
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.MacroFile.#ctor(System.String,DuetAPI.CodeChannel,DuetControlServer.SPI.QueuedCode)">
             <summary>
             Create a new macro instance
             </summary>
             <param name="fileName">Filename of the macro</param>
             <param name="channel">Channel to send the codes to</param>
-            <param name="isSystemMacro">Whether the macro file is requested from the firmware</param>
-            <param name="sourceConnection">Source connection of this macro</param>
+            <param name="startCode">Which code is starting this macro file</param>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.MacroFile.Diagnostics(System.Text.StringBuilder)">
+            <summary>
+            Print diagnostics of this class
+            </summary>
+            <param name="builder">String builder</param>
         </member>
         <member name="M:DuetControlServer.FileExecution.MacroFile.ReadCode">
             <summary>
-            Read another code from the file being executed
+            Read another code from the file being executed asynchronously
             </summary>
             <returns>Next available code or null if the file has ended</returns>
-        </member>
-        <member name="M:DuetControlServer.FileExecution.MacroFile.RunMacro">
-            <summary>
-            Execute the full macro file
-            </summary>
-            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.FileExecution.Print">
             <summary>
             Implementation of a file being printed
             </summary>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.Print.Diagnostics(System.Text.StringBuilder)">
+            <summary>
+            Print diagnostics of this class
+            </summary>
+            <param name="builder">String builder</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Start(System.String,DuetAPI.CodeChannel)">
             <summary>
@@ -287,6 +333,11 @@
         <member name="P:DuetControlServer.FileExecution.Print.Position">
             <summary>
             Reports the current file position
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.Print.LastFilePosition">
+            <summary>
+            Holds the file position after the current code being executed
             </summary>
         </member>
         <member name="P:DuetControlServer.FileExecution.Print.Length">
@@ -544,7 +595,6 @@
             <summary>
             Called to notify the subscribers about a model update
             </summary>
-            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.IPC.Server">
             <summary>
@@ -586,9 +636,21 @@
             </summary>
             <returns>Disposable lock object to be used with a using directive</returns>
         </member>
+        <member name="M:DuetControlServer.Model.Provider.AccessReadOnlyAsync">
+            <summary>
+            Access the machine model asynchronously for read operations only
+            </summary>
+            <returns>Disposable lock object to be used with a using directive</returns>
+        </member>
         <member name="M:DuetControlServer.Model.Provider.AccessReadWrite">
             <summary>
             Access the machine model for read/write operations
+            </summary>
+            <returns>Disposable lock object to be used with a using directive</returns>
+        </member>
+        <member name="M:DuetControlServer.Model.Provider.AccessReadWriteAsync">
+            <summary>
+            Access the machine model asynchronously for read/write operations
             </summary>
             <returns>Disposable lock object to be used with a using directive</returns>
         </member>
@@ -597,8 +659,8 @@
             Get the machine model. Make sure to call the acquire the corresponding lock first!
             </summary>
             <returns>Current Duet machine object model</returns>
-            <seealso cref="M:DuetControlServer.Model.Provider.AccessReadOnly"/>
-            <seealso cref="M:DuetControlServer.Model.Provider.AccessReadWrite"/>
+            <seealso cref="M:DuetControlServer.Model.Provider.AccessReadOnlyAsync"/>
+            <seealso cref="M:DuetControlServer.Model.Provider.AccessReadWriteAsync"/>
         </member>
         <member name="M:DuetControlServer.Model.Provider.Output(DuetAPI.Message)">
             <summary>
@@ -745,9 +807,34 @@
             Number of the GPIO pin that is used by RepRapFirmware to flag its ready state
             </summary>
         </member>
+        <member name="P:DuetControlServer.Settings.BufferedPrintCodes">
+            <summary>
+            Number of codes to buffer in the internal print subsystem
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.BufferedMacroCodes">
+            <summary>
+            Number of codes to buffer per macro
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.MaxBufferSpacePerChannel">
+            <summary>
+            Maximum space of buffered codes per channel (in bytes). Must be greater than <see cref="F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize"/>
+            </summary>
+        </member>
         <member name="P:DuetControlServer.Settings.MaxUpdateDelay">
             <summary>
             Maximum delay after which a status update is requested even when in burst mode (in ms)
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.IapFile">
+            <summary>
+            File holding the IAP binary for the Duet 3
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.FirmwareFile">
+            <summary>
+            File holding the firmware binary for the Duet 3
             </summary>
         </member>
         <member name="P:DuetControlServer.Settings.FileInfoReadLimit">
@@ -791,6 +878,164 @@
             </summary>
             <param name="args">Command-line arguments</param>
         </member>
+        <member name="T:DuetControlServer.SPI.ChannelInformation">
+            <summary>
+            Class used to hold internal information about a single code channel
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.#ctor(DuetAPI.CodeChannel)">
+            <summary>
+            Constructor of a code channel descriptor
+            </summary>
+            <param name="channel">Code channel of this instance</param>
+        </member>
+        <member name="P:DuetControlServer.SPI.ChannelInformation.Channel">
+            <summary>
+            What code channel this class is about
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation._lock">
+            <summary>
+            Lock used when accessing this instance
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation.PendingCodes">
+            <summary>
+            Queue of pending G/M/T-codes that have not been buffered yet
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.ChannelInformation.BytesBuffered">
+            <summary>
+            Occupied space for buffered codes in bytes
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation.BufferedCodes">
+            <summary>
+            List of buffered G/M/T-codes that are being processed by the firmware
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation.SuspendedCodes">
+            <summary>
+            Stack of suspended G/M/T-codes to resend when the current macro file finishes
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation.SystemMacroHasFinished">
+            <summary>
+            Indicates whether the requested system macro file has finished
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation.NestedMacros">
+            <summary>
+            Stack of nested macro files being executed
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation.NestedMacroCodes">
+            <summary>
+            Pending codes being started by a nested macro (and multiple codes may be started by an interceptor).
+            This is required because it may take a moment until they are internally processed
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation.PendingLockRequests">
+            <summary>
+            Queue of pending lock/unlock requests
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation.PendingFlushRequests">
+            <summary>
+            Queue of pending flush requests
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.Lock">
+            <summary>
+            Lock access to this code channel
+            </summary>
+            <returns>Disposable lock</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.LockAsync">
+            <summary>
+            Lock access to this code channel asynchronously
+            </summary>
+            <returns>Disposable lock</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.Diagnostics(System.Text.StringBuilder)">
+            <summary>
+            Write channel diagnostics to the given string builder
+            </summary>
+            <param name="builder">Target to write to</param>
+        </member>
+        <member name="P:DuetControlServer.SPI.ChannelInformation.IsIdle">
+            <summary>
+            Indicates if this code channel is currently idle
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.ProcessRequests">
+            <summary>
+            Process pending requests on this channel
+            </summary>
+            <returns>Whether another call to this method is permitted</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.HandleReply(DuetControlServer.SPI.Communication.MessageTypeFlags,System.String)">
+            <summary>
+            Handle a G-code reply
+            </summary>
+            <param name="flags">Message flags</param>
+            <param name="reply">Code reply</param>
+            <returns>Whether the reply could be processed</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.HandleMacroRequest(System.String,System.Boolean,System.Boolean)">
+            <summary>
+            Attempt to start a file macro
+            </summary>
+            <param name="filename">Name of the macro file</param>
+            <param name="reportMissing">Report an error if the file could not be found</param>
+            <param name="fromCode">Request comes from a real G/M/T-code</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.InvalidateBuffer">
+            <summary>
+            Invalidate all the buffered G/M/T-codes
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.SuspendBuffer(DuetControlServer.SPI.QueuedCode)">
+            <summary>
+            Suspend all the buffered G/M/T-codes for future execution
+            </summary>
+            <param name="codeBeingExecuted">Current code being executed to leave in the buffer</param>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation._resumingBuffer">
+            <summary>
+            Indicates if the suspended codes are being resumed
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.ResumeBuffer">
+            <summary>
+            Resume suspended codes when a nested macro file has finished
+            </summary>
+            <returns>True when finished</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.Invalidate(System.String)">
+            <summary>
+            Invalidate every request and buffered code on this channel
+            </summary>
+            <param name="codeErrorMessage">Error message to output</param>
+        </member>
+        <member name="T:DuetControlServer.SPI.ChannelStore">
+            <summary>
+            Class used to hold internal information about all the code channels
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelStore.#ctor">
+            <summary>
+            Constructor of the channel store
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.ChannelStore.Item(DuetAPI.CodeChannel)">
+            <summary>
+            Index operator for easy access via a CodeChannel value
+            </summary>
+            <param name="channel">Channel to retrieve information abotu</param>
+            <returns>Information about the code channel</returns>
+        </member>
         <member name="T:DuetControlServer.SPI.Communication.Consts">
             <summary>
             Static class holding SPI transfer constants
@@ -824,7 +1069,42 @@
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize">
             <summary>
-            Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware
+            Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.BufferedCodeHeaderSize">
+            <summary>
+            Size of the header prefixing a buffered code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.NoFilePosition">
+            <summary>
+            Value used by RepRapFirmware to represent an invalid file position
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.IapSegmentSize">
+            <summary>
+            Size of each transmitted IAP binary segment (must be a multiple of IFLASH_PAGE_SIZE)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.IapBootDelay">
+            <summary>
+            Time to wait when the IAP reboots to the main firmware
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.FirmwareSegmentSize">
+            <summary>
+            Size of each transmitted firmware binary segment (must be equal to blockReadSize in the IAP project)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.FirmwareFinishedDelay">
+            <summary>
+            Delay to await after the last firmware segment has been written (in ms)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.IapRebootDelay">
+            <summary>
+            Time to wait when the IAP reboots to the main firmware
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileRequest">
@@ -835,6 +1115,16 @@
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileRequest.Channel">
             <summary>
             Code channel running the file(s)
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdate">
+            <summary>
+            Request abort of the currently executing files
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdate.BufferSpace">
+            <summary>
+            Bytes available for storing buffered codes
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.CodeReply">
@@ -893,6 +1183,11 @@
             Output a warning message if the file could not be found
             </summary>
         </member>
+        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.MacroRequest.FromCode">
+            <summary>
+            Whether the code was requested from a G/M/T-code
+            </summary>
+        </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.MacroRequest.Length">
             <summary>
             Length of the filename
@@ -925,14 +1220,14 @@
             This is always guaranteed to work in case RRF does not have not enough resources are available to process the packet
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.ReportState">
-            <summary>
-            Response to the state request
-            </summary>
-        </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.ObjectModel">
             <summary>
             Response to an object model request
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.CodeBufferUpdate">
+            <summary>
+            Update about the available code buffer size
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.CodeReply">
@@ -1021,39 +1316,29 @@
             Feedrate in mm/s
             </summary>
         </member>
-        <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.StateResponse">
-            <summary>
-            Response to a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetState"/> request
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.StateResponse.BusyChannels">
-            <summary>
-            Bitmap of the code channels that are currently busy
-            </summary>
-        </member>
-        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags">
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.SpiCodeFlags">
             <summary>
             Flags of a G/M/T-code
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.NoMajorCommandNumber">
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SpiCodeFlags.HasMajorCommandNumber">
             <summary>
-            No major command number set
+            This code has a valid major code
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.NoMinorCommandNumber">
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SpiCodeFlags.HasMinorCommandNumber">
             <summary>
-            No minor command number set
+            This code has a valid minor code
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.FilePositionValid">
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SpiCodeFlags.HasFilePosition">
             <summary>
-            Indicates if the file position is valid
+            This code has a valid file position (for pausing)
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.EnforceAbsolutePosition">
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SpiCodeFlags.EnforceAbsolutePosition">
             <summary>
-            Indicates that G53 was used with this code
+            Indicates that G53 was used with this code (absolute positioning)
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader">
@@ -1172,6 +1457,21 @@
             Parameter is an expression
             </summary>
         </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.FlashVerifyRequest">
+            <summary>
+            Used as the last message to check if the firmware has been flashed successfully
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.FlashVerifyRequest.firmwareLength">
+            <summary>
+            Length of the flashed firmware
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.FlashVerifyRequest.crc16">
+            <summary>
+            CRC16 checksum of the firmware binary
+            </summary>
+        </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.MacroCompleted">
             <summary>
             Indicate that a macro has finished its execution
@@ -1259,11 +1559,6 @@
             Request indices for SPI transfers from the Linux board to the RepRapFirmware controller
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetState">
-            <summary>
-            Request state of the GCode buffers
-            </summary>
-        </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.EmergencyStop">
             <summary>
             Perform an immediate emergency stop
@@ -1325,9 +1620,20 @@
             Lock movement and wait for standstill
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.UnlockAll">
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.Unlock">
             <summary>
             Unlock everything again
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.WriteIap">
+            <summary>
+            Write another chunk of the IAP binary to the designated Flash area
+            </summary>
+            <remarks>There is no discrete header for this request but be aware that only multiples of IFLASH_PAGE_SIZE must be transmitted (except for the last sector)</remarks>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.StartIap">
+            <summary>
+            Launch the IAP binary
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel">
@@ -1712,12 +2018,11 @@
             Functions for CRC16 calculation
             </summary>
         </member>
-        <member name="M:DuetControlServer.SPI.CRC16.Calculate(System.Byte[],System.Int32)">
+        <member name="M:DuetControlServer.SPI.CRC16.Calculate(System.ReadOnlySpan{System.Byte})">
             <summary>
             Efficient CRC16 calculation based on the CRC16-IBM algorithm
             </summary>
             <param name="buffer">Buffer to calculate the checksum for</param>
-            <param name="length">Length of the buffer</param>
             <returns>CRC16 Checksum</returns>
             <remarks>
             Original found on https://stackoverflow.com/questions/18594963/crc16-iso-13239-implementation
@@ -1733,15 +2038,15 @@
             Set up the SPI device and the controller for the transfer ready pin
             </summary>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.GetFullTransfersPerSecond">
+        <member name="M:DuetControlServer.SPI.DataTransfer.Diagnostics(System.Text.StringBuilder)">
             <summary>
-            Get the average number of full transfers per second
+            Print diagnostics to the given string builder
             </summary>
-            <returns>Average number of full transfers per second</returns>
+            <param name="builder">Target to write to</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.PerformFullTransfer(System.Boolean)">
             <summary>
-            Perform a full data transfer
+            Perform a full data transfer synchronously
             </summary>
             <param name="mustSucceed">Keep retrying until the transfer succeeds</param>
             <returns>Whether new data could be transferred</returns>
@@ -1763,18 +2068,18 @@
             </summary>
             <returns>The next packet or null if none is available</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.ReadState(System.Int32@)">
-            <summary>
-            Read the result of a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetState"/> request
-            </summary>
-            <param name="busyChannels">Bitmap of the busy channels</param>
-        </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadObjectModel(System.Byte@,System.String@)">
             <summary>
             Read the result of a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetObjectModel"/> request
             </summary>
             <param name="module">Module described by the returned JSON data</param>
             <param name="json">JSON data</param>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.ReadCodeBufferUpdate(System.UInt16@)">
+            <summary>
+            Read a code buffer update
+            </summary>
+            <param name="bufferSpace">Buffer space</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadCodeReply(DuetControlServer.SPI.Communication.MessageTypeFlags@,System.String@)">
             <summary>
@@ -1783,12 +2088,13 @@
             <param name="messageType">Message type flags of the reply</param>
             <param name="reply">Code reply</param>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.ReadMacroRequest(DuetAPI.CodeChannel@,System.Boolean@,System.String@)">
+        <member name="M:DuetControlServer.SPI.DataTransfer.ReadMacroRequest(DuetAPI.CodeChannel@,System.Boolean@,System.Boolean@,System.String@)">
             <summary>
             Read the content of a <see cref="T:DuetControlServer.SPI.Communication.FirmwareRequests.MacroRequest"/> packet
             </summary>
             <param name="channel">Channel requesting a macro file</param>
             <param name="reportMissing">Write an error message if the macro is not found</param>
+            <param name="isSystemMacro">Indicates if this code is not bound to a code being executed (e.g. when a trigger macro is requested)</param>
             <param name="filename">Filename of the requested macro</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadAbortFile(DuetAPI.CodeChannel@)">
@@ -1837,12 +2143,6 @@
             </summary>
             <param name="packet">Packet holding the resend request</param>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.WriteGetState">
-            <summary>
-            Request the GCodeBuffer states from the firmware
-            </summary>
-            <returns>True if the packet could be written</returns>
-        </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.WriteEmergencyStop">
             <summary>
             Request an emergency stop
@@ -1854,6 +2154,13 @@
             Request a firmware reset
             </summary>
             <returns>True if the packet could be written</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.GetCodeSize(DuetControlServer.Commands.Code)">
+            <summary>
+            Figure out the size of a binary G/M/T-code
+            </summary>
+            <param name="code">Code to write</param>
+            <returns>Code size in bytes</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.WriteCode(DuetControlServer.Commands.Code)">
             <summary>
@@ -1927,6 +2234,38 @@
             <param name="channel">Code channel that releases the locks</param>
             <returns>True if the packet could be written</returns>
         </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.WriteIapSegment(System.IO.Stream)">
+            <summary>
+            Write another segment of the IAP binary
+            </summary>
+            <param name="stream">IAP binary</param>
+            <returns>Whether another segment could be written</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.StartIap">
+            <summary>
+            Instruct the firmware to start the IAP binary
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.FlashFirmwareSegment(System.IO.Stream)">
+            <summary>
+            Flash another segment of the firmware via the IAP binary
+            </summary>
+            <param name="stream"></param>
+            <returns>Whether another segment could be sent</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.VerifyFirmwareChecksum(System.Int64,System.UInt16)">
+            <summary>
+            Send the CRC16 checksum of the firmware binary to the IAP program and verify the written data
+            </summary>
+            <param name="firmwareLength">Length of the written firmware in bytes</param>
+            <param name="crc16">CRC16 checksum of the firmware</param>
+            <returns>Whether the firmware has been written successfully</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.WaitForIapReset">
+            <summary>
+            Wait for the IAP program to reset the controller
+            </summary>
+        </member>
         <member name="T:DuetControlServer.SPI.Interface">
             <summary>
             This class accesses RepRapFirmware via SPI and deals with general communication
@@ -1937,11 +2276,11 @@
             Initialize the SPI interface but do not connect yet
             </summary>
         </member>
-        <member name="M:DuetControlServer.SPI.Interface.Diagnostics(DuetAPI.Commands.CodeResult)">
+        <member name="M:DuetControlServer.SPI.Interface.Diagnostics(System.Text.StringBuilder)">
             <summary>
             Print diagnostics of this class
             </summary>
-            <param name="result">Message storage</param>
+            <param name="builder">String builder</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.GetHeightmap">
@@ -1961,7 +2300,7 @@
         </member>
         <member name="M:DuetControlServer.SPI.Interface.ProcessCode(DuetControlServer.Commands.Code)">
             <summary>
-            Execute a G/M/T-code asynchronously
+            Enqueue a G/M/T-code synchronously and obtain a task that completes when the code has finished
             </summary>
             <param name="code">Code to execute</param>
             <returns>Asynchronous task</returns>
@@ -2010,6 +2349,13 @@
             <param name="channel">Channel holding the resources</param>
             <returns>Asynchronous task</returns>
         </member>
+        <member name="M:DuetControlServer.SPI.Interface.UpdateFirmware(System.IO.Stream,System.IO.Stream)">
+            <summary>
+            Perform an update of the main firmware via IAP
+            </summary>
+            <param name="iapStream">IAP binary</param>
+            <param name="firmwareStream">Firmware binary</param>
+        </member>
         <member name="M:DuetControlServer.SPI.Interface.Connect">
             <summary>
             Initialize physical transfer and perform initial data transfer.
@@ -2021,6 +2367,20 @@
             <summary>
             Perform communication with the RepRapFirmware controller
             </summary>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.BufferCode(DuetControlServer.SPI.QueuedCode)">
+            <summary>
+            Send a queued code to the firmware
+            </summary>
+            <param name="queuedCode">Code to send</param>
+            <returns>Whether the code could be processed</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.InvalidateData(System.String)">
+            <summary>
+            Invalidate every resource due to a critical event
+            </summary>
+            <param name="codeErrorMessage">Message for cancelled codes</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.SPI.QueuedCode">
@@ -2040,19 +2400,29 @@
             Code item to execute
             </summary>
         </member>
-        <member name="P:DuetControlServer.SPI.QueuedCode.IsExecuting">
+        <member name="P:DuetControlServer.SPI.QueuedCode.IsReadyToSend">
             <summary>
-            Whether the code is being executed internally or by the firmware
+            Indicates if the code is ready to be sent to the firmware
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.QueuedCode.IsSuspended">
+            <summary>
+            Indicates if this code is currently suspended
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.QueuedCode.IsFinished">
+            <summary>
+            Indicates if the code has been finished because of a G-code reply
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.QueuedCode.BinarySize">
+            <summary>
+            Size of this code in binary representation
             </summary>
         </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.DoingNestedMacro">
             <summary>
             Indicates if RepRapFirmware requested a macro file for execution as part of this code
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.SPI.QueuedCode.CanFinish">
-            <summary>
-            Indicates if a complete G-code reply has been received implying this code can be finished
             </summary>
         </member>
         <member name="P:DuetControlServer.SPI.QueuedCode.Task">
@@ -2084,6 +2454,12 @@
             Called to resolve the task because it has finished
             </summary>
         </member>
+        <member name="M:DuetControlServer.SPI.QueuedCode.ToString">
+            <summary>
+            Convert this instance to a string
+            </summary>
+            <returns>String representation</returns>
+        </member>
         <member name="T:DuetControlServer.SPI.QueuedLockRequest">
             <summary>
             Queued lock/unlock request
@@ -2099,23 +2475,17 @@
             Indicates if the lock request has been sent to the firmware
             </summary>
         </member>
-        <member name="P:DuetControlServer.SPI.QueuedLockRequest.Channel">
-            <summary>
-            Code channel that is supposed to acquire/release the lock
-            </summary>
-        </member>
         <member name="P:DuetControlServer.SPI.QueuedLockRequest.Task">
             <summary>
             Awaitable task returning true if the lock could be acquired.
             It returns false if the controller is reset or an emergency stop occurs
             </summary>
         </member>
-        <member name="M:DuetControlServer.SPI.QueuedLockRequest.#ctor(System.Boolean,DuetAPI.CodeChannel)">
+        <member name="M:DuetControlServer.SPI.QueuedLockRequest.#ctor(System.Boolean)">
             <summary>
             Creates a new queued lock/unlock request instance
             </summary>
             <param name="isLockRequest">Whether the resource shall be locked</param>
-            <param name="channel">Code channel requesting the lock</param>
         </member>
         <member name="M:DuetControlServer.SPI.QueuedLockRequest.Resolve(System.Boolean)">
             <summary>
@@ -2138,14 +2508,6 @@
             <param name="from">Origin</param>
             <returns>Header describing a packet</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadState(System.ReadOnlySpan{System.Byte},System.Int32@)">
-            <summary>
-            Read the current state of the code buffers
-            </summary>
-            <param name="from">Origin</param>
-            <param name="busyChannels">Bitmap of the busy channels</param>
-            <returns>Number of bytes read</returns>
-        </member>
         <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadObjectModel(System.ReadOnlySpan{System.Byte},System.Byte@,System.String@)">
             <summary>
             Read an object model header plus JSON text from a memory span
@@ -2153,6 +2515,14 @@
             <param name="from">Origin</param>
             <param name="module">Number of the module from which the JSON data originates</param>
             <param name="json">Object model data as JSON or null if none available</param>
+            <returns>Number of bytes read</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadCodeBufferUpdate(System.ReadOnlySpan{System.Byte},System.UInt16@)">
+            <summary>
+            Read a code buffer update from a memory span
+            </summary>
+            <param name="from">Origin</param>
+            <param name="bufferSpace">Buffer space</param>
             <returns>Number of bytes read</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadCodeReply(System.ReadOnlySpan{System.Byte},DuetControlServer.SPI.Communication.MessageTypeFlags@,System.String@)">
@@ -2164,13 +2534,14 @@
             <param name="reply">Raw code reply</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadMacroRequest(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.Boolean@,System.String@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadMacroRequest(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.Boolean@,System.Boolean@,System.String@)">
             <summary>
             Read a macro file request from a memory span
             </summary>
             <param name="from">Origin</param>
             <param name="channel">Code channel that requested the execution</param>
             <param name="reportMissing">Output a message if the macro cannot be found</param>
+            <param name="fromCode">Whether the macro request came from the G/M/T-code being executed</param>
             <param name="filename">Filename of the macro to execute</param>
             <returns>Number of bytes read</returns>
         </member>

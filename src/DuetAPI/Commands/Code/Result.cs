@@ -36,6 +36,11 @@ namespace DuetAPI.Commands
         }
 
         /// <summary>
+        /// Checks if the message contains any data
+        /// </summary>
+        public bool IsEmpty => !this.Any(item => item.Content != "");
+
+        /// <summary>
         /// Indicates if the code could complete without an error
         /// </summary>
         public bool IsSuccessful => !this.Any(item => item.Type == MessageType.Error);

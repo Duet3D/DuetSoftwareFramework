@@ -1,32 +1,12 @@
-﻿using System;
+﻿using DuetAPI.Utility;
+using System;
 
 namespace DuetAPI
 {
     /// <summary>
-    /// Type of a generic message
-    /// </summary>
-    public enum MessageType
-    {
-        /// <summary>
-        /// This is a success message
-        /// </summary>
-        Success = 0,
-
-        /// <summary>
-        /// This is a warning message
-        /// </summary>
-        Warning,
-
-        /// <summary>
-        /// This is an error message
-        /// </summary>
-        Error
-    }
-    
-    /// <summary>
     /// Generic container for messages
     /// </summary>
-    public class Message : ICloneable
+    public sealed class Message : IAssignable, ICloneable
     {
         /// <summary>
         /// Create a new message
@@ -77,6 +57,7 @@ namespace DuetAPI
         /// <summary>
         /// Content of this message
         /// </summary>
+        /// <remarks>May be empty but not null</remarks>
         public string Content { get; set; } = "";
 
         /// <summary>
@@ -94,6 +75,28 @@ namespace DuetAPI
         }
 
         /// <summary>
+        /// Assigns every property of another instance of this one
+        /// </summary>
+        /// <param name="from">Object to assign from</param>
+        /// <exception cref="ArgumentNullException">other is null</exception>
+        /// <exception cref="ArgumentException">Types do not match</exception>
+        public void Assign(object from)
+        {
+            if (from == null)
+            {
+                throw new ArgumentNullException();
+            }
+            if (!(from is Message other))
+            {
+                throw new ArgumentException("Invalid type");
+            }
+
+            Time = other.Time;
+            Type = other.Type;
+            Content = string.Copy(other.Content);
+        }
+
+        /// <summary>
         /// Creates a clone of this instance
         /// </summary>
         /// <returns>Clone of this instance</returns>
@@ -103,7 +106,7 @@ namespace DuetAPI
             {
                 Time = Time,
                 Type = Type,
-                Content = Content
+                Content = string.Copy(Content)
             };
         }
     }

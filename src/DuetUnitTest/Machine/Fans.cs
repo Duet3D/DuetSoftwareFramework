@@ -11,18 +11,21 @@ namespace DuetUnitTest.Machine
         {
             MachineModel original = new MachineModel();
 
-            Fan fan = new Fan();
-            fan.Value = 100;
-            fan.Name = "Fan Name";
-            fan.Rpm = 1234;
-            fan.Inverted = true;
-            fan.Frequency = 20000;
-            fan.Min = 0.01F;
-            fan.Max = 0.99F;
-            fan.Blip = 0;
+            Fan fan = new Fan
+            {
+                Value = 100,
+                Name = "Fan Name",
+                Rpm = 1234,
+                Inverted = true,
+                Frequency = 20000,
+                Min = 0.01F,
+                Max = 0.99F,
+                Blip = 0
+            };
             fan.Thermostatic.Control = false;
-            fan.Thermostatic.Heaters = new int[] { 1, 2 };
-            fan.Thermostatic.Temperature = 79;
+            fan.Thermostatic.Heaters.Add(1);
+            fan.Thermostatic.Heaters.Add(2);
+            fan.Thermostatic.Temperature = 79F;
             fan.Pin = 23;
             original.Fans.Add(fan);
 
@@ -54,6 +57,60 @@ namespace DuetUnitTest.Machine
             Assert.AreNotSame(original.Fans[0].Thermostatic.Heaters, clone.Fans[0].Thermostatic.Heaters);
             Assert.AreNotSame(original.Fans[0].Thermostatic.Temperature, clone.Fans[0].Thermostatic.Temperature);
             Assert.AreNotSame(original.Fans[0].Pin, clone.Fans[0].Pin);
+        }
+
+        [Test]
+        public void Assign()
+        {
+            MachineModel original = new MachineModel();
+
+            Fan fan = new Fan
+            {
+                Value = 100,
+                Name = "Fan Name",
+                Rpm = 1234,
+                Inverted = true,
+                Frequency = 20000,
+                Min = 0.01F,
+                Max = 0.99F,
+                Blip = 0
+            };
+            fan.Thermostatic.Control = false;
+            fan.Thermostatic.Heaters.Add(1);
+            fan.Thermostatic.Heaters.Add(2);
+            fan.Thermostatic.Temperature = 79F;
+            fan.Pin = 23;
+            original.Fans.Add(fan);
+
+            MachineModel assigned = new MachineModel();
+            assigned.Assign(original);
+
+            Assert.AreEqual(1, original.Fans.Count);
+            Assert.AreEqual(original.Fans[0].Value, assigned.Fans[0].Value);
+            Assert.AreEqual(original.Fans[0].Name, assigned.Fans[0].Name);
+            Assert.AreEqual(original.Fans[0].Rpm, assigned.Fans[0].Rpm);
+            Assert.AreEqual(original.Fans[0].Inverted, assigned.Fans[0].Inverted);
+            Assert.AreEqual(original.Fans[0].Frequency, assigned.Fans[0].Frequency);
+            Assert.AreEqual(original.Fans[0].Min, assigned.Fans[0].Min);
+            Assert.AreEqual(original.Fans[0].Max, assigned.Fans[0].Max);
+            Assert.AreEqual(original.Fans[0].Blip, assigned.Fans[0].Blip);
+            Assert.AreEqual(original.Fans[0].Thermostatic.Control, assigned.Fans[0].Thermostatic.Control);
+            Assert.AreEqual(original.Fans[0].Thermostatic.Heaters, assigned.Fans[0].Thermostatic.Heaters);
+            Assert.AreEqual(original.Fans[0].Thermostatic.Temperature, assigned.Fans[0].Thermostatic.Temperature);
+            Assert.AreEqual(original.Fans[0].Pin, assigned.Fans[0].Pin);
+
+            Assert.AreNotSame(original.Fans[0].Value, assigned.Fans[0].Value);
+            Assert.AreNotSame(original.Fans[0].Name, assigned.Fans[0].Name);
+            Assert.AreNotSame(original.Fans[0].Rpm, assigned.Fans[0].Rpm);
+            Assert.AreNotSame(original.Fans[0].Inverted, assigned.Fans[0].Inverted);
+            Assert.AreNotSame(original.Fans[0].Frequency, assigned.Fans[0].Frequency);
+            Assert.AreNotSame(original.Fans[0].Min, assigned.Fans[0].Min);
+            Assert.AreNotSame(original.Fans[0].Max, assigned.Fans[0].Max);
+            Assert.AreNotSame(original.Fans[0].Blip, assigned.Fans[0].Blip);
+            Assert.AreNotSame(original.Fans[0].Thermostatic.Control, assigned.Fans[0].Thermostatic.Control);
+            Assert.AreNotSame(original.Fans[0].Thermostatic.Heaters, assigned.Fans[0].Thermostatic.Heaters);
+            Assert.AreNotSame(original.Fans[0].Thermostatic.Temperature, assigned.Fans[0].Thermostatic.Temperature);
+            Assert.AreNotSame(original.Fans[0].Pin, assigned.Fans[0].Pin);
         }
     }
 }

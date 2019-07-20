@@ -18,24 +18,26 @@ namespace DuetUnitTest.Machine
             original.Electronics.Firmware.Date = "Firmware Date";
             original.Electronics.ProcessorID = "Processor ID";
             original.Electronics.VIn.Current = 321;
-            original.Electronics.VIn.Min = 654;
-            original.Electronics.VIn.Max = 987;
-            original.Electronics.McuTemp.Current = 123;
-            original.Electronics.McuTemp.Min = 456;
-            original.Electronics.McuTemp.Max = 789;
+            original.Electronics.VIn.Min = 654F;
+            original.Electronics.VIn.Max = 987F;
+            original.Electronics.McuTemp.Current = 123F;
+            original.Electronics.McuTemp.Min = 456F;
+            original.Electronics.McuTemp.Max = 789F;
 
-            ExpansionBoard expansionBoard = new ExpansionBoard();
-            expansionBoard.Name = "Expansion Name";
-            expansionBoard.Revision = "Expansion Revision";
+            ExpansionBoard expansionBoard = new ExpansionBoard
+            {
+                Name = "Expansion Name",
+                Revision = "Expansion Revision"
+            };
             expansionBoard.Firmware.Name = "Expansion Firmware Name";
             expansionBoard.Firmware.Date = "Expansion Firmware Date";
             expansionBoard.Firmware.Version = "Expansion Firmware Version";
-            expansionBoard.VIn.Current = 321;
-            expansionBoard.VIn.Min = 654;
-            expansionBoard.VIn.Max = 987;
-            expansionBoard.McuTemp.Current = 123;
-            expansionBoard.McuTemp.Min = 456;
-            expansionBoard.McuTemp.Max = 789;
+            expansionBoard.VIn.Current = 321F;
+            expansionBoard.VIn.Min = 654F;
+            expansionBoard.VIn.Max = 987F;
+            expansionBoard.McuTemp.Current = 123F;
+            expansionBoard.McuTemp.Min = 456F;
+            expansionBoard.McuTemp.Max = 789F;
             expansionBoard.MaxHeaters = 12;
             expansionBoard.MaxMotors = 6;
             original.Electronics.ExpansionBoards.Add(expansionBoard);
@@ -98,6 +100,105 @@ namespace DuetUnitTest.Machine
             Assert.AreNotSame(original.Electronics.ExpansionBoards[0].McuTemp.Max, clone.Electronics.ExpansionBoards[0].McuTemp.Max);
             Assert.AreNotSame(original.Electronics.ExpansionBoards[0].MaxHeaters, clone.Electronics.ExpansionBoards[0].MaxHeaters);
             Assert.AreNotSame(original.Electronics.ExpansionBoards[0].MaxMotors, clone.Electronics.ExpansionBoards[0].MaxMotors);
+        }
+
+        [Test]
+        public void Assign()
+        {
+            MachineModel original = new MachineModel();
+            original.Electronics.Type = "Electronics Type";
+            original.Electronics.Name = "Electronics Name";
+            original.Electronics.Revision = "Electronics Revision";
+            original.Electronics.Firmware.Name = "Firmware Name";
+            original.Electronics.Firmware.Version = "Firmware Version";
+            original.Electronics.Firmware.Date = "Firmware Date";
+            original.Electronics.ProcessorID = "Processor ID";
+            original.Electronics.VIn.Current = 321F;
+            original.Electronics.VIn.Min = 654F;
+            original.Electronics.VIn.Max = 987F;
+            original.Electronics.McuTemp.Current = 123F;
+            original.Electronics.McuTemp.Min = 456F;
+            original.Electronics.McuTemp.Max = 789F;
+
+            ExpansionBoard expansionBoard = new ExpansionBoard
+            {
+                Name = "Expansion Name",
+                Revision = "Expansion Revision",
+                MaxHeaters = 12,
+                MaxMotors = 6
+            };
+            expansionBoard.Firmware.Name = "Expansion Firmware Name";
+            expansionBoard.Firmware.Date = "Expansion Firmware Date";
+            expansionBoard.Firmware.Version = "Expansion Firmware Version";
+            expansionBoard.VIn.Current = 321F;
+            expansionBoard.VIn.Min = 654F;
+            expansionBoard.VIn.Max = 987F;
+            expansionBoard.McuTemp.Current = 123F;
+            expansionBoard.McuTemp.Min = 456F;
+            expansionBoard.McuTemp.Max = 789F;
+            expansionBoard.MaxHeaters = 12;
+            expansionBoard.MaxMotors = 6;
+            original.Electronics.ExpansionBoards.Add(expansionBoard);
+
+            MachineModel assigned = new MachineModel();
+            assigned.Assign(original);
+
+            Assert.AreEqual(original.Electronics.Type, assigned.Electronics.Type);
+            Assert.AreEqual(original.Electronics.Name, assigned.Electronics.Name);
+            Assert.AreEqual(original.Electronics.Revision, assigned.Electronics.Revision);
+            Assert.AreEqual(original.Electronics.Firmware.Name, assigned.Electronics.Firmware.Name);
+            Assert.AreEqual(original.Electronics.Firmware.Version, assigned.Electronics.Firmware.Version);
+            Assert.AreEqual(original.Electronics.Firmware.Date, assigned.Electronics.Firmware.Date);
+            Assert.AreEqual(original.Electronics.ProcessorID, assigned.Electronics.ProcessorID);
+            Assert.AreEqual(original.Electronics.VIn.Current, assigned.Electronics.VIn.Current);
+            Assert.AreEqual(original.Electronics.VIn.Min, assigned.Electronics.VIn.Min);
+            Assert.AreEqual(original.Electronics.VIn.Max, assigned.Electronics.VIn.Max);
+            Assert.AreEqual(original.Electronics.McuTemp.Current, assigned.Electronics.McuTemp.Current);
+            Assert.AreEqual(original.Electronics.McuTemp.Min, assigned.Electronics.McuTemp.Min);
+            Assert.AreEqual(original.Electronics.McuTemp.Max, assigned.Electronics.McuTemp.Max);
+
+            Assert.AreEqual(1, assigned.Electronics.ExpansionBoards.Count);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].Name, assigned.Electronics.ExpansionBoards[0].Name);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].Revision, assigned.Electronics.ExpansionBoards[0].Revision);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].Firmware.Name, assigned.Electronics.ExpansionBoards[0].Firmware.Name);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].Firmware.Date, assigned.Electronics.ExpansionBoards[0].Firmware.Date);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].Firmware.Version, assigned.Electronics.ExpansionBoards[0].Firmware.Version);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].VIn.Current, assigned.Electronics.ExpansionBoards[0].VIn.Current);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].VIn.Min, assigned.Electronics.ExpansionBoards[0].VIn.Min);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].VIn.Max, assigned.Electronics.ExpansionBoards[0].VIn.Max);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].McuTemp.Current, assigned.Electronics.ExpansionBoards[0].McuTemp.Current);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].McuTemp.Min, assigned.Electronics.ExpansionBoards[0].McuTemp.Min);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].McuTemp.Max, assigned.Electronics.ExpansionBoards[0].McuTemp.Max);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].MaxHeaters, assigned.Electronics.ExpansionBoards[0].MaxHeaters);
+            Assert.AreEqual(original.Electronics.ExpansionBoards[0].MaxMotors, assigned.Electronics.ExpansionBoards[0].MaxMotors);
+
+            Assert.AreNotSame(original.Electronics.Type, assigned.Electronics.Type);
+            Assert.AreNotSame(original.Electronics.Name, assigned.Electronics.Name);
+            Assert.AreNotSame(original.Electronics.Revision, assigned.Electronics.Revision);
+            Assert.AreNotSame(original.Electronics.Firmware.Name, assigned.Electronics.Firmware.Name);
+            Assert.AreNotSame(original.Electronics.Firmware.Version, assigned.Electronics.Firmware.Version);
+            Assert.AreNotSame(original.Electronics.Firmware.Date, assigned.Electronics.Firmware.Date);
+            Assert.AreNotSame(original.Electronics.ProcessorID, assigned.Electronics.ProcessorID);
+            Assert.AreNotSame(original.Electronics.VIn.Current, assigned.Electronics.VIn.Current);
+            Assert.AreNotSame(original.Electronics.VIn.Min, assigned.Electronics.VIn.Min);
+            Assert.AreNotSame(original.Electronics.VIn.Max, assigned.Electronics.VIn.Max);
+            Assert.AreNotSame(original.Electronics.McuTemp.Current, assigned.Electronics.McuTemp.Current);
+            Assert.AreNotSame(original.Electronics.McuTemp.Min, assigned.Electronics.McuTemp.Min);
+            Assert.AreNotSame(original.Electronics.McuTemp.Max, assigned.Electronics.McuTemp.Max);
+
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].Name, assigned.Electronics.ExpansionBoards[0].Name);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].Revision, assigned.Electronics.ExpansionBoards[0].Revision);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].Firmware.Name, assigned.Electronics.ExpansionBoards[0].Firmware.Name);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].Firmware.Date, assigned.Electronics.ExpansionBoards[0].Firmware.Date);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].Firmware.Version, assigned.Electronics.ExpansionBoards[0].Firmware.Version);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].VIn.Current, assigned.Electronics.ExpansionBoards[0].VIn.Current);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].VIn.Min, assigned.Electronics.ExpansionBoards[0].VIn.Min);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].VIn.Max, assigned.Electronics.ExpansionBoards[0].VIn.Max);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].McuTemp.Current, assigned.Electronics.ExpansionBoards[0].McuTemp.Current);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].McuTemp.Min, assigned.Electronics.ExpansionBoards[0].McuTemp.Min);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].McuTemp.Max, assigned.Electronics.ExpansionBoards[0].McuTemp.Max);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].MaxHeaters, assigned.Electronics.ExpansionBoards[0].MaxHeaters);
+            Assert.AreNotSame(original.Electronics.ExpansionBoards[0].MaxMotors, assigned.Electronics.ExpansionBoards[0].MaxMotors);
         }
     }
 }

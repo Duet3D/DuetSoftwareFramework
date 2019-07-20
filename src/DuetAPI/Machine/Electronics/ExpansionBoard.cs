@@ -1,46 +1,133 @@
-﻿using System;
+﻿using DuetAPI.Utility;
+using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace DuetAPI.Machine
 {
     /// <summary>
     /// Represents information about an attached expansion board
     /// </summary>
-    public class ExpansionBoard : ICloneable
+    public sealed class ExpansionBoard : IAssignable, ICloneable, INotifyPropertyChanged
     {
+        /// <summary>
+        /// Event to trigger when a property has changed
+        /// </summary>
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         /// <summary>
         /// Name of the attached expansion board
         /// </summary>
-        public string Name { get; set; }
+        public string Name
+        {
+            get => _name;
+            set
+            {
+                if (_name != value)
+                {
+                    _name = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private string _name;
         
         /// <summary>
         /// Revision of the expansion board
         /// </summary>
-        public string Revision { get; set; }
+        public string Revision
+        {
+            get => _revision;
+            set
+            {
+                if (_revision != value)
+                {
+                    _revision = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private string _revision;
         
         /// <summary>
         /// Details about the firmware running on this expansion board
         /// </summary>
-        public Firmware Firmware { get; set; } = new Firmware();
+        public Firmware Firmware { get; private set; } = new Firmware();
         
         /// <summary>
         /// Set of the minimum, maximum and current input voltage (in V or null if unknown)
         /// </summary>
-        public MinMaxCurrent<float?> VIn { get; set; } = new MinMaxCurrent<float?>();
+        public MinMaxCurrent<float?> VIn { get; private set; } = new MinMaxCurrent<float?>();
         
         /// <summary>
         /// Set of the minimum, maximum and current MCU temperature (in degC or null if unknown)
         /// </summary>
-        public MinMaxCurrent<float?> McuTemp { get; set; } = new MinMaxCurrent<float?>();
+        public MinMaxCurrent<float?> McuTemp { get; private set; } = new MinMaxCurrent<float?>();
         
         /// <summary>
         /// How many heaters can be attached to this board
         /// </summary>
-        public int? MaxHeaters { get; set; }
+        public int? MaxHeaters
+        {
+            get => _maxHeaters;
+            set
+            {
+                if (_maxHeaters != value)
+                {
+                    _maxHeaters = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private int? _maxHeaters;
         
         /// <summary>
         /// How many drives can be attached to this board
         /// </summary>
-        public int? MaxMotors { get; set; }
+        public int? MaxMotors
+        {
+            get => _maxMotors;
+            set
+            {
+                if (_maxMotors != value)
+                {
+                    _maxMotors = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private int? _maxMotors;
+
+        /// <summary>
+        /// Assigns every property from another instance
+        /// </summary>
+        /// <param name="from">Object to assign from</param>
+        /// <exception cref="ArgumentNullException">other is null</exception>
+        /// <exception cref="ArgumentException">Types do not match</exception>
+        public void Assign(object from)
+        {
+            if (from == null)
+            {
+                throw new ArgumentNullException();
+            }
+            if (!(from is ExpansionBoard other))
+            {
+                throw new ArgumentException("Invalid type");
+            }
+
+            Name = (Name != null) ? string.Copy(other.Name) : null;
+            Revision = (Revision != null) ? string.Copy(other.Revision) : null;
+            Firmware.Assign(other.Firmware);
+            VIn.Assign(other.VIn);
+            McuTemp.Assign(other.McuTemp);
+            MaxHeaters = other.MaxHeaters;
+            MaxMotors = other.MaxMotors;
+        }
 
         /// <summary>
         /// Creates a clone of this instance

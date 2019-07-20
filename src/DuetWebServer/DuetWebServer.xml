@@ -31,7 +31,7 @@
             </summary>
             <returns>HTTP status code: (200) Machine object model as application/json (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
         </member>
-        <member name="M:DuetWebServer.Controllers.MachineController.DoCode">
+        <member name="M:DuetWebServer.Controllers.MachineController.DoCode(System.String)">
             <summary>
             POST /machine/code
             Execute a plain G/M/T-code from the request body and return the G-code response when done.

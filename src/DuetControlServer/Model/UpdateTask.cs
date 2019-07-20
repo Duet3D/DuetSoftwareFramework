@@ -23,19 +23,11 @@ namespace DuetControlServer.Model
             do
             {
                 // Run another update cycle
-                bool changedModel = false;
                 using (await Provider.AccessReadWriteAsync())
                 {
-                    MachineModel model = Provider.Get;
-                    changedModel |= UpdateNetwork(ref model);
-                    changedModel |= UpdateStorages(ref model);
-                    changedModel |= ClearMessages(ref model);
-                }
-
-                // Notify the model subscribers
-                if (changedModel)
-                {
-                    await IPC.Processors.Subscription.ModelUpdated();
+                    UpdateNetwork();
+                    UpdateStorages();
+                    ClearMessages();
                 }
 
                 // Wait for next update schedule
@@ -43,10 +35,8 @@ namespace DuetControlServer.Model
             } while (!Program.CancelSource.IsCancellationRequested);
         }
 
-        private static bool UpdateNetwork(ref MachineModel model)
+        private static void UpdateNetwork()
         {
-            bool changed = false;
-
             int index = 0;
             System.Net.NetworkInformation.NetworkInterface[] interfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
             foreach (var iface in interfaces)
@@ -66,10 +56,10 @@ namespace DuetControlServer.Model
                     InterfaceType type = iface.Name.StartsWith("w") ? InterfaceType.WiFi : InterfaceType.LAN;
                     // uint speed = (uint)(iface.Speed / 1000000),                // Unsupported in .NET Core 2.2 on Linux
 
-                    if (model.Network.Interfaces.Count <= index)
+                    if (index >= Provider.Get.Network.Interfaces.Count)
                     {
                         // Add new network interface
-                        model.Network.Interfaces.Add(new DuetAPI.Machine.NetworkInterface
+                        Provider.Get.Network.Interfaces.Add(new DuetAPI.Machine.NetworkInterface
                         {
                             MacAddress = macAddress,
                             ActualIP = ipAddress,
@@ -78,46 +68,31 @@ namespace DuetControlServer.Model
                             Gateway = gateway,
                             Type = type
                         });
-                        changed = true;
                     }
                     else
                     {
                         // Update existing entry
-                        DuetAPI.Machine.NetworkInterface existing = model.Network.Interfaces[index];
-                        if (existing.MacAddress != macAddress ||
-                            existing.ActualIP != ipAddress ||
-                            existing.ConfiguredIP != ipAddress ||
-                            existing.Subnet != subnet ||
-                            existing.Gateway != gateway ||
-                            existing.Type != type)
-                        {
-                            existing.MacAddress = macAddress;
-                            existing.ActualIP = ipAddress;
-                            existing.ConfiguredIP = ipAddress;
-                            existing.Subnet = subnet;
-                            existing.Type = type;
-                            changed = true;
-                        }
+                        DuetAPI.Machine.NetworkInterface existing = Provider.Get.Network.Interfaces[index];
+                        existing.MacAddress = macAddress;
+                        existing.ActualIP = ipAddress;
+                        existing.ConfiguredIP = ipAddress;
+                        existing.Subnet = subnet;
+                        existing.Type = type;
                     }
                     index++;
                 }
             }
 
-            for (int i = model.Network.Interfaces.Count - 1; i > index; i--)
+            for (int i = Provider.Get.Network.Interfaces.Count - 1; i > index; i--)
             {
-                model.Network.Interfaces.RemoveAt(i);
-                changed = true;
+                Provider.Get.Network.Interfaces.RemoveAt(i);
             }
-
-            return changed;
         }
 
         // Note: Storage 0 always represents the root (/) on Linux. The following code achieves this but it
         // might need further adjustments to ensure this on every Linux distribution
-        private static bool UpdateStorages(ref MachineModel model)
+        private static void UpdateStorages()
         {
-            bool changed = false;
-
             int index = 0;
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
@@ -126,59 +101,44 @@ namespace DuetControlServer.Model
                     long? capacity = (drive.DriveType == DriveType.Network) ? null : (long?)drive.TotalSize;
                     long? free = (drive.DriveType == DriveType.Network) ? null : (long?)drive.AvailableFreeSpace;
 
-                    if (model.Storages.Count <= index)
+                    if (index >= Provider.Get.Storages.Count)
                     {
                         // Add new storage device
-                        model.Storages.Add(new Storage
+                        Provider.Get.Storages.Add(new Storage
                         {
                             Capacity = capacity,
                             Free = free,
                             Mounted = drive.IsReady,
                             Path = drive.VolumeLabel
-
                         });
-                        changed = true;
                     }
                     else
                     {
-                        Storage existing = model.Storages[index];
-                        if (existing.Capacity != capacity ||
-                            existing.Free != free ||
-                            existing.Mounted != drive.IsReady ||
-                            existing.Path != drive.VolumeLabel)
-                        {
-                            existing.Capacity = capacity;
-                            existing.Free = free;
-                            existing.Mounted = drive.IsReady;
-                            existing.Path = drive.VolumeLabel;
-                            changed = true;
-                        }
+                        Storage existing = Provider.Get.Storages[index];
+                        existing.Capacity = capacity;
+                        existing.Free = free;
+                        existing.Mounted = drive.IsReady;
+                        existing.Path = drive.VolumeLabel;
                     }
                     index++;
                 }
             }
 
-            for (int i = model.Network.Interfaces.Count - 1; i > index; i--)
+            for (int i = Provider.Get.Network.Interfaces.Count - 1; i > index; i--)
             {
-                model.Network.Interfaces.RemoveAt(i);
-                changed = true;
+                Provider.Get.Network.Interfaces.RemoveAt(i);
             }
-
-            return changed;
         }
 
-        private static bool ClearMessages(ref MachineModel model)
+        private static void ClearMessages()
         {
-            bool changed = false;
-            for (int i = model.Messages.Count - 1; i >= 0; i--)
+            for (int i = Provider.Get.Messages.Count - 1; i >= 0; i--)
             {
-                if (model.Messages[i].Time - DateTime.Now > TimeSpan.FromSeconds(Settings.MaxMessageAge))
+                if (Provider.Get.Messages[i].Time - DateTime.Now > TimeSpan.FromSeconds(Settings.MaxMessageAge))
                 {
-                    model.Messages.RemoveAt(i);
-                    changed = true;
+                    Provider.Get.Messages.RemoveAt(i);
                 }
             }
-            return changed;
         }
     }
 }

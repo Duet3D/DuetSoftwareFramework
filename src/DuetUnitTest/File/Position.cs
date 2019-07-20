@@ -20,7 +20,7 @@ namespace DuetUnitTest.File
             Assert.AreEqual(0, code.FilePosition);
 
             // Line 2
-            code = file.ReadCodeAsync().Result;
+            code = file.ReadCode();
             Assert.AreEqual(15, code.FilePosition);
 
             // Line 3

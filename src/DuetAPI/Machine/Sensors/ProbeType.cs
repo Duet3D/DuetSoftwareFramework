@@ -21,34 +21,9 @@
         Modulated,
 
         /// <summary>
-        /// A probe that pulls the signal from HIGH to LOW when triggered
+        /// A switch that is triggered when the probe is activated
         /// </summary>
-        ActiveLow,
-
-        /// <summary>
-        /// A probe that is connected to the E0 switch
-        /// </summary>
-        E0Switch,
-
-        /// <summary>
-        /// A probe that pulls the signal from LOW to HIGH when triggered
-        /// </summary>
-        ActiveHigh,
-
-        /// <summary>
-        /// A probe that is connected to the E1 switch
-        /// </summary>
-        E1Switch,
-
-        /// <summary>
-        /// A probe that is connected to the Z switch
-        /// </summary>
-        ZSwitch,
-
-        /// <summary>
-        /// An unfiltered probe that pulls the signal from low to high when triggered (unfiltered for faster reaction)
-        /// </summary>
-        UnfilteredActiveHigh,
+        Switch,
 
         /// <summary>
         /// A BLTouch probe
@@ -60,5 +35,4 @@
         /// </summary>
         MotorLoadDetection
     }
-
 }

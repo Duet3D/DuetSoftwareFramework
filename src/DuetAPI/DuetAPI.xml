@@ -137,7 +137,6 @@
         <member name="T:DuetAPI.Commands.Code">
             <summary>
             A parsed representation of a generic G/M/T-code
-            Line number support has not yet been implemented (TODO)
             </summary>
             <seealso cref="T:DuetAPI.Commands.CodeResult"/>
         </member>
@@ -145,6 +144,12 @@
             <summary>
             Create an empty Code representation
             </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.#ctor(System.String)">
+            <summary>
+            Create a new Code instance and attempt to parse the given code string
+            </summary>
+            <param name="code">G/M/T-Code</param>
         </member>
         <member name="P:DuetAPI.Commands.Code.Type">
             <summary>
@@ -154,6 +159,26 @@
         <member name="P:DuetAPI.Commands.Code.Channel">
             <summary>
             Code channel to send this code to
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.LineNumber">
+            <summary>
+            Line number of this code
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.Indent">
+            <summary>
+            Number of whitespaces prefixing the command content
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.Keyword">
+            <summary>
+            Type of conditional G-code (if any)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.KeywordArgument">
+            <summary>
+            Argument of the conditional G-code (if any)
             </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.MajorNumber">
@@ -166,9 +191,9 @@
             Minor code number (e.g. 3 in G54.3)
             </summary>
         </member>
-        <member name="P:DuetAPI.Commands.Code.EnforceAbsoluteCoordinates">
+        <member name="P:DuetAPI.Commands.Code.Flags">
             <summary>
-            Whether absolute coordinates must be used regardless of the current mode (see G53)
+            Flags of this code
             </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.Comment">
@@ -179,36 +204,6 @@
             The parser combines different comment segments and concatenates them as a single value.
             So for example a code like 'G28 (Do homing) ; via G28' causes the Comment field to be filled with 'Do homing via G28'
             </remarks>
-        </member>
-        <member name="P:DuetAPI.Commands.Code.IsPreProcessed">
-            <summary>
-            Indicates if the code has been preprocessed (see also <see cref="F:DuetAPI.Connection.ConnectionMode.Intercept"/>)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Commands.Code.IsPostProcessed">
-            <summary>
-            Indicates if the code has been postprocessed (see also <see cref="F:DuetAPI.Connection.ConnectionMode.Intercept"/>)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Commands.Code.IsFromMacro">
-            <summary>
-            Indicates if the code comes from a macro file
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Commands.Code.IsFromSystemMacro">
-            <summary>
-            Indicates if the code comes from a system macro file that RepRapFirmware requested
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Commands.Code.IsFromConfig">
-            <summary>
-            Indicates if this code is part of config.g
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Commands.Code.IsFromConfigOverride">
-            <summary>
-            Indicates if this code is part of config-override.g
-            </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.FilePosition">
             <summary>
@@ -233,7 +228,7 @@
             Retrieve the parameter whose letter equals c or generate a default parameter
             </summary>
             <param name="c">Letter of the parameter to find</param>
-            <param name="defaultValue">Default parameter value</param>
+            <param name="defaultValue">Default parameter value (no expression)</param>
             <returns>The parsed parameter instance or null if none could be found</returns>
         </member>
         <member name="M:DuetAPI.Commands.Code.GetUnprecedentedString(System.Boolean)">
@@ -255,13 +250,153 @@
             </summary>
             <returns>Command fraction of the code</returns>
         </member>
-        <member name="M:DuetAPI.Commands.Code.#ctor(System.String)">
+        <member name="M:DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code)">
             <summary>
-            Create a parsed code representation from a text-based string
-            This constructor parses the whole code and fills the class members where applicable
+            Parse the next available G/M/T-code from the given stream
             </summary>
-            <param name="codeString">The text-based G/M/T-code</param>
+            <param name="reader">Input to read from</param>
+            <param name="result">Code to fill</param>
+            <returns>Whether anything could be read</returns>
             <exception cref="T:DuetAPI.Commands.CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
+        </member>
+        <member name="T:DuetAPI.Commands.KeywordType">
+            <summary>
+            Types of conditional G-code
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.None">
+            <summary>
+            No conditional code
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.If">
+            <summary>
+            If condition
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.ElseIf">
+            <summary>
+            Else-if condition
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.Else">
+            <summary>
+            Else condition
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.While">
+            <summary>
+            While condition
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.Break">
+            <summary>
+            Break instruction
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.Return">
+            <summary>
+            Return instruction
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.Abort">
+            <summary>
+            Abort instruction
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.Var">
+            <summary>
+            Var operation
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.Set">
+            <summary>
+            Set operation
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.CodeFlags">
+            <summary>
+            Code bits to classify G/M/T-codes
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.None">
+            <summary>
+            Placeholder to indicate that no flags are set
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.Asynchronous">
+            <summary>
+            Code execution finishes as soon as it is enqueued in the RRF transmit buffer
+            </summary>
+            <remarks>
+            Potential G-code replies from RRF are only reported through the object model.
+            This behaviour will be enhanced in the future.
+            </remarks>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.IsPreProcessed">
+            <summary>
+            Code has been preprocessed (i.e. it has been processed by the DCS pre-side code interceptors)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.IsPostProcessed">
+            <summary>
+            Code has been postprocessed (i.e. it has been processed by the internal DCS code processor)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.IsFromMacro">
+            <summary>
+            Code originates from a macro file
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.IsNestedMacro">
+            <summary>
+            Code originates from a system macro file (i.e. RRF requested it)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.IsFromConfig">
+            <summary>
+            Code comes from config.g or config.g.bak
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.IsFromConfigOverride">
+            <summary>
+            Code comes from config-override.g
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.EnforceAbsolutePosition">
+            <summary>
+            Enforce absolute positioning via prefixed G53 code
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.CodeFlagsConverter">
+            <summary>
+            Class to convert a <see cref="T:DuetAPI.Commands.CodeFlags"/> instance to an int
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeFlagsConverter.WriteJson(Newtonsoft.Json.JsonWriter,System.Object,Newtonsoft.Json.JsonSerializer)">
+            <summary>
+            Write code flags to JSON
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="value">Code flag value</param>
+            <param name="serializer">JON serializer</param>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeFlagsConverter.ReadJson(Newtonsoft.Json.JsonReader,System.Type,System.Object,Newtonsoft.Json.JsonSerializer)">
+            <summary>
+            Read code flags from JSON
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="objectType">Object type</param>
+            <param name="existingValue">Existing value</param>
+            <param name="serializer">JSON serializer</param>
+            <returns>Deserialized code flags</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeFlagsConverter.CanConvert(System.Type)">
+            <summary>
+            Check if the type can be converted
+            </summary>
+            <param name="objectType">Object type</param>
+            <returns>Whether the type can be converted</returns>
         </member>
         <member name="T:DuetAPI.Commands.CodeParameter">
             <summary>
@@ -272,6 +407,11 @@
         <member name="P:DuetAPI.Commands.CodeParameter.Letter">
             <summary>
             Letter of the code parameter (e.g. P in M106 P3)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.IsExpression">
+            <summary>
+            Indicates if this parameter is an expression that can be evaluated
             </summary>
         </member>
         <member name="F:DuetAPI.Commands.CodeParameter._stringValue">
@@ -496,6 +636,11 @@
             </summary>
             <param name="type">Message type</param>
             <param name="content">Message content</param>
+        </member>
+        <member name="P:DuetAPI.Commands.CodeResult.IsEmpty">
+            <summary>
+            Checks if the message contains any data
+            </summary>
         </member>
         <member name="P:DuetAPI.Commands.CodeResult.IsSuccessful">
             <summary>
@@ -832,7 +977,17 @@
         </member>
         <member name="T:DuetAPI.Machine.Channel">
             <summary>
-            Information about a G/M/T-code channel. May be further expanded
+            Information about a G/M/T-code channel
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Channel.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channel.Compatibility">
+            <summary>
+            Emulation used on this channel
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Channel.Feedrate">
@@ -860,10 +1015,23 @@
             Whether inches are being used instead of mm
             </summary>
         </member>
-        <member name="F:DuetAPI.Machine.Channel.StackDepth">
+        <member name="P:DuetAPI.Machine.Channel.StackDepth">
             <summary>
             Depth of the stack
             </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Channel.LineNumber">
+            <summary>
+            Number of the current line
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Channel.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
         </member>
         <member name="M:DuetAPI.Machine.Channel.Clone">
             <summary>
@@ -924,7 +1092,7 @@
         </member>
         <member name="P:DuetAPI.Machine.Channels.AutoPause">
             <summary>
-            Default G/M/T-code channel for generic codes
+            GM/T-code chanel for auto pause events
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Channels.Item(DuetAPI.CodeChannel)">
@@ -932,17 +1100,70 @@
             Index operator for simple access via the <see cref="T:DuetAPI.CodeChannel"/> enum
             </summary>
             <param name="key">Channel to access</param>
-            <returns></returns>
+            <returns>Channel instance</returns>
+        </member>
+        <member name="M:DuetAPI.Machine.Channels.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
         </member>
         <member name="M:DuetAPI.Machine.Channels.Clone">
             <summary>
             Creates a clone of this instance
             </summary>
-            <returns>A clone of this instance</returns>
+            <returns>Clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.Compatibility">
+            <summary>
+            Compatibility level for emulation
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Compatibility.Me">
+            <summary>
+            No emulation (same as RepRapFirmware)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Compatibility.RepRapFirmware">
+            <summary>
+            Emulating RepRapFirmware
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Compatibility.Marlin">
+            <summary>
+            Emulating Marlin
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Compatibility.Teacup">
+            <summary>
+            Emulating Teacup
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Compatibility.Sprinter">
+            <summary>
+            Emulating Sprinter
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Compatibility.Repetier">
+            <summary>
+            Emulating Repetier
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Compatibility.NanoDLP">
+            <summary>
+            Special emulation for NanoDLP
+            </summary>
         </member>
         <member name="T:DuetAPI.Machine.Electronics">
             <summary>
             Information about the electronics used
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Electronics.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Electronics.Type">
@@ -986,6 +1207,14 @@
              </summary>
             <seealso cref="T:DuetAPI.Machine.ExpansionBoard"/>
         </member>
+        <member name="M:DuetAPI.Machine.Electronics.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Electronics.Clone">
             <summary>
             Creates a clone of this instance
@@ -995,6 +1224,11 @@
         <member name="T:DuetAPI.Machine.ExpansionBoard">
             <summary>
             Represents information about an attached expansion board
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.ExpansionBoard.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.ExpansionBoard.Name">
@@ -1032,6 +1266,14 @@
             How many drives can be attached to this board
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.ExpansionBoard.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.ExpansionBoard.Clone">
             <summary>
             Creates a clone of this instance
@@ -1041,6 +1283,11 @@
         <member name="T:DuetAPI.Machine.Firmware">
             <summary>
             Information about a firmware version
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Firmware.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Firmware.Name">
@@ -1058,6 +1305,14 @@
             Date of the firmware (i.e. when it was compiled)
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Firmware.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Firmware.Clone">
             <summary>
             Creates a clone of this instance
@@ -1068,7 +1323,12 @@
             <summary>
             Provides minimum, maximum and current values
             </summary>
-            <typeparam name="T">Type of each value</typeparam>
+            <typeparam name="T">ValueType of each property</typeparam>
+        </member>
+        <member name="E:DuetAPI.Machine.MinMaxCurrent`1.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
         </member>
         <member name="P:DuetAPI.Machine.MinMaxCurrent`1.Current">
             <summary>
@@ -1085,6 +1345,14 @@
             Maximum value
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.MinMaxCurrent`1.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.MinMaxCurrent`1.Clone">
             <summary>
             Creates a clone of this instance
@@ -1094,6 +1362,11 @@
         <member name="T:DuetAPI.Machine.Fan">
             <summary>
             Class representing information about an attached fan
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Fan.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Fan.Value">
@@ -1146,6 +1419,14 @@
             Pin number of the assigned fan or null if unknown/unset
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Fan.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Fan.Clone">
             <summary>
             Creates a copy of this instance
@@ -1155,6 +1436,11 @@
         <member name="T:DuetAPI.Machine.Thermostatic">
             <summary>
             Thermostatic parameters of a fan
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Thermostatic.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Thermostatic.Control">
@@ -1172,6 +1458,14 @@
             Minimum temperature required to turn on the fan (in degC or null if unknown)
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Thermostatic.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Thermostatic.Clone">
             <summary>
             Create a clone of this instance
@@ -1181,6 +1475,11 @@
         <member name="T:DuetAPI.Machine.BedOrChamber">
             <summary>
             Information about a bed or chamber heater
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.BedOrChamber.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.BedOrChamber.Active">
@@ -1200,8 +1499,16 @@
         </member>
         <member name="P:DuetAPI.Machine.BedOrChamber.Heaters">
             <summary>
-            Heaters controlled by this bed or chamber (indices)
+            Indices of the heaters controlled by this bed or chamber
             </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.BedOrChamber.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
         </member>
         <member name="M:DuetAPI.Machine.BedOrChamber.Clone">
             <summary>
@@ -1212,6 +1519,11 @@
         <member name="T:DuetAPI.Machine.ExtraHeater">
             <summary>
             Information about an extra heater (virtual)
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.ExtraHeater.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.ExtraHeater.Current">
@@ -1237,6 +1549,14 @@
             Sensor number (thermistor index) of the extra heater or null if unknown/unset
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.ExtraHeater.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.ExtraHeater.Clone">
             <summary>
             Creates a clone of this instance
@@ -1246,6 +1566,11 @@
         <member name="T:DuetAPI.Machine.Heat">
             <summary>
             Information about the heat subsystem
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Heat.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Heat.Beds">
@@ -1288,6 +1613,14 @@
             </summary>
             <seealso cref="T:DuetAPI.Machine.Heater"/>
         </member>
+        <member name="M:DuetAPI.Machine.Heat.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Heat.Clone">
             <summary>
             Creates a copy of this instance
@@ -1297,6 +1630,11 @@
         <member name="T:DuetAPI.Machine.Heater">
             <summary>
             Information about a heater
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Heater.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Heater.Current">
@@ -1332,6 +1670,14 @@
             Sensor number (thermistor index) of this heater or null if unknown
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Heater.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Heater.Clone">
             <summary>
             Creates a clone of this instance
@@ -1341,6 +1687,11 @@
         <member name="T:DuetAPI.Machine.HeaterModel">
             <summary>
             Information about the way the heater heats up
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.HeaterModel.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.HeaterModel.Gain">
@@ -1393,6 +1744,14 @@
             Derivative value of the PID regulator
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.HeaterModel.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.HeaterModel.Clone">
             <summary>
             Creates a clone of this instance
@@ -1427,6 +1786,11 @@
         <member name="T:DuetAPI.Machine.Job">
             <summary>
             Information about the current file job (if any)
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Job.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Job.File">
@@ -1485,6 +1849,14 @@
             Estimated times left
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Job.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Job.Clone">
             <summary>
             Creates a clone of this instance
@@ -1493,8 +1865,12 @@
         </member>
         <member name="T:DuetAPI.Machine.Layer">
             <summary>
-            Information about a layer from a file being printed.
-            Do not change these properties after an instance was added to the object model
+            Information about a layer from a file being printed
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Layer.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Layer.Duration">
@@ -1517,6 +1893,14 @@
             Fraction of the file printed during this layer (0..1 or null if unknown)
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Layer.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Layer.Clone">
             <summary>
             Creates a clone of this instance
@@ -1526,6 +1910,11 @@
         <member name="T:DuetAPI.Machine.TimesLeft">
             <summary>
             Estimations about the times left
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.TimesLeft.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.TimesLeft.File">
@@ -1543,6 +1932,14 @@
             Time left based on the layer progress (in s or null)
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.TimesLeft.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.TimesLeft.Clone">
             <summary>
             Creates a clone of this instance
@@ -1551,9 +1948,7 @@
         </member>
         <member name="T:DuetAPI.Machine.MachineModel">
             <summary>
-            Representation of the full machine model.
-            
-            In the future this class will be further expanded by INotifyPropertyChanged and IObservableCollection interfaces.
+            Representation of the full machine model as maintained by DCS
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.MachineModel.Channels">
@@ -1568,7 +1963,7 @@
         </member>
         <member name="P:DuetAPI.Machine.MachineModel.Fans">
             <summary>
-            Information about the fans
+            List of configured fans
             </summary>
             <seealso cref="T:DuetAPI.Machine.Fan"/>
         </member>
@@ -1616,7 +2011,7 @@
         </member>
         <member name="P:DuetAPI.Machine.MachineModel.Spindles">
             <summary>
-            Information about CNC spindles
+            List of configured CNC spindles
             </summary>
             <seealso cref="T:DuetAPI.Machine.Spindle"/>
         </member>
@@ -1627,25 +2022,44 @@
         </member>
         <member name="P:DuetAPI.Machine.MachineModel.Storages">
             <summary>
-            Information about the configured storage systems
+            List of configured storage devices
             </summary>
             <seealso cref="T:DuetAPI.Machine.Storage"/>
         </member>
         <member name="P:DuetAPI.Machine.MachineModel.Tools">
             <summary>
-            Information about configured tools
+            List of configured tools
             </summary>
             <seealso cref="T:DuetAPI.Machine.Tool"/>
         </member>
+        <member name="P:DuetAPI.Machine.MachineModel.UserVariables">
+            <summary>
+            List of user-defined variables
+            </summary>
+            <seealso cref="T:DuetAPI.Machine.UserVariable"/>
+        </member>
+        <member name="M:DuetAPI.Machine.MachineModel.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.MachineModel.Clone">
             <summary>
-            Creates a duplicate of the full object model
+            Creates a clone of this instance
             </summary>
-            <returns>A clone of this model</returns>
+            <returns>Clone of this instance</returns>
         </member>
         <member name="T:DuetAPI.Machine.MessageBox">
             <summary>
             Information about the message box to show
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.MessageBox.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.MessageBox.Mode">
@@ -1667,6 +2081,14 @@
             <summary>
             Optional axis movement controls to show (axis indices)
             </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.MessageBox.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
         </member>
         <member name="M:DuetAPI.Machine.MessageBox.Clone">
             <summary>
@@ -1704,17 +2126,19 @@
             Information about a configured axis
             </summary>
         </member>
+        <member name="E:DuetAPI.Machine.Axis.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Axis.Letter">
             <summary>
-            Letter of the axis
+            Letter of the axis (always upper-case)
             </summary>
-            <remarks>
-            This must be upper-case
-            </remarks>
         </member>
         <member name="P:DuetAPI.Machine.Axis.Drives">
             <summary>
-            Array of the drives used (indices)
+            Indices of the drives used
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Axis.Homed">
@@ -1752,6 +2176,14 @@
             Whether or not the axis is visible
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Axis.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Axis.Clone">
             <summary>
             Creates a clone of this instance
@@ -1761,6 +2193,11 @@
         <member name="T:DuetAPI.Machine.CurrentMove">
             <summary>
             Information about the current move
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.CurrentMove.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.CurrentMove.RequestedSpeed">
@@ -1773,6 +2210,14 @@
             Top speed of the current move (in mm/s)
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.CurrentMove.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.CurrentMove.Clone">
             <summary>
             Creates a clone of this instance
@@ -1782,6 +2227,11 @@
         <member name="T:DuetAPI.Machine.Drive">
             <summary>
             Information about a drive
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Drive.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Drive.Position">
@@ -1814,6 +2264,14 @@
             Maximum allowed speed for this drive (in mm/s)
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Drive.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Drive.Clone">
             <summary>
             Creates a clone of this instance
@@ -1823,6 +2281,11 @@
         <member name="T:DuetAPI.Machine.DriveMicrostepping">
             <summary>
             Information about configured microstepping
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.DriveMicrostepping.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.DriveMicrostepping.Value">
@@ -1838,6 +2301,14 @@
             This may not be supported on all boards.
             </remarks>
         </member>
+        <member name="M:DuetAPI.Machine.DriveMicrostepping.AssignFrom(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.DriveMicrostepping.Clone">
             <summary>
             Creates a clone of this instance
@@ -1849,9 +2320,14 @@
             Information about an extruder drive
             </summary>
         </member>
-        <member name="F:DuetAPI.Machine.Extruder.Drives">
+        <member name="E:DuetAPI.Machine.Extruder.PropertyChanged">
             <summary>
-            Drive of this extruder
+            Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Extruder.Drives">
+            <summary>
+            Drives of this extruder
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Extruder.Factor">
@@ -1864,6 +2340,14 @@
             Nonlinear extrusion parameters (see M592)
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Extruder.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Extruder.Clone">
             <summary>
             Creates a clone of this instance
@@ -1873,6 +2357,11 @@
         <member name="T:DuetAPI.Machine.ExtruderNonlinear">
             <summary>
             Nonlinear extrusion parameters (see M592)
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.ExtruderNonlinear.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.ExtruderNonlinear.A">
@@ -1895,6 +2384,14 @@
             Reserved for future use, for the temperature at which these values are valid (in degC)
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.ExtruderNonlinear.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.ExtruderNonlinear.Clone">
             <summary>
             Creates a clone of this instance
@@ -1906,15 +2403,19 @@
             Information about the configured geometry
             </summary>
         </member>
+        <member name="E:DuetAPI.Machine.Geometry.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Geometry.Type">
             <summary>
-            Currently configured geometry type or null if unknown
+            Currently configured geometry type
             </summary>
-            <seealso cref="T:DuetAPI.Machine.GeometryType"/>
         </member>
         <member name="P:DuetAPI.Machine.Geometry.Anchors">
             <summary>
-            Hangprinter A, B, C, Dz anchors
+            Hangprinter A, B, C, Dz anchors (10 values)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Geometry.PrintRadius">
@@ -1952,6 +2453,14 @@
             Tilt values of the XY axes
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Geometry.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Geometry.Clone">
             <summary>
             Creates a clone of this instance
@@ -1960,7 +2469,7 @@
         </member>
         <member name="T:DuetAPI.Machine.GeometryType">
             <summary>
-            List of supported geometry types
+            Supported geometry types
             </summary>
         </member>
         <member name="F:DuetAPI.Machine.GeometryType.Cartesian">
@@ -2013,22 +2522,40 @@
             SCARA geometry
             </summary>
         </member>
-        <member name="T:DuetAPI.Machine.Idle">
+        <member name="F:DuetAPI.Machine.GeometryType.Unknown">
+            <summary>
+            Unknown geometry
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.MotorsIdleControl">
             <summary>
             Idle factor parameters for automatic motor current reduction
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.Idle.Timeout">
+        <member name="E:DuetAPI.Machine.MotorsIdleControl.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MotorsIdleControl.Timeout">
             <summary>
             Idle timeout after which the stepper motor currents are reduced (in s)
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.Idle.Factor">
+        <member name="P:DuetAPI.Machine.MotorsIdleControl.Factor">
             <summary>
             Motor current reduction factor (on a scale between 0 to 1)
             </summary>
         </member>
-        <member name="M:DuetAPI.Machine.Idle.Clone">
+        <member name="M:DuetAPI.Machine.MotorsIdleControl.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
+        <member name="M:DuetAPI.Machine.MotorsIdleControl.Clone">
             <summary>
             Creates a clone of this instance
             </summary>
@@ -2037,6 +2564,11 @@
         <member name="T:DuetAPI.Machine.Move">
             <summary>
             Information about the move subsystem
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Move.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Move.Axes">
@@ -2092,10 +2624,19 @@
             Index of the currently selected workspace
             </summary>
         </member>
-        <member name="F:DuetAPI.Machine.Move.WorkplaceCoordinates">
+        <member name="P:DuetAPI.Machine.Move.WorkplaceCoordinates">
             <summary>
             Axis offsets of each available workspace (in mm)
             </summary>
+            <remarks>When modifying items, make sure to (re-)set an entire item to ensure the change events are called</remarks>
+        </member>
+        <member name="M:DuetAPI.Machine.Move.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
         </member>
         <member name="M:DuetAPI.Machine.Move.Clone">
             <summary>
@@ -2123,6 +2664,11 @@
             Information about the network subsystem
             </summary>
         </member>
+        <member name="E:DuetAPI.Machine.Network.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Network.Name">
             <summary>
             Name of the machine
@@ -2142,6 +2688,14 @@
             </summary>
             <seealso cref="T:DuetAPI.Machine.NetworkInterface"/>
         </member>
+        <member name="M:DuetAPI.Machine.Network.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Network.Clone">
             <summary>
             Creates a clone of this instance
@@ -2151,6 +2705,11 @@
         <member name="T:DuetAPI.Machine.NetworkInterface">
             <summary>
             Information about a network interface
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.NetworkInterface.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.NetworkInterface.Type">
@@ -2209,6 +2768,14 @@
             List of active protocols
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.NetworkInterface.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.NetworkInterface.Clone">
             <summary>
             Creates a clone of this instance
@@ -2240,6 +2807,11 @@
             Information about the 3D scanner subsystem
             </summary>
         </member>
+        <member name="E:DuetAPI.Machine.Scanner.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Scanner.Progress">
             <summary>
             Progress of the current action (on a scale between 0 to 1)
@@ -2253,6 +2825,14 @@
             Status of the 3D scanner
             </summary>
             <seealso cref="T:DuetAPI.Machine.ScannerStatus"/>
+        </member>
+        <member name="M:DuetAPI.Machine.Scanner.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
         </member>
         <member name="M:DuetAPI.Machine.Scanner.Clone">
             <summary>
@@ -2300,6 +2880,16 @@
             Information about an endstop
             </summary>
         </member>
+        <member name="E:DuetAPI.Machine.Endstop.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Endstop.Action">
+            <summary>
+            Action to perform when an endstop is hit
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Endstop.Triggered">
             <summary>
             Whether or not the endstop is hit
@@ -2315,11 +2905,49 @@
             Type of the endstop
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Endstop.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Endstop.Clone">
             <summary>
             Creates a clone of this instance
             </summary>
             <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.EndstopAction">
+            <summary>
+            Action that is performed when an endstop is hit
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.EndstopAction.None">
+            <summary>
+            Don't stop anything
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.EndstopAction.ReduceSpeed">
+            <summary>
+            Reduce speed because an endstop or Z-probe is close to triggering
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.EndstopAction.StopDriver">
+            <summary>
+            Stop a single motor driver
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.EndstopAction.StopAxis">
+            <summary>
+            Stop all drivers for an axis
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.EndstopAction.StopAll">
+            <summary>
+            Stop all drives
+            </summary>
         </member>
         <member name="T:DuetAPI.Machine.EndstopPosition">
             <summary>
@@ -2371,6 +2999,11 @@
             Information about a configured probe
             </summary>
         </member>
+        <member name="E:DuetAPI.Machine.Probe.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Probe.Type">
             <summary>
             Type of the configured probe
@@ -2402,7 +3035,7 @@
             Dive height (in mm)
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.Probe.Offset">
+        <member name="P:DuetAPI.Machine.Probe.Offsets">
             <summary>
             X+Y offsets (in mm)
             </summary>
@@ -2410,6 +3043,11 @@
         <member name="P:DuetAPI.Machine.Probe.TriggerHeight">
             <summary>
             Z height at which the probe is triggered (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Probe.Filtered">
+            <summary>
+            Whether the probe signal is filtered
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Probe.Inverted">
@@ -2447,6 +3085,14 @@
             Indicates if the probe parameters are supposed to be saved to config-override.g
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Probe.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Probe.Clone">
             <summary>
             Creates a clone of this instance
@@ -2473,34 +3119,9 @@
             A modulated probe (like the original one shipped with the RepRapPro Ormerod)
             </summary>
         </member>
-        <member name="F:DuetAPI.Machine.ProbeType.ActiveLow">
+        <member name="F:DuetAPI.Machine.ProbeType.Switch">
             <summary>
-            A probe that pulls the signal from HIGH to LOW when triggered
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Machine.ProbeType.E0Switch">
-            <summary>
-            A probe that is connected to the E0 switch
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Machine.ProbeType.ActiveHigh">
-            <summary>
-            A probe that pulls the signal from LOW to HIGH when triggered
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Machine.ProbeType.E1Switch">
-            <summary>
-            A probe that is connected to the E1 switch
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Machine.ProbeType.ZSwitch">
-            <summary>
-            A probe that is connected to the Z switch
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Machine.ProbeType.UnfilteredActiveHigh">
-            <summary>
-            An unfiltered probe that pulls the signal from low to high when triggered (unfiltered for faster reaction)
+            A switch that is triggered when the probe is activated
             </summary>
         </member>
         <member name="F:DuetAPI.Machine.ProbeType.BLTouch">
@@ -2530,6 +3151,14 @@
             </summary>
             <seealso cref="T:DuetAPI.Machine.Probe"/>
         </member>
+        <member name="M:DuetAPI.Machine.Sensors.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Sensors.Clone">
             <summary>
             Creates a clone of this instance
@@ -2539,6 +3168,11 @@
         <member name="T:DuetAPI.Machine.Spindle">
             <summary>
             Information about a CNC spindle
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Spindle.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Spindle.Active">
@@ -2551,11 +3185,53 @@
             Current RPM
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Spindle.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Spindle.Clone">
             <summary>
             Creates a clone of this instance
             </summary>
             <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.BeepDetails">
+            <summary>
+            Details about a requested beep
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.BeepDetails.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.BeepDetails.Frequency">
+            <summary>
+            Frequency of the requested beep
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.BeepDetails.Duration">
+            <summary>
+            Duration of the requested beep (in ms)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.BeepDetails.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
+        <member name="M:DuetAPI.Machine.BeepDetails.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>Clone of this instance</returns>
         </member>
         <member name="T:DuetAPI.Machine.MachineMode">
             <summary>
@@ -2642,14 +3318,29 @@
             Information about the machine state
             </summary>
         </member>
+        <member name="E:DuetAPI.Machine.State.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.State.AtxPower">
             <summary>
-            Whether or not ATX power is on
+            State of the ATX power pin (if controlled)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.Beep">
+            <summary>
+            Details about a requested beep
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.State.CurrentTool">
             <summary>
             Number of the currently selected tool or -1 if none is selected
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.DisplayMessage">
+            <summary>
+            Persistent message to display (see M117)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.State.Mode">
@@ -2662,6 +3353,14 @@
             Current state of the machine
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.State.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.State.Clone">
             <summary>
             Creates a clone of this instance
@@ -2671,6 +3370,11 @@
         <member name="T:DuetAPI.Machine.Storage">
             <summary>
             Information about a storage device
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Storage.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Storage.Mounted">
@@ -2703,6 +3407,14 @@
             Logical path of the storage device
             </summary>
         </member>
+        <member name="M:DuetAPI.Machine.Storage.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Machine.Storage.Clone">
             <summary>
             Creates a clone of this instance
@@ -2712,6 +3424,11 @@
         <member name="T:DuetAPI.Machine.Tool">
             <summary>
             Information about a configured tool
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Tool.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Tool.Number">
@@ -2756,7 +3473,7 @@
         </member>
         <member name="P:DuetAPI.Machine.Tool.Spindle">
             <summary>
-            Associated spindle (index)
+            Associated spindle (index or -1)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Tool.Axes">
@@ -2769,6 +3486,7 @@
               [0],        // X
               [1]         // Y
             ]
+            Make sure to set each item individually so the change events are called
             </remarks>
         </member>
         <member name="P:DuetAPI.Machine.Tool.Offsets">
@@ -2780,34 +3498,56 @@
         </member>
         <member name="P:DuetAPI.Machine.Tool.OffsetsProbed">
             <summary>
-            Bitmap of the probed axis offsets
+            Bitmap of the axes which were probed
             </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Tool.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
         </member>
         <member name="M:DuetAPI.Machine.Tool.Clone">
             <summary>
             Creates a clone of this instance
             </summary>
-            <returns>A clone of this instance</returns>
+            <returns>Clone of this instance</returns>
         </member>
-        <member name="T:DuetAPI.MessageType">
+        <member name="T:DuetAPI.Machine.UserVariable">
             <summary>
-            Type of a generic message
+            Class holding information about a user variable
             </summary>
         </member>
-        <member name="F:DuetAPI.MessageType.Success">
+        <member name="E:DuetAPI.Machine.UserVariable.PropertyChanged">
             <summary>
-            This is a success message
+            Event to trigger when a property has changed
             </summary>
         </member>
-        <member name="F:DuetAPI.MessageType.Warning">
+        <member name="P:DuetAPI.Machine.UserVariable.Name">
             <summary>
-            This is a warning message
+            Name of the user variable
             </summary>
         </member>
-        <member name="F:DuetAPI.MessageType.Error">
+        <member name="P:DuetAPI.Machine.UserVariable.Value">
             <summary>
-            This is an error message
+            Value of the user variable
             </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.UserVariable.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
+        <member name="M:DuetAPI.Machine.UserVariable.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>Clone of this instance</returns>
         </member>
         <member name="T:DuetAPI.Message">
             <summary>
@@ -2845,6 +3585,7 @@
             <summary>
             Content of this message
             </summary>
+            <remarks>May be empty but not null</remarks>
         </member>
         <member name="M:DuetAPI.Message.ToString">
             <summary>
@@ -2852,15 +3593,48 @@
             </summary>
             <returns>RepRapFirmware-style message</returns>
         </member>
+        <member name="M:DuetAPI.Message.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
         <member name="M:DuetAPI.Message.Clone">
             <summary>
             Creates a clone of this instance
             </summary>
             <returns>Clone of this instance</returns>
         </member>
+        <member name="T:DuetAPI.MessageType">
+            <summary>
+            Type of a generic message
+            </summary>
+        </member>
+        <member name="F:DuetAPI.MessageType.Success">
+            <summary>
+            This is a success message
+            </summary>
+        </member>
+        <member name="F:DuetAPI.MessageType.Warning">
+            <summary>
+            This is a warning message
+            </summary>
+        </member>
+        <member name="F:DuetAPI.MessageType.Error">
+            <summary>
+            This is an error message
+            </summary>
+        </member>
         <member name="T:DuetAPI.ParsedFileInfo">
             <summary>
             Holds information about a parsed G-code file
+            </summary>
+        </member>
+        <member name="E:DuetAPI.ParsedFileInfo.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
             </summary>
         </member>
         <member name="P:DuetAPI.ParsedFileInfo.FileName">
@@ -2917,6 +3691,14 @@
             <summary>
             Estimated print time from G-code simulation (in s)
             </summary>
+        </member>
+        <member name="M:DuetAPI.ParsedFileInfo.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
         </member>
         <member name="M:DuetAPI.ParsedFileInfo.Clone">
             <summary>
@@ -3024,6 +3806,18 @@
             <param name="filename">Filename of the heightmap</param>
             <returns>Asynchronous task</returns>
         </member>
+        <member name="T:DuetAPI.Utility.IAssignable">
+            <summary>
+            Interface that provides a method to assign all values from another instance
+            </summary>
+            <remarks>Non-value types are supposed to be cloned when implementing this</remarks>
+        </member>
+        <member name="M:DuetAPI.Utility.IAssignable.Assign(System.Object)">
+            <summary>
+            Assign every property from another instance
+            </summary>
+            <param name="from">Source object</param>
+        </member>
         <member name="T:DuetAPI.Utility.JsonHelper">
             <summary>
             Helper class for JSON serialization, deserialization, patch creation and patch application
@@ -3064,6 +3858,44 @@
             <param name="obj">Object to patch</param>
             <param name="diff">JSON patch to apply</param>
             <seealso cref="M:DuetAPI.Utility.JsonHelper.DiffObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)"/>
+        </member>
+        <member name="T:DuetAPI.Utility.ListHelpers">
+            <summary>
+            Class holding a few functions for lists that implement <c>IClonable</c> and <c>IAssignFrom</c>
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.ListHelpers.AssignList``1(System.Collections.Generic.IList{``0},System.Collections.Generic.IList{``0})">
+            <summary>
+            Helper function to assign generic lists. Missing items are cloned, existing items are assigned
+            </summary>
+            <typeparam name="T">Item type</typeparam>
+            <param name="to">List to assign to</param>
+            <param name="from">List to assign from</param>
+        </member>
+        <member name="M:DuetAPI.Utility.ListHelpers.SetList``1(System.Collections.Generic.IList{``0},System.Collections.Generic.IList{``0})">
+            <summary>
+            Helper function to set generic lists
+            </summary>
+            <typeparam name="T">Item type</typeparam>
+            <param name="destination">List to set</param>
+            <param name="source">List to copy from</param>
+        </member>
+        <member name="M:DuetAPI.Utility.ListHelpers.AddItems``1(System.Collections.Generic.IList{``0},System.Collections.Generic.IList{``0})">
+            <summary>
+            Helper function to add items from one list to another
+            </summary>
+            <typeparam name="T">Item type</typeparam>
+            <param name="to">List to add items from</param>
+            <param name="from">List to add items to</param>
+        </member>
+        <member name="M:DuetAPI.Utility.ListHelpers.CloneItems``1(System.Collections.Generic.IList{``0},System.Collections.Generic.IList{``0})">
+            <summary>
+            Helper function to clone items and to add them to the specified list
+            </summary>
+            <remarks>This function does not clear the destination list</remarks>
+            <typeparam name="T">Item type</typeparam>
+            <param name="destination">List to add the clones to</param>
+            <param name="source">List to clone items from</param>
         </member>
     </members>
 </doc>

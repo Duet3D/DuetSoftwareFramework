@@ -69,6 +69,17 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Unlock everything again
         /// </summary>
-        Unlock = 11
+        Unlock = 11,
+
+        /// <summary>
+        /// Write another chunk of the IAP binary to the designated Flash area
+        /// </summary>
+        /// <remarks>There is no discrete header for this request but be aware that only multiples of IFLASH_PAGE_SIZE must be transmitted (except for the last sector)</remarks>
+        WriteIap = 12,
+
+        /// <summary>
+        /// Launch the IAP binary
+        /// </summary>
+        StartIap = 13
     }
 }

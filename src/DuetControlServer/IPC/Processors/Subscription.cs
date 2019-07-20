@@ -7,6 +7,7 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
+using DuetAPI.Machine;
 using DuetAPI.Utility;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -28,13 +29,12 @@ namespace DuetControlServer.IPC.Processors
             typeof(Acknowledge)
         };
         
-        private static readonly ConcurrentDictionary<Subscription, SubscriptionMode> _subscriptions = new ConcurrentDictionary<Subscription, SubscriptionMode>();
+        private static readonly List<Subscription> _subscriptions = new List<Subscription>();
 
         private readonly SubscriptionMode _mode;
-
-        private JObject _jsonModel, _lastModel;
-        private List<Message> _messages = new List<Message>();
-        private AsyncAutoResetEvent _updateAvailableEvent = new AsyncAutoResetEvent();
+        private readonly MachineModel _model;
+        private readonly List<Message> _messages = new List<Message>();
+        private readonly AsyncAutoResetEvent _updateAvailableEvent = new AsyncAutoResetEvent();
         
         /// <summary>
         /// Constructor of the subscription processor
@@ -43,7 +43,16 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="initMessage">Initialization message</param>
         public Subscription(Connection conn, ClientInitMessage initMessage) : base(conn, initMessage)
         {
+            lock (_subscriptions)
+            {
+                _subscriptions.Add(this);
+            }
+
             _mode = (initMessage as SubscribeInitMessage).SubscriptionMode;
+            using (Model.Provider.AccessReadOnly())
+            {
+                _model = (MachineModel)Model.Provider.Get.Clone();
+            }
         }
         
         /// <summary>
@@ -52,37 +61,21 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Task that represents the lifecycle of a connection</returns>
         public override async Task Process()
         {
-            // Initialize the machine model and register this subscriber
-            using (await Model.Provider.AccessReadOnlyAsync())
-            {
-                _jsonModel = JObject.FromObject(Model.Provider.Get, JsonHelper.DefaultSerializer);
-                _messages.AddRange(Model.Provider.Get.Messages);
-            }
-            _lastModel = _jsonModel;
-            _subscriptions.TryAdd(this, _mode);
-
             try
             {
-                bool patchWasEmpty = false;
-
-                // Send over the full machine model once
-                string json;
-                lock (_jsonModel)
+                // First send over the full machine model
+                JObject currentObject, lastObject, patch = null;
+                lock (_model)
                 {
-                    lock (_messages)
-                    {
-                        _jsonModel["messages"] = JArray.FromObject(_messages, JsonHelper.DefaultSerializer);
-                        _messages.Clear();
-                    }
-                    json = _jsonModel.ToString(Formatting.None);
-                    _jsonModel.Remove("messages");
+                    currentObject = lastObject = JObject.FromObject(_model, JsonHelper.DefaultSerializer);
+                    _model.Messages.Clear();
                 }
-                await Connection.Send(json + "\n");
-                
+                await Connection.Send(currentObject.ToString(Formatting.None) + "\n");
+
                 do
                 {
-                    // Wait for acknowledgement
-                    if (!patchWasEmpty)
+                    // Wait for an acknowledgement from the client if anything was sent before
+                    if (patch == null || patch.HasValues)
                     {
                         BaseCommand command = await Connection.ReceiveCommand();
                         if (command == null)
@@ -97,35 +90,40 @@ namespace DuetControlServer.IPC.Processors
                     }
 
                     // Wait for another update
+                    if (_mode == SubscriptionMode.Patch)
+                    {
+                        lastObject = currentObject;
+                    }
                     await _updateAvailableEvent.WaitAsync(Program.CancelSource.Token);
-                    
-                    // Send over the next update
+
+                    // Get the updated object model
+                    lock (_model)
+                    {
+                        using (Model.Provider.AccessReadOnly())
+                        {
+                            // NB: This could be further improved so that all the JSON tokens are written via the INotifyPropertyChanged events
+                            _model.Assign(Model.Provider.Get);
+                        }
+                        lock (_messages)
+                        {
+                            ListHelpers.AssignList(_model.Messages, _messages);
+                            _messages.Clear();
+                        }
+                        currentObject = JObject.FromObject(_model, JsonHelper.DefaultSerializer);
+                    }
+
+                    // Provide the model update
                     if (_mode == SubscriptionMode.Full)
                     {
                         // Send the entire object model in Full mode
-                        lock (_jsonModel)
-                        {
-                            lock (_messages)
-                            {
-                                _jsonModel["messages"] = JArray.FromObject(_messages, JsonHelper.DefaultSerializer);
-                                _messages.Clear();
-                            };
-                            json = _jsonModel.ToString(Formatting.None);
-                            _jsonModel.Remove("messages");
-                        }
-                        await Connection.Send(json + "\n");
+                        await Connection.Send(currentObject.ToString(Formatting.None) + "\n");
                     }
                     else
                     {
-                        // Only create a patch in Patch mode
-                        JObject patch;
-                        lock (_jsonModel)
-                        {
-                            patch = JsonHelper.DiffObject(_lastModel, _jsonModel);
-                            _lastModel = _jsonModel;
-                        }
+                        // Only create a diff in Patch mode
+                        patch = JsonHelper.DiffObject(lastObject, currentObject);
 
-                        // Compact layers
+                        // Compact the job layers. There is no point in sending them all every time an update occurs
                         if (patch.ContainsKey("job") && patch.Value<JObject>("job").ContainsKey("layers"))
                         {
                             JArray layersArray = patch["job"].Value<JArray>("layers");
@@ -135,29 +133,20 @@ namespace DuetControlServer.IPC.Processors
                             }
                         }
 
-                        // Write pending messages
-                        lock (_messages)
-                        {
-                            patch["messages"] = JArray.FromObject(_messages, JsonHelper.DefaultSerializer);
-                            _messages.Clear();
-                        }
-
-                        // Send it over unless it is empty
+                        // Send the patch unless it is empty
                         if (patch.HasValues)
                         {
-                            json = patch.ToString(Formatting.None);
-                            await Connection.Send(json + "\n");
-                        }
-                        else
-                        {
-                            patchWasEmpty = true;
+                            await Connection.Send(patch.ToString(Formatting.None) + "\n");
                         }
                     }
                 } while (!Program.CancelSource.IsCancellationRequested);
             }
             finally
             {
-                _subscriptions.TryRemove(this, out _);
+                lock (_subscriptions)
+                {
+                    _subscriptions.Remove(this);
+                }
             }
         }
 
@@ -173,9 +162,12 @@ namespace DuetControlServer.IPC.Processors
                 return false;
             }
 
-            foreach (var pair in _subscriptions)
+            lock (_subscriptions)
             {
-                pair.Key.AddMessage(message);
+                foreach (Subscription subscription in _subscriptions)
+                {
+                    subscription.AddMessage(message);
+                }
             }
             return true;
         }
@@ -192,31 +184,16 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Called to notify the subscribers about a model update
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public static async Task ModelUpdated()
+        public static void ModelUpdated()
         {
-            // This is probably really slow and needs to be improved!
-            JObject newModel;
-            using (await Model.Provider.AccessReadOnlyAsync())
+            lock (_subscriptions)
             {
-                newModel = JObject.FromObject(Model.Provider.Get, JsonHelper.DefaultSerializer);
-                newModel.Remove("messages");
+                foreach (Subscription subscription in _subscriptions)
+                {
+                    // Inform every subscriber about new data
+                    subscription._updateAvailableEvent.Set();
+                }
             }
-
-            // Notify subscribers
-            foreach (var pair in _subscriptions)
-            {
-                pair.Key.Update(newModel);
-            }
-        }
-
-        private void Update(JObject newModel)
-        {
-            lock (_jsonModel)
-            {
-                _jsonModel = newModel;
-            }
-            _updateAvailableEvent.Set();
         }
     }
 }

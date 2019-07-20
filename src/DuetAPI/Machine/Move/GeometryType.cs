@@ -1,58 +1,79 @@
-﻿namespace DuetAPI.Machine
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using System.Runtime.Serialization;
+
+namespace DuetAPI.Machine
 {
     /// <summary>
-    /// List of supported geometry types
+    /// Supported geometry types
     /// </summary>
-    public static class GeometryType
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum GeometryType
     {
         /// <summary>
         /// Cartesian geometry
         /// </summary>
-        public const string Cartesian = "cartesian";
+        [EnumMember(Value = "cartesian")]
+        Cartesian,
 
         /// <summary>
         /// CoreXY geometry
         /// </summary>
-        public const string CoreXY = "coreXY";
+        [EnumMember(Value = "coreXY")]
+        CoreXY,
 
         /// <summary>
         /// CoreXY geometry with extra U axis
         /// </summary>
-        public const string CoreXYU = "coreXYU";
+        [EnumMember(Value = "coreXYU")]
+        CoreXYU,
 
         /// <summary>
         /// CoreXY geometry with extra UV axes
         /// </summary>
-        public const string CoreXYUV = "coreXYUV";
+        [EnumMember(Value = "coreXYUV")]
+        CoreXYUV,
 
         /// <summary>
         /// CoreXZ geometry
         /// </summary>
-        public const string CoreXZ = "coreXZ";
+        [EnumMember(Value = "coreXZ")]
+        CoreXZ,
 
         /// <summary>
         /// Hangprinter geometry
         /// </summary>
-        public const string Hangprinter = "Hangprinter";
+        [EnumMember(Value = "Hangprinter")]
+        Hangprinter,
 
         /// <summary>
         /// Delta geometry
         /// </summary>
-        public const string Delta = "delta";
+        [EnumMember(Value = "delta")]
+        Delta,
 
         /// <summary>
         /// Polar geometry
         /// </summary>
-        public const string Polar = "Polar";
+        [EnumMember(Value = "Polar")]
+        Polar,
 
         /// <summary>
         /// Rotary delta geometry
         /// </summary>
-        public const string RotaryDelta = "Rotary delta";
+        [EnumMember(Value = "Rotary delta")]
+        RotaryDelta,
 
         /// <summary>
         /// SCARA geometry
         /// </summary>
-        public const string Scara = "Scara";
+        [EnumMember(Value = "Scara")]
+        Scara,
+
+        /// <summary>
+        /// Unknown geometry
+        /// </summary>
+        [EnumMember(Value = "unknown")]
+        Unknown
     }
 }

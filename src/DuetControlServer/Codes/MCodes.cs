@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using Nito.AsyncEx;
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -342,6 +343,29 @@ namespace DuetControlServer.Codes
                         }
                         return new CodeResult(MessageType.Error, "Configuration file not found");
                     }
+
+                // Update the firmware
+                case 997:
+                    if (((int[])code.Parameter('S', new int[] { 0 })).Contains(0))
+                    {
+                        string iapFile = await FilePath.ToPhysical(Settings.IapFile, "sys");
+                        if (!File.Exists(iapFile))
+                        {
+                            return new CodeResult(MessageType.Error, $"Failed to find IAP file {iapFile}");
+                        }
+
+                        string firmwareFile = await FilePath.ToPhysical(code.Parameter('P') ?? Settings.FirmwareFile, "sys");
+                        if (!File.Exists(firmwareFile))
+                        {
+                            return new CodeResult(MessageType.Error, $"Failed to find firmware file {code.Parameter('P') ?? Settings.FirmwareFile}");
+                        }
+
+                        FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
+                        FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
+                        SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
+                    }
+                    // TODO: Implement mechanism for expansion boards
+                    return new CodeResult();
 
                 // Reset controller
                 case 999:

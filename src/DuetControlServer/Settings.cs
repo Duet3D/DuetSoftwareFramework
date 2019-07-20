@@ -93,10 +93,39 @@ namespace DuetControlServer
         public static int TransferReadyPin { get; set; } = 25;      // Pin 22 on the RaspPi expansion header
 
         /// <summary>
+        /// Number of codes to buffer in the internal print subsystem
+        /// </summary>
+        [JsonProperty]
+        public static int BufferedPrintCodes { get; set; } = 32;
+
+        /// <summary>
+        /// Number of codes to buffer per macro
+        /// </summary>
+        [JsonProperty]
+        public static int BufferedMacroCodes { get; set; } = 16;
+
+        /// <summary>
+        /// Maximum space of buffered codes per channel (in bytes). Must be greater than <see cref="SPI.Communication.Consts.MaxCodeBufferSize"/>
+        /// </summary>
+        public static int MaxBufferSpacePerChannel { get; set; } = 512;
+
+        /// <summary>
         /// Maximum delay after which a status update is requested even when in burst mode (in ms)
         /// </summary>
         [JsonProperty]
         public static double MaxUpdateDelay { get; set; } = 250.0;
+
+        /// <summary>
+        /// File holding the IAP binary for the Duet 3
+        /// </summary>
+        [JsonProperty]
+        public static string IapFile { get; set; } = "iapduet3.bin";
+
+        /// <summary>
+        /// File holding the firmware binary for the Duet 3
+        /// </summary>
+        [JsonProperty]
+        public static string FirmwareFile { get; set; } = "Duet3Firmware.bin";
 
         /// <summary>
         /// How many bytes to parse max at the beginning and end of a file to retrieve G-code file information
@@ -170,18 +199,6 @@ namespace DuetControlServer
         };
 
         /// <summary>
-        /// Number of codes to buffer in the internal print subsystem
-        /// </summary>
-        [JsonProperty]
-        public static int BufferedPrintCodes { get; set; } = 32;
-
-        /// <summary>
-        /// Number of codes to buffer per macro
-        /// </summary>
-        [JsonProperty]
-        public static int BufferedMacroCodes { get; set; } = 16;
-
-        /// <summary>
         /// Load settings from the config file or create it if it does not already exist
         /// </summary>
         /// <param name="args">Command-line arguments</param>
@@ -209,6 +226,11 @@ namespace DuetControlServer
                 PrintTimeFilters.Clear();
                 SimulatedTimeFilters.Clear();
                 JsonConvert.DeserializeObject<Settings>(fileContent);
+
+                if (MaxBufferSpacePerChannel < SPI.Communication.Consts.MaxCodeBufferSize)
+                {
+                    throw new ArgumentException($"{nameof(MaxBufferSpacePerChannel)} is too low");
+                }
             }
             else
             {

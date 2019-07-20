@@ -123,7 +123,10 @@ namespace DuetControlServer
             }
             while (reader.Position < Settings.FileInfoReadLimit);
 
-            partialFileInfo.Filament = filamentConsumption.ToArray();
+            foreach (float filament in filamentConsumption)
+            {
+                partialFileInfo.Filament.Add(filament);
+            }
         }
 
         private static async Task ParseFooter(SeekableStreamReader reader, long length, ParsedFileInfo partialFileInfo)
@@ -209,7 +212,12 @@ namespace DuetControlServer
             }
             while (length - reader.Position < Settings.FileInfoReadLimit);
 
-            partialFileInfo.Filament = filamentConsumption.ToArray();
+            partialFileInfo.Filament.Clear();
+            foreach (float filament in filamentConsumption)
+            {
+                partialFileInfo.Filament.Add(filament);
+            }
+
             if (lastZ != null && partialFileInfo.Height == 0)
             {
                 partialFileInfo.Height = lastZ.Value;
@@ -253,7 +261,7 @@ namespace DuetControlServer
             return (result.Height != 0) &&
                     (result.FirstLayerHeight != 0) &&
                     (result.LayerHeight != 0) &&
-                    (result.Filament.Length > 0) &&
+                    (result.Filament.Count > 0) &&
                     (result.GeneratedBy != "");
         }
 

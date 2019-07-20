@@ -42,6 +42,11 @@ namespace DuetControlServer.SPI
         public readonly Queue<QueuedCode> PendingCodes = new Queue<QueuedCode>();
 
         /// <summary>
+        /// Occupied space for buffered codes in bytes
+        /// </summary>
+        public int BytesBuffered { get; set; }
+
+        /// <summary>
         /// List of buffered G/M/T-codes that are being processed by the firmware
         /// </summary>
         public readonly List<QueuedCode> BufferedCodes = new List<QueuedCode>();
@@ -80,19 +85,19 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Lock access to this code channel
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Disposable lock</returns>
         public IDisposable Lock() => _lock.Lock();
 
         /// <summary>
         /// Lock access to this code channel asynchronously
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Disposable lock</returns>
         public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync();
 
         /// <summary>
-        /// Return the diagnostics
+        /// Write channel diagnostics to the given string builder
         /// </summary>
-        /// <returns></returns>
+        /// <param name="builder">Target to write to</param>
         public void Diagnostics(StringBuilder builder)
         {
             StringBuilder channelDiagostics = new StringBuilder();
@@ -105,6 +110,10 @@ namespace DuetControlServer.SPI
             foreach (QueuedCode bufferedCode in BufferedCodes)
             {
                 channelDiagostics.AppendLine($"Buffered code: {bufferedCode.Code}");
+            }
+            if (BytesBuffered != 0)
+            {
+                channelDiagostics.AppendLine($"=> {BytesBuffered} bytes");
             }
 
             foreach (Queue<QueuedCode> suspendedCodes in SuspendedCodes)
@@ -200,6 +209,7 @@ namespace DuetControlServer.SPI
                         }
                         catch (AggregateException ae)
                         {
+                            // FIXME: Should this terminate the macro being executed?
                             Console.WriteLine($"[err] {code} -> {ae.InnerException.Message}");
                         }
                     });
@@ -290,6 +300,7 @@ namespace DuetControlServer.SPI
                 if (BufferedCodes[0].IsFinished)
                 {
                     Console.WriteLine($"[info] Completed {BufferedCodes[0].Code}");
+                    BytesBuffered -= BufferedCodes[0].BinarySize;
                     BufferedCodes.RemoveAt(0);
                 }
                 return true;
@@ -304,7 +315,7 @@ namespace DuetControlServer.SPI
         /// <param name="filename">Name of the macro file</param>
         /// <param name="reportMissing">Report an error if the file could not be found</param>
         /// <param name="fromCode">Request comes from a real G/M/T-code</param>
-        /// <returns></returns>
+        /// <returns>Asynchronous task</returns>
         public async Task HandleMacroRequest(string filename, bool reportMissing, bool fromCode)
         {
             // Get the code starting the macro file
@@ -404,6 +415,8 @@ namespace DuetControlServer.SPI
                     queuedCode.SetFinished();
                 }
             }
+
+            BytesBuffered = 0;
             BufferedCodes.Clear();
 
             while (SuspendedCodes.TryPop(out Queue<QueuedCode> suspendedCodes))
@@ -419,6 +432,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Suspend all the buffered G/M/T-codes for future execution
         /// </summary>
+        /// <param name="codeBeingExecuted">Current code being executed to leave in the buffer</param>
         public void SuspendBuffer(QueuedCode codeBeingExecuted = null)
         {
             Queue<QueuedCode> suspendedItems = new Queue<QueuedCode>();
@@ -434,6 +448,8 @@ namespace DuetControlServer.SPI
                         bufferedCode.IsSuspended = true;
                         suspendedItems.Enqueue(bufferedCode);
                     }
+
+                    BytesBuffered -= bufferedCode.BinarySize;
                     BufferedCodes.Remove(bufferedCode);
                 }
             }
@@ -533,6 +549,8 @@ namespace DuetControlServer.SPI
             {
                 bufferedCode.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
             }
+
+            BytesBuffered = 0;
             BufferedCodes.Clear();
         }
     }

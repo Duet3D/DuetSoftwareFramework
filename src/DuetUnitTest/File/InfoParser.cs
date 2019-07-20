@@ -27,7 +27,7 @@ namespace DuetUnitTest.File
             Assert.AreNotEqual(0, info.Height);
             Assert.AreNotEqual(0, info.FirstLayerHeight);
             Assert.AreNotEqual(0, info.LayerHeight);
-            Assert.AreNotEqual(0, info.Filament.Length);
+            Assert.AreNotEqual(0, info.Filament.Count);
             Assert.AreNotEqual("", info.GeneratedBy);
             // Assert.AreNotEqual(0, info.PrintTime);
             // Assert.AreNotEqual(0, info.SimulatedTime);
@@ -47,7 +47,7 @@ namespace DuetUnitTest.File
             Assert.AreEqual(0, info.Height);
             Assert.AreEqual(0.5, info.FirstLayerHeight);
             Assert.AreEqual(0, info.LayerHeight);
-            Assert.AreEqual(0, info.Filament.Length);
+            Assert.AreEqual(0, info.Filament.Count);
             Assert.AreEqual("", info.GeneratedBy);
             Assert.AreEqual(0, info.PrintTime);
             Assert.AreEqual(0, info.SimulatedTime);

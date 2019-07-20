@@ -220,6 +220,14 @@ namespace DuetAPI.Commands
             {
                 return (float[])codeParameter._parsedValue;
             }
+            if (codeParameter._parsedValue is int intValue)
+            {
+                return new float[] { intValue };
+            }
+            if (codeParameter._parsedValue is uint uintValue)
+            {
+                return new float[] { uintValue };
+            }
             if (codeParameter._parsedValue is int[])
             {
                 return ((int[])codeParameter._parsedValue).Select(Convert.ToSingle).ToArray();
@@ -243,6 +251,10 @@ namespace DuetAPI.Commands
             {
                 return (int[])codeParameter._parsedValue;
             }
+            if (codeParameter._parsedValue is int intValue)
+            {
+                return new int[] { intValue };
+            }
             if (codeParameter._parsedValue is float[])
             {
                 return ((float[])codeParameter._parsedValue).Select(Convert.ToInt32).ToArray();
@@ -262,6 +274,14 @@ namespace DuetAPI.Commands
             {
                 return (uint[])codeParameter._parsedValue;
             }
+            if (codeParameter._parsedValue is int intValue && intValue >= 0)
+            {
+                return new uint[] { (uint)intValue };
+            }
+            if (codeParameter._parsedValue is uint uintValue)
+            {
+                return new uint[] { uintValue };
+            }
             if (codeParameter._parsedValue is float[])
             {
                 return ((float[])codeParameter._parsedValue).Select(Convert.ToUInt32).ToArray();
@@ -280,6 +300,18 @@ namespace DuetAPI.Commands
             if (codeParameter._parsedValue is long[])
             {
                 return (long[])codeParameter._parsedValue;
+            }
+            if (codeParameter._parsedValue is int intValue)
+            {
+                return new long[] { intValue };
+            }
+            if (codeParameter._parsedValue is uint uintValue)
+            {
+                return new long[] { uintValue };
+            }
+            if (codeParameter._parsedValue is long longValue)
+            {
+                return new long[] { longValue };
             }
             if (codeParameter._parsedValue is int[] || codeParameter._parsedValue is uint[] || codeParameter._parsedValue is float[])
             {

@@ -13,17 +13,23 @@ namespace DuetUnitTest.Machine
 
             Tool tool = new Tool
             {
-                Active = new float[] { 200F, 220F },
-                Fans = new int[] { 3 },
                 Filament = "PET-G",
-                Heaters = new int[] { 4, 5 },
-                Mix = new float[] { 0.4F, 0.6F },
                 Name = "Mixing Tool",
                 Number = 3,
-                Offsets = new float[] { 12F, 34F, 56F },
-                Spindle = 3,
-                Standby = new float[] { 40F, 60F }
+                Spindle = 3
             };
+            tool.Active.Add(200F);
+            tool.Active.Add(220F);
+            tool.Fans.Add(3);
+            tool.Heaters.Add(4);
+            tool.Heaters.Add(5);
+            tool.Mix.Add(0.4F);
+            tool.Mix.Add(0.6F);
+            tool.Offsets.Add(12F);
+            tool.Offsets.Add(34F);
+            tool.Offsets.Add(56F);
+            tool.Standby.Add(40F);
+            tool.Standby.Add(60F);
             tool.Axes.Add(new int[] { 0 });
             tool.Axes.Add(new int[] { 1 });
             original.Tools.Add(tool);
@@ -58,6 +64,67 @@ namespace DuetUnitTest.Machine
             Assert.AreNotSame(original.Tools[0].Offsets, clone.Tools[0].Offsets);
             Assert.AreNotSame(original.Tools[0].Spindle, clone.Tools[0].Spindle);
             Assert.AreNotSame(original.Tools[0].Standby, clone.Tools[0].Standby);
+        }
+
+        [Test]
+        public void Assign()
+        {
+            MachineModel original = new MachineModel();
+
+            Tool tool = new Tool
+            {
+                Filament = "PET-G",
+                Name = "Mixing Tool",
+                Number = 3,
+                Spindle = 3
+            };
+            tool.Active.Add(200F);
+            tool.Active.Add(220F);
+            tool.Fans.Add(3);
+            tool.Heaters.Add(4);
+            tool.Heaters.Add(5);
+            tool.Mix.Add(0.4F);
+            tool.Mix.Add(0.6F);
+            tool.Offsets.Add(12F);
+            tool.Offsets.Add(34F);
+            tool.Offsets.Add(56F);
+            tool.Standby.Add(40F);
+            tool.Standby.Add(60F);
+            tool.Axes.Add(new int[] { 0 });
+            tool.Axes.Add(new int[] { 1 });
+            original.Tools.Add(tool);
+
+            MachineModel assigned = new MachineModel();
+            assigned.Assign(original);
+
+            Assert.AreEqual(1, original.Tools.Count);
+            Assert.AreEqual(original.Tools[0].Active, assigned.Tools[0].Active);
+            Assert.AreEqual(original.Tools[0].Axes.Count, 2);
+            Assert.AreEqual(original.Tools[0].Axes[0], assigned.Tools[0].Axes[0]);
+            Assert.AreEqual(original.Tools[0].Axes[1], assigned.Tools[0].Axes[1]);
+            Assert.AreEqual(original.Tools[0].Fans, assigned.Tools[0].Fans);
+            Assert.AreEqual(original.Tools[0].Filament, assigned.Tools[0].Filament);
+            Assert.AreEqual(original.Tools[0].Heaters, assigned.Tools[0].Heaters);
+            Assert.AreEqual(original.Tools[0].Mix, assigned.Tools[0].Mix);
+            Assert.AreEqual(original.Tools[0].Name, assigned.Tools[0].Name);
+            Assert.AreEqual(original.Tools[0].Number, assigned.Tools[0].Number);
+            Assert.AreEqual(original.Tools[0].Offsets, assigned.Tools[0].Offsets);
+            Assert.AreEqual(original.Tools[0].Spindle, assigned.Tools[0].Spindle);
+            Assert.AreEqual(original.Tools[0].Standby, assigned.Tools[0].Standby);
+
+            Assert.AreNotSame(original.Tools[0].Active, assigned.Tools[0].Active);
+            Assert.AreNotSame(original.Tools[0].Axes, assigned.Tools[0].Axes);
+            Assert.AreNotSame(original.Tools[0].Axes[0], assigned.Tools[0].Axes[0]);
+            Assert.AreNotSame(original.Tools[0].Axes[1], assigned.Tools[0].Axes[1]);
+            Assert.AreNotSame(original.Tools[0].Fans, assigned.Tools[0].Fans);
+            Assert.AreNotSame(original.Tools[0].Filament, assigned.Tools[0].Filament);
+            Assert.AreNotSame(original.Tools[0].Heaters, assigned.Tools[0].Heaters);
+            Assert.AreNotSame(original.Tools[0].Mix, assigned.Tools[0].Mix);
+            Assert.AreNotSame(original.Tools[0].Name, assigned.Tools[0].Name);
+            Assert.AreNotSame(original.Tools[0].Number, assigned.Tools[0].Number);
+            Assert.AreNotSame(original.Tools[0].Offsets, assigned.Tools[0].Offsets);
+            Assert.AreNotSame(original.Tools[0].Spindle, assigned.Tools[0].Spindle);
+            Assert.AreNotSame(original.Tools[0].Standby, assigned.Tools[0].Standby);
         }
     }
 }
