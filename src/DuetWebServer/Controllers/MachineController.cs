@@ -98,8 +98,14 @@ namespace DuetWebServer.Controllers
         /// </summary>
         /// <returns>HTTP status code: (200) G-Code response as text/plain (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
         [HttpPost("code")]
-        public async Task<IActionResult> DoCode([FromBody] string code)
+        public async Task<IActionResult> DoCode()
         {
+            string code;
+            using (StreamReader reader = new StreamReader(Request.Body, Encoding.UTF8))
+            {
+                code = reader.ReadToEnd();
+            }
+
             try
             {
                 using (CommandConnection connection = await BuildConnection())
