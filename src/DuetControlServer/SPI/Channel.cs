@@ -353,12 +353,16 @@ namespace DuetControlServer.SPI
                     }
                     else
                     {
-                        await Model.Provider.Output(MessageType.Error, $"Could not find macro files {MacroFile.ConfigFile} and {MacroFile.ConfigFileFallback}");
+                        await Model.Provider.Output(MessageType.Error, $"Macro files {MacroFile.ConfigFile} and {MacroFile.ConfigFileFallback} not found");
                     }
                 }
                 else if (reportMissing)
                 {
-                    await Model.Provider.Output(MessageType.Error, $"Could not find macro file {filename}");
+                    if (!fromCode || BufferedCodes.Count == 0 || BufferedCodes[0].Code.Type != CodeType.MCode || BufferedCodes[0].Code.MajorNumber != 98)
+                    {
+                        // M98 outputs its own warning message via RRF
+                        await Model.Provider.Output(MessageType.Error, $"Macro file {filename} not found");
+                    }
                 }
                 else
                 {
