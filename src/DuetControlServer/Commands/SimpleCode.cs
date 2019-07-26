@@ -25,7 +25,8 @@ namespace DuetControlServer.Commands
                 codes = Commands.Code.ParseMultiple(Code);
                 foreach (Code code in codes)
                 {
-                    code.Channel = Channel;
+                    // M122 always goes to the Daemon channel so we (hopefully) get a low-latency response
+                    code.Channel = (code.Type == CodeType.MCode && code.MajorNumber == 122) ? DuetAPI.CodeChannel.Daemon : Channel;
                     code.SourceConnection = SourceConnection;
 
                     codeTasks.Enqueue(code.Enqueue());

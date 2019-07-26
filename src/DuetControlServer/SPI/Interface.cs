@@ -390,6 +390,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Process incoming packets
+                DateTime startTime = DateTime.Now;
                 for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
                     Communication.PacketHeader? packet;
@@ -410,6 +411,12 @@ namespace DuetControlServer.SPI
                     }
 
                     await ProcessPacket(packet.Value);
+
+                    if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(250))
+                    {
+                        Console.WriteLine($"WARN: Packet with request {packet?.Request} took longer than 250ms!");
+                    }
+                    startTime = DateTime.Now;
                 }
                 _bytesReserved = 0;
 
@@ -440,6 +447,12 @@ namespace DuetControlServer.SPI
                     }
                 } while (dataProcessed);
 
+                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(250))
+                {
+                    Console.WriteLine("WARN: Channel processing took longer than 250ms!");
+                }
+                startTime = DateTime.Now;
+
                 // Request object model updates
                 if (IsIdle || DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.MaxUpdateDelay))
                 {
@@ -447,8 +460,18 @@ namespace DuetControlServer.SPI
                     _lastQueryTime = DateTime.Now;
                 }
 
+                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(250))
+                {
+                    Console.WriteLine("WARN: Object model processing took longer than 250ms!");
+                }
+                startTime = DateTime.Now;
+
                 // Do another full SPI transfer
                 DataTransfer.PerformFullTransfer();
+                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(250))
+                {
+                    Console.WriteLine("WARN: SPI transfer took longer than 250ms!");
+                }
 
                 // Wait a moment
                 if (IsIdle)

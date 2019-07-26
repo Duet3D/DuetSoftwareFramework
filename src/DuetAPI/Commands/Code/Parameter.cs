@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json;
@@ -24,6 +25,11 @@ namespace DuetAPI.Commands
         public bool IsExpression { get; }
 
         /// <summary>
+        /// Indicates if this parameter is a driver identifier
+        /// </summary>
+        public bool IsDriverId { get; private set; }
+
+        /// <summary>
         /// Unparsed string representation of the code parameter or an empty string if none present
         /// </summary>
         private readonly string _stringValue;
@@ -31,7 +37,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Internal parsed representation of the string value (one of string, int, uint, float, int[], uint[] or float[])
         /// </summary>
-        private readonly object _parsedValue;
+        private object _parsedValue;
         
         /// <summary>
         /// Creates a new CodeParameter instance and parses value to a native data type if applicable
@@ -124,6 +130,70 @@ namespace DuetAPI.Commands
             Letter = letter;
             _stringValue = value.ToString();
             _parsedValue = value;
+        }
+
+        /// <summary>
+        /// Convert this parameter to driver id(s)
+        /// </summary>
+        /// <remarks>The data remains a uint (array) after the conversion. The top 16 bits reflect the board number and the bottom 16 bits the port</remarks>
+        public void ConvertDriverIds()
+        {
+            if (!IsExpression)
+            {
+                List<uint> drivers = new List<uint>();
+
+                string[] parameters = _stringValue.Split(':');
+                foreach (string value in parameters)
+                {
+                    string[] segments = value.Split('.');
+                    if (segments.Length == 1)
+                    {
+                        if (ushort.TryParse(segments[0], out ushort port))
+                        {
+                            drivers.Add(port);
+                        }
+                        else
+                        {
+                            throw new CodeParserException($"Failed to parse driver number from {Letter} parameter");
+                        }
+                    }
+                    else if (segments.Length == 2)
+                    {
+                        uint driver;
+                        if (ushort.TryParse(segments[0], out ushort board))
+                        {
+                            driver = (uint)board << 16;
+                        }
+                        else
+                        {
+                            throw new CodeParserException($"Failed to parse board number from {Letter} parameter");
+                        }
+                        if (ushort.TryParse(segments[1], out ushort port))
+                        {
+                            driver |= port;
+                        }
+                        else
+                        {
+                            throw new CodeParserException($"Failed to parse driver number from {Letter} parameter");
+                        }
+                        drivers.Add(driver);
+                    }
+                    else
+                    {
+                        throw new CodeParserException($"Driver value from {Letter} parameter is invalid");
+                    }
+                }
+
+                if (drivers.Count == 1)
+                {
+                    _parsedValue = drivers[0];
+                }
+                else
+                {
+                    _parsedValue = drivers.ToArray();
+                }
+                IsDriverId = true;
+            }
         }
 
         /// <summary>

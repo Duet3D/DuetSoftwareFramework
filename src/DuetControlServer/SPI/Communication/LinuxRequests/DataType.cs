@@ -43,6 +43,18 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Parameter is an expression
         /// </summary>
-        Expression = 7
+        Expression = 7,
+
+        /// <summary>
+        /// Parameter is a driver identifier (format: [board.]driver)
+        /// </summary>
+        /// <remarks>The top 16 bits contain the board ID and the bottom 16 bits contain the driver number</remarks>
+        DriverId = 8,
+
+        /// <summary>
+        /// Parameter is a driver identifier array (format: [board1.]driver1:[board2.]driver2)
+        /// </summary>
+        /// <remarks>The top 16 bits contain the board ID and the bottom 16 bits contain the driver number</remarks>
+        DriverIdArray = 9
     }
 }

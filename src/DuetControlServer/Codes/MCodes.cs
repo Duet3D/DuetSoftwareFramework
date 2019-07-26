@@ -50,9 +50,9 @@ namespace DuetControlServer.Codes
                             {
                                 _fileToPrint = file;
                             }
-                            return new CodeResult(MessageType.Success, $"File {file} selected for printing");
+                            return new CodeResult(MessageType.Success, $"File {code.GetUnprecedentedString()} selected for printing");
                         }
-                        return new CodeResult(MessageType.Error, $"Could not find file {file}");
+                        return new CodeResult(MessageType.Error, $"Could not find file {code.GetUnprecedentedString()}");
                     }
 
                 // Resume a file print
@@ -124,11 +124,15 @@ namespace DuetControlServer.Codes
                 case 32:
                     {
                         string file = await FilePath.ToPhysical(code.GetUnprecedentedString(), "gcodes");
-                        using (await _fileToPrintLock.LockAsync())
+                        if (File.Exists(file))
                         {
-                            _fileToPrint = file;
+                            using (await _fileToPrintLock.LockAsync())
+                            {
+                                _fileToPrint = file;
+                            }
+                            return await Print.Start(file, code.Channel);
                         }
-                        return await Print.Start(file, code.Channel);
+                        return new CodeResult(MessageType.Error, $"Could not find file {code.GetUnprecedentedString()}");
                     }
 
                 // Return file information

@@ -1,10 +1,8 @@
-﻿using DuetAPI;
-using DuetAPI.Machine;
+﻿using DuetAPI.Machine;
 using DuetAPI.Utility;
 using Newtonsoft.Json;
 using Nito.AsyncEx;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading.Tasks;
 
@@ -27,40 +25,6 @@ namespace DuetControlServer.Model
             for (int i = 0; i < SPI.Communication.Consts.NumModules; i++)
             {
                 _moduleUpdateEvents[i] = new AsyncManualResetEvent();
-            }
-
-            using (Provider.AccessReadWrite())
-            {
-                foreach (CodeChannel channel in (CodeChannel[])Enum.GetValues(typeof(CodeChannel)))
-                {
-                    Provider.Get.Channels[channel].PropertyChanged += PropertyHasChanged;
-                }
-                Provider.Get.Electronics.PropertyChanged += PropertyHasChanged;
-                Provider.Get.Electronics.ExpansionBoards.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Fans.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Heat.Beds.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Heat.Chambers.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Job.PropertyChanged += PropertyHasChanged;
-                Provider.Get.Job.Layers.CollectionChanged += CollectionHasChanged;
-                Provider.Get.MessageBox.PropertyChanged += PropertyHasChanged;
-                //Provider.Get.Messages.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Move.PropertyChanged += PropertyHasChanged;
-                Provider.Get.Move.Extruders.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Move.Geometry.PropertyChanged += PropertyHasChanged;
-                Provider.Get.Move.Geometry.Anchors.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Move.Geometry.AngleCorrections.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Move.Idle.PropertyChanged += PropertyHasChanged;
-                Provider.Get.Move.WorkplaceCoordinates.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Network.PropertyChanged += PropertyHasChanged;
-                Provider.Get.Network.Interfaces.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Scanner.PropertyChanged += PropertyHasChanged;
-                Provider.Get.Sensors.Endstops.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Sensors.Probes.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Spindles.CollectionChanged += CollectionHasChanged;
-                Provider.Get.State.PropertyChanged += PropertyHasChanged;
-                Provider.Get.Storages.CollectionChanged += CollectionHasChanged;
-                Provider.Get.Tools.CollectionChanged += CollectionHasChanged;
-                Provider.Get.UserVariables.CollectionChanged += CollectionHasChanged;
             }
         }
 
@@ -120,26 +84,30 @@ namespace DuetControlServer.Model
         /// <param name="module">Module that is supposed to be merged</param>
         /// <param name="json">JSON data</param>
         /// <returns>Asynchronous task</returns>
-        public static async void MergeData(byte module, string json)
+        public static void MergeData(byte module, string json)
         {
+            // Don't attempt to update the object model while it is being updated...
             if (_updating)
             {
                 return;
             }
 
+            // Perofmr the JSON processing in the background.
+            // Since the deserialization takes some time, we do not want it to block the SPI task
             _updating = true;
-            await DoMerge(module, json);
-            _updating = false;
+            _ = Task.Run(() =>
+            {
+                _ = DoMerge(module, json);
+                _updating = false;
+            });
         }
 
         private static async Task DoMerge(byte module, string json)
         {
-            // Console.WriteLine($"Got object model for module {module}: {json}");
-
             if (module == 2)
             {
                 // Deserialize extended response (temporary)
-                var responseDefinition = new
+                var response = new
                 {
                     status = 'I',
                     coords = new
@@ -247,11 +215,11 @@ namespace DuetControlServer.Model
                         cur = 0.0F,
                         max = 0.0F
                     },
-                    firmwareName = ""
+                    firmwareName = "",
+                    mode = "FFF"
                 };
+                response = JsonConvert.DeserializeAnonymousType(json, response);
 
-                // FIXME: I bet this call causes a memory leak for some reason:
-                var response = JsonConvert.DeserializeAnonymousType(json, responseDefinition);
                 using (await Provider.AccessReadWriteAsync())
                 {
                     // - Electronics -
@@ -264,19 +232,27 @@ namespace DuetControlServer.Model
                     Provider.Get.Electronics.VIn.Max = response.vin.max;
 
                     // - Fans -
-                    Fan[] fans = new Fan[response.Params.fanPercent.Length];
                     for (int fan = 0; fan < response.Params.fanPercent.Length; fan++)
                     {
-                        Fan fanObj = new Fan
+                        Fan fanObj;
+                        if (fan >= Provider.Get.Fans.Count)
                         {
-                            Name = response.Params.fanNames[fan],
-                            Rpm = (response.sensors.fanRPM.Length > fan && response.sensors.fanRPM[fan] > 0) ? (int?)response.sensors.fanRPM[fan] : null,
-                            Value = response.Params.fanPercent[fan] / 100
-                        };
-                        fanObj.Thermostatic.Control = (response.controllableFans & (1 << fan)) == 0;
-                        fans[fan] = fanObj;
+                            fanObj = new Fan();
+                            Provider.Get.Fans.Add(fanObj);
+                        }
+                        else
+                        {
+                            fanObj = Provider.Get.Fans[fan];
+                        }
+
+                        fanObj.Name = response.Params.fanNames[fan];
+                        fanObj.Rpm = (response.sensors.fanRPM.Length > fan && response.sensors.fanRPM[fan] > 0) ? (int?)response.sensors.fanRPM[fan] : null;
+                        fanObj.Value = response.Params.fanPercent[fan] / 100;
                     }
-                    ListHelpers.AssignList(Provider.Get.Fans, fans);
+                    for (int fan = Provider.Get.Fans.Count; fan > response.Params.fanPercent.Length; fan--)
+                    {
+                        Provider.Get.Fans.RemoveAt(fan - 1);
+                    }
 
                     // - Move -
                     Provider.Get.Move.Compensation = response.compensation;
@@ -285,130 +261,212 @@ namespace DuetControlServer.Model
                     Provider.Get.Move.SpeedFactor = response.Params.speedFactor / 100;
                     Provider.Get.Move.BabystepZ = response.Params.babystep;
 
-                    Drive[] drives = new Drive[response.coords.xyz.Length + response.coords.extr.Length];
+                    // Update drives
+                    int numDrives = response.coords.xyz.Length + response.coords.extr.Length;
+                    for (int drive = 0; drive < numDrives; drive++)
+                    {
+                        Drive driveObj;
+                        if (drive >= Provider.Get.Move.Drives.Count)
+                        {
+                            driveObj = new Drive();
+                            Provider.Get.Move.Drives.Add(driveObj);
+                        }
+                        else
+                        {
+                            driveObj = Provider.Get.Move.Drives[drive];
+                        }
+
+                        driveObj.Position = (drive < response.coords.xyz.Length) ? response.coords.xyz[drive] : response.coords.extr[drive - response.coords.xyz.Length];
+                    }
+                    for (int drive = Provider.Get.Move.Drives.Count; drive > numDrives; drive--)
+                    {
+                        Provider.Get.Move.Drives.RemoveAt(drive - 1);
+                    }
 
                     // Update axes
-                    Axis[] axes = new Axis[response.coords.xyz.Length];
                     for (int axis = 0; axis < response.coords.xyz.Length; axis++)
                     {
-                        Axis axisObj = new Axis
+                        Axis axisObj;
+                        if (axis >= Provider.Get.Move.Axes.Count)
                         {
-                            Letter = GetAxisLetter(axis),
-                            Homed = response.coords.axesHomed[axis] != 0,
-                            MachinePosition = response.coords.machine[axis]
-                        };
-                        axisObj.Drives.Add(axis);
-                        axes[axis] = axisObj;
+                            axisObj = new Axis();
+                            Provider.Get.Move.Axes.Add(axisObj);
+                        }
+                        else
+                        {
+                            axisObj = Provider.Get.Move.Axes[axis];
+                        }
 
-                        drives[axis] = new Drive
-                        {
-                            Position = response.coords.xyz[axis]
-                        };
+                        axisObj.Letter = GetAxisLetter(axis);
+                        axisObj.Homed = response.coords.axesHomed[axis] != 0;
+                        axisObj.MachinePosition = response.coords.machine[axis];
                     }
-                    ListHelpers.AssignList(Provider.Get.Move.Axes, axes);
+                    for (int axis = Provider.Get.Move.Axes.Count; axis > response.coords.xyz.Length; axis--)
+                    {
+                        Provider.Get.Move.Axes.RemoveAt(axis - 1);
+                    }
 
                     // Update extruder drives
-                    Extruder[] extruders = new Extruder[response.coords.extr.Length];
+                    Extruder extruderObj;
                     for (int extruder = 0; extruder < response.coords.extr.Length; extruder++)
                     {
-                        Extruder extruderObj = new Extruder
+                        if (extruder >= Provider.Get.Move.Extruders.Count)
                         {
-                            Factor = response.Params.extrFactors[extruder] / 100
-                        };
-                        extruderObj.Drives.Add(response.coords.xyz.Length + extruder);
-                        extruders[extruder] = extruderObj;
+                            extruderObj = new Extruder();
+                            Provider.Get.Move.Extruders.Add(extruderObj);
+                        }
+                        else
+                        {
+                            extruderObj = Provider.Get.Move.Extruders[extruder];
+                        }
 
-                        drives[response.coords.xyz.Length + extruder] = new Drive
+                        extruderObj.Factor = response.Params.extrFactors[extruder] / 100;
+                        if (extruderObj.Drives.Count == 1)
                         {
-                            Position = response.coords.extr[extruder]
-                        };
+                            extruderObj.Drives[0] = response.coords.xyz.Length + extruder;
+                        }
+                        else
+                        {
+                            extruderObj.Drives.Add(response.coords.xyz.Length + extruder);
+                        }
                     }
-                    ListHelpers.AssignList(Provider.Get.Move.Extruders, extruders);
-
-                    ListHelpers.AssignList(Provider.Get.Move.Drives, drives);
+                    for (int extruder = Provider.Get.Move.Extruders.Count; extruder > response.coords.extr.Length; extruder--)
+                    {
+                        Provider.Get.Move.Extruders.RemoveAt(extruder - 1);
+                    }
 
                     // - Heat -
                     Provider.Get.Heat.ColdExtrudeTemperature = response.coldExtrudeTemp;
                     Provider.Get.Heat.ColdRetractTemperature = response.coldRetractTemp;
 
-                    // Update beds
-                    BedOrChamber[] beds;
-                    if (response.temps.bed != null)
-                    {
-                        beds = new BedOrChamber[1];
-
-                        BedOrChamber bed = new BedOrChamber();
-                        bed.Active.Add(response.temps.bed.active);
-                        bed.Standby.Add(response.temps.bed.standby);
-                        bed.Heaters.Add(response.temps.bed.heater);
-                        beds[0] = bed;
-                    }
-                    else
-                    {
-                        beds = new BedOrChamber[0];
-                    }
-                    ListHelpers.AssignList(Provider.Get.Heat.Beds, beds);
-
-                    // Update chambers
-                    BedOrChamber[] chambers;
-                    if (response.temps.chamber != null)
-                    {
-                        chambers = new BedOrChamber[1];
-
-                        BedOrChamber chamber = new BedOrChamber();
-                        chamber.Active.Add(response.temps.chamber.active);
-                        chamber.Standby.Add(response.temps.chamber.standby);
-                        chamber.Heaters.Add(response.temps.chamber.heater);
-                        chambers[0] = chamber;
-                    }
-                    else
-                    {
-                        chambers = new BedOrChamber[0];
-                    }
-                    ListHelpers.AssignList(Provider.Get.Heat.Chambers, chambers);
-
                     // Update heaters
-                    Heater[] heaters = new Heater[response.temps.current.Length];
                     for (int heater = 0; heater < response.temps.current.Length; heater++)
                     {
-                        heaters[heater] = new Heater
+                        Heater heaterObj;
+                        if (heater >= Provider.Get.Heat.Heaters.Count)
                         {
-                            Current = response.temps.current[heater],
-                            Max = response.tempLimit,
-                            Name = response.temps.names[heater],
-                            Sensor = heater,
-                            State = (HeaterState)response.temps.state[heater]
-                        };
-                    }
-                    ListHelpers.AssignList(Provider.Get.Heat.Heaters, heaters);
+                            heaterObj = new Heater();
+                            Provider.Get.Heat.Heaters.Add(heaterObj);
+                        }
+                        else
+                        {
+                            heaterObj = Provider.Get.Heat.Heaters[heater];
+                        }
 
-                    // Update extra heaters
-                    ExtraHeater[] extraHeaters = new ExtraHeater[response.temps.extra.Length];
-                    for (int extra = 0; extra < response.temps.extra.Length; extra++)
-                    {
-                        extraHeaters[extra] = new ExtraHeater
-                        {
-                            Current = response.temps.extra[extra].temp,
-                            Name = response.temps.extra[extra].name
-                        };
+                        heaterObj.Current = response.temps.current[heater];
+                        heaterObj.Max = response.tempLimit;
+                        heaterObj.Name = response.temps.names[heater];
+                        heaterObj.Sensor = heater;
+                        heaterObj.State = (HeaterState)response.temps.state[heater];
                     }
-                    ListHelpers.AssignList(Provider.Get.Heat.Extra, extraHeaters);
+                    for (int heater = Provider.Get.Heat.Heaters.Count; heater > response.temps.current.Length; heater--)
+                    {
+                        Provider.Get.Heat.Heaters.RemoveAt(heater - 1);
+                    }
 
-                    // - Sensors -
-                    Probe[] probes = new Probe[1];
-                    Probe probe = new Probe()
+                    // Update beds
+                    if (response.temps.bed != null)
                     {
-                        Value = response.sensors.probeValue
-                    };
-                    if (response.sensors.probeSecondary != null)
-                    {
-                        foreach (int secondaryValue in response.sensors.probeSecondary)
+                        BedOrChamber bedObj;
+                        if (Provider.Get.Heat.Beds.Count == 0)
                         {
-                            probe.SecondaryValues.Add(secondaryValue);
+                            bedObj = new BedOrChamber();
+                            Provider.Get.Heat.Beds.Add(bedObj);
+                        }
+                        else
+                        {
+                            bedObj = Provider.Get.Heat.Beds[0];
+                        }
+
+                        if (bedObj.Heaters.Count == 0)
+                        {
+                            bedObj.Active.Add(response.temps.bed.active);
+                            bedObj.Standby.Add(response.temps.bed.standby);
+                            bedObj.Heaters.Add(response.temps.bed.heater);
+                        }
+                        else
+                        {
+                            bedObj.Active[0] = response.temps.bed.active;
+                            bedObj.Standby[0] = response.temps.bed.standby;
+                            bedObj.Heaters[0] = response.temps.bed.heater;
                         }
                     }
-                    probes[0] = probe;
-                    ListHelpers.AssignList(Provider.Get.Sensors.Probes, probes);
+                    else if (Provider.Get.Heat.Beds.Count > 0)
+                    {
+                        Provider.Get.Heat.Beds.Clear();
+                    }
+
+                    // Update chambers
+                    if (response.temps.chamber != null)
+                    {
+                        BedOrChamber chamberObj;
+                        if (Provider.Get.Heat.Chambers.Count == 0)
+                        {
+                            chamberObj = new BedOrChamber();
+                            Provider.Get.Heat.Chambers.Add(chamberObj);
+                        }
+                        else
+                        {
+                            chamberObj = Provider.Get.Heat.Chambers[0];
+                        }
+
+                        if (chamberObj.Heaters.Count == 0)
+                        {
+                            chamberObj.Active.Add(response.temps.chamber.active);
+                            chamberObj.Standby.Add(response.temps.chamber.standby);
+                            chamberObj.Heaters.Add(response.temps.chamber.heater);
+                        }
+                        else
+                        {
+                            chamberObj.Active[0] = response.temps.chamber.active;
+                            chamberObj.Standby[0] = response.temps.chamber.standby;
+                            chamberObj.Heaters[0] = response.temps.chamber.heater;
+                        }
+                    }
+                    else if (Provider.Get.Heat.Chambers.Count > 0)
+                    {
+                        Provider.Get.Heat.Chambers.Clear();
+                    }
+
+                    // Update extra heaters
+                    for (int extra = 0; extra < response.temps.extra.Length; extra++)
+                    {
+                        ExtraHeater extraObj;
+                        if (extra >= Provider.Get.Heat.Extra.Count)
+                        {
+                            extraObj = new ExtraHeater();
+                            Provider.Get.Heat.Extra.Add(extraObj);
+                        }
+                        else
+                        {
+                            extraObj = Provider.Get.Heat.Extra[extra];
+                        }
+
+                        extraObj.Current = response.temps.extra[extra].temp;
+                        extraObj.Name = response.temps.extra[extra].name;
+                    }
+                    for (int extra = Provider.Get.Heat.Extra.Count; extra > response.temps.extra.Length; extra--)
+                    {
+                        Provider.Get.Heat.Extra.RemoveAt(extra - 1);
+                    }
+
+                    // - Sensors -
+                    Probe probeObj;
+                    if (Provider.Get.Sensors.Probes.Count == 0)
+                    {
+                        probeObj = new Probe();
+                        Provider.Get.Sensors.Probes.Add(probeObj);
+                    }
+                    else
+                    {
+                        probeObj = Provider.Get.Sensors.Probes[0];
+                    }
+
+                    probeObj.Value = response.sensors.probeValue;
+                    if (response.sensors.probeSecondary != null)
+                    {
+                        ListHelpers.SetList(probeObj.SecondaryValues, response.sensors.probeSecondary);
+                    }
 
                     // - State -
                     Provider.Get.State.AtxPower = (response.Params.atxPower == -1) ? null : (bool?)(response.Params.atxPower != 0);
@@ -437,47 +495,49 @@ namespace DuetControlServer.Model
                         // RRF does not always know whether a macro file is being executed
                         Provider.Get.State.Status = MachineStatus.Busy;
                     }
+                    Provider.Get.State.Mode = (MachineMode)Enum.Parse(typeof(MachineMode), response.mode, true);
 
                     // - Tools -
-                    Tool[] tools = new Tool[response.tools.Length];
+                    Tool toolObj;
                     for (int tool = 0; tool < response.tools.Length; tool++)
                     {
-                        Tool toolObj = new Tool
+                        if (tool >= Provider.Get.Tools.Count)
                         {
-                            Filament = response.tools[tool].filament,
-                            Name = (response.tools[tool].name == "") ? null : response.tools[tool].name,
-                            Number = response.tools[tool].number
-                        };
-                        foreach (float active in response.temps.tools.active[tool])
-                        {
-                            toolObj.Active.Add(active);
+                            toolObj = new Tool();
+                            Provider.Get.Tools.Add(toolObj);
                         }
-                        foreach (float standby in response.temps.tools.standby[tool])
+                        else
                         {
-                            toolObj.Standby.Add(standby);
+                            toolObj = Provider.Get.Tools[tool];
                         }
-                        if (response.tools[tool].fan >= 0)
+
+                        toolObj.Filament = response.tools[tool].filament;
+                        toolObj.Name = (response.tools[tool].name == "") ? null : response.tools[tool].name;
+                        toolObj.Number = response.tools[tool].number;
+                        ListHelpers.SetList(toolObj.Heaters, response.tools[tool].heaters);
+                        ListHelpers.SetList(toolObj.Active, response.temps.tools.active[tool]);
+                        ListHelpers.SetList(toolObj.Standby, response.temps.tools.standby[tool]);
+                        if (toolObj.Fans.Count == 0)
                         {
                             toolObj.Fans.Add(response.tools[tool].fan);
                         }
-                        foreach (int heater in response.tools[tool].heaters)
+                        else
                         {
-                            toolObj.Heaters.Add(heater);
+                            toolObj.Fans[0] = response.tools[tool].fan;
                         }
-                        foreach (float offset in response.tools[tool].offsets)
-                        {
-                            toolObj.Offsets.Add(offset);
-                        }
-                        tools[tool] = toolObj;
+                        ListHelpers.SetList(toolObj.Offsets, response.tools[tool].offsets);
                     }
-                    ListHelpers.AssignList(Provider.Get.Tools, tools);
+                    for (int tool = Provider.Get.Tools.Count; tool > response.tools.Length; tool--)
+                    {
+                        Provider.Get.Tools.RemoveAt(tool - 1);
+                    }
                 }
             }
 
             // Deserialize print status response
             else if (module == 3)
             {
-                var printResponseDefinition = new
+                var printResponse = new
                 {
                     currentLayer = 0,
                     currentLayerTime = 0F,
@@ -493,8 +553,8 @@ namespace DuetControlServer.Model
 						layer = 0F
                     }
                 };
+                printResponse = JsonConvert.DeserializeAnonymousType(json, printResponse);
 
-                var printResponse = JsonConvert.DeserializeAnonymousType(json, printResponseDefinition);
                 using (await Provider.AccessReadWriteAsync())
                 {
                     Provider.Get.Job.Layer = printResponse.currentLayer;
@@ -518,6 +578,9 @@ namespace DuetControlServer.Model
                 }
             }
 
+            // Notify subscribers
+            IPC.Processors.Subscription.ModelUpdated();
+
             // Notify waiting threads about the last module updated
             _moduleUpdateEvents[module].Set();
             _moduleUpdateEvents[module].Reset();
@@ -525,6 +588,11 @@ namespace DuetControlServer.Model
             {
                 _lastUpdatedModule = module;
             }
+
+            // Force manual garbage collection (maybe the GC cannot keep up with the speed of the update loop)
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
         }
 
         private static MachineStatus GetStatus(char letter)

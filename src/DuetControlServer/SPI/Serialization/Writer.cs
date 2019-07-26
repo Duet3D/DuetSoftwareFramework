@@ -119,7 +119,7 @@ namespace DuetControlServer.SPI.Serialization
                 }
                 else if (parameter.Type == typeof(uint))
                 {
-                    binaryParam.Type = DataType.UInt;
+                    binaryParam.Type = parameter.IsDriverId ? DataType.DriverId : DataType.UInt;
                     binaryParam.UIntValue = parameter;
                 }
                 else if (parameter.Type == typeof(float))
@@ -136,7 +136,7 @@ namespace DuetControlServer.SPI.Serialization
                 }
                 else if (parameter.Type == typeof(uint[]))
                 {
-                    binaryParam.Type = DataType.UIntArray;
+                    binaryParam.Type = parameter.IsDriverId ? DataType.DriverIdArray : DataType.UIntArray;
                     uint[] array = parameter;
                     binaryParam.IntValue = array.Length;
                     extraParameters.Add(array);

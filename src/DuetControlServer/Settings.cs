@@ -87,6 +87,12 @@ namespace DuetControlServer
         public static int SpiPollDelay { get; set; } = 25;
 
         /// <summary>
+        /// Path to the GPIO chip device node
+        /// </summary>
+        [JsonProperty]
+        public static string GpioChipDevice { get; set; } = "/dev/gpiochip0";
+
+        /// <summary>
         /// Number of the GPIO pin that is used by RepRapFirmware to flag its ready state
         /// </summary>
         [JsonProperty]
@@ -107,7 +113,8 @@ namespace DuetControlServer
         /// <summary>
         /// Maximum space of buffered codes per channel (in bytes). Must be greater than <see cref="SPI.Communication.Consts.MaxCodeBufferSize"/>
         /// </summary>
-        public static int MaxBufferSpacePerChannel { get; set; } = 512;
+        [JsonProperty]
+        public static int MaxBufferSpacePerChannel { get; set; } = 768;
 
         /// <summary>
         /// Maximum delay after which a status update is requested even when in burst mode (in ms)

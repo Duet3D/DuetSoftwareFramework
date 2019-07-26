@@ -91,14 +91,15 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseM569()
         {
-            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M569 P2 S1 T0.5");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M569 P1.2 S1 T0.5");
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(569, code.MajorNumber);
             Assert.AreEqual(null, code.MinorNumber);
             Assert.AreEqual(CodeFlags.None, code.Flags);
             Assert.AreEqual(3, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
-            Assert.AreEqual(2, (int)code.Parameters[0]);
+            uint driverId = (uint)((1 << 16) | 2);
+            Assert.AreEqual(driverId, (uint)code.Parameters[0]);
             Assert.AreEqual('S', code.Parameters[1].Letter);
             Assert.AreEqual(1, (int)code.Parameters[1]);
             Assert.AreEqual('T', code.Parameters[2].Letter);
@@ -121,6 +122,22 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual('P', code.Parameters[2].Letter);
             Assert.AreEqual("io1.in", (string)code.Parameters[2]);
             Assert.AreEqual("comment", code.Comment);
+        }
+
+        [Test]
+        public void ParseM915()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M915 P2:0.3:1.4 S22");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(915, code.MajorNumber);
+            Assert.AreEqual(null, code.MinorNumber);
+            Assert.AreEqual(CodeFlags.None, code.Flags);
+            Assert.AreEqual(2, code.Parameters.Count);
+            Assert.AreEqual('P', code.Parameters[0].Letter);
+            uint[] driverIds = new uint[] { 2, 3, (1 << 16) | 4 };
+            Assert.AreEqual(driverIds, (uint[])code.Parameters[0]);
+            Assert.AreEqual('S', code.Parameters[1].Letter);
+            Assert.AreEqual(22, (int)code.Parameters[1]);
         }
 
         [Test]

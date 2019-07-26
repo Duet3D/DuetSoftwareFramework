@@ -528,10 +528,7 @@ namespace DuetControlServer.SPI
 
             while (NestedMacros.TryPop(out MacroFile macroFile))
             {
-                if (macroFile.StartCode != null)
-                {
-                    macroFile.StartCode.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
-                }
+                macroFile.StartCode?.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
             }
 
             while (PendingCodes.TryDequeue(out QueuedCode queuedCode))

@@ -387,6 +387,34 @@ namespace DuetAPI.Commands
                 throw new CodeParserException("Too many parameters (> 255)");
             }
 
+            // M584, M569 and M915 use driver identifiers
+            if (result.Type == CodeType.MCode)
+            {
+                switch (result.MajorNumber)
+                {
+                    case 569:
+                    case 915:
+                        foreach (CodeParameter parameter in result.Parameters)
+                        {
+                            if (char.ToUpperInvariant(parameter.Letter) == 'P')
+                            {
+                                parameter.ConvertDriverIds();
+                            }
+                        }
+                        break;
+
+                    case 584:
+                        foreach (CodeParameter parameter in result.Parameters)
+                        {
+                            if ("XYZUVWABCE".Contains(char.ToUpperInvariant(parameter.Letter)))
+                            {
+                                parameter.ConvertDriverIds();
+                            }
+                        }
+                        break;
+                }
+            }
+
             // End
             return contentRead;
         }

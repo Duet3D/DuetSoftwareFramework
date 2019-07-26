@@ -8,10 +8,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using Code = DuetControlServer.Commands.Code;
-using Unosquare.RaspberryIO;
-using Unosquare.RaspberryIO.Abstractions;
-using Unosquare.WiringPi;
 using Nito.AsyncEx;
+using System.Threading.Tasks;
+using LinuxDevices;
 
 namespace DuetControlServer.SPI
 {
@@ -21,7 +20,8 @@ namespace DuetControlServer.SPI
     public static class DataTransfer
     {
         // General transfer variables
-        private static ISpiChannel _spiChannel;
+        private static InputGpioPin _transferReadyPin;
+        private static SpiDevice _spiDevice;
         private static readonly AsyncManualResetEvent _transferReadyEvent = new AsyncManualResetEvent();
         private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting, _updating;
         private static ushort _lastTransferNumber;
@@ -30,18 +30,18 @@ namespace DuetControlServer.SPI
         private static int _numMeasuredTransfers;
 
         // Transfer headers
-        private static Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
+        private static readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
         private static readonly Memory<byte> _txHeaderBuffer = new byte[Marshal.SizeOf(typeof(Communication.TransferHeader))];
         private static Communication.TransferHeader _rxHeader;
         private static Communication.TransferHeader _txHeader;
         private static byte _packetId;
 
         // Transfer responses
-        private static Memory<byte> _rxResponseBuffer = new byte[4];
+        private static readonly Memory<byte> _rxResponseBuffer = new byte[4];
         private static readonly Memory<byte> _txResponseBuffer = new byte[4];
 
         // Transfer data. Keep two TX buffers so resend requests can be processed
-        private static Memory<byte> _rxBuffer = new byte[Communication.Consts.BufferSize];
+        private static readonly Memory<byte> _rxBuffer = new byte[Communication.Consts.BufferSize];
         private static readonly Memory<byte>[] _txBuffers = { new byte[Communication.Consts.BufferSize], new byte[Communication.Consts.BufferSize] };
         private static int _txBufferIndex;
         private static int _rxPointer, _txPointer;
@@ -56,21 +56,13 @@ namespace DuetControlServer.SPI
             // Initialize TX header. This only needs to happen once
             Serialization.Writer.InitTransferHeader(ref _txHeader);
 
-            // Initialize WiringPi
-            Pi.Init<BootstrapWiringPi>();
-            Pi.Gpio[Settings.TransferReadyPin].PinMode = GpioPinDriveMode.Input;
-            Pi.Gpio[Settings.TransferReadyPin].InputPullMode = GpioPinResistorPullMode.PullDown;
-            if (Settings.SpiBusID == 0)
-            {
-                Pi.Spi.Channel0Frequency = Settings.SpiFrequency;
-                _spiChannel = Pi.Spi.Channel0;
-            }
-            else
-            {
-                Pi.Spi.Channel1Frequency = Settings.SpiFrequency;
-                _spiChannel = Pi.Spi.Channel1;
-            }
-            Pi.Gpio[Settings.TransferReadyPin].RegisterInterruptCallback(EdgeDetection.FallingAndRisingEdge, () => _transferReadyEvent.Set());
+            // Initialize transfer ready pin
+            _transferReadyPin = new InputGpioPin(Settings.GpioChipDevice, Settings.TransferReadyPin);
+            _transferReadyPin.PinChanged += (sender, pinValue) => _transferReadyEvent.Set();
+            _transferReadyPin.StartMonitoring(250, Program.CancelSource.Token);
+
+            // Initialize SPI device
+            _spiDevice = new SpiDevice($"/dev/spidev{Settings.SpiBusID}.{Settings.SpiChipSelectLine}", Settings.SpiFrequency);
         }
 
         private static decimal GetFullTransfersPerSecond()
@@ -92,7 +84,7 @@ namespace DuetControlServer.SPI
         /// <param name="builder">Target to write to</param>
         public static void Diagnostics(StringBuilder builder)
         {
-            builder.AppendLine($"SPI speed: {_spiChannel.Frequency} Hz");
+            builder.AppendLine($"Configured SPI speed: {Settings.SpiFrequency} Hz");
             builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}");
         }
 
@@ -177,6 +169,7 @@ namespace DuetControlServer.SPI
                 }
                 catch (OperationCanceledException e)
                 {
+                    Console.WriteLine(e.Message);
                     if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout && _started && !_updating)
                     {
                         // If this is the first unexpected timeout event, report it unless the firmware is being updated
@@ -671,8 +664,10 @@ namespace DuetControlServer.SPI
             PerformFullTransfer(false);
 
             // Wait for IAP to start...
-            Thread.Sleep(Communication.Consts.IapBootDelay);
-            Pi.Gpio[Settings.TransferReadyPin].WaitForValue(GpioPinValue.High, int.MaxValue);
+            do
+            {
+                Thread.Sleep(250);
+            } while (!_transferReadyPin.Value);
             _transferReadyEvent.Set();
         }
 
@@ -698,7 +693,7 @@ namespace DuetControlServer.SPI
 
             // In theory the response of this could be checked to consist only of 0x1A bytes
             WaitForTransfer();
-            _spiChannel.Write(segment.ToArray());
+            _spiDevice.TransferFullDuplex(segment, segment);
             return true;
         }
 
@@ -720,15 +715,15 @@ namespace DuetControlServer.SPI
                 firmwareLength = (uint)firmwareLength,
                 crc16 = crc16
             };
-            byte[] transferData = /*stackalloc*/ new byte[Marshal.SizeOf(typeof(Communication.LinuxRequests.FlashVerifyRequest))];
+            Span<byte> transferData = /*stackalloc*/ new byte[Marshal.SizeOf(typeof(Communication.LinuxRequests.FlashVerifyRequest))];
             MemoryMarshal.Write(transferData, ref verifyRequest);
             WaitForTransfer();
-            _spiChannel.Write(transferData);
+            _spiDevice.TransferFullDuplex(transferData, transferData);
 
             // Check if the IAP can confirm our CRC16 checksum
             byte[] writeOk = /*stackalloc*/ new byte[1];
             WaitForTransfer();
-            writeOk = _spiChannel.SendReceive(writeOk);
+            _spiDevice.TransferFullDuplex(writeOk, writeOk);
             return (writeOk[0] == 0x0C);
         }
 
@@ -773,26 +768,55 @@ namespace DuetControlServer.SPI
         #region Functions for data transfers
         private static void WaitForTransfer()
         {
-            if (_waitingForFirstTransfer)
-            {
-                if (!Pi.Gpio[Settings.TransferReadyPin].WaitForValue(GpioPinValue.High, _updating ? int.MaxValue : Settings.SpiTransferTimeout))
-                {
-                    throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
-                }
-                if (Program.CancelSource.IsCancellationRequested)
-                {
-                    throw new OperationCanceledException("Program termination");
-                }
-                _waitingForFirstTransfer = false;
-            }
-            else if (_updating)
+            if (_updating)
             {
                 _transferReadyEvent.Wait(Program.CancelSource.Token);
             }
+            else if (_waitingForFirstTransfer)
+            {
+                _transferReadyEvent.Reset();
+                if (!_transferReadyPin.Value)
+                {
+                    using (CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SpiTransferTimeout))
+                    {
+                        using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, timeoutCts.Token))
+                        {
+                            _transferReadyEvent.Wait(cts.Token);
+
+                            if (Program.CancelSource.IsCancellationRequested)
+                            {
+                                throw new OperationCanceledException("Program termination");
+                            }
+                            if (timeoutCts.IsCancellationRequested)
+                            {
+                                throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
+                            }
+                        }
+                    }
+                }
+                _waitingForFirstTransfer = false;
+            }
             else
             {
-                CancellationToken token = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, (new CancellationTokenSource(Settings.SpiTransferTimeout)).Token).Token;
-                _transferReadyEvent.Wait(token);
+                DateTime startTime = DateTime.Now;
+
+                using (CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SpiTransferTimeout))
+                {
+                    using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, timeoutCts.Token))
+                    {
+                        _transferReadyEvent.Wait(cts.Token);
+
+                        if (timeoutCts.IsCancellationRequested)
+                        {
+                            throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
+                        }
+                    }
+                }
+
+                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(200))
+                {
+                    Console.WriteLine("=> TransferReadyPin level change took longer than 200ms");
+                }
             }
             _transferReadyEvent.Reset();
         }
@@ -803,7 +827,12 @@ namespace DuetControlServer.SPI
             {
                 // Perform SPI header exchange
                 WaitForTransfer();
-                _rxHeaderBuffer = _spiChannel.SendReceive(_txHeaderBuffer.ToArray());
+                DateTime startTime = DateTime.Now;
+                _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
+                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(200))
+                {
+                    Console.WriteLine("Raw SPI header transfer took longer than 200ms");
+                }
 
                 // Check for possible response code
                 uint responseCode = MemoryMarshal.Read<uint>(_rxHeaderBuffer.Span);
@@ -898,7 +927,12 @@ namespace DuetControlServer.SPI
             MemoryMarshal.Write(_txResponseBuffer.Span, ref response);
 
             WaitForTransfer();
-            _rxResponseBuffer = _spiChannel.SendReceive(_txResponseBuffer.ToArray());
+            DateTime startTime = DateTime.Now;
+            _spiDevice.TransferFullDuplex(_txResponseBuffer.Span, _rxResponseBuffer.Span);
+            if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(200))
+            {
+                Console.WriteLine("Raw SPI response transfer took longer than 200ms");
+            }
 
             return MemoryMarshal.Read<uint>(_rxResponseBuffer.Span);
         }
@@ -909,7 +943,12 @@ namespace DuetControlServer.SPI
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
                 WaitForTransfer();
-                _rxBuffer = _spiChannel.SendReceive(_txBuffers[_txBufferIndex].Slice(0, bytesToTransfer).ToArray());
+                DateTime startTime = DateTime.Now;
+                _spiDevice.TransferFullDuplex(_txBuffers[_txBufferIndex].Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
+                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(200))
+                {
+                    Console.WriteLine("Raw SPI data transfer took longer than 200ms");
+                }
 
                 // Check for possible response code
                 uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);

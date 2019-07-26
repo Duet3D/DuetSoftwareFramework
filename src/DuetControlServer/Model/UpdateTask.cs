@@ -94,11 +94,23 @@ namespace DuetControlServer.Model
         private static void UpdateStorages()
         {
             int index = 0;
+            long totalSize;
+
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
-                if (drive.DriveType != DriveType.Ram && drive.TotalSize > 0)
+                try
                 {
-                    long? capacity = (drive.DriveType == DriveType.Network) ? null : (long?)drive.TotalSize;
+                    // On some systems this query causes an IOException...
+                    totalSize = drive.TotalSize;
+                }
+                catch
+                {
+                    totalSize = 0;
+                }
+
+                if (drive.DriveType != DriveType.Ram && totalSize > 0)
+                {
+                    long? capacity = (drive.DriveType == DriveType.Network) ? null : (long?)totalSize;
                     long? free = (drive.DriveType == DriveType.Network) ? null : (long?)drive.AvailableFreeSpace;
 
                     if (index >= Provider.Get.Storages.Count)
