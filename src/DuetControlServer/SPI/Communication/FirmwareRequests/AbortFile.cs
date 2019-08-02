@@ -12,5 +12,10 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// Code channel running the file(s)
         /// </summary>
         public byte Channel;
+
+        /// <summary>
+        /// Indicates if all pending files are supposed to be aborted
+        /// </summary>
+        public byte AbortAll;
     }
 }

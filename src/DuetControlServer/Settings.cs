@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
-using DuetAPI.Utility;
 using Newtonsoft.Json;
 
 namespace DuetControlServer
@@ -117,10 +116,11 @@ namespace DuetControlServer
         public static int MaxBufferSpacePerChannel { get; set; } = 768;
 
         /// <summary>
-        /// Maximum delay after which a status update is requested even when in burst mode (in ms)
+        /// Interval of regular status updates (in ms)
         /// </summary>
+        /// <remarks>This is preliminary and will be removed from future versions</remarks>
         [JsonProperty]
-        public static double MaxUpdateDelay { get; set; } = 250.0;
+        public static double ModelUpdateInterval { get; set; } = 125.0;
 
         /// <summary>
         /// File holding the IAP binary for the Duet 3

@@ -131,8 +131,8 @@ namespace DuetUnitTest.SPI
             
             // Header
             Assert.AreEqual(CodeChannel.USB, channel);
-            Assert.AreEqual(false, reportMissing);
-            Assert.AreEqual(true, fromCode);
+            Assert.IsFalse(reportMissing);
+            Assert.IsTrue(fromCode);
             
             // Message
             Assert.AreEqual("homeall.g", filename);
@@ -143,11 +143,12 @@ namespace DuetUnitTest.SPI
         {
             Span<byte> blob = GetBlob("abortFile.bin");
 
-            int bytesRead = Reader.ReadAbortFile(blob, out CodeChannel channel);
+            int bytesRead = Reader.ReadAbortFile(blob, out CodeChannel channel, out bool abortAll);
             Assert.AreEqual(4, bytesRead);
 
             // Header
             Assert.AreEqual(CodeChannel.File, channel);
+            Assert.IsFalse(abortAll);
         }
 
         [Test]

@@ -250,12 +250,13 @@
             </summary>
             <returns>Command fraction of the code</returns>
         </member>
-        <member name="M:DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code)">
+        <member name="M:DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code,System.Boolean@)">
             <summary>
             Parse the next available G/M/T-code from the given stream
             </summary>
             <param name="reader">Input to read from</param>
             <param name="result">Code to fill</param>
+            <param name="enforcingAbsolutePosition">If G53 is in effect for the current line</param>
             <returns>Whether anything could be read</returns>
             <exception cref="T:DuetAPI.Commands.CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
         </member>
@@ -414,6 +415,11 @@
             Indicates if this parameter is an expression that can be evaluated
             </summary>
         </member>
+        <member name="P:DuetAPI.Commands.CodeParameter.IsDriverId">
+            <summary>
+            Indicates if this parameter is a driver identifier
+            </summary>
+        </member>
         <member name="F:DuetAPI.Commands.CodeParameter._stringValue">
             <summary>
             Unparsed string representation of the code parameter or an empty string if none present
@@ -439,6 +445,12 @@
             </summary>
             <param name="letter">Letter of the code parameter</param>
             <param name="value">Value of this parameter</param>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.ConvertDriverIds">
+            <summary>
+            Convert this parameter to driver id(s)
+            </summary>
+            <remarks>The data remains a uint (array) after the conversion. The top 16 bits reflect the board number and the bottom 16 bits the port</remarks>
         </member>
         <member name="P:DuetAPI.Commands.CodeParameter.Type">
             <summary>
@@ -821,6 +833,32 @@
         <member name="T:DuetAPI.Commands.SyncMachineModel">
             <summary>
             Wait for the machine model to be fully updated from RepRapFirmware
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.WriteMessage">
+            <summary>
+            Write an arbitrary message
+            </summary>
+            <remarks>If neither <c>OutputMessage</c> nor <c>LogMessage</c> is true, the message is written to the console output</remarks>
+        </member>
+        <member name="P:DuetAPI.Commands.WriteMessage.Type">
+            <summary>
+            Type of the message to write
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.WriteMessage.Content">
+            <summary>
+            Content of the message to write
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.WriteMessage.OutputMessage">
+            <summary>
+            Output the message on the console and via the object model
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.WriteMessage.LogMessage">
+            <summary>
+            Write the message to the log file (if applicable)
             </summary>
         </member>
         <member name="T:DuetAPI.Connection.ConnectionMode">
@@ -1946,6 +1984,40 @@
             </summary>
             <returns>A clone of this instance</returns>
         </member>
+        <member name="T:DuetAPI.Machine.Laser">
+            <summary>
+            Information about an attached laser diode
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Laser.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Laser.ActualPwm">
+            <summary>
+            Actual PWM intensity (0..1)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Laser.RequestedPwm">
+            <summary>
+            Requested PWM intensity from the G1 move (0..1)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Laser.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
+        <member name="M:DuetAPI.Machine.Laser.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>Clone of this instance</returns>
+        </member>
         <member name="T:DuetAPI.Machine.MachineModel">
             <summary>
             Representation of the full machine model as maintained by DCS
@@ -1975,6 +2047,11 @@
         <member name="P:DuetAPI.Machine.MachineModel.Job">
             <summary>
             Information about the current file job (if any)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MachineModel.Lasers">
+            <summary>
+            List of configured laser diodes
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.MachineModel.MessageBox">
@@ -2080,6 +2157,11 @@
         <member name="P:DuetAPI.Machine.MessageBox.AxisControls">
             <summary>
             Optional axis movement controls to show (axis indices)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MessageBox.Seq">
+            <summary>
+            Counter that is incremented whenever a new message box is shown
             </summary>
         </member>
         <member name="M:DuetAPI.Machine.MessageBox.Assign(System.Object)">
@@ -2664,6 +2746,21 @@
             Information about the network subsystem
             </summary>
         </member>
+        <member name="F:DuetAPI.Machine.Network.DefaultName">
+            <summary>
+            Default name of the machine
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Network.DefaultHostname">
+            <summary>
+            Fallback hostname if the <c>Name</c> is invalid
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.Network.DefaultPassword">
+            <summary>
+            Default network password of the machine
+            </summary>
+        </member>
         <member name="E:DuetAPI.Machine.Network.PropertyChanged">
             <summary>
             Event to trigger when a property has changed
@@ -2672,6 +2769,11 @@
         <member name="P:DuetAPI.Machine.Network.Name">
             <summary>
             Name of the machine
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Network.Hostname">
+            <summary>
+            Hostname of the machine
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Network.Password">
@@ -3330,7 +3432,7 @@
         </member>
         <member name="P:DuetAPI.Machine.State.Beep">
             <summary>
-            Details about a requested beep
+            Information about a requested beep
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.State.CurrentTool">
@@ -3341,6 +3443,11 @@
         <member name="P:DuetAPI.Machine.State.DisplayMessage">
             <summary>
             Persistent message to display (see M117)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.LogFile">
+            <summary>
+            Log file being written to or null if logging is disabled
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.State.Mode">
@@ -3449,6 +3556,11 @@
         <member name="P:DuetAPI.Machine.Tool.Name">
             <summary>
             Name of the tool or null if unset
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tool.FilamentExtruder">
+            <summary>
+            Extruder drive index for resolving the tool filament (index or -1)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Tool.Filament">

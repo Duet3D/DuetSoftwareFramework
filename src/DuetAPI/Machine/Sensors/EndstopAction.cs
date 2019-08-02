@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Action that is performed when an endstop is hit

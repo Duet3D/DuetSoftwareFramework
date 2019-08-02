@@ -3,6 +3,7 @@ using DuetAPI.Utility;
 using Newtonsoft.Json;
 using Nito.AsyncEx;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading.Tasks;
 
@@ -13,9 +14,18 @@ namespace DuetControlServer.Model
     /// </summary>
     public static class Updater
     {
-        private static volatile bool _updating;
         private static byte _lastUpdatedModule;
         private static readonly AsyncManualResetEvent[] _moduleUpdateEvents = new AsyncManualResetEvent[SPI.Communication.Consts.NumModules];
+
+        /// <summary>
+        /// Indicates if this class is ready to accept JSON data
+        /// </summary>
+        public static bool IsReady
+        {
+            get => _isReady;
+            set => _isReady = value;
+        }
+        private static volatile bool _isReady;
 
         /// <summary>
         /// Initialize this class
@@ -26,40 +36,7 @@ namespace DuetControlServer.Model
             {
                 _moduleUpdateEvents[i] = new AsyncManualResetEvent();
             }
-        }
-
-        private static void CollectionHasChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-        {
-            if (e.OldItems != null)
-            {
-                for (int i = 0; i < e.OldItems.Count; i++)
-                {
-                    if (e.OldItems[i] is INotifyPropertyChanged obj)
-                    {
-                        // Unsubscribe from existing items in order to prevent a memory leak...
-                        obj.PropertyChanged -= PropertyHasChanged;
-                    }
-                }
-            }
-
-            if (e.NewItems != null)
-            {
-                for (int i = 0; i < e.NewItems.Count; i++)
-                {
-                    if (e.NewItems[i] is INotifyPropertyChanged obj)
-                    {
-                        // Subscribe for potential updates again.
-                        // We do not subscribe to sub-collections/sub-types yet so it is possible that this has to be changed again...
-                        obj.PropertyChanged += PropertyHasChanged;
-                    }
-                }
-            }
-        }
-
-        private static void PropertyHasChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            // Notify clients about new data
-            IPC.Processors.Subscription.ModelUpdated();
+            IsReady = true;
         }
 
         /// <summary>
@@ -86,19 +63,24 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static void MergeData(byte module, string json)
         {
-            // Don't attempt to update the object model while it is being updated...
-            if (_updating)
+            if (!IsReady)
             {
+                Console.WriteLine("[warn] Attempting to merge JSON data but not ready");
                 return;
             }
 
-            // Perofmr the JSON processing in the background.
-            // Since the deserialization takes some time, we do not want it to block the SPI task
-            _updating = true;
-            _ = Task.Run(() =>
+            IsReady = false;
+            _ = Task.Run(async () =>
             {
-                _ = DoMerge(module, json);
-                _updating = false;
+                try
+                {
+                    await DoMerge(module, json);
+                }
+                catch (AggregateException ae)
+                {
+                    Console.WriteLine($"[err] Caught exception while updating object model: {ae.InnerException}");
+                }
+                IsReady = true;
             });
         }
 
@@ -130,6 +112,7 @@ namespace DuetControlServer.Model
                         message = "",
                         msgBox = new
                         {
+                            mode = 0,
                             msg = "",
                             title = "",
                             seq = 0,
@@ -197,7 +180,7 @@ namespace DuetControlServer.Model
                             number = 0,
                             name = "",
                             heaters = new int[0],
-                            extruders = new int[0],
+                            drives = new int[0],
                             fan = 0,
                             filament = "",
                             offsets = new float[0]
@@ -216,9 +199,11 @@ namespace DuetControlServer.Model
                         max = 0.0F
                     },
                     firmwareName = "",
-                    mode = "FFF"
+                    mode = "FFF",
+                    name = Network.DefaultHostname
                 };
                 response = JsonConvert.DeserializeAnonymousType(json, response);
+                List<Tool> addedTools = new List<Tool>();
 
                 using (await Provider.AccessReadWriteAsync())
                 {
@@ -468,26 +453,47 @@ namespace DuetControlServer.Model
                         ListHelpers.SetList(probeObj.SecondaryValues, response.sensors.probeSecondary);
                     }
 
-                    // - State -
-                    Provider.Get.State.AtxPower = (response.Params.atxPower == -1) ? null : (bool?)(response.Params.atxPower != 0);
+                    // - Output -
+                    int beepDuration = 0, beepFrequency = 0;
+                    MessageBoxMode? messageBoxMode = null;
+                    string displayMessage = null;
                     if (response.output != null)
                     {
                         if (response.output.beepFrequency != 0 && response.output.beepDuration != 0)
                         {
-                            Provider.Get.State.Beep.Frequency = response.output.beepFrequency;
-                            Provider.Get.State.Beep.Duration = response.output.beepDuration;
-                            _ = Task.Run(async () =>
-                            {
-                                await Task.Delay(response.output.beepDuration);
-                                using (await Provider.AccessReadWriteAsync())
-                                {
-                                    Provider.Get.State.Beep.Duration = 0;
-                                    Provider.Get.State.Beep.Frequency = 0;
-                                }
-                            }, Program.CancelSource.Token);
+                            beepDuration = response.output.beepFrequency;
+                            beepFrequency = response.output.beepDuration;
                         }
-                        Provider.Get.State.DisplayMessage = response.output.message;
+                        displayMessage = response.output.message;
+                        if (response.output.msgBox != null)
+                        {
+                            messageBoxMode = (MessageBoxMode)response.output.msgBox.mode;
+                            Provider.Get.MessageBox.Title = response.output.msgBox.title;
+                            Provider.Get.MessageBox.Message = response.output.msgBox.msg;
+                            for (int i = 0; i < 9; i++)
+                            {
+                                if ((response.output.msgBox.controls & (1 << i)) != 0)
+                                {
+                                    if (!Provider.Get.MessageBox.AxisControls.Contains(i))
+                                    {
+                                        Provider.Get.MessageBox.AxisControls.Add(i);
+                                    }
+                                }
+                                else if (Provider.Get.MessageBox.AxisControls.Contains(i))
+                                {
+                                    Provider.Get.MessageBox.AxisControls.Remove(i);
+                                }
+                            }
+                            Provider.Get.MessageBox.Seq = response.output.msgBox.seq;
+                        }
                     }
+                    Provider.Get.State.Beep.Duration = beepDuration;
+                    Provider.Get.State.Beep.Frequency = beepFrequency;
+                    Provider.Get.State.DisplayMessage = displayMessage;
+                    Provider.Get.MessageBox.Mode = messageBoxMode;
+
+                    // - State -
+                    Provider.Get.State.AtxPower = (response.Params.atxPower == -1) ? null : (bool?)(response.Params.atxPower != 0);
                     Provider.Get.State.CurrentTool = response.currentTool;
                     Provider.Get.State.Status = GetStatus(response.status);
                     if (Provider.Get.State.Status == MachineStatus.Idle && FileExecution.MacroFile.DoingMacroFile)
@@ -496,6 +502,7 @@ namespace DuetControlServer.Model
                         Provider.Get.State.Status = MachineStatus.Busy;
                     }
                     Provider.Get.State.Mode = (MachineMode)Enum.Parse(typeof(MachineMode), response.mode, true);
+                    Provider.Get.Network.Name = response.name;
 
                     // - Tools -
                     Tool toolObj;
@@ -505,14 +512,17 @@ namespace DuetControlServer.Model
                         {
                             toolObj = new Tool();
                             Provider.Get.Tools.Add(toolObj);
+                            addedTools.Add(toolObj);
                         }
                         else
                         {
                             toolObj = Provider.Get.Tools[tool];
                         }
 
-                        toolObj.Filament = response.tools[tool].filament;
-                        toolObj.Name = (response.tools[tool].name == "") ? null : response.tools[tool].name;
+                        // FIXME: The filament drive is not part of the status response / OM yet
+                        toolObj.FilamentExtruder = (response.tools[tool].drives.Length > 0) ? response.tools[tool].drives[0] : -1;
+                        toolObj.Filament = (response.tools[tool].filament != "") ?  response.tools[tool].filament : null;
+                        toolObj.Name = (response.tools[tool].name != "") ? response.tools[tool].name : null;
                         toolObj.Number = response.tools[tool].number;
                         ListHelpers.SetList(toolObj.Heaters, response.tools[tool].heaters);
                         ListHelpers.SetList(toolObj.Active, response.temps.tools.active[tool]);
@@ -529,9 +539,17 @@ namespace DuetControlServer.Model
                     }
                     for (int tool = Provider.Get.Tools.Count; tool > response.tools.Length; tool--)
                     {
+                        Utility.FilamentManager.ToolRemoved(Provider.Get.Tools[tool]);
                         Provider.Get.Tools.RemoveAt(tool - 1);
                     }
                 }
+
+                // Keep track of filaments. Deal with added tools here to avoid deadlocks
+                foreach (Tool toolObj in addedTools)
+                {
+                    await Utility.FilamentManager.ToolAdded(toolObj);
+                }
+                // Keep track of filaments. Deal with added tools here to avoid deadlocks
             }
 
             // Deserialize print status response
@@ -578,9 +596,6 @@ namespace DuetControlServer.Model
                 }
             }
 
-            // Notify subscribers
-            IPC.Processors.Subscription.ModelUpdated();
-
             // Notify waiting threads about the last module updated
             _moduleUpdateEvents[module].Set();
             _moduleUpdateEvents[module].Reset();
@@ -589,10 +604,8 @@ namespace DuetControlServer.Model
                 _lastUpdatedModule = module;
             }
 
-            // Force manual garbage collection (maybe the GC cannot keep up with the speed of the update loop)
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            // Notify subscribers
+            IPC.Processors.Subscription.ModelUpdated();
         }
 
         private static MachineStatus GetStatus(char letter)

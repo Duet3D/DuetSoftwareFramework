@@ -43,12 +43,49 @@ namespace DuetUnitTest.Commands
         }
 
         [Test]
+        public void ParseG53Line()
+        {
+            IList<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.Code.ParseMultiple("G53 G1 X100 G0 Y200\nG1 Z50");
+            Assert.AreEqual(3, codes.Count);
+
+            Assert.AreEqual(1, codes[0].MajorNumber);
+            Assert.AreEqual(1, codes[0].Parameters.Count);
+            Assert.AreEqual('X', codes[0].Parameters[0].Letter);
+            Assert.AreEqual(100, (int)codes[0].Parameters[0]);
+            Assert.IsTrue(codes[0].Flags.HasFlag(CodeFlags.EnforceAbsolutePosition));
+
+            Assert.AreEqual(0, codes[1].MajorNumber);
+            Assert.AreEqual(1, codes[1].Parameters.Count);
+            Assert.AreEqual('Y', codes[1].Parameters[0].Letter);
+            Assert.AreEqual(200, (int)codes[1].Parameters[0]);
+            Assert.IsTrue(codes[1].Flags.HasFlag(CodeFlags.EnforceAbsolutePosition));
+
+            Assert.AreEqual(1, codes[2].MajorNumber);
+            Assert.AreEqual(1, codes[2].Parameters.Count);
+            Assert.AreEqual('Z', codes[2].Parameters[0].Letter);
+            Assert.AreEqual(50, (int)codes[2].Parameters[0]);
+            Assert.IsFalse(codes[2].Flags.HasFlag(CodeFlags.EnforceAbsolutePosition));
+        }
+
+        [Test]
         public void ParseG54()
         {
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G54.6");
             Assert.AreEqual(CodeType.GCode, code.Type);
             Assert.AreEqual(54, code.MajorNumber);
             Assert.AreEqual(6, code.MinorNumber);
+        }
+
+        [Test]
+        public void ParseM98()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M98 Pconfig.g");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(98, code.MajorNumber);
+            Assert.IsNull(code.MinorNumber);
+            Assert.AreEqual(1, code.Parameters.Count);
+            Assert.AreEqual('P', code.Parameters[0].Letter);
+            Assert.AreEqual("config.g", (string)code.Parameters[0]);
         }
 
         [Test]

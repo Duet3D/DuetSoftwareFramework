@@ -132,10 +132,11 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="from">Origin</param>
         /// <param name="channel">Code channel running the file</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadAbortFile(ReadOnlySpan<byte> from, out CodeChannel channel)
+        public static int ReadAbortFile(ReadOnlySpan<byte> from, out CodeChannel channel, out bool abortAll)
         {
             AbortFileRequest header = MemoryMarshal.Read<AbortFileRequest>(from);
             channel = (CodeChannel)header.Channel;
+            abortAll = header.AbortAll != 0;
             return Marshal.SizeOf(header);
         }
 

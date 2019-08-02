@@ -9,7 +9,6 @@ using System.Text;
 using System.Threading;
 using Code = DuetControlServer.Commands.Code;
 using Nito.AsyncEx;
-using System.Threading.Tasks;
 using LinuxDevices;
 
 namespace DuetControlServer.SPI
@@ -59,7 +58,7 @@ namespace DuetControlServer.SPI
             // Initialize transfer ready pin
             _transferReadyPin = new InputGpioPin(Settings.GpioChipDevice, Settings.TransferReadyPin);
             _transferReadyPin.PinChanged += (sender, pinValue) => _transferReadyEvent.Set();
-            _transferReadyPin.StartMonitoring(250, Program.CancelSource.Token);
+            _transferReadyPin.StartMonitoring(Program.CancelSource.Token);
 
             // Initialize SPI device
             _spiDevice = new SpiDevice($"/dev/spidev{Settings.SpiBusID}.{Settings.SpiChipSelectLine}", Settings.SpiFrequency);
@@ -169,7 +168,6 @@ namespace DuetControlServer.SPI
                 }
                 catch (OperationCanceledException e)
                 {
-                    Console.WriteLine(e.Message);
                     if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout && _started && !_updating)
                     {
                         // If this is the first unexpected timeout event, report it unless the firmware is being updated
@@ -273,9 +271,9 @@ namespace DuetControlServer.SPI
         /// Read the content of an <see cref="AbortFileRequest"/> packet
         /// </summary>
         /// <param name="channel">Code channel where all files are supposed to be aborted</param>
-        public static void ReadAbortFile(out CodeChannel channel)
+        public static void ReadAbortFile(out CodeChannel channel, out bool abortAll)
         {
-            Serialization.Reader.ReadAbortFile(_packetData.Span, out channel);
+            Serialization.Reader.ReadAbortFile(_packetData.Span, out channel, out abortAll);
         }
 
         /// <summary>

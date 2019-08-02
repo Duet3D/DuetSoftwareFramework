@@ -1,6 +1,5 @@
 ﻿using DuetAPI.Machine;
 using DuetControlServer.Commands;
-using DuetControlServer.FileExecution;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -21,12 +20,12 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task Save(Code code)
         {
-            string file = await FilePath.ToPhysical(MacroFile.ConfigOverrideFile, "sys");
-            using (FileStream stream = new FileStream(file, FileMode.Create, FileAccess.Write))
+            string file = await FilePath.ToPhysicalAsync(FilePath.ConfigOverrideFile, "sys");
+            using (FileStream fs = new FileStream(file, FileMode.Create, FileAccess.Write))
             {
-                using (StreamWriter writer = new StreamWriter(stream))
+                using (StreamWriter writer = new StreamWriter(fs))
                 {
-                    await writer.WriteLineAsync($"; config-override.g file generated in response to M500 at {DateTime.Now:yyyy-MM-dd HH:MM}");
+                    await writer.WriteLineAsync($"; config-override.g file generated in response to M500 at {DateTime.Now:yyyy-MM-dd HH:mm}");
                     await writer.WriteLineAsync();
                     await WriteCalibrationParameters(writer);
                     await WriteModelParameters(writer);

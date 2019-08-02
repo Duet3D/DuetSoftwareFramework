@@ -155,7 +155,7 @@ namespace DuetAPI.Utility
             {
                 using (StreamWriter writer = new StreamWriter(stream))
                 {
-                    await writer.WriteLineAsync($"RepRapFirmware height map file v2 generated at {DateTime.Now:yyyy-MM-dd HH:MM}");
+                    await writer.WriteLineAsync($"RepRapFirmware height map file v2 generated at {DateTime.Now:yyyy-MM-dd HH:mm}");
                     await writer.WriteLineAsync("xmin,xmax,ymin,ymax,radius,xspacing,yspacing,xnum,ynum");
                     await writer.WriteLineAsync(FormattableString.Invariant($"{XMin:F2},{XMax:F2},{YMin:F2},{YMax:F2},{Radius:F2},{XSpacing:F2},{YSpacing:F2},{NumX},{NumY}"));
 

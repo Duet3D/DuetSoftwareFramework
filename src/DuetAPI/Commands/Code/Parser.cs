@@ -1,6 +1,5 @@
 ﻿using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace DuetAPI.Commands
 {
@@ -14,15 +13,20 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="reader">Input to read from</param>
         /// <param name="result">Code to fill</param>
+        /// <param name="enforcingAbsolutePosition">If G53 is in effect for the current line</param>
         /// <returns>Whether anything could be read</returns>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
-        public static bool Parse(TextReader reader, Code result)
+        public static bool Parse(TextReader reader, Code result, ref bool enforcingAbsolutePosition)
         {
-            bool contentRead = false;
+            if (enforcingAbsolutePosition)
+            {
+                result.Flags |= CodeFlags.EnforceAbsolutePosition;
+            }
 
             char letter = '\0', c;
             string value = "";
 
+            bool contentRead = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
             bool readingAtStart = true, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false, wasQuoted = false;
 
@@ -218,9 +222,10 @@ namespace DuetAPI.Commands
                             {
                                 result.MajorNumber = null;
                                 result.Flags |= CodeFlags.EnforceAbsolutePosition;
+                                enforcingAbsolutePosition = true;
                             }
 
-                            result.Type = (CodeType)letter;
+                            result.Type = (CodeType)upperLetter;
                             if (value.Contains('.'))
                             {
                                 string[] args = value.Split('.');
@@ -360,6 +365,7 @@ namespace DuetAPI.Commands
                     }
                 }
             } while (c != '\n');
+            enforcingAbsolutePosition &= (c != '\n');
 
             // Do not allow malformed codes
             if (inEncapsulatedComment)

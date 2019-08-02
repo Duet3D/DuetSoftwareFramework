@@ -9,6 +9,7 @@ using DuetAPI.Connection;
 using DuetControlServer.Codes;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.SPI;
+using Newtonsoft.Json;
 
 namespace DuetControlServer.Commands
 {
@@ -29,24 +30,29 @@ namespace DuetControlServer.Commands
         public Code(string code) : base(code) { }
 
         /// <summary>
+        /// Indicates whether the code has been internally processed
+        /// </summary>
+        [JsonIgnore]
+        public bool InternallyExecuted { get; set; }
+
+        /// <summary>
         /// Parse multiple codes from the given input string
         /// </summary>
         /// <param name="codeString">Codes to parse</param>
         /// <returns>Enumeration of parsed G/M/T-codes</returns>
         public static IList<Code> ParseMultiple(string codeString)
         {
-            // NB: Even though "yield return" seems like a good idea, it is a good idea
-            // to parse all the codes before any is actually started...
+            // NB: Even though "yield return" seems like a good idea, it is safer to parse all the codes before any code is actually started...
             List<Code> codes = new List<Code>();
             using (MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(codeString)))
             {
                 using (StreamReader reader = new StreamReader(stream))
                 {
+                    bool enforcingAbsolutePosition = false;
                     while (!reader.EndOfStream)
                     {
                         Code code = new Code();
-                        // FIXME: G53 may apply to multiple codes on the same line...
-                        Parse(reader, code);
+                        Parse(reader, code, ref enforcingAbsolutePosition);
                         codes.Add(code);
                     }
                 }
@@ -61,7 +67,7 @@ namespace DuetControlServer.Commands
         public override async Task<CodeResult> Execute()
         {
             // Attempt to process the code internally
-            CodeResult result = await ExecuteInternally();
+            CodeResult result = InternallyExecuted ? null : await ExecuteInternally();
             if (result != null)
             {
                 return result;
@@ -106,7 +112,7 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public Task<CodeResult> Enqueue()
         {
-            CodeResult result = ExecuteInternally().Result;
+            CodeResult result = InternallyExecuted ? null : ExecuteInternally().Result;
             if (result != null)
             {
                 return Task.FromResult(result);
@@ -132,6 +138,7 @@ namespace DuetControlServer.Commands
 
                 if (result != null)
                 {
+                    InternallyExecuted = true;
                     return await OnCodeExecuted(result);
                 }
             }
@@ -154,6 +161,7 @@ namespace DuetControlServer.Commands
 
             if (result != null)
             {
+                InternallyExecuted = true;
                 return await OnCodeExecuted(result);
             }
 
@@ -165,6 +173,7 @@ namespace DuetControlServer.Commands
 
                 if (result != null)
                 {
+                    InternallyExecuted = true;
                     return await OnCodeExecuted(result);
                 }
             }
@@ -200,6 +209,18 @@ namespace DuetControlServer.Commands
                     if (msg.Type == MessageType.Error)
                     {
                         msg.Content = ToShortString() + ": " + msg.Content;
+                    }
+                }
+            }
+
+            // Log warning+error replies if the code could be processed internally
+            if (InternallyExecuted && !result.IsEmpty)
+            {
+                foreach (Message msg in result)
+                {
+                    if (msg.Type != MessageType.Success || Channel == CodeChannel.File)
+                    {
+                        await Utility.Logger.Log(msg);
                     }
                 }
             }

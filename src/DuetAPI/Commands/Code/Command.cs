@@ -27,7 +27,8 @@ namespace DuetAPI.Commands
             {
                 using (StreamReader reader = new StreamReader(stream))
                 {
-                    Parse(reader, this);
+                    bool enforcingAbsolutePosition = false;
+                    Parse(reader, this, ref enforcingAbsolutePosition);
                 }
             }
         }

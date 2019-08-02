@@ -1,6 +1,5 @@
 ﻿using DuetAPI.Utility;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
 namespace DuetAPI.Machine
@@ -19,22 +18,27 @@ namespace DuetAPI.Machine
         /// Information about the main and expansion boards
         /// </summary>
         public Electronics Electronics { get; private set; } = new Electronics();
-        
+
         /// <summary>
         /// List of configured fans
         /// </summary>
         /// <seealso cref="Fan"/>
         public ObservableCollection<Fan> Fans { get; } = new ObservableCollection<Fan>();
-        
+
         /// <summary>
         /// Information about the heat subsystem
         /// </summary>
         public Heat Heat { get; private set; } = new Heat();
-        
+
         /// <summary>
         /// Information about the current file job (if any)
         /// </summary>
         public Job Job { get; private set; } = new Job();
+
+        /// <summary>
+        /// List of configured laser diodes
+        /// </summary>
+        public ObservableCollection<Laser> Lasers { get; } = new ObservableCollection<Laser>();
         
         /// <summary>
         /// Information about message box requests
@@ -119,6 +123,7 @@ namespace DuetAPI.Machine
             ListHelpers.AssignList(Fans, other.Fans);
             Heat.Assign(other.Heat);
             Job.Assign(other.Job);
+            ListHelpers.AssignList(Lasers, other.Lasers);
             MessageBox.Assign(other.MessageBox);
             ListHelpers.AssignList(Messages, other.Messages);
             Move.Assign(other.Move);
@@ -153,6 +158,7 @@ namespace DuetAPI.Machine
             };
 
             ListHelpers.CloneItems(clone.Fans, Fans);
+            ListHelpers.CloneItems(clone.Lasers, Lasers);
             ListHelpers.CloneItems(clone.Messages, Messages);
             ListHelpers.CloneItems(clone.Spindles, Spindles);
             ListHelpers.CloneItems(clone.Storages, Storages);

@@ -64,6 +64,23 @@ namespace DuetAPI.Machine
             }
         }
         private string _name;
+
+        /// <summary>
+        /// Extruder drive index for resolving the tool filament (index or -1)
+        /// </summary>
+        public int FilamentExtruder
+        {
+            get => _filamentExtruder;
+            set
+            {
+                if (_filamentExtruder != value)
+                {
+                    _filamentExtruder = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private int _filamentExtruder;
         
         /// <summary>
         /// Name of the currently loaded filament

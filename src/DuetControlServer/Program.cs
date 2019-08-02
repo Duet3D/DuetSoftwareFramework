@@ -125,6 +125,9 @@ namespace DuetControlServer
                 CancelSource.Cancel();
             }
 
+            // Stop logging
+            Utility.Logger.Stop();
+
             // Stop the IPC subsystem. This has to happen here because Socket.AcceptAsync() does not have a CancellationToken parameter
             Server.Shutdown();
 

@@ -182,13 +182,13 @@ namespace DuetControlServer.SPI
                 NestedMacroCodes.Dequeue();
                 return true;
             }
-            else if (NestedMacros.TryPeek(out MacroFile macro))
+            else if (NestedMacros.TryPeek(out MacroFile macroFile))
             {
                 // Try to read the next real code from the system macro being executed
                 Commands.Code code = null;
-                if (!macro.IsFinished && NestedMacroCodes.Count < Settings.BufferedMacroCodes)
+                if (!macroFile.IsFinished && NestedMacroCodes.Count < Settings.BufferedMacroCodes)
                 {
-                    code = macro.ReadCode();
+                    code = macroFile.ReadCode();
                 }
 
                 // If there is any, start executing it in the background. An interceptor may also generate extra codes
@@ -202,9 +202,9 @@ namespace DuetControlServer.SPI
                         try
                         {
                             CodeResult result = await code.Execute();
-                            if (!macro.IsAborted)
+                            if (!macroFile.IsAborted)
                             {
-                                await Model.Provider.Output(result);
+                                await Utility.Logger.LogOutput(result);
                             }
                         }
                         catch (AggregateException ae)
@@ -218,15 +218,15 @@ namespace DuetControlServer.SPI
                 }
 
                 // Macro file is complete if no more codes can be read from the file and the buffered codes are completely gone
-                if (macro.IsFinished  && !NestedMacroCodes.TryPeek(out _) && BufferedCodes.Count == 0 &&
-                    ((macro.StartCode != null && macro.StartCode.DoingNestedMacro) || (macro.StartCode == null && !SystemMacroHasFinished)) &&
-                    MacroCompleted(macro.StartCode, macro.IsAborted))
+                if (macroFile.IsFinished  && !NestedMacroCodes.TryPeek(out _) && BufferedCodes.Count == 0 &&
+                    ((macroFile.StartCode != null && macroFile.StartCode.DoingNestedMacro) || (macroFile.StartCode == null && !SystemMacroHasFinished)) &&
+                    MacroCompleted(macroFile.StartCode, macroFile.IsAborted))
                 {
-                    if (macro.StartCode == null)
+                    if (macroFile.StartCode == null)
                     {
                         SystemMacroHasFinished = true;
                     }
-                    Console.WriteLine($"[info] {(macro.IsAborted ? "Aborted" : "Finished")} macro file '{Path.GetFileName(macro.FileName)}'");
+                    Console.WriteLine($"[info] {(macroFile.IsAborted ? "Aborted" : "Finished")} macro file '{Path.GetFileName(macroFile.FileName)}'");
                 }
             }
             else if (PendingCodes.TryPeek(out QueuedCode queuedCode) && Interface.BufferCode(queuedCode))
@@ -265,6 +265,8 @@ namespace DuetControlServer.SPI
             return false;
         }
 
+        private string _partialLogMessage;
+
         /// <summary>
         /// Handle a G-code reply
         /// </summary>
@@ -273,6 +275,22 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the reply could be processed</returns>
         public bool HandleReply(MessageTypeFlags flags, string reply)
         {
+            if (flags.HasFlag(MessageTypeFlags.LogMessage))
+            {
+                _partialLogMessage += reply;
+                if (!flags.HasFlag(MessageTypeFlags.PushFlag))
+                {
+                    if (!string.IsNullOrWhiteSpace(_partialLogMessage))
+                    {
+                        MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                                            : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                                                : MessageType.Success;
+                        Utility.Logger.Log(type, _partialLogMessage);
+                    }
+                    _partialLogMessage = null;
+                }
+            }
+
             if (NestedMacros.TryPeek(out MacroFile macroFile) &&
                 ((macroFile.StartCode != null && !macroFile.StartCode.DoingNestedMacro) || (macroFile.StartCode == null && SystemMacroHasFinished)))
             {
@@ -281,13 +299,13 @@ namespace DuetControlServer.SPI
                     macroFile.StartCode.HandleReply(flags, reply);
                     if (macroFile.IsFinished)
                     {
-                        NestedMacros.Pop();
+                        NestedMacros.Pop().Dispose();
                         Console.WriteLine($"[info] Completed macro + start code {macroFile.StartCode}");
                     }
                 }
                 else if (!flags.HasFlag(MessageTypeFlags.PushFlag))
                 {
-                    NestedMacros.Pop();
+                    NestedMacros.Pop().Dispose();
                     SystemMacroHasFinished = false;
                     Console.WriteLine($"[info] Completed system macro");
                 }
@@ -340,20 +358,20 @@ namespace DuetControlServer.SPI
             }
 
             // Locate the macro file
-            string path = await FilePath.ToPhysical(filename, "sys");
+            string path = await FilePath.ToPhysicalAsync(filename, "sys");
             if (!File.Exists(path))
             {
-                if (filename == MacroFile.ConfigFile)
+                if (filename == FilePath.ConfigFile)
                 {
-                    path = await FilePath.ToPhysical(MacroFile.ConfigFileFallback, "sys");
+                    path = await FilePath.ToPhysicalAsync(FilePath.ConfigFileFallback, "sys");
                     if (File.Exists(path))
                     {
                         // Use config.b.bak if config.g cannot be found
-                        Console.WriteLine($"[warn] Using fallback file {MacroFile.ConfigFileFallback} because {MacroFile.ConfigFile} could not be found");
+                        Console.WriteLine($"[warn] Using fallback file {FilePath.ConfigFileFallback} because {FilePath.ConfigFile} could not be found");
                     }
                     else
                     {
-                        await Model.Provider.Output(MessageType.Error, $"Macro files {MacroFile.ConfigFile} and {MacroFile.ConfigFileFallback} not found");
+                        await Utility.Logger.LogOutput(MessageType.Error, $"Macro files {FilePath.ConfigFile} and {FilePath.ConfigFileFallback} not found");
                     }
                 }
                 else if (reportMissing)
@@ -361,7 +379,7 @@ namespace DuetControlServer.SPI
                     if (!fromCode || BufferedCodes.Count == 0 || BufferedCodes[0].Code.Type != CodeType.MCode || BufferedCodes[0].Code.MajorNumber != 98)
                     {
                         // M98 outputs its own warning message via RRF
-                        await Model.Provider.Output(MessageType.Error, $"Macro file {filename} not found");
+                        await Utility.Logger.LogOutput(MessageType.Error, $"Macro file {filename} not found");
                     }
                 }
                 else
@@ -382,7 +400,7 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                await Model.Provider.Output(MessageType.Error, $"Failed to open macro file '{filename}': {e.Message}");
+                await Utility.Logger.LogOutput(MessageType.Error, $"Failed to open macro file '{filename}': {e.Message}");
 
                 SuspendBuffer(startingCode);
                 MacroCompleted(startingCode, true);
@@ -516,24 +534,24 @@ namespace DuetControlServer.SPI
             {
                 while (suspendedCodes.TryDequeue(out QueuedCode queuedCode))
                 {
-                    queuedCode.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                    queuedCode.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
                 }
             }
             _resumingBuffer = false;
 
             while (NestedMacroCodes.TryDequeue(out QueuedCode item))
             {
-                item.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                item.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
             }
 
             while (NestedMacros.TryPop(out MacroFile macroFile))
             {
-                macroFile.StartCode?.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                macroFile.StartCode?.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
             }
 
             while (PendingCodes.TryDequeue(out QueuedCode queuedCode))
             {
-                queuedCode.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                queuedCode.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
             }
 
             while (PendingLockRequests.TryDequeue(out QueuedLockRequest item))
@@ -548,7 +566,7 @@ namespace DuetControlServer.SPI
 
             foreach (QueuedCode bufferedCode in BufferedCodes)
             {
-                bufferedCode.HandleReply(Communication.MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                bufferedCode.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
             }
 
             BytesBuffered = 0;

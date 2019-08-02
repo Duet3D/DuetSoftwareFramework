@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace DuetAPI.Connection
+﻿namespace DuetAPI.Connection
 {
     /// <summary>
     /// Static class that holds the connection defaults

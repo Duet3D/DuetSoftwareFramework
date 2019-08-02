@@ -73,41 +73,16 @@ namespace DuetControlServer.FileExecution
                 Model.Provider.Get.Job.File.Assign(info);
             }
 
-            // Notify RepRapFirmware and start processing the file
+            // Notify RepRapFirmware and start processing the file in the background
             Console.WriteLine($"[info] Printing file '{fileName}'");
             SPI.Interface.SetPrintStarted();
-            RunPrint();
+            _ = Task.Run(RunPrint);
             return new CodeResult();
         }
 
-        private static async void RunPrint()
+        private static async Task RunPrint()
         {
             BaseFile file = _file;
-
-            // Process "start.g" at the beginning of a print
-            string startPath = await FilePath.ToPhysical("start.g", "sys");
-            if (File.Exists(startPath))
-            {
-                MacroFile startMacro = new MacroFile(startPath, CodeChannel.File, null);
-                do
-                {
-                    Code code = startMacro.ReadCode();
-                    if (code == null)
-                    {
-                        break;
-                    }
-
-                    try
-                    {
-                        CodeResult result = await code.Execute();
-                        await Model.Provider.Output(result);
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine($"[err] {code} -> {e}");
-                    }
-                } while (!Program.CancelSource.IsCancellationRequested);
-            }
 
             // Process the job file
             Queue<Code> codes = new Queue<Code>();
@@ -167,7 +142,7 @@ namespace DuetControlServer.FileExecution
                     try
                     {
                         CodeResult result = await codeTasks.Dequeue();
-                        await Model.Provider.Output(result);
+                        await Utility.Logger.LogOutput(result);
                     }
                     catch (Exception e)
                     {
@@ -254,7 +229,7 @@ namespace DuetControlServer.FileExecution
                 }
             }
 
-            await Model.Provider.Output(MessageType.Success, $"Print has been paused at byte {filePosition}");
+            await Utility.Logger.LogOutput(MessageType.Success, $"Print has been paused at byte {filePosition}");
         }
 
         /// <summary>

@@ -24,7 +24,7 @@ namespace DuetControlServer.Codes
                 case 29:
                     if (code.Parameter('S', 0) == 1)
                     {
-                        string file = await FilePath.ToPhysical(code.Parameter('P', "heightmap.csv"), "sys");
+                        string file = await FilePath.ToPhysicalAsync(code.Parameter('P', FilePath.DefaultHeightmapFile), "sys");
 
                         try
                         {
@@ -108,7 +108,7 @@ namespace DuetControlServer.Codes
                         try
                         {
                             Heightmap map = await SPI.Interface.GetHeightmap();
-                            await map.Save(await FilePath.ToPhysical(file, "sys"));
+                            await map.Save(await FilePath.ToPhysicalAsync(file, "sys"));
                             result.Add(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
                         }
                         catch (AggregateException ae)

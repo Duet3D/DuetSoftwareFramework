@@ -6,6 +6,7 @@ using DuetControlServer.FileExecution;
 using Newtonsoft.Json;
 using Nito.AsyncEx;
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -43,7 +44,7 @@ namespace DuetControlServer.Codes
                 // Select a file to print
                 case 23:
                     {
-                        string file = await FilePath.ToPhysical(code.GetUnprecedentedString(), "gcodes");
+                        string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), "gcodes");
                         if (File.Exists(file))
                         {
                             using (await _fileToPrintLock.LockAsync())
@@ -111,7 +112,7 @@ namespace DuetControlServer.Codes
                         string file = code.GetUnprecedentedString();
                         try
                         {
-                            File.Delete(await FilePath.ToPhysical(file));
+                            File.Delete(await FilePath.ToPhysicalAsync(file));
                             return new CodeResult();
                         }
                         catch (Exception e)
@@ -123,7 +124,7 @@ namespace DuetControlServer.Codes
                 // Start a file print
                 case 32:
                     {
-                        string file = await FilePath.ToPhysical(code.GetUnprecedentedString(), "gcodes");
+                        string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), "gcodes");
                         if (File.Exists(file))
                         {
                             using (await _fileToPrintLock.LockAsync())
@@ -141,7 +142,7 @@ namespace DuetControlServer.Codes
                     {
                         try
                         {
-                            string file = await FilePath.ToPhysical(code.GetUnprecedentedString());
+                            string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
                             ParsedFileInfo info = await FileInfoParser.Parse(file);
 
                             string json = JsonConvert.SerializeObject(info, JsonHelper.DefaultSettings);
@@ -164,13 +165,16 @@ namespace DuetControlServer.Codes
                 // Compute SHA1 hash of target file
                 case 38:
                     {
-                        string file = await FilePath.ToPhysical(code.GetUnprecedentedString());
+                        string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
                         try
                         {
                             using (FileStream stream = new FileStream(file, FileMode.Open, FileAccess.Read))
                             {
-                                var sha1 = System.Security.Cryptography.SHA1.Create();
-                                byte[] hash = await Task.Run(() => sha1.ComputeHash(stream), Program.CancelSource.Token);
+                                byte[] hash;
+                                using (var sha1 = System.Security.Cryptography.SHA1.Create())
+                                {
+                                    hash = await Task.Run(() => sha1.ComputeHash(stream), Program.CancelSource.Token);
+                                }
                                 return new CodeResult(MessageType.Success, BitConverter.ToString(hash).Replace("-", ""));
                             }
                         }
@@ -218,14 +222,6 @@ namespace DuetControlServer.Codes
                         }
                     }
 
-                // Return from macro
-                case 99:
-                    if (!MacroFile.AbortLastFile(code.Channel))
-                    {
-                        return new CodeResult(MessageType.Error, "Not executing a macro file");
-                    }
-                    return new CodeResult();
-
                 // Emergency Stop
                 case 112:
                     await SPI.Interface.RequestEmergencyStop();
@@ -248,12 +244,12 @@ namespace DuetControlServer.Codes
                 // Save heightmap
                 case 374:
                     {
-                        string file = code.Parameter('P', "heightmap.csv");
+                        string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
 
                         try
                         {
                             Heightmap map = await SPI.Interface.GetHeightmap();
-                            await map.Save(await FilePath.ToPhysical(file, "sys"));
+                            await map.Save(await FilePath.ToPhysicalAsync(file, "sys"));
                             return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
                         }
                         catch (AggregateException ae)
@@ -265,7 +261,7 @@ namespace DuetControlServer.Codes
                 // Load heightmap
                 case 375:
                     {
-                        string file = await FilePath.ToPhysical(code.Parameter('P', "heightmap.csv"), "sys");
+                        string file = await FilePath.ToPhysicalAsync(code.Parameter('P', FilePath.DefaultHeightmapFile), "sys");
 
                         try
                         {
@@ -286,7 +282,7 @@ namespace DuetControlServer.Codes
                         string path = code.Parameter('P', "");
                         try
                         {
-                            Directory.CreateDirectory(await FilePath.ToPhysical(path));
+                            Directory.CreateDirectory(await FilePath.ToPhysicalAsync(path));
                             return new CodeResult();
                         }
                         catch (Exception e)
@@ -303,8 +299,8 @@ namespace DuetControlServer.Codes
 
                         try
                         {
-                            string source = await FilePath.ToPhysical(from);
-                            string destination = await FilePath.ToPhysical(to);
+                            string source = await FilePath.ToPhysicalAsync(from);
+                            string destination = await FilePath.ToPhysicalAsync(to);
 
                             if (File.Exists(source))
                             {
@@ -339,7 +335,13 @@ namespace DuetControlServer.Codes
                 // Print settings
                 case 503:
                     {
-                        string configFile = await FilePath.ToPhysical(MacroFile.ConfigFile, "sys");
+                        string configFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFile, "sys");
+                        if (File.Exists(configFile))
+                        {
+                            string content = await File.ReadAllTextAsync(configFile);
+                            return new CodeResult(MessageType.Success, content);
+                        }
+                        configFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFileFallback, "sys");
                         if (File.Exists(configFile))
                         {
                             string content = await File.ReadAllTextAsync(configFile);
@@ -348,17 +350,101 @@ namespace DuetControlServer.Codes
                         return new CodeResult(MessageType.Error, "Configuration file not found");
                     }
 
+                // Set current RTC date and time
+                case 905:
+                    {
+                        bool seen = false;
+
+                        CodeParameter pParam = code.Parameter('P');
+                        if (pParam != null)
+                        {
+                            if (DateTime.TryParseExact(pParam, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
+                            {
+                                System.Diagnostics.Process.Start("timedatectl", $"set-time {date:yyyy-MM-dd}").WaitForExit();
+                                seen = true;
+                            }
+                            else
+                            {
+                                return new CodeResult(MessageType.Error, "Invalid date format");
+                            }
+                        }
+
+                        CodeParameter sParam = code.Parameter('S');
+                        if (sParam != null)
+                        {
+                            if (DateTime.TryParseExact(sParam, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime time))
+                            {
+                                System.Diagnostics.Process.Start("timedatectl", $"set-time {time:HH:mm:ss}").WaitForExit();
+                                seen = true;
+                            }
+                            else
+                            {
+                                return new CodeResult(MessageType.Error, "Invalid time format");
+                            }
+                        }
+
+                        if (!seen)
+                        {
+                            return new CodeResult(MessageType.Success, $"Current date and time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                        }
+                    }
+                    break;
+
+                // Start/stop event logging to SD card
+                case 929:
+                    {
+                        CodeParameter sParam = code.Parameter('S');
+                        if (sParam == null)
+                        {
+                            using (await Model.Provider.AccessReadOnlyAsync())
+                            {
+                                return new CodeResult(MessageType.Success, $"Event logging is {(Model.Provider.Get.State.LogFile != null ? "enabled" : "disabled")}");
+                            }
+                        }
+
+                        if (sParam > 0)
+                        {
+                            string filename = code.Parameter('P', Utility.Logger.DefaultLogFile);
+                            if (string.IsNullOrWhiteSpace(filename))
+                            {
+                                return new CodeResult(MessageType.Error, "Missing filename in M929 command");
+                            }
+
+                            using (await Model.Provider.AccessReadWriteAsync())
+                            {
+                                if (Model.Provider.Get.State.LogFile != null)
+                                {
+                                    Utility.Logger.Stop();
+                                }
+
+                                string physicalFilename = await FilePath.ToPhysicalAsync(filename, "sys");
+                                Utility.Logger.Start(physicalFilename);
+
+                                Model.Provider.Get.State.LogFile = filename;
+                            }
+                        }
+                        else
+                        {
+                            using (await Model.Provider.AccessReadWriteAsync())
+                            {
+                                Utility.Logger.Stop();
+                                Model.Provider.Get.State.LogFile = null;
+                            }
+                        }
+                        break;
+                    }
+
                 // Update the firmware
                 case 997:
                     if (((int[])code.Parameter('S', new int[] { 0 })).Contains(0))
                     {
-                        string iapFile = await FilePath.ToPhysical(Settings.IapFile, "sys");
+                        string iapFile = await FilePath.ToPhysicalAsync(Settings.IapFile, "sys");
                         if (!File.Exists(iapFile))
                         {
                             return new CodeResult(MessageType.Error, $"Failed to find IAP file {iapFile}");
                         }
 
-                        string firmwareFile = await FilePath.ToPhysical(code.Parameter('P') ?? Settings.FirmwareFile, "sys");
+                        string firmwareFile = await FilePath.ToPhysicalAsync(code.Parameter('P') ?? Settings.FirmwareFile, "sys");
                         if (!File.Exists(firmwareFile))
                         {
                             return new CodeResult(MessageType.Error, $"Failed to find firmware file {code.Parameter('P') ?? Settings.FirmwareFile}");

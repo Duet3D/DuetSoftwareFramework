@@ -78,6 +78,11 @@ namespace DuetAPI.Machine
         public ObservableCollection<int> AxisControls { get; } = new ObservableCollection<int>();
 
         /// <summary>
+        /// Counter that is incremented whenever a new message box is shown
+        /// </summary>
+        public int Seq { get; set; }
+
+        /// <summary>
         /// Assigns every property of another instance of this one
         /// </summary>
         /// <param name="from">Object to assign from</param>

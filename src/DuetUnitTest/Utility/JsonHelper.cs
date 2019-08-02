@@ -1,5 +1,4 @@
-﻿using DuetAPI;
-using DuetAPI.Machine;
+﻿using DuetAPI.Machine;
 using DuetAPI.Utility;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;

@@ -2,7 +2,6 @@
 using DuetControlServer.Commands;
 using System;
 using System.IO;
-using System.Threading.Tasks;
 using Zhaobang.IO;
 
 namespace DuetControlServer.FileExecution
@@ -100,11 +99,11 @@ namespace DuetControlServer.FileExecution
                 FilePosition = _reader.Position
             };
 
-            bool codeRead;
+            bool codeRead, enforcingAbsolutePosition = false;
             do
             {
                 // FIXME: G53 may apply to multiple codes on the same line...
-                codeRead = DuetAPI.Commands.Code.Parse(_reader, code);
+                codeRead = DuetAPI.Commands.Code.Parse(_reader, code, ref enforcingAbsolutePosition);
                 LineNumber = code.LineNumber.Value;
             } while (!codeRead && _reader.Position != _fileStream.Length);
 
@@ -122,6 +121,7 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         public void Dispose()
         {
+            _reader.Dispose();
             _fileStream.Dispose();
         }
     }

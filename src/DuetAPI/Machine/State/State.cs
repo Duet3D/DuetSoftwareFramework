@@ -38,7 +38,7 @@ namespace DuetAPI.Machine
         private bool? _atxPower;
 
         /// <summary>
-        /// Details about a requested beep
+        /// Information about a requested beep
         /// </summary>
         public BeepDetails Beep { get; private set; } = new BeepDetails();
         
@@ -75,6 +75,23 @@ namespace DuetAPI.Machine
             }
         }
         private string _displayMessage = "";
+
+        /// <summary>
+        /// Log file being written to or null if logging is disabled
+        /// </summary>
+        public string LogFile
+        {
+            get => _logFile;
+            set
+            {
+                if (_logFile != value)
+                {
+                    _logFile = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private string _logFile;
 
         /// <summary>
         /// Current mode of operation

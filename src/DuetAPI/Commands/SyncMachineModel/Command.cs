@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace DuetAPI.Commands
+﻿namespace DuetAPI.Commands
 {
     /// <summary>
     /// Wait for the machine model to be fully updated from RepRapFirmware

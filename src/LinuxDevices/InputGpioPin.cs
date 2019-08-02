@@ -95,7 +95,7 @@ namespace LinuxDevices
         /// Start polling for pin events
         /// </summary>
         /// <param name="cancellationToken"></param>
-        public unsafe void StartMonitoring(int pollInterval = 500, CancellationToken cancellationToken = default)
+        public unsafe void StartMonitoring(CancellationToken cancellationToken = default)
         {
             if (_reqFd < 0)
             {
@@ -129,7 +129,7 @@ namespace LinuxDevices
             if (_deviceFileDescriptor >= 0)
             {
                 Interop.close(_deviceFileDescriptor);
-                _deviceFileDescriptor = -1;
+                _deviceFileDescriptor = _reqFd = -1;
             }
         }
     }

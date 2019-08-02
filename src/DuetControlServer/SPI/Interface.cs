@@ -41,8 +41,8 @@ namespace DuetControlServer.SPI
         private static Communication.PrintStoppedReason? _printStoppedReason;
         private static Stream _iapStream, _firmwareStream;
 
-        // Partial generic message (if any)
-        private static string _partialCodeReply;
+        // Partial messages (if any)
+        private static string _partialGenericMessage;
 
         /// <summary>
         /// Initialize the SPI interface but do not connect yet
@@ -296,7 +296,7 @@ namespace DuetControlServer.SPI
                 Console.WriteLine("Error");
 
                 // Failed to flash the firmware
-                await Model.Provider.Output(MessageType.Error, "Could not flash the firmware binary after 3 attempts. Please install it manually via bossac.");
+                await Utility.Logger.LogOutput(MessageType.Error, "Could not flash the firmware binary after 3 attempts. Please install it manually via bossac.");
                 Program.CancelSource.Cancel();
             }
             else
@@ -454,7 +454,7 @@ namespace DuetControlServer.SPI
                 startTime = DateTime.Now;
 
                 // Request object model updates
-                if (IsIdle || DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.MaxUpdateDelay))
+                if (Model.Updater.IsReady && DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
                 {
                     DataTransfer.WriteGetObjectModel(_moduleToQuery);
                     _lastQueryTime = DateTime.Now;
@@ -602,12 +602,12 @@ namespace DuetControlServer.SPI
         {
             DataTransfer.ReadCodeReply(out Communication.MessageTypeFlags flags, out string reply);
 
-            // TODO implement logging here
             // TODO check for "File %s will print in %" PRIu32 "h %" PRIu32 "m plus heating time" and modify simulation time
 
             // Deal with generic replies. Keep this check in sync with RepRapFirmware
-            if (flags.HasFlag(Communication.MessageTypeFlags.UsbMessage) && flags.HasFlag(Communication.MessageTypeFlags.AuxMessage) &&
-                flags.HasFlag(Communication.MessageTypeFlags.HttpMessage) && flags.HasFlag(Communication.MessageTypeFlags.TelnetMessage))
+            if ((flags.HasFlag(Communication.MessageTypeFlags.UsbMessage) && flags.HasFlag(Communication.MessageTypeFlags.AuxMessage) &&
+                 flags.HasFlag(Communication.MessageTypeFlags.HttpMessage) && flags.HasFlag(Communication.MessageTypeFlags.TelnetMessage)) ||
+                flags == Communication.MessageTypeFlags.LogMessage)
             {
                 OutputGenericMessage(flags, reply.TrimEnd());
                 return;
@@ -640,22 +640,20 @@ namespace DuetControlServer.SPI
 
         private static void OutputGenericMessage(Communication.MessageTypeFlags flags, string reply)
         {
-            if (_partialCodeReply != null)
-            {
-                reply = _partialCodeReply + reply;
-                _partialCodeReply = null;
-            }
-
             if (flags.HasFlag(Communication.MessageTypeFlags.PushFlag))
             {
-                _partialCodeReply = reply;
+                _partialGenericMessage += reply;
             }
-            else if (reply != "")
+            else
             {
-                MessageType type = flags.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
-                    : flags.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
-                    : MessageType.Success;
-                Model.Provider.Output(type, reply);
+                if (!string.IsNullOrWhiteSpace(_partialGenericMessage))
+                {
+                    MessageType type = flags.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                                        : flags.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                                            : MessageType.Success;
+                    Model.Provider.Output(type, _partialGenericMessage + reply);
+                }
+                _partialGenericMessage = null;
             }
         }
 
@@ -670,14 +668,21 @@ namespace DuetControlServer.SPI
 
         private static async Task HandleAbortFileRequest()
         {
-            DataTransfer.ReadAbortFile(out CodeChannel channel);
-            Console.WriteLine($"[info] Received file abort request for channel {channel}");
+            DataTransfer.ReadAbortFile(out CodeChannel channel, out bool abortAll);
+            Console.WriteLine($"[info] Received file abort request on channel {channel} for {(abortAll ? "all files" : "the last file")}");
 
-            if (channel == CodeChannel.File)
+            if (abortAll)
             {
-                await Print.Cancel();
+                if (channel == CodeChannel.File)
+                {
+                    await Print.Cancel();
+                }
+                MacroFile.AbortAllFiles(channel);
             }
-            MacroFile.AbortAllFiles(channel);
+            else
+            {
+                MacroFile.AbortLastFile(channel);
+            }
             Channels[channel].InvalidateBuffer();
         }
 
@@ -687,7 +692,7 @@ namespace DuetControlServer.SPI
 
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                DuetAPI.Machine.Channel item = Model.Provider.Get.Channels[channel];
+                Channel item = Model.Provider.Get.Channels[channel];
                 item.StackDepth = stackDepth;
                 item.RelativeExtrusion = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.DrivesRelative);
                 item.VolumetricExtrusion = stackFlags.HasFlag(Communication.FirmwareRequests.StackFlags.VolumetricExtrusion);

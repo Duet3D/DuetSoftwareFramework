@@ -12,6 +12,21 @@ namespace DuetAPI.Machine
     public sealed class Network : IAssignable, ICloneable, INotifyPropertyChanged
     {
         /// <summary>
+        /// Default name of the machine
+        /// </summary>
+        public const string DefaultName = "My Duet";
+
+        /// <summary>
+        /// Fallback hostname if the <c>Name</c> is invalid
+        /// </summary>
+        public const string DefaultHostname = "duet";
+
+        /// <summary>
+        /// Default network password of the machine
+        /// </summary>
+        public const string DefaultPassword = "reprap";
+
+        /// <summary>
         /// Event to trigger when a property has changed
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
@@ -36,7 +51,26 @@ namespace DuetAPI.Machine
                 }
             }
         }
-        private string _name;
+        private string _name = DefaultName;
+
+        /// <summary>
+        /// Hostname of the machine
+        /// </summary>
+        public string Hostname
+        {
+            get
+            {
+                string hostname = "";
+                foreach (char c in Name)
+                {
+                    if (char.IsLetterOrDigit(c) || c == '-' || c == '_')
+                    {
+                        hostname += c;
+                    }
+                }
+                return (hostname != "") ? hostname : DefaultHostname;
+            }
+        }
         
         /// <summary>
         /// Password required to access this machine
@@ -56,7 +90,7 @@ namespace DuetAPI.Machine
                 }
             }
         }
-        private string _password;
+        private string _password = DefaultPassword;
 
         /// <summary>
         /// List of available network interfaces

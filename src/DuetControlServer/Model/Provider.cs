@@ -27,6 +27,16 @@ namespace DuetControlServer.Model
 
             // Initialize machine name
             Get.Network.Name = Environment.MachineName;
+            Get.Network.PropertyChanged += NetworkChanged;
+        }
+
+        private static void NetworkChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(Get.Network.Name))
+            {
+                // Change Linux hostname when the machine name is modified
+                System.Diagnostics.Process.Start("hostname", Get.Network.Hostname).WaitForExit();
+            }
         }
 
         /// <summary>
@@ -72,7 +82,7 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Output(Message message)
         {
-            if (message.Content.Trim() != "")
+            if (string.IsNullOrWhiteSpace(message.Content))
             {
                 message.Print();
 
@@ -101,7 +111,7 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Output(DuetAPI.Commands.CodeResult codeResult)
         {
-            if (codeResult != null)
+            if (codeResult != null && !codeResult.IsEmpty)
             {
                 foreach (Message message in codeResult)
                 {

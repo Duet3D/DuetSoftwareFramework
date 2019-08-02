@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using DuetAPI;
-using DuetAPI.Commands;
 
 namespace DuetControlServer.SPI.Communication.LinuxRequests
 {

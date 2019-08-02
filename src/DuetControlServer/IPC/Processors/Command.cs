@@ -22,7 +22,8 @@ namespace DuetControlServer.IPC.Processors
             typeof(Flush),
             typeof(ResolvePath),
             typeof(SimpleCode),
-            typeof(SyncMachineModel)
+            typeof(SyncMachineModel),
+            typeof(WriteMessage)
         };
         
         /// <summary>
