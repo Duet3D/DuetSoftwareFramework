@@ -4,5 +4,5 @@ Maintainer: RepRapFirmware <package@reprapfirmware.org>
 Depends: duetcontrolserver
 Suggests: duetwebcontrol
 Priority: standard
-Version: 1.0.0
+Version: 1.0.1
 Description: Virtual SD card directory for the Duet software framework

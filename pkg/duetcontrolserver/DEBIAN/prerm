@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Stop DCS
+if (systemctl -q is-active duetcontrolserver); then
+    systemctl -q stop duetcontrolserver
+fi

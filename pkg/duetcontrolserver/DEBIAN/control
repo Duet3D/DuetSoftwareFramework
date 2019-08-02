@@ -3,7 +3,7 @@ Version: DCSVER
 Section: electronics
 Priority: standard
 Architecture: armhf
-Depends: duetruntime (= DCSVER), wiringpi
+Depends: duetruntime (= DCSVER)
 Maintainer: RepRapFirmware <package@reprapfirmware.org>
 Homepage: https://reprapfirmware.org
 Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git

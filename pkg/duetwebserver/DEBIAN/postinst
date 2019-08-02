@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# Update systemd services
+systemctl -q daemon-reload
+
+# Start DWS again if it is enabled via systemd
+if (systemctl -q is-enabled duetwebserver); then
+    systemctl -q start duetwebserver
+fi
+

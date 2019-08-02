@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# Update systemd services
+systemctl -q daemon-reload
+
+# Start DCS again if it is enabled via systemd
+if (systemctl -q is-enabled duetcontrolserver); then
+    systemctl -q start duetcontrolserver
+fi
+
