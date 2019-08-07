@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Stop DWS
+if (systemctl -q is-active duetwebserver); then
+    systemctl -q stop duetwebserver
+fi

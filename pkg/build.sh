@@ -8,6 +8,7 @@ mkdir /tmp/duet
 dcsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" ../src/DuetControlServer/DuetControlServer.csproj)
 dwsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" ../src/DuetWebServer/DuetWebServer.csproj)
 sdver=$(cat $pwd/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
+signkey=C406404B2459FE0B1C6CC19D3738126EDA91C86B
 
 export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
 
@@ -75,8 +76,9 @@ build_dwc() {
 	echo "Building DWC2..."
 
 	echo "- Cloning repository..."
-	git clone -q --single-branch --branch next https://github.com/chrishamm/DuetWebControl.git /tmp/duet/DuetWebControl
-	dwcver=$(jq -r ".version" /tmp/duet/DuetWebControl/package.json)
+	#git clone -q --single-branch --branch next https://github.com/chrishamm/DuetWebControl.git /tmp/duet/DuetWebControl
+	cp -r /home/christian/duet/DuetWebControl /tmp/duet/DuetWebControl
+	dwcver=$(jq -r ".version" /tmp/duet/DuetWebControl/package.json)-2
 	cd /tmp/duet/DuetWebControl
 
 	echo "- Installing dependencies..."
@@ -112,7 +114,9 @@ build_sd
 build_dwc
 build_meta
 
-mkdir -p ./dists/stretch/dsf/binary-armhf
-mv *.deb ./dists/stretch/dsf/binary-armhf
-dpkg-scanpackages dists/stretch/dsf/binary-armhf /dev/null > ./dists/stretch/dsf/binary-armhf/Packages
-dpkg-scanpackages dists/stretch/dsf/binary-armhf /dev/null | gzip -9c > ./dists/stretch/dsf/binary-armhf/Packages.gz
+dpkg-sig -k $signkey -s builder *.deb
+
+mkdir -p ./dists/buster/dsf/binary-armhf
+mv *.deb ./dists/buster/dsf/binary-armhf
+dpkg-scanpackages dists/buster/dsf/binary-armhf /dev/null > ./dists/buster/dsf/binary-armhf/Packages
+dpkg-scanpackages dists/buster/dsf/binary-armhf /dev/null | gzip -9c > ./dists/buster/dsf/binary-armhf/Packages.gz

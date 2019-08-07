@@ -1,9 +1,11 @@
 [Unit]
 Description=Duet Web Server
 Wants=duetcontrolserver.service
+Requires=duetcontrolserver.service
 After=network.target duetcontrolserver.service
 
 [Service]
+WorkingDirectory=/opt/dsf/sd/www
 ExecStart=/opt/dsf/bin/DuetWebServer
 TimeoutStopSec=15
 Type=simple
