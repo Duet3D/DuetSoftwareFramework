@@ -91,6 +91,15 @@
     <HelpKINode Title="Tool.Assign Method " Url="html/M_DuetAPI_Machine_Tool_Assign.htm" />
     <HelpKINode Title="UserVariable.Assign Method " Url="html/M_DuetAPI_Machine_UserVariable_Assign.htm" />
   </HelpKINode>
+  <HelpKINode Title="AssignFilament enumeration member" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_Request.htm" />
+  <HelpKINode Title="AssignFilament method" Url="html/M_DuetControlServer_SPI_Interface_AssignFilament.htm" />
+  <HelpKINode Title="AssignFilamentHeader structure">
+    <HelpKINode Title="AssignFilamentHeader Structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_AssignFilamentHeader.htm" />
+    <HelpKINode Title="fields" Url="html/Fields_T_DuetControlServer_SPI_Communication_LinuxRequests_AssignFilamentHeader.htm" />
+    <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_SPI_Communication_LinuxRequests_AssignFilamentHeader.htm" />
+  </HelpKINode>
+  <HelpKINode Title="AssignFilamentHeader.Extruder field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_AssignFilamentHeader_Extruder.htm" />
+  <HelpKINode Title="AssignFilamentHeader.FilamentLength field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_AssignFilamentHeader_FilamentLength.htm" />
   <HelpKINode Title="AssignFrom method" Url="html/M_DuetAPI_Machine_DriveMicrostepping_AssignFrom.htm" />
   <HelpKINode Title="AssignList(Of T) method" Url="html/M_DuetAPI_Utility_ListHelpers_AssignList__1.htm" />
   <HelpKINode Title="AssignList&lt;T&gt; method" Url="html/M_DuetAPI_Utility_ListHelpers_AssignList__1.htm" />
@@ -264,7 +273,10 @@
   <HelpKINode Title="Calculate method" Url="html/M_DuetControlServer_SPI_CRC16_Calculate.htm" />
   <HelpKINode Title="Calibrating enumeration member" Url="html/T_DuetAPI_Machine_ScannerStatus.htm" />
   <HelpKINode Title="Cancel method" Url="html/M_DuetControlServer_FileExecution_Print_Cancel.htm" />
-  <HelpKINode Title="CancelSource field" Url="html/F_DuetControlServer_Program_CancelSource.htm" />
+  <HelpKINode Title="CancelSource field">
+    <HelpKINode Title="Program.CancelSource Field" Url="html/F_DuetWebServer_Program_CancelSource.htm" />
+    <HelpKINode Title="Program.CancelSource Field" Url="html/F_DuetControlServer_Program_CancelSource.htm" />
+  </HelpKINode>
   <HelpKINode Title="CanConvert method">
     <HelpKINode Title="CharEnumConverter.CanConvert Method " Url="html/M_DuetAPI_Utility_CharEnumConverter_CanConvert.htm" />
     <HelpKINode Title="CodeFlagsConverter.CanConvert Method " Url="html/M_DuetAPI_Commands_CodeFlagsConverter_CanConvert.htm" />
@@ -333,11 +345,13 @@
   <HelpKINode Title="ChannelInformation.PendingCodes field" Url="html/F_DuetControlServer_SPI_ChannelInformation_PendingCodes.htm" />
   <HelpKINode Title="ChannelInformation.PendingFlushRequests field" Url="html/F_DuetControlServer_SPI_ChannelInformation_PendingFlushRequests.htm" />
   <HelpKINode Title="ChannelInformation.PendingLockRequests field" Url="html/F_DuetControlServer_SPI_ChannelInformation_PendingLockRequests.htm" />
+  <HelpKINode Title="ChannelInformation.PriorityCodes field" Url="html/F_DuetControlServer_SPI_ChannelInformation_PriorityCodes.htm" />
   <HelpKINode Title="ChannelInformation.ProcessRequests method" Url="html/M_DuetControlServer_SPI_ChannelInformation_ProcessRequests.htm" />
   <HelpKINode Title="ChannelInformation.ResumeBuffer method" Url="html/M_DuetControlServer_SPI_ChannelInformation_ResumeBuffer.htm" />
   <HelpKINode Title="ChannelInformation.SuspendBuffer method" Url="html/M_DuetControlServer_SPI_ChannelInformation_SuspendBuffer.htm" />
   <HelpKINode Title="ChannelInformation.SuspendedCodes field" Url="html/F_DuetControlServer_SPI_ChannelInformation_SuspendedCodes.htm" />
   <HelpKINode Title="ChannelInformation.SystemMacroHasFinished field" Url="html/F_DuetControlServer_SPI_ChannelInformation_SystemMacroHasFinished.htm" />
+  <HelpKINode Title="ChannelInformation.WaitingForMessageAcknowledgement property" Url="html/P_DuetControlServer_SPI_ChannelInformation_WaitingForMessageAcknowledgement.htm" />
   <HelpKINode Title="Channels class">
     <HelpKINode Title="Channels Class" Url="html/T_DuetAPI_Machine_Channels.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Machine_Channels__ctor.htm" />
@@ -440,12 +454,12 @@
   <HelpKINode Title="CloseOnly enumeration member" Url="html/T_DuetAPI_Machine_MessageBoxMode.htm" />
   <HelpKINode Title="CNC enumeration member" Url="html/T_DuetAPI_Machine_MachineMode.htm" />
   <HelpKINode Title="Code class">
-    <HelpKINode Title="Code Class" Url="html/T_DuetControlServer_Commands_Code.htm" />
     <HelpKINode Title="Code Class" Url="html/T_DuetAPI_Commands_Code.htm" />
-    <HelpKINode Title="constructor" Url="html/Overload_DuetControlServer_Commands_Code__ctor.htm" />
+    <HelpKINode Title="Code Class" Url="html/T_DuetControlServer_Commands_Code.htm" />
     <HelpKINode Title="constructor" Url="html/Overload_DuetAPI_Commands_Code__ctor.htm" />
-    <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Commands_Code.htm" />
+    <HelpKINode Title="constructor" Url="html/Overload_DuetControlServer_Commands_Code__ctor.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_Code.htm" />
+    <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Commands_Code.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_Code.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Commands_Code.htm" />
   </HelpKINode>
@@ -456,8 +470,8 @@
   </HelpKINode>
   <HelpKINode Title="Code.Channel property" Url="html/P_DuetAPI_Commands_Code_Channel.htm" />
   <HelpKINode Title="Code.Code constructor">
-    <HelpKINode Title="Code Constructor " Url="html/Overload_DuetAPI_Commands_Code__ctor.htm" />
     <HelpKINode Title="Code Constructor " Url="html/Overload_DuetControlServer_Commands_Code__ctor.htm" />
+    <HelpKINode Title="Code Constructor " Url="html/Overload_DuetAPI_Commands_Code__ctor.htm" />
   </HelpKINode>
   <HelpKINode Title="Code.Comment property" Url="html/P_DuetAPI_Commands_Code_Comment.htm" />
   <HelpKINode Title="Code.Enqueue method" Url="html/M_DuetControlServer_Commands_Code_Enqueue.htm" />
@@ -605,8 +619,8 @@
   <HelpKINode Title="Command class">
     <HelpKINode Title="Command Class" Url="html/T_DuetAPI_Commands_Command.htm" />
     <HelpKINode Title="Command Class" Url="html/T_DuetControlServer_IPC_Processors_Command.htm" />
-    <HelpKINode Title="constructor" Url="html/M_DuetControlServer_IPC_Processors_Command__ctor.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Commands_Command__ctor.htm" />
+    <HelpKINode Title="constructor" Url="html/M_DuetControlServer_IPC_Processors_Command__ctor.htm" />
     <HelpKINode Title="fields" Url="html/Fields_T_DuetControlServer_IPC_Processors_Command.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_IPC_Processors_Command.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_Command.htm" />
@@ -789,6 +803,7 @@
   <HelpKINode Title="DataTransfer.StartIap method" Url="html/M_DuetControlServer_SPI_DataTransfer_StartIap.htm" />
   <HelpKINode Title="DataTransfer.VerifyFirmwareChecksum method" Url="html/M_DuetControlServer_SPI_DataTransfer_VerifyFirmwareChecksum.htm" />
   <HelpKINode Title="DataTransfer.WaitForIapReset method" Url="html/M_DuetControlServer_SPI_DataTransfer_WaitForIapReset.htm" />
+  <HelpKINode Title="DataTransfer.WriteAssignFilament method" Url="html/M_DuetControlServer_SPI_DataTransfer_WriteAssignFilament.htm" />
   <HelpKINode Title="DataTransfer.WriteCode method" Url="html/M_DuetControlServer_SPI_DataTransfer_WriteCode.htm" />
   <HelpKINode Title="DataTransfer.WriteEmergencyStop method" Url="html/M_DuetControlServer_SPI_DataTransfer_WriteEmergencyStop.htm" />
   <HelpKINode Title="DataTransfer.WriteGetHeightMap method" Url="html/M_DuetControlServer_SPI_DataTransfer_WriteGetHeightMap.htm" />
@@ -805,6 +820,7 @@
   <HelpKINode Title="DataType enumeration" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_DataType.htm" />
   <HelpKINode Title="Date property" Url="html/P_DuetAPI_Machine_Firmware_Date.htm" />
   <HelpKINode Title="DeadTime property" Url="html/P_DuetAPI_Machine_HeaterModel_DeadTime.htm" />
+  <HelpKINode Title="DefaultConfigFile field" Url="html/F_DuetWebServer_Program_DefaultConfigFile.htm" />
   <HelpKINode Title="DefaultHeightmapFile field" Url="html/F_DuetControlServer_FilePath_DefaultHeightmapFile.htm" />
   <HelpKINode Title="DefaultHostname field" Url="html/F_DuetAPI_Machine_Network_DefaultHostname.htm" />
   <HelpKINode Title="DefaultLogFile field" Url="html/F_DuetControlServer_Utility_Logger_DefaultLogFile.htm" />
@@ -1044,6 +1060,7 @@
   <HelpKINode Title="DuetControlServer.SPI.Communication.FirmwareRequests.StackEvent structure" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_StackEvent.htm" />
   <HelpKINode Title="DuetControlServer.SPI.Communication.FirmwareRequests.StackFlags enumeration" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_StackFlags.htm" />
   <HelpKINode Title="DuetControlServer.SPI.Communication.LinuxRequests namespace" Url="html/N_DuetControlServer_SPI_Communication_LinuxRequests.htm" />
+  <HelpKINode Title="DuetControlServer.SPI.Communication.LinuxRequests.AssignFilamentHeader structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_AssignFilamentHeader.htm" />
   <HelpKINode Title="DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_CodeHeader.htm" />
   <HelpKINode Title="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter structure" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_CodeParameter.htm" />
   <HelpKINode Title="DuetControlServer.SPI.Communication.LinuxRequests.DataType enumeration" Url="html/T_DuetControlServer_SPI_Communication_LinuxRequests_DataType.htm" />
@@ -1223,6 +1240,7 @@
     <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Machine_Extruder.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Machine_Extruder.htm" />
   </HelpKINode>
+  <HelpKINode Title="Extruder field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_AssignFilamentHeader_Extruder.htm" />
   <HelpKINode Title="Extruder.Assign method" Url="html/M_DuetAPI_Machine_Extruder_Assign.htm" />
   <HelpKINode Title="Extruder.Clone method" Url="html/M_DuetAPI_Machine_Extruder_Clone.htm" />
   <HelpKINode Title="Extruder.Drives property" Url="html/P_DuetAPI_Machine_Extruder_Drives.htm" />
@@ -1245,7 +1263,10 @@
   <HelpKINode Title="ExtruderNonlinear.PropertyChanged event" Url="html/E_DuetAPI_Machine_ExtruderNonlinear_PropertyChanged.htm" />
   <HelpKINode Title="ExtruderNonlinear.Temperature property" Url="html/P_DuetAPI_Machine_ExtruderNonlinear_Temperature.htm" />
   <HelpKINode Title="ExtruderNonlinear.UpperLimit property" Url="html/P_DuetAPI_Machine_ExtruderNonlinear_UpperLimit.htm" />
-  <HelpKINode Title="Extruders property" Url="html/P_DuetAPI_Machine_Move_Extruders.htm" />
+  <HelpKINode Title="Extruders property">
+    <HelpKINode Title="Move.Extruders Property " Url="html/P_DuetAPI_Machine_Move_Extruders.htm" />
+    <HelpKINode Title="Tool.Extruders Property " Url="html/P_DuetAPI_Machine_Tool_Extruders.htm" />
+  </HelpKINode>
   <HelpKINode Title="Factor property">
     <HelpKINode Title="Extruder.Factor Property " Url="html/P_DuetAPI_Machine_Extruder_Factor.htm" />
     <HelpKINode Title="MotorsIdleControl.Factor Property " Url="html/P_DuetAPI_Machine_MotorsIdleControl_Factor.htm" />
@@ -1289,6 +1310,7 @@
   <HelpKINode Title="FilamentChange enumeration member" Url="html/T_DuetControlServer_SPI_Communication_PrintPausedReason.htm" />
   <HelpKINode Title="FilamentExtruder property" Url="html/P_DuetAPI_Machine_Tool_FilamentExtruder.htm" />
   <HelpKINode Title="FilamentFilters property" Url="html/P_DuetControlServer_Settings_FilamentFilters.htm" />
+  <HelpKINode Title="FilamentLength field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_AssignFilamentHeader_FilamentLength.htm" />
   <HelpKINode Title="FilamentManager class">
     <HelpKINode Title="FilamentManager Class" Url="html/T_DuetControlServer_Utility_FilamentManager.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Utility_FilamentManager.htm" />
@@ -1389,8 +1411,8 @@
     <HelpKINode Title="Flush Class" Url="html/T_DuetAPI_Commands_Flush.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetControlServer_Commands_Flush__ctor.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Commands_Flush__ctor.htm" />
-    <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_Flush.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Commands_Flush.htm" />
+    <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_Flush.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_Flush.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Commands_Flush.htm" />
   </HelpKINode>
@@ -1401,8 +1423,8 @@
   <HelpKINode Title="Flush.Channel property" Url="html/P_DuetAPI_Commands_Flush_Channel.htm" />
   <HelpKINode Title="Flush.Execute method" Url="html/M_DuetControlServer_Commands_Flush_Execute.htm" />
   <HelpKINode Title="Flush.Flush constructor">
-    <HelpKINode Title="Flush Constructor " Url="html/M_DuetControlServer_Commands_Flush__ctor.htm" />
     <HelpKINode Title="Flush Constructor " Url="html/M_DuetAPI_Commands_Flush__ctor.htm" />
+    <HelpKINode Title="Flush Constructor " Url="html/M_DuetControlServer_Commands_Flush__ctor.htm" />
   </HelpKINode>
   <HelpKINode Title="FormatCode field">
     <HelpKINode Title="Consts.FormatCode Field" Url="html/F_DuetControlServer_SPI_Communication_Consts_FormatCode.htm" />
@@ -1432,6 +1454,7 @@
   <HelpKINode Title="GeneratedBy property" Url="html/P_DuetAPI_ParsedFileInfo_GeneratedBy.htm" />
   <HelpKINode Title="GeneratedByFilters property" Url="html/P_DuetControlServer_Settings_GeneratedByFilters.htm" />
   <HelpKINode Title="GeneratedByLength field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted_GeneratedByLength.htm" />
+  <HelpKINode Title="GenericMessage enumeration member" Url="html/T_DuetControlServer_SPI_Communication_MessageTypeFlags.htm" />
   <HelpKINode Title="Geometry class">
     <HelpKINode Title="Geometry Class" Url="html/T_DuetAPI_Machine_Geometry.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Machine_Geometry__ctor.htm" />
@@ -1459,12 +1482,12 @@
   <HelpKINode Title="GetCodeSize method" Url="html/M_DuetControlServer_SPI_DataTransfer_GetCodeSize.htm" />
   <HelpKINode Title="GetDirectoryContents method" Url="html/M_DuetWebServer_FileProviders_DuetFileProvider_GetDirectoryContents.htm" />
   <HelpKINode Title="GetFileInfo class">
-    <HelpKINode Title="GetFileInfo Class" Url="html/T_DuetAPI_Commands_GetFileInfo.htm" />
     <HelpKINode Title="GetFileInfo Class" Url="html/T_DuetControlServer_Commands_GetFileInfo.htm" />
-    <HelpKINode Title="constructor" Url="html/M_DuetControlServer_Commands_GetFileInfo__ctor.htm" />
+    <HelpKINode Title="GetFileInfo Class" Url="html/T_DuetAPI_Commands_GetFileInfo.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Commands_GetFileInfo__ctor.htm" />
-    <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Commands_GetFileInfo.htm" />
+    <HelpKINode Title="constructor" Url="html/M_DuetControlServer_Commands_GetFileInfo__ctor.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_GetFileInfo.htm" />
+    <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Commands_GetFileInfo.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_GetFileInfo.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Commands_GetFileInfo.htm" />
   </HelpKINode>
@@ -1476,8 +1499,8 @@
   <HelpKINode Title="GetFileInfo.Execute method" Url="html/M_DuetControlServer_Commands_GetFileInfo_Execute.htm" />
   <HelpKINode Title="GetFileInfo.FileName property" Url="html/P_DuetAPI_Commands_GetFileInfo_FileName.htm" />
   <HelpKINode Title="GetFileInfo.GetFileInfo constructor">
-    <HelpKINode Title="GetFileInfo Constructor " Url="html/M_DuetAPI_Commands_GetFileInfo__ctor.htm" />
     <HelpKINode Title="GetFileInfo Constructor " Url="html/M_DuetControlServer_Commands_GetFileInfo__ctor.htm" />
+    <HelpKINode Title="GetFileInfo Constructor " Url="html/M_DuetAPI_Commands_GetFileInfo__ctor.htm" />
   </HelpKINode>
   <HelpKINode Title="GetFileList method" Url="html/M_DuetWebServer_Controllers_MachineController_GetFileList.htm" />
   <HelpKINode Title="GetHashCode method" Url="html/M_DuetAPI_Commands_CodeParameter_GetHashCode.htm" />
@@ -1488,10 +1511,10 @@
     <HelpKINode Title="GetMachineModel Class" Url="html/T_DuetAPI_Commands_GetMachineModel.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetControlServer_Commands_GetMachineModel__ctor.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Commands_GetMachineModel__ctor.htm" />
-    <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_GetMachineModel.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Commands_GetMachineModel.htm" />
-    <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Commands_GetMachineModel.htm" />
+    <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_GetMachineModel.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_GetMachineModel.htm" />
+    <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Commands_GetMachineModel.htm" />
   </HelpKINode>
   <HelpKINode Title="GetMachineModel method">
     <HelpKINode Title="BaseCommandConnection.GetMachineModel Method " Url="html/M_DuetAPIClient_BaseCommandConnection_GetMachineModel.htm" />
@@ -1723,13 +1746,13 @@
     <HelpKINode Title="Interface Class" Url="html/T_DuetControlServer_SPI_Interface.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_SPI_Interface.htm" />
   </HelpKINode>
+  <HelpKINode Title="Interface.AssignFilament method" Url="html/M_DuetControlServer_SPI_Interface_AssignFilament.htm" />
   <HelpKINode Title="Interface.BufferCode method" Url="html/M_DuetControlServer_SPI_Interface_BufferCode.htm" />
   <HelpKINode Title="Interface.Connect method" Url="html/M_DuetControlServer_SPI_Interface_Connect.htm" />
   <HelpKINode Title="Interface.Diagnostics method" Url="html/M_DuetControlServer_SPI_Interface_Diagnostics.htm" />
   <HelpKINode Title="Interface.Flush method" Url="html/M_DuetControlServer_SPI_Interface_Flush.htm" />
   <HelpKINode Title="Interface.GetHeightmap method" Url="html/M_DuetControlServer_SPI_Interface_GetHeightmap.htm" />
   <HelpKINode Title="Interface.Init method" Url="html/M_DuetControlServer_SPI_Interface_Init.htm" />
-  <HelpKINode Title="Interface.InvalidateData method" Url="html/M_DuetControlServer_SPI_Interface_InvalidateData.htm" />
   <HelpKINode Title="Interface.LockMovementAndWaitForStandstill method" Url="html/M_DuetControlServer_SPI_Interface_LockMovementAndWaitForStandstill.htm" />
   <HelpKINode Title="Interface.ProcessCode method" Url="html/M_DuetControlServer_SPI_Interface_ProcessCode.htm" />
   <HelpKINode Title="Interface.RequestEmergencyStop method" Url="html/M_DuetControlServer_SPI_Interface_RequestEmergencyStop.htm" />
@@ -1758,7 +1781,6 @@
   </HelpKINode>
   <HelpKINode Title="Invalidate method" Url="html/M_DuetControlServer_SPI_ChannelInformation_Invalidate.htm" />
   <HelpKINode Title="InvalidateBuffer method" Url="html/M_DuetControlServer_SPI_ChannelInformation_InvalidateBuffer.htm" />
-  <HelpKINode Title="InvalidateData method" Url="html/M_DuetControlServer_SPI_Interface_InvalidateData.htm" />
   <HelpKINode Title="InvalidFormatCode field" Url="html/F_DuetControlServer_SPI_Communication_Consts_InvalidFormatCode.htm" />
   <HelpKINode Title="Inverted property">
     <HelpKINode Title="Fan.Inverted Property " Url="html/P_DuetAPI_Machine_Fan_Inverted.htm" />
@@ -1794,6 +1816,7 @@
   <HelpKINode Title="IsPostProcessed enumeration member" Url="html/T_DuetAPI_Commands_CodeFlags.htm" />
   <HelpKINode Title="IsPreProcessed enumeration member" Url="html/T_DuetAPI_Commands_CodeFlags.htm" />
   <HelpKINode Title="IsPrinting property" Url="html/P_DuetControlServer_FileExecution_Print_IsPrinting.htm" />
+  <HelpKINode Title="IsPrioritized enumeration member" Url="html/T_DuetAPI_Commands_CodeFlags.htm" />
   <HelpKINode Title="IsReady property" Url="html/P_DuetControlServer_Model_Updater_IsReady.htm" />
   <HelpKINode Title="IsReadyToSend property" Url="html/P_DuetControlServer_SPI_QueuedCode_IsReadyToSend.htm" />
   <HelpKINode Title="IsSuccessful property" Url="html/P_DuetAPI_Commands_CodeResult_IsSuccessful.htm" />
@@ -1937,6 +1960,7 @@
   <HelpKINode Title="LockUnlock.Channel field" Url="html/F_DuetControlServer_SPI_Communication_SharedRequests_LockUnlock_Channel.htm" />
   <HelpKINode Title="Log method" Url="html/Overload_DuetControlServer_Utility_Logger_Log.htm" />
   <HelpKINode Title="LogFile property" Url="html/P_DuetAPI_Machine_State_LogFile.htm" />
+  <HelpKINode Title="LoggedGenericMessage enumeration member" Url="html/T_DuetControlServer_SPI_Communication_MessageTypeFlags.htm" />
   <HelpKINode Title="Logger class">
     <HelpKINode Title="Logger Class" Url="html/T_DuetControlServer_Utility_Logger.htm" />
     <HelpKINode Title="fields" Url="html/Fields_T_DuetControlServer_Utility_Logger.htm" />
@@ -2426,6 +2450,7 @@
   <HelpKINode Title="PrintTime field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted_PrintTime.htm" />
   <HelpKINode Title="PrintTime property" Url="html/P_DuetAPI_ParsedFileInfo_PrintTime.htm" />
   <HelpKINode Title="PrintTimeFilters property" Url="html/P_DuetControlServer_Settings_PrintTimeFilters.htm" />
+  <HelpKINode Title="PriorityCodes field" Url="html/F_DuetControlServer_SPI_ChannelInformation_PriorityCodes.htm" />
   <HelpKINode Title="Probe class">
     <HelpKINode Title="Probe Class" Url="html/T_DuetAPI_Machine_Probe.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Machine_Probe__ctor.htm" />
@@ -2474,11 +2499,16 @@
     <HelpKINode Title="Program Class" Url="html/T_DuetControlServer_Program.htm" />
     <HelpKINode Title="Program Class" Url="html/T_DuetWebServer_Program.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetWebServer_Program__ctor.htm" />
+    <HelpKINode Title="fields" Url="html/Fields_T_DuetWebServer_Program.htm" />
     <HelpKINode Title="fields" Url="html/Fields_T_DuetControlServer_Program.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetWebServer_Program.htm" />
   </HelpKINode>
-  <HelpKINode Title="Program.CancelSource field" Url="html/F_DuetControlServer_Program_CancelSource.htm" />
+  <HelpKINode Title="Program.CancelSource field">
+    <HelpKINode Title="Program.CancelSource Field" Url="html/F_DuetWebServer_Program_CancelSource.htm" />
+    <HelpKINode Title="Program.CancelSource Field" Url="html/F_DuetControlServer_Program_CancelSource.htm" />
+  </HelpKINode>
   <HelpKINode Title="Program.CreateWebHostBuilder method" Url="html/M_DuetWebServer_Program_CreateWebHostBuilder.htm" />
+  <HelpKINode Title="Program.DefaultConfigFile field" Url="html/F_DuetWebServer_Program_DefaultConfigFile.htm" />
   <HelpKINode Title="Program.Main method" Url="html/M_DuetWebServer_Program_Main.htm" />
   <HelpKINode Title="Program.Program constructor" Url="html/M_DuetWebServer_Program__ctor.htm" />
   <HelpKINode Title="Progress property" Url="html/P_DuetAPI_Machine_Scanner_Progress.htm" />
@@ -2683,17 +2713,17 @@
     <HelpKINode Title="ResolvePath Class" Url="html/T_DuetAPI_Commands_ResolvePath.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Commands_ResolvePath__ctor.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetControlServer_Commands_ResolvePath__ctor.htm" />
-    <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_ResolvePath.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Commands_ResolvePath.htm" />
-    <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_ResolvePath.htm" />
+    <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_ResolvePath.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Commands_ResolvePath.htm" />
+    <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_ResolvePath.htm" />
   </HelpKINode>
   <HelpKINode Title="ResolvePath method" Url="html/M_DuetAPIClient_BaseCommandConnection_ResolvePath.htm" />
   <HelpKINode Title="ResolvePath.Execute method" Url="html/M_DuetControlServer_Commands_ResolvePath_Execute.htm" />
   <HelpKINode Title="ResolvePath.Path property" Url="html/P_DuetAPI_Commands_ResolvePath_Path.htm" />
   <HelpKINode Title="ResolvePath.ResolvePath constructor">
-    <HelpKINode Title="ResolvePath Constructor " Url="html/M_DuetAPI_Commands_ResolvePath__ctor.htm" />
     <HelpKINode Title="ResolvePath Constructor " Url="html/M_DuetControlServer_Commands_ResolvePath__ctor.htm" />
+    <HelpKINode Title="ResolvePath Constructor " Url="html/M_DuetAPI_Commands_ResolvePath__ctor.htm" />
   </HelpKINode>
   <HelpKINode Title="Response(Of T) class">
     <HelpKINode Title="Response(T) Class" Url="html/T_DuetAPI_Commands_Response_1.htm" />
@@ -2846,17 +2876,17 @@
     <HelpKINode Title="SimpleCode Class" Url="html/T_DuetControlServer_Commands_SimpleCode.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Commands_SimpleCode__ctor.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetControlServer_Commands_SimpleCode__ctor.htm" />
-    <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_SimpleCode.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Commands_SimpleCode.htm" />
-    <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_SimpleCode.htm" />
+    <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_SimpleCode.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Commands_SimpleCode.htm" />
+    <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_SimpleCode.htm" />
   </HelpKINode>
   <HelpKINode Title="SimpleCode.Channel property" Url="html/P_DuetAPI_Commands_SimpleCode_Channel.htm" />
   <HelpKINode Title="SimpleCode.Code property" Url="html/P_DuetAPI_Commands_SimpleCode_Code.htm" />
   <HelpKINode Title="SimpleCode.Execute method" Url="html/M_DuetControlServer_Commands_SimpleCode_Execute.htm" />
   <HelpKINode Title="SimpleCode.SimpleCode constructor">
-    <HelpKINode Title="SimpleCode Constructor " Url="html/M_DuetControlServer_Commands_SimpleCode__ctor.htm" />
     <HelpKINode Title="SimpleCode Constructor " Url="html/M_DuetAPI_Commands_SimpleCode__ctor.htm" />
+    <HelpKINode Title="SimpleCode Constructor " Url="html/M_DuetControlServer_Commands_SimpleCode__ctor.htm" />
   </HelpKINode>
   <HelpKINode Title="SimulatedTime field" Url="html/F_DuetControlServer_SPI_Communication_LinuxRequests_PrintStarted_SimulatedTime.htm" />
   <HelpKINode Title="SimulatedTime property" Url="html/P_DuetAPI_ParsedFileInfo_SimulatedTime.htm" />
@@ -3032,20 +3062,20 @@
   <HelpKINode Title="SuspendedCodes field" Url="html/F_DuetControlServer_SPI_ChannelInformation_SuspendedCodes.htm" />
   <HelpKINode Title="Switch enumeration member" Url="html/T_DuetAPI_Machine_ProbeType.htm" />
   <HelpKINode Title="SyncMachineModel class">
-    <HelpKINode Title="SyncMachineModel Class" Url="html/T_DuetAPI_Commands_SyncMachineModel.htm" />
     <HelpKINode Title="SyncMachineModel Class" Url="html/T_DuetControlServer_Commands_SyncMachineModel.htm" />
+    <HelpKINode Title="SyncMachineModel Class" Url="html/T_DuetAPI_Commands_SyncMachineModel.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Commands_SyncMachineModel__ctor.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetControlServer_Commands_SyncMachineModel__ctor.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_SyncMachineModel.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Commands_SyncMachineModel.htm" />
-    <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Commands_SyncMachineModel.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_SyncMachineModel.htm" />
+    <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Commands_SyncMachineModel.htm" />
   </HelpKINode>
   <HelpKINode Title="SyncMachineModel method" Url="html/M_DuetAPIClient_BaseCommandConnection_SyncMachineModel.htm" />
   <HelpKINode Title="SyncMachineModel.Execute method" Url="html/M_DuetControlServer_Commands_SyncMachineModel_Execute.htm" />
   <HelpKINode Title="SyncMachineModel.SyncMachineModel constructor">
-    <HelpKINode Title="SyncMachineModel Constructor " Url="html/M_DuetAPI_Commands_SyncMachineModel__ctor.htm" />
     <HelpKINode Title="SyncMachineModel Constructor " Url="html/M_DuetControlServer_Commands_SyncMachineModel__ctor.htm" />
+    <HelpKINode Title="SyncMachineModel Constructor " Url="html/M_DuetAPI_Commands_SyncMachineModel__ctor.htm" />
   </HelpKINode>
   <HelpKINode Title="SystemMacroHasFinished field" Url="html/F_DuetControlServer_SPI_ChannelInformation_SystemMacroHasFinished.htm" />
   <HelpKINode Title="Task property">
@@ -3118,6 +3148,7 @@
   <HelpKINode Title="Tool.Assign method" Url="html/M_DuetAPI_Machine_Tool_Assign.htm" />
   <HelpKINode Title="Tool.Axes property" Url="html/P_DuetAPI_Machine_Tool_Axes.htm" />
   <HelpKINode Title="Tool.Clone method" Url="html/M_DuetAPI_Machine_Tool_Clone.htm" />
+  <HelpKINode Title="Tool.Extruders property" Url="html/P_DuetAPI_Machine_Tool_Extruders.htm" />
   <HelpKINode Title="Tool.Fans property" Url="html/P_DuetAPI_Machine_Tool_Fans.htm" />
   <HelpKINode Title="Tool.Filament property" Url="html/P_DuetAPI_Machine_Tool_Filament.htm" />
   <HelpKINode Title="Tool.FilamentExtruder property" Url="html/P_DuetAPI_Machine_Tool_FilamentExtruder.htm" />
@@ -3272,6 +3303,7 @@
   <HelpKINode Title="VolumetricExtrusion property" Url="html/P_DuetAPI_Machine_Channel_VolumetricExtrusion.htm" />
   <HelpKINode Title="WaitForFullUpdate method" Url="html/M_DuetControlServer_Model_Updater_WaitForFullUpdate.htm" />
   <HelpKINode Title="WaitForIapReset method" Url="html/M_DuetControlServer_SPI_DataTransfer_WaitForIapReset.htm" />
+  <HelpKINode Title="WaitingForMessageAcknowledgement property" Url="html/P_DuetControlServer_SPI_ChannelInformation_WaitingForMessageAcknowledgement.htm" />
   <HelpKINode Title="WarmUpDuration property" Url="html/P_DuetAPI_Machine_Job_WarmUpDuration.htm" />
   <HelpKINode Title="Warning enumeration member">
     <HelpKINode Title="CodeReplyFlags Enumeration" Url="html/T_DuetControlServer_SPI_Communication_FirmwareRequests_CodeReplyFlags.htm" />
@@ -3287,6 +3319,10 @@
   <HelpKINode Title="While enumeration member" Url="html/T_DuetAPI_Commands_KeywordType.htm" />
   <HelpKINode Title="WiFi enumeration member" Url="html/T_DuetAPI_Machine_InterfaceType.htm" />
   <HelpKINode Title="WorkplaceCoordinates property" Url="html/P_DuetAPI_Machine_Move_WorkplaceCoordinates.htm" />
+  <HelpKINode Title="WriteAssignFilament method">
+    <HelpKINode Title="DataTransfer.WriteAssignFilament Method " Url="html/M_DuetControlServer_SPI_DataTransfer_WriteAssignFilament.htm" />
+    <HelpKINode Title="Writer.WriteAssignFilament Method " Url="html/M_DuetControlServer_SPI_Serialization_Writer_WriteAssignFilament.htm" />
+  </HelpKINode>
   <HelpKINode Title="WriteCode method">
     <HelpKINode Title="DataTransfer.WriteCode Method " Url="html/M_DuetControlServer_SPI_DataTransfer_WriteCode.htm" />
     <HelpKINode Title="Writer.WriteCode Method " Url="html/M_DuetControlServer_SPI_Serialization_Writer_WriteCode.htm" />
@@ -3314,12 +3350,12 @@
   <HelpKINode Title="WriteMessage class">
     <HelpKINode Title="WriteMessage Class" Url="html/T_DuetAPI_Commands_WriteMessage.htm" />
     <HelpKINode Title="WriteMessage Class" Url="html/T_DuetControlServer_Commands_WriteMessage.htm" />
-    <HelpKINode Title="constructor" Url="html/M_DuetControlServer_Commands_WriteMessage__ctor.htm" />
     <HelpKINode Title="constructor" Url="html/M_DuetAPI_Commands_WriteMessage__ctor.htm" />
+    <HelpKINode Title="constructor" Url="html/M_DuetControlServer_Commands_WriteMessage__ctor.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetControlServer_Commands_WriteMessage.htm" />
     <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Commands_WriteMessage.htm" />
-    <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_WriteMessage.htm" />
     <HelpKINode Title="properties" Url="html/Properties_T_DuetAPI_Commands_WriteMessage.htm" />
+    <HelpKINode Title="properties" Url="html/Properties_T_DuetControlServer_Commands_WriteMessage.htm" />
   </HelpKINode>
   <HelpKINode Title="WriteMessage.Content property" Url="html/P_DuetAPI_Commands_WriteMessage_Content.htm" />
   <HelpKINode Title="WriteMessage.Execute method" Url="html/M_DuetControlServer_Commands_WriteMessage_Execute.htm" />
@@ -3349,6 +3385,7 @@
   <HelpKINode Title="Writer.InitTransferHeader method" Url="html/M_DuetControlServer_SPI_Serialization_Writer_InitTransferHeader.htm" />
   <HelpKINode Title="Writer.PacketHeaderSize field" Url="html/F_DuetControlServer_SPI_Serialization_Writer_PacketHeaderSize.htm" />
   <HelpKINode Title="Writer.TransmissionHeaderSize field" Url="html/F_DuetControlServer_SPI_Serialization_Writer_TransmissionHeaderSize.htm" />
+  <HelpKINode Title="Writer.WriteAssignFilament method" Url="html/M_DuetControlServer_SPI_Serialization_Writer_WriteAssignFilament.htm" />
   <HelpKINode Title="Writer.WriteCode method" Url="html/M_DuetControlServer_SPI_Serialization_Writer_WriteCode.htm" />
   <HelpKINode Title="Writer.WriteHeightMap method" Url="html/M_DuetControlServer_SPI_Serialization_Writer_WriteHeightMap.htm" />
   <HelpKINode Title="Writer.WriteLockUnlock method" Url="html/M_DuetControlServer_SPI_Serialization_Writer_WriteLockUnlock.htm" />

@@ -80,6 +80,11 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Launch the IAP binary
         /// </summary>
-        StartIap = 13
+        StartIap = 13,
+
+        /// <summary>
+        /// Assign filament to a given extruder drive
+        /// </summary>
+        AssignFilament = 14
     }
 }

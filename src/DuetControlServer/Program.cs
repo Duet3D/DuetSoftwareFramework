@@ -21,7 +21,8 @@ namespace DuetControlServer
         /// Entry point of the program
         /// </summary>
         /// <param name="args">Command-line arguments</param>
-        static void Main(string[] args)
+        /// <returns>Asynchronous task</returns>
+        static async Task Main(string[] args)
         {
             Console.WriteLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
             Console.WriteLine("Written by Christian Hammacher for Duet3D");
@@ -29,7 +30,14 @@ namespace DuetControlServer
             Console.WriteLine();
 
             // Deal with program termination requests (SIGTERM)
-            AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) => CancelSource.Cancel();
+            AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) =>
+            {
+                if (!CancelSource.IsCancellationRequested)
+                {
+                    Console.WriteLine("[info] Received SIGTERM, shutting down...");
+                    CancelSource.Cancel();
+                }
+            };
 
             // Initialise settings
             Console.Write("Loading settings... ");
@@ -49,7 +57,7 @@ namespace DuetControlServer
             {
                 try
                 {
-                    testConnection.Connect(Settings.SocketPath, CancelSource.Token).Wait();
+                    await testConnection.Connect(Settings.SocketPath, CancelSource.Token);
                     Console.WriteLine("Error: Another instance is already running. Stopping.");
                     return;
                 }
@@ -113,20 +121,20 @@ namespace DuetControlServer
             Task[] taskList = { spiTask, ipcTask, modelUpdateTask };
 
             // Wait for program termination
-            Task.WaitAny(taskList);
+            await Task.WhenAny(taskList);
 
             // Tell other tasks to stop in case this is an abnormal program termination
             if (!CancelSource.IsCancellationRequested)
             {
-                Console.WriteLine("[crit] Abnormal program termination:");
+                Console.Write("[crit] Abnormal program termination: ");
                 if (spiTask.IsCompleted) { Console.WriteLine("SPI task terminated");  }
                 if (ipcTask.IsCompleted) { Console.WriteLine("IPC task terminated");  }
-                if (modelUpdateTask.IsCompleted) { Console.WriteLine("Model task terminated");  }
+                if (modelUpdateTask.IsCompleted) { Console.WriteLine("Model task terminated"); }
                 CancelSource.Cancel();
             }
 
             // Stop logging
-            Utility.Logger.Stop();
+            await Utility.Logger.Stop();
 
             // Stop the IPC subsystem. This has to happen here because Socket.AcceptAsync() does not have a CancellationToken parameter
             Server.Shutdown();
@@ -134,6 +142,7 @@ namespace DuetControlServer
             // Wait for all tasks to finish
             try
             {
+                // Do not use Task.WhenAll() here because it does not throw exceptions for already completed tasks
                 Task.WaitAll(taskList);
             }
             catch (AggregateException ae)

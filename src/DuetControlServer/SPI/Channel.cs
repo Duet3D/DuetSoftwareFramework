@@ -37,6 +37,11 @@ namespace DuetControlServer.SPI
         private readonly AsyncLock _lock = new AsyncLock();
 
         /// <summary>
+        /// Prioritised codes that override every other code
+        /// </summary>
+        public readonly Queue<QueuedCode> PriorityCodes = new Queue<QueuedCode>();
+
+        /// <summary>
         /// Queue of pending G/M/T-codes that have not been buffered yet
         /// </summary>
         public readonly Queue<QueuedCode> PendingCodes = new Queue<QueuedCode>();
@@ -81,6 +86,11 @@ namespace DuetControlServer.SPI
         /// Queue of pending flush requests
         /// </summary>
         public readonly Queue<TaskCompletionSource<object>> PendingFlushRequests = new Queue<TaskCompletionSource<object>>();
+
+        /// <summary>
+        /// Indicates if this channel is blocked and waiting for a message acknowledgement
+        /// </summary>
+        public bool WaitingForMessageAcknowledgement { get; set; }
 
         /// <summary>
         /// Lock access to this code channel
@@ -145,6 +155,11 @@ namespace DuetControlServer.SPI
                 channelDiagostics.AppendLine($"Number of flush requests: {PendingFlushRequests.Count}");
             }
 
+            if (WaitingForMessageAcknowledgement)
+            {
+                channelDiagostics.AppendLine("Waiting for message acknowledgment");
+            }
+
             if (channelDiagostics.Length != 0)
             {
                 builder.AppendLine($"{Channel}:");
@@ -165,24 +180,43 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Process pending requests on this channel
         /// </summary>
-        /// <returns>Whether another call to this method is permitted</returns>
+        /// <returns>If anything more can be done on this channel</returns>
         public bool ProcessRequests()
         {
-            // The order is: Suspended codes > nested macro codes > next nested macro code > pending code > (un-)lock requests > flush requests
+            // 1. Priority codes (e.g. M292)
+            if (PriorityCodes.TryPeek(out QueuedCode queuedCode))
+            {
+                if (queuedCode.IsFinished || (queuedCode.IsReadyToSend && BufferCode(queuedCode)))
+                {
+                    PriorityCodes.Dequeue();
+                    return true;
+                }
+
+                // Block this channel until every priority code is gone
+                return false;
+            }
+            if (WaitingForMessageAcknowledgement)
+            {
+                // Still waiting for M292...
+                return false;
+            }
+
+            // 2. Suspended codes being resumed (may include suspended codes from nested macros)
             if (_resumingBuffer)
             {
-                // Resume codes that were temporarily suspended. This is the case when a nested macro returns
                 ResumeBuffer();
                 return _resumingBuffer;
             }
-            else if (NestedMacroCodes.TryPeek(out QueuedCode queuedSystemCode) &&
-                (queuedSystemCode.Code.Type == CodeType.Comment || queuedSystemCode.IsFinished || (queuedSystemCode.IsReadyToSend && Interface.BufferCode(queuedSystemCode))))
+
+            // 3. Macro codes
+            if (NestedMacroCodes.TryPeek(out queuedCode) && (queuedCode.IsFinished || (queuedCode.IsReadyToSend && BufferCode(queuedCode))))
             {
-                // Check if the current system code has finished internally or if it can be buffered for RRF
                 NestedMacroCodes.Dequeue();
                 return true;
             }
-            else if (NestedMacros.TryPeek(out MacroFile macroFile))
+
+            // 4. Macro files
+            if (NestedMacros.TryPeek(out MacroFile macroFile))
             {
                 // Try to read the next real code from the system macro being executed
                 Commands.Code code = null;
@@ -196,12 +230,18 @@ namespace DuetControlServer.SPI
                 {
                     // Note that Code.Enqueue is not used here to avoid potential deadlocks that would occur when
                     // firmware calls (e.g. load heightmap) are made while the code is being enqueued
-                    NestedMacroCodes.Enqueue(new QueuedCode(code));
+                    queuedCode = new QueuedCode(code);
+                    NestedMacroCodes.Enqueue(queuedCode);
                     _ = Task.Run(async () =>
                     {
                         try
                         {
                             CodeResult result = await code.Execute();
+                            if (!queuedCode.IsReadyToSend)
+                            {
+                                // Macro codes need special treatment because they may complete before they are actually sent to RepRapFirmware
+                                queuedCode.HandleReply(result);
+                            }
                             if (!macroFile.IsAborted)
                             {
                                 await Utility.Logger.LogOutput(result);
@@ -228,19 +268,22 @@ namespace DuetControlServer.SPI
                     }
                     Console.WriteLine($"[info] {(macroFile.IsAborted ? "Aborted" : "Finished")} macro file '{Path.GetFileName(macroFile.FileName)}'");
                 }
+                return false;
             }
-            else if (PendingCodes.TryPeek(out QueuedCode queuedCode) && Interface.BufferCode(queuedCode))
+
+            // 5. Regular pending codes
+            if (PendingCodes.TryPeek(out queuedCode) && BufferCode(queuedCode))
             {
-                // Execute another regular code in RepRapFirmware. It is already pre- and postprocessed at this point
                 PendingCodes.Dequeue();
                 return true;
             }
-            else if (BufferedCodes.Count == 0)
+
+            // 6. (Un-)Lock and flush requests
+            if (BufferedCodes.Count == 0)
             {
-                // No code is being executed on this channel
                 if (PendingLockRequests.TryPeek(out QueuedLockRequest lockRequest))
                 {
-                    // Deal with pending lock/unlock requests
+                    // No code is being executed on this channel
                     if (!lockRequest.IsLockRequested)
                     {
                         if (lockRequest.IsLockRequest)
@@ -262,7 +305,48 @@ namespace DuetControlServer.SPI
                     }
                 }
             }
+
             return false;
+        }
+
+        private bool BufferCode(QueuedCode queuedCode)
+        {
+            if (queuedCode.Code.Type == CodeType.MCode && queuedCode.Code.MajorNumber == 291)
+            {
+                int sParam = queuedCode.Code.Parameter('S', 0);
+                if (sParam == 2 || sParam == 3)
+                {
+                    // This M291 call interrupts the G-code flow, wait for M292 next
+                    WaitingForMessageAcknowledgement = true;
+                }
+            }
+            else if (queuedCode.Code.Type == CodeType.MCode && queuedCode.Code.MajorNumber == 292)
+            {
+                // The pending message box is about to be closed
+                WaitingForMessageAcknowledgement = false;
+            }
+            else if (WaitingForMessageAcknowledgement)
+            {
+                // Still waiting for M292...
+                return false;
+            }
+
+            // Try to send this code to the firmware
+            try
+            {
+                if (Interface.BufferCode(queuedCode, out int codeLength))
+                {
+                    BytesBuffered += codeLength;
+                    BufferedCodes.Add(queuedCode);
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception e)
+            {
+                queuedCode.SetException(e);
+                return true;
+            }
         }
 
         private string _partialLogMessage;
@@ -300,14 +384,14 @@ namespace DuetControlServer.SPI
                     if (macroFile.IsFinished)
                     {
                         NestedMacros.Pop().Dispose();
-                        Console.WriteLine($"[info] Completed macro + start code {macroFile.StartCode}");
+                        Console.WriteLine($"[info] Completed macro {macroFile.FileName} + start code {macroFile.StartCode}");
                     }
                 }
                 else if (!flags.HasFlag(MessageTypeFlags.PushFlag))
                 {
                     NestedMacros.Pop().Dispose();
                     SystemMacroHasFinished = false;
-                    Console.WriteLine($"[info] Completed system macro");
+                    Console.WriteLine($"[info] Completed system macro {macroFile.FileName}");
                 }
                 return true;
             }
@@ -344,6 +428,13 @@ namespace DuetControlServer.SPI
                 {
                     // In case a G/M/T-code invokes more than one macro file...
                     startingCode = macroFile.StartCode;
+
+                    // Check if the other macro file has been finished
+                    if (macroFile.IsFinished)
+                    {
+                        NestedMacros.Pop().Dispose();
+                        Console.WriteLine($"[info] Completed intermediate macro '{macroFile.FileName}'");
+                    }
                 }
                 else if (BufferedCodes.Count > 0)
                 {
@@ -426,29 +517,55 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Indicates if the suspended codes are being resumed
+        /// </summary>
+        private bool _resumingBuffer;
+
+        /// <summary>
         /// Invalidate all the buffered G/M/T-codes
         /// </summary>
-        public void InvalidateBuffer()
+        /// <param name="invalidateLastFile)">Invalidate only codes of the last stack level</param>
+        public void InvalidateBuffer(bool invalidateLastFile)
         {
-            foreach (QueuedCode queuedCode in BufferedCodes)
+            if (invalidateLastFile)
             {
-                if (!queuedCode.IsFinished)
+                // Only a G/M-code can ask for last file aborts. It is still being executed, so take care of it 
+                for (int i = BufferedCodes.Count - 1; i > 0; i--)
+                {
+                    BytesBuffered -= BufferedCodes[i].BinarySize;
+                    BufferedCodes.RemoveAt(i);
+                }
+
+                if (SuspendedCodes.TryPop(out Queue<QueuedCode> suspendedCodes))
+                {
+                    while (suspendedCodes.TryDequeue(out QueuedCode suspendedCode))
+                    {
+                        suspendedCode.SetFinished();
+                    }
+                }
+            }
+            else
+            {
+                // Remove every buffered code of this channel if every code is being invalidated
+                foreach (QueuedCode queuedCode in BufferedCodes)
                 {
                     queuedCode.SetFinished();
                 }
-            }
 
-            BytesBuffered = 0;
-            BufferedCodes.Clear();
+                BytesBuffered = 0;
+                BufferedCodes.Clear();
 
-            while (SuspendedCodes.TryPop(out Queue<QueuedCode> suspendedCodes))
-            {
-                while (suspendedCodes.TryDequeue(out QueuedCode suspendedCode))
+                while (SuspendedCodes.TryPop(out Queue<QueuedCode> suspendedCodes))
                 {
-                    suspendedCode.SetFinished();
+                    while (suspendedCodes.TryDequeue(out QueuedCode suspendedCode))
+                    {
+                        suspendedCode.SetFinished();
+                    }
                 }
             }
-            _resumingBuffer = SystemMacroHasFinished = false;
+
+            _resumingBuffer = invalidateLastFile;
+            SystemMacroHasFinished = false;
         }
 
         /// <summary>
@@ -494,11 +611,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Indicates if the suspended codes are being resumed
-        /// </summary>
-        private bool _resumingBuffer;
-
-        /// <summary>
         /// Resume suspended codes when a nested macro file has finished
         /// </summary>
         /// <returns>True when finished</returns>
@@ -508,7 +620,7 @@ namespace DuetControlServer.SPI
             {
                 while (suspendedCodes.TryPeek(out QueuedCode suspendedCode))
                 {
-                    if (Interface.BufferCode(suspendedCode))
+                    if (BufferCode(suspendedCode))
                     {
                         Console.WriteLine($"-> Resumed suspended code");
                         suspendedCode.IsSuspended = false;
@@ -538,10 +650,14 @@ namespace DuetControlServer.SPI
                 }
             }
             _resumingBuffer = false;
+            WaitingForMessageAcknowledgement = SystemMacroHasFinished = false;
 
             while (NestedMacroCodes.TryDequeue(out QueuedCode item))
             {
-                item.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                if (!item.IsFinished)
+                {
+                    item.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                }
             }
 
             while (NestedMacros.TryPop(out MacroFile macroFile))

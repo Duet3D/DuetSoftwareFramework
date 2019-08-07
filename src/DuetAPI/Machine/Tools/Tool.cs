@@ -110,6 +110,11 @@ namespace DuetAPI.Machine
         public ObservableCollection<int> Heaters { get; } = new ObservableCollection<int>();
         
         /// <summary>
+        /// Extruder drives of this tool
+        /// </summary>
+        public ObservableCollection<int> Extruders { get; set; } = new ObservableCollection<int>();
+
+        /// <summary>
         /// Mix ratios of the associated extruder drives
         /// </summary>
         public ObservableCollection<float> Mix { get; } = new ObservableCollection<float>();
@@ -180,6 +185,7 @@ namespace DuetAPI.Machine
             Filament = (other.Filament != null) ? string.Copy(other.Filament) : null;
             ListHelpers.SetList(Fans, other.Fans);
             ListHelpers.SetList(Heaters, other.Heaters);
+            ListHelpers.SetList(Extruders, other.Extruders);
             ListHelpers.SetList(Mix, other.Mix);
             Spindle = other.Spindle;
             ListHelpers.SetList(Axes, other.Axes);
@@ -204,6 +210,7 @@ namespace DuetAPI.Machine
             ListHelpers.AddItems(clone.Standby, Standby);
             ListHelpers.AddItems(clone.Fans, Fans);
             ListHelpers.AddItems(clone.Heaters, Heaters);
+            ListHelpers.AddItems(clone.Extruders, Extruders);
             ListHelpers.AddItems(clone.Mix, Mix);
             ListHelpers.CloneItems(clone.Axes, Axes);
             ListHelpers.AddItems(clone.Offsets, Offsets);

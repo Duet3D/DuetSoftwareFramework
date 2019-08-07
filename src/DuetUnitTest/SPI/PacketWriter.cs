@@ -428,5 +428,25 @@ namespace DuetUnitTest.SPI
             Assert.AreEqual(0, span[2]);
             Assert.AreEqual(0, span[3]);
         }
+
+        [Test]
+        public void AssignFilament()
+        {
+            Span<byte> span = new byte[128];
+            span.Fill(0xFF);
+
+            int bytesWritten = Writer.WriteAssignFilament(span, 12, "foo bar");
+            Assert.AreEqual(16, bytesWritten);
+
+            // Header
+            int extruder = MemoryMarshal.Read<int>(span.Slice(0, 4));
+            Assert.AreEqual(12, extruder);
+            int filamentLength = MemoryMarshal.Read<int>(span.Slice(4, 4));
+            Assert.AreEqual(7, filamentLength);
+
+            // Filament name
+            string filamentName = Encoding.UTF8.GetString(span.Slice(8, 7));
+            Assert.AreEqual("foo bar", filamentName);
+        }
     }
 }

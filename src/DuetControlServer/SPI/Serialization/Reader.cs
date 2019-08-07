@@ -131,6 +131,7 @@ namespace DuetControlServer.SPI.Serialization
         /// </summary>
         /// <param name="from">Origin</param>
         /// <param name="channel">Code channel running the file</param>
+        /// <param name="abortAll">Whether all files are supposed to be aborted</param>
         /// <returns>Number of bytes read</returns>
         public static int ReadAbortFile(ReadOnlySpan<byte> from, out CodeChannel channel, out bool abortAll)
         {

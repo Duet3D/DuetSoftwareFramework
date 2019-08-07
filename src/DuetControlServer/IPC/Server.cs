@@ -89,7 +89,7 @@ namespace DuetControlServer.IPC
                 catch (Exception e)
                 {
                     // We get here as well when the connection has been terminated (IOException, SocketException -> Broken pipe)
-                    if (!(e is IOException) && !(e is SocketException))
+                    if (!(e is OperationCanceledException) && !(e is IOException) && !(e is SocketException))
                     {
                         Console.WriteLine($"[warn] Connection error: {e}");
                     }

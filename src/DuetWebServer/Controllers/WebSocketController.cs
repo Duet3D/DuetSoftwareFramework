@@ -36,7 +36,7 @@ namespace DuetWebServer.Controllers
                 // 2. Connect to DCS
                 try
                 {
-                    await connection.Connect(SubscriptionMode.Patch, socketPath);
+                    await connection.Connect(SubscriptionMode.Patch, socketPath, Program.CancelSource.Token);
                 }
                 catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
                 {
@@ -56,21 +56,20 @@ namespace DuetWebServer.Controllers
                 {
                     // 3a. Fetch full model copy and send it over initially
                     string json = await connection.GetSerializedMachineModel();
-                    await webSocket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true,
-                        default(CancellationToken));
+                    await webSocket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, Program.CancelSource.Token);
 
                     // 3b. Keep sending updates to the client and wait for "OK" after each update
                     do
                     {
                         // 3c. Wait for response from the client
                         byte[] receivedBytes = new byte[8];
-                        await webSocket.ReceiveAsync(receivedBytes, default(CancellationToken));
+                        await webSocket.ReceiveAsync(receivedBytes, Program.CancelSource.Token);
                         string receivedData = Encoding.UTF8.GetString(receivedBytes);
 
                         // 3d. Deal with PING requests
                         if (receivedData.Equals("PING\n", StringComparison.InvariantCultureIgnoreCase))
                         {
-                            await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, default(CancellationToken));
+                            await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, Program.CancelSource.Token);
                             continue;
                         }
 
@@ -84,7 +83,7 @@ namespace DuetWebServer.Controllers
 
                         // 3f. Check for another update and send it to the client
                         json = await connection.GetSerializedMachineModel();
-                        await webSocket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, default(CancellationToken));
+                        await webSocket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, Program.CancelSource.Token);
                     } while (webSocket.State == WebSocketState.Open);
                 }
                 catch (Exception e)
@@ -99,7 +98,7 @@ namespace DuetWebServer.Controllers
         {
             if (webSocket.State == WebSocketState.Open)
             {
-                await webSocket.CloseAsync(WebSocketCloseStatus.EndpointUnavailable, "DCS is unavailable", default(CancellationToken));
+                await webSocket.CloseAsync(status, message, Program.CancelSource.Token);
             }
         }
     }

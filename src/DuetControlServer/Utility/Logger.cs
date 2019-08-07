@@ -1,5 +1,6 @@
 ﻿using DuetAPI;
 using Nito.AsyncEx;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -22,31 +23,45 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Start logging to a file
         /// </summary>
-        /// <param name="filename"></param>
-        public static void Start(string filename)
+        /// <param name="filename">Filename to write to</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task Start(string filename)
         {
             using (_lock.Lock())
             {
+                // Close any open file
+                await StopInternal();
+
+                // Start logging to the specified file
                 _fileStream = new FileStream(filename, FileMode.Append, FileAccess.Write);
                 _writer = new StreamWriter(_fileStream) { AutoFlush = true };
-                _writer.WriteLine("Event logging started");
+                await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging started");
             }
         }
 
         /// <summary>
         /// Stop logging
         /// </summary>
-        public static void Stop()
+        /// <returns>Asynchronous task</returns>
+        public static async Task Stop()
         {
+            using (await _lock.LockAsync())
+            {
+                await StopInternal();
+            }
+        }
+
+        private static async Task StopInternal()
+        {
+            if (_writer != null)
+            {
+                await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging stopped");
+                _writer.Close();
+                _writer = null;
+            }
+
             if (_fileStream != null)
             {
-                using (_lock.Lock())
-                {
-                    _writer.WriteLine("Event logging stopped");
-                    _writer.Close();
-                    _writer = null;
-                }
-
                 _fileStream.Close();
                 _fileStream = null;
             }
@@ -55,15 +70,24 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Write a message including timestamp to the log file
         /// </summary>
-        /// <param name="message">Message to log</param>
+        /// <param name="msg">Message to log</param>
         public static async Task Log(Message msg)
         {
             using (await _lock.LockAsync())
             {
-                if (_fileStream != null)
+                if (_writer != null)
                 {
-                    await _writer.WriteAsync(msg.Time.ToString("yyyy-MM-dd HH:mm:ss "));
-                    await _writer.WriteLineAsync(msg.ToString());
+                    try
+                    {
+                        await _writer.WriteAsync(msg.Time.ToString("yyyy-MM-dd HH:mm:ss "));
+                        await _writer.WriteLineAsync(msg.ToString());
+                    }
+                    catch (AggregateException ae)
+                    {
+                        Console.Write("[err] Failed to write to log file: ");
+                        Console.WriteLine(ae.InnerException);
+                        await StopInternal();
+                    }
                 }
             }
         }

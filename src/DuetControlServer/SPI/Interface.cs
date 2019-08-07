@@ -8,6 +8,7 @@ using DuetAPI.Commands;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.FileExecution;
+using DuetControlServer.SPI.Communication;
 using Nito.AsyncEx;
 using Code = DuetControlServer.Commands.Code;
 
@@ -18,15 +19,15 @@ namespace DuetControlServer.SPI
     /// </summary>
     public static class Interface
     {
-        // Information about the code channels
-        private static readonly ChannelStore Channels = new ChannelStore();
         private static readonly CodeChannel[] CodeChannels = (CodeChannel[])Enum.GetValues(typeof(CodeChannel));
+
+        // Information about the code channels
+        private static readonly ChannelStore _channels = new ChannelStore();
+        private static readonly List<CodeChannel> _busyChannels = new List<CodeChannel>();
         private static int _bytesReserved = 0, _bufferSpace = 0;
 
-        // Number of the module of the object model being queried (TODO fully implement this)
+        // Object model query
         private static byte _moduleToQuery = 2;
-
-        // Time when the object model was queried the last time
         private static DateTime _lastQueryTime = DateTime.Now;
 
         // Heightmap requests
@@ -38,8 +39,9 @@ namespace DuetControlServer.SPI
 
         // Special requests
         private static bool _emergencyStopRequested, _resetRequested, _printStarted;
-        private static Communication.PrintStoppedReason? _printStoppedReason;
+        private static PrintStoppedReason? _printStoppedReason;
         private static Stream _iapStream, _firmwareStream;
+        private static readonly Queue<Tuple<int, string>> _extruderFilamentUpdates = new Queue<Tuple<int, string>>();
 
         // Partial messages (if any)
         private static string _partialGenericMessage;
@@ -62,9 +64,9 @@ namespace DuetControlServer.SPI
         {
             foreach (CodeChannel channel in CodeChannels)
             {
-                using (await Channels[channel].LockAsync())
+                using (await _channels[channel].LockAsync())
                 {
-                    Channels[channel].Diagnostics(builder);
+                    _channels[channel].Diagnostics(builder);
                 }
             }
             builder.AppendLine($"Code buffer space: {_bufferSpace}");
@@ -116,12 +118,18 @@ namespace DuetControlServer.SPI
         public static Task<CodeResult> ProcessCode(Code code)
         {
             QueuedCode item = null;
-            using (Channels[code.Channel].Lock())
+            using (_channels[code.Channel].Lock())
             {
-                if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
+                if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
+                {
+                    // This code is supposed to override every other queued code
+                    item = new QueuedCode(code);
+                    _channels[code.Channel].PriorityCodes.Enqueue(item);
+                }
+                else if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
                 {
                     // Macro codes are already enqueued at the time this is called
-                    foreach (QueuedCode queuedCode in Channels[code.Channel].NestedMacroCodes)
+                    foreach (QueuedCode queuedCode in _channels[code.Channel].NestedMacroCodes)
                     {
                         if (queuedCode.Code == code)
                         {
@@ -134,14 +142,14 @@ namespace DuetControlServer.SPI
                     if (item == null)
                     {
                         item = new QueuedCode(code);
-                        Channels[code.Channel].NestedMacroCodes.Enqueue(item);
+                        _channels[code.Channel].NestedMacroCodes.Enqueue(item);
                     }
                 }
                 else
                 {
                     // Enqueue this code for regular execution
                     item = new QueuedCode(code);
-                    Channels[code.Channel].PendingCodes.Enqueue(item);
+                    _channels[code.Channel].PendingCodes.Enqueue(item);
                 }
             }
             item.IsReadyToSend = true;
@@ -156,9 +164,9 @@ namespace DuetControlServer.SPI
         public static Task Flush(CodeChannel channel)
         {
             TaskCompletionSource<object> source = new TaskCompletionSource<object>();
-            using (Channels[channel].Lock())
+            using (_channels[channel].Lock())
             {
-                Channels[channel].PendingFlushRequests.Enqueue(source);
+                _channels[channel].PendingFlushRequests.Enqueue(source);
             }
             return source.Task;
         }
@@ -195,7 +203,7 @@ namespace DuetControlServer.SPI
         /// Notify the firmware that the file print has been stopped
         /// </summary>
         /// <param name="stopReason">Reason why the print has stopped</param>
-        public static void SetPrintStopped(Communication.PrintStoppedReason stopReason)
+        public static void SetPrintStopped(PrintStoppedReason stopReason)
         {
             _printStoppedReason = stopReason;
         }
@@ -208,9 +216,9 @@ namespace DuetControlServer.SPI
         public static async Task<bool> LockMovementAndWaitForStandstill(CodeChannel channel)
         {
             QueuedLockRequest request = new QueuedLockRequest(true);
-            using (await Channels[channel].LockAsync())
+            using (await _channels[channel].LockAsync())
             {
-                Channels[channel].PendingLockRequests.Enqueue(request);
+                _channels[channel].PendingLockRequests.Enqueue(request);
             }
             return await request.Task;
         }
@@ -223,9 +231,9 @@ namespace DuetControlServer.SPI
         public static async Task UnlockAll(CodeChannel channel)
         {
             QueuedLockRequest request = new QueuedLockRequest(false);
-            using (await Channels[channel].LockAsync())
+            using (await _channels[channel].LockAsync())
             {
-                Channels[channel].PendingLockRequests.Enqueue(request);
+                _channels[channel].PendingLockRequests.Enqueue(request);
             }
             await request.Task;
         }
@@ -313,6 +321,19 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Assign the filament to an extruder drive
+        /// </summary>
+        /// <param name="extruder">Extruder drive</param>
+        /// <param name="filament">Loaded filament</param>
+        public static void AssignFilament(int extruder, string filament)
+        {
+            lock (_extruderFilamentUpdates)
+            {
+                _extruderFilamentUpdates.Enqueue(new Tuple<int, string>(extruder, filament));
+            }
+        }
+
+        /// <summary>
         /// Initialize physical transfer and perform initial data transfer.
         /// This is only called once on initialization
         /// </summary>
@@ -353,6 +374,7 @@ namespace DuetControlServer.SPI
                 // Invalidate data if a controller reset has been performed
                 if (DataTransfer.HadReset())
                 {
+                    _emergencyStopRequested = _resetRequested = false;
                     Console.WriteLine("[info] Controller has been reset");
                     await InvalidateData("Controller reset");
                 }
@@ -390,10 +412,9 @@ namespace DuetControlServer.SPI
                 }
 
                 // Process incoming packets
-                DateTime startTime = DateTime.Now;
                 for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
-                    Communication.PacketHeader? packet;
+                    PacketHeader? packet;
 
                     try
                     {
@@ -411,47 +432,34 @@ namespace DuetControlServer.SPI
                     }
 
                     await ProcessPacket(packet.Value);
-
-                    if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(250))
-                    {
-                        Console.WriteLine($"WARN: Packet with request {packet?.Request} took longer than 250ms!");
-                    }
-                    startTime = DateTime.Now;
                 }
                 _bytesReserved = 0;
 
                 // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
                 bool dataProcessed;
-                List<CodeChannel> blockedChannels = new List<CodeChannel>();
                 do
                 {
                     dataProcessed = false;
                     foreach (CodeChannel channel in CodeChannels)
                     {
-                        if (!blockedChannels.Contains(channel))
+                        if (!_busyChannels.Contains(channel))
                         {
-                            using (Channels[channel].Lock())
+                            using (_channels[channel].Lock())
                             {
-                                if (Channels[channel].ProcessRequests())
+                                if (_channels[channel].ProcessRequests())
                                 {
-                                    // Something could be done on this channel
+                                    // Something could be processed
                                     dataProcessed = true;
                                 }
                                 else
                                 {
-                                    // Don't call Process() again for this channel if it returned false before
-                                    blockedChannels.Add(channel);
+                                    // Cannot do any more on this channel
+                                    _busyChannels.Add(channel);
                                 }
                             }
                         }
                     }
                 } while (dataProcessed);
-
-                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(250))
-                {
-                    Console.WriteLine("WARN: Channel processing took longer than 250ms!");
-                }
-                startTime = DateTime.Now;
 
                 // Request object model updates
                 if (Model.Updater.IsReady && DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
@@ -460,18 +468,19 @@ namespace DuetControlServer.SPI
                     _lastQueryTime = DateTime.Now;
                 }
 
-                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(250))
+                // Update filament assignment per extruder drive
+                lock (_extruderFilamentUpdates)
                 {
-                    Console.WriteLine("WARN: Object model processing took longer than 250ms!");
+                    if (_extruderFilamentUpdates.TryPeek(out Tuple<int, string> filamentMapping) &&
+                        DataTransfer.WriteAssignFilament(filamentMapping.Item1, filamentMapping.Item2))
+                    {
+                        _extruderFilamentUpdates.Dequeue();
+                    }
                 }
-                startTime = DateTime.Now;
 
                 // Do another full SPI transfer
                 DataTransfer.PerformFullTransfer();
-                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(250))
-                {
-                    Console.WriteLine("WARN: SPI transfer took longer than 250ms!");
-                }
+                _busyChannels.Clear();
 
                 // Wait a moment
                 if (IsIdle)
@@ -485,27 +494,19 @@ namespace DuetControlServer.SPI
         /// Send a queued code to the firmware
         /// </summary>
         /// <param name="queuedCode">Code to send</param>
+        /// <param name="codeLength">Length of the binary code in bytes</param>
         /// <returns>Whether the code could be processed</returns>
-        public static bool BufferCode(QueuedCode queuedCode)
+        /// <remarks>The corresponding Channel is locked when this is called</remarks>
+        public static bool BufferCode(QueuedCode queuedCode, out int codeLength)
         {
-            try
+            codeLength = Consts.BufferedCodeHeaderSize + DataTransfer.GetCodeSize(queuedCode.Code);
+            if (_bufferSpace > codeLength && _channels[queuedCode.Code.Channel].BytesBuffered + codeLength <= Settings.MaxBufferSpacePerChannel &&
+                DataTransfer.WriteCode(queuedCode.Code))
             {
-                int codeLength = Communication.Consts.BufferedCodeHeaderSize + DataTransfer.GetCodeSize(queuedCode.Code);
-                if (_bufferSpace > codeLength && Channels[queuedCode.Code.Channel].BytesBuffered + codeLength <= Settings.MaxBufferSpacePerChannel &&
-                    DataTransfer.WriteCode(queuedCode.Code))
-                {
-                    _bytesReserved += codeLength;
-                    _bufferSpace -= codeLength;
-                    queuedCode.BinarySize = codeLength;
-                    Channels[queuedCode.Code.Channel].BytesBuffered += codeLength;
-                    Channels[queuedCode.Code.Channel].BufferedCodes.Add(queuedCode);
-                    Console.WriteLine($"[info] Sent {queuedCode.Code}, remaining space {Settings.MaxBufferSpacePerChannel - Channels[queuedCode.Code.Channel].BytesBuffered} ({_bufferSpace} total), needed {codeLength}");
-                    return true;
-                }
-            }
-            catch (Exception e)
-            {
-                queuedCode.SetException(e);
+                _bytesReserved += codeLength;
+                _bufferSpace -= codeLength;
+                queuedCode.BinarySize = codeLength;
+                Console.WriteLine($"[info] Sent {queuedCode.Code}, remaining space {Settings.MaxBufferSpacePerChannel - _channels[queuedCode.Code.Channel].BytesBuffered - codeLength} ({_bufferSpace} total), needed {codeLength}");
                 return true;
             }
             return false;
@@ -517,9 +518,9 @@ namespace DuetControlServer.SPI
             {
                 foreach (CodeChannel channel in CodeChannels)
                 {
-                    using (Channels[channel].Lock())
+                    using (_channels[channel].Lock())
                     {
-                        if (!Channels[channel].IsIdle)
+                        if (!_channels[channel].IsIdle)
                         {
                             return false;
                         }
@@ -529,7 +530,7 @@ namespace DuetControlServer.SPI
             }
         }
 
-        private static Task ProcessPacket(Communication.PacketHeader packet)
+        private static Task ProcessPacket(PacketHeader packet)
         {
             Communication.FirmwareRequests.Request request = (Communication.FirmwareRequests.Request)packet.Request;
             switch (request)
@@ -600,58 +601,54 @@ namespace DuetControlServer.SPI
 
         private static void HandleCodeReply()
         {
-            DataTransfer.ReadCodeReply(out Communication.MessageTypeFlags flags, out string reply);
+            DataTransfer.ReadCodeReply(out MessageTypeFlags flags, out string reply);
 
             // TODO check for "File %s will print in %" PRIu32 "h %" PRIu32 "m plus heating time" and modify simulation time
 
-            // Deal with generic replies. Keep this check in sync with RepRapFirmware
-            if ((flags.HasFlag(Communication.MessageTypeFlags.UsbMessage) && flags.HasFlag(Communication.MessageTypeFlags.AuxMessage) &&
-                 flags.HasFlag(Communication.MessageTypeFlags.HttpMessage) && flags.HasFlag(Communication.MessageTypeFlags.TelnetMessage)) ||
-                flags == Communication.MessageTypeFlags.LogMessage)
+            // Deal with generic replies
+            if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage ||
+                flags == MessageTypeFlags.LogMessage || flags == (MessageTypeFlags.LogMessage | MessageTypeFlags.PushFlag))
             {
-                OutputGenericMessage(flags, reply.TrimEnd());
+                OutputGenericMessage(flags, reply);
                 return;
             }
 
             // Check if this is a targeted message. If yes, send it to the corresponding code being executed
             bool replyHandled = false;
-            if (flags.HasFlag(Communication.MessageTypeFlags.BinaryCodeReplyFlag))
+            if (!replyHandled && flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
             {
                 foreach (CodeChannel channel in CodeChannels)
                 {
-                    Communication.MessageTypeFlags channelFlag = (Communication.MessageTypeFlags)(1 << (int)channel);
+                    MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)channel);
                     if (flags.HasFlag(channelFlag))
                     {
-                        using (Channels[channel].Lock())
+                        using (_channels[channel].Lock())
                         {
-                            replyHandled = Channels[channel].HandleReply(flags, reply);
+                            replyHandled = _channels[channel].HandleReply(flags, reply);
                         }
                         break;
                     }
                 }
             }
 
-            if (!replyHandled && !flags.HasFlag(Communication.MessageTypeFlags.CodeQueueMessage))
+            if (!replyHandled && !flags.HasFlag(MessageTypeFlags.CodeQueueMessage))
             {
                 // If the message could not be processed, output a warning. Should never happen except for queued codes
                 Console.WriteLine($"[warn] Received out-of-sync code reply ({flags}: {reply.TrimEnd()})");
             }
         }
 
-        private static void OutputGenericMessage(Communication.MessageTypeFlags flags, string reply)
+        private static void OutputGenericMessage(MessageTypeFlags flags, string reply)
         {
-            if (flags.HasFlag(Communication.MessageTypeFlags.PushFlag))
-            {
-                _partialGenericMessage += reply;
-            }
-            else
+            _partialGenericMessage += reply;
+            if (!flags.HasFlag(MessageTypeFlags.PushFlag))
             {
                 if (!string.IsNullOrWhiteSpace(_partialGenericMessage))
                 {
-                    MessageType type = flags.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
-                                        : flags.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                    MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                                        : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                             : MessageType.Success;
-                    Model.Provider.Output(type, _partialGenericMessage + reply);
+                    Utility.Logger.LogOutput(type, _partialGenericMessage.TrimEnd());
                 }
                 _partialGenericMessage = null;
             }
@@ -660,9 +657,9 @@ namespace DuetControlServer.SPI
         private static async Task HandleMacroRequest()
         {
             DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename);
-            using (await Channels[channel].LockAsync())
+            using (await _channels[channel].LockAsync())
             {
-                await Channels[channel].HandleMacroRequest(filename, reportMissing, fromCode);
+                await _channels[channel].HandleMacroRequest(filename, reportMissing, fromCode);
             }
         }
 
@@ -678,12 +675,18 @@ namespace DuetControlServer.SPI
                     await Print.Cancel();
                 }
                 MacroFile.AbortAllFiles(channel);
+                _channels[channel].InvalidateBuffer(false);
             }
             else
             {
                 MacroFile.AbortLastFile(channel);
+                _channels[channel].InvalidateBuffer(true);
+                if (_channels[channel].NestedMacros.TryPop(out MacroFile macroFile))
+                {
+                    Console.WriteLine($"[info] Aborted last macro file '{macroFile.FileName}'");
+                    macroFile.Dispose();
+                }
             }
-            Channels[channel].InvalidateBuffer();
         }
 
         private static async Task HandleStackEvent()
@@ -704,8 +707,8 @@ namespace DuetControlServer.SPI
 
         private static async Task HandlePrintPaused()
         {
-            DataTransfer.ReadPrintPaused(out uint filePosition, out Communication.PrintPausedReason pauseReason);
-            if (filePosition == SPI.Communication.Consts.NoFilePosition)
+            DataTransfer.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
+            if (filePosition == Consts.NoFilePosition)
             {
                 // We get an invalid file position from RRF if the print is paused during a macro file.
                 // In this case, RRF has no way to determine the file position so we have to care of that.
@@ -723,13 +726,13 @@ namespace DuetControlServer.SPI
             }
 
             // Resolve pending and buffered codes on the file channel
-            using (await Channels[CodeChannel.File].LockAsync())
+            using (await _channels[CodeChannel.File].LockAsync())
             {
-                while (Channels[CodeChannel.File].PendingCodes.TryDequeue(out QueuedCode code))
+                while (_channels[CodeChannel.File].PendingCodes.TryDequeue(out QueuedCode code))
                 {
                     code.SetFinished();
                 }
-                Channels[CodeChannel.File].InvalidateBuffer();
+                _channels[CodeChannel.File].InvalidateBuffer(false);
             }
         }
 
@@ -754,9 +757,9 @@ namespace DuetControlServer.SPI
         private static async Task HandleResourceLocked()
         {
             DataTransfer.ReadResourceLocked(out CodeChannel channel);
-            using (await Channels[channel].LockAsync())
+            using (await _channels[channel].LockAsync())
             {
-                if (Channels[channel].PendingLockRequests.TryDequeue(out QueuedLockRequest item))
+                if (_channels[channel].PendingLockRequests.TryDequeue(out QueuedLockRequest item))
                 {
                     item.Resolve(true);
                 }
@@ -768,8 +771,11 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="codeErrorMessage">Message for cancelled codes</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task InvalidateData(string codeErrorMessage)
+        private static async Task InvalidateData(string codeErrorMessage)
         {
+            // Keep this event in the log...
+            await Utility.Logger.Log(MessageType.Warning, codeErrorMessage);
+
             // Close every open file. This closes the internal macro files as well
             await Print.Cancel();
 
@@ -778,9 +784,9 @@ namespace DuetControlServer.SPI
             {
                 MacroFile.AbortAllFiles(channel);
 
-                using (await Channels[channel].LockAsync())
+                using (await _channels[channel].LockAsync())
                 {
-                    Channels[channel].Invalidate(codeErrorMessage);
+                    _channels[channel].Invalidate(codeErrorMessage);
                 }
             }
             _bytesReserved = _bufferSpace = 0;

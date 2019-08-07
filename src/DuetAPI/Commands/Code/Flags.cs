@@ -57,7 +57,12 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Enforce absolute positioning via prefixed G53 code
         /// </summary>
-        EnforceAbsolutePosition = 128
+        EnforceAbsolutePosition = 128,
+
+        /// <summary>
+        /// Override every other code and send it to the firmware as quickly as possible
+        /// </summary>
+        IsPrioritized = 256
     }
 
     /// <summary>

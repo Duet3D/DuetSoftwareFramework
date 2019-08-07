@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using System;
+using System.Threading;
 
 namespace DuetWebServer
 {
@@ -9,14 +11,23 @@ namespace DuetWebServer
     /// </summary>
     public class Program
     {
-        private const string DefaultConfigFile = "/opt/dsf/conf/http.json";
+        /// <summary>
+        /// Default path to the configuration file
+        /// </summary>
+        public const string DefaultConfigFile = "/opt/dsf/conf/http.json";
         
+        /// <summary>
+        /// Global cancel source for program termination
+        /// </summary>
+        public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
+
         /// <summary>
         /// Called when the application is launched
         /// </summary>
         /// <param name="args">Command-line arguments</param>
         public static void Main(string[] args)
         {
+            AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) => CancelSource.Cancel();
             CreateWebHostBuilder(args).Build().Run();
         }
 

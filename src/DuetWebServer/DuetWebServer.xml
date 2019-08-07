@@ -148,6 +148,16 @@
             Main class of the ASP.NET Core endpoint
             </summary>
         </member>
+        <member name="F:DuetWebServer.Program.DefaultConfigFile">
+            <summary>
+            Default path to the configuration file
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Program.CancelSource">
+            <summary>
+            Global cancel source for program termination
+            </summary>
+        </member>
         <member name="M:DuetWebServer.Program.Main(System.String[])">
             <summary>
             Called when the application is launched

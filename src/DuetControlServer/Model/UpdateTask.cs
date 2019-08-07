@@ -41,6 +41,7 @@ namespace DuetControlServer.Model
                     Console.WriteLine("[info] System time has been changed");
                     Code code = new Code
                     {
+                        InternallyExecuted = true,
                         Channel = DuetAPI.CodeChannel.Daemon,
                         Type = CodeType.MCode,
                         MajorNumber = 905

@@ -13,6 +13,24 @@ namespace DuetControlServer.Model
     /// </summary>
     public static class Provider
     {
+        private class WriterLockWrapper : IDisposable
+        {
+            private readonly IDisposable lockItem;
+
+            internal WriterLockWrapper(IDisposable item)
+            {
+                lockItem = item;
+            }
+
+            public void Dispose()
+            {
+                lockItem.Dispose();
+
+                // Model has been updated - notify clients
+                IPC.Processors.Subscription.ModelUpdated();
+            }
+        }
+
         private static readonly AsyncReaderWriterLock _lock = new AsyncReaderWriterLock();
 
         /// <summary>
@@ -27,16 +45,6 @@ namespace DuetControlServer.Model
 
             // Initialize machine name
             Get.Network.Name = Environment.MachineName;
-            Get.Network.PropertyChanged += NetworkChanged;
-        }
-
-        private static void NetworkChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == nameof(Get.Network.Name))
-            {
-                // Change Linux hostname when the machine name is modified
-                System.Diagnostics.Process.Start("hostname", Get.Network.Hostname).WaitForExit();
-            }
         }
 
         /// <summary>
@@ -49,22 +57,22 @@ namespace DuetControlServer.Model
         /// Access the machine model asynchronously for read operations only
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static AwaitableDisposable<IDisposable> AccessReadOnlyAsync() => _lock.ReaderLockAsync();
+        public static AwaitableDisposable<IDisposable> AccessReadOnlyAsync() =>  _lock.ReaderLockAsync();
 
         /// <summary>
         /// Access the machine model for read/write operations
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static IDisposable AccessReadWrite() => _lock.WriterLock();
+        public static IDisposable AccessReadWrite() => new WriterLockWrapper(_lock.WriterLock());
 
         /// <summary>
         /// Access the machine model asynchronously for read/write operations
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static AwaitableDisposable<IDisposable> AccessReadWriteAsync()
+        public static async Task<IDisposable> AccessReadWriteAsync()
         {
-            // FIXME: Whenevever the underlying lock is released, it is safe to assume an update can be triggered
-            return _lock.WriterLockAsync();
+            IDisposable lockItem = await _lock.WriterLockAsync();
+            return new WriterLockWrapper(lockItem);
         }
 
         /// <summary>
@@ -82,12 +90,14 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Output(Message message)
         {
-            if (string.IsNullOrWhiteSpace(message.Content))
+            if (!string.IsNullOrWhiteSpace(message.Content))
             {
                 message.Print();
 
                 if (!IPC.Processors.Subscription.Output(message))
                 {
+                    // Attempt to forward messages directly to subscribers. If none are available,
+                    // append it to the object model so potential clients can fetch it for a limited time...
                     using (await AccessReadWriteAsync())
                     {
                         Get.Messages.Add(message);

@@ -271,6 +271,7 @@ namespace DuetControlServer.SPI
         /// Read the content of an <see cref="AbortFileRequest"/> packet
         /// </summary>
         /// <param name="channel">Code channel where all files are supposed to be aborted</param>
+        /// <param name="abortAll">Whether all files are supposed to be aborted</param>
         public static void ReadAbortFile(out CodeChannel channel, out bool abortAll)
         {
             Serialization.Reader.ReadAbortFile(_packetData.Span, out channel, out abortAll);
@@ -733,6 +734,30 @@ namespace DuetControlServer.SPI
             Thread.Sleep(Communication.Consts.IapRebootDelay);
             _waitingForFirstTransfer = true;
         }
+        
+        /// <summary>
+        /// Assign a filament name to the given extruder drive
+        /// </summary>
+        /// <param name="extruder"></param>
+        /// <param name="filamentName"></param>
+        /// <returns></returns>
+        public static bool WriteAssignFilament(int extruder, string filamentName)
+        {
+            // Serialize the requqest first to see how much space it requires
+            Span<byte> span = new byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
+            int dataLength = Serialization.Writer.WriteAssignFilament(span, extruder, filamentName);
+
+            // See if the request fits into the buffer
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            // Write it
+            WritePacket(Communication.LinuxRequests.Request.AssignFilament, dataLength);
+            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            return true;
+        }
 
         private static bool CanWritePacket(int dataLength = 0)
         {
@@ -796,8 +821,6 @@ namespace DuetControlServer.SPI
             }
             else
             {
-                DateTime startTime = DateTime.Now;
-
                 using (CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SpiTransferTimeout))
                 {
                     using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, timeoutCts.Token))
@@ -810,11 +833,6 @@ namespace DuetControlServer.SPI
                         }
                     }
                 }
-
-                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(200))
-                {
-                    Console.WriteLine("=> TransferReadyPin level change took longer than 200ms");
-                }
             }
             _transferReadyEvent.Reset();
         }
@@ -825,12 +843,7 @@ namespace DuetControlServer.SPI
             {
                 // Perform SPI header exchange
                 WaitForTransfer();
-                DateTime startTime = DateTime.Now;
                 _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
-                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(200))
-                {
-                    Console.WriteLine("Raw SPI header transfer took longer than 200ms");
-                }
 
                 // Check for possible response code
                 uint responseCode = MemoryMarshal.Read<uint>(_rxHeaderBuffer.Span);
@@ -941,12 +954,7 @@ namespace DuetControlServer.SPI
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
                 WaitForTransfer();
-                DateTime startTime = DateTime.Now;
                 _spiDevice.TransferFullDuplex(_txBuffers[_txBufferIndex].Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
-                if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(200))
-                {
-                    Console.WriteLine("Raw SPI data transfer took longer than 200ms");
-                }
 
                 // Check for possible response code
                 uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);

@@ -369,6 +369,11 @@
             Enforce absolute positioning via prefixed G53 code
             </summary>
         </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.IsPrioritized">
+            <summary>
+            Override every other code and send it to the firmware as quickly as possible
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.CodeFlagsConverter">
             <summary>
             Class to convert a <see cref="T:DuetAPI.Commands.CodeFlags"/> instance to an int
@@ -3576,6 +3581,11 @@
         <member name="P:DuetAPI.Machine.Tool.Heaters">
             <summary>
             List of associated heaters (indices)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Tool.Extruders">
+            <summary>
+            Extruder drives of this tool
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Tool.Mix">

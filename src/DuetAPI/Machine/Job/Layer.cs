@@ -23,7 +23,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Duration of the layer (in s or null if unknown)
         /// </summary>
-        public float? Duration
+        public float Duration
         {
             get => _duration;
             set
@@ -35,12 +35,12 @@ namespace DuetAPI.Machine
                 }
             }
         }
-        private float? _duration;
+        private float _duration;
 
         /// <summary>
         /// Height of the layer (in mm or null if unknown)
         /// </summary>
-        public float? Height
+        public float Height
         {
             get => _height;
             set
@@ -52,7 +52,7 @@ namespace DuetAPI.Machine
                 }
             }
         }
-        private float? _height;
+        private float _height;
 
         /// <summary>
         /// Actual amount of filament extruded during this layer (in mm)
@@ -74,7 +74,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Fraction of the file printed during this layer (0..1 or null if unknown)
         /// </summary>
-        public float? FractionPrinted
+        public float FractionPrinted
         {
             get => _fractionPrinted;
             set
@@ -86,7 +86,7 @@ namespace DuetAPI.Machine
                 }
             }
         }
-        private float? _fractionPrinted;
+        private float _fractionPrinted;
 
         /// <summary>
         /// Assigns every property from another instance

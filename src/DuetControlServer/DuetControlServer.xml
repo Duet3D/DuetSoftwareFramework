@@ -742,6 +742,7 @@
             Entry point of the program
             </summary>
             <param name="args">Command-line arguments</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.Settings">
             <summary>
@@ -911,6 +912,11 @@
             Lock used when accessing this instance
             </summary>
         </member>
+        <member name="F:DuetControlServer.SPI.ChannelInformation.PriorityCodes">
+            <summary>
+            Prioritised codes that override every other code
+            </summary>
+        </member>
         <member name="F:DuetControlServer.SPI.ChannelInformation.PendingCodes">
             <summary>
             Queue of pending G/M/T-codes that have not been buffered yet
@@ -957,6 +963,11 @@
             Queue of pending flush requests
             </summary>
         </member>
+        <member name="P:DuetControlServer.SPI.ChannelInformation.WaitingForMessageAcknowledgement">
+            <summary>
+            Indicates if this channel is blocked and waiting for a message acknowledgement
+            </summary>
+        </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.Lock">
             <summary>
             Lock access to this code channel
@@ -984,7 +995,7 @@
             <summary>
             Process pending requests on this channel
             </summary>
-            <returns>Whether another call to this method is permitted</returns>
+            <returns>If anything more can be done on this channel</returns>
         </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.HandleReply(DuetControlServer.SPI.Communication.MessageTypeFlags,System.String)">
             <summary>
@@ -1003,21 +1014,22 @@
             <param name="fromCode">Request comes from a real G/M/T-code</param>
             <returns>Asynchronous task</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.ChannelInformation.InvalidateBuffer">
+        <member name="F:DuetControlServer.SPI.ChannelInformation._resumingBuffer">
+            <summary>
+            Indicates if the suspended codes are being resumed
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.InvalidateBuffer(System.Boolean)">
             <summary>
             Invalidate all the buffered G/M/T-codes
             </summary>
+            <param name="invalidateLastFile))">Invalidate only codes of the last stack level</param>
         </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.SuspendBuffer(DuetControlServer.SPI.QueuedCode)">
             <summary>
             Suspend all the buffered G/M/T-codes for future execution
             </summary>
             <param name="codeBeingExecuted">Current code being executed to leave in the buffer</param>
-        </member>
-        <member name="F:DuetControlServer.SPI.ChannelInformation._resumingBuffer">
-            <summary>
-            Indicates if the suspended codes are being resumed
-            </summary>
         </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.ResumeBuffer">
             <summary>
@@ -1331,6 +1343,21 @@
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.StackEvent.Feedrate">
             <summary>
             Feedrate in mm/s
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.AssignFilamentHeader">
+            <summary>
+            Header of a filament assignment. This is followed by the actual filament name
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.AssignFilamentHeader.Extruder">
+            <summary>
+            Extruder drive number
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.AssignFilamentHeader.FilamentLength">
+            <summary>
+            Length of the filament name
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.SpiCodeFlags">
@@ -1665,6 +1692,11 @@
             Launch the IAP binary
             </summary>
         </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.AssignFilament">
+            <summary>
+            Assign filament to a given extruder drive
+            </summary>
+        </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel">
             <summary>
             Set an arbitrary object model value that is accessible via a field path.
@@ -1791,6 +1823,16 @@
         <member name="F:DuetControlServer.SPI.Communication.MessageTypeFlags.PushFlag">
             <summary>
             There is more to come; the message has been truncated
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.MessageTypeFlags.GenericMessage">
+            <summary>
+            A message that is to be sent to the web, Telnet, USB and panel
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.MessageTypeFlags.LoggedGenericMessage">
+            <summary>
+            A GenericMessage that is also logged
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.PacketHeader">
@@ -2131,6 +2173,7 @@
             Read the content of an <see cref="T:DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileRequest"/> packet
             </summary>
             <param name="channel">Code channel where all files are supposed to be aborted</param>
+            <param name="abortAll">Whether all files are supposed to be aborted</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ReadStackEvent(DuetAPI.CodeChannel@,System.Byte@,DuetControlServer.SPI.Communication.FirmwareRequests.StackFlags@,System.Single@)">
             <summary>
@@ -2295,6 +2338,14 @@
             Wait for the IAP program to reset the controller
             </summary>
         </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.WriteAssignFilament(System.Int32,System.String)">
+            <summary>
+            Assign a filament name to the given extruder drive
+            </summary>
+            <param name="extruder"></param>
+            <param name="filamentName"></param>
+            <returns></returns>
+        </member>
         <member name="T:DuetControlServer.SPI.Interface">
             <summary>
             This class accesses RepRapFirmware via SPI and deals with general communication
@@ -2385,6 +2436,13 @@
             <param name="iapStream">IAP binary</param>
             <param name="firmwareStream">Firmware binary</param>
         </member>
+        <member name="M:DuetControlServer.SPI.Interface.AssignFilament(System.Int32,System.String)">
+            <summary>
+            Assign the filament to an extruder drive
+            </summary>
+            <param name="extruder">Extruder drive</param>
+            <param name="filament">Loaded filament</param>
+        </member>
         <member name="M:DuetControlServer.SPI.Interface.Connect">
             <summary>
             Initialize physical transfer and perform initial data transfer.
@@ -2398,12 +2456,14 @@
             </summary>
             <returns>Asynchronous task</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Interface.BufferCode(DuetControlServer.SPI.QueuedCode)">
+        <member name="M:DuetControlServer.SPI.Interface.BufferCode(DuetControlServer.SPI.QueuedCode,System.Int32@)">
             <summary>
             Send a queued code to the firmware
             </summary>
             <param name="queuedCode">Code to send</param>
+            <param name="codeLength">Length of the binary code in bytes</param>
             <returns>Whether the code could be processed</returns>
+            <remarks>The corresponding Channel is locked when this is called</remarks>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.InvalidateData(System.String)">
             <summary>
@@ -2580,6 +2640,7 @@
             </summary>
             <param name="from">Origin</param>
             <param name="channel">Code channel running the file</param>
+            <param name="abortAll">Whether all files are supposed to be aborted</param>
             <returns>Number of bytes read</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadStackEvent(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.Byte@,DuetControlServer.SPI.Communication.FirmwareRequests.StackFlags@,System.Single@)">
@@ -2720,6 +2781,15 @@
             <param name="channel">Channel for the lock request</param>
             <returns>Number of bytes written</returns>
         </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteAssignFilament(System.Span{System.Byte},System.Int32,System.String)">
+            <summary>
+            Assign a filament name to the given extruder drive
+            </summary>
+            <param name="to">Destination</param>
+            <param name="extruder">Extruder drive</param>
+            <param name="filamentName">Filament name</param>
+            <returns>Number of bytes written</returns>
+        </member>
         <member name="T:DuetControlServer.Utility.ConfigOverride">
             <summary>
             Static class holding values for config-override.g
@@ -2742,7 +2812,7 @@
             Called when a new tool is being added to the object model
             </summary>
             <param name="tool">New tool</param>
-            <returns></returns>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.Utility.FilamentManager.ToolRemoved(DuetAPI.Machine.Tool)">
             <summary>
@@ -2764,18 +2834,20 @@
             <summary>
             Start logging to a file
             </summary>
-            <param name="filename"></param>
+            <param name="filename">Filename to write to</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.Utility.Logger.Stop">
             <summary>
             Stop logging
             </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.Utility.Logger.Log(DuetAPI.Message)">
             <summary>
             Write a message including timestamp to the log file
             </summary>
-            <param name="message">Message to log</param>
+            <param name="msg">Message to log</param>
         </member>
         <member name="M:DuetControlServer.Utility.Logger.Log(DuetAPI.MessageType,System.String)">
             <summary>

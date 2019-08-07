@@ -15,6 +15,14 @@ namespace DuetControlServer.FileExecution
     /// </summary>
     public class MacroFile : BaseFile
     {
+        private enum ConfigExtraSteps
+        {
+            SendHostname,
+            SendDateTime,
+            Done
+        }
+        private ConfigExtraSteps _extraStep = ConfigExtraSteps.SendHostname;
+
         /// <summary>
         /// List of macro files being executed
         /// </summary>
@@ -102,9 +110,13 @@ namespace DuetControlServer.FileExecution
         /// <param name="startCode">Which code is starting this macro file</param>
         public MacroFile(string fileName, CodeChannel channel, QueuedCode startCode) : base(fileName, channel)
         {
-            string name = Path.GetFileName(fileName);
-            IsConfig = (name == FilePath.ConfigFile || name == FilePath.ConfigFileFallback);
-            IsConfigOverride = (name == FilePath.ConfigOverrideFile);
+            if (startCode == null)
+            {
+                string name = Path.GetFileName(fileName);
+                IsConfig = (name == FilePath.ConfigFile || name == FilePath.ConfigFileFallback);
+                IsConfigOverride = (name == FilePath.ConfigOverrideFile);
+            }
+
             StartCode = startCode;
             lock (_macroFiles)
             {
@@ -135,7 +147,47 @@ namespace DuetControlServer.FileExecution
         /// <returns>Next available code or null if the file has ended</returns>
         public override Code ReadCode()
         {
-            Code result = base.ReadCode();
+            Code result;
+
+            // When executing config.g, perform some extra steps...
+            if (IsConfig)
+            {
+                switch (_extraStep)
+                {
+                    case ConfigExtraSteps.SendHostname:
+                        result = new Code
+                        {
+                            Channel = Channel,
+                            InternallyExecuted = true,          // don't check our own hostname
+                            Type = CodeType.MCode,
+                            MajorNumber = 550
+                        };
+                        result.Parameters.Add(new CodeParameter('P', Environment.MachineName));
+                        _extraStep = ConfigExtraSteps.SendDateTime;
+                        break;
+
+                    case ConfigExtraSteps.SendDateTime:
+                        result = new Code
+                        {
+                            Channel = Channel,
+                            InternallyExecuted = true,          // don't update our own datetime
+                            Type = CodeType.MCode,
+                            MajorNumber = 905
+                        };
+                        result.Parameters.Add(new CodeParameter('P', DateTime.Now.ToString("yyyy-MM-dd")));
+                        result.Parameters.Add(new CodeParameter('S', DateTime.Now.ToString("HH:mm:ss")));
+                        _extraStep = ConfigExtraSteps.Done;
+                        break;
+
+                    default:
+                        result = base.ReadCode();
+                        break;
+                }
+            }
+            else
+            {
+                result = base.ReadCode();
+            }
 
             // Clean up again when the macro file has been finished
             if (result == null)
@@ -144,20 +196,6 @@ namespace DuetControlServer.FileExecution
                 {
                     _macroFiles.Remove(this);
                 }
-            }
-
-            // Send the current date time to the firmware when it changes
-            if (result == null && IsConfig)
-            {
-                result = new Code
-                {
-                    Channel = Channel,
-                    InternallyExecuted = true,          // don't update our own datetime
-                    Type = CodeType.MCode,
-                    MajorNumber = 905
-                };
-                result.Parameters.Add(new CodeParameter('P', DateTime.Now.ToString("yyyy-MM-dd")));
-                result.Parameters.Add(new CodeParameter('S', DateTime.Now.ToString("HH:mm:ss")));
             }
 
             // Update code information

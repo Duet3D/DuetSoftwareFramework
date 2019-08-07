@@ -458,6 +458,36 @@ namespace DuetControlServer.SPI.Serialization
             return Marshal.SizeOf(header);
         }
 
+        /// <summary>
+        /// Assign a filament name to the given extruder drive
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="extruder">Extruder drive</param>
+        /// <param name="filamentName">Filament name</param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteAssignFilament(Span<byte> to, int extruder, string filamentName)
+        {
+            Span<byte> unicodeFilamentName = Encoding.UTF8.GetBytes(filamentName);
+            if (unicodeFilamentName.Length > 32)
+            {
+                throw new ArgumentException("Value is too long", nameof(filamentName));
+            }
+
+            // Write header
+            AssignFilamentHeader header = new AssignFilamentHeader
+            {
+                Extruder = extruder,
+                FilamentLength = (uint)unicodeFilamentName.Length
+            };
+            MemoryMarshal.Write(to, ref header);
+            int bytesWritten = Marshal.SizeOf(header);
+
+            // Write filament name
+            unicodeFilamentName.CopyTo(to.Slice(bytesWritten));
+            bytesWritten += unicodeFilamentName.Length;
+            return AddPadding(to, bytesWritten);
+        }
+
         private static int AddPadding(Span<byte> to, int bytesWritten)
         {
             int padding = 4 - bytesWritten % 4;

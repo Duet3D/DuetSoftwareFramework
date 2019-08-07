@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Machine;
+using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -16,23 +17,34 @@ namespace DuetControlServer.Utility
         private const string FilamentsCsvHeader = "RepRapFirmware filament assignment file v1";
 
         private static bool _mappingLoaded;
+        private static readonly AsyncLock _lock = new AsyncLock();
         private static readonly Dictionary<int, string> _filamentMapping = new Dictionary<int, string>();
 
         /// <summary>
         /// Called when a new tool is being added to the object model
         /// </summary>
         /// <param name="tool">New tool</param>
-        /// <returns></returns>
+        /// <returns>Asynchronous task</returns>
         public static async Task ToolAdded(Tool tool)
         {
-            if (!_mappingLoaded)
+            using (await _lock.LockAsync())
             {
-                string filename = await FilePath.ToPhysicalAsync(FilamentsCsvFile, "sys");
-                if (File.Exists(filename))
+                if (!_mappingLoaded)
                 {
-                    await LoadMapping(filename);
-                    _mappingLoaded = true;
+                    string filename = await FilePath.ToPhysicalAsync(FilamentsCsvFile, "sys");
+                    if (File.Exists(filename))
+                    {
+                        await LoadMapping(filename);
+                        _mappingLoaded = true;
+                    }
                 }
+            }
+
+            int extruderDrive = tool.FilamentExtruder;
+            if (_mappingLoaded && extruderDrive >= 0 && _filamentMapping.TryGetValue(extruderDrive, out string filamentName))
+            {
+                // Tell RepRapFirmware about the loaded filament
+                SPI.Interface.AssignFilament(extruderDrive, filamentName);
             }
             tool.PropertyChanged += ToolPropertyChanged;
         }
@@ -77,10 +89,16 @@ namespace DuetControlServer.Utility
             if (e.PropertyName == nameof(Tool.Filament))
             {
                 Tool tool = (Tool)sender;
-                _filamentMapping[tool.FilamentExtruder] = tool.Filament;
+                using (_lock.Lock())
+                {
+                    if (_filamentMapping[tool.FilamentExtruder] != tool.Filament)
+                    {
+                        _filamentMapping[tool.FilamentExtruder] = tool.Filament;
 
-                string filename = FilePath.ToPhysical(FilamentsCsvFile, "sys");
-                SaveMapping(filename);
+                        string filename = FilePath.ToPhysical(FilamentsCsvFile, "sys");
+                        SaveMapping(filename);
+                    }
+                }
             }
         }
 
@@ -92,9 +110,12 @@ namespace DuetControlServer.Utility
                 {
                     writer.WriteLine($"{FilamentsCsvHeader} generated at {DateTime.Now:yyyy-MM-dd HH:mm}");
                     writer.WriteLine("extruder,filament");
-                    foreach (var pair in _filamentMapping)
+                    using (_lock.Lock())
                     {
-                        writer.WriteLine($"{pair.Key},{pair.Value}");
+                        foreach (var pair in _filamentMapping)
+                        {
+                            writer.WriteLine($"{pair.Key},{pair.Value}");
+                        }
                     }
                 }
             }

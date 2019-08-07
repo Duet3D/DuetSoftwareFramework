@@ -105,5 +105,17 @@ namespace DuetControlServer.SPI.Communication
         /// </summary>
         PushFlag = 0x20000000,
         #endregion
+
+        #region Common combination
+        /// <summary>
+        /// A message that is to be sent to the web, Telnet, USB and panel
+        /// </summary>
+        GenericMessage = UsbMessage | AuxMessage | HttpMessage | TelnetMessage,
+
+        /// <summary>
+        /// A GenericMessage that is also logged
+        /// </summary>
+        LoggedGenericMessage = GenericMessage | LogMessage,
+        #endregion
     }
 }

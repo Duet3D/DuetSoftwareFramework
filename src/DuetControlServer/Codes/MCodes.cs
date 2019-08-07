@@ -218,7 +218,7 @@ namespace DuetControlServer.Codes
                             }
 
                             Storage storage = Model.Provider.Get.Storages[index];
-                            return new CodeResult(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / (1000 * 1000 * 1000):F2}Gb, free space {storage.Free / (1000 * 1000 * 1000):F2}Gb, speed {storage.Speed / (1000*1000):F2}MBytes/sec");
+                            return new CodeResult(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / (1000 * 1000 * 1000):F2}Gb, free space {storage.Free / (1000 * 1000 * 1000):F2}Gb, speed {storage.Speed / (1000 * 1000):F2}MBytes/sec");
                         }
                     }
 
@@ -239,6 +239,11 @@ namespace DuetControlServer.Codes
                         await Diagnostics(result);
                         return result;
                     }
+                    break;
+
+                // Message box acknowledgement
+                case 292:
+                    code.Flags |= CodeFlags.IsPrioritized;
                     break;
 
                 // Save heightmap
@@ -350,6 +355,44 @@ namespace DuetControlServer.Codes
                         return new CodeResult(MessageType.Error, "Configuration file not found");
                     }
 
+                // Set Name
+                case 550:
+                    {
+                        // Verify the P parameter
+                        string pParam = code.Parameter('P');
+                        if (pParam.Length > 40)
+                        {
+                            return new CodeResult(MessageType.Error, "Machine name is too long");
+                        }
+
+                        // Strip letters and digits from the machine name
+                        string machineName = "";
+                        foreach (char c in Environment.MachineName)
+                        {
+                            if (char.IsLetterOrDigit(c))
+                            {
+                                machineName += c;
+                            }
+                        }
+
+                        // Strip letters and digits from the desired name
+                        string desiredName = "";
+                        foreach (char c in pParam)
+                        {
+                            if (char.IsLetterOrDigit(c))
+                            {
+                                desiredName += c;
+                            }
+                        }
+
+                        // Make sure the subset of letters and digits is equal
+                        if (!machineName.Equals(desiredName, StringComparison.CurrentCultureIgnoreCase))
+                        {
+                            return new CodeResult(MessageType.Error, "Machine name must consist of the same letters and digits as configured by the Linux hostname");
+                        }
+                    }
+                    break;
+
                 // Set current RTC date and time
                 case 905:
                     {
@@ -412,26 +455,21 @@ namespace DuetControlServer.Codes
 
                             using (await Model.Provider.AccessReadWriteAsync())
                             {
-                                if (Model.Provider.Get.State.LogFile != null)
-                                {
-                                    Utility.Logger.Stop();
-                                }
-
                                 string physicalFilename = await FilePath.ToPhysicalAsync(filename, "sys");
-                                Utility.Logger.Start(physicalFilename);
+                                await Utility.Logger.Start(physicalFilename);
 
                                 Model.Provider.Get.State.LogFile = filename;
                             }
+
+                            return new CodeResult();
                         }
-                        else
+
+                        using (await Model.Provider.AccessReadWriteAsync())
                         {
-                            using (await Model.Provider.AccessReadWriteAsync())
-                            {
-                                Utility.Logger.Stop();
-                                Model.Provider.Get.State.LogFile = null;
-                            }
+                            await Utility.Logger.Stop();
+                            Model.Provider.Get.State.LogFile = null;
                         }
-                        break;
+                        return new CodeResult();
                     }
 
                 // Update the firmware

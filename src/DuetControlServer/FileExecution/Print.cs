@@ -154,10 +154,16 @@ namespace DuetControlServer.FileExecution
                     // No more codes available - print must have finished
                     break;
                 }
-            }
-            while (!Program.CancelSource.IsCancellationRequested);
+            } while (!Program.CancelSource.IsCancellationRequested);
 
             Console.WriteLine("[info] DCS has finished printing");
+
+            // Update the last print filename
+            using (await Model.Provider.AccessReadWriteAsync())
+            {
+                Model.Provider.Get.Job.LastFileName = await FilePath.ToVirtualAsync(file.FileName);
+                // FIXME: Add support for simulation
+            }
 
             // Notify the controller that the print has stopped
             SPI.Communication.PrintStoppedReason stopReason = !file.IsAborted ? SPI.Communication.PrintStoppedReason.NormalCompletion

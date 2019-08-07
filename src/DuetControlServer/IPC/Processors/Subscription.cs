@@ -126,7 +126,7 @@ namespace DuetControlServer.IPC.Processors
                         if (patch.ContainsKey("job") && patch.Value<JObject>("job").ContainsKey("layers"))
                         {
                             JArray layersArray = patch["job"].Value<JArray>("layers");
-                            while (!layersArray[0].HasValues)
+                            while (layersArray.Count > 0 && !layersArray[0].HasValues)
                             {
                                 layersArray.RemoveAt(0);
                             }

@@ -36,6 +36,7 @@ namespace DuetControlServer.Model
             {
                 _moduleUpdateEvents[i] = new AsyncManualResetEvent();
             }
+
             IsReady = true;
         }
 
@@ -76,13 +77,15 @@ namespace DuetControlServer.Model
                 {
                     await DoMerge(module, json);
                 }
-                catch (AggregateException ae)
+                catch (Exception e)
                 {
-                    Console.WriteLine($"[err] Caught exception while updating object model: {ae.InnerException}");
+                    Console.WriteLine($"[err] Caught exception while updating object model: {e}");
                 }
                 IsReady = true;
             });
         }
+
+        private static float _currentHeight;
 
         private static async Task DoMerge(byte module, string json)
         {
@@ -116,7 +119,7 @@ namespace DuetControlServer.Model
                             msg = "",
                             title = "",
                             seq = 0,
-                            timeout = 0,
+                            timeout = 0.0F,
                             controls = 0
                         }
                     },
@@ -525,6 +528,7 @@ namespace DuetControlServer.Model
                         toolObj.Name = (response.tools[tool].name != "") ? response.tools[tool].name : null;
                         toolObj.Number = response.tools[tool].number;
                         ListHelpers.SetList(toolObj.Heaters, response.tools[tool].heaters);
+                        ListHelpers.SetList(toolObj.Extruders, response.tools[tool].drives);
                         ListHelpers.SetList(toolObj.Active, response.temps.tools.active[tool]);
                         ListHelpers.SetList(toolObj.Standby, response.temps.tools.standby[tool]);
                         if (toolObj.Fans.Count == 0)
@@ -539,7 +543,7 @@ namespace DuetControlServer.Model
                     }
                     for (int tool = Provider.Get.Tools.Count; tool > response.tools.Length; tool--)
                     {
-                        Utility.FilamentManager.ToolRemoved(Provider.Get.Tools[tool]);
+                        Utility.FilamentManager.ToolRemoved(Provider.Get.Tools[tool - 1]);
                         Provider.Get.Tools.RemoveAt(tool - 1);
                     }
                 }
@@ -549,7 +553,6 @@ namespace DuetControlServer.Model
                 {
                     await Utility.FilamentManager.ToolAdded(toolObj);
                 }
-                // Keep track of filaments. Deal with added tools here to avoid deadlocks
             }
 
             // Deserialize print status response
@@ -557,10 +560,17 @@ namespace DuetControlServer.Model
             {
                 var printResponse = new
                 {
+                    status = 'I',
+                    coords = new
+                    {
+                        xyz = new float[3]
+                    },
                     currentLayer = 0,
                     currentLayerTime = 0F,
                     filePosition = 0L,
                     firstLayerDuration = 0F,
+                    firstLayerHeight = 0F,
+                    fractionPrinted = 0F,
                     extrRaw = new float[0],
                     printDuration = 0F,
 					warmUpDuration = 0F,
@@ -575,6 +585,52 @@ namespace DuetControlServer.Model
 
                 using (await Provider.AccessReadWriteAsync())
                 {
+                    if (printResponse.currentLayer > Provider.Get.Job.Layers.Count + 1)
+                    {
+                        // Layer complete
+                        Layer lastLayer = (Provider.Get.Job.Layers.Count > 0)
+                            ? Provider.Get.Job.Layers[Provider.Get.Job.Layers.Count - 1]
+                                : new Layer() { Filament = new float[printResponse.extrRaw.Length] };
+
+                        float lastHeight = 0F, lastDuration = 0F, lastProgress = 0F;
+                        float[] lastFilamentUsage = new float[printResponse.extrRaw.Length];
+                        foreach (Layer l in Provider.Get.Job.Layers)
+                        {
+                            lastHeight += l.Height;
+                            lastDuration += l.Duration;
+                            lastProgress += l.FractionPrinted;
+                            for (int i = 0; i < Math.Min(lastFilamentUsage.Length, l.Filament.Length); i++)
+                            {
+                                lastFilamentUsage[i] += l.Filament[i];
+                            }
+                        }
+
+                        float[] filamentUsage = new float[printResponse.extrRaw.Length];
+                        for (int i = 0; i < filamentUsage.Length; i++)
+                        {
+                            filamentUsage[i] = printResponse.extrRaw[i] - lastFilamentUsage[i];
+                        }
+
+                        float printDuration = printResponse.printDuration - printResponse.warmUpDuration;
+                        Layer layer = new Layer
+                        {
+                            Duration = printDuration - lastDuration,
+                            Filament = filamentUsage,
+                            FractionPrinted = (printResponse.fractionPrinted / 100F) - lastProgress,
+                            Height = (printResponse.currentLayer > 2) ? _currentHeight - lastHeight : printResponse.firstLayerHeight
+                        };
+                        Provider.Get.Job.Layers.Add(layer);
+
+                        // FIXME: In case Z isn't mapped to the 3rd axis...
+                        _currentHeight = printResponse.coords.xyz[2];
+                    }
+                    else if (printResponse.currentLayer < Provider.Get.Job.Layers.Count && GetStatus(printResponse.status) == MachineStatus.Processing)
+                    {
+                        // Starting a new print job
+                        Provider.Get.Job.Layers.Clear();
+                        _currentHeight = 0F;
+                    }
+
                     Provider.Get.Job.Layer = printResponse.currentLayer;
                     Provider.Get.Job.LayerTime = (printResponse.currentLayer == 1) ? printResponse.firstLayerDuration : printResponse.currentLayerTime;
                     Provider.Get.Job.FilePosition = printResponse.filePosition;
@@ -587,15 +643,6 @@ namespace DuetControlServer.Model
                 }
             }
 
-            // Reset everything if the controller is halted
-            using (await Provider.AccessReadOnlyAsync())
-            {
-                if (Provider.Get.State.Status == MachineStatus.Halted)
-                {
-                    await SPI.Interface.InvalidateData("Firmware halted");
-                }
-            }
-
             // Notify waiting threads about the last module updated
             _moduleUpdateEvents[module].Set();
             _moduleUpdateEvents[module].Reset();
@@ -603,9 +650,6 @@ namespace DuetControlServer.Model
             {
                 _lastUpdatedModule = module;
             }
-
-            // Notify subscribers
-            IPC.Processors.Subscription.ModelUpdated();
         }
 
         private static MachineStatus GetStatus(char letter)
