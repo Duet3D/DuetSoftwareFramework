@@ -319,6 +319,17 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Read a chunk of a <see cref="Request.RequestFileChunk"/> packet
+        /// </summary>
+        /// <param name="filename">Filename</param>
+        /// <param name="offset">File offset</param>
+        /// <param name="maxLength">Maximum chunk size</param>
+        public static void ReadFileChunkRequest(out string filename, out uint offset, out uint maxLength)
+        {
+            Serialization.Reader.ReadFileChunkRequest(_packetData.Span, out filename, out offset, out maxLength);
+        }
+
+        /// <summary>
         /// Write the last packet + content for diagnostic purposes
         /// </summary>
         public static void DumpMalformedPacket()
@@ -740,7 +751,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="extruder"></param>
         /// <param name="filamentName"></param>
-        /// <returns></returns>
+        /// <returns>Whether the firmware has been written successfully</returns>
         public static bool WriteAssignFilament(int extruder, string filamentName)
         {
             // Serialize the requqest first to see how much space it requires
@@ -755,6 +766,30 @@ namespace DuetControlServer.SPI
 
             // Write it
             WritePacket(Communication.LinuxRequests.Request.AssignFilament, dataLength);
+            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            return true;
+        }
+
+        /// <summary>
+        /// Write another chunk of the file being requested
+        /// </summary>
+        /// <param name="data">File chunk data</param>
+        /// <param name="fileLength">Total length of the file in bytes</param>
+        /// <returns>Whether the firmware has been written successfully</returns>
+        public static bool WriteFileChunk(Span<byte> data, long fileLength)
+        {
+            // Serialize the requqest first to see how much space it requires
+            Span<byte> span = new byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
+            int dataLength = Serialization.Writer.WriteFileChunk(span, data, fileLength);
+
+            // See if the request fits into the buffer
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            // Write it
+            WritePacket(Communication.LinuxRequests.Request.FileChunk, dataLength);
             span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
             return true;
         }

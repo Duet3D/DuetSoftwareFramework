@@ -54,6 +54,11 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// <summary>
         /// Ressource locked
         /// </summary>
-        Locked = 9
+        Locked = 9,
+
+        /// <summary>
+        /// Request another chunk of a file
+        /// </summary>
+        RequestFileChunk = 10
     }
 }

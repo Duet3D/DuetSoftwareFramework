@@ -567,6 +567,9 @@ namespace DuetControlServer.SPI
 
                 case Communication.FirmwareRequests.Request.Locked:
                     return HandleResourceLocked();
+
+                case Communication.FirmwareRequests.Request.RequestFileChunk:
+                    return HandleFileChunkRequest();
             }
             return Task.CompletedTask;
         }
@@ -763,6 +766,27 @@ namespace DuetControlServer.SPI
                 {
                     item.Resolve(true);
                 }
+            }
+        }
+
+        private static async Task HandleFileChunkRequest()
+        {
+            DataTransfer.ReadFileChunkRequest(out string filename, out uint offset, out uint maxLength);
+            try
+            {
+                string filePath = await FilePath.ToPhysicalAsync(filename, "sys");
+                using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                {
+                    fs.Position = offset;
+
+                    byte[] buffer = /*stackalloc*/ new byte[maxLength];
+                    int bytesRead = await fs.ReadAsync(buffer, 0, (int)maxLength);
+                    DataTransfer.WriteFileChunk(buffer.AsSpan(0, bytesRead), fs.Length);
+                }
+            }
+            catch
+            {
+                DataTransfer.WriteFileChunk(null, 0);
             }
         }
 

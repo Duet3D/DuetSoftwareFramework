@@ -214,6 +214,31 @@ namespace DuetControlServer.SPI.Serialization
             return Marshal.SizeOf(header);
         }
 
+        /// <summary>
+        /// Read a file chunk request`
+        /// </summary>
+        /// <param name="from">Origin</param>
+        /// <param name="filename">Filename to read from</param>
+        /// <param name="offset">Offset in the file</param>
+        /// <param name="maxLength">Maximum chunk length</param>
+        /// <returns>Number of bytes read</returns>
+        public static int ReadFileChunkRequest(ReadOnlySpan<byte> from, out string filename, out uint offset, out uint maxLength)
+        {
+            FileChunkRequest header = MemoryMarshal.Read<FileChunkRequest>(from);
+            int bytesRead = Marshal.SizeOf(header);
+
+            // Read header
+            offset = header.Offset;
+            maxLength = header.MaxLength;
+
+            // Read filename
+            ReadOnlySpan<byte> unicodeFilename = from.Slice(bytesRead, (int)header.FilenameLength);
+            filename = Encoding.UTF8.GetString(unicodeFilename);
+            bytesRead += (int)header.FilenameLength;
+
+            return AddPadding(bytesRead);
+        }
+
         private static int AddPadding(int bytesRead)
         {
             int padding = 4 - bytesRead % 4;

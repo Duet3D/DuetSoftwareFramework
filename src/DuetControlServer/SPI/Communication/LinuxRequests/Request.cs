@@ -85,6 +85,11 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Assign filament to a given extruder drive
         /// </summary>
-        AssignFilament = 14
+        AssignFilament = 14,
+
+        /// <summary>
+        /// Response to a <see cref="FirmwareRequests.FileChunkRequest"/>
+        /// </summary>
+        FileChunk = 15
     }
 }

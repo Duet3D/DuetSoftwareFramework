@@ -488,6 +488,33 @@ namespace DuetControlServer.SPI.Serialization
             return AddPadding(to, bytesWritten);
         }
 
+        /// <summary>
+        /// Write a file chunk
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="data">File chunk data</param>
+        /// <param name="fileLength">Total length of the file in bytes</param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteFileChunk(Span<byte> to, Span<byte> data, long fileLength)
+        {
+            // Write header
+            FileChunk header = new FileChunk
+            {
+                DataLength = (data != null) ? data.Length : -1,
+                FileLength = (uint)fileLength
+            };
+            MemoryMarshal.Write(to, ref header);
+            int bytesWritten = Marshal.SizeOf(header);
+
+            // Write chunk
+            if (data != null)
+            {
+                data.CopyTo(to.Slice(bytesWritten));
+                bytesWritten += data.Length;
+            }
+            return AddPadding(to, bytesWritten);
+        }
+
         private static int AddPadding(Span<byte> to, int bytesWritten)
         {
             int padding = 4 - bytesWritten % 4;

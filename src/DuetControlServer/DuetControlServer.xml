@@ -1197,6 +1197,26 @@
             This is a final code response
             </summary>
         </member>
+        <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkRequest">
+            <summary>
+            Request abort of the currently executing files
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkRequest.Offset">
+            <summary>
+            Offset in the file
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkRequest.MaxLength">
+            <summary>
+            Maximum length of the file chunk to return
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkRequest.FilenameLength">
+            <summary>
+            Length of the filename
+            </summary>
+        </member>
         <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.MacroRequest">
             <summary>
             Request execution of a macro file
@@ -1292,6 +1312,11 @@
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.Locked">
             <summary>
             Ressource locked
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.RequestFileChunk">
+            <summary>
+            Request another chunk of a file
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.FirmwareRequests.StackFlags">
@@ -1513,6 +1538,22 @@
             </summary>
             <remarks>The top 16 bits contain the board ID and the bottom 16 bits contain the driver number</remarks>
         </member>
+        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.FileChunk">
+            <summary>
+            Response to a <see cref="T:DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkRequest"/>.
+            This is followed by the payload if Length is greater than 0
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.DataLength">
+            <summary>
+            Length of the file chunk or -1 if an error occurred
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.FileLength">
+            <summary>
+            Total length of the file
+            </summary>
+        </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.FlashVerifyRequest">
             <summary>
             Used as the last message to check if the firmware has been flashed successfully
@@ -1695,6 +1736,11 @@
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.AssignFilament">
             <summary>
             Assign filament to a given extruder drive
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.FileChunk">
+            <summary>
+            Response to a <see cref="T:DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkRequest"/>
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModel">
@@ -2204,6 +2250,14 @@
             <param name="channel">Code channel that has acquired the lock</param>
             <returns>Asynchronous task</returns>
         </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.ReadFileChunkRequest(System.String@,System.UInt32@,System.UInt32@)">
+            <summary>
+            Read a chunk of a <see cref="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.RequestFileChunk"/> packet
+            </summary>
+            <param name="filename">Filename</param>
+            <param name="offset">File offset</param>
+            <param name="maxLength">Maximum chunk size</param>
+        </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.DumpMalformedPacket">
             <summary>
             Write the last packet + content for diagnostic purposes
@@ -2344,7 +2398,15 @@
             </summary>
             <param name="extruder"></param>
             <param name="filamentName"></param>
-            <returns></returns>
+            <returns>Whether the firmware has been written successfully</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.WriteFileChunk(System.Span{System.Byte},System.Int64)">
+            <summary>
+            Write another chunk of the file being requested
+            </summary>
+            <param name="data">File chunk data</param>
+            <param name="fileLength">Total length of the file in bytes</param>
+            <returns>Whether the firmware has been written successfully</returns>
         </member>
         <member name="T:DuetControlServer.SPI.Interface">
             <summary>
@@ -2680,6 +2742,16 @@
             <param name="channel">Channel that has acquired the lock</param>
             <returns>Number of bytes read</returns>
         </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadFileChunkRequest(System.ReadOnlySpan{System.Byte},System.String@,System.UInt32@,System.UInt32@)">
+            <summary>
+            Read a file chunk request`
+            </summary>
+            <param name="from">Origin</param>
+            <param name="filename">Filename to read from</param>
+            <param name="offset">Offset in the file</param>
+            <param name="maxLength">Maximum chunk length</param>
+            <returns>Number of bytes read</returns>
+        </member>
         <member name="T:DuetControlServer.SPI.Serialization.Writer">
             <summary>
             Static class for writing data for SPI transmissions.
@@ -2788,6 +2860,15 @@
             <param name="to">Destination</param>
             <param name="extruder">Extruder drive</param>
             <param name="filamentName">Filament name</param>
+            <returns>Number of bytes written</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteFileChunk(System.Span{System.Byte},System.Span{System.Byte},System.Int64)">
+            <summary>
+            Write a file chunk
+            </summary>
+            <param name="to">Destination</param>
+            <param name="data">File chunk data</param>
+            <param name="fileLength">Total length of the file in bytes</param>
             <returns>Number of bytes written</returns>
         </member>
         <member name="T:DuetControlServer.Utility.ConfigOverride">
