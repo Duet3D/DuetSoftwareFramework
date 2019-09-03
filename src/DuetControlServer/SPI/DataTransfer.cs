@@ -61,7 +61,7 @@ namespace DuetControlServer.SPI
             _transferReadyPin.StartMonitoring(Program.CancelSource.Token);
 
             // Initialize SPI device
-            _spiDevice = new SpiDevice($"/dev/spidev{Settings.SpiBusID}.{Settings.SpiChipSelectLine}", Settings.SpiFrequency);
+            _spiDevice = new SpiDevice(Settings.SpiDevice, Settings.SpiFrequency);
         }
 
         private static decimal GetFullTransfersPerSecond()

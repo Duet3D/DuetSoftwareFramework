@@ -76,10 +76,29 @@ namespace DuetUnitTest.Commands
             Assert.AreEqual(6, code.MinorNumber);
         }
 
+        // FIXME: Make quotes for string mandatory and interpret this correctly --v
+        [Test]
+        public void ParseG92()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G92 XYZ");
+            Assert.AreEqual(CodeType.GCode, code.Type);
+            Assert.AreEqual(92, code.MajorNumber);
+            Assert.AreEqual(null, code.MinorNumber);
+
+            Assert.AreEqual(3, code.Parameters.Count);
+
+            Assert.AreEqual('X', code.Parameters[0].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[0]);
+            Assert.AreEqual('Y', code.Parameters[1].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[1]);
+            Assert.AreEqual('Z', code.Parameters[2].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[2]);
+        }
+
         [Test]
         public void ParseM98()
         {
-            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M98 Pconfig.g");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M98 P\"config.g\"");
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(98, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);

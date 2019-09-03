@@ -13,9 +13,9 @@ namespace DuetUnitTest.Machine
 
             Endstop endstop = new Endstop
             {
-                Position = EndstopPosition.HighEnd,
                 Triggered = true,
-                Type = EndstopType.MotorLoadDetection
+                Type = EndstopType.MotorStallAny,
+                Probe = 0
             };
             original.Sensors.Endstops.Add(endstop);
 
@@ -41,9 +41,9 @@ namespace DuetUnitTest.Machine
             MachineModel clone = (MachineModel)original.Clone();
 
             Assert.AreEqual(1, original.Sensors.Endstops.Count);
-            Assert.AreEqual(original.Sensors.Endstops[0].Position, clone.Sensors.Endstops[0].Position);
             Assert.AreEqual(original.Sensors.Endstops[0].Triggered, clone.Sensors.Endstops[0].Triggered);
             Assert.AreEqual(original.Sensors.Endstops[0].Type, clone.Sensors.Endstops[0].Type);
+            Assert.AreEqual(original.Sensors.Endstops[0].Probe, clone.Sensors.Endstops[0].Probe);
 
             Assert.AreEqual(1, original.Sensors.Probes.Count);
             Assert.AreEqual(original.Sensors.Probes[0].DisablesBed, clone.Sensors.Probes[0].DisablesBed);
@@ -60,9 +60,9 @@ namespace DuetUnitTest.Machine
             Assert.AreEqual(original.Sensors.Probes[0].Type, clone.Sensors.Probes[0].Type);
             Assert.AreEqual(original.Sensors.Probes[0].Value, clone.Sensors.Probes[0].Value);
 
-            Assert.AreNotSame(original.Sensors.Endstops[0].Position, clone.Sensors.Endstops[0].Position);
             Assert.AreNotSame(original.Sensors.Endstops[0].Triggered, clone.Sensors.Endstops[0].Triggered);
             Assert.AreNotSame(original.Sensors.Endstops[0].Type, clone.Sensors.Endstops[0].Type);
+            Assert.AreNotSame(original.Sensors.Endstops[0].Probe, clone.Sensors.Endstops[0].Probe);
 
             Assert.AreNotSame(original.Sensors.Probes[0].DisablesBed, clone.Sensors.Probes[0].DisablesBed);
             Assert.AreNotSame(original.Sensors.Probes[0].DiveHeight, clone.Sensors.Probes[0].DiveHeight);
@@ -86,9 +86,9 @@ namespace DuetUnitTest.Machine
 
             Endstop endstop = new Endstop
             {
-                Position = EndstopPosition.HighEnd,
                 Triggered = true,
-                Type = EndstopType.MotorLoadDetection
+                Type = EndstopType.MotorStallIndividual,
+                Probe = 1
             };
             original.Sensors.Endstops.Add(endstop);
 
@@ -115,9 +115,9 @@ namespace DuetUnitTest.Machine
             assigned.Assign(original);
 
             Assert.AreEqual(1, original.Sensors.Endstops.Count);
-            Assert.AreEqual(original.Sensors.Endstops[0].Position, assigned.Sensors.Endstops[0].Position);
             Assert.AreEqual(original.Sensors.Endstops[0].Triggered, assigned.Sensors.Endstops[0].Triggered);
             Assert.AreEqual(original.Sensors.Endstops[0].Type, assigned.Sensors.Endstops[0].Type);
+            Assert.AreEqual(original.Sensors.Endstops[0].Probe, assigned.Sensors.Endstops[0].Probe);
 
             Assert.AreEqual(1, original.Sensors.Probes.Count);
             Assert.AreEqual(original.Sensors.Probes[0].DisablesBed, assigned.Sensors.Probes[0].DisablesBed);
@@ -134,9 +134,9 @@ namespace DuetUnitTest.Machine
             Assert.AreEqual(original.Sensors.Probes[0].Type, assigned.Sensors.Probes[0].Type);
             Assert.AreEqual(original.Sensors.Probes[0].Value, assigned.Sensors.Probes[0].Value);
 
-            Assert.AreNotSame(original.Sensors.Endstops[0].Position, assigned.Sensors.Endstops[0].Position);
             Assert.AreNotSame(original.Sensors.Endstops[0].Triggered, assigned.Sensors.Endstops[0].Triggered);
             Assert.AreNotSame(original.Sensors.Endstops[0].Type, assigned.Sensors.Endstops[0].Type);
+            Assert.AreNotSame(original.Sensors.Endstops[0].Probe, assigned.Sensors.Endstops[0].Probe);
 
             Assert.AreNotSame(original.Sensors.Probes[0].DisablesBed, assigned.Sensors.Probes[0].DisablesBed);
             Assert.AreNotSame(original.Sensors.Probes[0].DiveHeight, assigned.Sensors.Probes[0].DiveHeight);

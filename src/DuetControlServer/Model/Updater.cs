@@ -14,8 +14,7 @@ namespace DuetControlServer.Model
     /// </summary>
     public static class Updater
     {
-        private static byte _lastUpdatedModule;
-        private static readonly AsyncManualResetEvent[] _moduleUpdateEvents = new AsyncManualResetEvent[SPI.Communication.Consts.NumModules];
+        private static readonly AsyncManualResetEvent _updateEvent = new AsyncManualResetEvent();
 
         /// <summary>
         /// Indicates if this class is ready to accept JSON data
@@ -32,11 +31,6 @@ namespace DuetControlServer.Model
         /// </summary>
         public static void Init()
         {
-            for (int i = 0; i < SPI.Communication.Consts.NumModules; i++)
-            {
-                _moduleUpdateEvents[i] = new AsyncManualResetEvent();
-            }
-
             IsReady = true;
         }
 
@@ -44,16 +38,7 @@ namespace DuetControlServer.Model
         /// Wait for the model to be fully updated from RepRapFirmware
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task WaitForFullUpdate()
-        {
-            byte module;
-            lock (_moduleUpdateEvents)
-            {
-                module = _lastUpdatedModule;
-            }
-
-            await _moduleUpdateEvents[module].WaitAsync();
-        }
+        public static Task WaitForFullUpdate() => _updateEvent.WaitAsync();
 
         /// <summary>
         /// Merge received data into the object model.
@@ -87,11 +72,11 @@ namespace DuetControlServer.Model
 
         private static float _currentHeight;
 
+        // This parses RRF-style JSON responses. Will be eventually replaced with binary responses
         private static async Task DoMerge(byte module, string json)
         {
             if (module == 2)
             {
-                // Deserialize extended response (temporary)
                 var response = new
                 {
                     status = 'I',
@@ -176,6 +161,7 @@ namespace DuetControlServer.Model
                     compensation = "",
                     controllableFans = 0,
                     tempLimit = 0.0F,
+                    endstops = 0L,
                     tools = new[]
                     {
                         new
@@ -201,7 +187,6 @@ namespace DuetControlServer.Model
                         cur = 0.0F,
                         max = 0.0F
                     },
-                    firmwareName = "",
                     mode = "FFF",
                     name = Network.DefaultHostname
                 };
@@ -211,7 +196,6 @@ namespace DuetControlServer.Model
                 using (await Provider.AccessReadWriteAsync())
                 {
                     // - Electronics -
-                    Provider.Get.Electronics.Firmware.Name = response.firmwareName;
                     Provider.Get.Electronics.McuTemp.Current = response.mcutemp.cur;
                     Provider.Get.Electronics.McuTemp.Min = response.mcutemp.min;
                     Provider.Get.Electronics.McuTemp.Max = response.mcutemp.max;
@@ -249,7 +233,7 @@ namespace DuetControlServer.Model
                     Provider.Get.Move.SpeedFactor = response.Params.speedFactor / 100;
                     Provider.Get.Move.BabystepZ = response.Params.babystep;
 
-                    // Update drives
+                    // Update drives and endstops
                     int numDrives = response.coords.xyz.Length + response.coords.extr.Length;
                     for (int drive = 0; drive < numDrives; drive++)
                     {
@@ -265,10 +249,23 @@ namespace DuetControlServer.Model
                         }
 
                         driveObj.Position = (drive < response.coords.xyz.Length) ? response.coords.xyz[drive] : response.coords.extr[drive - response.coords.xyz.Length];
+
+                        Endstop endstopObj;
+                        if (drive >= Provider.Get.Sensors.Endstops.Count)
+                        {
+                            endstopObj = new Endstop();
+                            Provider.Get.Sensors.Endstops.Add(endstopObj);
+                        }
+                        else
+                        {
+                            endstopObj = Provider.Get.Sensors.Endstops[drive];
+                        }
+                        endstopObj.Triggered = (response.endstops & (1 << drive)) != 0;
                     }
                     for (int drive = Provider.Get.Move.Drives.Count; drive > numDrives; drive--)
                     {
                         Provider.Get.Move.Drives.RemoveAt(drive - 1);
+                        Provider.Get.Sensors.Endstops.RemoveAt(drive - 1);
                     }
 
                     // Update axes
@@ -288,6 +285,8 @@ namespace DuetControlServer.Model
                         axisObj.Letter = GetAxisLetter(axis);
                         axisObj.Homed = response.coords.axesHomed[axis] != 0;
                         axisObj.MachinePosition = response.coords.machine[axis];
+                        axisObj.MinEndstop = axis;
+                        axisObj.MaxEndstop = axis;
                     }
                     for (int axis = Provider.Get.Move.Axes.Count; axis > response.coords.xyz.Length; axis--)
                     {
@@ -524,7 +523,7 @@ namespace DuetControlServer.Model
 
                         // FIXME: The filament drive is not part of the status response / OM yet
                         toolObj.FilamentExtruder = (response.tools[tool].drives.Length > 0) ? response.tools[tool].drives[0] : -1;
-                        toolObj.Filament = (response.tools[tool].filament != "") ?  response.tools[tool].filament : null;
+                        toolObj.Filament = (response.tools[tool].filament != "") ? response.tools[tool].filament : null;
                         toolObj.Name = (response.tools[tool].name != "") ? response.tools[tool].name : null;
                         toolObj.Number = response.tools[tool].number;
                         ListHelpers.SetList(toolObj.Heaters, response.tools[tool].heaters);
@@ -554,10 +553,9 @@ namespace DuetControlServer.Model
                     await Utility.FilamentManager.ToolAdded(toolObj);
                 }
             }
-
-            // Deserialize print status response
             else if (module == 3)
             {
+                // Deserialize print status response
                 var printResponse = new
                 {
                     status = 'I',
@@ -573,12 +571,12 @@ namespace DuetControlServer.Model
                     fractionPrinted = 0F,
                     extrRaw = new float[0],
                     printDuration = 0F,
-					warmUpDuration = 0F,
-					timesLeft = new
+                    warmUpDuration = 0F,
+                    timesLeft = new
                     {
                         file = 0F,
-						filament = 0F,
-						layer = 0F
+                        filament = 0F,
+                        layer = 0F
                     }
                 };
                 printResponse = JsonConvert.DeserializeAnonymousType(json, printResponse);
@@ -635,20 +633,73 @@ namespace DuetControlServer.Model
                     Provider.Get.Job.LayerTime = (printResponse.currentLayer == 1) ? printResponse.firstLayerDuration : printResponse.currentLayerTime;
                     Provider.Get.Job.FilePosition = printResponse.filePosition;
                     ListHelpers.SetList(Provider.Get.Job.ExtrudedRaw, printResponse.extrRaw);
-                    Provider.Get.Job.Duration =  printResponse.printDuration;
+                    Provider.Get.Job.Duration = printResponse.printDuration;
                     Provider.Get.Job.WarmUpDuration = printResponse.warmUpDuration;
                     Provider.Get.Job.TimesLeft.File = (printResponse.timesLeft.file > 0F) ? (float?)printResponse.timesLeft.file : null;
                     Provider.Get.Job.TimesLeft.Filament = (printResponse.timesLeft.filament > 0F) ? (float?)printResponse.timesLeft.filament : null;
                     Provider.Get.Job.TimesLeft.Layer = (printResponse.timesLeft.layer > 0F) ? (float?)printResponse.timesLeft.layer : null;
                 }
-            }
 
-            // Notify waiting threads about the last module updated
-            _moduleUpdateEvents[module].Set();
-            _moduleUpdateEvents[module].Reset();
-            lock (_moduleUpdateEvents)
+                // Notify waiting threads about the model update
+                _updateEvent.Set();
+                _updateEvent.Reset();
+            }
+            else if (module == 5)
             {
-                _lastUpdatedModule = module;
+                // Deserialize config response
+                var response = new
+                {
+                    axisMins = new float[0],
+                    axisMaxes = new float[0],
+                    accelerations = new float[0],
+                    currents = new int[0],
+                    firmwareElectronics = "",
+                    firmwareName = "",
+                    boardName = "",
+                    firmwareVersion = "",
+                    firmwareDate = "",
+                    idleCurrentFactor = 0.0F,
+                    idleTimeout = 0.0F,
+                    minFeedrates = new float[0],
+                    maxFeedrates = new float[0]
+                };
+                response = JsonConvert.DeserializeAnonymousType(json, response);
+
+                if (response.axisMins == null)
+                {
+                    Console.WriteLine("[warn] Config response unsupported. Update your firmware!");
+                    return;
+                }
+
+                using (await Provider.AccessReadWriteAsync())
+                {
+                    // - Axes -
+                    for (int axis = 0; axis < Math.Min(Provider.Get.Move.Axes.Count, response.axisMins.Length); axis++)
+                    {
+                        Provider.Get.Move.Axes[axis].Min = response.axisMins[axis];
+                        Provider.Get.Move.Axes[axis].Max = response.axisMaxes[axis];
+                    }
+
+                    // - Drives -
+                    for (int drive = 0; drive < Math.Min(Provider.Get.Move.Drives.Count, response.accelerations.Length); drive++)
+                    {
+                        Provider.Get.Move.Drives[drive].Acceleration = response.accelerations[drive];
+                        Provider.Get.Move.Drives[drive].Current = response.currents[drive];
+                        Provider.Get.Move.Drives[drive].MinSpeed = response.minFeedrates[drive];
+                        Provider.Get.Move.Drives[drive].MaxSpeed = response.maxFeedrates[drive];
+                    }
+
+                    // - Electronics -
+                    Provider.Get.Electronics.Name = response.firmwareElectronics;
+                    Provider.Get.Electronics.ShortName = response.boardName;
+                    Provider.Get.Electronics.Firmware.Name = response.firmwareName;
+                    Provider.Get.Electronics.Firmware.Version = response.firmwareVersion;
+                    Provider.Get.Electronics.Firmware.Date = response.firmwareDate;
+
+                    // - Move -
+                    Provider.Get.Move.Idle.Factor = response.idleCurrentFactor / 100F;
+                    Provider.Get.Move.Idle.Timeout = response.idleTimeout;
+                }
             }
         }
 

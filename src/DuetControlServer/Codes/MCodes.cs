@@ -233,7 +233,7 @@ namespace DuetControlServer.Codes
 
                 // Immediate DSF diagnostics
                 case 122:
-                    if (code.GetUnprecedentedString() == "DSF")
+                    if (code.Parameter('B', 0) == 0 && code.GetUnprecedentedString() == "DSF")
                     {
                         CodeResult result = new CodeResult();
                         await Diagnostics(result);
@@ -474,26 +474,39 @@ namespace DuetControlServer.Codes
 
                 // Update the firmware
                 case 997:
-                    if (((int[])code.Parameter('S', new int[] { 0 })).Contains(0))
+                    if (((int[])code.Parameter('S', new int[] { 0 })).Contains(0) && (int)code.Parameter('B', 0) == 0)
                     {
-                        string iapFile = await FilePath.ToPhysicalAsync(Settings.IapFile, "sys");
+                        string iapFile, firmwareFile;
+                        using (await Model.Provider.AccessReadOnlyAsync())
+                        {
+                            if (!string.IsNullOrEmpty(Model.Provider.Get.Electronics.ShortName))
+                            {
+                                iapFile = await FilePath.ToPhysicalAsync($"Duet3iap_spi_{Model.Provider.Get.Electronics.ShortName}.bin", "sys");
+                                firmwareFile = await FilePath.ToPhysicalAsync($"Duet3Firmware_{Model.Provider.Get.Electronics.ShortName}.bin", "sys");
+                            }
+                            else
+                            {
+                                iapFile = await FilePath.ToPhysicalAsync($"Duet3iap_spi.bin", "sys");
+                                firmwareFile = await FilePath.ToPhysicalAsync("Duet3Firmware.bin", "sys");
+                            }
+                        }
+
                         if (!File.Exists(iapFile))
                         {
                             return new CodeResult(MessageType.Error, $"Failed to find IAP file {iapFile}");
                         }
-
-                        string firmwareFile = await FilePath.ToPhysicalAsync(code.Parameter('P') ?? Settings.FirmwareFile, "sys");
                         if (!File.Exists(firmwareFile))
                         {
-                            return new CodeResult(MessageType.Error, $"Failed to find firmware file {code.Parameter('P') ?? Settings.FirmwareFile}");
+                            return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
                         }
 
                         FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
                         FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
                         SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
+
+                        return new CodeResult();
                     }
-                    // TODO: Implement mechanism for expansion boards
-                    return new CodeResult();
+                    break;
 
                 // Reset controller
                 case 999:
@@ -550,7 +563,7 @@ namespace DuetControlServer.Codes
 
                 // Diagnostics
                 case 122:
-                    if (code.GetUnprecedentedString() != "DSF")
+                    if (code.Parameter('B', 0) == 0 && code.GetUnprecedentedString() != "DSF")
                     {
                         await Diagnostics(result);
                     }

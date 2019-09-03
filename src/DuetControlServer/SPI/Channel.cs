@@ -4,6 +4,7 @@ using DuetControlServer.FileExecution;
 using DuetControlServer.SPI.Communication;
 using Nito.AsyncEx;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -30,6 +31,11 @@ namespace DuetControlServer.SPI
         /// What code channel this class is about
         /// </summary>
         public CodeChannel Channel { get; }
+
+        /// <summary>
+        /// Indicates if this channel is blocked until the next full transfer
+        /// </summary>
+        public bool IsBusy { get; set; }
 
         /// <summary>
         /// Lock used when accessing this instance
@@ -172,7 +178,8 @@ namespace DuetControlServer.SPI
         /// </summary>
         public bool IsIdle
         {
-            get => (PendingCodes.Count == 0) && (BufferedCodes.Count == 0) && (SuspendedCodes.Count == 0) &&
+            get => !IsBusy &&
+                (PendingCodes.Count == 0) && (BufferedCodes.Count == 0) && (SuspendedCodes.Count == 0) &&
                 (NestedMacros.Count == 0) &&
                 (PendingLockRequests.Count == 0);
         }
@@ -566,6 +573,9 @@ namespace DuetControlServer.SPI
 
             _resumingBuffer = invalidateLastFile;
             SystemMacroHasFinished = false;
+
+            // Do not send codes to RRF until it has cleared its internal buffer
+            IsBusy = true;
         }
 
         /// <summary>
@@ -608,6 +618,9 @@ namespace DuetControlServer.SPI
 
             // Enequeue the suspended codes so they can continue execution later on
             SuspendedCodes.Push(suspendedItems);
+
+            // Do not send codes to RRF until it has cleared its internal buffer
+            IsBusy = true;
         }
 
         /// <summary>
@@ -693,7 +706,7 @@ namespace DuetControlServer.SPI
     /// <summary>
     /// Class used to hold internal information about all the code channels
     /// </summary>
-    public class ChannelStore
+    public class ChannelStore : IEnumerable<ChannelInformation>
     {
         private readonly ChannelInformation[] _channels;
 
@@ -714,12 +727,35 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Index operator for easy access via a CodeChannel value
         /// </summary>
-        /// <param name="channel">Channel to retrieve information abotu</param>
+        /// <param name="channel">Channel to retrieve information about</param>
         /// <returns>Information about the code channel</returns>
         public ChannelInformation this[CodeChannel channel]
         {
             get => _channels[(int)channel];
             set => _channels[(int)channel] = value;
         }
+
+        /// <summary>
+        /// Reset busy channels
+        /// </summary>
+        public void ResetBusyChannels()
+        {
+            foreach (ChannelInformation channel in _channels)
+            {
+                channel.IsBusy = false;
+            }
+        }
+
+        /// <summary>
+        /// Implementation of the GetEnumerator method
+        /// </summary>
+        /// <returns></returns>
+        IEnumerator IEnumerable.GetEnumerator() => _channels.GetEnumerator();
+
+        /// <summary>
+        /// Implementation of the GetEnumerator method
+        /// </summary>
+        /// <returns></returns>
+        IEnumerator<ChannelInformation> IEnumerable<ChannelInformation>.GetEnumerator() => ((IEnumerable<ChannelInformation>)_channels).GetEnumerator();
     }
 }

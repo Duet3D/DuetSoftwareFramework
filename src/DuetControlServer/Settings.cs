@@ -43,6 +43,12 @@ namespace DuetControlServer
         public static int HostUpdateInterval { get; set; } = 4000;
 
         /// <summary>
+        /// How frequently the config response is polled (in ms; temporary; will be removed once the new object model has been finished)
+        /// </summary>
+        [JsonProperty]
+        public static int ConfigUpdateInterval { get; set; } = 5000;
+
+        /// <summary>
         /// Maximum time to keep messages in the object model unless client(s) pick them up (in s).
         /// Note that messages are only cleared when the host update task runs.
         /// </summary>
@@ -50,22 +56,16 @@ namespace DuetControlServer
         public static double MaxMessageAge { get; set; } = 60.0;
 
         /// <summary>
+        /// SPI device that is connected to RepRapFirmware
+        /// </summary>
+        [JsonProperty]
+        public static string SpiDevice = "/dev/spidev0.0";
+
+        /// <summary>
         /// Frequency to use for SPI transfers
         /// </summary>
         [JsonProperty]
         public static int SpiFrequency = 1_000_000;
-
-        /// <summary>
-        /// Bus ID of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
-        /// </summary>
-        [JsonProperty]
-        public static int SpiBusID { get; set; } = 0;
-
-        /// <summary>
-        /// Chip select line of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
-        /// </summary>
-        [JsonProperty]
-        public static int SpiChipSelectLine { get; set; } = 0;
 
         /// <summary>
         /// Maximum allowed delay between data exchanges during a full transfer (in ms)
@@ -121,18 +121,6 @@ namespace DuetControlServer
         /// <remarks>This is preliminary and will be removed from future versions</remarks>
         [JsonProperty]
         public static double ModelUpdateInterval { get; set; } = 125.0;
-
-        /// <summary>
-        /// File holding the IAP binary for the Duet 3
-        /// </summary>
-        [JsonProperty]
-        public static string IapFile { get; set; } = "iapduet3.bin";
-
-        /// <summary>
-        /// File holding the firmware binary for the Duet 3
-        /// </summary>
-        [JsonProperty]
-        public static string FirmwareFile { get; set; } = "Duet3Firmware.bin";
 
         /// <summary>
         /// How many bytes to parse max at the beginning and end of a file to retrieve G-code file information

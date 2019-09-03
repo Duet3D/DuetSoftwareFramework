@@ -13,13 +13,13 @@ namespace DuetAPI.Machine
         /// List of configured endstops
         /// </summary>
         /// <seealso cref="Endstop"/>
-        public ObservableCollection<Endstop> Endstops { get; set; } = new ObservableCollection<Endstop>();
+        public ObservableCollection<Endstop> Endstops { get; } = new ObservableCollection<Endstop>();
         
         /// <summary>
         /// List of configured probes
         /// </summary>
         /// <seealso cref="Probe"/>
-        public ObservableCollection<Probe> Probes { get; set; } = new ObservableCollection<Probe>();
+        public ObservableCollection<Probe> Probes { get; } = new ObservableCollection<Probe>();
 
         // TODO add Sensors here holding info about thermistors
 

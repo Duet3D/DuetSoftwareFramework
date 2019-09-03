@@ -21,8 +21,13 @@
         Probe,
 
         /// <summary>
-        /// Motor load detection is used for this endstop
+        /// Motor load detection is used for this endstop (stop all when one motor stalls)
         /// </summary>
-        MotorLoadDetection
+        MotorStallAny,
+
+        /// <summary>
+        /// Motor load detection is used for this endstop (run each motor until it stalls)
+        /// </summary>
+        MotorStallIndividual
     }
 }

@@ -39,6 +39,23 @@ namespace DuetAPI.Machine
         private string _type;
         
         /// <summary>
+        /// Short code name of the board
+        /// </summary>
+        public string ShortName
+        {
+            get => _shortName;
+            set
+            {
+                if (_shortName != value)
+                {
+                    _shortName = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private string _shortName;
+
+        /// <summary>
         /// Full name of the main board
         /// </summary>
         public string Name
@@ -127,6 +144,8 @@ namespace DuetAPI.Machine
                 throw new ArgumentException("Invalid type");
             }
 
+            ShortName = (other.ShortName != null) ? string.Copy(other.ShortName) : null;
+            Name = (other.Name != null) ? string.Copy(other.Name) : null;
             Type = (other.Type != null) ? string.Copy(other.Type) : null;
             Name = (other.Name != null) ? string.Copy(other.Name) : null;
             Revision = (other.Revision != null) ? string.Copy(other.Revision) : null;
@@ -147,6 +166,7 @@ namespace DuetAPI.Machine
             {
                 Type = (Type != null) ? string.Copy(Type) : null,
                 Name = (Name != null) ? string.Copy(Name) : null,
+                ShortName = (ShortName != null) ? string.Copy(ShortName) : null,
                 Revision = (Revision != null) ? string.Copy(Revision) : null,
                 Firmware = (Firmware)Firmware.Clone(),
                 ProcessorID = (ProcessorID != null) ? string.Copy(ProcessorID) : null,

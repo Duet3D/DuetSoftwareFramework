@@ -96,6 +96,23 @@ namespace DuetAPI.Machine
         private float? _min;
 
         /// <summary>
+        /// Index of the endstop that is used for the low end or null if none is configured
+        /// </summary>
+        public int? MinEndstop
+        {
+            get => _minEndstop;
+            set
+            {
+                if (_minEndstop != value)
+                {
+                    _minEndstop = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private int? _minEndstop;
+
+        /// <summary>
         /// Whether the axis minimum was probed
         /// </summary>
         public bool MinProbed
@@ -128,6 +145,23 @@ namespace DuetAPI.Machine
             }
         }
         private float? _max;
+
+        /// <summary>
+        /// Index of the endstop that is used for the high end or null if none is configured
+        /// </summary>
+        public int? MaxEndstop
+        {
+            get => _maxEndstop;
+            set
+            {
+                if (_maxEndstop != value)
+                {
+                    _maxEndstop = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private int? _maxEndstop;
 
         /// <summary>
         /// Whether the axis maximum was probed
@@ -185,7 +219,11 @@ namespace DuetAPI.Machine
             Homed = other.Homed;
             MachinePosition = other.MachinePosition;
             Min = other.Min;
+            MinEndstop = other.MinEndstop;
+            MinProbed = other.MinProbed;
             Max = other.Max;
+            MaxEndstop = other.MaxEndstop;
+            MaxProbed = other.MaxProbed;
             Visible = other.Visible;
         }
 
@@ -201,7 +239,11 @@ namespace DuetAPI.Machine
                 Homed = Homed,
                 MachinePosition = MachinePosition,
                 Min = Min,
+                MinEndstop = MinEndstop,
+                MinProbed = MinProbed,
                 Max = Max,
+                MaxEndstop = MaxEndstop,
+                MaxProbed = MaxProbed,
                 Visible = Visible
             };
 

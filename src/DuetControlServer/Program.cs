@@ -49,6 +49,7 @@ namespace DuetControlServer
             catch (Exception e)
             {
                 Console.WriteLine($"Error: {e.Message}");
+                CancelSource.Cancel();
                 return;
             }
 
@@ -59,6 +60,7 @@ namespace DuetControlServer
                 {
                     await testConnection.Connect(Settings.SocketPath, CancelSource.Token);
                     Console.WriteLine("Error: Another instance is already running. Stopping.");
+                    CancelSource.Cancel();
                     return;
                 }
                 catch
@@ -78,6 +80,7 @@ namespace DuetControlServer
             catch (Exception e)
             {
                 Console.WriteLine($"Error: {e.Message}");
+                CancelSource.Cancel();
                 return;
             }
 
@@ -89,6 +92,7 @@ namespace DuetControlServer
                 if (!SPI.Interface.Connect())
                 {
                     Console.WriteLine("Error: Duet is not available");
+                    CancelSource.Cancel();
                     return;
                 }
                 Console.WriteLine("Done!");
@@ -109,6 +113,7 @@ namespace DuetControlServer
             catch (Exception e)
             {
                 Console.WriteLine($"Error: {e.Message}");
+                CancelSource.Cancel();
                 return;
             }
             

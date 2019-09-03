@@ -19,15 +19,13 @@ namespace DuetControlServer.SPI
     /// </summary>
     public static class Interface
     {
-        private static readonly CodeChannel[] CodeChannels = (CodeChannel[])Enum.GetValues(typeof(CodeChannel));
-
         // Information about the code channels
         private static readonly ChannelStore _channels = new ChannelStore();
-        private static readonly List<CodeChannel> _busyChannels = new List<CodeChannel>();
         private static int _bytesReserved = 0, _bufferSpace = 0;
 
         // Object model query
         private static byte _moduleToQuery = 2;
+        private static DateTime _lastConfigQuery = DateTime.Now;
         private static DateTime _lastQueryTime = DateTime.Now;
 
         // Heightmap requests
@@ -62,11 +60,11 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         public static async Task Diagnostics(StringBuilder builder)
         {
-            foreach (CodeChannel channel in CodeChannels)
+            foreach (ChannelInformation channel in _channels)
             {
-                using (await _channels[channel].LockAsync())
+                using (await channel.LockAsync())
                 {
-                    _channels[channel].Diagnostics(builder);
+                    channel.Diagnostics(builder);
                 }
             }
             builder.AppendLine($"Code buffer space: {_bufferSpace}");
@@ -440,13 +438,13 @@ namespace DuetControlServer.SPI
                 do
                 {
                     dataProcessed = false;
-                    foreach (CodeChannel channel in CodeChannels)
+                    foreach (ChannelInformation channel in _channels)
                     {
-                        if (!_busyChannels.Contains(channel))
+                        using (channel.Lock())
                         {
-                            using (_channels[channel].Lock())
+                            if (!channel.IsBusy)
                             {
-                                if (_channels[channel].ProcessRequests())
+                                if (channel.ProcessRequests())
                                 {
                                     // Something could be processed
                                     dataProcessed = true;
@@ -454,7 +452,7 @@ namespace DuetControlServer.SPI
                                 else
                                 {
                                     // Cannot do any more on this channel
-                                    _busyChannels.Add(channel);
+                                    channel.IsBusy = true;
                                 }
                             }
                         }
@@ -480,7 +478,7 @@ namespace DuetControlServer.SPI
 
                 // Do another full SPI transfer
                 DataTransfer.PerformFullTransfer();
-                _busyChannels.Clear();
+                _channels.ResetBusyChannels();
 
                 // Wait a moment
                 if (IsIdle)
@@ -516,11 +514,11 @@ namespace DuetControlServer.SPI
         {
             get
             {
-                foreach (CodeChannel channel in CodeChannels)
+                foreach (ChannelInformation channel in _channels)
                 {
-                    using (_channels[channel].Lock())
+                    using (channel.Lock())
                     {
-                        if (!_channels[channel].IsIdle)
+                        if (!channel.IsIdle)
                         {
                             return false;
                         }
@@ -578,16 +576,33 @@ namespace DuetControlServer.SPI
         {
             DataTransfer.ReadObjectModel(out byte module, out string json);
 
-            // Are we printing? Need to know for the next status update
+            // Check which module to query next
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                if (module == 2 && Model.Provider.Get.State.Status == MachineStatus.Processing)
+                switch (module)
                 {
-                    _moduleToQuery = 3;
-                }
-                else
-                {
-                    _moduleToQuery = 2;
+                    // Advanced status response
+                    case 2:
+                        if (DateTime.Now - _lastConfigQuery > TimeSpan.FromMilliseconds(Settings.ConfigUpdateInterval))
+                        {
+                            _moduleToQuery = 5;
+                        }
+                        else if (Model.Provider.Get.State.Status == MachineStatus.Processing)
+                        {
+                            _moduleToQuery = 3;
+                        }
+                        break;
+
+                    // Print response
+                    case 3:
+                        _moduleToQuery = 2;
+                        break;
+
+                    // Config response
+                    case 5:
+                        _moduleToQuery = 2;
+                        _lastConfigQuery = DateTime.Now;
+                        break;
                 }
             }
 
@@ -620,14 +635,14 @@ namespace DuetControlServer.SPI
             bool replyHandled = false;
             if (!replyHandled && flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
             {
-                foreach (CodeChannel channel in CodeChannels)
+                foreach (ChannelInformation channel in _channels)
                 {
-                    MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)channel);
+                    MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)channel.Channel);
                     if (flags.HasFlag(channelFlag))
                     {
-                        using (_channels[channel].Lock())
+                        using (channel.Lock())
                         {
-                            replyHandled = _channels[channel].HandleReply(flags, reply);
+                            replyHandled = channel.HandleReply(flags, reply);
                         }
                         break;
                     }
@@ -772,6 +787,7 @@ namespace DuetControlServer.SPI
         private static async Task HandleFileChunkRequest()
         {
             DataTransfer.ReadFileChunkRequest(out string filename, out uint offset, out uint maxLength);
+            Console.WriteLine($"[trace] Received file chunk request for {filename}, offset {offset}, maxLength {maxLength}");
             try
             {
                 string filePath = await FilePath.ToPhysicalAsync(filename, "sys");
@@ -784,8 +800,9 @@ namespace DuetControlServer.SPI
                     DataTransfer.WriteFileChunk(buffer.AsSpan(0, bytesRead), fs.Length);
                 }
             }
-            catch
+            catch (Exception e)
             {
+                Console.WriteLine($"[err] Failed to send requested file chunk of {filename}: {e.Message}");
                 DataTransfer.WriteFileChunk(null, 0);
             }
         }
@@ -804,13 +821,13 @@ namespace DuetControlServer.SPI
             await Print.Cancel();
 
             // Resolve pending macros, unbuffered (system) codes and flush requests
-            foreach (CodeChannel channel in CodeChannels)
+            foreach (ChannelInformation channel in _channels)
             {
-                MacroFile.AbortAllFiles(channel);
+                MacroFile.AbortAllFiles(channel.Channel);
 
-                using (await _channels[channel].LockAsync())
+                using (await channel.LockAsync())
                 {
-                    _channels[channel].Invalidate(codeErrorMessage);
+                    channel.Invalidate(codeErrorMessage);
                 }
             }
             _bytesReserved = _bufferSpace = 0;

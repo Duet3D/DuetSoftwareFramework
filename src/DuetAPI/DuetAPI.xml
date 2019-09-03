@@ -1214,6 +1214,11 @@
             Type name of the main board
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Electronics.ShortName">
+            <summary>
+            Short code name of the board
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Electronics.Name">
             <summary>
             Full name of the main board
@@ -1272,6 +1277,11 @@
         <member name="E:DuetAPI.Machine.ExpansionBoard.PropertyChanged">
             <summary>
             Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ExpansionBoard.ShortName">
+            <summary>
+            Short code name of the board
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.ExpansionBoard.Name">
@@ -2243,6 +2253,11 @@
             Minimum travel of this axis (in mm or null if unknown/unset)
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Axis.MinEndstop">
+            <summary>
+            Index of the endstop that is used for the low end or null if none is configured
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Axis.MinProbed">
             <summary>
             Whether the axis minimum was probed
@@ -2251,6 +2266,11 @@
         <member name="P:DuetAPI.Machine.Axis.Max">
             <summary>
             Maximum travel of this axis (in mm or null if unknown/unset)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Axis.MaxEndstop">
+            <summary>
+            Index of the endstop that is used for the high end or null if none is configured
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Axis.MaxProbed">
@@ -3002,14 +3022,14 @@
             Whether or not the endstop is hit
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.Endstop.Position">
-            <summary>
-            Position where the endstop is located
-            </summary>
-        </member>
         <member name="P:DuetAPI.Machine.Endstop.Type">
             <summary>
             Type of the endstop
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Endstop.Probe">
+            <summary>
+            Index of the used probe (if <see cref="P:DuetAPI.Machine.Endstop.Type"/> is <see cref="F:DuetAPI.Machine.EndstopType.Probe"/>)
             </summary>
         </member>
         <member name="M:DuetAPI.Machine.Endstop.Assign(System.Object)">
@@ -3056,26 +3076,6 @@
             Stop all drives
             </summary>
         </member>
-        <member name="T:DuetAPI.Machine.EndstopPosition">
-            <summary>
-            Position of a configured endstop
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Machine.EndstopPosition.None">
-            <summary>
-            Endstop is not configured
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Machine.EndstopPosition.LowEnd">
-            <summary>
-            Endstop is configured to be hit at the low axis end
-            </summary>
-        </member>
-        <member name="F:DuetAPI.Machine.EndstopPosition.HighEnd">
-            <summary>
-            Endstop is configured to be hit at the high axis end
-            </summary>
-        </member>
         <member name="T:DuetAPI.Machine.EndstopType">
             <summary>
             Type of a configured endstop
@@ -3096,9 +3096,14 @@
             A probe is used for this endstop
             </summary>
         </member>
-        <member name="F:DuetAPI.Machine.EndstopType.MotorLoadDetection">
+        <member name="F:DuetAPI.Machine.EndstopType.MotorStallAny">
             <summary>
-            Motor load detection is used for this endstop
+            Motor load detection is used for this endstop (stop all when one motor stalls)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.EndstopType.MotorStallIndividual">
+            <summary>
+            Motor load detection is used for this endstop (run each motor until it stalls)
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.Probe">

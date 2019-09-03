@@ -55,23 +55,6 @@ namespace DuetAPI.Machine
         private bool _triggered;
         
         /// <summary>
-        /// Position where the endstop is located
-        /// </summary>
-        public EndstopPosition Position
-        {
-            get => _position;
-            set
-            {
-                if (_position != value)
-                {
-                    _position = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private EndstopPosition _position = EndstopPosition.None;
-        
-        /// <summary>
         /// Type of the endstop
         /// </summary>
         public EndstopType Type
@@ -87,6 +70,24 @@ namespace DuetAPI.Machine
             }
         }
         private EndstopType _type;
+
+
+        /// <summary>
+        /// Index of the used probe (if <see cref="Type"/> is <see cref="EndstopType.Probe"/>)
+        /// </summary>
+        public int? Probe
+        {
+            get => _probe;
+            set
+            {
+                if (_probe != value)
+                {
+                    _probe = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private int? _probe;
 
         /// <summary>
         /// Assigns every property from another instance
@@ -107,8 +108,8 @@ namespace DuetAPI.Machine
 
             Action = other.Action;
             Triggered = other.Triggered;
-            Position = other.Position;
             Type = other.Type;
+            Probe = other.Probe;
         }
 
         /// <summary>
@@ -121,8 +122,8 @@ namespace DuetAPI.Machine
             {
                 Action = Action,
                 Triggered = Triggered,
-                Position = Position,
-                Type = Type
+                Type = Type,
+                Probe = Probe
             };
         }
     }

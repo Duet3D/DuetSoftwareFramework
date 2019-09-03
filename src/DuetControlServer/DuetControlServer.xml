@@ -773,25 +773,25 @@
             the host controller (e.g. network information and mass storages) are updated (in ms)
             </summary>
         </member>
+        <member name="P:DuetControlServer.Settings.ConfigUpdateInterval">
+            <summary>
+            How frequently the config response is polled (in ms; temporary; will be removed once the new object model has been finished)
+            </summary>
+        </member>
         <member name="P:DuetControlServer.Settings.MaxMessageAge">
             <summary>
             Maximum time to keep messages in the object model unless client(s) pick them up (in s).
             Note that messages are only cleared when the host update task runs.
             </summary>
         </member>
+        <member name="F:DuetControlServer.Settings.SpiDevice">
+            <summary>
+            SPI device that is connected to RepRapFirmware
+            </summary>
+        </member>
         <member name="F:DuetControlServer.Settings.SpiFrequency">
             <summary>
             Frequency to use for SPI transfers
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.Settings.SpiBusID">
-            <summary>
-            Bus ID of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.Settings.SpiChipSelectLine">
-            <summary>
-            Chip select line of the SPI device that is connected to RepRapFirmware (on Linux the format is /dev/spidev{bus}.{csline})
             </summary>
         </member>
         <member name="P:DuetControlServer.Settings.SpiTransferTimeout">
@@ -839,16 +839,6 @@
             Interval of regular status updates (in ms)
             </summary>
             <remarks>This is preliminary and will be removed from future versions</remarks>
-        </member>
-        <member name="P:DuetControlServer.Settings.IapFile">
-            <summary>
-            File holding the IAP binary for the Duet 3
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.Settings.FirmwareFile">
-            <summary>
-            File holding the firmware binary for the Duet 3
-            </summary>
         </member>
         <member name="P:DuetControlServer.Settings.FileInfoReadLimit">
             <summary>
@@ -905,6 +895,11 @@
         <member name="P:DuetControlServer.SPI.ChannelInformation.Channel">
             <summary>
             What code channel this class is about
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.ChannelInformation.IsBusy">
+            <summary>
+            Indicates if this channel is blocked until the next full transfer
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.ChannelInformation._lock">
@@ -1057,8 +1052,25 @@
             <summary>
             Index operator for easy access via a CodeChannel value
             </summary>
-            <param name="channel">Channel to retrieve information abotu</param>
+            <param name="channel">Channel to retrieve information about</param>
             <returns>Information about the code channel</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelStore.ResetBusyChannels">
+            <summary>
+            Reset busy channels
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelStore.System#Collections#IEnumerable#GetEnumerator">
+            <summary>
+            Implementation of the GetEnumerator method
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelStore.System#Collections#Generic#IEnumerable{DuetControlServer#SPI#ChannelInformation}#GetEnumerator">
+            <summary>
+            Implementation of the GetEnumerator method
+            </summary>
+            <returns></returns>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.Consts">
             <summary>
@@ -1084,11 +1096,6 @@
         <member name="F:DuetControlServer.SPI.Communication.Consts.BufferSize">
             <summary>
             Size of a packet transfer buffer
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.Consts.NumModules">
-            <summary>
-            Number of RepRapFirmware modules that can be queried via <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetObjectModel"/>
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize">

@@ -16,8 +16,12 @@ namespace DuetUnitTest.Machine
                 Homed = true,
                 Letter = 'X',
                 MachinePosition = 123,
+                Min = -789,
+                MinEndstop = 1,
+                MinProbed = true,
                 Max = 456,
-                Min = -789
+                MaxEndstop = 2,
+                MaxProbed = true
             };
             axis.Drives.Add(1);
             axis.Drives.Add(2);
@@ -31,8 +35,8 @@ namespace DuetUnitTest.Machine
             {
                 Acceleration = 12,
                 Current = 1200,
-                MaxSpeed = 400,
                 MinSpeed = 10,
+                MaxSpeed = 400,
                 Position = 56
             };
             drive.Microstepping.Interpolated = false;
@@ -56,20 +60,24 @@ namespace DuetUnitTest.Machine
 
             MachineModel clone = (MachineModel)original.Clone();
 
-            Assert.AreEqual(1, original.Move.Axes.Count);
+            Assert.AreEqual(1, clone.Move.Axes.Count);
             Assert.AreEqual(original.Move.Axes[0].Drives, clone.Move.Axes[0].Drives);
             Assert.AreEqual(original.Move.Axes[0].Homed, clone.Move.Axes[0].Homed);
             Assert.AreEqual(original.Move.Axes[0].Letter, clone.Move.Axes[0].Letter);
             Assert.AreEqual(original.Move.Axes[0].MachinePosition, clone.Move.Axes[0].MachinePosition);
-            Assert.AreEqual(original.Move.Axes[0].Max, clone.Move.Axes[0].Max);
             Assert.AreEqual(original.Move.Axes[0].Min, clone.Move.Axes[0].Min);
+            Assert.AreEqual(original.Move.Axes[0].MinEndstop, clone.Move.Axes[0].MinEndstop);
+            Assert.AreEqual(original.Move.Axes[0].MinProbed, clone.Move.Axes[0].MinProbed);
+            Assert.AreEqual(original.Move.Axes[0].Max, clone.Move.Axes[0].Max);
+            Assert.AreEqual(original.Move.Axes[0].MaxEndstop, clone.Move.Axes[0].MaxEndstop);
+            Assert.AreEqual(original.Move.Axes[0].MaxProbed, clone.Move.Axes[0].MaxProbed);
 
             Assert.AreEqual(original.Move.BabystepZ, clone.Move.BabystepZ);
             Assert.AreEqual(original.Move.Compensation, clone.Move.Compensation);
             Assert.AreEqual(original.Move.CurrentMove.RequestedSpeed, clone.Move.CurrentMove.RequestedSpeed);
             Assert.AreEqual(original.Move.CurrentMove.TopSpeed, clone.Move.CurrentMove.TopSpeed);
 
-            Assert.AreEqual(1, original.Move.Drives.Count);
+            Assert.AreEqual(1, clone.Move.Drives.Count);
             Assert.AreEqual(original.Move.Drives[0].Acceleration, clone.Move.Drives[0].Acceleration);
             Assert.AreEqual(original.Move.Drives[0].Current, clone.Move.Drives[0].Current);
             Assert.AreEqual(original.Move.Drives[0].MaxSpeed, clone.Move.Drives[0].MaxSpeed);
@@ -78,7 +86,7 @@ namespace DuetUnitTest.Machine
             Assert.AreEqual(original.Move.Drives[0].MinSpeed, clone.Move.Drives[0].MinSpeed);
             Assert.AreEqual(original.Move.Drives[0].Position, clone.Move.Drives[0].Position);
 
-            Assert.AreEqual(1, original.Move.Extruders.Count);
+            Assert.AreEqual(1, clone.Move.Extruders.Count);
             Assert.AreEqual(original.Move.Extruders[0].Factor, clone.Move.Extruders[0].Factor);
             Assert.AreEqual(original.Move.Extruders[0].Nonlinear.A, clone.Move.Extruders[0].Nonlinear.A);
             Assert.AreEqual(original.Move.Extruders[0].Nonlinear.B, clone.Move.Extruders[0].Nonlinear.B);
@@ -132,8 +140,12 @@ namespace DuetUnitTest.Machine
                 Homed = true,
                 Letter = 'X',
                 MachinePosition = 123,
+                Min = -789,
+                MinEndstop = 1,
+                MinProbed = true,
                 Max = 456,
-                Min = -789
+                MaxEndstop = 2,
+                MaxProbed = true
             };
             axis.Drives.Add(1);
             axis.Drives.Add(2);
@@ -173,20 +185,24 @@ namespace DuetUnitTest.Machine
             MachineModel assigned = new MachineModel();
             assigned.Assign(original);
 
-            Assert.AreEqual(1, original.Move.Axes.Count);
+            Assert.AreEqual(1, assigned.Move.Axes.Count);
             Assert.AreEqual(original.Move.Axes[0].Drives, assigned.Move.Axes[0].Drives);
             Assert.AreEqual(original.Move.Axes[0].Homed, assigned.Move.Axes[0].Homed);
             Assert.AreEqual(original.Move.Axes[0].Letter, assigned.Move.Axes[0].Letter);
             Assert.AreEqual(original.Move.Axes[0].MachinePosition, assigned.Move.Axes[0].MachinePosition);
-            Assert.AreEqual(original.Move.Axes[0].Max, assigned.Move.Axes[0].Max);
             Assert.AreEqual(original.Move.Axes[0].Min, assigned.Move.Axes[0].Min);
+            Assert.AreEqual(original.Move.Axes[0].MinEndstop, assigned.Move.Axes[0].MinEndstop);
+            Assert.AreEqual(original.Move.Axes[0].MinProbed, assigned.Move.Axes[0].MinProbed);
+            Assert.AreEqual(original.Move.Axes[0].Max, assigned.Move.Axes[0].Max);
+            Assert.AreEqual(original.Move.Axes[0].MaxEndstop, assigned.Move.Axes[0].MaxEndstop);
+            Assert.AreEqual(original.Move.Axes[0].MaxProbed, assigned.Move.Axes[0].MaxProbed);
 
             Assert.AreEqual(original.Move.BabystepZ, assigned.Move.BabystepZ);
             Assert.AreEqual(original.Move.Compensation, assigned.Move.Compensation);
             Assert.AreEqual(original.Move.CurrentMove.RequestedSpeed, assigned.Move.CurrentMove.RequestedSpeed);
             Assert.AreEqual(original.Move.CurrentMove.TopSpeed, assigned.Move.CurrentMove.TopSpeed);
 
-            Assert.AreEqual(1, original.Move.Drives.Count);
+            Assert.AreEqual(1, assigned.Move.Drives.Count);
             Assert.AreEqual(original.Move.Drives[0].Acceleration, assigned.Move.Drives[0].Acceleration);
             Assert.AreEqual(original.Move.Drives[0].Current, assigned.Move.Drives[0].Current);
             Assert.AreEqual(original.Move.Drives[0].MaxSpeed, assigned.Move.Drives[0].MaxSpeed);
@@ -195,7 +211,7 @@ namespace DuetUnitTest.Machine
             Assert.AreEqual(original.Move.Drives[0].MinSpeed, assigned.Move.Drives[0].MinSpeed);
             Assert.AreEqual(original.Move.Drives[0].Position, assigned.Move.Drives[0].Position);
 
-            Assert.AreEqual(1, original.Move.Extruders.Count);
+            Assert.AreEqual(1, assigned.Move.Extruders.Count);
             Assert.AreEqual(original.Move.Extruders[0].Factor, assigned.Move.Extruders[0].Factor);
             Assert.AreEqual(original.Move.Extruders[0].Nonlinear.A, assigned.Move.Extruders[0].Nonlinear.A);
             Assert.AreEqual(original.Move.Extruders[0].Nonlinear.B, assigned.Move.Extruders[0].Nonlinear.B);

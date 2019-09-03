@@ -1,7 +1,4 @@
-﻿// Written by Christian Hammacher (2019)
-// This particular file is licensed under the terms of the MIT license.
-
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
