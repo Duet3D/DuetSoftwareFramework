@@ -1,0 +1,211 @@
+#
+# This file is to be "sourced" by packager scripts
+#
+RSYNC="rsync -qaH"
+
+declare -i VALIDATED=0
+declare -i CLEANUP=1
+declare -i PRINT_DEBUG=0
+declare -i HELP=0
+declare -i SIGN_PKGS=0
+declare -i PKGS=1
+
+COMMON_FUNCTIONS=$(readlink -f ${BASH_SOURCE[0]})
+COMMON_DIR=$(dirname $COMMON_FUNCTIONS)
+PACKAGE_TYPE=$(basename $PACKAGER_DIR)
+SRC_DIR=$(readlink -f $COMMON_DIR/../../src)
+PKG_DIR=$(readlink -f $COMMON_DIR/..)
+TOP_DIR=$(readlink -f $PKG_DIR/..)
+
+[ "$PACKAGE_TYPE" == "deb" ] && TARGET_ARCH=armhf || TARGET_ARCH=armhfp
+BUILD_TYPE=Debug
+PACKAGES="progs,sd,dwc,meta"
+
+source $COMMON_DIR/parse_args
+
+print_help() {
+cat <<EOF
+Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
+	[ --build-type=< Debug | Release > ]
+	[ --dest-dir=< destination directory > ]
+	[ --sign-pkgs ]
+	[ --no-pkgs ]
+	[ --no-cleanup ]
+	[ --print-debug ]
+	[ --help ]
+	[ --packages=[<package>, ... ]
+
+target-arch:   Defaults to "armhf" for deb packages and "armhfp" for rpm packages.
+build-type:    Defaults to "Debug".
+dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".
+sign-packages: Signs the resulting packages,
+no-pkgs:       Builds but doesn't package the results.
+no-cleanup:    Prevents the work subdirectories in <dest-dir> from being cleaned up.
+               Automatically set if no-pkgs was specified.
+print-debug:   Prints the setup variables and exits.
+packages:      One or more of progs, sd, dwc, meta separated by commas.
+               If none are specified, all will be built.
+
+EOF
+exit 0
+}
+
+[ $HELP -eq 1 ] && print_help
+
+declare -i BUILD_PROGS=0
+declare -i BUILD_SD=0
+declare -i BUILD_DWC=0
+declare -i BUILD_META=0
+
+PACKAGES=${PACKAGES//,/ }
+for p in $PACKAGES ; do
+	eval BUILD_${p^^}=1
+done
+
+DEST_DIR=${DEST_DIR:-/tmp/duet/${PACKAGE_TYPE}/${BUILD_TYPE}/${TARGET_ARCH}}
+[ $PKGS -eq 0 ] && CLEANUP=0
+
+dcsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" $SRC_DIR/DuetControlServer/DuetControlServer.csproj)
+dwsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" $SRC_DIR/DuetWebServer/DuetWebServer.csproj)
+# We always get the sd version from the deb control file even if we're building an rpm
+sdver=$(cat $PKG_DIR/deb/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
+signkey=C406404B2459FE0B1C6CC19D3738126EDA91C86B
+
+export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
+
+case $TARGET_ARCH in
+	armhf|armhfp) DOTNET_ARCH=linux-arm ;;
+	aarch64) DOTNET_ARCH=linux-arm64 ;;
+	x86_64) DOTNET_ARCH=linux-x64 ;;
+	i386|i686|x86_32)  DOTNET_ARCH=linux-x86 ;;
+	*) echo "Unknown TARGET_ARCH: $TARGET_ARCH" ; return 1 ;;
+esac
+
+VALIDATED=1
+
+print_debug() {
+	echo "***********************************"
+	echo "PACKAGE_TYPE:     $PACKAGE_TYPE"
+	echo "COMMON_FUNCTIONS: $COMMON_FUNCTIONS"
+	echo "COMMON_DIR:       $COMMON_DIR"
+	echo "PACKAGER_SCRIPT:  $PACKAGER_SCRIPT"
+	echo "PACKAGER_DIR:     $PACKAGER_DIR"
+	echo "SRC_DIR:          $SRC_DIR"
+	echo "PKG_DIR:          $PKG_DIR"
+	echo "TOP_DIR:          $TOP_DIR"
+	echo "TARGET_ARCH:      $TARGET_ARCH"
+	echo "DOTNET_ARCH:      $DOTNET_ARCH"
+	echo "BUILD_TYPE:       $BUILD_TYPE"
+	echo "DEST_DIR:         $DEST_DIR"
+	echo "dcsver:           $dcsver"
+	echo "dwsver:           $dwsver"
+	echo "sdver:            $sdver"
+	echo "PACKAGES:         $PACKAGES"
+	echo "CLEANUP:          $CLEANUP"
+	echo "***********************************"
+}
+
+print_debug
+[ $PRINT_DEBUG -eq 1 ] && exit 0
+
+build_progs() {
+	echo "Building $DOTNET_ARCH $BUILD_TYPE (DCS $dcsver and DWS $dwsver) to $DEST_DIR,,,"
+
+	rm -rf $DEST_DIR/files
+	mkdir -p $DEST_DIR/files
+
+	rm -rf $DEST_DIR/duetcontrolserver_$dcsver
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/DuetControlServer/DuetControlServer.csproj
+	mkdir -p $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
+	[ -d $COMMON_DIR/duetcontrolserver/ ] && $RSYNC -vaH $COMMON_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
+	[ -d $PACKAGER_DIR/duetcontrolserver/ ] && $RSYNC -vaH $PACKAGER_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
+	mv $DEST_DIR/files/DuetControlServer* $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
+
+	rm -rf $DEST_DIR/duetwebserver_$dwsver/
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/DuetWebServer/DuetWebServer.csproj
+	mkdir -p $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
+	[ -d $COMMON_DIR/duetwebserver/ ] && $RSYNC -vaH $COMMON_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
+	[ -d $PACKAGER_DIR/duetwebserver/ ] && $RSYNC -vaH $PACKAGER_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
+	mv $DEST_DIR/files/DuetWebServer* $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
+	mv $DEST_DIR/files/appsettings.* $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
+	mv $DEST_DIR/files/web.config $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
+
+	rm -rf $DEST_DIR/duettools_$dcsver/
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $TOP_DIR/examples/CodeConsole/CodeConsole.csproj
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $TOP_DIR/examples/CodeLogger/CodeLogger.csproj
+	mkdir -p $DEST_DIR/duettools_$dcsver/opt/dsf/bin
+	[ -d $COMMON_DIR/duettools/ ] && $RSYNC -vaH $COMMON_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
+	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC -vaH $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
+	mv $DEST_DIR/files/CodeConsole* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
+	mv $DEST_DIR/files/CodeLogger* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
+
+	rm -rf $DEST_DIR/duetruntime_$dcsver
+	mkdir -p $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin
+	[ -d $COMMON_DIR/duetruntime/ ] && $RSYNC -vaH $COMMON_DIR/duetruntime/. $DEST_DIR/duetruntime_$dcsver/
+	[ -d $PACKAGER_DIR/duetruntime/ ] && $RSYNC -vaH $PACKAGER_DIR/duetruntime/. $DEST_DIR/duetruntime_$dcsver/
+	mv $DEST_DIR/files/* $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin
+}
+
+build_sd() {
+	echo "Building virtual SD card package v$sdver..."
+	rm -rf $DEST_DIR/duetsd_$sdver
+	[ -d $COMMON_DIR/duetsd/ ] && $RSYNC -vaH $COMMON_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/
+	[ -d $PACKAGER_DIR/duetsd/ ] && $RSYNC -vaH $PACKAGER_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/
+}
+
+build_dwc() {
+	echo "Building DWC2..."
+
+	if [ ! -d $DEST_DIR/DuetWebControl ] ; then
+		echo "- Cloning repository..."
+		if [ -d /home/christian/duet/DuetWebControl ] ; then
+			cp -r /home/christian/duet/DuetWebControl $DEST_DIR/DuetWebControl
+		else
+			git clone -q --single-branch --branch next https://github.com/chrishamm/DuetWebControl.git $DEST_DIR/DuetWebControl
+		fi
+	else
+		echo "- Using existing repository in $DEST_DIR/DuetWebControl"
+	fi
+
+	dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)-2
+	>/dev/null pushd $DEST_DIR/DuetWebControl
+
+	echo "- Installing dependencies..."
+	npm install > /dev/null
+
+	echo "- Building web interface..."
+	npm run build > /dev/null
+
+	>/dev/null popd
+
+	rm -rf $DEST_DIR/duetwebcontrol_$dwcver
+	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc2
+	[ -d $COMMON_DIR/duetwebcontrol/ ] && $RSYNC -vaH $COMMON_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
+	[ -d $PACKAGER_DIR/duetwebcontrol/ ] && $RSYNC -vaH $PACKAGER_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
+
+	unzip -q $DEST_DIR/DuetWebControl/dist/DuetWebControl-Duet3.zip -d $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc2
+}
+
+build_meta() {
+	echo "Building meta..."
+
+	rm -rf $DEST_DIR/duetsoftwareframework_$dcsver
+	[ -d $COMMON_DIR/duetsoftwareframework/ ] && $RSYNC -vaH $COMMON_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/
+	[ -d $PACKAGER_DIR/duetsoftwareframework/ ] && $RSYNC -vaH $PACKAGER_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/
+}
+
+cleanup_tmp() {
+	if [ $BUILD_PROGS -eq 1 ] ; then
+		rm -rf $DEST_DIR/files
+		rm -rf $DEST_DIR/duetcontrolserver_$dcsver
+		rm -rf $DEST_DIR/duetwebserver_$dwsver
+		rm -rf $DEST_DIR/duettools_$dcsver
+		rm -rf $DEST_DIR/duetruntime_$dcsver
+	fi
+	[ $BUILD_SD -eq 1 ] && rm -rf $DEST_DIR/duetsd_$sdver
+	if [ $BUILD_DWC -eq 1 ] ; then
+		rm -rf $DEST_DIR/duetwebcontrol_$dwcver
+		rm -rf $DEST_DIR/DuetWebControl
+	fi
+	[ $BUILD_META -eq 1 ] && rm -rf $DEST_DIR/duetsoftwareframework_$dcsver
+}

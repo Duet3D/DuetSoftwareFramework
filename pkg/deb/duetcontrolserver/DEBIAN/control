@@ -2,7 +2,7 @@ Package: duetcontrolserver
 Version: DCSVER
 Section: electronics
 Priority: standard
-Architecture: armhf
+Architecture: TARGET_ARCH
 Depends: duetruntime (= DCSVER)
 Maintainer: RepRapFirmware <package@reprapfirmware.org>
 Homepage: https://reprapfirmware.org

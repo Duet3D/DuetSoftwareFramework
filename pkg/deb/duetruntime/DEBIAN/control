@@ -1,10 +1,10 @@
-Package: duettools
+Package: duetruntime
 Version: DCSVER
 Section: electronics
-Priority: optional
-Architecture: armhf
-Depends: duetcontrolserver (= DCSVER)
+Priority: standard
+Architecture: TARGET_ARCH
+Depends: curl, libunwind8, gettext
 Maintainer: RepRapFirmware <package@reprapfirmware.org>
 Homepage: https://reprapfirmware.org
 Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git
-Description: Optional tools (code examples)
+Description: .NET Core runtime libraries for the Duet software framework

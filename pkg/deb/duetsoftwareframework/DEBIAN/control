@@ -2,7 +2,7 @@ Package: duetsoftwareframework
 Version: DCSVER
 Section: electronics
 Priority: standard
-Architecture: armhf
+Architecture: TARGET_ARCH
 Depends: duetcontrolserver, duetsd, duettools, duetwebserver, duetwebcontrol
 Maintainer: RepRapFirmware <package@reprapfirmware.org>
 Homepage: https://reprapfirmware.org
