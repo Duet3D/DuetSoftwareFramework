@@ -28,7 +28,7 @@ cat <<EOF
 Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
 	[ --build-type=< Debug | Release > ]
 	[ --dest-dir=< destination directory > ]
-	[ --sign-pkgs ]
+	[ --signing-key=< path to keyfile > ]
 	[ --no-pkgs ]
 	[ --no-cleanup ]
 	[ --print-debug ]
@@ -38,7 +38,8 @@ Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
 target-arch:   Defaults to "armhf" for deb packages and "armhfp" for rpm packages.
 build-type:    Defaults to "Debug".
 dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".
-sign-packages: Signs the resulting packages,
+signing-key:   Path to file containing signing key or id appropriate for the package type.
+               No default.  If a key file isn't provided, the packages won't be signed.
 no-pkgs:       Builds but doesn't package the results.
 no-cleanup:    Prevents the work subdirectories in <dest-dir> from being cleaned up.
                Automatically set if no-pkgs was specified.
@@ -69,7 +70,6 @@ dcsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" $SRC_
 dwsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" $SRC_DIR/DuetWebServer/DuetWebServer.csproj)
 # We always get the sd version from the deb control file even if we're building an rpm
 sdver=$(cat $PKG_DIR/deb/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
-signkey=C406404B2459FE0B1C6CC19D3738126EDA91C86B
 
 export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
 
@@ -80,6 +80,8 @@ case $TARGET_ARCH in
 	i386|i686|x86_32)  DOTNET_ARCH=linux-x86 ;;
 	*) echo "Unknown TARGET_ARCH: $TARGET_ARCH" ; return 1 ;;
 esac
+
+[ -n "$SIGNING_KEY" ] && [ ! -f "$SIGNING_KEY" ] && { echo "Signing key file $SIGNING_KEY not found." ; return 1 ; }
 
 VALIDATED=1
 
@@ -100,6 +102,7 @@ print_debug() {
 	echo "dcsver:           $dcsver"
 	echo "dwsver:           $dwsver"
 	echo "sdver:            $sdver"
+	echo "SIGNING_KEY:      $SIGNING_KEY"
 	echo "PACKAGES:         $PACKAGES"
 	echo "CLEANUP:          $CLEANUP"
 	echo "***********************************"

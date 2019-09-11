@@ -69,7 +69,8 @@ pkg_meta() {
 
 if [ $PKGS -eq 1 ] ; then
 	echo "Completing package creation"
-	if [ $SIGN_PKGS -eq 1 ] ; then
+	if [ -n "$SIGNING_KEY"  ] ; then
+		signkey=`cat $SIGNING_KEY`
 		if which dpkg-sig >/dev/null 2>&1 ; then
 			dpkg-sig -k $signkey -s builder $DEST_DIR/*.deb
 		else

@@ -14,7 +14,7 @@ cat <<EOF
 Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
 	[ --build-type=< Debug | Release > ]
 	[ --dest-dir=< destination directory > ]
-	[ --sign-pkgs ]
+	[ --signing-key=< path to keyfile > ]
 	[ --no-pkgs ]
 	[ --no-cleanup ]
 	[ --print-debug ]
@@ -29,7 +29,8 @@ If none are specified, all will be run.
 target-arch:   Defaults to "armhf" for deb packages and "armhfp" for rpm packages.
 build-type:    Defaults to "Debug".
 dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".
-sign-packages: Signs the resulting packages,
+signing-key:   Path to file containing signing key appropriate for the package type.
+               No default.  If a key file isn't provided, the packages won't be signed.
 no-pkgs:       Builds but doesn't package the results.
 no-cleanup:    Prevents the work subdirectories in <dest-dir> from being cleaned up.
                Automatically set if no-pkgs was specified.
