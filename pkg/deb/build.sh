@@ -79,8 +79,6 @@ if [ $PKGS -eq 1 ] ; then
 
 	mkdir -p $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH
 	mv $DEST_DIR/*.deb $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH
-	dpkg-scanpackages $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH /dev/null > $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH/Packages
-	dpkg-scanpackages $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH /dev/null | gzip -9c > $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH/Packages.gz
 	echo
 	echo "Built $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH"
 	du -sch --time $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH/*
