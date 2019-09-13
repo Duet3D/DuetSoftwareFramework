@@ -152,8 +152,9 @@ build_progs() {
 build_sd() {
 	echo "Building virtual SD card package v$sdver..."
 	rm -rf $DEST_DIR/duetsd_$sdver
-	[ -d $COMMON_DIR/duetsd/ ] && $RSYNC -vaH $COMMON_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/
-	[ -d $PACKAGER_DIR/duetsd/ ] && $RSYNC -vaH $PACKAGER_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/
+	mkdir -p $DEST_DIR/duetsd_$sdver
+	[ -d $COMMON_DIR/duetsd/ ] && $RSYNC -vaH $COMMON_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
+	[ -d $PACKAGER_DIR/duetsd/ ] && $RSYNC -vaH $PACKAGER_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
 }
 
 build_dwc() {
