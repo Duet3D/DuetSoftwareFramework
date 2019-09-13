@@ -9,6 +9,7 @@ declare -i PRINT_DEBUG=0
 declare -i HELP=0
 declare -i SIGN_PKGS=0
 declare -i PKGS=1
+declare -i BUILD=1
 
 COMMON_FUNCTIONS=$(readlink -f ${BASH_SOURCE[0]})
 COMMON_DIR=$(dirname $COMMON_FUNCTIONS)
@@ -30,6 +31,7 @@ Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
 	[ --dest-dir=< destination directory > ]
 	[ --signing-key=< path to keyfile > ]
 	[ --no-pkgs ]
+	[ --no-build ]
 	[ --no-cleanup ]
 	[ --print-debug ]
 	[ --help ]
@@ -41,6 +43,7 @@ dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".
 signing-key:   Path to file containing signing key or id appropriate for the package type.
                No default.  If a key file isn't provided, the packages won't be signed.
 no-pkgs:       Builds but doesn't package the results.
+no-build:      Packages existing builds.
 no-cleanup:    Prevents the work subdirectories in <dest-dir> from being cleaned up.
                Automatically set if no-pkgs was specified.
 print-debug:   Prints the setup variables and exits.
@@ -188,17 +191,24 @@ build_dwc() {
 	[ -d $PACKAGER_DIR/duetwebcontrol/ ] && $RSYNC -vaH $PACKAGER_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
 
 	unzip -q $DEST_DIR/DuetWebControl/dist/DuetWebControl-Duet3.zip -d $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc2
+	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/sd
+	>/dev/null pushd $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/sd
+	ln -s ../dwc2 www
+	>/dev/null popd
+
 }
 
 build_meta() {
 	echo "Building meta..."
 
 	rm -rf $DEST_DIR/duetsoftwareframework_$dcsver
-	[ -d $COMMON_DIR/duetsoftwareframework/ ] && $RSYNC -vaH $COMMON_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/
-	[ -d $PACKAGER_DIR/duetsoftwareframework/ ] && $RSYNC -vaH $PACKAGER_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/
+	mkdir -p $DEST_DIR/duetsoftwareframework_$dcsver
+	[ -d $COMMON_DIR/duetsoftwareframework/ ] && $RSYNC -vaH $COMMON_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/ || :
+	[ -d $PACKAGER_DIR/duetsoftwareframework/ ] && $RSYNC -vaH $PACKAGER_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/ || :
 }
 
 cleanup_tmp() {
+	echo "Cleaning up"
 	if [ $BUILD_PROGS -eq 1 ] ; then
 		rm -rf $DEST_DIR/files
 		rm -rf $DEST_DIR/duetcontrolserver_$dcsver

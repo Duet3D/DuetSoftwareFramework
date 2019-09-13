@@ -62,10 +62,10 @@ pkg_meta() {
 	dpkg-deb --build $DEST_DIR/duetsoftwareframework_$dcsver $DEST_DIR/
 }
 
-[ $BUILD_PROGS -eq 1 ] && build_progs && [ $PKGS -eq 1 ] && pkg_progs
-[ $BUILD_SD -eq 1 ] && build_sd && [ $PKGS -eq 1 ] && pkg_sd
-[ $BUILD_DWC -eq 1 ] && build_dwc && [ $PKGS -eq 1 ] && pkg_dwc
-[ $BUILD_META -eq 1 ] && build_meta && [ $PKGS -eq 1 ] && pkg_meta
+[ $BUILD_PROGS -eq 1 ] && { [ $BUILD -eq 1 ] && build_progs || : ; } && [ $PKGS -eq 1 ] && pkg_progs
+[ $BUILD_SD -eq 1 ] && { [ $BUILD -eq 1 ] && build_sd || : ; } && [ $PKGS -eq 1 ] && pkg_sd
+[ $BUILD_DWC -eq 1 ] && { [ $BUILD -eq 1 ] && build_dwc || : ; } && [ $PKGS -eq 1 ] && pkg_dwc
+[ $BUILD_META -eq 1 ] && { [ $BUILD -eq 1 ] && build_meta || : ; } && [ $PKGS -eq 1 ] && pkg_meta
 
 if [ $PKGS -eq 1 ] ; then
 	echo "Completing package creation"
