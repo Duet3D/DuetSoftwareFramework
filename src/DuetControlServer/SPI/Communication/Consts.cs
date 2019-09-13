@@ -24,7 +24,7 @@ namespace DuetControlServer.SPI.Communication
         /// <summary>
         /// Size of a packet transfer buffer
         /// </summary>
-        public const int BufferSize = 2048;
+        public const int BufferSize = 8192;
 
         /// <summary>
         /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)

@@ -20,27 +20,29 @@ namespace DuetControlServer.Codes
             switch (code.MajorNumber)
             {
                 // Load heightmap
-                // FIXME Obtain the movement lock before sending the heightmap
                 case 29:
                     if (code.Parameter('S', 0) == 1)
                     {
-                        string file = await FilePath.ToPhysicalAsync(code.Parameter('P', FilePath.DefaultHeightmapFile), "sys");
+                        if (await SPI.Interface.Flush(code.Channel))
+                        {
+                            string file = await FilePath.ToPhysicalAsync(code.Parameter('P', FilePath.DefaultHeightmapFile), "sys");
+                            try
+                            {
+                                Heightmap map = new Heightmap();
+                                await map.Load(file);
 
-                        try
-                        {
-                            Heightmap map = new Heightmap();
-                            await map.Load(file);
-                            await SPI.Interface.SetHeightmap(map);
-                            return new CodeResult();
+                                if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
+                                {
+                                    await SPI.Interface.SetHeightmap(map);
+                                    await SPI.Interface.UnlockAll(code.Channel);
+                                }
+                            }
+                            catch (AggregateException ae)
+                            {
+                                return new CodeResult(DuetAPI.MessageType.Error, $"Failed to load height map from file {file}: {ae.InnerException.Message}");
+                            }
                         }
-                        catch (AggregateException ae)
-                        {
-                            return new CodeResult(DuetAPI.MessageType.Error, $"Failed to load height map from file {file}: {ae.InnerException.Message}");
-                        }
-                        catch (Exception e)
-                        {
-                            return new CodeResult(DuetAPI.MessageType.Error, $"Failed to load height map from file {file}: {e.Message}");
-                        }
+                        return new CodeResult();
                     }
                     break;
             }
@@ -103,17 +105,24 @@ namespace DuetControlServer.Codes
                 case 29:
                     if (code.Parameter('S', 0) == 0)
                     {
-                        string file = code.Parameter('P', "heightmap.csv");
+                        if (await SPI.Interface.Flush(code.Channel))
+                        {
+                            string file = code.Parameter('P', "heightmap.csv");
+                            try
+                            {
+                                if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
+                                {
+                                    Heightmap map = await SPI.Interface.GetHeightmap();
+                                    await SPI.Interface.UnlockAll(code.Channel);
 
-                        try
-                        {
-                            Heightmap map = await SPI.Interface.GetHeightmap();
-                            await map.Save(await FilePath.ToPhysicalAsync(file, "sys"));
-                            result.Add(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
-                        }
-                        catch (AggregateException ae)
-                        {
-                            result.Add(DuetAPI.MessageType.Error, $"Failed to save height map to file {file}: {ae.InnerException.Message}");
+                                    await map.Save(await FilePath.ToPhysicalAsync(file, "sys"));
+                                    result.Add(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
+                                }
+                            }
+                            catch (AggregateException ae)
+                            {
+                                result.Add(DuetAPI.MessageType.Error, $"Failed to save height map to file {file}: {ae.InnerException.Message}");
+                            }
                         }
                     }
                     break;

@@ -23,6 +23,11 @@
         /// <summary>
         /// Heater is being tuned
         /// </summary>
-        Tuning
+        Tuning,
+
+        /// <summary>
+        /// Heater is offline
+        /// </summary>
+        Offline
     }
 }

@@ -16,7 +16,7 @@ namespace DuetAPI.Commands
         None = 0,
 
         /// <summary>
-        /// Code execution finishes as soon as it is enqueued in the RRF transmit buffer
+        /// Code execution finishes as soon as it is enqueued in the code queue
         /// </summary>
         /// <remarks>
         /// Potential G-code replies from RRF are only reported through the object model.
@@ -78,7 +78,7 @@ namespace DuetAPI.Commands
         /// <param name="serializer">JON serializer</param>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            writer.WriteValue((int)value);
+            writer.WriteValue(Convert.ToInt32(value));
         }
 
         /// <summary>
@@ -91,7 +91,7 @@ namespace DuetAPI.Commands
         /// <returns>Deserialized code flags</returns>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            return (CodeFlags)(int)reader.Value;
+            return (CodeFlags)Convert.ToInt32(reader.Value);
         }
 
         /// <summary>

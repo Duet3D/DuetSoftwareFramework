@@ -71,7 +71,6 @@ namespace DuetAPI.Machine
         }
         private EndstopType _type;
 
-
         /// <summary>
         /// Index of the used probe (if <see cref="Type"/> is <see cref="EndstopType.Probe"/>)
         /// </summary>

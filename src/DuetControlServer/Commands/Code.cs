@@ -33,7 +33,7 @@ namespace DuetControlServer.Commands
         /// Indicates whether the code has been internally processed
         /// </summary>
         [JsonIgnore]
-        public bool InternallyExecuted { get; set; }
+        public bool InternallyProcessed { get; set; }
 
         /// <summary>
         /// Parse multiple codes from the given input string
@@ -60,17 +60,39 @@ namespace DuetControlServer.Commands
             return codes;
         }
 
+        private TaskCompletionSource<CodeResult> _tcs;
+        internal void SetResult(CodeResult result) => _tcs.SetResult(result);
+        internal void SetException(Exception e) => _tcs.SetException(e);
+
         /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish
         /// </summary>
-        /// <returns>Code result instance</returns>
-        public override async Task<CodeResult> Execute()
+        /// <returns>Result of the code or null if it was cancelled</returns>
+        public override Task<CodeResult> Execute()
         {
+            if (Flags.HasFlag(CodeFlags.IsPrioritized))
+            {
+                // This type of code bypasses queued codes...
+                return Process();
+            }
+
+            if (_tcs == null)
+            {
+                _tcs = new TaskCompletionSource<CodeResult>();
+                Execution.Execute(this);
+            }
+            return _tcs.Task;
+        }
+
+        internal async Task<CodeResult> Process()
+        {
+            Console.WriteLine($"[info] Processing {this}");
+
             // Attempt to process the code internally
-            CodeResult result = InternallyExecuted ? null : await ExecuteInternally();
+            CodeResult result = InternallyProcessed ? null : await ProcessInternally();
             if (result != null)
             {
-                return result;
+                return await OnCodeExecuted(result);
             }
 
             // Send it to RepRapFirmware unless it is a comment
@@ -85,8 +107,11 @@ namespace DuetControlServer.Commands
                         try
                         {
                             CodeResult res = await codeTask;
-                            res = await OnCodeExecuted(res);
-                            await Model.Provider.Output(res);
+                            if (res != null)
+                            {
+                                res = await OnCodeExecuted(res);
+                                await Model.Provider.Output(res);
+                            }
                         }
                         catch (AggregateException ae)
                         {
@@ -99,34 +124,22 @@ namespace DuetControlServer.Commands
                 {
                     // Wait for the code to complete
                     result = await Interface.ProcessCode(this);
+                    if (result != null)
+                    {
+                        result = await OnCodeExecuted(result);
+                    }
                 }
             }
-
-            return await OnCodeExecuted(result);
-        }
-
-        /// <summary>
-        /// Start an arbitrary G/M/T-code and get the task that is resolved when RRF finishes its execution.
-        /// This is an internal alternative to the <see cref="CodeFlags.Asynchronous"/> flag.
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public Task<CodeResult> Enqueue()
-        {
-            CodeResult result = InternallyExecuted ? null : ExecuteInternally().Result;
-            if (result != null)
+            else
             {
-                return Task.FromResult(result);
+                // Return a standard result for comments
+                result = await OnCodeExecuted(new CodeResult());
             }
 
-            if (Type != CodeType.Comment)
-            {
-                Task<CodeResult> codeTask = Interface.ProcessCode(this);
-                return codeTask.ContinueWith((task) => OnCodeExecuted(task.Result).Result);
-            }
-            return OnCodeExecuted(result);
+            return result;
         }
 
-        private async Task<CodeResult> ExecuteInternally()
+        private async Task<CodeResult> ProcessInternally()
         {
             CodeResult result = null;
 
@@ -138,8 +151,8 @@ namespace DuetControlServer.Commands
 
                 if (result != null)
                 {
-                    InternallyExecuted = true;
-                    return await OnCodeExecuted(result);
+                    InternallyProcessed = true;
+                    return result;
                 }
             }
 
@@ -161,11 +174,11 @@ namespace DuetControlServer.Commands
 
             if (result != null)
             {
-                InternallyExecuted = true;
-                return await OnCodeExecuted(result);
+                InternallyProcessed = true;
+                return result;
             }
 
-            // If the could not be interpreted, post-process it
+            // If the code could not be interpreted internally, post-process it before it is sent to RRF
             if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
             {
                 result = await Interception.Intercept(this, InterceptionMode.Post);
@@ -173,12 +186,12 @@ namespace DuetControlServer.Commands
 
                 if (result != null)
                 {
-                    InternallyExecuted = true;
-                    return await OnCodeExecuted(result);
+                    InternallyProcessed = true;
+                    return result;
                 }
             }
 
-            // Code has not been interpreted yet
+            // Code has not been interpreted yet - let RRF deal with it
             return null;
         }
 
@@ -201,8 +214,8 @@ namespace DuetControlServer.Commands
             }
 
             // RepRapFirmware generally prefixes error messages with the code itself.
-            // Do this only for error messages that come either from a print or from a macro
-            if (result != null && (Flags.HasFlag(CodeFlags.IsFromMacro) || Channel == CodeChannel.File))
+            // Do this only for error messages that originate either from a print or from a macro file
+            if (Flags.HasFlag(CodeFlags.IsFromMacro) || Channel == CodeChannel.File)
             {
                 foreach (Message msg in result)
                 {
@@ -214,7 +227,7 @@ namespace DuetControlServer.Commands
             }
 
             // Log warning+error replies if the code could be processed internally
-            if (InternallyExecuted && !result.IsEmpty)
+            if (InternallyProcessed && !result.IsEmpty)
             {
                 foreach (Message msg in result)
                 {

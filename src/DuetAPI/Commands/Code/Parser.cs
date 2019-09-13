@@ -26,9 +26,10 @@ namespace DuetAPI.Commands
             char letter = '\0', c;
             string value = "";
 
-            bool contentRead = false;
+            bool contentRead = false, unprecedentedParameter = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
-            bool readingAtStart = true, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false, wasQuoted = false;
+            bool readingAtStart = true, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
+            bool wasQuoted = false, wasExpression = false;
 
             do
             {
@@ -115,7 +116,7 @@ namespace DuetAPI.Commands
                         }
                         else if (c == '"')
                         {
-                            // Parameter is quoted
+                            // Parameter is a quoted string
                             inQuotes = true;
                             isNumericParameter = false;
                         }
@@ -129,8 +130,8 @@ namespace DuetAPI.Commands
                         else
                         {
                             // Starting numeric or string parameter
+                            isNumericParameter = (c != 'e') && (NumericParameterChars.Contains(c)) && !unprecedentedParameter;
                             value += c;
-                            isNumericParameter = (c != 'e') && (NumericParameterChars.Contains(c));
                         }
                     }
                     else if (inQuotes)
@@ -163,11 +164,15 @@ namespace DuetAPI.Commands
                         {
                             // No longer in an expression
                             inExpression = false;
+                            wasExpression = true;
                             endingChunk = true;
                         }
                         value += c;
                     }
-                    else if (endingChunk || char.IsWhiteSpace(c) || (isNumericParameter && !NumericParameterChars.Contains(c)))
+                    else if (endingChunk ||
+                        (unprecedentedParameter && c == '\n') ||
+                        (!unprecedentedParameter && char.IsWhiteSpace(c)) ||
+                        (isNumericParameter && !NumericParameterChars.Contains(c)))
                     {
                         // Parameter has ended
                         inChunk = endingChunk = false;
@@ -232,6 +237,7 @@ namespace DuetAPI.Commands
                                 if (int.TryParse(args[0], out int majorNumber))
                                 {
                                     result.MajorNumber = majorNumber;
+                                    unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 30 || majorNumber == 32);
                                 }
                                 else
                                 {
@@ -249,13 +255,14 @@ namespace DuetAPI.Commands
                             else if (int.TryParse(value, out int majorNumber))
                             {
                                 result.MajorNumber = majorNumber;
+                                unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 30 || majorNumber == 32);
                             }
                             else
                             {
                                 throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})");
                             }
                         }
-                        else if (!result.MajorNumber.HasValue && result.Keyword == KeywordType.None && !wasQuoted)
+                        else if (!result.MajorNumber.HasValue && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
                         {
                             // Check for conditional G-code
                             if (letter == 'i' && value == "f")
@@ -310,8 +317,7 @@ namespace DuetAPI.Commands
                             }
                             else if (result.Parameter(letter) == null)
                             {
-                                // Add parsed parameter
-                                result.Parameters.Add(new CodeParameter(letter, value, false));
+                                AddParameter(result, letter, value, false, false);
                             }
                             else
                             {
@@ -320,8 +326,7 @@ namespace DuetAPI.Commands
                         }
                         else if (letter == '\0' || result.Parameter(letter) == null)
                         {
-                            // Add parsed parameter
-                            result.Parameters.Add(new CodeParameter(letter, value, wasQuoted));
+                            AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
                         }
                         else
                         {
@@ -330,7 +335,7 @@ namespace DuetAPI.Commands
 
                         letter = '\0';
                         value = "";
-                        wasQuoted = false;
+                        wasQuoted = wasExpression = false;
                     }
 
                     if (c == ';')
@@ -423,6 +428,22 @@ namespace DuetAPI.Commands
 
             // End
             return contentRead;
+        }
+
+        private static void AddParameter(Code code, char letter, string value, bool isQuoted, bool isSingleParameter)
+        {
+            if (isQuoted || isSingleParameter)
+            {
+                code.Parameters.Add(new CodeParameter(letter, value, isQuoted));
+            }
+            else
+            {
+                code.Parameters.Add(new CodeParameter(letter, "", false));
+                foreach (char c in value)
+                {
+                    code.Parameters.Add(new CodeParameter(c, "", false));
+                }
+            }
         }
     }
 }

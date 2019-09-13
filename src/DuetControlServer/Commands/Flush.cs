@@ -11,6 +11,6 @@ namespace DuetControlServer.Commands
         /// Wait for all pending codes of the given channel to finish
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public override Task Execute() => SPI.Interface.Flush(Channel);
+        public override Task<bool> Execute() => SPI.Interface.Flush(Channel);
     }
 }

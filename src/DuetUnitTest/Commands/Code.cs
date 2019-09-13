@@ -96,6 +96,15 @@ namespace DuetUnitTest.Commands
         }
 
         [Test]
+        public void ParseM32()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M32 some fancy  file.g");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(32, code.MajorNumber);
+            Assert.AreEqual("some fancy  file.g", code.GetUnprecedentedString());
+        }
+
+        [Test]
         public void ParseM98()
         {
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M98 P\"config.g\"");

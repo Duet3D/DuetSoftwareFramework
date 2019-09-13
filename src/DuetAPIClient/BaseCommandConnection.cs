@@ -25,9 +25,9 @@ namespace DuetAPIClient
         /// <param name="channel">Code channel to wait for</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public Task Flush(CodeChannel channel = CodeChannel.SPI, CancellationToken cancellationToken = default)
+        public Task<bool> Flush(CodeChannel channel = CodeChannel.SPI, CancellationToken cancellationToken = default)
         {
-            return PerformCommand(new Flush() { Channel = channel }, cancellationToken);
+            return PerformCommand<bool>(new Flush() { Channel = channel }, cancellationToken);
         }
 
         /// <summary>

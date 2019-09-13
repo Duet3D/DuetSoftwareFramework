@@ -91,7 +91,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Queue of pending flush requests
         /// </summary>
-        public readonly Queue<TaskCompletionSource<object>> PendingFlushRequests = new Queue<TaskCompletionSource<object>>();
+        public readonly Queue<TaskCompletionSource<bool>> PendingFlushRequests = new Queue<TaskCompletionSource<bool>>();
 
         /// <summary>
         /// Indicates if this channel is blocked and waiting for a message acknowledgement
@@ -143,7 +143,7 @@ namespace DuetControlServer.SPI
 
             foreach (MacroFile macroFile in NestedMacros)
             {
-                channelDiagostics.AppendLine($"Nested macro: {macroFile.FileName}, started by: {((macroFile.StartCode == null) ? "n/a" : macroFile.StartCode.ToString())}");
+                channelDiagostics.AppendLine($"Nested macro: {macroFile.FileName}, started by: {((macroFile.StartCode == null) ? "system" : macroFile.StartCode.ToString())}");
             }
 
             foreach (QueuedCode nestedMacroCode in NestedMacroCodes)
@@ -190,7 +190,7 @@ namespace DuetControlServer.SPI
         /// <returns>If anything more can be done on this channel</returns>
         public bool ProcessRequests()
         {
-            // 1. Priority codes (e.g. M292)
+            // 1. Priority codes
             if (PriorityCodes.TryPeek(out QueuedCode queuedCode))
             {
                 if (queuedCode.IsFinished || (queuedCode.IsReadyToSend && BufferCode(queuedCode)))
@@ -200,19 +200,21 @@ namespace DuetControlServer.SPI
                 }
 
                 // Block this channel until every priority code is gone
-                return false;
+                IsBusy = true;
             }
-            if (WaitingForMessageAcknowledgement)
-            {
-                // Still waiting for M292...
-                return false;
-            }
-
+                
             // 2. Suspended codes being resumed (may include suspended codes from nested macros)
             if (_resumingBuffer)
             {
                 ResumeBuffer();
                 return _resumingBuffer;
+            }
+
+            // FIXME This doesn't work yet for non-M292 codes. Needs more refactoring
+            if (WaitingForMessageAcknowledgement)
+            {
+                // Still waiting for M292...
+                return false;
             }
 
             // 3. Macro codes
@@ -222,7 +224,7 @@ namespace DuetControlServer.SPI
                 return true;
             }
 
-            // 4. Macro files
+            // 4. New codes from macro files
             if (NestedMacros.TryPeek(out MacroFile macroFile))
             {
                 // Try to read the next real code from the system macro being executed
@@ -243,7 +245,7 @@ namespace DuetControlServer.SPI
                     {
                         try
                         {
-                            CodeResult result = await code.Execute();
+                            CodeResult result = await code.Process();
                             if (!queuedCode.IsReadyToSend)
                             {
                                 // Macro codes need special treatment because they may complete before they are actually sent to RepRapFirmware
@@ -274,43 +276,39 @@ namespace DuetControlServer.SPI
                         SystemMacroHasFinished = true;
                     }
                     Console.WriteLine($"[info] {(macroFile.IsAborted ? "Aborted" : "Finished")} macro file '{Path.GetFileName(macroFile.FileName)}'");
+                    return false;
                 }
-                return false;
             }
 
-            // 5. Regular pending codes
-            if (PendingCodes.TryPeek(out queuedCode) && BufferCode(queuedCode))
+            // 5. Regular codes - only applicable if no macro is being executed
+            else if (PendingCodes.TryPeek(out queuedCode) && BufferCode(queuedCode))
             {
                 PendingCodes.Dequeue();
                 return true;
             }
 
-            // 6. (Un-)Lock and flush requests
-            if (BufferedCodes.Count == 0)
+            // 6. Lock/Unlock requests
+            if (PendingLockRequests.TryPeek(out QueuedLockRequest lockRequest))
             {
-                if (PendingLockRequests.TryPeek(out QueuedLockRequest lockRequest))
+                if (!lockRequest.IsLockRequested)
                 {
-                    // No code is being executed on this channel
-                    if (!lockRequest.IsLockRequested)
+                    if (lockRequest.IsLockRequest)
                     {
-                        if (lockRequest.IsLockRequest)
-                        {
-                            lockRequest.IsLockRequested = DataTransfer.WriteLockMovementAndWaitForStandstill(Channel);
-                        }
-                        else if (DataTransfer.WriteUnlock(Channel))
-                        {
-                            PendingLockRequests.Dequeue();
-                        }
+                        lockRequest.IsLockRequested = DataTransfer.WriteLockMovementAndWaitForStandstill(Channel);
+                    }
+                    else if (DataTransfer.WriteUnlock(Channel))
+                    {
+                        PendingLockRequests.Dequeue();
                     }
                 }
-                else
-                {
-                    // If there is no pending lock/unlock request, this code channel is idle
-                    if (PendingFlushRequests.TryDequeue(out TaskCompletionSource<object> source))
-                    {
-                        source.SetResult(null);
-                    }
-                }
+                return false;
+            }
+
+            // 7. Flush requests
+            if (BufferedCodes.Count == 0 && PendingFlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
+            {
+                source.SetResult(true);
+                return false;
             }
 
             return false;
@@ -574,6 +572,12 @@ namespace DuetControlServer.SPI
             _resumingBuffer = invalidateLastFile;
             SystemMacroHasFinished = false;
 
+            // Resolve pending flush requests. At this point, codes waiting for a flush must stop executing
+            while (PendingFlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
+            {
+                source.SetResult(false);
+            }
+
             // Do not send codes to RRF until it has cleared its internal buffer
             IsBusy = true;
         }
@@ -688,9 +692,9 @@ namespace DuetControlServer.SPI
                 item.Resolve(false);
             }
 
-            while (PendingFlushRequests.TryDequeue(out TaskCompletionSource<object> source))
+            while (PendingFlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
             {
-                source.SetException(new OperationCanceledException(codeErrorMessage));
+                source.SetResult(false);
             }
 
             foreach (QueuedCode bufferedCode in BufferedCodes)

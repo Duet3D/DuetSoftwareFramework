@@ -35,14 +35,16 @@ namespace DuetControlServer.Codes
                 // Cancel print
                 case 0:
                 case 1:
-                    if (Print.IsPrinting)
+                    if (await SPI.Interface.Flush(code.Channel) && Print.IsPrinting)
                     {
+                        // Invalidate the print file to make sure no more codes are read from the file
                         await Print.Cancel();
                     }
                     break;
 
                 // Select a file to print
                 case 23:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), "gcodes");
                         if (File.Exists(file))
@@ -55,74 +57,93 @@ namespace DuetControlServer.Codes
                         }
                         return new CodeResult(MessageType.Error, $"Could not find file {code.GetUnprecedentedString()}");
                     }
+                    return new CodeResult();
 
                 // Resume a file print
                 case 24:
-                    if (!Print.IsPaused)
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
-                        string file;
-                        using (await _fileToPrintLock.LockAsync())
+                        // See if a file print is supposed to be started
+                        if (!Print.IsPaused)
                         {
-                            file = string.Copy(_fileToPrint);
+                            string file;
+                            using (await _fileToPrintLock.LockAsync())
+                            {
+                                file = string.Copy(_fileToPrint);
+                            }
+
+                            if (string.IsNullOrEmpty(file))
+                            {
+                                return new CodeResult(MessageType.Error, "Cannot print, because no file is selected!");
+                            }
+
+                            return await Print.Start(file, code.Channel);
                         }
 
-                        if (string.IsNullOrEmpty(file))
-                        {
-                            return new CodeResult(MessageType.Error, "Cannot print, because no file is selected!");
-                        }
-
-                        // FIXME Emulate Marlin via "File opened\nFile selected". IMHO this should happen via a CodeChannel property
-                        return await Print.Start(file, code.Channel);
+                        // Let RepRapFirmware process this request so it can invoke resume.g
+                        return null;
                     }
-                    break;
+                    return new CodeResult();
 
                 // Pause print
                 case 25:
                 case 226:
-                    if (Print.IsPrinting && !Print.IsPaused)
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
-                        // Stop sending file instructions to the firmware
-                        await Print.Pause();
+                        if (Print.IsPrinting && !Print.IsPaused)
+                        {
+                            // Stop reading any more codes from the file being printed. Everything else is handled by RRF
+                            await Print.Pause();
+                        }
+                        return null;
                     }
-                    break;
+                    return new CodeResult();
 
                 // Set SD position
                 case 26:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         CodeParameter sParam = code.Parameter('S');
                         if (sParam != null)
                         {
                             Print.Position = sParam;
                         }
+
                         // P is not supported yet
-                        return new CodeResult();
                     }
+                    return new CodeResult();
 
                 // Report SD print status
                 case 27:
-                    if (Print.IsPrinting)
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
-                        return new CodeResult(MessageType.Success, $"SD printing byte {Print.Position}/{Print.Length}");
+                        if (Print.IsPrinting)
+                        {
+                            return new CodeResult(MessageType.Success, $"SD printing byte {Print.Position}/{Print.Length}");
+                        }
+                        return new CodeResult(MessageType.Success, "Not SD printing.");
                     }
-                    return new CodeResult(MessageType.Success, "Not SD printing.");
+                    return new CodeResult();
 
                 // Delete a file on the SD card
                 case 30:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = code.GetUnprecedentedString();
                         try
                         {
                             File.Delete(await FilePath.ToPhysicalAsync(file));
-                            return new CodeResult();
                         }
                         catch (Exception e)
                         {
                             return new CodeResult(MessageType.Error, $"Failed to delete file {file}: {e.Message}");
                         }
                     }
+                    return new CodeResult();
 
                 // Start a file print
                 case 32:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), "gcodes");
                         if (File.Exists(file))
@@ -135,35 +156,44 @@ namespace DuetControlServer.Codes
                         }
                         return new CodeResult(MessageType.Error, $"Could not find file {code.GetUnprecedentedString()}");
                     }
+                    return new CodeResult();
 
                 // Return file information
                 case 36:
-                    if (code.Parameters.Count > 0)
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
-                        try
+                        if (code.Parameters.Count > 0)
                         {
-                            string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
-                            ParsedFileInfo info = await FileInfoParser.Parse(file);
+                            try
+                            {
+                                string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
+                                ParsedFileInfo info = await FileInfoParser.Parse(file);
 
-                            string json = JsonConvert.SerializeObject(info, JsonHelper.DefaultSettings);
-                            return new CodeResult(MessageType.Success, "{\"err\":0," + json.Substring(1));
-                        }
-                        catch
-                        {
-                            return new CodeResult(MessageType.Success, "{\"err\":1}");
+                                string json = JsonConvert.SerializeObject(info, JsonHelper.DefaultSettings);
+                                return new CodeResult(MessageType.Success, "{\"err\":0," + json.Substring(1));
+                            }
+                            catch
+                            {
+                                return new CodeResult(MessageType.Success, "{\"err\":1}");
+                            }
                         }
                     }
-                    break;
+                    return new CodeResult();
 
                 // Simulate file
                 case 37:
-                    // TODO: Check if file exists
-                    // TODO: Execute and await pseudo-M37 with IsPreProcessed = true so the firmware enters the right simulation state
-                    // TODO: Start file print
-                    return new CodeResult(MessageType.Warning, "M37 is not supported yet");
+                    if (await SPI.Interface.Flush(code.Channel))
+                    {
+                        // TODO: Check if file exists
+                        // TODO: Execute and await pseudo-M37 with IsPreProcessed = true so the firmware enters the right simulation state
+                        // TODO: Start file print
+                        return new CodeResult(MessageType.Warning, "M37 is not supported yet");
+                    }
+                    return new CodeResult();
 
                 // Compute SHA1 hash of target file
                 case 38:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
                         try
@@ -183,46 +213,51 @@ namespace DuetControlServer.Codes
                             return new CodeResult(MessageType.Error, $"Could not compute SHA1 checksum for file {file}: {ae.InnerException.Message}");
                         }
                     }
+                    return new CodeResult();
 
                 // Report SD card information
                 case 39:
-                    using (await Model.Provider.AccessReadOnlyAsync())
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
-                        int index = code.Parameter('P', 0);
-                        if (code.Parameter('S', 0) == 2)
+                        using (await Model.Provider.AccessReadOnlyAsync())
                         {
-                            if (index < 0 || index >= Model.Provider.Get.Storages.Count)
+                            int index = code.Parameter('P', 0);
+                            if (code.Parameter('S', 0) == 2)
                             {
-                                return new CodeResult(MessageType.Success, $"{{\"SDinfo\":{{\"slot\":{index},present:0}}}}");
-                            }
-
-                            Storage storage = Model.Provider.Get.Storages[index];
-                            var output = new
-                            {
-                                SDinfo = new
+                                if (index < 0 || index >= Model.Provider.Get.Storages.Count)
                                 {
-                                    slot = index,
-                                    present = 1,
-                                    capacity = storage.Capacity,
-                                    free = storage.Free,
-                                    speed = storage.Speed
+                                    return new CodeResult(MessageType.Success, $"{{\"SDinfo\":{{\"slot\":{index},present:0}}}}");
                                 }
-                            };
-                            return new CodeResult(MessageType.Success, JsonConvert.SerializeObject(output));
-                        }
-                        else
-                        {
-                            if (index < 0 || index >= Model.Provider.Get.Storages.Count)
-                            {
-                                return new CodeResult(MessageType.Error, $"Bad SD slot number: {index}");
-                            }
 
-                            Storage storage = Model.Provider.Get.Storages[index];
-                            return new CodeResult(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / (1000 * 1000 * 1000):F2}Gb, free space {storage.Free / (1000 * 1000 * 1000):F2}Gb, speed {storage.Speed / (1000 * 1000):F2}MBytes/sec");
+                                Storage storage = Model.Provider.Get.Storages[index];
+                                var output = new
+                                {
+                                    SDinfo = new
+                                    {
+                                        slot = index,
+                                        present = 1,
+                                        capacity = storage.Capacity,
+                                        free = storage.Free,
+                                        speed = storage.Speed
+                                    }
+                                };
+                                return new CodeResult(MessageType.Success, JsonConvert.SerializeObject(output));
+                            }
+                            else
+                            {
+                                if (index < 0 || index >= Model.Provider.Get.Storages.Count)
+                                {
+                                    return new CodeResult(MessageType.Error, $"Bad SD slot number: {index}");
+                                }
+
+                                Storage storage = Model.Provider.Get.Storages[index];
+                                return new CodeResult(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / (1000 * 1000 * 1000):F2}Gb, free space {storage.Free / (1000 * 1000 * 1000):F2}Gb, speed {storage.Speed / (1000 * 1000):F2}MBytes/sec");
+                            }
                         }
                     }
+                    return new CodeResult();
 
-                // Emergency Stop
+                // Emergency Stop - unconditional and interpreteted immediately when read
                 case 112:
                     await SPI.Interface.RequestEmergencyStop();
                     using (await Model.Provider.AccessReadWriteAsync())
@@ -241,63 +276,71 @@ namespace DuetControlServer.Codes
                     }
                     break;
 
-                // Message box acknowledgement
-                case 292:
-                    code.Flags |= CodeFlags.IsPrioritized;
-                    break;
-
                 // Save heightmap
                 case 374:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
-
                         try
                         {
-                            Heightmap map = await SPI.Interface.GetHeightmap();
-                            await map.Save(await FilePath.ToPhysicalAsync(file, "sys"));
-                            return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
+                            if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
+                            {
+                                Heightmap map = await SPI.Interface.GetHeightmap();
+                                await SPI.Interface.UnlockAll(code.Channel);
+
+                                await map.Save(await FilePath.ToPhysicalAsync(file, "sys"));
+                                return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
+                            }
                         }
                         catch (AggregateException ae)
                         {
                             return new CodeResult(MessageType.Error, $"Failed to save height map to file {file}: {ae.InnerException.Message}");
                         }
                     }
+                    return new CodeResult();
 
                 // Load heightmap
                 case 375:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = await FilePath.ToPhysicalAsync(code.Parameter('P', FilePath.DefaultHeightmapFile), "sys");
-
                         try
                         {
                             Heightmap map = new Heightmap();
                             await map.Load(file);
-                            await SPI.Interface.SetHeightmap(map);
-                            return new CodeResult();
+
+                            if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
+                            {
+                                await SPI.Interface.SetHeightmap(map);
+                                await SPI.Interface.UnlockAll(code.Channel);
+                            }
                         }
                         catch (AggregateException ae)
                         {
                             return new CodeResult(MessageType.Error, $"Failed to load height map from file {file}: {ae.InnerException.Message}");
                         }
                     }
+                    return new CodeResult();
 
                 // Create Directory on SD-Card
                 case 470:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         string path = code.Parameter('P', "");
                         try
                         {
                             Directory.CreateDirectory(await FilePath.ToPhysicalAsync(path));
-                            return new CodeResult();
                         }
                         catch (Exception e)
                         {
                             return new CodeResult(MessageType.Error, $"Failed to create directory {path}: {e.Message}");
                         }
                     }
+                    return new CodeResult();
 
                 // Rename File/Directory on SD-Card
                 case 471:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         string from = code.Parameter('S');
                         string to = code.Parameter('T');
@@ -331,14 +374,19 @@ namespace DuetControlServer.Codes
                             return new CodeResult(MessageType.Error, $"Failed to rename file or directory {from} to {to}: {e.Message}");
                         }
                     }
+                    return new CodeResult();
 
                 // Store parameters
                 case 500:
-                    await Utility.ConfigOverride.Save(code);
-                    break;
+                    if (await SPI.Interface.Flush(code.Channel))
+                    {
+                        await Utility.ConfigOverride.Save(code);
+                    }
+                    return new CodeResult();
 
                 // Print settings
                 case 503:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         string configFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFile, "sys");
                         if (File.Exists(configFile))
@@ -354,9 +402,11 @@ namespace DuetControlServer.Codes
                         }
                         return new CodeResult(MessageType.Error, "Configuration file not found");
                     }
+                    return new CodeResult();
 
                 // Set Name
                 case 550:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         // Verify the P parameter
                         string pParam = code.Parameter('P');
@@ -390,11 +440,15 @@ namespace DuetControlServer.Codes
                         {
                             return new CodeResult(MessageType.Error, "Machine name must consist of the same letters and digits as configured by the Linux hostname");
                         }
+
+                        // Hostname is legit - pretend we didn't see this code so RRF can interpret it
+                        return null;
                     }
-                    break;
+                    return new CodeResult();
 
                 // Set current RTC date and time
                 case 905:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         bool seen = false;
 
@@ -431,10 +485,11 @@ namespace DuetControlServer.Codes
                             return new CodeResult(MessageType.Success, $"Current date and time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         }
                     }
-                    break;
+                    return new CodeResult();
 
                 // Start/stop event logging to SD card
                 case 929:
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
                         CodeParameter sParam = code.Parameter('S');
                         if (sParam == null)
@@ -469,46 +524,49 @@ namespace DuetControlServer.Codes
                             await Utility.Logger.Stop();
                             Model.Provider.Get.State.LogFile = null;
                         }
-                        return new CodeResult();
                     }
+                    return new CodeResult();
 
                 // Update the firmware
                 case 997:
                     if (((int[])code.Parameter('S', new int[] { 0 })).Contains(0) && (int)code.Parameter('B', 0) == 0)
                     {
-                        string iapFile, firmwareFile;
-                        using (await Model.Provider.AccessReadOnlyAsync())
+                        if (await SPI.Interface.Flush(code.Channel))
                         {
-                            if (!string.IsNullOrEmpty(Model.Provider.Get.Electronics.ShortName))
+                            string iapFile, firmwareFile;
+                            using (await Model.Provider.AccessReadOnlyAsync())
                             {
-                                iapFile = await FilePath.ToPhysicalAsync($"Duet3iap_spi_{Model.Provider.Get.Electronics.ShortName}.bin", "sys");
-                                firmwareFile = await FilePath.ToPhysicalAsync($"Duet3Firmware_{Model.Provider.Get.Electronics.ShortName}.bin", "sys");
+                                if (!string.IsNullOrEmpty(Model.Provider.Get.Electronics.ShortName))
+                                {
+                                    iapFile = await FilePath.ToPhysicalAsync($"Duet3iap_spi_{Model.Provider.Get.Electronics.ShortName}.bin", "sys");
+                                    firmwareFile = await FilePath.ToPhysicalAsync($"Duet3Firmware_{Model.Provider.Get.Electronics.ShortName}.bin", "sys");
+                                }
+                                else
+                                {
+                                    iapFile = await FilePath.ToPhysicalAsync($"Duet3iap_spi.bin", "sys");
+                                    firmwareFile = await FilePath.ToPhysicalAsync("Duet3Firmware.bin", "sys");
+                                }
                             }
-                            else
+
+                            if (!File.Exists(iapFile))
                             {
-                                iapFile = await FilePath.ToPhysicalAsync($"Duet3iap_spi.bin", "sys");
-                                firmwareFile = await FilePath.ToPhysicalAsync("Duet3Firmware.bin", "sys");
+                                return new CodeResult(MessageType.Error, $"Failed to find IAP file {iapFile}");
                             }
-                        }
 
-                        if (!File.Exists(iapFile))
-                        {
-                            return new CodeResult(MessageType.Error, $"Failed to find IAP file {iapFile}");
-                        }
-                        if (!File.Exists(firmwareFile))
-                        {
-                            return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
-                        }
+                            if (!File.Exists(firmwareFile))
+                            {
+                                return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
+                            }
 
-                        FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
-                        FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
-                        SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
-
+                            FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
+                            FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
+                            await SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
+                        }
                         return new CodeResult();
                     }
                     break;
 
-                // Reset controller
+                // Reset controller - unconditional and interpreteted immediately when read
                 case 999:
                     if (code.Parameters.Count == 0)
                     {

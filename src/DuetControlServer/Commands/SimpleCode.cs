@@ -25,11 +25,17 @@ namespace DuetControlServer.Commands
                 codes = Commands.Code.ParseMultiple(Code);
                 foreach (Code code in codes)
                 {
-                    // M122 always goes to the Daemon channel so we (hopefully) get a low-latency response
-                    code.Channel = (code.Type == CodeType.MCode && code.MajorNumber == 122) ? DuetAPI.CodeChannel.Daemon : Channel;
-                    code.SourceConnection = SourceConnection;
-
-                    codeTasks.Enqueue(code.Enqueue());
+                    // M112, M122, and M999 always go to the Daemon channel so we (hopefully) get a low-latency response
+                    if (code.Type == CodeType.MCode && (code.MajorNumber == 112 || code.MajorNumber == 122 || code.MajorNumber == 999))
+                    {
+                        code.Channel = DuetAPI.CodeChannel.Daemon;
+                        code.Flags |= CodeFlags.IsPrioritized;
+                    }
+                    else
+                    {
+                        code.Channel = Channel;
+                    }
+                    codeTasks.Enqueue(code.Execute());
                 }
             }
             catch (CodeParserException e)

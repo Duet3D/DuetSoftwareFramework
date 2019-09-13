@@ -1836,6 +1836,11 @@
             Heater is being tuned
             </summary>
         </member>
+        <member name="F:DuetAPI.Machine.HeaterState.Offline">
+            <summary>
+            Heater is offline
+            </summary>
+        </member>
         <member name="T:DuetAPI.Machine.Job">
             <summary>
             Information about the current file job (if any)

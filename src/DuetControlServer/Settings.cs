@@ -194,6 +194,12 @@ namespace DuetControlServer
         };
 
         /// <summary>
+        /// Indicates if the firmware is supposed to be updated
+        /// </summary>
+        [JsonIgnore]
+        public static bool UpdateOnly { get; set; }
+
+        /// <summary>
         /// Load settings from the config file or create it if it does not already exist
         /// </summary>
         /// <param name="args">Command-line arguments</param>
@@ -248,6 +254,11 @@ namespace DuetControlServer
                     Console.WriteLine("-s, --config: Set config file");
                     Console.WriteLine("-S, --socket: Specify the UNIX socket path");
                     Console.WriteLine("-b, --base-directory: Set the base path for system and G-code files");
+                    Console.WriteLine("-u, --update: Update RepRapFirmware when the board type has been determined");
+                }
+                else if (arg == "-u" || arg == "--update")
+                {
+                    Settings.UpdateOnly = true;
                 }
                 else if (lastArg == "-S" || lastArg == "--socket")
                 {

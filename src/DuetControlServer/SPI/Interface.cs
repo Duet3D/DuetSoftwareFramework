@@ -24,7 +24,7 @@ namespace DuetControlServer.SPI
         private static int _bytesReserved = 0, _bufferSpace = 0;
 
         // Object model query
-        private static byte _moduleToQuery = 2;
+        private static byte _moduleToQuery = 5;
         private static DateTime _lastConfigQuery = DateTime.Now;
         private static DateTime _lastQueryTime = DateTime.Now;
 
@@ -39,6 +39,7 @@ namespace DuetControlServer.SPI
         private static bool _emergencyStopRequested, _resetRequested, _printStarted;
         private static PrintStoppedReason? _printStoppedReason;
         private static Stream _iapStream, _firmwareStream;
+        private static TaskCompletionSource<object> _firmwareUpdateRequest;
         private static readonly Queue<Tuple<int, string>> _extruderFilamentUpdates = new Queue<Tuple<int, string>>();
 
         // Partial messages (if any)
@@ -158,10 +159,10 @@ namespace DuetControlServer.SPI
         /// Wait for all pending codes to finish
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
-        /// <returns>Asynchronous task</returns>
-        public static Task Flush(CodeChannel channel)
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public static Task<bool> Flush(CodeChannel channel)
         {
-            TaskCompletionSource<object> source = new TaskCompletionSource<object>();
+            TaskCompletionSource<bool> source = new TaskCompletionSource<bool>();
             using (_channels[channel].Lock())
             {
                 _channels[channel].PendingFlushRequests.Enqueue(source);
@@ -241,10 +242,17 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="iapStream">IAP binary</param>
         /// <param name="firmwareStream">Firmware binary</param>
-        public static void UpdateFirmware(Stream iapStream, Stream firmwareStream)
+        public static Task UpdateFirmware(Stream iapStream, Stream firmwareStream)
         {
+            if (_firmwareUpdateRequest != null)
+            {
+                throw new InvalidOperationException("Firmware is already being updated");
+            }
+
             _iapStream = iapStream;
             _firmwareStream = firmwareStream;
+            _firmwareUpdateRequest = new TaskCompletionSource<object>();
+            return _firmwareUpdateRequest.Task;
         }
 
         private static async Task PerformFirmwareUpdate()
@@ -316,6 +324,9 @@ namespace DuetControlServer.SPI
 
             _firmwareStream.Close();
             _firmwareStream = null;
+
+            _firmwareUpdateRequest.SetResult(null);
+            _firmwareUpdateRequest = null;
         }
 
         /// <summary>
@@ -367,6 +378,10 @@ namespace DuetControlServer.SPI
                 {
                     await InvalidateData("Firmware update imminent");
                     await PerformFirmwareUpdate();
+                    if (Settings.UpdateOnly)
+                    {
+                        break;
+                    }
                 }
 
                 // Invalidate data if a controller reset has been performed
@@ -460,7 +475,7 @@ namespace DuetControlServer.SPI
                 } while (dataProcessed);
 
                 // Request object model updates
-                if (Model.Updater.IsReady && DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
+                if (DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
                 {
                     DataTransfer.WriteGetObjectModel(_moduleToQuery);
                     _lastQueryTime = DateTime.Now;
@@ -531,6 +546,13 @@ namespace DuetControlServer.SPI
         private static Task ProcessPacket(PacketHeader packet)
         {
             Communication.FirmwareRequests.Request request = (Communication.FirmwareRequests.Request)packet.Request;
+
+            if (Settings.UpdateOnly && request != Communication.FirmwareRequests.Request.ObjectModel)
+            {
+                // Don't process any requests except for object model responses if only the firmware is supposed to be updated
+                return Task.CompletedTask;
+            }
+
             switch (request)
             {
                 case Communication.FirmwareRequests.Request.ResendPacket:
@@ -607,7 +629,7 @@ namespace DuetControlServer.SPI
             }
 
             // Merge the data into our own object model
-            Model.Updater.MergeData(module, json);
+            await Model.Updater.MergeData(module, json);
         }
 
         private static void HandleCodeBufferUpdate()

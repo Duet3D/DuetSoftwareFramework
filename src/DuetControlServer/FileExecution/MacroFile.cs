@@ -158,7 +158,7 @@ namespace DuetControlServer.FileExecution
                         result = new Code
                         {
                             Channel = Channel,
-                            InternallyExecuted = true,          // don't check our own hostname
+                            InternallyProcessed = true,          // don't check our own hostname
                             Type = CodeType.MCode,
                             MajorNumber = 550
                         };
@@ -170,7 +170,7 @@ namespace DuetControlServer.FileExecution
                         result = new Code
                         {
                             Channel = Channel,
-                            InternallyExecuted = true,          // don't update our own datetime
+                            InternallyProcessed = true,          // don't update our own datetime
                             Type = CodeType.MCode,
                             MajorNumber = 905
                         };

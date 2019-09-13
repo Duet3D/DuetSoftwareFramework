@@ -61,7 +61,12 @@ namespace DuetAPI.Commands
                 // It is not encapsulated...
                 value = value.Trim();
 
-                if (value.StartsWith('{') && value.EndsWith('}'))
+                if (value == "")
+                {
+                    // Empty parameters are repesented as integers with the value 0 (e.g. G92 XY => G92 X0 Y0)
+                    _parsedValue = 0;
+                }
+                else if (value.StartsWith('{') && value.EndsWith('}'))
                 {
                     // It is an expression
                     IsExpression = true;
@@ -114,7 +119,7 @@ namespace DuetAPI.Commands
                 }
                 else
                 {
-                    // It must be a string (fallback)
+                    // It is a string
                     _parsedValue = value;
                 }
             }

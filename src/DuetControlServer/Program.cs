@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,17 +28,7 @@ namespace DuetControlServer
             Console.WriteLine("Licensed under the terms of the GNU Public License Version 3");
             Console.WriteLine();
 
-            // Deal with program termination requests (SIGTERM)
-            AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) =>
-            {
-                if (!CancelSource.IsCancellationRequested)
-                {
-                    Console.WriteLine("[info] Received SIGTERM, shutting down...");
-                    CancelSource.Cancel();
-                }
-            };
-
-            // Initialise settings
+            // Initialize settings
             Console.Write("Loading settings... ");
             try
             {
@@ -49,7 +38,6 @@ namespace DuetControlServer
             catch (Exception e)
             {
                 Console.WriteLine($"Error: {e.Message}");
-                CancelSource.Cancel();
                 return;
             }
 
@@ -58,9 +46,30 @@ namespace DuetControlServer
             {
                 try
                 {
-                    await testConnection.Connect(Settings.SocketPath, CancelSource.Token);
-                    Console.WriteLine("Error: Another instance is already running. Stopping.");
-                    CancelSource.Cancel();
+                    await testConnection.Connect(Settings.SocketPath);
+                    if (Settings.UpdateOnly)
+                    {
+                        Console.Write("Another instance is already running, sending update request to it... ");
+                        try
+                        {
+                            await testConnection.PerformCode(new DuetAPI.Commands.Code
+                            {
+                                Type = DuetAPI.Commands.CodeType.MCode,
+                                MajorNumber = 997,
+                                Flags = DuetAPI.Commands.CodeFlags.IsPrioritized
+                            });
+                            Console.WriteLine("Done!");
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Write("Error: ");
+                            Console.WriteLine(e);
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Error: Another instance is already running. Stopping.");
+                    }
                     return;
                 }
                 catch
@@ -74,17 +83,15 @@ namespace DuetControlServer
             try
             {
                 Model.Provider.Init();
-                Model.Updater.Init();
                 Console.WriteLine("Done!");
             }
             catch (Exception e)
             {
                 Console.WriteLine($"Error: {e.Message}");
-                CancelSource.Cancel();
                 return;
             }
 
-            // Connect to the controller
+            // Connect to RRF controller
             Console.Write("Connecting to RepRapFirmware... ");
             try
             {
@@ -92,7 +99,6 @@ namespace DuetControlServer
                 if (!SPI.Interface.Connect())
                 {
                     Console.WriteLine("Error: Duet is not available");
-                    CancelSource.Cancel();
                     return;
                 }
                 Console.WriteLine("Done!");
@@ -103,7 +109,7 @@ namespace DuetControlServer
                 return;
             }
 
-            // Start up the IPC server
+            // Start up IPC server
             Console.Write("Creating IPC socket... ");
             try
             {
@@ -113,28 +119,42 @@ namespace DuetControlServer
             catch (Exception e)
             {
                 Console.WriteLine($"Error: {e.Message}");
-                CancelSource.Cancel();
                 return;
             }
             
             Console.WriteLine();
 
-            // Run the main tasks in the background
-            Task spiTask = Task.Run(SPI.Interface.Run);
-            Task ipcTask = Server.AcceptConnections();
-            Task modelUpdateTask = Model.UpdateTask.UpdatePeriodically();
-            Task[] taskList = { spiTask, ipcTask, modelUpdateTask };
+            // Start main tasks in the background
+            Task spiTask = Task.Run(SPI.Interface.Run, CancelSource.Token);
+            Task ipcTask = Task.Run(Server.AcceptConnections, CancelSource.Token);
+            Task modelUpdateTask = Task.Run(Model.UpdateTask.UpdatePeriodically, CancelSource.Token);
+            Task codeTask = Task.Run(Codes.Execution.ProcessCodes, CancelSource.Token);
+            Task[] taskList = { spiTask, ipcTask, modelUpdateTask, codeTask };
 
-            // Wait for program termination
+            // Deal with program termination requests (SIGTERM) and wait for program termination
+            AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) =>
+            {
+                if (!CancelSource.IsCancellationRequested)
+                {
+                    Console.WriteLine("[info] Received SIGTERM, shutting down...");
+                    CancelSource.Cancel();
+                }
+            };
+
             await Task.WhenAny(taskList);
 
             // Tell other tasks to stop in case this is an abnormal program termination
-            if (!CancelSource.IsCancellationRequested)
+            if (Settings.UpdateOnly)
+            {
+                CancelSource.Cancel();
+            }
+            else if (!CancelSource.IsCancellationRequested)
             {
                 Console.Write("[crit] Abnormal program termination: ");
                 if (spiTask.IsCompleted) { Console.WriteLine("SPI task terminated");  }
                 if (ipcTask.IsCompleted) { Console.WriteLine("IPC task terminated");  }
                 if (modelUpdateTask.IsCompleted) { Console.WriteLine("Model task terminated"); }
+                if (codeTask.IsCompleted) { Console.WriteLine("Code task terminated"); }
                 CancelSource.Cancel();
             }
 
@@ -154,7 +174,7 @@ namespace DuetControlServer
             {
                 foreach (Exception e in ae.InnerExceptions)
                 {
-                    if (!(e is OperationCanceledException) && !(e is SocketException))
+                    if (!(e is OperationCanceledException))
                     {
                         Console.Write("[crit] ");
                         Console.WriteLine(e);

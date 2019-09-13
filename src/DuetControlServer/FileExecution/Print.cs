@@ -1,9 +1,9 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
+using DuetAPI.Machine;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
@@ -77,7 +77,19 @@ namespace DuetControlServer.FileExecution
             Console.WriteLine($"[info] Printing file '{fileName}'");
             SPI.Interface.SetPrintStarted();
             _ = Task.Run(RunPrint);
-            return new CodeResult();
+
+            // Return a result
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                if (Model.Provider.Get.Channels[source].Compatibility == Compatibility.Marlin)
+                {
+                    return new CodeResult(MessageType.Success, "File opened\nFile selected");
+                }
+                else
+                {
+                    return new CodeResult();
+                }
+            }
         }
 
         private static async Task RunPrint()
@@ -119,10 +131,8 @@ namespace DuetControlServer.FileExecution
                         break;
                     }
 
-                    // The trick here is that Code.Enqueue runs synchronously and returns a
-                    // task instance that completes when a code result is available...
                     codes.Enqueue(code);
-                    codeTasks.Enqueue(code.Enqueue());
+                    codeTasks.Enqueue(code.Execute());
                 }
 
                 // Is there anything to do?
@@ -138,7 +148,7 @@ namespace DuetControlServer.FileExecution
                         LastFilePosition = file.Position;
                     }
 
-                    // Process the next code
+                    // Wait the next code to finish
                     try
                     {
                         CodeResult result = await codeTasks.Dequeue();

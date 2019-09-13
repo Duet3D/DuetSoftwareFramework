@@ -1,10 +1,10 @@
 ﻿namespace DuetAPI.Commands
 {
     /// <summary>
-    /// Wait for all pending codes of the given channel to finish
+    /// Wait for all pending codes of the given channel to finish.
+    /// If the flush command was successful, this command returns true
     /// </summary>
-    /// <remarks>At present, this command only waits for codes interacting with the firmware.</remarks>
-    public class Flush : Command
+    public class Flush : Command<bool>
     {
         /// <summary>
         /// Code channel to wait for

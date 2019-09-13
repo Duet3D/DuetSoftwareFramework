@@ -7,7 +7,7 @@ namespace DuetControlServer.SPI
     /// </summary>
     public class QueuedLockRequest
     {
-        private TaskCompletionSource<bool> _taskCompletionSource = new TaskCompletionSource<bool>();
+        private readonly TaskCompletionSource<bool> _taskCompletionSource = new TaskCompletionSource<bool>();
 
         /// <summary>
         /// Indicates if this is a lock or unlock request

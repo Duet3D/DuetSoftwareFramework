@@ -54,10 +54,17 @@ namespace DuetControlServer.IPC
             // Each connection is assigned a unique ID
             do
             {
-                Socket socket = await unixSocket.AcceptAsync();
-                
-                int id = Interlocked.Increment(ref LastConnectionID);
-                ConnectionEstablished(socket, id);
+                try
+                {
+                    Socket socket = await unixSocket.AcceptAsync();
+
+                    int id = Interlocked.Increment(ref LastConnectionID);
+                    ConnectionEstablished(socket, id);
+                }
+                catch (SocketException)
+                {
+                    throw new OperationCanceledException(Program.CancelSource.Token);
+                }
             }
             while (!Program.CancelSource.IsCancellationRequested);
         }
