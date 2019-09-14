@@ -81,7 +81,7 @@ case $TARGET_ARCH in
 	*) echo "Unknown TARGET_ARCH: $TARGET_ARCH" ; return 1 ;;
 esac
 
-[ -n "$SIGNING_KEY" ] && [ ! -f "$SIGNING_KEY" ] && { echo "Signing key file $SIGNING_KEY not found." ; return 1 ; }
+[ -n "$SIGNING_KEY" ] && [ -f "$SIGNING_KEY" ] && SIGNING_KEY=`cat $SIGNING_KEY`
 
 VALIDATED=1
 

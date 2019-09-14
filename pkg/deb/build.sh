@@ -70,9 +70,8 @@ pkg_meta() {
 if [ $PKGS -eq 1 ] ; then
 	echo "Completing package creation"
 	if [ -n "$SIGNING_KEY"  ] ; then
-		signkey=`cat $SIGNING_KEY`
 		if which dpkg-sig >/dev/null 2>&1 ; then
-			dpkg-sig -k $signkey -s builder $DEST_DIR/*.deb
+			dpkg-sig -k $SIGNING_KEY -s builder $DEST_DIR/*.deb
 		else
 			echo "dpkg-sig isn't installed.  Skipping signing."
 		fi
