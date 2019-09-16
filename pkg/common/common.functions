@@ -40,8 +40,11 @@ Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
 target-arch:   Defaults to "armhf" for deb packages and "armhfp" for rpm packages.
 build-type:    Defaults to "Debug".
 dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".
-signing-key:   Path to file containing signing key or id appropriate for the package type.
-               No default.  If a key file isn't provided, the packages won't be signed.
+signing-key:   A key id or a path to a file containing a key id.  If a file
+               isn't found by the name provided it will be assumed that it's
+               actually a key id.  Whatever is provided must be appropriate for
+               the package type.
+               No default.  If not provided, the packages won't be signed.
 no-pkgs:       Builds but doesn't package the results.
 no-build:      Packages existing builds.
 no-cleanup:    Prevents the work subdirectories in <dest-dir> from being cleaned up.
@@ -123,15 +126,15 @@ build_progs() {
 	rm -rf $DEST_DIR/duetcontrolserver_$dcsver
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/DuetControlServer/DuetControlServer.csproj
 	mkdir -p $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
-	[ -d $COMMON_DIR/duetcontrolserver/ ] && $RSYNC -vaH $COMMON_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
-	[ -d $PACKAGER_DIR/duetcontrolserver/ ] && $RSYNC -vaH $PACKAGER_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
+	[ -d $COMMON_DIR/duetcontrolserver/ ] && $RSYNC $COMMON_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
+	[ -d $PACKAGER_DIR/duetcontrolserver/ ] && $RSYNC $PACKAGER_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
 	mv $DEST_DIR/files/DuetControlServer* $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duetwebserver_$dwsver/
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/DuetWebServer/DuetWebServer.csproj
+	dotnet publish -r $DOTNET_ARCH -c $-vaHBUILD_TYPE -o $DEST_DIR/files $SRC_DIR/DuetWebServer/DuetWebServer.csproj
 	mkdir -p $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
-	[ -d $COMMON_DIR/duetwebserver/ ] && $RSYNC -vaH $COMMON_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
-	[ -d $PACKAGER_DIR/duetwebserver/ ] && $RSYNC -vaH $PACKAGER_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
+	[ -d $COMMON_DIR/duetwebserver/ ] && $RSYNC $COMMON_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
+	[ -d $PACKAGER_DIR/duetwebserver/ ] && $RSYNC $PACKAGER_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
 	mv $DEST_DIR/files/DuetWebServer* $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
 	mv $DEST_DIR/files/appsettings.* $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
 	mv $DEST_DIR/files/web.config $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
@@ -140,15 +143,15 @@ build_progs() {
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $TOP_DIR/examples/CodeConsole/CodeConsole.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $TOP_DIR/examples/CodeLogger/CodeLogger.csproj
 	mkdir -p $DEST_DIR/duettools_$dcsver/opt/dsf/bin
-	[ -d $COMMON_DIR/duettools/ ] && $RSYNC -vaH $COMMON_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
-	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC -vaH $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
+	[ -d $COMMON_DIR/duettools/ ] && $RSYNC $COMMON_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
+	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
 	mv $DEST_DIR/files/CodeConsole* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	mv $DEST_DIR/files/CodeLogger* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duetruntime_$dcsver
 	mkdir -p $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin
-	[ -d $COMMON_DIR/duetruntime/ ] && $RSYNC -vaH $COMMON_DIR/duetruntime/. $DEST_DIR/duetruntime_$dcsver/
-	[ -d $PACKAGER_DIR/duetruntime/ ] && $RSYNC -vaH $PACKAGER_DIR/duetruntime/. $DEST_DIR/duetruntime_$dcsver/
+	[ -d $COMMON_DIR/duetruntime/ ] && $RSYNC $COMMON_DIR/duetruntime/. $DEST_DIR/duetruntime_$dcsver/
+	[ -d $PACKAGER_DIR/duetruntime/ ] && $RSYNC $PACKAGER_DIR/duetruntime/. $DEST_DIR/duetruntime_$dcsver/
 	mv $DEST_DIR/files/* $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin
 }
 
@@ -156,8 +159,8 @@ build_sd() {
 	echo "Building virtual SD card package v$sdver..."
 	rm -rf $DEST_DIR/duetsd_$sdver
 	mkdir -p $DEST_DIR/duetsd_$sdver
-	[ -d $COMMON_DIR/duetsd/ ] && $RSYNC -vaH $COMMON_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
-	[ -d $PACKAGER_DIR/duetsd/ ] && $RSYNC -vaH $PACKAGER_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
+	[ -d $COMMON_DIR/duetsd/ ] && $RSYNC $COMMON_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
+	[ -d $PACKAGER_DIR/duetsd/ ] && $RSYNC $PACKAGER_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
 }
 
 build_dwc() {
@@ -187,8 +190,8 @@ build_dwc() {
 
 	rm -rf $DEST_DIR/duetwebcontrol_$dwcver
 	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc2
-	[ -d $COMMON_DIR/duetwebcontrol/ ] && $RSYNC -vaH $COMMON_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
-	[ -d $PACKAGER_DIR/duetwebcontrol/ ] && $RSYNC -vaH $PACKAGER_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
+	[ -d $COMMON_DIR/duetwebcontrol/ ] && $RSYNC $COMMON_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
+	[ -d $PACKAGER_DIR/duetwebcontrol/ ] && $RSYNC $PACKAGER_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
 
 	unzip -q $DEST_DIR/DuetWebControl/dist/DuetWebControl-Duet3.zip -d $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc2
 	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/sd
@@ -203,8 +206,8 @@ build_meta() {
 
 	rm -rf $DEST_DIR/duetsoftwareframework_$dcsver
 	mkdir -p $DEST_DIR/duetsoftwareframework_$dcsver
-	[ -d $COMMON_DIR/duetsoftwareframework/ ] && $RSYNC -vaH $COMMON_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/ || :
-	[ -d $PACKAGER_DIR/duetsoftwareframework/ ] && $RSYNC -vaH $PACKAGER_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/ || :
+	[ -d $COMMON_DIR/duetsoftwareframework/ ] && $RSYNC $COMMON_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/ || :
+	[ -d $PACKAGER_DIR/duetsoftwareframework/ ] && $RSYNC $PACKAGER_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/ || :
 }
 
 cleanup_tmp() {

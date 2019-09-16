@@ -9,7 +9,7 @@ HELP=0
 
 source $COMMON_DIR/parse_args
 
-print_help() {
+print_help_top_level() {
 cat <<EOF
 Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
 	[ --build-type=< Debug | Release > ]
@@ -47,7 +47,7 @@ EOF
 exit 0
 }
 
-[ $HELP -eq 1 ] && print_help
+[ $HELP -eq 1 ] && print_help_top_level
 
 [ ${#POSITIONAL_ARGS[@]} -gt 0 ] && PACKAGE_TYPES=${POSITIONAL_ARGS[@]}
 
