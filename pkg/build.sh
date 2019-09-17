@@ -30,10 +30,8 @@ If none are specified, all will be run.
 target-arch:   Defaults to "armhf" for deb packages and "armhfp" for rpm packages.
 build-type:    Defaults to "Debug".
 dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".
-signing-key:   A key id or a path to a file containing a key id.  If a file
-               isn't found by the name provided it will be assumed that it's
-               actually a key id.  Whatever is provided must be appropriate for
-               the package type.
+signing-key:   A key id or a path preceeded by an '@' to a file containing a
+               key id.
                No default.  If not provided, the packages won't be signed.
 no-pkgs:       Builds but doesn't package the results.
 no-build:      Packages existing builds.

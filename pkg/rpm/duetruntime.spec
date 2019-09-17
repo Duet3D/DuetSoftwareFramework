@@ -47,16 +47,17 @@ rsync -vaH %{S:0}/. %{buildroot}/
 %{dsfoptdir}/bin/DuetAPI.*
 %{dsfoptdir}/bin/DuetAPIClient.*
 
-%if %{?_build_type} == "Debug"
 %{dsfoptdir}/bin/WindowsBase.dll
 %{dsfoptdir}/bin/SOS.NETCore.dll
 %{dsfoptdir}/bin/sosdocsunix.txt
-%{dsfoptdir}/bin/Remotion.Ling.dll
 %{dsfoptdir}/bin/mscorlib.dll
 %{dsfoptdir}/bin/libsos.so
-%{dsfoptdir}/bin/libsosplugin.so
 %{dsfoptdir}/bin/libmscordbi.so
 %{dsfoptdir}/bin/libmscordaccore.so
 %{dsfoptdir}/bin/libdbgshim.so
 %{dsfoptdir}/bin/libcoreclrtraceptprovider.so
+%{dsfoptdir}/bin/Remotion.Linq.dll
+
+%if %{?_build_type} == "Debug"
+%{dsfoptdir}/bin/libsosplugin.so
 %endif

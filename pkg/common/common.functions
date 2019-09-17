@@ -29,7 +29,7 @@ cat <<EOF
 Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
 	[ --build-type=< Debug | Release > ]
 	[ --dest-dir=< destination directory > ]
-	[ --signing-key=< path to keyfile > ]
+	[ --signing-key=< key id or path to keyfile > ]
 	[ --no-pkgs ]
 	[ --no-build ]
 	[ --no-cleanup ]
@@ -40,10 +40,8 @@ Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
 target-arch:   Defaults to "armhf" for deb packages and "armhfp" for rpm packages.
 build-type:    Defaults to "Debug".
 dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".
-signing-key:   A key id or a path to a file containing a key id.  If a file
-               isn't found by the name provided it will be assumed that it's
-               actually a key id.  Whatever is provided must be appropriate for
-               the package type.
+signing-key:   A key id or a path preceeded by an '@' to a file containing a
+               key id.
                No default.  If not provided, the packages won't be signed.
 no-pkgs:       Builds but doesn't package the results.
 no-build:      Packages existing builds.
@@ -87,7 +85,11 @@ case $TARGET_ARCH in
 	*) echo "Unknown TARGET_ARCH: $TARGET_ARCH" ; return 1 ;;
 esac
 
-[ -n "$SIGNING_KEY" ] && [ -f "$SIGNING_KEY" ] && SIGNING_KEY=`cat $SIGNING_KEY`
+if [ -n "$SIGNING_KEY" ] && [ "${SIGNING_KEY:0:1}" == "@" ] ; then
+	SIGNING_KEY=${SIGNING_KEY:1}
+	SIGNING_KEY=${SIGNING_KEY/#\~/$HOME}
+	SIGNING_KEY=`cat ${SIGNING_KEY}`
+fi
 
 VALIDATED=1
 
