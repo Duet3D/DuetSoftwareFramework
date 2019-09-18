@@ -133,7 +133,7 @@ build_progs() {
 	mv $DEST_DIR/files/DuetControlServer* $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duetwebserver_$dwsver/
-	dotnet publish -r $DOTNET_ARCH -c $-vaHBUILD_TYPE -o $DEST_DIR/files $SRC_DIR/DuetWebServer/DuetWebServer.csproj
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/DuetWebServer/DuetWebServer.csproj
 	mkdir -p $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
 	[ -d $COMMON_DIR/duetwebserver/ ] && $RSYNC $COMMON_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
 	[ -d $PACKAGER_DIR/duetwebserver/ ] && $RSYNC $PACKAGER_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
