@@ -1,4 +1,3 @@
-
 declare -i OPTION_COUNT=0
 declare -a POSITIONAL_ARGS
 for a in $* ; do

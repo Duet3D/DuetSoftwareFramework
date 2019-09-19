@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -52,5 +52,5 @@ exit 0
 for pt in $PACKAGE_TYPES ; do
 	build_script=$PKG_DIR/$pt/build.sh
 	[ ! -x $build_script ] && { echo "No build script for package type $pt.  Skipping." ; continue ; }
-	$build_script $@
+	$build_script "$@"
 done

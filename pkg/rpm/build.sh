@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 # PACKAGER_SCRIPT and PACKAGER_DIR must be set before sourcing common.functions
