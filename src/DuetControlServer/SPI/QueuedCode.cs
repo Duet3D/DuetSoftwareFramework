@@ -11,7 +11,7 @@ namespace DuetControlServer.SPI
     public class QueuedCode
     {
         private readonly CodeResult _result = new CodeResult();
-        private readonly TaskCompletionSource<CodeResult> _taskSource = new TaskCompletionSource<CodeResult>();
+        private readonly TaskCompletionSource<CodeResult> _taskSource = new TaskCompletionSource<CodeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool _lastMessageIncomplete = false;        // true if the last message had the push flag set
 
         /// <summary>

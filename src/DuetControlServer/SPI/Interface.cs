@@ -82,7 +82,7 @@ namespace DuetControlServer.SPI
             {
                 if (_getHeightmapRequest == null)
                 {
-                    _getHeightmapRequest = new TaskCompletionSource<Heightmap>();
+                    _getHeightmapRequest = new TaskCompletionSource<Heightmap>(TaskCreationOptions.RunContinuationsAsynchronously);
                 }
             }
             return await _getHeightmapRequest.Task;
@@ -101,7 +101,7 @@ namespace DuetControlServer.SPI
             {
                 if (_setHeightmapRequest == null)
                 {
-                    _setHeightmapRequest = new TaskCompletionSource<object>();
+                    _setHeightmapRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
                 }
                 _heightmapToSet = map;
                 task = _setHeightmapRequest.Task;
@@ -162,7 +162,7 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static Task<bool> Flush(CodeChannel channel)
         {
-            TaskCompletionSource<bool> source = new TaskCompletionSource<bool>();
+            TaskCompletionSource<bool> source = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (_channels[channel].Lock())
             {
                 _channels[channel].PendingFlushRequests.Enqueue(source);
@@ -251,7 +251,7 @@ namespace DuetControlServer.SPI
 
             _iapStream = iapStream;
             _firmwareStream = firmwareStream;
-            _firmwareUpdateRequest = new TaskCompletionSource<object>();
+            _firmwareUpdateRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             return _firmwareUpdateRequest.Task;
         }
 
