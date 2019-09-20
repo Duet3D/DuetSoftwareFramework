@@ -26,7 +26,7 @@ source $COMMON_DIR/parse_args
 
 print_help() {
 cat <<EOF
-Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
+Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | arm64 | aarch64 > ]
 	[ --build-type=< Debug | Release > ]
 	[ --dest-dir=< destination directory > ]
 	[ --signing-key=< key id or path to keyfile > ]
@@ -79,7 +79,7 @@ export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
 
 case $TARGET_ARCH in
 	armhf|armhfp) DOTNET_ARCH=linux-arm ;;
-	aarch64) DOTNET_ARCH=linux-arm64 ;;
+	arm64|aarch64) DOTNET_ARCH=linux-arm64 ;;
 	x86_64) DOTNET_ARCH=linux-x64 ;;
 	i386|i686|x86_32)  DOTNET_ARCH=linux-x86 ;;
 	*) echo "Unknown TARGET_ARCH: $TARGET_ARCH" ; return 1 ;;
