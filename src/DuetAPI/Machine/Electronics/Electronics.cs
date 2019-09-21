@@ -22,6 +22,23 @@ namespace DuetAPI.Machine
         }
 
         /// <summary>
+        /// Version of the Duet Software Framework package
+        /// </summary>
+        public Version Version
+        {
+            get => _version;
+            set
+            {
+                if (_version != value)
+                {
+                    _version = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private Version _version;
+
+        /// <summary>
         /// Type name of the main board
         /// </summary>
         public string Type

@@ -57,7 +57,7 @@ namespace DuetControlServer.Codes
                         }
                         return new CodeResult(MessageType.Error, $"Could not find file {code.GetUnprecedentedString()}");
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Resume a file print
                 case 24:
@@ -83,7 +83,7 @@ namespace DuetControlServer.Codes
                         // Let RepRapFirmware process this request so it can invoke resume.g
                         return null;
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Pause print
                 case 25:
@@ -95,9 +95,11 @@ namespace DuetControlServer.Codes
                             // Stop reading any more codes from the file being printed. Everything else is handled by RRF
                             await Print.Pause();
                         }
+
+                        // Let RepRapFirmware pause the print
                         return null;
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Set SD position
                 case 26:
@@ -110,8 +112,10 @@ namespace DuetControlServer.Codes
                         }
 
                         // P is not supported yet
+
+                        return new CodeResult();
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Report SD print status
                 case 27:
@@ -123,7 +127,7 @@ namespace DuetControlServer.Codes
                         }
                         return new CodeResult(MessageType.Success, "Not SD printing.");
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Delete a file on the SD card
                 case 30:
@@ -139,7 +143,7 @@ namespace DuetControlServer.Codes
                             return new CodeResult(MessageType.Error, $"Failed to delete file {file}: {e.Message}");
                         }
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Start a file print
                 case 32:
@@ -156,7 +160,7 @@ namespace DuetControlServer.Codes
                         }
                         return new CodeResult(MessageType.Error, $"Could not find file {code.GetUnprecedentedString()}");
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Return file information
                 case 36:
@@ -178,7 +182,7 @@ namespace DuetControlServer.Codes
                             }
                         }
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Simulate file
                 case 37:
@@ -189,7 +193,7 @@ namespace DuetControlServer.Codes
                         // TODO: Start file print
                         return new CodeResult(MessageType.Warning, "M37 is not supported yet");
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Compute SHA1 hash of target file
                 case 38:
@@ -213,7 +217,7 @@ namespace DuetControlServer.Codes
                             return new CodeResult(MessageType.Error, $"Could not compute SHA1 checksum for file {file}: {ae.InnerException.Message}");
                         }
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Report SD card information
                 case 39:
@@ -255,7 +259,7 @@ namespace DuetControlServer.Codes
                             }
                         }
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Emergency Stop - unconditional and interpreteted immediately when read
                 case 112:
@@ -297,7 +301,7 @@ namespace DuetControlServer.Codes
                             return new CodeResult(MessageType.Error, $"Failed to save height map to file {file}: {ae.InnerException.Message}");
                         }
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Load heightmap
                 case 375:
@@ -320,7 +324,7 @@ namespace DuetControlServer.Codes
                             return new CodeResult(MessageType.Error, $"Failed to load height map from file {file}: {ae.InnerException.Message}");
                         }
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Create Directory on SD-Card
                 case 470:
@@ -336,7 +340,7 @@ namespace DuetControlServer.Codes
                             return new CodeResult(MessageType.Error, $"Failed to create directory {path}: {e.Message}");
                         }
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Rename File/Directory on SD-Card
                 case 471:
@@ -374,7 +378,7 @@ namespace DuetControlServer.Codes
                             return new CodeResult(MessageType.Error, $"Failed to rename file or directory {from} to {to}: {e.Message}");
                         }
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Store parameters
                 case 500:
@@ -382,7 +386,7 @@ namespace DuetControlServer.Codes
                     {
                         await Utility.ConfigOverride.Save(code);
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Print settings
                 case 503:
@@ -402,7 +406,7 @@ namespace DuetControlServer.Codes
                         }
                         return new CodeResult(MessageType.Error, "Configuration file not found");
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Set Name
                 case 550:
@@ -444,7 +448,7 @@ namespace DuetControlServer.Codes
                         // Hostname is legit - pretend we didn't see this code so RRF can interpret it
                         return null;
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Set current RTC date and time
                 case 905:
@@ -485,7 +489,7 @@ namespace DuetControlServer.Codes
                             return new CodeResult(MessageType.Success, $"Current date and time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         }
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Start/stop event logging to SD card
                 case 929:
@@ -525,7 +529,7 @@ namespace DuetControlServer.Codes
                             Model.Provider.Get.State.LogFile = null;
                         }
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Update the firmware
                 case 997:
@@ -561,8 +565,9 @@ namespace DuetControlServer.Codes
                             FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
                             FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
                             await SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
+                            return new CodeResult();
                         }
-                        return new CodeResult();
+                        throw new OperationCanceledException();
                     }
                     break;
 
@@ -638,7 +643,6 @@ namespace DuetControlServer.Codes
             builder.AppendLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
             await SPI.Interface.Diagnostics(builder);
             SPI.DataTransfer.Diagnostics(builder);
-            MacroFile.Diagnostics(builder);
             await Print.Diagnostics(builder);
 
             result.Add(MessageType.Success, builder.ToString().TrimEnd());

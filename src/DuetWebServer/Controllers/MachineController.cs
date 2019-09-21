@@ -125,6 +125,11 @@ namespace DuetWebServer.Controllers
                 _logger.LogError($"[{nameof(DoCode)}] DCS is unavailable");
                 return StatusCode(503, ae.InnerException.Message);
             }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning($"[{nameof(DoCode)}] Code {code} has been cancelled");
+                return Content("Error: Code has been cancelled");
+            }
             catch (Exception e)
             {
                 _logger.LogWarning(e, $"[{nameof(DoCode)}] Failed to execute code {code}");

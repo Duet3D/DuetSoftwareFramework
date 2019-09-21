@@ -4,6 +4,27 @@
         <name>DuetControlServer</name>
     </assembly>
     <members>
+        <member name="M:DuetControlServer.Codes.Execution.ProcessCodes">
+            <summary>
+            Start dealing with codes in an ordered way
+            </summary>
+            <remarks>
+            This class is currently NOT used by file prints since it would conflict with the buffering concept
+            </remarks>
+        </member>
+        <member name="M:DuetControlServer.Codes.Execution.Invalidate(DuetAPI.CodeChannel)">
+            <summary>
+            Invalidate all buffered codes of the given channel
+            </summary>
+            <param name="channel">Code channel to invalidate</param>
+        </member>
+        <member name="M:DuetControlServer.Codes.Execution.Execute(DuetControlServer.Commands.Code)">
+            <summary>
+            Enqueue a G/M/T-code for execution
+            </summary>
+            <param name="code">Code to execute</param>
+        </member>
+        <!-- Badly formed XML comment ignored for member "M:DuetControlServer.Codes.Execution.ExecuteCodes(DuetAPI.CodeChannel)" -->
         <member name="T:DuetControlServer.Codes.GCodes">
             <summary>
             Static class that processes G-codes in the control server
@@ -82,7 +103,7 @@
             </summary>
             <param name="code">G/M/T-Code</param>
         </member>
-        <member name="P:DuetControlServer.Commands.Code.InternallyExecuted">
+        <member name="P:DuetControlServer.Commands.Code.InternallyProcessed">
             <summary>
             Indicates whether the code has been internally processed
             </summary>
@@ -98,14 +119,8 @@
             <summary>
             Run an arbitrary G/M/T-code and wait for it to finish
             </summary>
-            <returns>Code result instance</returns>
-        </member>
-        <member name="M:DuetControlServer.Commands.Code.Enqueue">
-            <summary>
-            Start an arbitrary G/M/T-code and get the task that is resolved when RRF finishes its execution.
-            This is an internal alternative to the <see cref="F:DuetAPI.Commands.CodeFlags.Asynchronous"/> flag.
-            </summary>
-            <returns>Asynchronous task</returns>
+            <returns>Result of the code</returns>
+            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
         </member>
         <member name="T:DuetControlServer.Commands.Flush">
             <summary>
@@ -160,7 +175,8 @@
             <summary>
             Converts simple G/M/T-codes to a regular Code instances, executes them and returns the result as text
             </summary>
-            <returns>G-code result as text</returns>
+            <returns>Code result as text</returns>
+            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
         </member>
         <member name="T:DuetControlServer.Commands.SyncMachineModel">
             <summary>
@@ -252,30 +268,6 @@
             Implementation of a macro file
             </summary>
         </member>
-        <member name="F:DuetControlServer.FileExecution.MacroFile._macroFiles">
-            <summary>
-            List of macro files being executed
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.FileExecution.MacroFile.DoingMacroFile">
-            <summary>
-            Indicates if a file macro is being done
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.FileExecution.MacroFile.AbortAllFiles(DuetAPI.CodeChannel)">
-            <summary>
-            Abort files on the given channel (probably because the firmware requested this)
-            </summary>
-            <param name="channel">Channel on which macros are supposed to be cancelled</param>
-            <returns>If an abortion could be requested</returns>
-        </member>
-        <member name="M:DuetControlServer.FileExecution.MacroFile.AbortLastFile(DuetAPI.CodeChannel)">
-            <summary>
-            Abort the last file on the given channel
-            </summary>
-            <param name="channel">Channel of the running macro file</param>
-            <returns>If an abortion could be requested</returns>
-        </member>
         <member name="P:DuetControlServer.FileExecution.MacroFile.IsConfig">
             <summary>
             Whether this file is config.g or config.g.bak
@@ -299,11 +291,10 @@
             <param name="channel">Channel to send the codes to</param>
             <param name="startCode">Which code is starting this macro file</param>
         </member>
-        <member name="M:DuetControlServer.FileExecution.MacroFile.Diagnostics(System.Text.StringBuilder)">
+        <member name="M:DuetControlServer.FileExecution.MacroFile.Abort">
             <summary>
-            Print diagnostics of this class
+            Abort the execution of this file
             </summary>
-            <param name="builder">String builder</param>
         </member>
         <member name="M:DuetControlServer.FileExecution.MacroFile.ReadCode">
             <summary>
@@ -690,16 +681,6 @@
             Static helper class to merge the RepRapFirmware object model with ours
             </summary>
         </member>
-        <member name="P:DuetControlServer.Model.Updater.IsReady">
-            <summary>
-            Indicates if this class is ready to accept JSON data
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.Model.Updater.Init">
-            <summary>
-            Initialize this class
-            </summary>
-        </member>
         <member name="M:DuetControlServer.Model.Updater.WaitForFullUpdate">
             <summary>
             Wait for the model to be fully updated from RepRapFirmware
@@ -875,6 +856,11 @@
             Regular expressions for finding the simulated time
             </summary>
         </member>
+        <member name="P:DuetControlServer.Settings.UpdateOnly">
+            <summary>
+            Indicates if the firmware is supposed to be updated
+            </summary>
+        </member>
         <member name="M:DuetControlServer.Settings.Load(System.String[])">
             <summary>
             Load settings from the config file or create it if it does not already exist
@@ -1018,7 +1004,7 @@
             <summary>
             Invalidate all the buffered G/M/T-codes
             </summary>
-            <param name="invalidateLastFile))">Invalidate only codes of the last stack level</param>
+            <param name="invalidateLastFileCodes))">Invalidate only codes of the last stack level</param>
         </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.SuspendBuffer(DuetControlServer.SPI.QueuedCode)">
             <summary>
@@ -1032,11 +1018,11 @@
             </summary>
             <returns>True when finished</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.ChannelInformation.Invalidate(System.String)">
+        <member name="M:DuetControlServer.SPI.ChannelInformation.Invalidate">
             <summary>
             Invalidate every request and buffered code on this channel
             </summary>
-            <param name="codeErrorMessage">Error message to output</param>
+            <returns>If any resource has been invalidated</returns>
         </member>
         <member name="T:DuetControlServer.SPI.ChannelStore">
             <summary>
@@ -2437,7 +2423,7 @@
             Retrieve the current heightmap from the firmware
             </summary>
             <returns>Heightmap in use</returns>
-            <exception cref="T:System.OperationCanceledException">Operation could not finish</exception>
+            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Operation could not finish</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.SetHeightmap(DuetAPI.Utility.Heightmap)">
             <summary>
@@ -2445,7 +2431,8 @@
             </summary>
             <param name="map">Heightmap to set</param>
             <returns>Asynchronous task</returns>
-            <exception cref="T:System.OperationCanceledException">Operation could not finish</exception>
+            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Operation could not finish</exception>
+            <exception cref="T:System.InvalidOperationException">Heightmap is already being set</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.ProcessCode(DuetControlServer.Commands.Code)">
             <summary>
@@ -2459,7 +2446,7 @@
             Wait for all pending codes to finish
             </summary>
             <param name="channel">Code channel to wait for</param>
-            <returns>Asynchronous task</returns>
+            <returns>Whether the codes have been flushed successfully</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.RequestEmergencyStop">
             <summary>
@@ -2504,6 +2491,7 @@
             </summary>
             <param name="iapStream">IAP binary</param>
             <param name="firmwareStream">Firmware binary</param>
+            <exception cref="T:System.InvalidOperationException">Firmware is already being updated</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.AssignFilament(System.Int32,System.String)">
             <summary>
@@ -2534,11 +2522,11 @@
             <returns>Whether the code could be processed</returns>
             <remarks>The corresponding Channel is locked when this is called</remarks>
         </member>
-        <member name="M:DuetControlServer.SPI.Interface.InvalidateData(System.String)">
+        <member name="M:DuetControlServer.SPI.Interface.Invalidate(System.String)">
             <summary>
             Invalidate every resource due to a critical event
             </summary>
-            <param name="codeErrorMessage">Message for cancelled codes</param>
+            <param name="message">Reason why everything is being invalidated</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.SPI.QueuedCode">
@@ -2601,9 +2589,14 @@
             </summary>
             <param name="result">Code reply</param>
         </member>
+        <member name="M:DuetControlServer.SPI.QueuedCode.SetCancelled">
+            <summary>
+            Report that this code has been cancelled
+            </summary>
+        </member>
         <member name="M:DuetControlServer.SPI.QueuedCode.SetException(System.Exception)">
             <summary>
-            Report that soemthing went wrong while executing this code
+            Report that something went wrong while executing this code
             </summary>
             <param name="e">Exception to return</param>
         </member>

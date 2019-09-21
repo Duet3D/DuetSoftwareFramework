@@ -84,10 +84,10 @@ namespace DuetControlServer.IPC
                         return (JObject)token;
                     }
                 }
-                catch (JsonReaderException)
+                catch (JsonReaderException e)
                 {
                     InitReader();
-                    await SendResponse(new IOException("Server received invalid JSON object"));
+                    await SendResponse(e);
                 }
             }
             while (!Program.CancelSource.IsCancellationRequested);
@@ -171,13 +171,16 @@ namespace DuetControlServer.IPC
             {
                 if (e is AggregateException ae)
                 {
-                    // Assume there is only one inner exception in this AggregateException...
+                    // Assume there is only one inner exception in this AggregateException
+                    // and get it so that it can be properly passed through to the client
                     e = ae.InnerException;
                 }
 
-                Console.Write("[warn] Handled exception: ");
-                Console.WriteLine(e);
-
+                if (!(e is TaskCanceledException))
+                {
+                    Console.Write("[warn] Handled exception: ");
+                    Console.WriteLine(e);
+                }
                 ErrorResponse errorResponse = new ErrorResponse(e);
                 json = JsonConvert.SerializeObject(errorResponse, JsonHelper.DefaultSettings);
             }

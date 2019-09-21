@@ -327,7 +327,7 @@
         </member>
         <member name="F:DuetAPI.Commands.CodeFlags.Asynchronous">
             <summary>
-            Code execution finishes as soon as it is enqueued in the RRF transmit buffer
+            Code execution finishes as soon as it is enqueued in the code queue
             </summary>
             <remarks>
             Potential G-code replies from RRF are only reported through the object model.
@@ -697,9 +697,9 @@
         </member>
         <member name="T:DuetAPI.Commands.Flush">
             <summary>
-            Wait for all pending codes of the given channel to finish
+            Wait for all pending codes of the given channel to finish.
+            If the flush command was successful, this command returns true
             </summary>
-            <remarks>At present, this command only waits for codes interacting with the firmware.</remarks>
         </member>
         <member name="P:DuetAPI.Commands.Flush.Channel">
             <summary>
@@ -1207,6 +1207,11 @@
         <member name="E:DuetAPI.Machine.Electronics.PropertyChanged">
             <summary>
             Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Electronics.Version">
+            <summary>
+            Version of the Duet Software Framework package
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Electronics.Type">

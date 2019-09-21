@@ -13,7 +13,8 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Converts simple G/M/T-codes to a regular Code instances, executes them and returns the result as text
         /// </summary>
-        /// <returns>G-code result as text</returns>
+        /// <returns>Code result as text</returns>
+        /// <exception cref="TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
         public override async Task<string> Execute()
         {
             IList<Code> codes;

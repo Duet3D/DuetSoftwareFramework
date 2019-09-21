@@ -123,6 +123,7 @@ namespace DuetAPIClient
         /// <param name="command">Command to run</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Command result</returns>
+        /// <exception cref="TaskCanceledException">Operation has been cancelled</exception>
         /// <exception cref="InternalServerException">Deserialized internal error from DCS</exception>
         protected async Task PerformCommand(BaseCommand command, CancellationToken cancellationToken)
         {
@@ -132,6 +133,10 @@ namespace DuetAPIClient
             if (!response.Success)
             {
                 ErrorResponse errorResponse = (ErrorResponse)response;
+                if (errorResponse.ErrorType == nameof(TaskCanceledException))
+                {
+                    throw new TaskCanceledException(errorResponse.ErrorMessage);
+                }
                 throw new InternalServerException(command.Command, errorResponse.ErrorType, errorResponse.ErrorMessage);
             }
         }
@@ -143,6 +148,7 @@ namespace DuetAPIClient
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Command result</returns>
         /// <typeparam name="T">Type of the command result</typeparam>
+        /// <exception cref="TaskCanceledException">Operation has been cancelled</exception>
         /// <exception cref="InternalServerException">Deserialized internal error from DCS</exception>
         protected async Task<T> PerformCommand<T>(BaseCommand command, CancellationToken cancellationToken)
         {
@@ -155,6 +161,10 @@ namespace DuetAPIClient
             }
 
             ErrorResponse errorResponse = (ErrorResponse)response;
+            if (errorResponse.ErrorType == nameof(TaskCanceledException))
+            {
+                throw new TaskCanceledException(errorResponse.ErrorMessage);
+            }
             throw new InternalServerException(command.Command, errorResponse.ErrorType, errorResponse.ErrorMessage);
         }
 

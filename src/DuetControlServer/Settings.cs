@@ -126,7 +126,7 @@ namespace DuetControlServer
         /// How many bytes to parse max at the beginning and end of a file to retrieve G-code file information
         /// </summary>
         [JsonProperty]
-        public static uint FileInfoReadLimit { get; set; } = 32768;
+        public static uint FileInfoReadLimit { get; set; } = 65536;
 
         /// <summary>
         /// Maximum allowed layer height. Used by the file info parser

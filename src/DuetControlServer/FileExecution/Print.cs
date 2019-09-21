@@ -132,7 +132,7 @@ namespace DuetControlServer.FileExecution
                     }
 
                     codes.Enqueue(code);
-                    codeTasks.Enqueue(code.Execute());
+                    codeTasks.Enqueue(code.Process());
                 }
 
                 // Is there anything to do?
@@ -156,7 +156,10 @@ namespace DuetControlServer.FileExecution
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine($"[err] {code} -> {e}");
+                        if (!(e is TaskCanceledException))
+                        {
+                            Console.WriteLine($"[err] {code} -> {e}");
+                        }
                     }
                 }
                 else

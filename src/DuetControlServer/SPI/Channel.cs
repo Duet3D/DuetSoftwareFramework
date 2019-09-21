@@ -256,6 +256,10 @@ namespace DuetControlServer.SPI
                                 await Utility.Logger.LogOutput(result);
                             }
                         }
+                        catch (OperationCanceledException)
+                        {
+                            // Something has gone wrong and the SPI connector has invalidated everything - don't deal with this (yet?)
+                        }
                         catch (AggregateException ae)
                         {
                             // FIXME: Should this terminate the macro being executed?
@@ -267,7 +271,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Macro file is complete if no more codes can be read from the file and the buffered codes are completely gone
-                if (macroFile.IsFinished  && !NestedMacroCodes.TryPeek(out _) && BufferedCodes.Count == 0 &&
+                if (macroFile.IsFinished && !NestedMacroCodes.TryPeek(out _) && BufferedCodes.Count == 0 &&
                     ((macroFile.StartCode != null && macroFile.StartCode.DoingNestedMacro) || (macroFile.StartCode == null && !SystemMacroHasFinished)) &&
                     MacroCompleted(macroFile.StartCode, macroFile.IsAborted))
                 {
@@ -288,18 +292,19 @@ namespace DuetControlServer.SPI
             }
 
             // 6. Lock/Unlock requests
-            if (PendingLockRequests.TryPeek(out QueuedLockRequest lockRequest))
+            if (BufferedCodes.Count == 0 && PendingLockRequests.TryPeek(out QueuedLockRequest lockRequest))
             {
-                if (!lockRequest.IsLockRequested)
+                if (lockRequest.IsLockRequest)
                 {
-                    if (lockRequest.IsLockRequest)
+                    if (!lockRequest.IsLockRequested)
                     {
                         lockRequest.IsLockRequested = DataTransfer.WriteLockMovementAndWaitForStandstill(Channel);
                     }
-                    else if (DataTransfer.WriteUnlock(Channel))
-                    {
-                        PendingLockRequests.Dequeue();
-                    }
+                }
+                else if (DataTransfer.WriteUnlock(Channel))
+                {
+                    lockRequest.Resolve(true);
+                    PendingLockRequests.Dequeue();
                 }
                 return false;
             }
@@ -406,7 +411,6 @@ namespace DuetControlServer.SPI
                 BufferedCodes[0].HandleReply(flags, reply);
                 if (BufferedCodes[0].IsFinished)
                 {
-                    Console.WriteLine($"[info] Completed {BufferedCodes[0].Code}");
                     BytesBuffered -= BufferedCodes[0].BinarySize;
                     BufferedCodes.RemoveAt(0);
                 }
@@ -529,10 +533,10 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Invalidate all the buffered G/M/T-codes
         /// </summary>
-        /// <param name="invalidateLastFile)">Invalidate only codes of the last stack level</param>
-        public void InvalidateBuffer(bool invalidateLastFile)
+        /// <param name="invalidateLastFileCodes)">Invalidate only codes of the last stack level</param>
+        public void InvalidateBuffer(bool invalidateLastFileCodes)
         {
-            if (invalidateLastFile)
+            if (invalidateLastFileCodes)
             {
                 // Only a G/M-code can ask for last file aborts. It is still being executed, so take care of it 
                 for (int i = BufferedCodes.Count - 1; i > 0; i--)
@@ -545,7 +549,7 @@ namespace DuetControlServer.SPI
                 {
                     while (suspendedCodes.TryDequeue(out QueuedCode suspendedCode))
                     {
-                        suspendedCode.SetFinished();
+                        suspendedCode.SetCancelled();
                     }
                 }
             }
@@ -554,7 +558,7 @@ namespace DuetControlServer.SPI
                 // Remove every buffered code of this channel if every code is being invalidated
                 foreach (QueuedCode queuedCode in BufferedCodes)
                 {
-                    queuedCode.SetFinished();
+                    queuedCode.SetCancelled();
                 }
 
                 BytesBuffered = 0;
@@ -564,12 +568,12 @@ namespace DuetControlServer.SPI
                 {
                     while (suspendedCodes.TryDequeue(out QueuedCode suspendedCode))
                     {
-                        suspendedCode.SetFinished();
+                        suspendedCode.SetCancelled();
                     }
                 }
             }
 
-            _resumingBuffer = invalidateLastFile;
+            _resumingBuffer = invalidateLastFileCodes;
             SystemMacroHasFinished = false;
 
             // Resolve pending flush requests. At this point, codes waiting for a flush must stop executing
@@ -656,14 +660,19 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Invalidate every request and buffered code on this channel
         /// </summary>
-        /// <param name="codeErrorMessage">Error message to output</param>
-        public void Invalidate(string codeErrorMessage)
+        /// <returns>If any resource has been invalidated</returns>
+        public bool Invalidate()
         {
+            bool resourceInvalidated = false;
+
+            Codes.Execution.Invalidate(Channel);
+
             while (SuspendedCodes.TryPop(out Queue<QueuedCode> suspendedCodes))
             {
                 while (suspendedCodes.TryDequeue(out QueuedCode queuedCode))
                 {
-                    queuedCode.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                    queuedCode.SetCancelled();
+                    resourceInvalidated = true;
                 }
             }
             _resumingBuffer = false;
@@ -673,37 +682,48 @@ namespace DuetControlServer.SPI
             {
                 if (!item.IsFinished)
                 {
-                    item.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                    item.SetCancelled();
+                    resourceInvalidated = true;
                 }
             }
 
             while (NestedMacros.TryPop(out MacroFile macroFile))
             {
-                macroFile.StartCode?.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                macroFile.StartCode?.SetCancelled();
+                macroFile.Abort();
+                macroFile.Dispose();
+                resourceInvalidated = true;
             }
 
             while (PendingCodes.TryDequeue(out QueuedCode queuedCode))
             {
-                queuedCode.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                queuedCode.SetCancelled();
+                resourceInvalidated = true;
             }
 
             while (PendingLockRequests.TryDequeue(out QueuedLockRequest item))
             {
                 item.Resolve(false);
+                resourceInvalidated = true;
             }
 
             while (PendingFlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
             {
                 source.SetResult(false);
+                resourceInvalidated = true;
             }
 
             foreach (QueuedCode bufferedCode in BufferedCodes)
             {
-                bufferedCode.HandleReply(MessageTypeFlags.ErrorMessageFlag, codeErrorMessage);
+                bufferedCode.SetCancelled();
+                resourceInvalidated = true;
             }
-
-            BytesBuffered = 0;
             BufferedCodes.Clear();
+
+            IsBusy = true;
+            BytesBuffered = 0;
+
+            return resourceInvalidated;
         }
     }
 

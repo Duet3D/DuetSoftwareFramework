@@ -105,6 +105,19 @@ namespace DuetUnitTest.Commands
         }
 
         [Test]
+        public void ParseM92()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M92 E810:810:407:407");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(92, code.MajorNumber);
+
+            Assert.AreEqual(1, code.Parameters.Count);
+
+            int[] steps = { 810, 810, 407, 407 };
+            Assert.AreEqual(steps, (int[])code.Parameter('E'));
+        }
+
+        [Test]
         public void ParseM98()
         {
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M98 P\"config.g\"");

@@ -6,9 +6,9 @@
     <LangVersion>default</LangVersion>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D</Company>
-    <AssemblyVersion>1.0.3.5</AssemblyVersion>
-    <FileVersion>1.0.3.5</FileVersion>
-    <Version>1.0.3</Version>
+    <AssemblyVersion>1.0.4.0</AssemblyVersion>
+    <FileVersion>1.0.4.0</FileVersion>
+    <Version>1.0.4</Version>
     <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
   </PropertyGroup>

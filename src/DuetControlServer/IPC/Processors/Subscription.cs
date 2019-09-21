@@ -138,7 +138,8 @@ namespace DuetControlServer.IPC.Processors
                             await Connection.Send(patch.ToString(Formatting.None) + "\n");
                         }
                     }
-                } while (!Program.CancelSource.IsCancellationRequested);
+                }
+                while (!Program.CancelSource.IsCancellationRequested);
             }
             finally
             {

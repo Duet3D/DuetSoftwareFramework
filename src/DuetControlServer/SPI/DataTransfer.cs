@@ -183,7 +183,8 @@ namespace DuetControlServer.SPI
                         }
                     }
                 }
-            } while (mustSucceed && !Program.CancelSource.IsCancellationRequested);
+            }
+            while (mustSucceed && !Program.CancelSource.IsCancellationRequested);
 
             return false;
         }
@@ -381,7 +382,8 @@ namespace DuetControlServer.SPI
                 // Move on to the next one
                 int padding = 4 - (header.Length % 4);
                 buffer = buffer.Slice(headerSize + header.Length + ((padding == 4) ? 0 : padding));
-            } while (header.Id < packet.ResendPacketId && buffer.Length > 0);
+            }
+            while (header.Id < packet.ResendPacketId && buffer.Length > 0);
 
             throw new ArgumentException($"Firmware requested resend for invalid packet #{packet.ResendPacketId}");
         }
@@ -677,7 +679,8 @@ namespace DuetControlServer.SPI
             do
             {
                 Thread.Sleep(250);
-            } while (!_transferReadyPin.Value);
+            }
+            while (!_transferReadyPin.Value);
             _transferReadyEvent.Set();
         }
 
@@ -973,12 +976,7 @@ namespace DuetControlServer.SPI
             MemoryMarshal.Write(_txResponseBuffer.Span, ref response);
 
             WaitForTransfer();
-            DateTime startTime = DateTime.Now;
             _spiDevice.TransferFullDuplex(_txResponseBuffer.Span, _rxResponseBuffer.Span);
-            if (DateTime.Now - startTime > TimeSpan.FromMilliseconds(200))
-            {
-                Console.WriteLine("Raw SPI response transfer took longer than 200ms");
-            }
 
             return MemoryMarshal.Read<uint>(_rxResponseBuffer.Span);
         }

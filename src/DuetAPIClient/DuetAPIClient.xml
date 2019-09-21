@@ -39,7 +39,8 @@
             </summary>
             <param name="code">The code to execute</param>
             <param name="cancellationToken">Optional cancellation token</param>
-            <returns>Result of the given code or null if the code was never executed (buffer cleared)</returns>
+            <returns>Result of the given code</returns>
+            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
             <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
             <seealso cref="T:DuetAPI.Commands.Code"/>
         </member>
@@ -50,7 +51,8 @@
             <param name="code">The code to execute</param>
             <param name="channel">Optional destination channel of this code</param>
             <param name="cancellationToken">Optional cancellation token</param>
-            <returns>The code result as a string</returns>
+            <returns>Result of the given code converted to a string</returns>
+            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
             <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
             <seealso cref="T:DuetAPI.Commands.SimpleCode"/>
         </member>
@@ -135,6 +137,7 @@
             <param name="command">Command to run</param>
             <param name="cancellationToken">Cancellation token</param>
             <returns>Command result</returns>
+            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Operation has been cancelled</exception>
             <exception cref="T:DuetAPIClient.Exceptions.InternalServerException">Deserialized internal error from DCS</exception>
         </member>
         <member name="M:DuetAPIClient.BaseConnection.PerformCommand``1(DuetAPI.Commands.BaseCommand,System.Threading.CancellationToken)">
@@ -145,6 +148,7 @@
             <param name="cancellationToken">Cancellation token</param>
             <returns>Command result</returns>
             <typeparam name="T">Type of the command result</typeparam>
+            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Operation has been cancelled</exception>
             <exception cref="T:DuetAPIClient.Exceptions.InternalServerException">Deserialized internal error from DCS</exception>
         </member>
         <member name="M:DuetAPIClient.BaseConnection.Receive``1(System.Threading.CancellationToken)">

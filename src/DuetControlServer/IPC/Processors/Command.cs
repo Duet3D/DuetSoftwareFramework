@@ -62,11 +62,17 @@ namespace DuetControlServer.IPC.Processors
                     object result = await command.Invoke();
                     await Connection.SendResponse(result);
                 }
+                catch (TaskCanceledException e)
+                {
+                    if (Connection.IsConnected)
+                    {
+                        await Connection.SendResponse(e);
+                    }
+                }
                 catch (Exception e)
                 {
                     if (Connection.IsConnected)
                     {
-                        // Inform the client about this error
                         await Connection.SendResponse(e);
                         Console.WriteLine(e);
                     }
@@ -75,7 +81,8 @@ namespace DuetControlServer.IPC.Processors
                         throw;
                     }
                 }
-            } while (Connection.IsConnected);
+            }
+            while (Connection.IsConnected);
         }
     }
 }

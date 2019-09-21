@@ -11,7 +11,7 @@ namespace DuetControlServer.SPI
     public class QueuedCode
     {
         private readonly CodeResult _result = new CodeResult();
-        private readonly TaskCompletionSource<CodeResult> _taskSource = new TaskCompletionSource<CodeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<CodeResult> _tcs = new TaskCompletionSource<CodeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool _lastMessageIncomplete = false;        // true if the last message had the push flag set
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Task that is resolved when the code has finished
         /// </summary>
-        public Task<CodeResult> Task { get => _taskSource.Task; }
+        public Task<CodeResult> Task { get => _tcs.Task; }
 
         /// <summary>
         /// Process a code reply from the firmware
@@ -114,13 +114,22 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Report that soemthing went wrong while executing this code
+        /// Report that this code has been cancelled
+        /// </summary>
+        public void SetCancelled()
+        {
+            IsFinished = true;
+            _tcs.TrySetCanceled();
+        }
+
+        /// <summary>
+        /// Report that something went wrong while executing this code
         /// </summary>
         /// <param name="e">Exception to return</param>
         public void SetException(Exception e)
         {
             IsFinished = true;
-            _taskSource.SetException(e);
+            _tcs.TrySetException(e);
         }
 
         /// <summary>
@@ -129,7 +138,7 @@ namespace DuetControlServer.SPI
         public void SetFinished()
         {
             IsFinished = true;
-            _taskSource.SetResult(_result);
+            _tcs.TrySetResult(_result);
         }
 
         /// <summary>

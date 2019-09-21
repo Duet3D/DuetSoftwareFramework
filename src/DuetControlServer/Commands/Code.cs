@@ -61,13 +61,15 @@ namespace DuetControlServer.Commands
         }
 
         private TaskCompletionSource<CodeResult> _tcs;
-        internal void SetResult(CodeResult result) => _tcs.SetResult(result);
-        internal void SetException(Exception e) => _tcs.SetException(e);
+        internal void SetCanceled() => _tcs.TrySetCanceled();
+        internal void SetException(Exception e) => _tcs.TrySetException(e);
+        internal void SetResult(CodeResult result) => _tcs.TrySetResult(result);
 
         /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish
         /// </summary>
-        /// <returns>Result of the code or null if it was cancelled</returns>
+        /// <returns>Result of the code</returns>
+        /// <exception cref="TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
         public override Task<CodeResult> Execute()
         {
             if (Flags.HasFlag(CodeFlags.IsPrioritized))
@@ -78,7 +80,7 @@ namespace DuetControlServer.Commands
 
             if (_tcs == null)
             {
-                _tcs = new TaskCompletionSource<CodeResult>();
+                _tcs = new TaskCompletionSource<CodeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
                 Execution.Execute(this);
             }
             return _tcs.Task;
@@ -239,6 +241,7 @@ namespace DuetControlServer.Commands
             }
 
             // Finished. Optionally an "Executed" interceptor could be called here, but that would only make sense if the code reply was included
+            Console.WriteLine($"[info] Completed {this}");
             return result;
         }
     }

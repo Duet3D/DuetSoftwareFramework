@@ -180,6 +180,7 @@ namespace DuetControlServer.Model
                             fanObj.Name = response.Params.fanNames[fan];
                             fanObj.Rpm = (response.sensors.fanRPM.Length > fan && response.sensors.fanRPM[fan] > 0) ? (int?)response.sensors.fanRPM[fan] : null;
                             fanObj.Value = response.Params.fanPercent[fan] / 100F;
+                            fanObj.Thermostatic.Control = (response.controllableFans & (1 << fan)) == 0;
                         }
                         for (int fan = Provider.Get.Fans.Count; fan > response.Params.fanPercent.Length; fan--)
                         {
@@ -458,11 +459,6 @@ namespace DuetControlServer.Model
                         Provider.Get.State.AtxPower = (response.Params.atxPower == -1) ? null : (bool?)(response.Params.atxPower != 0);
                         Provider.Get.State.CurrentTool = response.currentTool;
                         Provider.Get.State.Status = GetStatus(response.status);
-                        if (Provider.Get.State.Status == MachineStatus.Idle && FileExecution.MacroFile.DoingMacroFile)
-                        {
-                            // RRF does not always know whether a macro file is being executed
-                            Provider.Get.State.Status = MachineStatus.Busy;
-                        }
                         Provider.Get.State.Mode = (MachineMode)Enum.Parse(typeof(MachineMode), response.mode, true);
                         Provider.Get.Network.Name = response.name;
 
@@ -652,6 +648,15 @@ namespace DuetControlServer.Model
                         // - Electronics -
                         Provider.Get.Electronics.Name = response.firmwareElectronics;
                         Provider.Get.Electronics.ShortName = response.boardName;
+                        switch (Provider.Get.Electronics.ShortName)
+                        {
+                            case "MBP05":
+                                Provider.Get.Electronics.Revision = "0.5";
+                                break;
+                            case "MB6HC":
+                                Provider.Get.Electronics.Revision = "0.6";
+                                break;
+                        }
                         Provider.Get.Electronics.Firmware.Name = response.firmwareName;
                         Provider.Get.Electronics.Firmware.Version = response.firmwareVersion;
                         Provider.Get.Electronics.Firmware.Date = response.firmwareDate;

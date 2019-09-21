@@ -54,7 +54,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Request cancellation of this file
         /// </summary>
-        public void Abort() => IsAborted = true;
+        public virtual void Abort() => IsAborted = true;
 
         /// <summary>
         /// Indicates if the file has been finished
@@ -105,7 +105,8 @@ namespace DuetControlServer.FileExecution
                 // FIXME: G53 may apply to multiple codes on the same line...
                 codeRead = DuetAPI.Commands.Code.Parse(_reader, code, ref enforcingAbsolutePosition);
                 LineNumber = code.LineNumber.Value;
-            } while (!codeRead && _reader.Position != _fileStream.Length);
+            }
+            while (!codeRead && _reader.Position != _fileStream.Length);
 
             // Return it
             if (!codeRead)

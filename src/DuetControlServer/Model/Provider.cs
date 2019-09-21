@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Machine;
@@ -39,9 +40,9 @@ namespace DuetControlServer.Model
         public static void Init()
         {
             // Initialize electronics
+            Get.Electronics.Version = Assembly.GetExecutingAssembly().GetName().Version;
             Get.Electronics.Type = "duet3";
             Get.Electronics.Name = "Duet 3";
-            Get.Electronics.Revision = "0.5";
 
             // Initialize machine name
             Get.Network.Name = Environment.MachineName;

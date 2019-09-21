@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -47,7 +48,8 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="code">The code to execute</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Result of the given code or null if the code was never executed (buffer cleared)</returns>
+        /// <returns>Result of the given code</returns>
+        /// <exception cref="TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
         /// <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
         /// <seealso cref="Code"/>
         public Task<CodeResult> PerformCode(Code code, CancellationToken cancellationToken = default)
@@ -61,7 +63,8 @@ namespace DuetAPIClient
         /// <param name="code">The code to execute</param>
         /// <param name="channel">Optional destination channel of this code</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>The code result as a string</returns>
+        /// <returns>Result of the given code converted to a string</returns>
+        /// <exception cref="TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
         /// <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
         /// <seealso cref="SimpleCode"/>
         public Task<string> PerformSimpleCode(string code, CodeChannel channel = Defaults.Channel, CancellationToken cancellationToken = default)

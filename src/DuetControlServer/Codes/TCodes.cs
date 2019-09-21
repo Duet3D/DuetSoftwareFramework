@@ -14,10 +14,7 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Result of the code if the code completed, else null</returns>
-        public static Task<CodeResult> Process(Code code)
-        {
-            return Task.FromResult<CodeResult>(null);
-        }
+        public static Task<CodeResult> Process(Code code) => Task.FromResult<CodeResult>(null);
 
         /// <summary>
         /// React to an executed T-code before its result is returend

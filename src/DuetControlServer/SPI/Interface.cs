@@ -31,15 +31,18 @@ namespace DuetControlServer.SPI
         // Heightmap requests
         private static readonly AsyncLock _heightmapLock = new AsyncLock();
         private static TaskCompletionSource<Heightmap> _getHeightmapRequest;
-        private static bool _heightmapRequested;
+        private static bool _isHeightmapRequested;
         private static TaskCompletionSource<object> _setHeightmapRequest;
         private static Heightmap _heightmapToSet;
+
+        // Firmware updates
+        private static readonly AsyncLock _firmwareUpdateLock = new AsyncLock();
+        private static Stream _iapStream, _firmwareStream;
+        private static TaskCompletionSource<object> _firmwareUpdateRequest;
 
         // Special requests
         private static bool _emergencyStopRequested, _resetRequested, _printStarted;
         private static PrintStoppedReason? _printStoppedReason;
-        private static Stream _iapStream, _firmwareStream;
-        private static TaskCompletionSource<object> _firmwareUpdateRequest;
         private static readonly Queue<Tuple<int, string>> _extruderFilamentUpdates = new Queue<Tuple<int, string>>();
 
         // Partial messages (if any)
@@ -75,17 +78,18 @@ namespace DuetControlServer.SPI
         /// Retrieve the current heightmap from the firmware
         /// </summary>
         /// <returns>Heightmap in use</returns>
-        /// <exception cref="OperationCanceledException">Operation could not finish</exception>
-        public static async Task<Heightmap> GetHeightmap()
+        /// <exception cref="TaskCanceledException">Operation could not finish</exception>
+        public static Task<Heightmap> GetHeightmap()
         {
-            using (await _heightmapLock.LockAsync())
+            using (_heightmapLock.Lock())
             {
                 if (_getHeightmapRequest == null)
                 {
+                    _isHeightmapRequested = false;
                     _getHeightmapRequest = new TaskCompletionSource<Heightmap>(TaskCreationOptions.RunContinuationsAsynchronously);
                 }
+                return _getHeightmapRequest.Task;
             }
-            return await _getHeightmapRequest.Task;
         }
 
         /// <summary>
@@ -93,20 +97,21 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="map">Heightmap to set</param>
         /// <returns>Asynchronous task</returns>
-        /// <exception cref="OperationCanceledException">Operation could not finish</exception>
-        public static async Task SetHeightmap(Heightmap map)
+        /// <exception cref="TaskCanceledException">Operation could not finish</exception>
+        /// <exception cref="InvalidOperationException">Heightmap is already being set</exception>
+        public static Task SetHeightmap(Heightmap map)
         {
-            Task task;
-            using (await _heightmapLock.LockAsync())
+            using (_heightmapLock.Lock())
             {
-                if (_setHeightmapRequest == null)
+                if (_setHeightmapRequest != null)
                 {
-                    _setHeightmapRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    throw new InvalidProgramException("Heightmap is already being set");
                 }
+
                 _heightmapToSet = map;
-                task = _setHeightmapRequest.Task;
+                _setHeightmapRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                return _setHeightmapRequest.Task;
             }
-            await task;
         }
 
         /// <summary>
@@ -162,12 +167,12 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static Task<bool> Flush(CodeChannel channel)
         {
-            TaskCompletionSource<bool> source = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (_channels[channel].Lock())
             {
-                _channels[channel].PendingFlushRequests.Enqueue(source);
+                _channels[channel].PendingFlushRequests.Enqueue(tcs);
             }
-            return source.Task;
+            return tcs.Task;
         }
 
         /// <summary>
@@ -177,7 +182,7 @@ namespace DuetControlServer.SPI
         public static async Task RequestEmergencyStop()
         {
             _emergencyStopRequested = true;
-            await InvalidateData("Firmware halted");
+            await Invalidate("Firmware halted");
         }
 
         /// <summary>
@@ -187,7 +192,7 @@ namespace DuetControlServer.SPI
         public static async Task RequestReset()
         {
             _resetRequested = true;
-            await InvalidateData("Firmware reset imminent");
+            await Invalidate("Firmware reset imminent");
         }
 
         /// <summary>
@@ -212,14 +217,14 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Code channel acquiring the lock</param>
         /// <returns>Whether the resource could be locked</returns>
-        public static async Task<bool> LockMovementAndWaitForStandstill(CodeChannel channel)
+        public static Task<bool> LockMovementAndWaitForStandstill(CodeChannel channel)
         {
             QueuedLockRequest request = new QueuedLockRequest(true);
-            using (await _channels[channel].LockAsync())
+            using (_channels[channel].Lock())
             {
                 _channels[channel].PendingLockRequests.Enqueue(request);
             }
-            return await request.Task;
+            return request.Task;
         }
 
         /// <summary>
@@ -227,14 +232,14 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Channel holding the resources</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task UnlockAll(CodeChannel channel)
+        public static Task UnlockAll(CodeChannel channel)
         {
             QueuedLockRequest request = new QueuedLockRequest(false);
-            using (await _channels[channel].LockAsync())
+            using (_channels[channel].Lock())
             {
                 _channels[channel].PendingLockRequests.Enqueue(request);
             }
-            await request.Task;
+            return request.Task;
         }
 
         /// <summary>
@@ -242,17 +247,21 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="iapStream">IAP binary</param>
         /// <param name="firmwareStream">Firmware binary</param>
+        /// <exception cref="InvalidOperationException">Firmware is already being updated</exception>
         public static Task UpdateFirmware(Stream iapStream, Stream firmwareStream)
         {
-            if (_firmwareUpdateRequest != null)
+            using (_firmwareUpdateLock.Lock())
             {
-                throw new InvalidOperationException("Firmware is already being updated");
-            }
+                if (_firmwareUpdateRequest != null)
+                {
+                    throw new InvalidOperationException("Firmware is already being updated");
+                }
 
-            _iapStream = iapStream;
-            _firmwareStream = firmwareStream;
-            _firmwareUpdateRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-            return _firmwareUpdateRequest.Task;
+                _iapStream = iapStream;
+                _firmwareStream = firmwareStream;
+                _firmwareUpdateRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                return _firmwareUpdateRequest.Task;
+            }
         }
 
         private static async Task PerformFirmwareUpdate()
@@ -276,7 +285,8 @@ namespace DuetControlServer.SPI
                 dataSent = DataTransfer.WriteIapSegment(_iapStream);
                 DataTransfer.PerformFullTransfer();
                 Console.Write('.');
-            } while (dataSent);
+            }
+            while (dataSent);
             Console.WriteLine();
 
             _iapStream.Close();
@@ -303,7 +313,8 @@ namespace DuetControlServer.SPI
                 Console.WriteLine();
 
                 Console.Write("[info] Verifying checksum... ");
-            } while (++numRetries < 3 && !DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
+            }
+            while (++numRetries < 3 && !DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
 
             if (numRetries == 3)
             {
@@ -325,8 +336,11 @@ namespace DuetControlServer.SPI
             _firmwareStream.Close();
             _firmwareStream = null;
 
-            _firmwareUpdateRequest.SetResult(null);
-            _firmwareUpdateRequest = null;
+            using (_firmwareUpdateLock.Lock())
+            {
+                _firmwareUpdateRequest.SetResult(null);
+                _firmwareUpdateRequest = null;
+            }
         }
 
         /// <summary>
@@ -376,7 +390,7 @@ namespace DuetControlServer.SPI
                 // Check if a firmware update is supposed to be performed
                 if (_iapStream != null && _firmwareStream != null)
                 {
-                    await InvalidateData("Firmware update imminent");
+                    await Invalidate("Firmware update imminent");
                     await PerformFirmwareUpdate();
                     if (Settings.UpdateOnly)
                     {
@@ -388,8 +402,7 @@ namespace DuetControlServer.SPI
                 if (DataTransfer.HadReset())
                 {
                     _emergencyStopRequested = _resetRequested = false;
-                    Console.WriteLine("[info] Controller has been reset");
-                    await InvalidateData("Controller reset");
+                    await Invalidate("Controller has been reset");
                 }
 
                 // Check for changes of the print status.
@@ -407,20 +420,19 @@ namespace DuetControlServer.SPI
                 }
 
                 // Deal with heightmap requests
-                using (_heightmapLock.Lock())
+                using (await _heightmapLock.LockAsync())
                 {
                     // Check if the heightmap is supposed to be set
-                    if (_heightmapToSet != null && DataTransfer.WriteHeightMap(_heightmapToSet))
+                    if (_setHeightmapRequest != null && DataTransfer.WriteHeightMap(_heightmapToSet))
                     {
-                        _heightmapToSet = null;
                         _setHeightmapRequest.SetResult(null);
                         _setHeightmapRequest = null;
                     }
 
                     // Check if the heightmap is requested
-                    if (_getHeightmapRequest != null && !_heightmapRequested)
+                    if (_getHeightmapRequest != null && !_isHeightmapRequested)
                     {
-                        _heightmapRequested = DataTransfer.WriteGetHeightMap();
+                        _isHeightmapRequested = DataTransfer.WriteGetHeightMap();
                     }
                 }
 
@@ -472,7 +484,8 @@ namespace DuetControlServer.SPI
                             }
                         }
                     }
-                } while (dataProcessed);
+                }
+                while (dataProcessed);
 
                 // Request object model updates
                 if (DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
@@ -500,7 +513,8 @@ namespace DuetControlServer.SPI
                 {
                     await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
                 }
-            } while (!Program.CancelSource.IsCancellationRequested);
+            }
+            while (!Program.CancelSource.IsCancellationRequested);
         }
 
         /// <summary>
@@ -671,10 +685,10 @@ namespace DuetControlServer.SPI
                 }
             }
 
-            if (!replyHandled && !flags.HasFlag(MessageTypeFlags.CodeQueueMessage))
+            if (!replyHandled)
             {
-                // If the message could not be processed, output a warning. Should never happen except for queued codes
-                Console.WriteLine($"[warn] Received out-of-sync code reply ({flags}: {reply.TrimEnd()})");
+                // Must be a left-over error message...
+                OutputGenericMessage(flags, reply);
             }
         }
 
@@ -708,23 +722,20 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadAbortFile(out CodeChannel channel, out bool abortAll);
             Console.WriteLine($"[info] Received file abort request on channel {channel} for {(abortAll ? "all files" : "the last file")}");
 
-            if (abortAll)
+            if (abortAll && channel == CodeChannel.File)
             {
-                if (channel == CodeChannel.File)
-                {
-                    await Print.Cancel();
-                }
-                MacroFile.AbortAllFiles(channel);
-                _channels[channel].InvalidateBuffer(false);
+                await Print.Cancel();
             }
-            else
+
+            _channels[channel].InvalidateBuffer(!abortAll);
+            while (_channels[channel].NestedMacros.TryPop(out MacroFile macroFile))
             {
-                MacroFile.AbortLastFile(channel);
-                _channels[channel].InvalidateBuffer(true);
-                if (_channels[channel].NestedMacros.TryPop(out MacroFile macroFile))
+                macroFile.StartCode?.HandleReply(new CodeResult());
+                macroFile.Abort();
+                macroFile.Dispose();
+                if (!abortAll)
                 {
-                    Console.WriteLine($"[info] Aborted last macro file '{macroFile.FileName}'");
-                    macroFile.Dispose();
+                    break;
                 }
             }
         }
@@ -781,7 +792,6 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadHeightMap(out Heightmap map);
             using (await _heightmapLock.LockAsync())
             {
-                _heightmapRequested = false;
                 if (_getHeightmapRequest == null)
                 {
                     Console.WriteLine("[err] Got heightmap response although it was not requested");
@@ -797,6 +807,7 @@ namespace DuetControlServer.SPI
         private static async Task HandleResourceLocked()
         {
             DataTransfer.ReadResourceLocked(out CodeChannel channel);
+
             using (await _channels[channel].LockAsync())
             {
                 if (_channels[channel].PendingLockRequests.TryDequeue(out QueuedLockRequest item))
@@ -832,24 +843,21 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Invalidate every resource due to a critical event
         /// </summary>
-        /// <param name="codeErrorMessage">Message for cancelled codes</param>
+        /// <param name="message">Reason why everything is being invalidated</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task InvalidateData(string codeErrorMessage)
+        private static async Task Invalidate(string message)
         {
-            // Keep this event in the log...
-            await Utility.Logger.Log(MessageType.Warning, codeErrorMessage);
+            bool outputMessage = Print.IsPrinting;
 
-            // Close every open file. This closes the internal macro files as well
+            // Cancel the file being printed
             await Print.Cancel();
 
             // Resolve pending macros, unbuffered (system) codes and flush requests
             foreach (ChannelInformation channel in _channels)
             {
-                MacroFile.AbortAllFiles(channel.Channel);
-
                 using (await channel.LockAsync())
                 {
-                    channel.Invalidate(codeErrorMessage);
+                    outputMessage |= channel.Invalidate();
                 }
             }
             _bytesReserved = _bufferSpace = 0;
@@ -857,11 +865,29 @@ namespace DuetControlServer.SPI
             // Resolve pending heightmap requests
             using (await _heightmapLock.LockAsync())
             {
-                _getHeightmapRequest?.SetException(new OperationCanceledException(codeErrorMessage));
-                _heightmapRequested = false;
+                if (_getHeightmapRequest != null)
+                {
+                    _getHeightmapRequest.SetCanceled();
+                    _getHeightmapRequest = null;
+                    outputMessage = true;
+                }
 
-                _setHeightmapRequest?.SetException(new OperationCanceledException(codeErrorMessage));
-                _heightmapToSet = null;
+                if (_setHeightmapRequest != null)
+                {
+                    _setHeightmapRequest.SetCanceled();
+                    _setHeightmapRequest = null;
+                    outputMessage = true;
+                }
+            }
+
+            // Keep this event in the log...
+            if (outputMessage)
+            {
+                await Utility.Logger.LogOutput(MessageType.Warning, message);
+            }
+            else
+            {
+                await Utility.Logger.Log(MessageType.Warning, message);
             }
         }
     }

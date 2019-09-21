@@ -59,7 +59,8 @@ namespace DuetControlServer.IPC.Processors
                     }
 
                     await EnqueueCommand(command);
-                } while (!Program.CancelSource.IsCancellationRequested);
+                }
+                while (!Program.CancelSource.IsCancellationRequested);
             }
             finally
             {

@@ -91,13 +91,13 @@ namespace DuetUnitTest.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
             
-            Code code = new Code("G1 X4 Y23.5 Z12.2 J\"testok\" E12:3.45")
+            Code code = new Code("G1 X4 Y23.5 Z12.2 J\"testok\" E12:3.45:5.67")
             {
                 Channel = CodeChannel.File
             };
 
             int bytesWritten = Writer.WriteCode(span, code);
-            Assert.AreEqual(72, bytesWritten);
+            Assert.AreEqual(76, bytesWritten);
             
             // Header
             Assert.AreEqual((byte)CodeChannel.File, span[0]);
@@ -135,11 +135,11 @@ namespace DuetUnitTest.SPI
             intValue = MemoryMarshal.Read<int>(span.Slice(44, 4));
             Assert.AreEqual(6, intValue);
 
-            // Fifth parameter (E12:3.45)
+            // Fifth parameter (E12:3.45:5.67)
             Assert.AreEqual((byte)'E', span[48]);
             Assert.AreEqual((byte)DataType.FloatArray, span[49]);
             intValue = MemoryMarshal.Read<int>(span.Slice(52, 4));
-            Assert.AreEqual(2, intValue);
+            Assert.AreEqual(3, intValue);
             
             // Payload of fourth parameter ("test")
             string stringValue = Encoding.UTF8.GetString(span.Slice(56, 6));
@@ -147,11 +147,13 @@ namespace DuetUnitTest.SPI
             Assert.AreEqual(0, span[62]);
             Assert.AreEqual(0, span[63]);
             
-            // Payload of fifth parameter (12:3.45)
+            // Payload of fifth parameter (12:3.45:5.67)
             floatValue = MemoryMarshal.Read<float>(span.Slice(64, 4));
             Assert.AreEqual(12, floatValue, 0.00001);
             floatValue = MemoryMarshal.Read<float>(span.Slice(68, 4));
             Assert.AreEqual(3.45, floatValue, 0.00001);
+            floatValue = MemoryMarshal.Read<float>(span.Slice(72, 4));
+            Assert.AreEqual(5.67, floatValue, 0.00001);
         }
         
         [Test]
