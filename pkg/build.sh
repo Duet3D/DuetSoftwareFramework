@@ -1,122 +1,56 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
-pwd=$(pwd)
-rm -rf /tmp/duet
-mkdir /tmp/duet
 
-dcsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" ../src/DuetControlServer/DuetControlServer.csproj)
-dwsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" ../src/DuetWebServer/DuetWebServer.csproj)
-sdver=$(cat $pwd/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
-signkey=C406404B2459FE0B1C6CC19D3738126EDA91C86B
+PKG_DIR=$(readlink -f $(dirname @0))
+COMMON_DIR=$PKG_DIR/common
+PACKAGE_TYPES="deb"
+HELP=0
 
-export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
+source $COMMON_DIR/parse_args
 
-build() {
-	echo "Building $1 configuration (DCS $dcsver and DWS $dwsver),,,"
-	rm -rf /tmp/duet/files
-	mkdir /tmp/duet/files
+print_help_top_level() {
+cat <<EOF
+Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
+	[ --build-type=< Debug | Release > ]
+	[ --dest-dir=< destination directory > ]
+	[ --signing-key=< key id or path to keyfile > ]
+	[ --no-pkgs ]
+	[ --no-build ]
+	[ --no-cleanup ]
+	[ --print-debug ]
+	[ --help ]
+	[ --packages=[<package>, ... ]
+	[ <package-type> ... ]
 
-	echo "- Building packages..."
-	cd $pwd/../src/DuetControlServer
-	dotnet publish -r linux-arm -c $1 -o /tmp/duet/files
-	cd $pwd/../src/DuetWebServer
-	dotnet publish -r linux-arm -c $1 -o /tmp/duet/files
-	cd $pwd/../examples/CodeConsole
-	dotnet publish -r linux-arm -c $1 -o /tmp/duet/files
-	cd $pwd/../examples/CodeLogger
-	dotnet publish -r linux-arm -c $1 -o /tmp/duet/files
+Runs the build script in the <package-type> directory.
+If more than 1 package-type is specified, they will be run in succession.
+If none are specified, all will be run.
 
-	echo "- Arranging files..."
-	mkdir -p /tmp/duet/duetcontrolserver_$dcsver/opt/dsf/bin
-	cp -r $pwd/duetcontrolserver/* /tmp/duet/duetcontrolserver_$dcsver
-	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duetcontrolserver_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duetcontrolserver_$dcsver/DEBIAN/changelog
-	mv /tmp/duet/files/DuetControlServer* /tmp/duet/duetcontrolserver_$dcsver/opt/dsf/bin
+target-arch:   Defaults to "armhf" for deb packages and "armhfp" for rpm packages.
+build-type:    Defaults to "Debug".
+dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".
+signing-key:   A key id or a path preceeded by an '@' to a file containing a
+               key id.
+               No default.  If not provided, the packages won't be signed.
+no-pkgs:       Builds but doesn't package the results.
+no-build:      Packages existing builds.
+no-cleanup:    Prevents the work subdirectories in <dest-dir> from being cleaned up.
+               Automatically set if no-pkgs was specified.
+print-debug:   Prints the setup variables and exits.
+packages:      One or more of progs, sd, dwc, meta separated by commas.
+               If none are specified, all will be built.
 
-	mkdir -p /tmp/duet/duetwebserver_$dwsver/opt/dsf/bin
-	cp -r $pwd/duetwebserver/* /tmp/duet/duetwebserver_$dwsver
-	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duetwebserver_$dwsver/DEBIAN/control
-	sed -i "s/DWSVER/$dwsver/g" /tmp/duet/duetwebserver_$dwsver/DEBIAN/control
-	sed -i "s/DWSVER/$dwsver/g" /tmp/duet/duetwebserver_$dwsver/DEBIAN/changelog
-	mv /tmp/duet/files/DuetWebServer* /tmp/duet/duetwebserver_$dwsver/opt/dsf/bin
-	mv /tmp/duet/files/appsettings.* /tmp/duet/duetwebserver_$dwsver/opt/dsf/bin
-	mv /tmp/duet/files/web.config /tmp/duet/duetwebserver_$dwsver/opt/dsf/bin
-
-	mkdir -p /tmp/duet/duettools_$dcsver/opt/dsf/bin
-	cp -r $pwd/duettools/* /tmp/duet/duettools_$dcsver
-	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duettools_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duettools_$dcsver/DEBIAN/changelog
-	mv /tmp/duet/files/CodeConsole* /tmp/duet/duettools_$dcsver/opt/dsf/bin
-	mv /tmp/duet/files/CodeLogger* /tmp/duet/duettools_$dcsver/opt/dsf/bin
-
-	mkdir -p /tmp/duet/duetruntime_$dcsver/opt/dsf/bin
-	cp -r $pwd/duetruntime/* /tmp/duet/duetruntime_$dcsver
-	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duetruntime_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duetruntime_$dcsver/DEBIAN/changelog
-	mv /tmp/duet/files/* /tmp/duet/duetruntime_$dcsver/opt/dsf/bin
-	rmdir /tmp/duet/files
-
-	echo "- Building packages..."
-	cd /tmp/duet
-	dpkg-deb --build duetcontrolserver_$dcsver
-	dpkg-deb --build duetwebserver_$dwsver
-	dpkg-deb --build duettools_$dcsver
-	dpkg-deb --build duetruntime_$dcsver
+EOF
+exit 0
 }
 
-build_sd() {
-	echo "Building virtual SD card package v$sdver..."
-	cp -r $pwd/duetsd /tmp/duet/duetsd_$sdver
-	sed -i "s/SDVER/$sdver/g" /tmp/duet/duetsd_$sdver/DEBIAN/control
-	dpkg-deb --build duetsd_$sdver
-}
+[ $HELP -eq 1 ] && print_help_top_level
 
-build_dwc() {
-	echo "Building DWC2..."
+[ ${#POSITIONAL_ARGS[@]} -gt 0 ] && PACKAGE_TYPES=${POSITIONAL_ARGS[@]}
 
-	echo "- Cloning repository..."
-	#git clone -q --single-branch --branch next https://github.com/chrishamm/DuetWebControl.git /tmp/duet/DuetWebControl
-	cp -r /home/christian/duet/DuetWebControl /tmp/duet/DuetWebControl
-	dwcver=$(jq -r ".version" /tmp/duet/DuetWebControl/package.json)-2
-	cd /tmp/duet/DuetWebControl
-
-	echo "- Installing dependencies..."
-	npm install > /dev/null
-
-	echo "- Building web interface..."
-	npm run build > /dev/null
-
-	echo "- Arranging files..."
-	mkdir -p /tmp/duet/duetwebcontrol_$dwcver/opt/dsf/dwc2
-	cp -r $pwd/duetwebcontrol/* /tmp/duet/duetwebcontrol_$dwcver
-	sed -i "s/DWCVER/$dwcver/g" /tmp/duet/duetwebcontrol_$dwcver/DEBIAN/control
-	unzip -q /tmp/duet/DuetWebControl/dist/DuetWebControl-Duet3.zip -d /tmp/duet/duetwebcontrol_$dwcver/opt/dsf/dwc2
-	rm -rf /tmp/duet/DuetWebControl
-
-	echo "- Building package..."
-	cd /tmp/duet
-	dpkg-deb --build duetwebcontrol_$dwcver
-}
-
-build_meta() {
-	echo "Building meta package..."
-
-	cp -r $pwd/duetsoftwareframework /tmp/duet/duetsoftwareframework_$dcsver
-	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duetsoftwareframework_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$dcsver/g" /tmp/duet/duetsoftwareframework_$dcsver/DEBIAN/changelog
-	dpkg-deb --build duetsoftwareframework_$dcsver
-}
-
-#build "Release"
-build "Debug"
-build_sd
-build_dwc
-build_meta
-
-dpkg-sig -k $signkey -s builder *.deb
-
-mkdir -p ./dists/buster/dsf/binary-armhf
-mv *.deb ./dists/buster/dsf/binary-armhf
-dpkg-scanpackages dists/buster/dsf/binary-armhf /dev/null > ./dists/buster/dsf/binary-armhf/Packages
-dpkg-scanpackages dists/buster/dsf/binary-armhf /dev/null | gzip -9c > ./dists/buster/dsf/binary-armhf/Packages.gz
+for pt in $PACKAGE_TYPES ; do
+	build_script=$PKG_DIR/$pt/build.sh
+	[ ! -x $build_script ] && { echo "No build script for package type $pt.  Skipping." ; continue ; }
+	$build_script "$@"
+done

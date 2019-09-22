@@ -1,0 +1,26 @@
+declare -i OPTION_COUNT=0
+declare -a POSITIONAL_ARGS
+for a in $* ; do
+	OPTION_COUNT+=1
+	case "$a" in
+		--*=*)
+			[[ $a =~ --([^=]+)=(.*) ]]
+			l=${BASH_REMATCH[1]//-/_}
+			r=${BASH_REMATCH[2]}
+			eval ${l^^}=\"$r\"
+			;;
+		--no-*)
+			[[ $a =~ --no-(.+) ]]
+			l=${BASH_REMATCH[1]//-/_}
+			eval ${l^^}=0
+			;;
+		--*)
+			[[ $a =~ --(.+) ]]
+			l=${BASH_REMATCH[1]//-/_}
+			eval ${l^^}=1
+			;;
+		*)
+			POSITIONAL_ARGS+=($a)
+			;;
+	esac
+done
