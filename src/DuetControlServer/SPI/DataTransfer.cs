@@ -50,7 +50,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Set up the SPI device and the controller for the transfer ready pin
         /// </summary>
-        public static void Initialize()
+        public static void Init()
         {
             // Initialize TX header. This only needs to happen once
             Serialization.Writer.InitTransferHeader(ref _txHeader);
@@ -62,6 +62,21 @@ namespace DuetControlServer.SPI
 
             // Initialize SPI device
             _spiDevice = new SpiDevice(Settings.SpiDevice, Settings.SpiFrequency);
+
+            // Check if large transfers can be performed
+            try
+            {
+                int maxSpiBufferSize = int.Parse(File.ReadAllText("/sys/module/spidev/parameters/bufsiz"));
+                if (maxSpiBufferSize < Communication.Consts.BufferSize)
+                {
+                    Console.WriteLine($"[warn] Kernel SPI buffer size is smaller than RepRapFirmware buffer size ({maxSpiBufferSize} configured vs {Communication.Consts.BufferSize} required)");
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("[warn] Failed to retrieve Kernel SPI buffer size:");
+                Console.WriteLine(e);
+            }
         }
 
         private static decimal GetFullTransfersPerSecond()

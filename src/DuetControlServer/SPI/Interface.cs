@@ -51,11 +51,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Initialize the SPI interface but do not connect yet
         /// </summary>
-        public static void Init()
-        {
-            // Initialize SPI and GPIO pin
-            DataTransfer.Initialize();
-        }
+        public static void Init() => DataTransfer.Init();
 
         /// <summary>
         /// Print diagnostics of this class
@@ -392,8 +388,9 @@ namespace DuetControlServer.SPI
                 {
                     await Invalidate("Firmware update imminent");
                     await PerformFirmwareUpdate();
-                    if (Settings.UpdateOnly)
+                    if (Program.UpdateOnly)
                     {
+                        // Stop after installing the firmware update
                         break;
                     }
                 }
@@ -561,7 +558,7 @@ namespace DuetControlServer.SPI
         {
             Communication.FirmwareRequests.Request request = (Communication.FirmwareRequests.Request)packet.Request;
 
-            if (Settings.UpdateOnly && request != Communication.FirmwareRequests.Request.ObjectModel)
+            if (Program.UpdateOnly && request != Communication.FirmwareRequests.Request.ObjectModel)
             {
                 // Don't process any requests except for object model responses if only the firmware is supposed to be updated
                 return Task.CompletedTask;

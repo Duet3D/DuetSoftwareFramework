@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -10,6 +11,7 @@ using DuetControlServer.Codes;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.SPI;
 using Newtonsoft.Json;
+using Nito.AsyncEx;
 
 namespace DuetControlServer.Commands
 {
@@ -18,6 +20,99 @@ namespace DuetControlServer.Commands
     /// </summary>
     public class Code : DuetAPI.Commands.Code
     {
+        #region Code Scheduler
+        /// <summary>
+        /// Queue of semaphores to guarantee the ordered execution of incoming G/M/T-codes
+        /// </summary>
+        private static Queue<AsyncSemaphore>[] _codeTickets;
+
+        /// <summary>
+        /// List of cancellation tokens to cancel pending codes while they are waiting for their execution
+        /// </summary>
+        private static CancellationTokenSource[] _cancellationTokenSources;
+
+        /// <summary>
+        /// Initialize the code scheduler
+        /// </summary>
+        public static void InitScheduler()
+        {
+            int numCodeChannels = Enum.GetValues(typeof(CodeChannel)).Length;
+            _codeTickets = new Queue<AsyncSemaphore>[numCodeChannels];
+            _cancellationTokenSources = new CancellationTokenSource[numCodeChannels];
+            for (int i = 0; i < numCodeChannels; i++)
+            {
+                _codeTickets[i] = new Queue<AsyncSemaphore>();
+                _cancellationTokenSources[i] = new CancellationTokenSource();
+            }
+        }
+
+        /// <summary>
+        /// Cancel pending codes of the given channel
+        /// </summary>
+        /// <param name="channel">Channel to cancel codes from</param>
+        public static void CancelPending(CodeChannel channel)
+        {
+            lock (_cancellationTokenSources)
+            {
+                // Cancel and dispose the existing CTS
+                CancellationTokenSource oldCTS = _cancellationTokenSources[(int)channel];
+                oldCTS.Cancel();
+                oldCTS.Dispose();
+
+                // Create a new one
+                _cancellationTokenSources[(int)channel] = new CancellationTokenSource();
+            }
+        }
+
+        private AsyncSemaphore GetTicket()
+        {
+            lock (_codeTickets)
+            {
+                Queue<AsyncSemaphore> tickets = _codeTickets[(int)Channel];
+                if (tickets.TryPeek(out _))
+                {
+                    // There are codes being executed. Create a new semaphore
+                    AsyncSemaphore semaphore = new AsyncSemaphore(1);
+                    tickets.Enqueue(semaphore);
+                    return semaphore;
+                }
+                else
+                {
+                    // No codes are being executed, we don't need to wait for execution
+                    tickets.Enqueue(null);
+                    return null;
+                }
+            }
+        }
+
+        private async Task WaitForExecution(AsyncSemaphore ticket)
+        {
+            // Get the current cancellation token of this channel
+            CancellationToken channelToken;
+            lock (_cancellationTokenSources)
+            {
+                channelToken = _cancellationTokenSources[(int)Channel].Token;
+            }
+
+            // Wait until the last code has been processed or sent to RRF
+            using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, channelToken))
+            {
+                await ticket.WaitAsync(cts.Token);
+            }
+        }
+
+        private void StartNextCode()
+        {
+            lock (_codeTickets)
+            {
+                if (_codeTickets[(int)Channel].TryDequeue(out AsyncSemaphore semaphore))
+                {
+                    semaphore?.Release();
+                }
+            }
+        }
+        #endregion
+
         /// <summary>
         /// Create an empty Code instance
         /// </summary>
@@ -60,11 +155,6 @@ namespace DuetControlServer.Commands
             return codes;
         }
 
-        private TaskCompletionSource<CodeResult> _tcs;
-        internal void SetCanceled() => _tcs.TrySetCanceled();
-        internal void SetException(Exception e) => _tcs.TrySetException(e);
-        internal void SetResult(CodeResult result) => _tcs.TrySetResult(result);
-
         /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish
         /// </summary>
@@ -72,21 +162,22 @@ namespace DuetControlServer.Commands
         /// <exception cref="TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
         public override Task<CodeResult> Execute()
         {
-            if (Flags.HasFlag(CodeFlags.IsPrioritized))
+            if (!Flags.HasFlag(CodeFlags.IsPrioritized) && !Flags.HasFlag(CodeFlags.IsFromMacro))
             {
-                // This type of code bypasses queued codes...
-                return Process();
+                AsyncSemaphore ticket = GetTicket();
+                if (ticket != null)
+                {
+                    return Task.Run(async () =>
+                    {
+                        await WaitForExecution(ticket);
+                        return await Process();
+                    });
+                }
             }
-
-            if (_tcs == null)
-            {
-                _tcs = new TaskCompletionSource<CodeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-                Execution.Execute(this);
-            }
-            return _tcs.Task;
+            return Process();
         }
 
-        internal async Task<CodeResult> Process()
+        private async Task<CodeResult> Process()
         {
             Console.WriteLine($"[info] Processing {this}");
 
@@ -94,7 +185,8 @@ namespace DuetControlServer.Commands
             CodeResult result = InternallyProcessed ? null : await ProcessInternally();
             if (result != null)
             {
-                return await OnCodeExecuted(result);
+                StartNextCode();
+                return await CodeExecuted(result);
             }
 
             // Send it to RepRapFirmware unless it is a comment
@@ -111,7 +203,7 @@ namespace DuetControlServer.Commands
                             CodeResult res = await codeTask;
                             if (res != null)
                             {
-                                res = await OnCodeExecuted(res);
+                                res = await CodeExecuted(res);
                                 await Model.Provider.Output(res);
                             }
                         }
@@ -120,22 +212,28 @@ namespace DuetControlServer.Commands
                             Console.WriteLine($"[err] {this} -> {ae.InnerException.Message}");
                         }
                     });
+
+                    StartNextCode();
                     return null;
                 }
                 else
                 {
+                    // RepRapFirmware buffers a number of codes so a new code can be started before the last one has finished
+                    StartNextCode();
+
                     // Wait for the code to complete
                     result = await Interface.ProcessCode(this);
                     if (result != null)
                     {
-                        result = await OnCodeExecuted(result);
+                        result = await CodeExecuted(result);
                     }
                 }
             }
             else
             {
                 // Return a standard result for comments
-                result = await OnCodeExecuted(new CodeResult());
+                result = await CodeExecuted(new CodeResult());
+                StartNextCode();
             }
 
             return result;
@@ -197,7 +295,7 @@ namespace DuetControlServer.Commands
             return null;
         }
 
-        private async Task<CodeResult> OnCodeExecuted(CodeResult result)
+        private async Task<CodeResult> CodeExecuted(CodeResult result)
         {
             // Process code result
             switch (Type)

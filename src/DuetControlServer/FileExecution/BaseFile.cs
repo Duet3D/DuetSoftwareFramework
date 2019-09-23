@@ -102,7 +102,6 @@ namespace DuetControlServer.FileExecution
             bool codeRead, enforcingAbsolutePosition = false;
             do
             {
-                // FIXME: G53 may apply to multiple codes on the same line...
                 codeRead = DuetAPI.Commands.Code.Parse(_reader, code, ref enforcingAbsolutePosition);
                 LineNumber = code.LineNumber.Value;
             }

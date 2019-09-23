@@ -245,7 +245,7 @@ namespace DuetControlServer.SPI
                     {
                         try
                         {
-                            CodeResult result = await code.Process();
+                            CodeResult result = await code.Execute();
                             if (!queuedCode.IsReadyToSend)
                             {
                                 // Macro codes need special treatment because they may complete before they are actually sent to RepRapFirmware
@@ -665,7 +665,7 @@ namespace DuetControlServer.SPI
         {
             bool resourceInvalidated = false;
 
-            Codes.Execution.Invalidate(Channel);
+            Commands.Code.CancelPending(Channel);
 
             while (SuspendedCodes.TryPop(out Queue<QueuedCode> suspendedCodes))
             {

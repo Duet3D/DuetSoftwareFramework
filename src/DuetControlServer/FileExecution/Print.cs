@@ -132,7 +132,7 @@ namespace DuetControlServer.FileExecution
                     }
 
                     codes.Enqueue(code);
-                    codeTasks.Enqueue(code.Process());
+                    codeTasks.Enqueue(code.Execute());
                 }
 
                 // Is there anything to do?

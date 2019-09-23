@@ -17,23 +17,55 @@ namespace DuetControlServer
         public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
 
         /// <summary>
+        /// Indicates if this program is only launched to update the Duet 3 firmware
+        /// </summary>
+        public static bool UpdateOnly;
+
+        private static void Write(string message)
+        {
+            if (!UpdateOnly)
+            {
+                Console.Write(message);
+            }
+        }
+
+        private static void WriteLine(string line = "")
+        {
+            if (!UpdateOnly)
+            {
+                Console.WriteLine(line);
+            }
+        }
+
+        /// <summary>
         /// Entry point of the program
         /// </summary>
         /// <param name="args">Command-line arguments</param>
         /// <returns>Asynchronous task</returns>
         static async Task Main(string[] args)
         {
-            Console.WriteLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
-            Console.WriteLine("Written by Christian Hammacher for Duet3D");
-            Console.WriteLine("Licensed under the terms of the GNU Public License Version 3");
-            Console.WriteLine();
+            // Check if only the firmware is supposed to be updated
+            foreach (string arg in args)
+            {
+                if (arg == "-u" || arg == "--update")
+                {
+                    UpdateOnly = true;
+                    break;
+                }
+            }
+
+            // Display welcome message
+            WriteLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
+            WriteLine("Written by Christian Hammacher for Duet3D");
+            WriteLine("Licensed under the terms of the GNU Public License Version 3");
+            WriteLine();
 
             // Initialize settings
-            Console.Write("Loading settings... ");
+            Write("Loading settings... ");
             try
             {
                 Settings.Load(args);
-                Console.WriteLine("Done!");
+                WriteLine("Done!");
             }
             catch (Exception e)
             {
@@ -47,9 +79,9 @@ namespace DuetControlServer
                 try
                 {
                     await testConnection.Connect(Settings.SocketPath);
-                    if (Settings.UpdateOnly)
+                    if (UpdateOnly)
                     {
-                        Console.Write("Another instance is already running, sending update request to it... ");
+                        Console.Write("Sending update request to DCS... ");
                         try
                         {
                             await testConnection.PerformCode(new DuetAPI.Commands.Code
@@ -62,8 +94,7 @@ namespace DuetControlServer
                         }
                         catch (Exception e)
                         {
-                            Console.Write("Error: ");
-                            Console.WriteLine(e);
+                            Console.WriteLine($"Error: {e.Message}");
                         }
                     }
                     else
@@ -79,11 +110,12 @@ namespace DuetControlServer
             }
 
             // Initialise object model
-            Console.Write("Initialising object model... ");
+            Write("Initialising variables... ");
             try
             {
+                Commands.Code.InitScheduler();
                 Model.Provider.Init();
-                Console.WriteLine("Done!");
+                WriteLine("Done!");
             }
             catch (Exception e)
             {
@@ -92,7 +124,7 @@ namespace DuetControlServer
             }
 
             // Connect to RRF controller
-            Console.Write("Connecting to RepRapFirmware... ");
+            Write("Connecting to RepRapFirmware... ");
             try
             {
                 SPI.Interface.Init();
@@ -101,7 +133,7 @@ namespace DuetControlServer
                     Console.WriteLine("Error: Duet is not available");
                     return;
                 }
-                Console.WriteLine("Done!");
+                WriteLine("Done!");
             }
             catch (AggregateException ae)
             {
@@ -110,11 +142,11 @@ namespace DuetControlServer
             }
 
             // Start up IPC server
-            Console.Write("Creating IPC socket... ");
+            Write("Creating IPC socket... ");
             try
             {
                 Server.CreateSocket();
-                Console.WriteLine("Done!");
+                WriteLine("Done!");
             }
             catch (Exception e)
             {
@@ -122,14 +154,13 @@ namespace DuetControlServer
                 return;
             }
             
-            Console.WriteLine();
+            WriteLine();
 
             // Start main tasks in the background
             Task spiTask = Task.Run(SPI.Interface.Run, CancelSource.Token);
             Task ipcTask = Task.Run(Server.AcceptConnections, CancelSource.Token);
             Task modelUpdateTask = Task.Run(Model.UpdateTask.UpdatePeriodically, CancelSource.Token);
-            Task codeTask = Task.Run(Codes.Execution.ProcessCodes, CancelSource.Token);
-            Task[] taskList = { spiTask, ipcTask, modelUpdateTask, codeTask };
+            Task[] taskList = { spiTask, ipcTask, modelUpdateTask };
 
             // Deal with program termination requests (SIGTERM) and wait for program termination
             AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) =>
@@ -144,7 +175,7 @@ namespace DuetControlServer
             await Task.WhenAny(taskList);
 
             // Tell other tasks to stop in case this is an abnormal program termination
-            if (Settings.UpdateOnly)
+            if (UpdateOnly)
             {
                 CancelSource.Cancel();
             }
@@ -154,7 +185,6 @@ namespace DuetControlServer
                 if (spiTask.IsCompleted) { Console.WriteLine("SPI task terminated");  }
                 if (ipcTask.IsCompleted) { Console.WriteLine("IPC task terminated");  }
                 if (modelUpdateTask.IsCompleted) { Console.WriteLine("Model task terminated"); }
-                if (codeTask.IsCompleted) { Console.WriteLine("Code task terminated"); }
                 CancelSource.Cancel();
             }
 

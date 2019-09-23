@@ -667,7 +667,7 @@ namespace DuetControlServer.Model
                     }
 
                     // Check if the firmware is supposed to be updated only. When this finishes, DCS is terminated.
-                    if (response.boardName != null && Settings.UpdateOnly && !_updating)
+                    if (response.boardName != null && Program.UpdateOnly && !_updating)
                     {
                         _updating = true;
 

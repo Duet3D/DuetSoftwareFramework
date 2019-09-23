@@ -65,7 +65,7 @@ namespace DuetControlServer
         /// Frequency to use for SPI transfers
         /// </summary>
         [JsonProperty]
-        public static int SpiFrequency = 1_000_000;
+        public static int SpiFrequency = 2_000_000;
 
         /// <summary>
         /// Maximum allowed delay between data exchanges during a full transfer (in ms)
@@ -123,10 +123,10 @@ namespace DuetControlServer
         public static double ModelUpdateInterval { get; set; } = 125.0;
 
         /// <summary>
-        /// How many bytes to parse max at the beginning and end of a file to retrieve G-code file information
+        /// How many bytes to parse max at the beginning and end of a file to retrieve G-code file information (256KiB)
         /// </summary>
         [JsonProperty]
-        public static uint FileInfoReadLimit { get; set; } = 65536;
+        public static uint FileInfoReadLimit { get; set; } = 262144;
 
         /// <summary>
         /// Maximum allowed layer height. Used by the file info parser
@@ -195,12 +195,6 @@ namespace DuetControlServer
         };
 
         /// <summary>
-        /// Indicates if the firmware is supposed to be updated
-        /// </summary>
-        [JsonIgnore]
-        public static bool UpdateOnly { get; set; }
-
-        /// <summary>
         /// Load settings from the config file or create it if it does not already exist
         /// </summary>
         /// <param name="args">Command-line arguments</param>
@@ -256,10 +250,6 @@ namespace DuetControlServer
                     Console.WriteLine("-S, --socket: Specify the UNIX socket path");
                     Console.WriteLine("-b, --base-directory: Set the base path for system and G-code files");
                     Console.WriteLine("-u, --update: Update RepRapFirmware when the board type has been determined");
-                }
-                else if (arg == "-u" || arg == "--update")
-                {
-                    Settings.UpdateOnly = true;
                 }
                 else if (lastArg == "-S" || lastArg == "--socket")
                 {

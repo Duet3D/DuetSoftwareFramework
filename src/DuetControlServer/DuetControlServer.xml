@@ -4,27 +4,6 @@
         <name>DuetControlServer</name>
     </assembly>
     <members>
-        <member name="M:DuetControlServer.Codes.Execution.ProcessCodes">
-            <summary>
-            Start dealing with codes in an ordered way
-            </summary>
-            <remarks>
-            This class is currently NOT used by file prints since it would conflict with the buffering concept
-            </remarks>
-        </member>
-        <member name="M:DuetControlServer.Codes.Execution.Invalidate(DuetAPI.CodeChannel)">
-            <summary>
-            Invalidate all buffered codes of the given channel
-            </summary>
-            <param name="channel">Code channel to invalidate</param>
-        </member>
-        <member name="M:DuetControlServer.Codes.Execution.Execute(DuetControlServer.Commands.Code)">
-            <summary>
-            Enqueue a G/M/T-code for execution
-            </summary>
-            <param name="code">Code to execute</param>
-        </member>
-        <!-- Badly formed XML comment ignored for member "M:DuetControlServer.Codes.Execution.ExecuteCodes(DuetAPI.CodeChannel)" -->
         <member name="T:DuetControlServer.Codes.GCodes">
             <summary>
             Static class that processes G-codes in the control server
@@ -91,6 +70,27 @@
             <summary>
             Implementation of the <see cref="T:DuetAPI.Commands.Code"/> command
             </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code._codeTickets">
+            <summary>
+            Queue of semaphores to guarantee the ordered execution of incoming G/M/T-codes
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code._cancellationTokenSources">
+            <summary>
+            List of cancellation tokens to cancel pending codes while they are waiting for their execution
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.InitScheduler">
+            <summary>
+            Initialize the code scheduler
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.CancelPending(DuetAPI.CodeChannel)">
+            <summary>
+            Cancel pending codes of the given channel
+            </summary>
+            <param name="channel">Channel to cancel codes from</param>
         </member>
         <member name="M:DuetControlServer.Commands.Code.#ctor">
             <summary>
@@ -718,6 +718,11 @@
             Global cancel source for program termination
             </summary>
         </member>
+        <member name="F:DuetControlServer.Program.UpdateOnly">
+            <summary>
+            Indicates if this program is only launched to update the Duet 3 firmware
+            </summary>
+        </member>
         <member name="M:DuetControlServer.Program.Main(System.String[])">
             <summary>
             Entry point of the program
@@ -823,7 +828,7 @@
         </member>
         <member name="P:DuetControlServer.Settings.FileInfoReadLimit">
             <summary>
-            How many bytes to parse max at the beginning and end of a file to retrieve G-code file information
+            How many bytes to parse max at the beginning and end of a file to retrieve G-code file information (256KiB)
             </summary>
         </member>
         <member name="P:DuetControlServer.Settings.MaxLayerHeight">
@@ -854,11 +859,6 @@
         <member name="P:DuetControlServer.Settings.SimulatedTimeFilters">
             <summary>
             Regular expressions for finding the simulated time
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.Settings.UpdateOnly">
-            <summary>
-            Indicates if the firmware is supposed to be updated
             </summary>
         </member>
         <member name="M:DuetControlServer.Settings.Load(System.String[])">
@@ -2143,7 +2143,7 @@
             Helper class for SPI data transfers
             </summary>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.Initialize">
+        <member name="M:DuetControlServer.SPI.DataTransfer.Init">
             <summary>
             Set up the SPI device and the controller for the transfer ready pin
             </summary>
