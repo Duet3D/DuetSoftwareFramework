@@ -169,17 +169,18 @@ build_dwc() {
 	echo "Building DWC2..."
 
 	if [ ! -d $DEST_DIR/DuetWebControl ] ; then
-		echo "- Cloning repository..."
-		if [ -d /home/christian/duet/DuetWebControl ] ; then
-			cp -r /home/christian/duet/DuetWebControl $DEST_DIR/DuetWebControl
+		if [ -d ~/duet/DuetWebControl ] ; then
+			echo "- Using local repository..."
+			cp -r ~/duet/DuetWebControl $DEST_DIR/DuetWebControl
 		else
+			echo "- Cloning repository..."
 			git clone -q --single-branch --branch next https://github.com/chrishamm/DuetWebControl.git $DEST_DIR/DuetWebControl
 		fi
 	else
 		echo "- Using existing repository in $DEST_DIR/DuetWebControl"
 	fi
 
-	dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)-2
+	dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)-5
 	>/dev/null pushd $DEST_DIR/DuetWebControl
 
 	echo "- Installing dependencies..."

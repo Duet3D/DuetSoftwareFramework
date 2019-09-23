@@ -1,5 +1,5 @@
 Package: reprapfirmware
-Version: DCSVER
+Version: DCSVER-1
 Architecture: all
 Depends: duetcontrolserver (>= 1.0.3.4), duetsd
 Priority: standard
