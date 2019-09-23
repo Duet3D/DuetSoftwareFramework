@@ -1,5 +1,8 @@
 #!/bin/sh
 
-# Instruct DuetControlServer to update the firmware. Do this only on ARMv7 and AARCH64
-[[ -n $(cat /proc/cpuinfo | grep -i -e armv7 -e aarch64) ]] && /opt/dsf/bin/DuetControlServer -u
-
+# Instruct DuetControlServer to update the firmware.
+# Do this only if GPIO and SPI devices are available
+GPIOCHIP_DEVICES=ls /dev/gpiochip 2>/dev/null
+SPI_DEVICES=ls /dev/spidev 2>/dev/null
+[ ! -z $GPIPCHIP_DEVICES ] && [ ! -z $SPI_DEVICES ] && /opt/dsf/bin/DuetControlServer -u
+exit 0
