@@ -1,0 +1,6 @@
+reprapfirmware (RRFVER) unstable; urgency=medium
+
+  * See https://github.com/dc42/RepRapFirmware for a full list of changes
+
+ -- Duet3D Packaging Authority <pkg@duet3d.com>  Thu, 23 Sep 2019 18:06:57 +0200
+

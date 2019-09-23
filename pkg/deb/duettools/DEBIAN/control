@@ -4,7 +4,7 @@ Section: electronics
 Priority: optional
 Architecture: TARGET_ARCH
 Depends: duetcontrolserver (= DCSVER)
-Maintainer: RepRapFirmware <package@reprapfirmware.org>
-Homepage: https://reprapfirmware.org
+Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
+Homepage: https://pkg.duet3d.com
 Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git
 Description: Optional tools (code examples)

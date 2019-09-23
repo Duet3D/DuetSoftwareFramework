@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# Instruct DuetControlServer to update the firmware. Do this only on ARMv7 and AARCH64
+[[ -n $(cat /proc/cpuinfo | grep -i -e armv7 -e aarch64) ]] && /opt/dsf/bin/DuetControlServer -u
+

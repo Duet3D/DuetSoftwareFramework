@@ -1,18 +1,22 @@
 {
-  "SpiFrequency": 1000000,
+  "SpiDevice": "/dev/spidev0.0",
+  "SpiFrequency": 2000000,
   "SocketPath": "/var/run/duet.sock",
   "Backlog": 4,
   "BaseDirectory": "/opt/dsf/sd",
   "HostUpdateInterval": 4000,
+  "ConfigUpdateInterval": 5000,
   "MaxMessageAge": 60.0,
-  "SpiBusID": 0,
-  "SpiChipSelectLine": 0,
   "SpiTransferTimeout": 500,
   "MaxSpiRetries": 3,
   "SpiPollDelay": 25,
+  "GpioChipDevice": "/dev/gpiochip0",
   "TransferReadyPin": 25,
-  "MaxUpdateDelay": 250.0,
-  "FileInfoReadLimit": 32768,
+  "BufferedPrintCodes": 32,
+  "BufferedMacroCodes": 16,
+  "MaxBufferSpacePerChannel": 768,
+  "ModelUpdateInterval": 125.0,
+  "FileInfoReadLimit": 262144,
   "MaxLayerHeight": 0.9,
   "LayerHeightFilters": [
     {
@@ -99,7 +103,5 @@
       "Pattern": "; Simulated print time\\D+(?<s>(\\d+\\.?\\d*))",
       "Options": 17
     }
-  ],
-  "BufferedPrintCodes": 32,
-  "BufferedMacroCodes": 16
+  ]
 }

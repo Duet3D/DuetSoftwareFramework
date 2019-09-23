@@ -1,6 +1,6 @@
 duetwebcontrol (DCSVER) unstable; urgency=medium
 
-  * See https://github.com/chrishamm/DuetSoftwareFramework for a full list of changes
+  * See https://github.com/chrishamm/DuetWebControl for a full list of changes
 
- -- RepRapFirmware.org <package@reprapfirmware.org>  Thu, 23 May 2019 15:06:55 +0200
+ -- Duet3D Packaging Authority <pkg@duet3d.com>  Thu, 23 May 2019 15:06:55 +0200
 

@@ -3,7 +3,8 @@ Version: DCSVER
 Section: electronics
 Priority: standard
 Architecture: TARGET_ARCH
-Depends: duetcontrolserver, duetsd, duettools, duetwebserver, duetwebcontrol
-Maintainer: RepRapFirmware <package@reprapfirmware.org>
-Homepage: https://reprapfirmware.org
+Depends: duetcontrolserver (= DCSVER), duetsd (= SDVER), duettools (= DCSVER), duetwebserver (= DWSVER), duetwebcontrol (= DWCVER), reprapfirmware (= DCSVER)
+Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
+Homepage: https://pkg.duet3d.com
+Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git
 Description: Meta package for the full Duet software framework

@@ -1,0 +1,9 @@
+Package: reprapfirmware
+Version: DCSVER
+Architecture: all
+Depends: duetcontrolserver (>= 1.0.3.4), duetsd
+Priority: standard
+Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
+Homepage: https://pkg.duet3d.com
+Vcs-Git: https://github.com/dc42/RepRapFirmware.git
+Description: RepRapFirmware Software Bundle

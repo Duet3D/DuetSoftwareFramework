@@ -39,6 +39,11 @@ pkg_progs() {
 pkg_sd() {
 	echo "- Packaging virtual SD card package v$sdver..."
 
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/filaments
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/gcodes
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/macros
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/sys
+
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetsd_$sdver/DEBIAN/control
 	sed -i "s/SDVER/$sdver/g" $DEST_DIR/duetsd_$sdver/DEBIAN/control
 	dpkg-deb --build $DEST_DIR/duetsd_$sdver $DEST_DIR
@@ -49,7 +54,7 @@ pkg_dwc() {
 
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetwebcontrol_$dwcver/DEBIAN/control
 	sed -i "s/DWCVER/$dwcver/g" $DEST_DIR/duetwebcontrol_$dwcver/DEBIAN/control
-	dpkg-deb --build $DEST_DIR/duetwebcontrol_$dwcver $DEST_DIR/
+	dpkg-deb --build $DEST_DIR/duetwebcontrol_$dwcver $DEST_DIR
 }
 
 
@@ -58,6 +63,9 @@ pkg_meta() {
 
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
 	sed -i "s/DCSVER/$dcsver/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
+	sed -i "s/SDVER/$sdver/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
+	sed -i "s/DWSVER/$dwsver/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
+	sed -i "s/DWCVER/$dwcver/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
 	sed -i "s/DCSVER/$dcsver/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/changelog
 	dpkg-deb --build $DEST_DIR/duetsoftwareframework_$dcsver $DEST_DIR/
 }
@@ -77,11 +85,11 @@ if [ $PKGS -eq 1 ] ; then
 		fi
 	fi
 
-	mkdir -p $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH
-	mv $DEST_DIR/*.deb $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH
+	mkdir -p $DEST_DIR/binary-$TARGET_ARCH
+	mv $DEST_DIR/*.deb $DEST_DIR/binary-$TARGET_ARCH
 	echo
-	echo "Built $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH"
-	du -sch --time $DEST_DIR/dists/buster/dsf/binary-$TARGET_ARCH/*
+	echo "Built $DEST_DIR/binary-$TARGET_ARCH"
+	du -sch --time $DEST_DIR/binary-$TARGET_ARCH/*
 else
 	echo
 	echo "Built $DEST_DIR"

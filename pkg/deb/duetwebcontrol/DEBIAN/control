@@ -1,7 +1,8 @@
 Package: duetwebcontrol
-Architecture: all
-Maintainer: RepRapFirmware <package@reprapfirmware.org>
-Priority: optional
 Version: DWCVER
-Description: Official web interface for Duet electronics
+Architecture: all
+Priority: optional
+Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
+Homepage: https://pkg.duet3d.com
 Vcs-Git: https://github.com/chrishamm/DuetWebControl.git
+Description: Official web interface for Duet electronics
