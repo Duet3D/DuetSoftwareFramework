@@ -196,7 +196,7 @@ namespace DuetAPI.Machine
             }
 
             Value = other.Value;
-            Name = (other.Name != null) ? string.Copy(other.Name) : null;
+            Name = other.Name;
             Rpm = other.Rpm;
             Inverted = other.Inverted;
             Frequency = other.Frequency;
@@ -216,7 +216,7 @@ namespace DuetAPI.Machine
             return new Fan
             {
                 Value = Value,
-                Name = (Name != null) ? string.Copy(Name) : null,
+                Name = Name,
                 Rpm = Rpm,
                 Inverted = Inverted,
                 Frequency = Frequency,

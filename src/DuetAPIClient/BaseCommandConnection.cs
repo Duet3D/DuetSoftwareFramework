@@ -1,10 +1,12 @@
-using System;
+using System.IO;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Machine;
+using DuetAPI.Utility;
 
 namespace DuetAPIClient
 {
@@ -25,7 +27,8 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
+        /// <returns>True if all pending codes could be flushed</returns>
+        /// <exception cref="SocketException">Command could not be sent</exception>
         public Task<bool> Flush(CodeChannel channel = CodeChannel.SPI, CancellationToken cancellationToken = default)
         {
             return PerformCommand<bool>(new Flush() { Channel = channel }, cancellationToken);
@@ -36,7 +39,8 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="fileName">The file to parse</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Retrieved file information</returns>
+        /// <returns>Information about the parsed file</returns>
+        /// <exception cref="SocketException">Command could not be sent</exception>
         /// <seealso cref="GetFileInfo"/>
         public Task<ParsedFileInfo> GetFileInfo(string fileName, CancellationToken cancellationToken = default)
         {
@@ -49,8 +53,9 @@ namespace DuetAPIClient
         /// <param name="code">The code to execute</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Result of the given code</returns>
-        /// <exception cref="TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
-        /// <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
+        /// <exception cref="TaskCanceledException">Code has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be sent</exception>
+        /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
         /// <seealso cref="Code"/>
         public Task<CodeResult> PerformCode(Code code, CancellationToken cancellationToken = default)
         {
@@ -64,8 +69,9 @@ namespace DuetAPIClient
         /// <param name="channel">Optional destination channel of this code</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Result of the given code converted to a string</returns>
-        /// <exception cref="TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
-        /// <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
+        /// <exception cref="TaskCanceledException">Code has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be sent</exception>
+        /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
         /// <seealso cref="SimpleCode"/>
         public Task<string> PerformSimpleCode(string code, CodeChannel channel = Defaults.Channel, CancellationToken cancellationToken = default)
         {
@@ -78,21 +84,22 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>The current machine model</returns>
+        /// <exception cref="SocketException">Command could not be sent</exception>
         public Task<MachineModel> GetMachineModel(CancellationToken cancellationToken = default)
         {
             return PerformCommand<MachineModel>(new GetMachineModel(), cancellationToken);
         }
-        
+
         /// <summary>
-        /// Optimized method to query the machine model JSON in any mode.
-        /// May be used to get machine model patches as well
+        /// Optimized method to directly query the machine model UTF-8 JSON
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Machine model JSON</returns>
-        public async Task<string> GetSerializedMachineModel(CancellationToken cancellationToken = default)
+        /// <exception cref="SocketException">Command could not be sent</exception>
+        public async Task<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
         {
-            await Send(new GetMachineModel());
-            return await ReceiveSerializedJsonResponse(nameof(GetMachineModel), cancellationToken);
+            await Send(new GetMachineModel(), cancellationToken);
+            return await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
         }
 
         /// <summary>
@@ -101,6 +108,7 @@ namespace DuetAPIClient
         /// <param name="path">File path to resolve</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Resolved file path</returns>
+        /// <exception cref="SocketException">Command could not be sent</exception>
         public Task<string> ResolvePath(string path, CancellationToken cancellationToken = default)
         {
             return PerformCommand<string>(new ResolvePath { Path = path }, cancellationToken);
@@ -111,6 +119,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
+        /// <exception cref="SocketException">Command could not be sent</exception>
         public Task SyncMachineModel(CancellationToken cancellationToken = default)
         {
             return PerformCommand(new SyncMachineModel(), cancellationToken);

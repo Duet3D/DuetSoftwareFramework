@@ -48,7 +48,7 @@ namespace DuetAPI.Utility
                 {
                     destination.Add(source[i]);
                 }
-                else
+                else if (!destination[i].Equals(source[i]))
                 {
                     destination[i] = source[i];
                 }

@@ -148,7 +148,7 @@ namespace DuetAPI.Machine
             ListHelpers.AssignList(Axes, other.Axes);
             BabystepZ = other.BabystepZ;
             CurrentMove.Assign(other.CurrentMove);
-            Compensation = (other.Compensation != null) ? string.Copy(other.Compensation) : null;
+            Compensation = other.Compensation;
             ListHelpers.AssignList(Drives, other.Drives);
             ListHelpers.AssignList(Extruders, other.Extruders);
             Geometry.Assign(other.Geometry);
@@ -168,7 +168,7 @@ namespace DuetAPI.Machine
             {
                 BabystepZ = BabystepZ,
                 CurrentMove = (CurrentMove)CurrentMove.Clone(),
-                Compensation = (Compensation != null) ? string.Copy(Compensation) : null,
+                Compensation = Compensation,
                 Geometry = (Geometry)Geometry.Clone(),
                 Idle = (MotorsIdleControl)Idle.Clone(),
                 SpeedFactor = SpeedFactor

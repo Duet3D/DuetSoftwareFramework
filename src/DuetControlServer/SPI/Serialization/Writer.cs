@@ -346,7 +346,7 @@ namespace DuetControlServer.SPI.Serialization
             {
                 FilenameLength = (byte)unicodeFilename.Length,
                 GeneratedByLength = (byte)unicodeGeneratedBy.Length,
-                NumFilaments = (ushort)info.Filament.Count,
+                NumFilaments = (ushort)info.Filament.Length,
                 FileSize = (uint)info.Size,
                 LastModifiedTime = info.LastModified.HasValue ? (ulong)(info.LastModified.Value - new DateTime (1970, 1, 1)).TotalSeconds : 0,
                 FirstLayerHeight = info.FirstLayerHeight,
@@ -359,9 +359,9 @@ namespace DuetControlServer.SPI.Serialization
             int bytesWritten = Marshal.SizeOf(header);
             
             // Write filaments
-            foreach (double filament in info.Filament)
+            foreach (float filament in info.Filament)
             {
-                float filamentUsage = (float)filament;
+                float filamentUsage = filament;
                 MemoryMarshal.Write(to.Slice(bytesWritten), ref filamentUsage);
                 bytesWritten += Marshal.SizeOf(filamentUsage);
             }

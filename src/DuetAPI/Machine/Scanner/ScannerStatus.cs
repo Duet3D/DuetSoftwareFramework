@@ -1,12 +1,12 @@
 ﻿using DuetAPI.Utility;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.Machine
 {
     /// <summary>
     /// Possible states of the attached 3D scanner
     /// </summary>
-    [JsonConverter(typeof(CharEnumConverter))]
+    [JsonConverter(typeof(JsonCharEnumConverter))]
     public enum ScannerStatus
     {
         /// <summary>

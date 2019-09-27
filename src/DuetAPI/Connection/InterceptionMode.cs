@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
+﻿using System.Text.Json.Serialization;
 
 namespace DuetAPI.Connection
 {
@@ -7,7 +6,7 @@ namespace DuetAPI.Connection
     /// Type of the intercepting connection
     /// </summary>
     /// <seealso cref="InitMessages.InterceptInitMessage"/>
-    [JsonConverter(typeof(StringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum InterceptionMode
     {
         /// <summary>
@@ -18,6 +17,11 @@ namespace DuetAPI.Connection
         /// <summary>
         /// Intercept codes after the initial processing of the control server but before they are forwarded to the RepRapFirmware controller
         /// </summary>
-        Post
+        Post,
+
+        /// <summary>
+        /// Receive a notification for executed codes. In this state the final result can be still changed
+        /// </summary>
+        Executed
     }
 }

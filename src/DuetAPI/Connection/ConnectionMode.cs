@@ -1,12 +1,11 @@
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.Connection
 {
     /// <summary>
     /// Supported connection types for client connections
     /// </summary>
-    [JsonConverter(typeof(StringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum ConnectionMode
     {
         /// <summary>

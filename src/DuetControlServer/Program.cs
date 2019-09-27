@@ -115,6 +115,7 @@ namespace DuetControlServer
             {
                 Commands.Code.InitScheduler();
                 Model.Provider.Init();
+                Model.Observer.Init();
                 WriteLine("Done!");
             }
             catch (Exception e)

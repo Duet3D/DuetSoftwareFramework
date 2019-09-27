@@ -2,9 +2,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace DuetWebServer
 {
@@ -13,7 +13,8 @@ namespace DuetWebServer
     /// </summary>
     public class Startup
     {
-        private IConfiguration _configuration;
+        private const string CorsPolicy = "cors-policy";
+        private readonly IConfiguration _configuration;
 
         /// <summary>
         /// Create a new Startup instance
@@ -33,7 +34,7 @@ namespace DuetWebServer
             // Register CORS policy (may or may not be used)
             services.AddCors(options =>
             {
-                options.AddPolicy("cors-localhost",
+                options.AddPolicy(CorsPolicy,
                 builder =>
                 {
                     // Allow very unrestrictive CORS requests (for now)
@@ -44,7 +45,7 @@ namespace DuetWebServer
                 });
             });
 
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+            services.AddControllers();
         }
 
         /// <summary>
@@ -52,7 +53,7 @@ namespace DuetWebServer
         /// </summary>
         /// <param name="app">Application builder</param>
         /// <param name="env">Hosting environment</param>
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
             {
@@ -64,11 +65,12 @@ namespace DuetWebServer
             {
                 ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
             });
+            app.UseRouting();
 
             // Set CORS flags if applicable
             if (_configuration.GetValue("UseCors", true))
             {
-                app.UseCors("cors-localhost");
+                app.UseCors(CorsPolicy);
             }
             
             // Use static files from 0:/www if applicable
@@ -79,7 +81,8 @@ namespace DuetWebServer
                 {
                     await next();
 
-                    if (context.Response.StatusCode == 404 && !context.Response.HasStarted && !context.Request.Path.Value.StartsWith("/rr_") && !context.Request.Path.Value.Contains("."))
+                    if (context.Response.StatusCode == 404 && !context.Response.HasStarted &&
+                        !context.Request.Path.Value.StartsWith("/rr_") && !context.Request.Path.Value.Contains("."))
                     {
                         context.Request.Path = "/";
                         await next();
@@ -94,9 +97,15 @@ namespace DuetWebServer
                 });
             }
 
-            // Use WebSockets and MVC architecture
             app.UseWebSockets();
-            app.UseMvc();
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllerRoute("default", "{controller=Machine}");
+                if (_configuration.GetValue("UseCors", true))
+                {
+                    endpoints.MapControllers().RequireCors(CorsPolicy);
+                }
+            });
         }
     }
 }

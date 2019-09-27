@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,8 +38,10 @@ namespace DuetControlServer
 
                 if (fileStream.Length > 0)
                 {
-                    await ParseHeader(reader, result);
-                    await ParseFooter(reader, fileStream.Length, result);
+                    List<float> filamentConsumption = new List<float>();
+                    await ParseHeader(reader, filamentConsumption, result);
+                    await ParseFooter(reader, fileStream.Length, filamentConsumption, result);
+                    result.Filament = filamentConsumption.ToArray();
 
                     if (result.FirstLayerHeight + result.LayerHeight > 0F && result.Height > 0F)
                     {
@@ -57,12 +61,11 @@ namespace DuetControlServer
             }
         }
 
-        private static async Task ParseHeader(SeekableStreamReader reader, ParsedFileInfo partialFileInfo)
+        private static async Task ParseHeader(SeekableStreamReader reader, List<float> filament, ParsedFileInfo partialFileInfo)
         {
             // Every time CTS.Token is accessed a copy is generated. Hence we cache one until this method completes
             CancellationToken token = Program.CancelSource.Token;
 
-            List<float> filamentConsumption = new List<float>();
             bool inRelativeMode = false, lastLineHadInfo = false;
             do
             {
@@ -109,34 +112,28 @@ namespace DuetControlServer
                 else if (code.Type == CodeType.Comment)
                 {
                     gotNewInfo |= partialFileInfo.LayerHeight == 0 && FindLayerHeight(line, ref partialFileInfo);
-                    gotNewInfo |= FindFilamentUsed(line, ref filamentConsumption);
-                    gotNewInfo |= partialFileInfo.GeneratedBy == "" && FindGeneratedBy(line, ref partialFileInfo);
+                    gotNewInfo |= FindFilamentUsed(line, ref filament);
+                    gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(line, ref partialFileInfo);
                     gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo);
                     gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo);
                 }
 
-                if (!gotNewInfo && !lastLineHadInfo && IsFileInfoComplete(partialFileInfo))
+                if (!gotNewInfo && !lastLineHadInfo && IsFileInfoComplete(partialFileInfo, filament))
                 {
                     break;
                 }
                 lastLineHadInfo = gotNewInfo;
             }
             while (reader.Position < Settings.FileInfoReadLimit);
-
-            foreach (float filament in filamentConsumption)
-            {
-                partialFileInfo.Filament.Add(filament);
-            }
         }
 
-        private static async Task ParseFooter(SeekableStreamReader reader, long length, ParsedFileInfo partialFileInfo)
+        private static async Task ParseFooter(SeekableStreamReader reader, long length, List<float> filament, ParsedFileInfo partialFileInfo)
         {
             CancellationToken token = Program.CancelSource.Token;
             reader.Seek(0, SeekOrigin.End);
 
             bool inRelativeMode = false, lastLineHadInfo = false;
             float? lastZ = null;
-            List<float> filamentConsumption = new List<float>(partialFileInfo.Filament);
 
             do
             {
@@ -198,25 +195,19 @@ namespace DuetControlServer
                 else if (code.Type == CodeType.Comment)
                 {
                     gotNewInfo |= partialFileInfo.LayerHeight == 0 && FindLayerHeight(line, ref partialFileInfo);
-                    gotNewInfo |= FindFilamentUsed(line, ref filamentConsumption);
-                    // gotNewInfo |= partialFileInfo.GeneratedBy == "") && FindGeneratedBy(line, ref partialFileInfo);
+                    gotNewInfo |= FindFilamentUsed(line, ref filament);
+                    // gotNewInfo |= partialFileInfo.GeneratedBy == string.Empty && FindGeneratedBy(line, ref partialFileInfo);
                     gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo);
                     gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo);
                 }
 
-                if (!gotNewInfo && !lastLineHadInfo && IsFileInfoComplete(partialFileInfo))
+                if (!gotNewInfo && !lastLineHadInfo && IsFileInfoComplete(partialFileInfo, filament))
                 {
                     break;
                 }
                 lastLineHadInfo = gotNewInfo;
             }
             while (length - reader.Position < Settings.FileInfoReadLimit);
-
-            partialFileInfo.Filament.Clear();
-            foreach (float filament in filamentConsumption)
-            {
-                partialFileInfo.Filament.Add(filament);
-            }
 
             if (lastZ != null && partialFileInfo.Height == 0)
             {
@@ -227,9 +218,9 @@ namespace DuetControlServer
         private static async Task<string> ReadLineFromEndAsync(SeekableStreamReader reader)
         {
             const int bufferSize = 128;
-            char[] buffer = /*stackalloc*/ new char[bufferSize];
+            char[] buffer = new char[bufferSize];
 
-            string line = "";
+            string line = string.Empty;
             while (reader.Position > 0)
             {
                 // Read a chunk. Do not do this char-wise for performance reasons
@@ -256,13 +247,13 @@ namespace DuetControlServer
             return null;
         }
 
-        private static bool IsFileInfoComplete(ParsedFileInfo result)
+        private static bool IsFileInfoComplete(ParsedFileInfo result, List<float> filament)
         {
             return (result.Height != 0) &&
                     (result.FirstLayerHeight != 0) &&
                     (result.LayerHeight != 0) &&
-                    (result.Filament.Count > 0) &&
-                    (result.GeneratedBy != "");
+                    (filament.Count > 0) &&
+                    (!string.IsNullOrEmpty(result.GeneratedBy));
         }
 
         private static bool FindLayerHeight(string line, ref ParsedFileInfo fileInfo)

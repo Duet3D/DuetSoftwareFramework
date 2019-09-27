@@ -10,10 +10,10 @@ namespace DuetControlServer.IPC.Processors
     /// Base class for connection interpreters
     /// </summary>
     /// <seealso cref="ConnectionMode"/>
-    public abstract class Base
+    public class Base
     {
         /// <summary>
-        /// Connection with wrappers to ensure basic operation and convenience wrappers for JSON-style requests
+        /// Connection to the IPC client served by this processor
         /// </summary>
         protected Connection Connection { get; }
 
@@ -21,11 +21,7 @@ namespace DuetControlServer.IPC.Processors
         /// Base constructor for connection interpreters. Invoke this from any derived class
         /// </summary>
         /// <param name="conn">Connection instance</param>
-        /// <param name="initMessage">Deserialized initialization message</param>
-        public Base(Connection conn, ClientInitMessage initMessage)
-        {
-             Connection = conn;
-        }
+        public Base(Connection conn) => Connection = conn;
 
         /// <summary>
         /// Worker method for a given connection.
@@ -34,9 +30,6 @@ namespace DuetControlServer.IPC.Processors
         /// </summary>
         /// <returns>Task that represents the worker lifecycle</returns>
         /// <exception cref="NotImplementedException">Thrown if this method is not overridden</exception>
-        public virtual Task Process()
-        {
-            throw new NotImplementedException("Processor not implemented");
-        }
+        public virtual Task Process() => throw new NotImplementedException("Processor not implemented");
     }
 }

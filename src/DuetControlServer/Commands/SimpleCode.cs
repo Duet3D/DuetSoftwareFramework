@@ -14,16 +14,14 @@ namespace DuetControlServer.Commands
         /// Converts simple G/M/T-codes to a regular Code instances, executes them and returns the result as text
         /// </summary>
         /// <returns>Code result as text</returns>
-        /// <exception cref="TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
+        /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         public override async Task<string> Execute()
         {
-            IList<Code> codes;
-            Queue<Task<CodeResult>> codeTasks = new Queue<Task<CodeResult>>();
-
             CodeResult result = new CodeResult();
+
             try
             {
-                codes = Commands.Code.ParseMultiple(Code);
+                List<Code> codes = Commands.Code.ParseMultiple(Code);
                 foreach (Code code in codes)
                 {
                     // M112, M122, and M999 always go to the Daemon channel so we (hopefully) get a low-latency response
@@ -36,32 +34,21 @@ namespace DuetControlServer.Commands
                     {
                         code.Channel = Channel;
                     }
-                    codeTasks.Enqueue(code.Execute());
+
+                    // Execute the code and append the result
+                    CodeResult codeResult = await code.Execute();
+                    result.AddRange(codeResult);
                 }
             }
             catch (CodeParserException e)
             {
-                return $"Error: {e.Message}]\n";
+                // Report parsing errors as an error message
+                result = new CodeResult(DuetAPI.MessageType.Error, e.Message);
             }
-
-            while (codeTasks.TryDequeue(out Task<CodeResult> task))
+            catch (OperationCanceledException)
             {
-                Code code = codes[0];
-                codes.RemoveAt(0);
-
-                try
-                {
-                    CodeResult codeResult = await task;
-                    if (codeResult != null && !codeResult.IsEmpty)
-                    {
-                        result.AddRange(codeResult);
-                    }
-                }
-                catch (AggregateException ae)
-                {
-                    // FIXME: Should this terminate the code(s) being executed?
-                    Console.WriteLine($"[err] {code} -> {ae.InnerException.Message}");
-                }
+                // Report this code as cancelled
+                result = new CodeResult(DuetAPI.MessageType.Error, "Code has been cancelled");
             }
 
             return result.ToString();

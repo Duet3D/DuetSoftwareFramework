@@ -8,7 +8,7 @@ namespace DuetAPI.Machine
     /// <summary>
     /// Information about a G/M/T-code channel
     /// </summary>
-    public sealed class Channel : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class Channel : IAssignable, INotifyPropertyChanged, ICloneable
     {
         /// <summary>
         /// Event to trigger when a property has changed

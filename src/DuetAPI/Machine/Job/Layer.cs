@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Utility;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -57,7 +58,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Actual amount of filament extruded during this layer (in mm)
         /// </summary>
-        public float[] Filament
+        public List<float> Filament
         {
             get => _filament;
             set
@@ -69,7 +70,7 @@ namespace DuetAPI.Machine
                 }
             }
         }
-        private float[] _filament = new float[0];
+        private List<float> _filament = new List<float>();
 
         /// <summary>
         /// Fraction of the file printed during this layer (0..1 or null if unknown)
@@ -107,7 +108,7 @@ namespace DuetAPI.Machine
 
             Duration = other.Duration;
             Height = other.Height;
-            Filament = (float[])other.Filament.Clone();
+            Filament = new List<float>(other.Filament);
             FractionPrinted = other.FractionPrinted;
         }
 
@@ -121,7 +122,7 @@ namespace DuetAPI.Machine
             {
                 Duration = Duration,
                 Height = Height,
-                Filament = (float[])Filament.Clone(),
+                Filament = new List<float>(Filament),
                 FractionPrinted = FractionPrinted
             };
         }

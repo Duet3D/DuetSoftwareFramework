@@ -24,7 +24,7 @@ namespace DuetAPI.Commands
             }
 
             char letter = '\0', c;
-            string value = "";
+            string value = string.Empty;
 
             bool contentRead = false, unprecedentedParameter = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
@@ -91,7 +91,7 @@ namespace DuetAPI.Commands
                             inEncapsulatedComment = true;
                             break;
                         default:
-                            if (!char.IsWhiteSpace(c) || result.KeywordArgument != "")
+                            if (!char.IsWhiteSpace(c) || !string.IsNullOrEmpty(result.KeywordArgument))
                             {
                                 // In fact, it should be possible to leave out whitespaces here but we here don't check for quoted strings yet
                                 result.KeywordArgument += c;
@@ -107,7 +107,7 @@ namespace DuetAPI.Commands
 
                 if (inChunk)
                 {
-                    if (!endingChunk && value == "")
+                    if (!endingChunk && string.IsNullOrEmpty(value))
                     {
                         if (char.IsWhiteSpace(c))
                         {
@@ -205,7 +205,7 @@ namespace DuetAPI.Commands
 
                 if (!inChunk && !readingAtStart)
                 {
-                    if (letter != '\0' || value != "" || wasQuoted)
+                    if (letter != '\0' || !string.IsNullOrEmpty(value) || wasQuoted)
                     {
                         // Chunk is complete
                         char upperLetter = char.ToUpperInvariant(letter);
@@ -268,13 +268,13 @@ namespace DuetAPI.Commands
                             if (letter == 'i' && value == "f")
                             {
                                 result.Keyword = KeywordType.If;
+                                result.KeywordArgument = string.Empty;
                                 inCondition = true;
-                                result.KeywordArgument = "";
                             }
                             else if (letter == 'e' && value == "lif")
                             {
                                 result.Keyword = KeywordType.ElseIf;
-                                result.KeywordArgument = "";
+                                result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (letter == 'e' && value == "lse")
@@ -284,7 +284,7 @@ namespace DuetAPI.Commands
                             else if (letter == 'w' && value == "hile")
                             {
                                 result.Keyword = KeywordType.While;
-                                result.KeywordArgument = "";
+                                result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (letter == 'b' && value == "reak")
@@ -295,7 +295,7 @@ namespace DuetAPI.Commands
                             else if (letter == 'r' && value == "eturn")
                             {
                                 result.Keyword = KeywordType.Return;
-                                result.KeywordArgument = "";
+                                result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (letter == 'a' && value == "bort")
@@ -306,13 +306,13 @@ namespace DuetAPI.Commands
                             else if (letter == 'v' && value == "ar")
                             {
                                 result.Keyword = KeywordType.Var;
-                                result.KeywordArgument = "";
+                                result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (letter == 's' && value == "et")
                             {
                                 result.Keyword = KeywordType.Set;
-                                result.KeywordArgument = "";
+                                result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (result.Parameter(letter) == null)
@@ -334,7 +334,7 @@ namespace DuetAPI.Commands
                         }
 
                         letter = '\0';
-                        value = "";
+                        value = string.Empty;
                         wasQuoted = wasExpression = false;
                     }
 
@@ -438,10 +438,10 @@ namespace DuetAPI.Commands
             }
             else
             {
-                code.Parameters.Add(new CodeParameter(letter, "", false));
+                code.Parameters.Add(new CodeParameter(letter, string.Empty, false));
                 foreach (char c in value)
                 {
-                    code.Parameters.Add(new CodeParameter(c, "", false));
+                    code.Parameters.Add(new CodeParameter(c, string.Empty, false));
                 }
             }
         }

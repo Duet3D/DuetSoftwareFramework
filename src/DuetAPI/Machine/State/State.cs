@@ -74,7 +74,7 @@ namespace DuetAPI.Machine
                 }
             }
         }
-        private string _displayMessage = "";
+        private string _displayMessage;
 
         /// <summary>
         /// Log file being written to or null if logging is disabled
@@ -147,6 +147,8 @@ namespace DuetAPI.Machine
             AtxPower = other.AtxPower;
             Beep.Assign(other.Beep);
             CurrentTool = other.CurrentTool;
+            DisplayMessage = other.DisplayMessage;
+            LogFile = other.LogFile;
             Mode = other.Mode;
             Status = other.Status;
         }
@@ -162,6 +164,8 @@ namespace DuetAPI.Machine
                 AtxPower = AtxPower,
                 Beep = (BeepDetails)Beep.Clone(),
                 CurrentTool = CurrentTool,
+                DisplayMessage = DisplayMessage,
+                LogFile = LogFile,
                 Mode = Mode,
                 Status = Status
             };

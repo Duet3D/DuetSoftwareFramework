@@ -1,10 +1,10 @@
 ﻿using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.Commands;
-using Newtonsoft.Json;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Model
@@ -16,7 +16,7 @@ namespace DuetControlServer.Model
     {
         private static readonly AsyncManualResetEvent _updateEvent = new AsyncManualResetEvent();
         private static float _currentHeight;
-        private static bool _updating;
+        private static bool _updatingFirmware;
 
         /// <summary>
         /// Wait for the model to be fully updated from RepRapFirmware
@@ -31,128 +31,15 @@ namespace DuetControlServer.Model
         /// <param name="module">Module that is supposed to be merged</param>
         /// <param name="json">JSON data</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task MergeData(byte module, string json)
+        public static async Task MergeData(byte module, byte[] json)
         {
             try
             {
                 if (module == 2)
                 {
-                    var response = new
-                    {
-                        status = 'I',
-                        coords = new
-                        {
-                            axesHomed = new byte[0],
-                            xyz = new float[0],
-                            machine = new float[0],
-                            extr = new float[0]
-                        },
-                        speeds = new
-                        {
-                            requested = 0.0F,
-                            top = 0.0F
-                        },
-                        currentTool = -1,
-                        output = new
-                        {
-                            beepDuration = 0,
-                            beepFrequency = 0,
-                            message = "",
-                            msgBox = new
-                            {
-                                mode = 0,
-                                msg = "",
-                                title = "",
-                                seq = 0,
-                                timeout = 0.0F,
-                                controls = 0
-                            }
-                        },
-                        Params = new
-                        {
-                            atxPower = 0,
-                            fanPercent = new float[0],
-                            fanNames = new string[0],
-                            speedFactor = 0.0F,
-                            extrFactors = new float[0],
-                            babystep = 0.0F
-                        },
-                        sensors = new
-                        {
-                            probeValue = 0,
-                            probeSecondary = new int[0],
-                            fanRPM = new int[0]
-                        },
-                        temps = new
-                        {
-                            bed = new
-                            {
-                                active = 0.0F,
-                                standby = 0.0F,
-                                state = 0,
-                                heater = 0
-                            },
-                            chamber = new
-                            {
-                                active = 0.0F,
-                                standby = 0.0F,
-                                state = 0,
-                                heater = 0
-                            },
-                            current = new float[0],
-                            state = new byte[0],
-                            names = new string[0],
-                            tools = new
-                            {
-                                active = new[] { new float[0] },
-                                standby = new[] { new float[0] }
-                            },
-                            extra = new[]
-                            {
-                            new
-                            {
-                                name = "",
-                                temp = 0.0F
-                            }
-                        }
-                        },
-                        coldExtrudeTemp = 160.0F,
-                        coldRetractTemp = 90.0F,
-                        compensation = "",
-                        controllableFans = 0,
-                        tempLimit = 0.0F,
-                        endstops = 0L,
-                        tools = new[]
-                        {
-                        new
-                        {
-                            number = 0,
-                            name = "",
-                            heaters = new int[0],
-                            drives = new int[0],
-                            fan = 0,
-                            filament = "",
-                            offsets = new float[0]
-                        }
-                    },
-                        mcutemp = new
-                        {
-                            min = 0.0F,
-                            cur = 0.0F,
-                            max = 0.0F
-                        },
-                        vin = new
-                        {
-                            min = 0.0F,
-                            cur = 0.0F,
-                            max = 0.0F
-                        },
-                        mode = "FFF",
-                        name = Network.DefaultHostname
-                    };
-                    response = JsonConvert.DeserializeAnonymousType(json, response);
-                    List<Tool> addedTools = new List<Tool>();
+                    AdvancedStatusResponse response = (AdvancedStatusResponse)JsonSerializer.Deserialize(json, typeof(AdvancedStatusResponse), JsonHelper.DefaultJsonOptions);
 
+                    List<Tool> addedTools = new List<Tool>();
                     using (await Provider.AccessReadWriteAsync())
                     {
                         // - Electronics -
@@ -164,7 +51,7 @@ namespace DuetControlServer.Model
                         Provider.Get.Electronics.VIn.Max = response.vin.max;
 
                         // - Fans -
-                        for (int fan = 0; fan < response.Params.fanPercent.Length; fan++)
+                        for (int fan = 0; fan < response.@params.fanPercent.Count; fan++)
                         {
                             Fan fanObj;
                             if (fan >= Provider.Get.Fans.Count)
@@ -177,12 +64,12 @@ namespace DuetControlServer.Model
                                 fanObj = Provider.Get.Fans[fan];
                             }
 
-                            fanObj.Name = response.Params.fanNames[fan];
-                            fanObj.Rpm = (response.sensors.fanRPM.Length > fan && response.sensors.fanRPM[fan] > 0) ? (int?)response.sensors.fanRPM[fan] : null;
-                            fanObj.Value = response.Params.fanPercent[fan] / 100F;
+                            fanObj.Name = response.@params.fanNames[fan];
+                            fanObj.Rpm = (response.sensors.fanRPM.Count > fan && response.sensors.fanRPM[fan] > 0) ? (int?)response.sensors.fanRPM[fan] : null;
+                            fanObj.Value = response.@params.fanPercent[fan] / 100F;
                             fanObj.Thermostatic.Control = (response.controllableFans & (1 << fan)) == 0;
                         }
-                        for (int fan = Provider.Get.Fans.Count; fan > response.Params.fanPercent.Length; fan--)
+                        for (int fan = Provider.Get.Fans.Count; fan > response.@params.fanPercent.Count; fan--)
                         {
                             Provider.Get.Fans.RemoveAt(fan - 1);
                         }
@@ -191,11 +78,11 @@ namespace DuetControlServer.Model
                         Provider.Get.Move.Compensation = response.compensation;
                         Provider.Get.Move.CurrentMove.RequestedSpeed = response.speeds.requested;
                         Provider.Get.Move.CurrentMove.TopSpeed = response.speeds.top;
-                        Provider.Get.Move.SpeedFactor = response.Params.speedFactor / 100;
-                        Provider.Get.Move.BabystepZ = response.Params.babystep;
+                        Provider.Get.Move.SpeedFactor = response.@params.speedFactor / 100;
+                        Provider.Get.Move.BabystepZ = response.@params.babystep;
 
                         // Update drives and endstops
-                        int numDrives = response.coords.xyz.Length + response.coords.extr.Length;
+                        int numDrives = response.coords.xyz.Count + response.coords.extr.Count;
                         for (int drive = 0; drive < numDrives; drive++)
                         {
                             Drive driveObj;
@@ -209,7 +96,7 @@ namespace DuetControlServer.Model
                                 driveObj = Provider.Get.Move.Drives[drive];
                             }
 
-                            driveObj.Position = (drive < response.coords.xyz.Length) ? response.coords.xyz[drive] : response.coords.extr[drive - response.coords.xyz.Length];
+                            driveObj.Position = (drive < response.coords.xyz.Count) ? response.coords.xyz[drive] : response.coords.extr[drive - response.coords.xyz.Count];
 
                             Endstop endstopObj;
                             if (drive >= Provider.Get.Sensors.Endstops.Count)
@@ -230,7 +117,7 @@ namespace DuetControlServer.Model
                         }
 
                         // Update axes
-                        for (int axis = 0; axis < response.coords.xyz.Length; axis++)
+                        for (int axis = 0; axis < response.coords.xyz.Count; axis++)
                         {
                             Axis axisObj;
                             if (axis >= Provider.Get.Move.Axes.Count)
@@ -249,14 +136,14 @@ namespace DuetControlServer.Model
                             axisObj.MinEndstop = axis;
                             axisObj.MaxEndstop = axis;
                         }
-                        for (int axis = Provider.Get.Move.Axes.Count; axis > response.coords.xyz.Length; axis--)
+                        for (int axis = Provider.Get.Move.Axes.Count; axis > response.coords.xyz.Count; axis--)
                         {
                             Provider.Get.Move.Axes.RemoveAt(axis - 1);
                         }
 
                         // Update extruder drives
                         Extruder extruderObj;
-                        for (int extruder = 0; extruder < response.coords.extr.Length; extruder++)
+                        for (int extruder = 0; extruder < response.coords.extr.Count; extruder++)
                         {
                             if (extruder >= Provider.Get.Move.Extruders.Count)
                             {
@@ -268,17 +155,21 @@ namespace DuetControlServer.Model
                                 extruderObj = Provider.Get.Move.Extruders[extruder];
                             }
 
-                            extruderObj.Factor = response.Params.extrFactors[extruder] / 100;
+                            extruderObj.Factor = response.@params.extrFactors[extruder] / 100F;
                             if (extruderObj.Drives.Count == 1)
                             {
-                                extruderObj.Drives[0] = response.coords.xyz.Length + extruder;
+                                int drive = response.coords.xyz.Count + extruder;
+                                if (extruderObj.Drives[0] != drive)
+                                {
+                                    extruderObj.Drives[0] = drive;
+                                }
                             }
                             else
                             {
-                                extruderObj.Drives.Add(response.coords.xyz.Length + extruder);
+                                extruderObj.Drives.Add(response.coords.xyz.Count + extruder);
                             }
                         }
-                        for (int extruder = Provider.Get.Move.Extruders.Count; extruder > response.coords.extr.Length; extruder--)
+                        for (int extruder = Provider.Get.Move.Extruders.Count; extruder > response.coords.extr.Count; extruder--)
                         {
                             Provider.Get.Move.Extruders.RemoveAt(extruder - 1);
                         }
@@ -288,7 +179,7 @@ namespace DuetControlServer.Model
                         Provider.Get.Heat.ColdRetractTemperature = response.coldRetractTemp;
 
                         // Update heaters
-                        for (int heater = 0; heater < response.temps.current.Length; heater++)
+                        for (int heater = 0; heater < response.temps.current.Count; heater++)
                         {
                             Heater heaterObj;
                             if (heater >= Provider.Get.Heat.Heaters.Count)
@@ -307,7 +198,7 @@ namespace DuetControlServer.Model
                             heaterObj.Sensor = heater;
                             heaterObj.State = (HeaterState)response.temps.state[heater];
                         }
-                        for (int heater = Provider.Get.Heat.Heaters.Count; heater > response.temps.current.Length; heater--)
+                        for (int heater = Provider.Get.Heat.Heaters.Count; heater > response.temps.current.Count; heater--)
                         {
                             Provider.Get.Heat.Heaters.RemoveAt(heater - 1);
                         }
@@ -334,9 +225,9 @@ namespace DuetControlServer.Model
                             }
                             else
                             {
-                                bedObj.Active[0] = response.temps.bed.active;
-                                bedObj.Standby[0] = response.temps.bed.standby;
-                                bedObj.Heaters[0] = response.temps.bed.heater;
+                                if (bedObj.Active[0] != response.temps.bed.active) { bedObj.Active[0] = response.temps.bed.active; }
+                                if (bedObj.Standby[0] != response.temps.bed.standby) { bedObj.Standby[0] = response.temps.bed.standby; }
+                                if (bedObj.Heaters[0] != response.temps.bed.heater) { bedObj.Heaters[0] = response.temps.bed.heater; }
                             }
                         }
                         else if (Provider.Get.Heat.Beds.Count > 0)
@@ -366,9 +257,9 @@ namespace DuetControlServer.Model
                             }
                             else
                             {
-                                chamberObj.Active[0] = response.temps.chamber.active;
-                                chamberObj.Standby[0] = response.temps.chamber.standby;
-                                chamberObj.Heaters[0] = response.temps.chamber.heater;
+                                if (chamberObj.Active[0] != response.temps.chamber.active) { chamberObj.Active[0] = response.temps.chamber.active; }
+                                if (chamberObj.Standby[0] != response.temps.chamber.standby) { chamberObj.Standby[0] = response.temps.chamber.standby; }
+                                if (chamberObj.Heaters[0] != response.temps.chamber.heater) { chamberObj.Heaters[0] = response.temps.chamber.heater; }
                             }
                         }
                         else if (Provider.Get.Heat.Chambers.Count > 0)
@@ -377,7 +268,7 @@ namespace DuetControlServer.Model
                         }
 
                         // Update extra heaters
-                        for (int extra = 0; extra < response.temps.extra.Length; extra++)
+                        for (int extra = 0; extra < response.temps.extra.Count; extra++)
                         {
                             ExtraHeater extraObj;
                             if (extra >= Provider.Get.Heat.Extra.Count)
@@ -393,7 +284,7 @@ namespace DuetControlServer.Model
                             extraObj.Current = response.temps.extra[extra].temp;
                             extraObj.Name = response.temps.extra[extra].name;
                         }
-                        for (int extra = Provider.Get.Heat.Extra.Count; extra > response.temps.extra.Length; extra--)
+                        for (int extra = Provider.Get.Heat.Extra.Count; extra > response.temps.extra.Count; extra--)
                         {
                             Provider.Get.Heat.Extra.RemoveAt(extra - 1);
                         }
@@ -419,7 +310,7 @@ namespace DuetControlServer.Model
                         // - Output -
                         int beepDuration = 0, beepFrequency = 0;
                         MessageBoxMode? messageBoxMode = null;
-                        string displayMessage = null;
+                        string displayMessage = string.Empty;
                         if (response.output != null)
                         {
                             if (response.output.beepFrequency != 0 && response.output.beepDuration != 0)
@@ -456,7 +347,7 @@ namespace DuetControlServer.Model
                         Provider.Get.MessageBox.Mode = messageBoxMode;
 
                         // - State -
-                        Provider.Get.State.AtxPower = (response.Params.atxPower == -1) ? null : (bool?)(response.Params.atxPower != 0);
+                        Provider.Get.State.AtxPower = (response.@params.atxPower == -1) ? null : (bool?)(response.@params.atxPower != 0);
                         Provider.Get.State.CurrentTool = response.currentTool;
                         Provider.Get.State.Status = GetStatus(response.status);
                         Provider.Get.State.Mode = (MachineMode)Enum.Parse(typeof(MachineMode), response.mode, true);
@@ -464,7 +355,7 @@ namespace DuetControlServer.Model
 
                         // - Tools -
                         Tool toolObj;
-                        for (int tool = 0; tool < response.tools.Length; tool++)
+                        for (int tool = 0; tool < response.tools.Count; tool++)
                         {
                             if (tool >= Provider.Get.Tools.Count)
                             {
@@ -478,25 +369,27 @@ namespace DuetControlServer.Model
                             }
 
                             // FIXME: The filament drive is not part of the status response / OM yet
-                            toolObj.FilamentExtruder = (response.tools[tool].drives.Length > 0) ? response.tools[tool].drives[0] : -1;
-                            toolObj.Filament = (response.tools[tool].filament != "") ? response.tools[tool].filament : null;
-                            toolObj.Name = (response.tools[tool].name != "") ? response.tools[tool].name : null;
+                            toolObj.FilamentExtruder = (response.tools[tool].drives.Count > 0) ? response.tools[tool].drives[0] : -1;
+                            toolObj.Filament = string.IsNullOrEmpty(response.tools[tool].filament) ? null : response.tools[tool].filament;
+                            toolObj.Name = string.IsNullOrEmpty(response.tools[tool].name) ? null : response.tools[tool].name;
                             toolObj.Number = response.tools[tool].number;
                             ListHelpers.SetList(toolObj.Heaters, response.tools[tool].heaters);
                             ListHelpers.SetList(toolObj.Extruders, response.tools[tool].drives);
                             ListHelpers.SetList(toolObj.Active, response.temps.tools.active[tool]);
                             ListHelpers.SetList(toolObj.Standby, response.temps.tools.standby[tool]);
-                            if (toolObj.Fans.Count == 0)
+
+                            List<int> fanIndices = new List<int>();
+                            for (int i = 0; i < response.@params.fanPercent.Count; i++)
                             {
-                                toolObj.Fans.Add(response.tools[tool].fan);
+                                if ((response.tools[tool].fans & (1 << i)) != 0)
+                                {
+                                    fanIndices.Add(i);
+                                }
                             }
-                            else
-                            {
-                                toolObj.Fans[0] = response.tools[tool].fan;
-                            }
+                            ListHelpers.SetList(toolObj.Fans, fanIndices);
                             ListHelpers.SetList(toolObj.Offsets, response.tools[tool].offsets);
                         }
-                        for (int tool = Provider.Get.Tools.Count; tool > response.tools.Length; tool--)
+                        for (int tool = Provider.Get.Tools.Count; tool > response.tools.Count; tool--)
                         {
                             Utility.FilamentManager.ToolRemoved(Provider.Get.Tools[tool - 1]);
                             Provider.Get.Tools.RemoveAt(tool - 1);
@@ -512,30 +405,7 @@ namespace DuetControlServer.Model
                 else if (module == 3)
                 {
                     // Deserialize print status response
-                    var printResponse = new
-                    {
-                        status = 'I',
-                        coords = new
-                        {
-                            xyz = new float[3]
-                        },
-                        currentLayer = 0,
-                        currentLayerTime = 0F,
-                        filePosition = 0L,
-                        firstLayerDuration = 0F,
-                        firstLayerHeight = 0F,
-                        fractionPrinted = 0F,
-                        extrRaw = new float[0],
-                        printDuration = 0F,
-                        warmUpDuration = 0F,
-                        timesLeft = new
-                        {
-                            file = 0F,
-                            filament = 0F,
-                            layer = 0F
-                        }
-                    };
-                    printResponse = JsonConvert.DeserializeAnonymousType(json, printResponse);
+                    PrintStatusResponse printResponse = (PrintStatusResponse)JsonSerializer.Deserialize(json, typeof(PrintStatusResponse), JsonHelper.DefaultJsonOptions);
 
                     using (await Provider.AccessReadWriteAsync())
                     {
@@ -544,22 +414,22 @@ namespace DuetControlServer.Model
                             // Layer complete
                             Layer lastLayer = (Provider.Get.Job.Layers.Count > 0)
                                 ? Provider.Get.Job.Layers[Provider.Get.Job.Layers.Count - 1]
-                                    : new Layer() { Filament = new float[printResponse.extrRaw.Length] };
+                                    : new Layer() { Filament = new List<float>(printResponse.extrRaw.Count) };
 
                             float lastHeight = 0F, lastDuration = 0F, lastProgress = 0F;
-                            float[] lastFilamentUsage = new float[printResponse.extrRaw.Length];
+                            float[] lastFilamentUsage = new float[printResponse.extrRaw.Count];
                             foreach (Layer l in Provider.Get.Job.Layers)
                             {
                                 lastHeight += l.Height;
                                 lastDuration += l.Duration;
                                 lastProgress += l.FractionPrinted;
-                                for (int i = 0; i < Math.Min(lastFilamentUsage.Length, l.Filament.Length); i++)
+                                for (int i = 0; i < Math.Min(lastFilamentUsage.Length, l.Filament.Count); i++)
                                 {
                                     lastFilamentUsage[i] += l.Filament[i];
                                 }
                             }
 
-                            float[] filamentUsage = new float[printResponse.extrRaw.Length];
+                            float[] filamentUsage = new float[printResponse.extrRaw.Count];
                             for (int i = 0; i < filamentUsage.Length; i++)
                             {
                                 filamentUsage[i] = printResponse.extrRaw[i] - lastFilamentUsage[i];
@@ -569,7 +439,7 @@ namespace DuetControlServer.Model
                             Layer layer = new Layer
                             {
                                 Duration = printDuration - lastDuration,
-                                Filament = filamentUsage,
+                                Filament = new List<float>(filamentUsage),
                                 FractionPrinted = (printResponse.fractionPrinted / 100F) - lastProgress,
                                 Height = (printResponse.currentLayer > 2) ? _currentHeight - lastHeight : printResponse.firstLayerHeight
                             };
@@ -603,25 +473,9 @@ namespace DuetControlServer.Model
                 else if (module == 5)
                 {
                     // Deserialize config response
-                    var response = new
-                    {
-                        axisMins = new float[0],
-                        axisMaxes = new float[0],
-                        accelerations = new float[0],
-                        currents = new int[0],
-                        firmwareElectronics = "",
-                        firmwareName = "",
-                        boardName = "",
-                        firmwareVersion = "",
-                        firmwareDate = "",
-                        idleCurrentFactor = 0.0F,
-                        idleTimeout = 0.0F,
-                        minFeedrates = new float[0],
-                        maxFeedrates = new float[0]
-                    };
-                    response = JsonConvert.DeserializeAnonymousType(json, response);
+                    ConfigResponse configResponse = (ConfigResponse)JsonSerializer.Deserialize(json, typeof(ConfigResponse), JsonHelper.DefaultJsonOptions);
 
-                    if (response.axisMins == null)
+                    if (configResponse.axisMins == null)
                     {
                         Console.WriteLine("[warn] Config response unsupported. Update your firmware!");
                         return;
@@ -630,24 +484,24 @@ namespace DuetControlServer.Model
                     using (await Provider.AccessReadWriteAsync())
                     {
                         // - Axes -
-                        for (int axis = 0; axis < Math.Min(Provider.Get.Move.Axes.Count, response.axisMins.Length); axis++)
+                        for (int axis = 0; axis < Math.Min(Provider.Get.Move.Axes.Count, configResponse.axisMins.Count); axis++)
                         {
-                            Provider.Get.Move.Axes[axis].Min = response.axisMins[axis];
-                            Provider.Get.Move.Axes[axis].Max = response.axisMaxes[axis];
+                            Provider.Get.Move.Axes[axis].Min = configResponse.axisMins[axis];
+                            Provider.Get.Move.Axes[axis].Max = configResponse.axisMaxes[axis];
                         }
 
                         // - Drives -
-                        for (int drive = 0; drive < Math.Min(Provider.Get.Move.Drives.Count, response.accelerations.Length); drive++)
+                        for (int drive = 0; drive < Math.Min(Provider.Get.Move.Drives.Count, configResponse.accelerations.Count); drive++)
                         {
-                            Provider.Get.Move.Drives[drive].Acceleration = response.accelerations[drive];
-                            Provider.Get.Move.Drives[drive].Current = response.currents[drive];
-                            Provider.Get.Move.Drives[drive].MinSpeed = response.minFeedrates[drive];
-                            Provider.Get.Move.Drives[drive].MaxSpeed = response.maxFeedrates[drive];
+                            Provider.Get.Move.Drives[drive].Acceleration = configResponse.accelerations[drive];
+                            Provider.Get.Move.Drives[drive].Current = configResponse.currents[drive];
+                            Provider.Get.Move.Drives[drive].MinSpeed = configResponse.minFeedrates[drive];
+                            Provider.Get.Move.Drives[drive].MaxSpeed = configResponse.maxFeedrates[drive];
                         }
 
                         // - Electronics -
-                        Provider.Get.Electronics.Name = response.firmwareElectronics;
-                        Provider.Get.Electronics.ShortName = response.boardName;
+                        Provider.Get.Electronics.Name = configResponse.firmwareElectronics;
+                        Provider.Get.Electronics.ShortName = configResponse.boardName;
                         switch (Provider.Get.Electronics.ShortName)
                         {
                             case "MBP05":
@@ -657,19 +511,19 @@ namespace DuetControlServer.Model
                                 Provider.Get.Electronics.Revision = "0.6";
                                 break;
                         }
-                        Provider.Get.Electronics.Firmware.Name = response.firmwareName;
-                        Provider.Get.Electronics.Firmware.Version = response.firmwareVersion;
-                        Provider.Get.Electronics.Firmware.Date = response.firmwareDate;
+                        Provider.Get.Electronics.Firmware.Name = configResponse.firmwareName;
+                        Provider.Get.Electronics.Firmware.Version = configResponse.firmwareVersion;
+                        Provider.Get.Electronics.Firmware.Date = configResponse.firmwareDate;
 
                         // - Move -
-                        Provider.Get.Move.Idle.Factor = response.idleCurrentFactor / 100F;
-                        Provider.Get.Move.Idle.Timeout = response.idleTimeout;
+                        Provider.Get.Move.Idle.Factor = configResponse.idleCurrentFactor / 100F;
+                        Provider.Get.Move.Idle.Timeout = configResponse.idleTimeout;
                     }
 
                     // Check if the firmware is supposed to be updated only. When this finishes, DCS is terminated.
-                    if (response.boardName != null && Program.UpdateOnly && !_updating)
+                    if (configResponse.boardName != null && Program.UpdateOnly && !_updatingFirmware)
                     {
-                        _updating = true;
+                        _updatingFirmware = true;
 
                         Code updateCode = new Code
                         {
@@ -681,7 +535,7 @@ namespace DuetControlServer.Model
                     }
                 }
             }
-            catch (Exception e)
+            catch (JsonException e)
             {
                 Console.WriteLine($"[err] Failed to merge JSON: {e}");
             }
@@ -689,38 +543,39 @@ namespace DuetControlServer.Model
 
         private static MachineStatus GetStatus(char letter)
         {
-            switch (letter)
+            return letter switch
             {
-                case 'F': return MachineStatus.Updating;
-                case 'O': return MachineStatus.Off;
-                case 'H': return MachineStatus.Halted;
-                case 'D': return MachineStatus.Pausing;
-                case 'S': return MachineStatus.Paused;
-                case 'R': return MachineStatus.Resuming;
-                case 'P': return MachineStatus.Processing;
-                case 'M': return MachineStatus.Simulating;
-                case 'B': return MachineStatus.Busy;
-                case 'T': return MachineStatus.ChangingTool;
-            }
-            return MachineStatus.Idle;
+                'F' => MachineStatus.Updating,
+                'O' => MachineStatus.Off,
+                'H' => MachineStatus.Halted,
+                'D' => MachineStatus.Pausing,
+                'S' => MachineStatus.Paused,
+                'R' => MachineStatus.Resuming,
+                'P' => MachineStatus.Processing,
+                'M' => MachineStatus.Simulating,
+                'B' => MachineStatus.Busy,
+                'T' => MachineStatus.ChangingTool,
+                _ => MachineStatus.Idle,
+            };
         }
-        
+
         // temporary - to be replaced with actual axis letter
+#warning FIXME this may not work for hidden axes
         private static char GetAxisLetter(int axis)
         {
-            switch (axis)
+            return axis switch
             {
-                case 0: return 'X';
-                case 1: return 'Y';
-                case 2: return 'Z';
-                case 3: return 'U';
-                case 4: return 'V';
-                case 5: return 'W';
-                case 6: return 'A';
-                case 7: return 'B';
-                case 8: return 'C';
-            }
-            return '?';
+                0 => 'X',
+                1 => 'Y',
+                2 => 'Z',
+                3 => 'U',
+                4 => 'V',
+                5 => 'W',
+                6 => 'A',
+                7 => 'B',
+                8 => 'C',
+                _ => '?',
+            };
         }
     }
 }

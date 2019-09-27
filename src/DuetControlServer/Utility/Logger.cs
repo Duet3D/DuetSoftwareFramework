@@ -105,7 +105,7 @@ namespace DuetControlServer.Utility
         /// <param name="result">Message list</param>
         public static async Task Log(DuetAPI.Commands.CodeResult result)
         {
-            if (result != null && !result.IsEmpty)
+            if (result != null)
             {
                 foreach (Message msg in result)
                 {
@@ -132,7 +132,7 @@ namespace DuetControlServer.Utility
         /// <returns></returns>
         public static async Task LogOutput(DuetAPI.Commands.CodeResult result)
         {
-            if (result != null && !result.IsEmpty)
+            if (result != null)
             {
                 foreach (Message msg in result)
                 {

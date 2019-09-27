@@ -109,7 +109,7 @@ namespace DuetAPI.Machine
             }
 
             Current = other.Current;
-            Name = (other.Name != null) ? string.Copy(other.Name) : null;
+            Name = other.Name;
             State = other.State;
             Sensor = other.Sensor;
         }
@@ -123,7 +123,7 @@ namespace DuetAPI.Machine
             return new ExtraHeater
             {
                 Current = Current,
-                Name = (Name != null) ? string.Copy(Name) : null,
+                Name = Name,
                 State = State,
                 Sensor = Sensor
             };

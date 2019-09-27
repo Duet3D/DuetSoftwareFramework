@@ -100,8 +100,8 @@ namespace DuetAPI.Machine
             }
 
             Mode = other.Mode;
-            Title = (other.Title != null) ? string.Copy(other.Title) : null;
-            Message = (other.Message != null) ? string.Copy(other.Message) : null;
+            Title = other.Title;
+            Message = other.Message;
             ListHelpers.SetList(AxisControls, other.AxisControls);
         }
 
@@ -114,8 +114,8 @@ namespace DuetAPI.Machine
             MessageBox clone = new MessageBox
             {
                 Mode = Mode,
-                Title = (Title != null) ? string.Copy(Title) : null,
-                Message = (Message != null) ? string.Copy(Message) : null
+                Title = Title,
+                Message = Message
             };
 
             ListHelpers.AddItems(clone.AxisControls, AxisControls);

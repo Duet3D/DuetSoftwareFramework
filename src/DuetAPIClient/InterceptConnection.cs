@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -34,10 +35,12 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
-        public Task Connect(InterceptionMode mode, string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default(CancellationToken))
+        /// <exception cref="SocketException">Init message could not be sent</exception>
+        public Task Connect(InterceptionMode mode, string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default)
         {
-            InterceptInitMessage initMessage = new InterceptInitMessage { InterceptionMode = mode };
             Mode = mode;
+
+            InterceptInitMessage initMessage = new InterceptInitMessage { InterceptionMode = mode };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -45,19 +48,26 @@ namespace DuetAPIClient
         /// Wait for a code to be intercepted and read it
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>A code that can be intercepted</returns>
-        public Task<Code> ReceiveCode(CancellationToken cancellationToken = default(CancellationToken)) => Receive<Code>(cancellationToken);
+        /// <returns>Code being intercepted or null if the connection has been closed</returns>
+        public Task<Code> ReceiveCode(CancellationToken cancellationToken = default) => Receive<Code>(cancellationToken);
+
+        /// <summary>
+        /// Instruct the control server to cancel the last received code (in intercepting mode)
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="SocketException">Command could not be sent</exception>
+        /// <seealso cref="Cancel"/>
+        public Task CancelCode(CancellationToken cancellationToken = default) => Send(new Cancel(), cancellationToken);
 
         /// <summary>
         /// Instruct the control server to ignore the last received code (in intercepting mode)
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <seealso cref="Ignore"/>
         /// <returns>Asynchronous task</returns>
-        public Task IgnoreCode(CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return PerformCommand(new Ignore(), cancellationToken);
-        }
+        /// <exception cref="SocketException">Command could not be sent</exception>
+        /// <seealso cref="Ignore"/>
+        public Task IgnoreCode(CancellationToken cancellationToken = default) => Send(new Ignore(), cancellationToken);
 
         /// <summary>
         /// Instruct the control server to resolve the last received code with the given message details (in intercepting mode)
@@ -66,11 +76,12 @@ namespace DuetAPIClient
         /// <param name="content">Content of the resolving message</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
+        /// <exception cref="SocketException">Command could not be sent</exception>
         /// <seealso cref="Message"/>
         /// <seealso cref="Resolve"/>
-        public Task ResolveCode(MessageType type, string content, CancellationToken cancellationToken = default(CancellationToken))
+        public Task ResolveCode(MessageType type, string content, CancellationToken cancellationToken = default)
         {
-            return PerformCommand(new Resolve { Content = content, Type = type }, cancellationToken);
+            return Send(new Resolve { Content = content, Type = type }, cancellationToken);
         }
     }
 }

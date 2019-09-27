@@ -2,12 +2,13 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
+using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
-using Newtonsoft.Json.Linq;
 
 namespace DuetControlServer.IPC
 {
@@ -44,22 +45,17 @@ namespace DuetControlServer.IPC
         }
 
         /// <summary>
-        /// Start accepting incoming connections.
-        /// This represents the lifecycle of this class
+        /// Accept incoming connections as long as this program is runnning
         /// </summary>
         /// <returns>Asynchronous task</returns>
         public static async Task AcceptConnections()
         {
-            // Keep accepting incoming connections.
-            // Each connection is assigned a unique ID
             do
             {
                 try
                 {
                     Socket socket = await unixSocket.AcceptAsync();
-
-                    int id = Interlocked.Increment(ref LastConnectionID);
-                    ConnectionEstablished(socket, id);
+                    ConnectionEstablished(socket);
                 }
                 catch (SocketException)
                 {
@@ -69,45 +65,46 @@ namespace DuetControlServer.IPC
             while (!Program.CancelSource.IsCancellationRequested);
         }
 
-        private static async void ConnectionEstablished(Socket socket, int id)
+        private static async void ConnectionEstablished(Socket socket)
         {
-            // Register it first
+            // Register the new connection first
+            int id = Interlocked.Increment(ref LastConnectionID);
             clientSockets.TryAdd(socket, id);
             
-            // Deal with the connection
-            using (Connection conn = new Connection(socket, id))
+            // Wrap it
+            Connection conn = new Connection(socket, id);
+            try
             {
-                try
-                {
-                    // Send server-side init message to the client
-                    await conn.SendResponse(new ServerInitMessage { Id = id });
+                // Send server-side init message to the client
+                await conn.Send(new ServerInitMessage { Id = id });
 
-                    // Read client-side init message and switch mode
-                    Base processor = await GetConnectionProcessor(conn);
-                    if (processor != null)
-                    {
-                        // Send success message
-                        await conn.SendResponse();
-                        
-                        // Let the processor deal with the connection
-                        await processor.Process();
-                    }
-                }
-                catch (Exception e)
+                // Read client-side init message and switch mode
+                Base processor = await GetConnectionProcessor(conn);
+                if (processor != null)
                 {
-                    // We get here as well when the connection has been terminated (IOException, SocketException -> Broken pipe)
-                    if (!(e is OperationCanceledException) && !(e is IOException) && !(e is SocketException))
-                    {
-                        Console.WriteLine($"[warn] Connection error: {e}");
-                    }
+                    // Send success message
+                    await conn.SendResponse();
+
+                    // Let the processor deal with the connection
+                    await processor.Process();
                 }
             }
-
-            // Remove this connection again
-            clientSockets.TryRemove(socket, out _);
-            if (socket.Connected)
+            catch (Exception e)
             {
-                socket.Disconnect(true);
+                // We get here as well when the connection has been terminated (IOException, SocketException -> Broken pipe)
+                if (!(e is OperationCanceledException))
+                {
+                    Console.WriteLine($"[warn] Connection error: {e}");
+                }
+            }
+            finally
+            {
+                // Remove this connection again
+                clientSockets.TryRemove(socket, out _);
+                if (socket.Connected)
+                {
+                    socket.Disconnect(true);
+                }
             }
         }
 
@@ -117,25 +114,25 @@ namespace DuetControlServer.IPC
         {
             try
             {
-                JObject response = await conn.ReceiveJson();
+                JsonDocument response = await conn.ReceiveJson();
                 if (response == null)
                 {
                     return null;
                 }
 
-                ClientInitMessage initMessage = response.ToObject<ClientInitMessage>();
+                ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
                 switch (initMessage.Mode)
                 {
                     case ConnectionMode.Command:
-                        initMessage = response.ToObject<CommandInitMessage>();
-                        return new Command(conn, initMessage);
+                        initMessage = JsonSerializer.Deserialize<CommandInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                        return new Command(conn);
                     
                     case ConnectionMode.Intercept:
-                        initMessage = response.ToObject<InterceptInitMessage>();
+                        initMessage = JsonSerializer.Deserialize<InterceptInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
                         return new Interception(conn, initMessage);
                     
                     case ConnectionMode.Subscribe:
-                        initMessage = response.ToObject<SubscribeInitMessage>();
+                        initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
                         return new Subscription(conn, initMessage);
                     
                     default:
@@ -144,12 +141,13 @@ namespace DuetControlServer.IPC
             }
             catch (Exception e)
             {
+                Console.WriteLine($"[err] Failed to get connection processor: {e}");
                 await conn.SendResponse(e);
             }
 
             return null;
         }
-        
+
         /// <summary>
         /// Close every connection and clean up the UNIX socket
         /// </summary>

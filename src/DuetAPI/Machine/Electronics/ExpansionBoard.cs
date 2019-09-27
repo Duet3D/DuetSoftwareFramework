@@ -137,9 +137,9 @@ namespace DuetAPI.Machine
                 throw new ArgumentException("Invalid type");
             }
 
-            ShortName = (other.ShortName != null) ? string.Copy(other.ShortName) : null;
-            Name = (Name != null) ? string.Copy(other.Name) : null;
-            Revision = (Revision != null) ? string.Copy(other.Revision) : null;
+            ShortName = other.ShortName;
+            Name = Name;
+            Revision = Revision;
             Firmware.Assign(other.Firmware);
             VIn.Assign(other.VIn);
             McuTemp.Assign(other.McuTemp);
@@ -155,9 +155,9 @@ namespace DuetAPI.Machine
         {
             return new ExpansionBoard
             {
-                ShortName = (ShortName != null) ? string.Copy(ShortName) : null,
-                Name = (Name != null) ? string.Copy(Name) : null,
-                Revision = (Revision != null) ? string.Copy(Revision) : null,
+                ShortName = ShortName,
+                Name = Name,
+                Revision = Revision,
                 Firmware = (Firmware)Firmware.Clone(),
                 VIn = (MinMaxCurrent<float?>)VIn.Clone(),
                 McuTemp = (MinMaxCurrent<float?>)McuTemp.Clone(),

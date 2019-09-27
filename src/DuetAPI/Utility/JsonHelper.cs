@@ -1,10 +1,9 @@
 ﻿using System;
-using System.Collections;
-using System.Linq;
-using System.Reflection;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Serialization;
+using System.IO;
+using System.Net.Sockets;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace DuetAPI.Utility
 {
@@ -14,255 +13,72 @@ namespace DuetAPI.Utility
     public static class JsonHelper
     {
         /// <summary>
-        /// Default JSON settings for serialization and deserialization.
-        /// It is strongly recommended to use these settings with Newtonsoft.Json!
+        /// Default JSON (de-)serialization options
         /// </summary>
-        public static readonly JsonSerializerSettings DefaultSettings = new JsonSerializerSettings
+        public static readonly JsonSerializerOptions DefaultJsonOptions = new JsonSerializerOptions
         {
-            ContractResolver = new CamelCasePropertyNamesContractResolver()
+            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
         };
 
         /// <summary>
-        /// Default JSON serializer.
-        /// It is strongly recommended to use this serializer with Newtonsoft.Json!
+        /// Receive a serialized JSON object from a socket in UTF-8 format
         /// </summary>
-        public static readonly JsonSerializer DefaultSerializer = new JsonSerializer
+        /// <param name="socket">Socket to read from</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Plain JSON</returns>
+        public static async Task<MemoryStream> ReceiveUtf8Json(Socket socket, CancellationToken cancellationToken = default)
         {
-            ContractResolver = new CamelCasePropertyNamesContractResolver()
-        };
+            //Console.Write("IN ");
 
-        /// <summary>
-        /// Create a JSON patch
-        /// </summary>
-        /// <param name="from">Source object</param>
-        /// <param name="to">Updated object</param>
-        /// <returns>JSON patch</returns>
-        /// <seealso cref="PatchObject(JObject, JObject)"/>
-        public static JObject DiffObject(JObject from, JObject to)
-        {
-            if (HasValue(from) != HasValue(to))
-            {
-                return to;
-            }
+            MemoryStream json = new MemoryStream();
+            bool inJson = false, inQuotes = false, isEscaped = false;
+            int numBraces = 0;
 
-            JObject diff = new JObject();
-            foreach (var pair in from)
+            byte[] readData = new byte[1];
+            while ((!inJson || numBraces > 0) && await socket.ReceiveAsync(readData, SocketFlags.None, cancellationToken) > 0)
             {
-                string key = char.ToLowerInvariant(pair.Key[0]) + pair.Key.Substring(1);
-                if (to.TryGetValue(key, StringComparison.InvariantCultureIgnoreCase, out JToken value))
+                char c = (char)readData[0];
+                //Console.Write(c);
+                if (inQuotes)
                 {
-                    if (pair.Value.Type == JTokenType.Object && value.Type == JTokenType.Object)
+                    if (isEscaped)
                     {
-                        JToken subDiff = DiffObject((JObject)pair.Value, (JObject)value);
-                        if (subDiff.HasValues)
-                        {
-                            diff[key] = subDiff;
-                        }
+                        isEscaped = false;
                     }
-                    else if (pair.Value.Type == JTokenType.Array && value.Type == JTokenType.Array)
+                    else if (c == '\\')
                     {
-                        JArray subDiff = DiffArray((JArray)pair.Value, (JArray)value, out bool foundDiffs);
-                        if (foundDiffs)
-                        {
-                            diff[key] = subDiff;
-                        }
+                        isEscaped = true;
                     }
-                    else if (!JToken.DeepEquals(pair.Value, value))
+                    else if (c == '"')
                     {
-                        diff[key] = value;
+                        inQuotes = false;
                     }
                 }
-            }
-            foreach (var pair in to)
-            {
-                string key = char.ToLowerInvariant(pair.Key[0]) + pair.Key.Substring(1);
-                if (!to.ContainsKey(key))
+                else if (c == '"')
                 {
-                    diff[key] = pair.Value;
+                    inQuotes = true;
+                }
+                else if (c == '{')
+                {
+                    inJson = true;
+                    numBraces++;
+                }
+                else if (c == '}')
+                {
+                    numBraces--;
+                }
+
+                if (inJson)
+                {
+                    json.WriteByte(readData[0]);
                 }
             }
-            return diff;
+
+            //Console.WriteLine(" OK");
+            json.Seek(0, SeekOrigin.Begin);
+            return json;
         }
-
-        private static JArray DiffArray(JArray from, JArray to, out bool foundDiffs)
-        {
-            if (HasValue(from) != HasValue(to))
-            {
-                foundDiffs = true;
-                return to;
-            }
-
-            JArray diff = new JArray();
-            foundDiffs = (from.Count != to.Count);
-            for (int i = 0; i < Math.Min(from.Count, to.Count); i++)
-            {
-                if (HasValue(from[i]) != HasValue(to[i]))
-                {
-                    foundDiffs = true;
-                    diff.Add(to[i]);
-                }
-                else if (from[i].Type == JTokenType.Object)
-                {
-                    JObject diffObj = DiffObject((JObject)from[i], (JObject)to[i]);
-                    foundDiffs |= diffObj.HasValues;
-                    diff.Add(diffObj);
-                }
-                else if (from[i].Type == JTokenType.Array)
-                {
-                    JArray diffArr = DiffArray((JArray)from[i], (JArray)to[i], out bool foundSubDiffs);
-                    foundDiffs |= foundSubDiffs;
-                    diff.Add(diffArr);
-                }
-                else
-                {
-                    foundDiffs |= !JToken.DeepEquals(from[i], to[i]);
-                    diff.Add(to[i]);
-                }
-            }
-            for (int i = from.Count; i < to.Count; i++)
-            {
-                diff.Add(to[i]);
-            }
-            return diff;
-        }
-
-        /// <summary>
-        /// Apply an arbitrary JSON patch
-        /// </summary>
-        /// <param name="obj">Object to patch</param>
-        /// <param name="diff">JSON patch to apply</param>
-        public static void PatchObject(JObject obj, JObject diff)
-        {
-            foreach (var pair in diff)
-            {
-                JToken token = obj[pair.Key];
-                if (token != null)
-                {
-                    if (token.Type == JTokenType.Array)
-                    {
-                        PatchList((JArray)token, (JArray)pair.Value);
-                    }
-                    else if (token.Type == JTokenType.Object)
-                    {
-                        PatchObject((JObject)token, (JObject)pair.Value);
-                    }
-                    else
-                    {
-                        obj[pair.Key] = pair.Value;
-                    }
-                }
-                else
-                {
-                    obj[pair.Key] = pair.Value;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Apply an arbitrary JSON patch
-        /// </summary>
-        /// <param name="obj">Object to patch</param>
-        /// <param name="diff">JSON patch to apply</param>
-        /// <seealso cref="DiffObject"/>
-        public static void PatchObject(object obj, JObject diff)
-        {
-            Type type = obj.GetType();
-            foreach (var pair in diff)
-            {
-                PropertyInfo prop = type.GetProperty(pair.Key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                if (prop != null)
-                {
-                    if (pair.Value.Type == JTokenType.Array && IsListType(prop.PropertyType))
-                    {
-                        JArray subArray = (JArray)pair.Value;
-                        IList list = (IList)prop.GetValue(obj);
-                        PatchList(list, prop.PropertyType.GetGenericArguments().Single(), subArray);
-                    }
-                    else if (pair.Value.Type == JTokenType.Object)
-                    {
-                        object subObj = prop.GetValue(obj);
-                        PatchObject(subObj, (JObject)pair.Value);
-                    }
-                    else if (prop.PropertyType.IsEnum && pair.Value?.ToString().Length == 1)
-                    {
-                        prop.SetValue(obj, pair.Value.ToString()[0]);
-                    }
-                    else
-                    {
-                        prop.SetValue(obj, pair.Value.ToObject(prop.PropertyType));
-                    }
-                }
-            }
-        }
-
-        private static void PatchList(JArray a, JArray b)
-        {
-            for (int i = a.Count - 1; i >= b.Count; i--)
-            {
-                a.RemoveAt(i);
-            }
-
-            for (int i = 0; i < b.Count; i++)
-            {
-                JToken token = b[i];
-                if (i >= a.Count)
-                {
-                    a.Add(token);
-                }
-                else
-                {
-                    JToken source = a[i];
-                    if (HasValue(source) && token.Type == JTokenType.Object)
-                    {
-                        PatchObject((JObject)source, (JObject)token);
-                    }
-                    else if (HasValue(source) && token.Type == JTokenType.Array)
-                    {
-                        PatchList((JArray)source, (JArray)token);
-                    }
-                    else
-                    {
-                        a[i] = b[i];
-                    }
-                }
-            }
-        }
-
-        private static void PatchList(IList list, Type itemType, JArray array)
-        {
-            for (int i = list.Count - 1; i >= array.Count; i--)
-            {
-                list.RemoveAt(i);
-            }
-
-            for (int i = 0; i < array.Count; i++)
-            {
-                JToken token = array[i];
-                if (i >= list.Count)
-                {
-                    list.Add(token.ToObject(itemType));
-                }
-                else
-                {
-                    object source = list[i];
-                    if (source != null && token.Type == JTokenType.Object && list[i] != null)
-                    {
-                        PatchObject(source, (JObject)token);
-                    }
-                    else if (source != null && token.Type == JTokenType.Array && IsListType(list[i].GetType()))
-                    {
-                        PatchList((IList)source, list[i].GetType(), (JArray)token);
-                    }
-                    else
-                    {
-                        list[i] = token.ToObject(itemType);
-                    }
-                }
-            }
-        }
-        
-        private static bool HasValue(JToken item) => item != null && item.Type != JTokenType.Null;
-
-        private static bool IsListType(Type type) => typeof(IList).IsAssignableFrom(type) && type.GetGenericArguments().Length == 1;
     }
 }

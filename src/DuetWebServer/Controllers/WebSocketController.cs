@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -27,69 +28,82 @@ namespace DuetWebServer.Controllers
         /// <returns>Asynchronous task</returns>
         public static async Task Process(WebSocket webSocket, string socketPath, ILogger logger)
         {
-            using (SubscribeConnection connection = new SubscribeConnection())
+            using SubscribeConnection connection = new SubscribeConnection();
+
+            // 1. Authentication
+            // TODO
+
+            // 2. Connect to DCS
+            try
             {
-                // 1. Authentication
-                // TODO
+                await connection.Connect(SubscriptionMode.Patch, null, socketPath, Program.CancelSource.Token);
+            }
+            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
+            {
+                logger.LogError($"[{nameof(WebSocketController)}] Incompatible DCS version");
+                await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, "Incompatible DCS version");
+                return;
+            }
+            catch (Exception)
+            {
+                logger.LogError($"[{nameof(WebSocketController)}] DCS is unavailable");
+                await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "DCS is unavailable");
+                return;
+            }
 
-                // 2. Connect to DCS
-                try
+            // 3. Keep the client up-to-date
+            try
+            {
+                // 3a. Fetch full model copy and send it over initially
+                using (MemoryStream json = await connection.GetSerializedMachineModel(Program.CancelSource.Token))
                 {
-                    await connection.Connect(SubscriptionMode.Patch, socketPath, Program.CancelSource.Token);
-                }
-                catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
-                {
-                    logger.LogError($"[{nameof(WebSocketController)}] Incompatible DCS version");
-                    await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, "Incompatible DCS version");
-                    return;
-                }
-                catch (Exception)
-                {
-                    logger.LogError($"[{nameof(WebSocketController)}] DCS is unavailable");
-                    await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "DCS is unavailable");
-                    return;
+                    await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, Program.CancelSource.Token);
                 }
 
-                // 3. Keep the client up-to-date
-                try
+                // 3b. Keep sending updates to the client and wait for "OK" after each update
+                do
                 {
-                    // 3a. Fetch full model copy and send it over initially
-                    string json = await connection.GetSerializedMachineModel();
-                    await webSocket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, Program.CancelSource.Token);
-
-                    // 3b. Keep sending updates to the client and wait for "OK" after each update
-                    do
+                    // 3c. Wait for response from the client
+                    byte[] receivedBytes = new byte[8];
+                    WebSocketReceiveResult result = await webSocket.ReceiveAsync(receivedBytes, Program.CancelSource.Token);
+                    if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        // 3c. Wait for response from the client
-                        byte[] receivedBytes = new byte[8];
-                        await webSocket.ReceiveAsync(receivedBytes, Program.CancelSource.Token);
-                        string receivedData = Encoding.UTF8.GetString(receivedBytes);
+                        // Remote end is closing this connection
+                        break;
+                    }
+                    if (result.MessageType == WebSocketMessageType.Binary)
+                    {
+                        // Terminate the connection if binary content is received
+                        await CloseConnection(webSocket, WebSocketCloseStatus.InvalidMessageType, "Only text commands are supported");
+                        break;
+                    }
+                    string receivedData = Encoding.UTF8.GetString(receivedBytes);
 
-                        // 3d. Deal with PING requests
-                        if (receivedData.Equals("PING\n", StringComparison.InvariantCultureIgnoreCase))
-                        {
-                            await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, Program.CancelSource.Token);
-                            continue;
-                        }
+                    // 3d. Deal with PING requests
+                    if (receivedData.Equals("PING\n", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        // Send PONG back to the client
+                        await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, Program.CancelSource.Token);
+                        continue;
+                    }
 
-                        // 3e. Check if the client has acknowledged the received data
-                        if (!receivedData.Equals("OK\n", StringComparison.InvariantCultureIgnoreCase))
-                        {
-                            // Terminate the connection if anything else than "OK" is received
-                            await CloseConnection(webSocket, WebSocketCloseStatus.InvalidMessageType, "Invalid command");
-                            break;
-                        }
+                    // 3e. Check if the client has acknowledged the received data
+                    if (!receivedData.Equals("OK\n", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        // Terminate the connection if anything else than "OK" is received
+                        await CloseConnection(webSocket, WebSocketCloseStatus.ProtocolError, "Invalid command");
+                        break;
+                    }
 
-                        // 3f. Check for another update and send it to the client
-                        json = await connection.GetSerializedMachineModel();
-                        await webSocket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, Program.CancelSource.Token);
-                    } while (webSocket.State == WebSocketState.Open);
-                }
-                catch (Exception e)
-                {
-                    logger.LogError(e, "WebSocket terminated with an exception");
-                    await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, e.Message);
-                }
+                    // 3f. Check for another update and send it to the client
+                    using MemoryStream json = await connection.GetSerializedMachineModel(Program.CancelSource.Token);
+                    await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, Program.CancelSource.Token);
+                } while (webSocket.State == WebSocketState.Open);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "WebSocket terminated with an exception");
+                await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, e.Message);
             }
         }
 

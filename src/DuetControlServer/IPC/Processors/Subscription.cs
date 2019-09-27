@@ -1,15 +1,15 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Sockets;
+using System.Text.Json;
 using System.Threading.Tasks;
-using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Nito.AsyncEx;
 
 namespace DuetControlServer.IPC.Processors
@@ -30,9 +30,22 @@ namespace DuetControlServer.IPC.Processors
         
         private static readonly List<Subscription> _subscriptions = new List<Subscription>();
 
+        /// <summary>
+        /// Checks if any subscribers are connected
+        /// </summary>
+        /// <returns>True if subscribers are connected</returns>
+        public static bool AreClientsConnected()
+        {
+            lock (_subscriptions)
+            {
+                return _subscriptions.Count > 0;
+            }
+        }
+
         private readonly SubscriptionMode _mode;
-        private readonly MachineModel _model;
-        private readonly List<Message> _messages = new List<Message>();
+        private readonly string[][] _filters;
+
+        private readonly Dictionary<string, object> _patch = new Dictionary<string, object>();
         private readonly AsyncAutoResetEvent _updateAvailableEvent = new AsyncAutoResetEvent();
         
         /// <summary>
@@ -40,17 +53,19 @@ namespace DuetControlServer.IPC.Processors
         /// </summary>
         /// <param name="conn">Connection instance</param>
         /// <param name="initMessage">Initialization message</param>
-        public Subscription(Connection conn, ClientInitMessage initMessage) : base(conn, initMessage)
+        public Subscription(Connection conn, ClientInitMessage initMessage) : base(conn)
         {
+            SubscribeInitMessage subscribeInitMessage = (SubscribeInitMessage)initMessage;
+            _mode = subscribeInitMessage.SubscriptionMode;
+            if (!string.IsNullOrEmpty(subscribeInitMessage.Filter))
+            {
+                string[] filterStrings = subscribeInitMessage.Filter.Split(',', '|', '\r', '\n', ' ');
+                _filters = filterStrings.Select(filter => filter.Split('/')).ToArray();
+            }
+
             lock (_subscriptions)
             {
                 _subscriptions.Add(this);
-            }
-
-            _mode = (initMessage as SubscribeInitMessage).SubscriptionMode;
-            using (Model.Provider.AccessReadOnly())
-            {
-                _model = (MachineModel)Model.Provider.Get.Clone();
             }
         }
         
@@ -62,20 +77,27 @@ namespace DuetControlServer.IPC.Processors
         {
             try
             {
-                // First send over the full machine model
-                JObject currentObject, lastObject, patch = null;
-                lock (_model)
+                // Subscribe to changes in Patch mode
+                if (_mode == SubscriptionMode.Patch)
                 {
-                    currentObject = lastObject = JObject.FromObject(_model, JsonHelper.DefaultSerializer);
-                    _model.Messages.Clear();
+                    Model.Observer.OnPropertyPathChanged += MachineModelPropertyChanged;
                 }
-                await Connection.Send(currentObject.ToString(Formatting.None) + "\n");
+
+                // Serialize the whole machine model
+                byte[] jsonData;
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    jsonData = JsonSerializer.SerializeToUtf8Bytes(Model.Provider.Get, JsonHelper.DefaultJsonOptions);
+                }
 
                 do
                 {
-                    // Wait for an acknowledgement from the client if anything was sent before
-                    if (patch == null || patch.HasValues)
+                    // Send new JSON data
+                    if (jsonData != null)
                     {
+                        await Connection.Send(jsonData);
+
+                        // Wait for an acknowledgement from the client
                         BaseCommand command = await Connection.ReceiveCommand();
                         if (command == null)
                         {
@@ -88,58 +110,43 @@ namespace DuetControlServer.IPC.Processors
                         }
                     }
 
-                    // Wait for another update
-                    if (_mode == SubscriptionMode.Patch)
-                    {
-                        lastObject = currentObject;
-                    }
+                    // Wait for an object model update to complete
                     await _updateAvailableEvent.WaitAsync(Program.CancelSource.Token);
 
-                    // Get the updated object model
-                    lock (_model)
+                    // Get the (diff) JSON
+                    if (_mode == SubscriptionMode.Patch)
                     {
-                        using (Model.Provider.AccessReadOnly())
+                        lock (_patch)
                         {
-                            // NB: This could be further improved so that all the JSON tokens are written via the INotifyPropertyChanged events
-                            _model.Assign(Model.Provider.Get);
+                            if (_patch.Count > 0)
+                            {
+                                jsonData = JsonSerializer.SerializeToUtf8Bytes(_patch, JsonHelper.DefaultJsonOptions);
+                                _patch.Clear();
+                            }
+                            else
+                            {
+                                jsonData = null;
+                            }
                         }
-                        lock (_messages)
-                        {
-                            ListHelpers.AssignList(_model.Messages, _messages);
-                            _messages.Clear();
-                        }
-                        currentObject = JObject.FromObject(_model, JsonHelper.DefaultSerializer);
-                    }
-
-                    // Provide the model update
-                    if (_mode == SubscriptionMode.Full)
-                    {
-                        // Send the entire object model in Full mode
-                        await Connection.Send(currentObject.ToString(Formatting.None) + "\n");
                     }
                     else
                     {
-                        // Only create a diff in Patch mode
-                        patch = JsonHelper.DiffObject(lastObject, currentObject);
-
-                        // Compact the job layers. There is no point in sending them all every time an update occurs
-                        if (patch.ContainsKey("job") && patch.Value<JObject>("job").ContainsKey("layers"))
+                        using (await Model.Provider.AccessReadOnlyAsync())
                         {
-                            JArray layersArray = patch["job"].Value<JArray>("layers");
-                            while (layersArray.Count > 0 && !layersArray[0].HasValues)
-                            {
-                                layersArray.RemoveAt(0);
-                            }
-                        }
-
-                        // Send the patch unless it is empty
-                        if (patch.HasValues)
-                        {
-                            await Connection.Send(patch.ToString(Formatting.None) + "\n");
+                            jsonData = JsonSerializer.SerializeToUtf8Bytes(Model.Provider.Get, JsonHelper.DefaultJsonOptions);
                         }
                     }
                 }
                 while (!Program.CancelSource.IsCancellationRequested);
+            }
+            catch (Exception e)
+            {
+                // Socket exceptions are expected.
+                // They occur when data is sent after the remote end had acknowledged an update but then terminated the connection
+                if (!(e is SocketException))
+                {
+                    throw;
+                }
             }
             finally
             {
@@ -147,38 +154,225 @@ namespace DuetControlServer.IPC.Processors
                 {
                     _subscriptions.Remove(this);
                 }
-            }
-        }
 
-        /// <summary>
-        /// Enqueue a generic message for output
-        /// </summary>
-        /// <param name="message">New message</param>
-        /// <returns>Whether the message could be stored</returns>
-        public static bool Output(Message message)
-        {
-            if (_subscriptions.Count == 0)
-            {
-                return false;
-            }
-
-            lock (_subscriptions)
-            {
-                foreach (Subscription subscription in _subscriptions)
+                if (_mode == SubscriptionMode.Patch)
                 {
-                    subscription.AddMessage(message);
+                    Model.Observer.OnPropertyPathChanged -= MachineModelPropertyChanged;
                 }
             }
-            return true;
         }
 
-        private void AddMessage(Message message)
+        private bool CheckFilter(object[] path, string[] filter)
         {
-            lock (_messages)
+            for (int i = 0; i < filter.Length; i++)
             {
-                _messages.Add(message);
+                string arg = filter[i];
+                if (arg == "**")
+                {
+                    return true;
+                }
+
+                if (i >= path.Length)
+                {
+                    return false;
+                }
+
+                object pathItem = path[i];
+                if (pathItem is string stringItem)
+                {
+                    if (arg != "*" &&
+                        !arg.Equals(stringItem, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        return false;
+                    }
+                }
+                else if (pathItem is Model.ItemPathNode listItem)
+                {
+                    if (!arg.Equals($"{listItem.Name}[*]", StringComparison.InvariantCultureIgnoreCase) &&
+                        !arg.Equals($"{listItem.Name}[{listItem.Index}]", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        return false;
+                    }
+                }
             }
-            _updateAvailableEvent.Set();
+
+            return (path.Length == filter.Length);
+        }
+
+        private bool CheckFilter(object[] path)
+        {
+            if (_filters == null)
+            {
+                return true;
+            }
+
+            foreach (string[] filter in _filters)
+            {
+                if (CheckFilter(path, filter))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private object GetPathNode(object[] path)
+        {
+            Dictionary<string, object> currentDictionary = _patch;
+            List<object> currentList = null;
+
+            for (int i = 0; i < path.Length - 1; i++)
+            {
+                object pathItem = path[i];
+                if (pathItem is string pathString)
+                {
+                    if (currentDictionary.TryGetValue(pathString, out object child))
+                    {
+                        if (child is Dictionary<string, object> childDictionary)
+                        {
+                            currentDictionary = childDictionary;
+                            currentList = null;
+                        }
+                        else if (child is List<object> childList)
+                        {
+                            currentList = childList;
+                            currentDictionary = null;
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException($"Invalid child type {child.GetType().Name} for path {string.Join('/', path)}");
+                        }
+                    }
+                    else
+                    {
+                        Dictionary<string, object> newNode = new Dictionary<string, object>();
+                        currentDictionary.Add(pathString, newNode);
+                        currentDictionary = newNode;
+                    }
+                }
+                else if (pathItem is Model.ItemPathNode itemPathNode)
+                {
+                    if (currentDictionary.TryGetValue(itemPathNode.Name, out object nodeList))
+                    {
+                        currentList = (List<object>)nodeList;
+                    }
+                    else
+                    {
+                        currentList = new List<object>(itemPathNode.Count);
+                        currentDictionary.Add(itemPathNode.Name, currentList);
+                    }
+
+                    for (int k = currentList.Count; k > itemPathNode.Count; k++)
+                    {
+                        currentList.RemoveAt(k - 1);
+                    }
+
+                    for (int k = currentList.Count; k < itemPathNode.Count; k++)
+                    {
+                        currentList.Add(new Dictionary<string, object>());
+                    }
+
+                    currentDictionary = (Dictionary<string, object>)currentList[itemPathNode.Index];
+                }
+            }
+
+            if (currentDictionary != null)
+            {
+                return currentDictionary;
+            }
+            return currentList;
+        }
+
+        private void MachineModelPropertyChanged(object[] path, Model.PropertyPathChangeType pathType, object value)
+        {
+            if (!CheckFilter(path))
+            {
+                return;
+            }
+
+            lock (_patch)
+            {
+                try
+                {
+                    object node = GetPathNode(path);
+                    switch (pathType)
+                    {
+                        case Model.PropertyPathChangeType.Property:
+                            // Set new property value
+                            Dictionary<string, object> propertyNode = (Dictionary<string, object>)node;
+                            string propertyName = (string)path[^1];
+                            propertyNode[propertyName] = value;
+                            break;
+
+                        case Model.PropertyPathChangeType.ObjectCollection:
+                            // Object collection count is already updated by the call to GetPathNode()
+                            break;
+
+                        case Model.PropertyPathChangeType.ValueCollection:
+                            // Set new value list
+                            if (node is Dictionary<string, object> valueNode)
+                            {
+                                string valueName = (string)path[^1];
+                                valueNode[valueName] = value;
+                            }
+                            else if (node is List<object> valueCollection)
+                            {
+                                int index = (int)path[^1];
+                                valueCollection[index] = value;
+                            }
+                            else
+                            {
+                                throw new ArgumentException($"Invalid value list type {node.GetType().Name}");
+                            }
+                            break;
+
+                        case Model.PropertyPathChangeType.GrowingCollection:
+                            // Add new items or clear list
+                            if (node is Dictionary<string, object> parent)
+                            {
+                                string collectionName = (string)path[^1];
+                                if (value == null && collectionName.Equals(nameof(MachineModel.Messages), StringComparison.InvariantCultureIgnoreCase))
+                                {
+                                    // Don't clear messages - they are volatile anyway
+                                    break;
+                                }
+
+                                List<object> growingCollection;
+                                if (parent.TryGetValue(collectionName, out object obj))
+                                {
+                                    growingCollection = (List<object>)obj;
+                                }
+                                else
+                                {
+                                    growingCollection = new List<object>();
+                                    parent.Add(collectionName, growingCollection);
+                                }
+
+                                if (value != null)
+                                {
+                                    foreach (object newItem in (IList)value)
+                                    {
+                                        growingCollection.Add(newItem);
+                                    }
+                                }
+                                else
+                                {
+                                    growingCollection.Clear();
+                                }
+                            }
+                            else
+                            {
+                                throw new ArgumentException($"Invalid growing collection parent type {node.GetType().Name}");
+                            }
+                            break;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Failed to record {string.Join('/', path)} = {value} ({pathType}):");
+                    Console.WriteLine(e);
+                }
+            }
         }
 
         /// <summary>

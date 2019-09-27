@@ -72,7 +72,7 @@ namespace DuetAPI.Machine
 
             ListHelpers.SetList(Active, other.Active);
             ListHelpers.SetList(Standby, other.Standby);
-            Name = (other.Name != null) ? string.Copy(other.Name) : null;
+            Name = other.Name;
             ListHelpers.SetList(Heaters, other.Heaters);
         }
 
@@ -84,7 +84,7 @@ namespace DuetAPI.Machine
         {
             BedOrChamber clone = new BedOrChamber
             {
-                Name = (Name != null) ? string.Copy(Name) : null
+                Name = Name
             };
 
             ListHelpers.AddItems(clone.Active, Active);

@@ -28,7 +28,12 @@ namespace DuetAPI.Commands
         public T Result { get; set; }
 
         /// <summary>
-        /// Creates a new Response instance
+        /// Default constructor for a response
+        /// </summary>
+        public Response() { }
+
+        /// <summary>
+        /// Creates a new Response instance from the given result
         /// </summary>
         /// <param name="result"></param>
         public Response(T result)

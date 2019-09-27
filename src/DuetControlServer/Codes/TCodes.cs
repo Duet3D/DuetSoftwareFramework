@@ -20,13 +20,12 @@ namespace DuetControlServer.Codes
         /// React to an executed T-code before its result is returend
         /// </summary>
         /// <param name="code">Code processed by RepRapFirmware</param>
-        /// <param name="result">Result that it generated</param>
         /// <returns>Result to output</returns>
-        public static async Task<CodeResult> CodeExecuted(Code code, CodeResult result)
+        public static async Task CodeExecuted(Code code)
         {
-            if (!code.MajorNumber.HasValue || !result.IsSuccessful)
+            if (!code.MajorNumber.HasValue || !code.Result.IsSuccessful)
             {
-                return result;
+                return;
             }
 
             // Set new tool number
@@ -43,8 +42,6 @@ namespace DuetControlServer.Codes
                     Model.Provider.Get.State.CurrentTool = -1;
                 }
             }
-
-            return result;
         }
     }
 }

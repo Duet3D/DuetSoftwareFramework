@@ -247,7 +247,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="module">Module described by the returned JSON data</param>
         /// <param name="json">JSON data</param>
-        public static void ReadObjectModel(out byte module, out string json)
+        public static void ReadObjectModel(out byte module, out byte[] json)
         {
             Serialization.Reader.ReadObjectModel(_packetData.Span, out module, out json);
         }
@@ -362,7 +362,7 @@ namespace DuetControlServer.SPI
                 dump += ((int)c).ToString("x2");
             }
             dump += "\n";
-            string str = System.Text.Encoding.UTF8.GetString(_packetData.Span);
+            string str = Encoding.UTF8.GetString(_packetData.Span);
             foreach(char c in str)
             {
                 dump += char.IsLetterOrDigit(c) ? c : '.';
@@ -386,7 +386,7 @@ namespace DuetControlServer.SPI
             do
             {
                 // Read next packet
-                header = MemoryMarshal.Read<Communication.PacketHeader>(buffer);
+                header = MemoryMarshal.Cast<byte, Communication.PacketHeader>(buffer)[0];
                 if (header.Id == packet.ResendPacketId)
                 {
                     Span<byte> destination = GetWriteBuffer(headerSize + header.Length);
@@ -441,7 +441,7 @@ namespace DuetControlServer.SPI
         /// <returns>Code size in bytes</returns>
         public static int GetCodeSize(Code code)
         {
-            Span<byte> span = /*stackalloc*/ new byte[Communication.Consts.MaxCodeBufferSize];
+            Span<byte> span = stackalloc byte[Communication.Consts.MaxCodeBufferSize];
             try
             {
                 return Serialization.Writer.WriteCode(span, code);
@@ -460,7 +460,7 @@ namespace DuetControlServer.SPI
         public static bool WriteCode(Code code)
         {
             // Attempt to serialize the code first
-            Span<byte> span = /*stackalloc*/ new byte[Communication.Consts.MaxCodeBufferSize];
+            Span<byte> span = stackalloc byte[Communication.Consts.MaxCodeBufferSize];
             int codeLength;
             try
             {
@@ -509,8 +509,8 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteSetObjectModel(string field, object value)
         {
-            // Serialize the requqest first to see how much space it requires
-            Span<byte> span = new byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
+            // Serialize the request first to see how much space it requires
+            Span<byte> span = stackalloc byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
             int dataLength = Serialization.Writer.WriteObjectModel(span, field, value);
 
             // See if the request fits into the buffer
@@ -532,8 +532,8 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WritePrintStarted(ParsedFileInfo info)
         {
-            // Serialize the requqest first to see how much space it requires
-            Span<byte> span = new byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
+            // Serialize the request first to see how much space it requires
+            Span<byte> span = stackalloc byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
             int dataLength = Serialization.Writer.WritePrintStarted(span, info);
 
             // See if the request fits into the buffer
@@ -608,8 +608,8 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteHeightMap(Heightmap map)
         {
-            // Serialize the requqest first to see how much space it requires
-            Span<byte> span = new byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
+            // Serialize the request first to see how much space it requires
+            Span<byte> span = stackalloc byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
             int dataLength = Serialization.Writer.WriteHeightMap(span, map);
 
             // See if the request fits into the buffer
@@ -669,7 +669,7 @@ namespace DuetControlServer.SPI
         {
             _updating = true;
 
-            Span<byte> data = /*stackalloc*/ new byte[Communication.Consts.IapSegmentSize];
+            Span<byte> data = stackalloc byte[Communication.Consts.IapSegmentSize];
             int bytesRead = stream.Read(data);
             if (bytesRead <= 0)
             {
@@ -706,7 +706,7 @@ namespace DuetControlServer.SPI
         /// <returns>Whether another segment could be sent</returns>
         public static bool FlashFirmwareSegment(Stream stream)
         {
-            Span<byte> segment = /*stackalloc*/ new byte[Communication.Consts.FirmwareSegmentSize];
+            Span<byte> segment = stackalloc byte[Communication.Consts.FirmwareSegmentSize];
             int bytesRead = stream.Read(segment);
             if (bytesRead <= 0)
             {
@@ -743,13 +743,13 @@ namespace DuetControlServer.SPI
                 firmwareLength = (uint)firmwareLength,
                 crc16 = crc16
             };
-            Span<byte> transferData = /*stackalloc*/ new byte[Marshal.SizeOf(typeof(Communication.LinuxRequests.FlashVerifyRequest))];
+            Span<byte> transferData = stackalloc byte[Marshal.SizeOf(typeof(Communication.LinuxRequests.FlashVerifyRequest))];
             MemoryMarshal.Write(transferData, ref verifyRequest);
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(transferData, transferData);
 
             // Check if the IAP can confirm our CRC16 checksum
-            byte[] writeOk = /*stackalloc*/ new byte[1];
+            Span<byte> writeOk = stackalloc byte[1];
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(writeOk, writeOk);
             return (writeOk[0] == 0x0C);
@@ -772,8 +772,8 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the firmware has been written successfully</returns>
         public static bool WriteAssignFilament(int extruder, string filamentName)
         {
-            // Serialize the requqest first to see how much space it requires
-            Span<byte> span = new byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
+            // Serialize the request first to see how much space it requires
+            Span<byte> span = stackalloc byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
             int dataLength = Serialization.Writer.WriteAssignFilament(span, extruder, filamentName);
 
             // See if the request fits into the buffer
@@ -796,8 +796,8 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the firmware has been written successfully</returns>
         public static bool WriteFileChunk(Span<byte> data, long fileLength)
         {
-            // Serialize the requqest first to see how much space it requires
-            Span<byte> span = new byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
+            // Serialize the request first to see how much space it requires
+            Span<byte> span = stackalloc byte[Communication.Consts.BufferSize - Marshal.SizeOf(typeof(Communication.PacketHeader))];
             int dataLength = Serialization.Writer.WriteFileChunk(span, data, fileLength);
 
             // See if the request fits into the buffer
@@ -853,38 +853,30 @@ namespace DuetControlServer.SPI
                 _transferReadyEvent.Reset();
                 if (!_transferReadyPin.Value)
                 {
-                    using (CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SpiTransferTimeout))
-                    {
-                        using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, timeoutCts.Token))
-                        {
-                            _transferReadyEvent.Wait(cts.Token);
+                    using CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SpiTransferTimeout);
+                    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, timeoutCts.Token);
+                    _transferReadyEvent.Wait(cts.Token);
 
-                            if (Program.CancelSource.IsCancellationRequested)
-                            {
-                                throw new OperationCanceledException("Program termination");
-                            }
-                            if (timeoutCts.IsCancellationRequested)
-                            {
-                                throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
-                            }
-                        }
+                    if (Program.CancelSource.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException("Program termination");
+                    }
+                    if (timeoutCts.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                     }
                 }
                 _waitingForFirstTransfer = false;
             }
             else
             {
-                using (CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SpiTransferTimeout))
-                {
-                    using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, timeoutCts.Token))
-                    {
-                        _transferReadyEvent.Wait(cts.Token);
+                using CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SpiTransferTimeout);
+                using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, timeoutCts.Token);
+                _transferReadyEvent.Wait(cts.Token);
 
-                        if (timeoutCts.IsCancellationRequested)
-                        {
-                            throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
-                        }
-                    }
+                if (timeoutCts.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                 }
             }
             _transferReadyEvent.Reset();
@@ -907,7 +899,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Inspect received header
-                _rxHeader = MemoryMarshal.Read<Communication.TransferHeader>(_rxHeaderBuffer.Span);
+                _rxHeader = MemoryMarshal.Cast<byte, Communication.TransferHeader>(_rxHeaderBuffer.Span)[0];
                 if (_rxHeader.FormatCode == 0 || _rxHeader.FormatCode == 0xFF)
                 {
                     throw new OperationCanceledException("Board is not available (no header)");

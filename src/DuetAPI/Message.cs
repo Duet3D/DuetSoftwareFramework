@@ -58,7 +58,7 @@ namespace DuetAPI
         /// Content of this message
         /// </summary>
         /// <remarks>May be empty but not null</remarks>
-        public string Content { get; set; } = "";
+        public string Content { get; set; } = string.Empty;
 
         /// <summary>
         /// Converts this message to a RepRapFirmware-style message
@@ -66,12 +66,12 @@ namespace DuetAPI
         /// <returns>RepRapFirmware-style message</returns>
         public override string ToString()
         {
-            switch (Type)
+            return Type switch
             {
-                case MessageType.Error: return "Error: " + Content;
-                case MessageType.Warning: return "Warning: " + Content;
-                default: return Content;
-            }
+                MessageType.Error => "Error: " + Content,
+                MessageType.Warning => "Warning: " + Content,
+                _ => Content,
+            };
         }
 
         /// <summary>
@@ -93,7 +93,7 @@ namespace DuetAPI
 
             Time = other.Time;
             Type = other.Type;
-            Content = string.Copy(other.Content);
+            Content = Content;
         }
 
         /// <summary>
@@ -106,7 +106,7 @@ namespace DuetAPI
             {
                 Time = Time,
                 Type = Type,
-                Content = string.Copy(Content)
+                Content = Content
             };
         }
     }

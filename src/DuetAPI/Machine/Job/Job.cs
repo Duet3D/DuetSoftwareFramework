@@ -137,6 +137,7 @@ namespace DuetAPI.Machine
         /// Information about the past layers
         /// </summary>
         /// <seealso cref="Layer"/>
+        [JsonGrowingList]
         public ObservableCollection<Layer> Layers { get; } = new ObservableCollection<Layer>();
         
         /// <summary>
@@ -180,7 +181,7 @@ namespace DuetAPI.Machine
 
             File.Assign(other.File);
             FilePosition = other.FilePosition;
-            LastFileName = (other.LastFileName != null) ? string.Copy(other.LastFileName) : null;
+            LastFileName = other.LastFileName;
             LastFileSimulated = other.LastFileSimulated;
             ListHelpers.SetList(ExtrudedRaw, other.ExtrudedRaw);
             Duration = other.Duration;
@@ -201,7 +202,7 @@ namespace DuetAPI.Machine
             {
                 File = (ParsedFileInfo)File.Clone(),
                 FilePosition = FilePosition,
-                LastFileName = (LastFileName != null) ? string.Copy(LastFileName) : null,
+                LastFileName = LastFileName,
                 LastFileSimulated = LastFileSimulated,
                 Duration = Duration,
                 Layer = Layer,

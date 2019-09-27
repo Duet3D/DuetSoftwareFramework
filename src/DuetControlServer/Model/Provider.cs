@@ -14,21 +14,36 @@ namespace DuetControlServer.Model
     /// </summary>
     public static class Provider
     {
+        /// <summary>
+        /// Wrapper around the writer lock which notifies subscribers whenever an update has been processed
+        /// </summary>
         private class WriterLockWrapper : IDisposable
         {
             private readonly IDisposable lockItem;
 
-            internal WriterLockWrapper(IDisposable item)
-            {
-                lockItem = item;
-            }
+            /// <summary>
+            /// Constructor of the lock wrapper
+            /// </summary>
+            /// <param name="item">Actual lock</param>
+            internal WriterLockWrapper(IDisposable item) => lockItem = item;
 
+            /// <summary>
+            /// Dipose method that is called when the lock is released
+            /// </summary>
             public void Dispose()
             {
-                lockItem.Dispose();
+                // Notify subscribers and clear the messages if anyone is connected
+                if (IPC.Processors.Subscription.AreClientsConnected())
+                {
+                    IPC.Processors.Subscription.ModelUpdated();
+                    if (Get.Messages.Count > 0)
+                    {
+                        Get.Messages.Clear();
+                    }
+                }
 
-                // Model has been updated - notify clients
-                IPC.Processors.Subscription.ModelUpdated();
+                // Dispose the lock again 
+                lockItem.Dispose();
             }
         }
 
@@ -40,7 +55,7 @@ namespace DuetControlServer.Model
         public static void Init()
         {
             // Initialize electronics
-            Get.Electronics.Version = Assembly.GetExecutingAssembly().GetName().Version;
+            Get.Electronics.Version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
             Get.Electronics.Type = "duet3";
             Get.Electronics.Name = "Duet 3";
 
@@ -91,18 +106,16 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Output(Message message)
         {
-            if (!string.IsNullOrWhiteSpace(message.Content))
+            if (!string.IsNullOrWhiteSpace(message?.Content))
             {
+                // Output the message
                 message.Print();
 
-                if (!IPC.Processors.Subscription.Output(message))
+                // Attempt to forward messages directly to subscribers. If none are available,
+                // append it to the object model so potential clients can fetch it for a limited time...
+                using (await AccessReadWriteAsync())
                 {
-                    // Attempt to forward messages directly to subscribers. If none are available,
-                    // append it to the object model so potential clients can fetch it for a limited time...
-                    using (await AccessReadWriteAsync())
-                    {
-                        Get.Messages.Add(message);
-                    }
+                    Get.Messages.Add(message);
                 }
             }
         }
@@ -122,7 +135,7 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Output(DuetAPI.Commands.CodeResult codeResult)
         {
-            if (codeResult != null && !codeResult.IsEmpty)
+            if (codeResult != null)
             {
                 foreach (Message message in codeResult)
                 {

@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Utility;
 using System;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.Machine
 {
@@ -64,23 +65,24 @@ namespace DuetAPI.Machine
         /// </summary>
         /// <param name="key">Channel to access</param>
         /// <returns>Channel instance</returns>
+        [JsonIgnore]
         public Channel this[CodeChannel key]
         {
             get
             {
-                switch (key)
+                return key switch
                 {
-                    case CodeChannel.HTTP: return HTTP;
-                    case CodeChannel.Telnet: return Telnet;
-                    case CodeChannel.File: return File;
-                    case CodeChannel.USB: return USB;
-                    case CodeChannel.AUX: return AUX;
-                    case CodeChannel.Daemon: return Daemon;
-                    case CodeChannel.CodeQueue: return CodeQueue;
-                    case CodeChannel.LCD: return LCD;
-                    case CodeChannel.AutoPause: return AutoPause;
-                    default: return SPI;
-                }
+                    CodeChannel.HTTP => HTTP,
+                    CodeChannel.Telnet => Telnet,
+                    CodeChannel.File => File,
+                    CodeChannel.USB => USB,
+                    CodeChannel.AUX => AUX,
+                    CodeChannel.Daemon => Daemon,
+                    CodeChannel.CodeQueue => CodeQueue,
+                    CodeChannel.LCD => LCD,
+                    CodeChannel.AutoPause => AutoPause,
+                    _ => SPI,
+                };
             }
         }
 

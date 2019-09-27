@@ -23,7 +23,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Header describing a packet</returns>
         public static PacketHeader ReadPacketHeader(ReadOnlySpan<byte> from)
         {
-            return MemoryMarshal.Read<PacketHeader>(from);
+            return MemoryMarshal.Cast<byte, PacketHeader>(from)[0];
         }
 
         /// <summary>
@@ -33,16 +33,16 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="module">Number of the module from which the JSON data originates</param>
         /// <param name="json">Object model data as JSON or null if none available</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadObjectModel(ReadOnlySpan<byte> from, out byte module, out string json)
+        public static int ReadObjectModel(ReadOnlySpan<byte> from, out byte module, out byte[] json)
         {
-            ObjectModel header = MemoryMarshal.Read<ObjectModel>(from);
+            ObjectModel header = MemoryMarshal.Cast<byte, ObjectModel>(from)[0];
             int bytesRead = Marshal.SizeOf(header);
             
             module = header.Module;
             if (header.Length > 0)
             {
                 ReadOnlySpan<byte> unicodeJSON = from.Slice(bytesRead, header.Length);
-                json = Encoding.UTF8.GetString(unicodeJSON);
+                json = unicodeJSON.ToArray();
                 bytesRead += header.Length;
             }
             else
@@ -61,7 +61,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes read</returns>
         public static int ReadCodeBufferUpdate(ReadOnlySpan<byte> from, out ushort bufferSpace)
         {
-            CodeBufferUpdate header = MemoryMarshal.Read<CodeBufferUpdate>(from);
+            CodeBufferUpdate header = MemoryMarshal.Cast<byte, CodeBufferUpdate>(from)[0];
 
             // Read header
             bufferSpace = header.BufferSpace;
@@ -78,7 +78,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes read</returns>
         public static int ReadCodeReply(ReadOnlySpan<byte> from, out MessageTypeFlags messageType, out string reply)
         {
-            CodeReply header = MemoryMarshal.Read<CodeReply>(from);
+            CodeReply header = MemoryMarshal.Cast<byte, CodeReply>(from)[0];
             int bytesRead = Marshal.SizeOf(header);
 
             // Read header
@@ -93,7 +93,7 @@ namespace DuetControlServer.SPI.Serialization
             }
             else
             {
-                reply = "";
+                reply = string.Empty;
             }
 
             return AddPadding(bytesRead);
@@ -110,7 +110,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes read</returns>
         public static int ReadMacroRequest(ReadOnlySpan<byte> from, out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename)
         {
-            MacroRequest header = MemoryMarshal.Read<MacroRequest>(from);
+            MacroRequest header = MemoryMarshal.Cast<byte, MacroRequest>(from)[0];
             int bytesRead = Marshal.SizeOf(header);
  
             // Read header
@@ -135,7 +135,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes read</returns>
         public static int ReadAbortFile(ReadOnlySpan<byte> from, out CodeChannel channel, out bool abortAll)
         {
-            AbortFileRequest header = MemoryMarshal.Read<AbortFileRequest>(from);
+            AbortFileRequest header = MemoryMarshal.Cast<byte, AbortFileRequest>(from)[0];
             channel = (CodeChannel)header.Channel;
             abortAll = header.AbortAll != 0;
             return Marshal.SizeOf(header);
@@ -153,7 +153,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <seealso cref="Request.StackEvent"/>
         public static int ReadStackEvent(ReadOnlySpan<byte> from, out CodeChannel channel, out byte stackDepth, out StackFlags flags, out float feedrate)
         {
-            StackEvent header = MemoryMarshal.Read<StackEvent>(from);
+            StackEvent header = MemoryMarshal.Cast<byte, StackEvent>(from)[0];
             channel = (CodeChannel)header.Channel;
             stackDepth = header.StackDepth;
             flags = (StackFlags)header.Flags;
@@ -170,7 +170,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes read</returns>
         public static int ReadPrintPaused(ReadOnlySpan<byte> from, out uint filePosition, out PrintPausedReason reason)
         {
-            PrintPaused header = MemoryMarshal.Read<PrintPaused>(from);
+            PrintPaused header = MemoryMarshal.Cast<byte, PrintPaused>(from)[0];
             filePosition = header.FilePosition;
             reason = (PrintPausedReason)header.PauseReason;
             return Marshal.SizeOf(header);
@@ -184,7 +184,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes read</returns>
         public static int ReadHeightMap(ReadOnlySpan<byte> from, out DuetAPI.Utility.Heightmap map)
         {
-            HeightMap header = MemoryMarshal.Read<HeightMap>(from);
+            HeightMap header = MemoryMarshal.Cast<byte, HeightMap>(from)[0];
             map = new DuetAPI.Utility.Heightmap
             {
                 XMin = header.XMin,
@@ -197,7 +197,9 @@ namespace DuetControlServer.SPI.Serialization
                 NumX = header.NumX,
                 NumY = header.NumY
             };
-            map.ZCoordinates = MemoryMarshal.Cast<byte, float>(from.Slice(Marshal.SizeOf(header), Marshal.SizeOf(typeof(float)) * map.NumX * map.NumY)).ToArray();
+
+            ReadOnlySpan<byte> zCoordinates = from.Slice(Marshal.SizeOf(header), Marshal.SizeOf(typeof(float)) * map.NumX * map.NumY);
+            map.ZCoordinates = MemoryMarshal.Cast<byte, float>(zCoordinates).ToArray();
             return Marshal.SizeOf(header) + map.ZCoordinates.Length * Marshal.SizeOf(typeof(float));
         }
 
@@ -209,7 +211,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes read</returns>
         public static int ReadResourceLocked(ReadOnlySpan<byte> from, out CodeChannel channel)
         {
-            LockUnlock header = MemoryMarshal.Read<LockUnlock>(from);
+            LockUnlock header = MemoryMarshal.Cast<byte, LockUnlock>(from)[0];
             channel = header.Channel;
             return Marshal.SizeOf(header);
         }
@@ -224,7 +226,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes read</returns>
         public static int ReadFileChunkRequest(ReadOnlySpan<byte> from, out string filename, out uint offset, out uint maxLength)
         {
-            FileChunkRequest header = MemoryMarshal.Read<FileChunkRequest>(from);
+            FileChunkRequest header = MemoryMarshal.Cast<byte, FileChunkRequest>(from)[0];
             int bytesRead = Marshal.SizeOf(header);
 
             // Read header

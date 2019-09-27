@@ -23,15 +23,17 @@ namespace DuetAPI.Commands
         /// <param name="code">G/M/T-Code</param>
         public Code(string code)
         {
-            using (MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(code)))
-            {
-                using (StreamReader reader = new StreamReader(stream))
-                {
-                    bool enforcingAbsolutePosition = false;
-                    Parse(reader, this, ref enforcingAbsolutePosition);
-                }
-            }
+            using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(code));
+            using StreamReader reader = new StreamReader(stream);
+            bool enforcingAbsolutePosition = false;
+            Parse(reader, this, ref enforcingAbsolutePosition);
         }
+
+        /// <summary>
+        /// Result of this code. This property is only set when the code has finished its excution.
+        /// It remains null if the code has been cancelled
+        /// </summary>
+        public CodeResult Result { get; set; }
 
         /// <summary>
         /// Type of the code. If no exact type could be determined, it is interpreted as a comment
@@ -96,7 +98,7 @@ namespace DuetAPI.Commands
         /// List of parsed code parameters (see <see cref="CodeParameter"/> for further information)
         /// </summary>
         /// <seealso cref="CodeParameter"/>
-        public List<CodeParameter> Parameters { get; } = new List<CodeParameter>();
+        public List<CodeParameter> Parameters { get; set; } = new List<CodeParameter>();
 
         /// <summary>
         /// Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!
@@ -124,28 +126,28 @@ namespace DuetAPI.Commands
         /// <returns>Unprecedented string</returns>
         public string GetUnprecedentedString(bool quoteStrings = false)
         {
-            string result = "";
+            StringBuilder builder = new StringBuilder();
             foreach (CodeParameter p in Parameters)
             {
-                if (result != "")
+                if (builder.Length != 0)
                 {
-                    result += " ";
+                    builder.Append(' ');
                 }
                 if (p.Letter != '\0')
                 {
-                    result += p.Letter;
+                    builder.Append(p.Letter);
                 }
                 if (quoteStrings && p.Type == typeof(string))
                 {
-                    result += '"';
+                    builder.Append('"');
                 }
-                result += p;
+                builder.Append((string)p);
                 if (quoteStrings && p.Type == typeof(string))
                 {
-                    result += '"';
+                    builder.Append('"');
                 }
             }
-            return result;
+            return builder.ToString();
         }
 
         /// <summary>
@@ -161,27 +163,37 @@ namespace DuetAPI.Commands
 
             // Because it is neither always feasible nor reasonable to keep track of the original code,
             // attempt to rebuild it here. First, assemble the code letter, then the major+minor numbers (e.g. G53.4)
-            string result = ToShortString();
+            StringBuilder builder = new StringBuilder();
+            builder.Append(ToShortString());
 
             // After this append each parameter and encapsulate it in double quotes
             foreach(CodeParameter parameter in Parameters)
             {
                 if (parameter.Type == typeof(string))
                 {
-                    result += $" {parameter.Letter}\"{((string)parameter).Replace("\"", "\"\"")}\"";
+                    builder.Append($" {parameter.Letter}\"{((string)parameter).Replace("\"", "\"\"")}\"");
                 }
                 else
                 {
-                    result += $" {parameter.Letter}{(string)parameter}";
+                    builder.Append($" {parameter.Letter}{(string)parameter}");
                 }
             }
 
-            // Finally the comment is appended
-            if (Comment != null)
+            // Then the comment is appended (if applicable)
+            if (!string.IsNullOrEmpty(Comment))
             {
-                result += " ;" + Comment;
+                builder.Append(';');
+                builder.Append(Comment);
             }
-            return result;
+
+            // If this code has finished, append the code result
+            if (Result != null && !Result.IsEmpty)
+            {
+                builder.AppendLine();
+                builder.Append(Result.ToString().TrimEnd());
+            }
+
+            return builder.ToString();
         }
 
         /// <summary>

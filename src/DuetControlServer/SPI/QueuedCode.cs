@@ -65,11 +65,11 @@ namespace DuetControlServer.SPI
         /// <param name="reply">Raw code reply</param>
         public void HandleReply(Communication.MessageTypeFlags messageType, string reply)
         {
-            if (reply == "")
+            if (string.IsNullOrEmpty(reply))
             {
                 if (_result.Count == 0)
                 {
-                    _result.Add(DuetAPI.MessageType.Success, "");
+                    _result.Add(DuetAPI.MessageType.Success, string.Empty);
                 }
             }
             else

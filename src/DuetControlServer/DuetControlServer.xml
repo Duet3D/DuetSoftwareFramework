@@ -16,12 +16,11 @@
             <param name="code">Code to process</param>
             <returns>Result of the code if the code completed, else null</returns>
         </member>
-        <member name="M:DuetControlServer.Codes.GCodes.CodeExecuted(DuetAPI.Commands.Code,DuetAPI.Commands.CodeResult)">
+        <member name="M:DuetControlServer.Codes.GCodes.CodeExecuted(DuetAPI.Commands.Code)">
             <summary>
             React to an executed G-code before its result is returend
             </summary>
             <param name="code">Code processed by RepRapFirmware</param>
-            <param name="result">Result that it generated</param>
             <returns>Result to output</returns>
             <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
         </member>
@@ -37,12 +36,11 @@
             <param name="code">Code to process</param>
             <returns>Result of the code if the code completed, else null</returns>
         </member>
-        <member name="M:DuetControlServer.Codes.MCodes.CodeExecuted(DuetAPI.Commands.Code,DuetAPI.Commands.CodeResult)">
+        <member name="M:DuetControlServer.Codes.MCodes.CodeExecuted(DuetAPI.Commands.Code)">
             <summary>
             React to an executed M-code before its result is returend
             </summary>
             <param name="code">Code processed by RepRapFirmware</param>
-            <param name="result">Result that it generated</param>
             <returns>Result to output</returns>
             <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
         </member>
@@ -58,12 +56,11 @@
             <param name="code">Code to process</param>
             <returns>Result of the code if the code completed, else null</returns>
         </member>
-        <member name="M:DuetControlServer.Codes.TCodes.CodeExecuted(DuetAPI.Commands.Code,DuetAPI.Commands.CodeResult)">
+        <member name="M:DuetControlServer.Codes.TCodes.CodeExecuted(DuetAPI.Commands.Code)">
             <summary>
             React to an executed T-code before its result is returend
             </summary>
             <param name="code">Code processed by RepRapFirmware</param>
-            <param name="result">Result that it generated</param>
             <returns>Result to output</returns>
         </member>
         <member name="T:DuetControlServer.Commands.Code">
@@ -120,7 +117,7 @@
             Run an arbitrary G/M/T-code and wait for it to finish
             </summary>
             <returns>Result of the code</returns>
-            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
+            <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
         </member>
         <member name="T:DuetControlServer.Commands.Flush">
             <summary>
@@ -176,7 +173,7 @@
             Converts simple G/M/T-codes to a regular Code instances, executes them and returns the result as text
             </summary>
             <returns>Code result as text</returns>
-            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
+            <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
         </member>
         <member name="T:DuetControlServer.Commands.SyncMachineModel">
             <summary>
@@ -381,11 +378,6 @@
             Identifier of this connection
             </summary>
         </member>
-        <member name="P:DuetControlServer.IPC.Connection.IsConnected">
-            <summary>
-            Check the state of the connection
-            </summary>
-        </member>
         <member name="M:DuetControlServer.IPC.Connection.#ctor(System.Net.Sockets.Socket,System.Int32)">
             <summary>
             Constructor for new connections
@@ -397,7 +389,7 @@
             <summary>
             Read a generic JSON object from the socket
             </summary>
-            <returns>Abstract JObject instance for deserialization or null if nothing could be read</returns>
+            <returns>JsonDocument for deserialization or null if the connection has been closed</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
         </member>
         <member name="M:DuetControlServer.IPC.Connection.ReceiveCommand">
@@ -405,7 +397,7 @@
             Receive a fully-populated instance of a BaseCommand from the client
             </summary>
             <returns>Received command or null if nothing could be read</returns>
-            <exception cref="T:System.ArgumentException"></exception>
+            <exception cref="T:System.ArgumentException">Bad command received</exception>
         </member>
         <member name="M:DuetControlServer.IPC.Connection.GetCommandType(System.String)">
             <summary>
@@ -416,38 +408,19 @@
         </member>
         <member name="M:DuetControlServer.IPC.Connection.SendResponse(System.Object)">
             <summary>
-            Send a response to the client
+            Send a response to the client. The given object is send either in an empty, error, or standard response body
             </summary>
-            <remarks>
-            Wraps the object to send either in an empty, standard or error response.
-            Instances of type <see cref="T:DuetAPI.Connection.InitMessages.ServerInitMessage"/> and <see cref="T:DuetAPI.Commands.Code"/> are not encapsulated.
-            </remarks>
             <param name="obj">Object to send</param>
             <returns>Asynchronous task</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Message could not be sent</exception>
         </member>
-        <member name="M:DuetControlServer.IPC.Connection.Send(Newtonsoft.Json.Linq.JObject)">
+        <member name="M:DuetControlServer.IPC.Connection.Send(System.Object)">
             <summary>
             Send a JSON object to the client
             </summary>
             <param name="obj">Object to send</param>
             <returns>Asynchronous task</returns>
-        </member>
-        <member name="M:DuetControlServer.IPC.Connection.Send(System.String)">
-            <summary>
-            Send plain text to the client
-            </summary>
-            <param name="text">Text to send</param>
-            <returns>Asynchronous task</returns>
-        </member>
-        <member name="M:DuetControlServer.IPC.Connection.Close">
-            <summary>
-            Close the connection
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.IPC.Connection.Dispose">
-            <summary>
-            Dispose this instance
-            </summary>
+            <exception cref="T:System.Net.Sockets.SocketException">Message could not be sent</exception>
         </member>
         <member name="T:DuetControlServer.IPC.Processors.Base">
             <summary>
@@ -457,15 +430,14 @@
         </member>
         <member name="P:DuetControlServer.IPC.Processors.Base.Connection">
             <summary>
-            Connection with wrappers to ensure basic operation and convenience wrappers for JSON-style requests
+            Connection to the IPC client served by this processor
             </summary>
         </member>
-        <member name="M:DuetControlServer.IPC.Processors.Base.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.InitMessages.ClientInitMessage)">
+        <member name="M:DuetControlServer.IPC.Processors.Base.#ctor(DuetControlServer.IPC.Connection)">
             <summary>
             Base constructor for connection interpreters. Invoke this from any derived class
             </summary>
             <param name="conn">Connection instance</param>
-            <param name="initMessage">Deserialized initialization message</param>
         </member>
         <member name="M:DuetControlServer.IPC.Processors.Base.Process">
             <summary>
@@ -486,12 +458,11 @@
             List of supported commands in this mode
             </summary>
         </member>
-        <member name="M:DuetControlServer.IPC.Processors.Command.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.InitMessages.ClientInitMessage)">
+        <member name="M:DuetControlServer.IPC.Processors.Command.#ctor(DuetControlServer.IPC.Connection)">
             <summary>
             Constructor of the command interpreter
             </summary>
             <param name="conn">Connection instance</param>
-            <param name="initMessage">Initialization message</param>
         </member>
         <member name="M:DuetControlServer.IPC.Processors.Command.Process">
             <summary>
@@ -510,7 +481,7 @@
             List of supported commands in this mode
             </summary>
             <remarks>
-            In addition to these commands, the commands of the <see cref="T:DuetControlServer.IPC.Processors.Command"/> interpreter are supported too
+            In addition to these commands, commands of the <see cref="T:DuetControlServer.IPC.Processors.Command"/> interpreter are supported while a code is being intercepted
             </remarks>
         </member>
         <member name="M:DuetControlServer.IPC.Processors.Interception.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.InitMessages.ClientInitMessage)">
@@ -523,25 +494,17 @@
         <member name="M:DuetControlServer.IPC.Processors.Interception.Process">
             <summary>
             Waits for commands to be received and enqueues them in a concurrent queue so that a <see cref="T:DuetAPI.Commands.Code"/>
-            can decide when to resume/resolve the execution.
+            can decide when to cancel/resume/resolve the execution.
             </summary>
             <returns>Task that represents the lifecycle of the connection</returns>
-        </member>
-        <member name="M:DuetControlServer.IPC.Processors.Interception.EnqueueCommand(DuetAPI.Commands.BaseCommand)">
-            <summary>
-            Checks if the command request is allowed and enqueues it internally if that is the case.
-            If it is illegal, an exception is thrown that can be sent back to the client.
-            </summary>
-            <param name="command">Command to enqueue</param>
-            <returns>Task</returns>
-            <exception cref="T:System.ArgumentException">Thrown if the command type is illegal</exception>
         </member>
         <member name="M:DuetControlServer.IPC.Processors.Interception.Intercept(DuetAPI.Commands.Code)">
             <summary>
             Called by the <see cref="T:DuetAPI.Commands.Code"/> implementation to check if the client wants to intercept a G/M/T-code
             </summary>
             <param name="code">Code to intercept</param>
-            <returns>null if not intercepted or a <see cref="T:DuetAPI.Commands.CodeResult"/> instance if resolved</returns>
+            <returns>True if the code has been resolved</returns>
+            <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
         </member>
         <member name="M:DuetControlServer.IPC.Processors.Interception.Intercept(DuetAPI.Commands.Code,DuetAPI.Connection.InterceptionMode)">
             <summary>
@@ -550,7 +513,7 @@
             </summary>
             <param name="code">Code to intercept</param>
             <param name="type">Type of the interception</param>
-            <returns>null if not intercepted and a CodeResult otherwise</returns>
+            <returns>True if the code has been resolved</returns>
         </member>
         <member name="T:DuetControlServer.IPC.Processors.Subscription">
             <summary>
@@ -562,6 +525,12 @@
             <summary>
             List of supported commands in this mode
             </summary>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Subscription.AreClientsConnected">
+            <summary>
+            Checks if any subscribers are connected
+            </summary>
+            <returns>True if subscribers are connected</returns>
         </member>
         <member name="M:DuetControlServer.IPC.Processors.Subscription.#ctor(DuetControlServer.IPC.Connection,DuetAPI.Connection.InitMessages.ClientInitMessage)">
             <summary>
@@ -575,13 +544,6 @@
             Task that keeps pushing model updates to the client
             </summary>
             <returns>Task that represents the lifecycle of a connection</returns>
-        </member>
-        <member name="M:DuetControlServer.IPC.Processors.Subscription.Output(DuetAPI.Message)">
-            <summary>
-            Enqueue a generic message for output
-            </summary>
-            <param name="message">New message</param>
-            <returns>Whether the message could be stored</returns>
         </member>
         <member name="M:DuetControlServer.IPC.Processors.Subscription.ModelUpdated">
             <summary>
@@ -600,8 +562,7 @@
         </member>
         <member name="M:DuetControlServer.IPC.Server.AcceptConnections">
             <summary>
-            Start accepting incoming connections.
-            This represents the lifecycle of this class
+            Accept incoming connections as long as this program is runnning
             </summary>
             <returns>Asynchronous task</returns>
         </member>
@@ -610,11 +571,105 @@
             Close every connection and clean up the UNIX socket
             </summary>
         </member>
+        <member name="T:DuetControlServer.Model.ItemPathNode">
+            <summary>
+            Node of an object model path pointing to a list item
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Model.ItemPathNode.Name">
+            <summary>
+            Name of the list
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Model.ItemPathNode.Index">
+            <summary>
+            Index of the item
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Model.ItemPathNode.Count">
+            <summary>
+            Count of the list owning this item
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Model.ItemPathNode.ToString">
+            <summary>
+            Convert an item node to a string (for debugging)
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="T:DuetControlServer.Model.PropertyPathChangeType">
+            <summary>
+            Type of path modification
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Model.PropertyPathChangeType.Property">
+            <summary>
+            Property has changed
+            </summary>
+            <remarks>Value is the property value</remarks>
+        </member>
+        <member name="F:DuetControlServer.Model.PropertyPathChangeType.ObjectCollection">
+            <summary>
+            Object collection has changed (e.g. tools)
+            </summary>
+            <remarks>Value is the number of new items</remarks>
+        </member>
+        <member name="F:DuetControlServer.Model.PropertyPathChangeType.ValueCollection">
+            <summary>
+            Value collection has changed (e.g. heater temperatures)
+            </summary>
+            <remarks>Value is the collection itself</remarks>
+        </member>
+        <member name="F:DuetControlServer.Model.PropertyPathChangeType.GrowingCollection">
+            <summary>
+            Growing collection has changed (messages or job layers)
+            </summary>
+            <remarks>If value is null, the list has been cleared, else only the added items are passed</remarks>
+        </member>
+        <member name="T:DuetControlServer.Model.PropertyPathChanged">
+            <summary>
+            Delegate to call when a property is being changed
+            </summary>
+            <param name="path">Path to the value that changed</param>
+            <param name="changeType">Type of the modification</param>
+            <param name="value">New value</param>
+        </member>
+        <member name="T:DuetControlServer.Model.Observer">
+            <summary>
+            Static class that observes the main machine model and calls an event whenever a deep value has changed
+            </summary>
+        </member>
+        <member name="E:DuetControlServer.Model.Observer.OnPropertyPathChanged">
+            <summary>
+            Event to call when a deep value has changed
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Model.Observer.Init">
+            <summary>
+            Initializes the observer to keep track of deep changes in the object model
+            </summary>
+        </member>
         <member name="T:DuetControlServer.Model.Provider">
             <summary>
             Provider for the machine's object model to provides thread-safe read/write access.
             Make sure to access the machine model only when atomic operations are performed
             so that pending updates can be performed as quickly as possible.
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.Model.Provider.WriterLockWrapper">
+            <summary>
+            Wrapper around the writer lock which notifies subscribers whenever an update has been processed
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Model.Provider.WriterLockWrapper.#ctor(System.IDisposable)">
+            <summary>
+            Constructor of the lock wrapper
+            </summary>
+            <param name="item">Actual lock</param>
+        </member>
+        <member name="M:DuetControlServer.Model.Provider.WriterLockWrapper.Dispose">
+            <summary>
+            Dipose method that is called when the lock is released
             </summary>
         </member>
         <member name="M:DuetControlServer.Model.Provider.Init">
@@ -687,7 +742,7 @@
             </summary>
             <returns>Asynchronous task</returns>
         </member>
-        <member name="M:DuetControlServer.Model.Updater.MergeData(System.Byte,System.String)">
+        <member name="M:DuetControlServer.Model.Updater.MergeData(System.Byte,System.Byte[])">
             <summary>
             Merge received data into the object model.
             This code is temporary and will be replaced once the new object is finished
@@ -966,11 +1021,6 @@
             Write channel diagnostics to the given string builder
             </summary>
             <param name="builder">Target to write to</param>
-        </member>
-        <member name="P:DuetControlServer.SPI.ChannelInformation.IsIdle">
-            <summary>
-            Indicates if this code channel is currently idle
-            </summary>
         </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.ProcessRequests">
             <summary>
@@ -2178,7 +2228,7 @@
             </summary>
             <returns>The next packet or null if none is available</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.ReadObjectModel(System.Byte@,System.String@)">
+        <member name="M:DuetControlServer.SPI.DataTransfer.ReadObjectModel(System.Byte@,System.Byte[]@)">
             <summary>
             Read the result of a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.GetObjectModel"/> request
             </summary>
@@ -2423,7 +2473,7 @@
             Retrieve the current heightmap from the firmware
             </summary>
             <returns>Heightmap in use</returns>
-            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Operation could not finish</exception>
+            <exception cref="T:System.OperationCanceledException">Operation could not finish</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.SetHeightmap(DuetAPI.Utility.Heightmap)">
             <summary>
@@ -2431,7 +2481,7 @@
             </summary>
             <param name="map">Heightmap to set</param>
             <returns>Asynchronous task</returns>
-            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Operation could not finish</exception>
+            <exception cref="T:System.OperationCanceledException">Operation could not finish</exception>
             <exception cref="T:System.InvalidOperationException">Heightmap is already being set</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.ProcessCode(DuetControlServer.Commands.Code)">
@@ -2659,7 +2709,7 @@
             <param name="from">Origin</param>
             <returns>Header describing a packet</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadObjectModel(System.ReadOnlySpan{System.Byte},System.Byte@,System.String@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadObjectModel(System.ReadOnlySpan{System.Byte},System.Byte@,System.Byte[]@)">
             <summary>
             Read an object model header plus JSON text from a memory span
             </summary>

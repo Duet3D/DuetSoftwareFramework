@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
@@ -18,17 +19,21 @@ namespace DuetControlServer.IPC.Processors
         /// List of supported commands in this mode
         /// </summary>
         /// <remarks>
-        /// In addition to these commands, the commands of the <see cref="Command"/> interpreter are supported too
+        /// In addition to these commands, commands of the <see cref="Command"/> interpreter are supported while a code is being intercepted
         /// </remarks>
         public static readonly Type[] SupportedCommands =
         {
+            typeof(Cancel),
             typeof(Ignore),
             typeof(Resolve)
         };
         
         private static readonly ConcurrentDictionary<Interception, InterceptionMode> _interceptors = new ConcurrentDictionary<Interception, InterceptionMode>();
         
+        private readonly AsyncCollection<Code> _codeQueue = new AsyncCollection<Code>();
         private readonly AsyncCollection<BaseCommand> _commandQueue = new AsyncCollection<BaseCommand>();
+
+        private readonly InterceptionMode _mode;
         private readonly AsyncLock _lock = new AsyncLock();
 
         /// <summary>
@@ -36,14 +41,17 @@ namespace DuetControlServer.IPC.Processors
         /// </summary>
         /// <param name="conn">Connection instance</param>
         /// <param name="initMessage">Initialization message</param>
-        public Interception(Connection conn, ClientInitMessage initMessage) : base(conn, initMessage)
+        public Interception(Connection conn, ClientInitMessage initMessage) : base(conn)
         {
-            _interceptors.TryAdd(this, (initMessage as InterceptInitMessage).InterceptionMode);
+            InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
+            _mode = interceptInitMessage.InterceptionMode;
+
+            _interceptors.TryAdd(this, _mode);
         }
         
         /// <summary>
         /// Waits for commands to be received and enqueues them in a concurrent queue so that a <see cref="Code"/>
-        /// can decide when to resume/resolve the execution.
+        /// can decide when to cancel/resume/resolve the execution.
         /// </summary>
         /// <returns>Task that represents the lifecycle of the connection</returns>
         public override async Task Process()
@@ -52,41 +60,64 @@ namespace DuetControlServer.IPC.Processors
             {
                 do
                 {
-                    BaseCommand command = await Connection.ReceiveCommand();
-                    if (command == null)
+                    // Read another code from the interceptor
+                    if (await _codeQueue.OutputAvailableAsync(Program.CancelSource.Token))
+                    {
+                        Code code = await _codeQueue.TakeAsync(Program.CancelSource.Token);
+                        await Connection.Send(code);
+                    }
+                    else
                     {
                         break;
                     }
 
-                    await EnqueueCommand(command);
+                    // Keep processing commands until an action for the code has been received
+                    BaseCommand command;
+                    do
+                    {
+                        // Read another command from the IPC connection
+                        command = await Connection.ReceiveCommand();
+                        if (command == null)
+                        {
+                            break;
+                        }
+
+                        if (Command.SupportedCommands.Contains(command.GetType()))
+                        {
+                            // Interpret regular Command codes here
+                            object result = command.Invoke();
+                            await Connection.SendResponse(result);
+                        }
+                        else if (SupportedCommands.Contains(command.GetType()))
+                        {
+                            // Send other commands to the task intercepting the code
+                            await _commandQueue.AddAsync(command);
+                            break;
+                        }
+                        else
+                        {
+                            // Take care of unsupported commands
+                            throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
+                        }
+                    }
+                    while (!Program.CancelSource.IsCancellationRequested);
+
+                    // Stop if the connection has been terminated
+                    if (command == null)
+                    {
+                        break;
+                    }
                 }
                 while (!Program.CancelSource.IsCancellationRequested);
             }
+            catch (SocketException)
+            {
+                // IPC client has closed the connection
+            }
             finally
             {
-                // When the connection is terminated, enqueue an Ignore command for safety to avoid a deadlock after an abnormal termination
-                await EnqueueCommand(new Ignore());
-
+                _commandQueue.CompleteAdding();
                 _interceptors.TryRemove(this, out _);
-            }
-        }
-
-        /// <summary>
-        /// Checks if the command request is allowed and enqueues it internally if that is the case.
-        /// If it is illegal, an exception is thrown that can be sent back to the client.
-        /// </summary>
-        /// <param name="command">Command to enqueue</param>
-        /// <returns>Task</returns>
-        /// <exception cref="ArgumentException">Thrown if the command type is illegal</exception>
-        private async Task EnqueueCommand(BaseCommand command)
-        {
-            if (SupportedCommands.Contains(command.GetType()) || Command.SupportedCommands.Contains(command.GetType()))
-            {
-                await _commandQueue.AddAsync(command);
-            }
-            else
-            {
-                throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
             }
         }
 
@@ -94,84 +125,71 @@ namespace DuetControlServer.IPC.Processors
         /// Called by the <see cref="Code"/> implementation to check if the client wants to intercept a G/M/T-code
         /// </summary>
         /// <param name="code">Code to intercept</param>
-        /// <returns>null if not intercepted or a <see cref="CodeResult"/> instance if resolved</returns>
-        private async Task<CodeResult> Intercept(Code code)
+        /// <returns>True if the code has been resolved</returns>
+        /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
+        private async Task<bool> Intercept(Code code)
         {
             // Avoid race conditions. A client can deal with only one code at once!
             using (await _lock.LockAsync(Program.CancelSource.Token))
             {
-                // Send it to the interceptor
-                await Connection.SendResponse(code);
+                // Send it to the IPC client
+                await _codeQueue.AddAsync(code);
 
                 // Keep on processing commands from the interceptor until a handling result is returned.
-                // This must be either an Ignore or a Resolve instruction!
+                // This must be either a Cancel, Ignore, or Resolve instruction!
                 try
                 {
-                    while (await _commandQueue.OutputAvailableAsync(Program.CancelSource.Token))
+                    if (await _commandQueue.OutputAvailableAsync(Program.CancelSource.Token))
                     {
                         BaseCommand command = await _commandQueue.TakeAsync(Program.CancelSource.Token);
 
-                        // Code is ignored. Don't do anything with it but acknowledge the request
-                        if (command is Ignore)
+                        // Code is cancelled. This invokes an OperationCanceledException on the code's task.
+                        // When a code is cancelled, its result is reset to null
+                        if (command is Cancel)
                         {
-                            await Connection.SendResponse();
-                            break;
+                            code.Result = null;
+                            throw new OperationCanceledException();
                         }
 
                         // Code is resolved with a given result and the request is acknowledged
-                        if (command is Resolve)
+                        if (command is Resolve resolveCommand)
                         {
-                            await Connection.SendResponse();
-
-                            if ((command as Resolve).Content == null)
-                            {
-                                return new CodeResult();
-                            }
-                            return new CodeResult((command as Resolve).Type, (command as Resolve).Content);
+                            code.Result = (resolveCommand.Content == null) ? new CodeResult() : new CodeResult(resolveCommand.Type, resolveCommand.Content);
+                            return true;
                         }
 
-                        // Deal with other requests
-                        object result = command.Invoke();
-                        await Connection.SendResponse(result);
+                        // Code is ignored. Don't do anything
                     }
                 }
-                catch (Exception e)
+                catch (Exception e) when (!(e is OperationCanceledException))
                 {
-                    if (Connection.IsConnected)
-                    {
-                        // Notify the client
-                        await Connection.SendResponse(e);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Intercept error: " + e.Message);
-                    }
+                    _codeQueue.CompleteAdding();
+                    Console.WriteLine($"[err] Interception handler enocuntered an exception: {e}");
                 }
             }
-            return null;
+            return false;
         }
-        
+
         /// <summary>
         /// Called by the <see cref="Code"/> class to intercept a code.
         /// This method goes through each connected interception channel and notifies the clients.
         /// </summary>
         /// <param name="code">Code to intercept</param>
         /// <param name="type">Type of the interception</param>
-        /// <returns>null if not intercepted and a CodeResult otherwise</returns>
-        public static async Task<CodeResult> Intercept(Code code, InterceptionMode type)
+        /// <returns>True if the code has been resolved</returns>
+        public static async Task<bool> Intercept(Code code, InterceptionMode type)
         {
             foreach (var pair in _interceptors)
             {
                 if (code.SourceConnection != pair.Key.Connection.Id && pair.Value == type)
                 {
-                    CodeResult result = await pair.Key.Intercept(code);
-                    if (result != null)
+                    if (await pair.Key.Intercept(code))
                     {
-                        return result;
+                        return true;
                     }
                 }
             }
-            return null;
+            return false;
         }
     }
 }

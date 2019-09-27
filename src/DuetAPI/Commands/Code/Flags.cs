@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 
 namespace DuetAPI.Commands
 {
@@ -7,7 +6,6 @@ namespace DuetAPI.Commands
     /// Code bits to classify G/M/T-codes
     /// </summary>
     [Flags]
-    [JsonConverter(typeof(CodeFlagsConverter))]
     public enum CodeFlags : int
     {
         /// <summary>
@@ -63,45 +61,5 @@ namespace DuetAPI.Commands
         /// Override every other code and send it to the firmware as quickly as possible
         /// </summary>
         IsPrioritized = 256
-    }
-
-    /// <summary>
-    /// Class to convert a <see cref="CodeFlags"/> instance to an int
-    /// </summary>
-    public class CodeFlagsConverter : JsonConverter
-    {
-        /// <summary>
-        /// Write code flags to JSON
-        /// </summary>
-        /// <param name="writer">JSON writer</param>
-        /// <param name="value">Code flag value</param>
-        /// <param name="serializer">JON serializer</param>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            writer.WriteValue(Convert.ToInt32(value));
-        }
-
-        /// <summary>
-        /// Read code flags from JSON
-        /// </summary>
-        /// <param name="reader">JSON reader</param>
-        /// <param name="objectType">Object type</param>
-        /// <param name="existingValue">Existing value</param>
-        /// <param name="serializer">JSON serializer</param>
-        /// <returns>Deserialized code flags</returns>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            return (CodeFlags)Convert.ToInt32(reader.Value);
-        }
-
-        /// <summary>
-        /// Check if the type can be converted
-        /// </summary>
-        /// <param name="objectType">Object type</param>
-        /// <returns>Whether the type can be converted</returns>
-        public override bool CanConvert(Type objectType)
-        {
-            return objectType == typeof(int);
-        }
     }
 }

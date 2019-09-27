@@ -54,14 +54,14 @@ namespace DuetControlServer.Codes
         /// React to an executed G-code before its result is returend
         /// </summary>
         /// <param name="code">Code processed by RepRapFirmware</param>
-        /// <param name="result">Result that it generated</param>
         /// <returns>Result to output</returns>
         /// <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
-        public static async Task<CodeResult> CodeExecuted(Code code, CodeResult result)
+        public static async Task CodeExecuted(Code code)
         {
-            if (!result.IsSuccessful)
+            // Only process successfully finished code results
+            if (code.Result == null || !code.Result.IsSuccessful)
             {
-                return result;
+                return;
             }
 
             switch (code.MajorNumber)
@@ -115,12 +115,12 @@ namespace DuetControlServer.Codes
                                 await SPI.Interface.UnlockAll(code.Channel);
 
                                 await map.Save(await FilePath.ToPhysicalAsync(file, "sys"));
-                                result.Add(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
+                                code.Result.Add(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
                             }
                         }
                         catch (AggregateException ae)
                         {
-                            result.Add(DuetAPI.MessageType.Error, $"Failed to save height map to file {file}: {ae.InnerException.Message}");
+                            code.Result.Add(DuetAPI.MessageType.Error, $"Failed to save height map to file {file}: {ae.InnerException.Message}");
                         }
                     }
                     break;
@@ -141,7 +141,6 @@ namespace DuetControlServer.Codes
                     }
                     break;
             }
-            return result;
         }
     }
 }

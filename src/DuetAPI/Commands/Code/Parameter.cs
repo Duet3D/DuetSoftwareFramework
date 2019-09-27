@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.Commands
 {
@@ -61,7 +61,7 @@ namespace DuetAPI.Commands
                 // It is not encapsulated...
                 value = value.Trim();
 
-                if (value == "")
+                if (string.IsNullOrEmpty(value))
                 {
                     // Empty parameters are repesented as integers with the value 0 (e.g. G92 XY => G92 X0 Y0)
                     _parsedValue = 0;
@@ -448,54 +448,72 @@ namespace DuetAPI.Commands
     /// <summary>
     /// Converts a <see cref="CodeParameter"/> instance to JSON
     /// </summary>
-    public class CodeParameterConverter : JsonConverter
+    public class CodeParameterConverter : JsonConverter<CodeParameter>
     {
-        private class ParameterRepresentation
-        {
-            public char Letter { get; set; }
-            public string Value { get; set; }
-            public bool IsString { get; set; }
-        }
-        
         /// <summary>
-        /// Writes a code parameter to JSON
-        /// </summary>
-        /// <param name="writer">JSON writer</param>
-        /// <param name="serializer">JSON Serializer</param>
-        /// <param name="value">Value to write</param>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            CodeParameter parameter = (CodeParameter)value;
-            JObject.FromObject(new ParameterRepresentation
-            {
-                Letter = parameter.Letter,
-                Value = parameter,
-                IsString = parameter.Type == typeof(string)
-            }).WriteTo(writer);
-        }
-
-        /// <summary>
-        /// Reads a code parameters from JSON
+        /// Read a CodeParameter object from JSON
         /// </summary>
         /// <param name="reader">JSON reader</param>
-        /// <param name="objectType">Object type</param>
-        /// <param name="existingValue">Existing value</param>
-        /// <param name="serializer">JSON serializer</param>
-        /// <returns>Deserialized CodeParameter</returns>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        /// <param name="typeToConvert">Type to convert</param>
+        /// <param name="options"></param>
+        /// <returns>Read value</returns>
+        public override CodeParameter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            ParameterRepresentation representation = JToken.ReadFrom(reader).ToObject<ParameterRepresentation>();
-            return new CodeParameter(representation.Letter, representation.Value, representation.IsString);
+            if (reader.TokenType == JsonTokenType.StartObject)
+            {
+                char letter = '\0';
+                string propertyName = string.Empty, value = string.Empty;
+                bool isString = false;
+
+                while (reader.Read())
+                {
+                    switch (reader.TokenType)
+                    {
+                        case JsonTokenType.PropertyName:
+                            propertyName = reader.GetString();
+                            break;
+
+                        case JsonTokenType.String:
+                            if (propertyName.Equals("letter", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                letter = Convert.ToChar(reader.GetString());
+                            }
+                            else if (propertyName.Equals("value"))
+                            {
+                                value = reader.GetString();
+                            }
+                            break;
+
+                        // null parameter values are not supported
+
+                        case JsonTokenType.Number:
+                            if (propertyName.Equals("isString", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                isString = Convert.ToBoolean(reader.GetInt32());
+                            }
+                            break;
+
+                        case JsonTokenType.EndObject:
+                            return new CodeParameter(letter, value, isString);
+                    }
+                }
+            }
+            throw new JsonException("Invalid code parameter");
         }
 
         /// <summary>
-        /// Checks if the corresponding type can be converted
+        /// Write a CodeParameter to JSON
         /// </summary>
-        /// <param name="objectType">Object type to check</param>
-        /// <returns>Whether the object can be converted</returns>
-        public override bool CanConvert(Type objectType)
+        /// <param name="writer">JSON writer</param>
+        /// <param name="value">Value to serialize</param>
+        /// <param name="options">Write options</param>
+        public override void Write(Utf8JsonWriter writer, CodeParameter value, JsonSerializerOptions options)
         {
-            return objectType == typeof(CodeParameter);
+            writer.WriteStartObject();
+            writer.WriteString("letter", value.Letter.ToString());
+            writer.WriteString("value", value);
+            writer.WriteNumber("isString", Convert.ToInt32(value.Type == typeof(string)));
+            writer.WriteEndObject();
         }
     }
 }

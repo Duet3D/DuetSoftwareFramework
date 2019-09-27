@@ -112,7 +112,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Extruder drives of this tool
         /// </summary>
-        public ObservableCollection<int> Extruders { get; set; } = new ObservableCollection<int>();
+        public ObservableCollection<int> Extruders { get; } = new ObservableCollection<int>();
 
         /// <summary>
         /// Mix ratios of the associated extruder drives
@@ -147,7 +147,7 @@ namespace DuetAPI.Machine
         /// ]
         /// Make sure to set each item individually so the change events are called
         /// </remarks>
-        public ObservableCollection<int[]> Axes { get; set; } = new ObservableCollection<int[]>();
+        public ObservableCollection<int[]> Axes { get; } = new ObservableCollection<int[]>();
 
         /// <summary>
         /// Axis offsets (in mm)
@@ -181,8 +181,8 @@ namespace DuetAPI.Machine
             Number = other.Number;
             ListHelpers.SetList(Active, other.Active);
             ListHelpers.SetList(Standby, other.Standby);
-            Name = (other.Name != null) ? string.Copy(other.Name) : null;
-            Filament = (other.Filament != null) ? string.Copy(other.Filament) : null;
+            Name = other.Name;
+            Filament = other.Filament;
             ListHelpers.SetList(Fans, other.Fans);
             ListHelpers.SetList(Heaters, other.Heaters);
             ListHelpers.SetList(Extruders, other.Extruders);
@@ -201,8 +201,8 @@ namespace DuetAPI.Machine
             Tool clone = new Tool
             {
                 Number = Number,
-                Name = (Name != null) ? string.Copy(Name) : null,
-                Filament = (Filament != null) ? string.Copy(Filament) : null,
+                Name = Name,
+                Filament = Filament,
                 Spindle = Spindle
             };
 

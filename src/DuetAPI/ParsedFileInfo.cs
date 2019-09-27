@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Utility;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -140,10 +141,24 @@ namespace DuetAPI
         }
         private int? _numLayers;
 
+#pragma warning disable CA1819 // Properties should not return arrays
         /// <summary>
         /// Filament consumption per extruder drive (in mm)
         /// </summary>
-        public ObservableCollection<float> Filament { get; } = new ObservableCollection<float>();
+        public float[] Filament
+        {
+            get => _filament;
+            set
+            {
+                if (_filament != value)
+                {
+                    _filament = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private float[] _filament = Array.Empty<float>();
+#pragma warning restore CA1819 // Properties should not return arrays
 
         /// <summary>
         /// Name of the application that generated this file
@@ -160,7 +175,7 @@ namespace DuetAPI
                 }
             }
         }
-        private string _generatedBy = "";
+        private string _generatedBy = string.Empty;
         
         /// <summary>
         /// Estimated print time (in s)
@@ -213,14 +228,15 @@ namespace DuetAPI
                 throw new ArgumentException("Invalid type");
             }
 
-            FileName = (other.FileName != null) ? string.Copy(other.FileName) : null;
+            FileName = other.FileName;
             Size = other.Size;
             LastModified = other.LastModified;
             Height = other.Height;
             FirstLayerHeight = other.FirstLayerHeight;
             LayerHeight = other.LayerHeight;
             NumLayers = other.NumLayers;
-            GeneratedBy = string.Copy(other.GeneratedBy);
+            Filament = other.Filament;
+            GeneratedBy = other.GeneratedBy;
             PrintTime = other.PrintTime;
             SimulatedTime = other.SimulatedTime;
             ListHelpers.SetList(Filament, other.Filament);
@@ -234,19 +250,18 @@ namespace DuetAPI
         {
             ParsedFileInfo clone = new ParsedFileInfo
             {
-                FileName = (FileName != null) ? string.Copy(FileName) : null,
+                FileName = FileName,
                 Size = Size,
                 LastModified = LastModified,
                 Height = Height,
                 FirstLayerHeight = FirstLayerHeight,
                 LayerHeight = LayerHeight,
                 NumLayers = NumLayers,
-                GeneratedBy = string.Copy(GeneratedBy),
+                Filament = Filament,
+                GeneratedBy = GeneratedBy,
                 PrintTime = PrintTime,
                 SimulatedTime = SimulatedTime
             };
-
-            ListHelpers.AddItems(clone.Filament, Filament);
 
             return clone;
         }

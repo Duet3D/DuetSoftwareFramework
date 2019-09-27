@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
 using DuetAPI;
@@ -13,7 +14,6 @@ using DuetAPIClient.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
 namespace DuetWebServer.Controllers
 {
@@ -69,11 +69,9 @@ namespace DuetWebServer.Controllers
         {
             try
             {
-                using (CommandConnection connection = await BuildConnection())
-                {
-                    string json = await connection.GetSerializedMachineModel();
-                    return Content(json, "application/json");
-                }
+                using CommandConnection connection = await BuildConnection();
+                MemoryStream json = await connection.GetSerializedMachineModel();
+                return new FileStreamResult(json, "application/json");
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
@@ -103,17 +101,16 @@ namespace DuetWebServer.Controllers
             string code;
             using (StreamReader reader = new StreamReader(Request.Body, Encoding.UTF8))
             {
-                code = reader.ReadToEnd();
+                code = await reader.ReadToEndAsync();
             }
 
             try
             {
-                using (CommandConnection connection = await BuildConnection())
-                {
-                    _logger.LogInformation($"[{nameof(DoCode)}] Executing code '{code}'");
-                    string result = await connection.PerformSimpleCode(code, CodeChannel.HTTP);
-                    return Content(result);
-                }
+                using CommandConnection connection = await BuildConnection();
+                _logger.LogInformation($"[{nameof(DoCode)}] Executing code '{code}'");
+                string result = await connection.PerformSimpleCode(code, CodeChannel.HTTP);
+
+                return Content(result);
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
@@ -249,12 +246,11 @@ namespace DuetWebServer.Controllers
                     return NotFound(HttpUtility.UrlPathEncode(filename));
                 }
 
-                using (CommandConnection connection = await BuildConnection())
-                {
-                    var info = await connection.GetFileInfo(resolvedPath);
-                    string json = JsonConvert.SerializeObject(info, JsonHelper.DefaultSettings);
-                    return Content(json, "application/json");
-                }
+                using CommandConnection connection = await BuildConnection();
+                var info = await connection.GetFileInfo(resolvedPath);
+
+                string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
+                return Content(json, "application/json");
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
@@ -434,7 +430,7 @@ namespace DuetWebServer.Controllers
                     fileList.Add(new { type = 'f', name = info.Name, size = info.Length, date = info.LastWriteTime });
                 }
                 
-                string json = JsonConvert.SerializeObject(fileList, JsonHelper.DefaultSettings);
+                string json = JsonSerializer.Serialize(fileList, JsonHelper.DefaultJsonOptions);
                 return Content(json, "application/json");
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
@@ -499,10 +495,8 @@ namespace DuetWebServer.Controllers
 
         private async Task<string> ResolvePath(string path)
         {
-            using (CommandConnection connection = await BuildConnection())
-            {
-                return await connection.ResolvePath(path);
-            }
+            using CommandConnection connection = await BuildConnection();
+            return await connection.ResolvePath(path);
         }
     }
 }

@@ -215,14 +215,14 @@ namespace DuetAPI.Machine
             }
 
             Type = other.Type;
-            FirmwareVersion = (other.FirmwareVersion != null) ? string.Copy(other.FirmwareVersion) : null;
+            FirmwareVersion = other.FirmwareVersion;
             Speed = other.Speed;
             Signal = other.Signal;
-            MacAddress = (other.MacAddress != null) ? string.Copy(other.MacAddress) : null;
-            ConfiguredIP = (other.ConfiguredIP != null) ? string.Copy(other.ConfiguredIP) : null;
-            ActualIP = (other.ActualIP != null) ? string.Copy(other.ActualIP) : null;
-            Subnet = (other.Subnet != null) ? string.Copy(other.Subnet) : null;
-            Gateway = (other.Gateway != null) ? string.Copy(other.Gateway) : null;
+            MacAddress = other.MacAddress;
+            ConfiguredIP = other.ConfiguredIP;
+            ActualIP = other.ActualIP;
+            Subnet = other.Subnet;
+            Gateway = other.Gateway;
             NumReconnects = other.NumReconnects;
             ListHelpers.SetList(ActiveProtocols, other.ActiveProtocols);
         }
@@ -236,14 +236,14 @@ namespace DuetAPI.Machine
             NetworkInterface clone = new NetworkInterface
             {
                 Type = Type,
-                FirmwareVersion = (FirmwareVersion != null) ? string.Copy(FirmwareVersion) : null,
+                FirmwareVersion = FirmwareVersion,
                 Speed = Speed,
                 Signal = Signal,
-                MacAddress = (MacAddress != null) ? string.Copy(MacAddress) : null,
-                ConfiguredIP = (ConfiguredIP != null) ? string.Copy(ConfiguredIP) : null,
-                ActualIP = (ActualIP != null) ? string.Copy(ActualIP) : null,
-                Subnet = (Subnet != null) ? string.Copy(Subnet) : null,
-                Gateway = (Gateway != null) ? string.Copy(Gateway) : null,
+                MacAddress = MacAddress,
+                ConfiguredIP = ConfiguredIP,
+                ActualIP = ActualIP,
+                Subnet = Subnet,
+                Gateway = Gateway,
                 NumReconnects = NumReconnects
             };
 

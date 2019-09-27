@@ -3,7 +3,6 @@ using DuetAPI.Commands;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.FileExecution;
-using Newtonsoft.Json;
 using Nito.AsyncEx;
 using System;
 using System.Globalization;
@@ -11,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes
@@ -69,7 +69,7 @@ namespace DuetControlServer.Codes
                             string file;
                             using (await _fileToPrintLock.LockAsync())
                             {
-                                file = string.Copy(_fileToPrint);
+                                file = _fileToPrint;
                             }
 
                             if (string.IsNullOrEmpty(file))
@@ -173,7 +173,7 @@ namespace DuetControlServer.Codes
                                 string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
                                 ParsedFileInfo info = await FileInfoParser.Parse(file);
 
-                                string json = JsonConvert.SerializeObject(info, JsonHelper.DefaultSettings);
+                                string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
                                 return new CodeResult(MessageType.Success, "{\"err\":0," + json.Substring(1));
                             }
                             catch
@@ -202,15 +202,13 @@ namespace DuetControlServer.Codes
                         string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
                         try
                         {
-                            using (FileStream stream = new FileStream(file, FileMode.Open, FileAccess.Read))
+                            using FileStream stream = new FileStream(file, FileMode.Open, FileAccess.Read);
+                            byte[] hash;
+                            using (var sha1 = System.Security.Cryptography.SHA1.Create())
                             {
-                                byte[] hash;
-                                using (var sha1 = System.Security.Cryptography.SHA1.Create())
-                                {
-                                    hash = await Task.Run(() => sha1.ComputeHash(stream), Program.CancelSource.Token);
-                                }
-                                return new CodeResult(MessageType.Success, BitConverter.ToString(hash).Replace("-", ""));
+                                hash = await Task.Run(() => sha1.ComputeHash(stream), Program.CancelSource.Token);
                             }
+                            return new CodeResult(MessageType.Success, BitConverter.ToString(hash).Replace("-", string.Empty));
                         }
                         catch (AggregateException ae)
                         {
@@ -245,7 +243,7 @@ namespace DuetControlServer.Codes
                                         speed = storage.Speed
                                     }
                                 };
-                                return new CodeResult(MessageType.Success, JsonConvert.SerializeObject(output));
+                                return new CodeResult(MessageType.Success, JsonSerializer.Serialize(output, JsonHelper.DefaultJsonOptions));
                             }
                             else
                             {
@@ -330,7 +328,12 @@ namespace DuetControlServer.Codes
                 case 470:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        string path = code.Parameter('P', "");
+                        string path = code.Parameter('P');
+                        if (path == null)
+                        {
+                            return new CodeResult(MessageType.Error, "Missing directory name");
+                        }
+
                         try
                         {
                             Directory.CreateDirectory(await FilePath.ToPhysicalAsync(path));
@@ -420,7 +423,7 @@ namespace DuetControlServer.Codes
                         }
 
                         // Strip letters and digits from the machine name
-                        string machineName = "";
+                        string machineName = string.Empty;
                         foreach (char c in Environment.MachineName)
                         {
                             if (char.IsLetterOrDigit(c))
@@ -430,7 +433,7 @@ namespace DuetControlServer.Codes
                         }
 
                         // Strip letters and digits from the desired name
-                        string desiredName = "";
+                        string desiredName = string.Empty;
                         foreach (char c in pParam)
                         {
                             if (char.IsLetterOrDigit(c))
@@ -587,14 +590,13 @@ namespace DuetControlServer.Codes
         /// React to an executed M-code before its result is returend
         /// </summary>
         /// <param name="code">Code processed by RepRapFirmware</param>
-        /// <param name="result">Result that it generated</param>
         /// <returns>Result to output</returns>
         /// <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
-        public static async Task<CodeResult> CodeExecuted(Code code, CodeResult result)
+        public static async Task CodeExecuted(Code code)
         {
-            if (!result.IsSuccessful)
+            if (!code.Result.IsSuccessful)
             {
-                return result;
+                return;
             }
 
             switch (code.MajorNumber)
@@ -628,11 +630,10 @@ namespace DuetControlServer.Codes
                 case 122:
                     if (code.Parameter('B', 0) == 0 && code.GetUnprecedentedString() != "DSF")
                     {
-                        await Diagnostics(result);
+                        await Diagnostics(code.Result);
                     }
                     break;
             }
-            return result;
         }
 
         private static async Task Diagnostics(CodeResult result)

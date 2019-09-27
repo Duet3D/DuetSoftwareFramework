@@ -156,7 +156,7 @@ namespace DuetControlServer.FileExecution
                     }
                     catch (Exception e)
                     {
-                        if (!(e is TaskCanceledException))
+                        if (!(e is OperationCanceledException))
                         {
                             Console.WriteLine($"[err] {code} -> {e}");
                         }

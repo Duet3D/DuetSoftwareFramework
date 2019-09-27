@@ -22,7 +22,8 @@
             </summary>
             <param name="channel">Code channel to wait for</param>
             <param name="cancellationToken">Optional cancellation token</param>
-            <returns>Asynchronous task</returns>
+            <returns>True if all pending codes could be flushed</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.GetFileInfo(System.String,System.Threading.CancellationToken)">
             <summary>
@@ -30,7 +31,8 @@
             </summary>
             <param name="fileName">The file to parse</param>
             <param name="cancellationToken">Optional cancellation token</param>
-            <returns>Retrieved file information</returns>
+            <returns>Information about the parsed file</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
             <seealso cref="M:DuetAPIClient.BaseCommandConnection.GetFileInfo(System.String,System.Threading.CancellationToken)"/>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.PerformCode(DuetAPI.Commands.Code,System.Threading.CancellationToken)">
@@ -40,8 +42,9 @@
             <param name="code">The code to execute</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Result of the given code</returns>
-            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
-            <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
+            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Code has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
+            <remarks>Cancelling the read operation does not cancel the code execution</remarks>
             <seealso cref="T:DuetAPI.Commands.Code"/>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.PerformSimpleCode(System.String,DuetAPI.CodeChannel,System.Threading.CancellationToken)">
@@ -52,8 +55,9 @@
             <param name="channel">Optional destination channel of this code</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Result of the given code converted to a string</returns>
-            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Code has been cancelled (buffer cleared)</exception>
-            <remarks>Cancelling the operation does not cause the code to be cancelled</remarks>
+            <exception cref="T:System.Threading.Tasks.TaskCanceledException">Code has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
+            <remarks>Cancelling the read operation does not cancel the code execution</remarks>
             <seealso cref="T:DuetAPI.Commands.SimpleCode"/>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.GetMachineModel(System.Threading.CancellationToken)">
@@ -63,14 +67,15 @@
             </summary>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>The current machine model</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.GetSerializedMachineModel(System.Threading.CancellationToken)">
             <summary>
-            Optimized method to query the machine model JSON in any mode.
-            May be used to get machine model patches as well
+            Optimized method to directly query the machine model UTF-8 JSON
             </summary>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Machine model JSON</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.ResolvePath(System.String,System.Threading.CancellationToken)">
             <summary>
@@ -79,6 +84,7 @@
             <param name="path">File path to resolve</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Resolved file path</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.SyncMachineModel(System.Threading.CancellationToken)">
             <summary>
@@ -86,10 +92,16 @@
             </summary>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
         </member>
         <member name="T:DuetAPIClient.BaseConnection">
             <summary>
             Base class for connections that access the control server via the Duet API using a UNIX socket
+            </summary>
+        </member>
+        <member name="F:DuetAPIClient.BaseConnection._unixSocket">
+            <summary>
+            Socket used for inter-process communication
             </summary>
         </member>
         <member name="M:DuetAPIClient.BaseConnection.#ctor(DuetAPI.Connection.ConnectionMode)">
@@ -167,29 +179,14 @@
             <returns>Partially deserialized data or null if the connection is gone</returns>
             <exception cref="T:System.IO.IOException">Received no or invalid JSON object</exception>
         </member>
-        <member name="M:DuetAPIClient.BaseConnection.ReceiveSerializedJson(System.Threading.CancellationToken)">
-            <summary>
-            Receive a serialized object from the server
-            </summary>
-            <param name="cancellationToken">Cancellation token</param>
-            <returns>Plain JSON</returns>
-        </member>
-        <member name="M:DuetAPIClient.BaseConnection.ReceiveSerializedJsonResponse(System.String,System.Threading.CancellationToken)">
-            <summary>
-            Get a serialized object from a response container from the server.
-            If an internal error is reported, the received JSON is deserialized and the reported error is thrown.
-            </summary>
-            <param name="command">Name of the previously sent command</param>
-            <param name="cancellationToken">Cancellation token</param>
-            <returns>Plain JSON</returns>
-            <exception cref="T:DuetAPIClient.Exceptions.InternalServerException">Deserialized internal error from DCS</exception>
-        </member>
-        <member name="M:DuetAPIClient.BaseConnection.Send(System.Object)">
+        <member name="M:DuetAPIClient.BaseConnection.Send(System.Object,System.Threading.CancellationToken)">
             <summary>
             Serialize an arbitrary object into JSON and send it to the server plus NL
             </summary>
             <param name="obj">Object to send</param>
+            <param name="cancellationToken">Cancellation token</param>
             <returns>Asynchronous task</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Message could not be sent</exception>
         </member>
         <member name="T:DuetAPIClient.CommandConnection">
             <summary>
@@ -211,6 +208,7 @@
             <returns>Asynchronous task</returns>
             <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Init message could not be sent</exception>
         </member>
         <member name="T:DuetAPIClient.Exceptions.IncompatibleVersionException">
             <summary>
@@ -275,21 +273,32 @@
             <returns>Asynchronous task</returns>
             <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Init message could not be sent</exception>
         </member>
         <member name="M:DuetAPIClient.InterceptConnection.ReceiveCode(System.Threading.CancellationToken)">
             <summary>
             Wait for a code to be intercepted and read it
             </summary>
             <param name="cancellationToken">Optional cancellation token</param>
-            <returns>A code that can be intercepted</returns>
+            <returns>Code being intercepted or null if the connection has been closed</returns>
+        </member>
+        <member name="M:DuetAPIClient.InterceptConnection.CancelCode(System.Threading.CancellationToken)">
+            <summary>
+            Instruct the control server to cancel the last received code (in intercepting mode)
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
+            <seealso cref="T:DuetAPI.Commands.Cancel"/>
         </member>
         <member name="M:DuetAPIClient.InterceptConnection.IgnoreCode(System.Threading.CancellationToken)">
             <summary>
             Instruct the control server to ignore the last received code (in intercepting mode)
             </summary>
             <param name="cancellationToken">Optional cancellation token</param>
-            <seealso cref="T:DuetAPI.Commands.Ignore"/>
             <returns>Asynchronous task</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
+            <seealso cref="T:DuetAPI.Commands.Ignore"/>
         </member>
         <member name="M:DuetAPIClient.InterceptConnection.ResolveCode(DuetAPI.MessageType,System.String,System.Threading.CancellationToken)">
             <summary>
@@ -299,6 +308,7 @@
             <param name="content">Content of the resolving message</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be sent</exception>
             <seealso cref="T:DuetAPI.Message"/>
             <seealso cref="T:DuetAPI.Commands.Resolve"/>
         </member>
@@ -318,16 +328,24 @@
             Mode of the subscription
             </summary>
         </member>
-        <member name="M:DuetAPIClient.SubscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode,System.String,System.Threading.CancellationToken)">
+        <member name="P:DuetAPIClient.SubscribeConnection.Filter">
+            <summary>
+            Filter expression
+            </summary>
+            <seealso cref="P:DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter"/>
+        </member>
+        <member name="M:DuetAPIClient.SubscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Establishes a connection to the given UNIX socket file
             </summary>
             <param name="mode">Subscription mode</param>
+            <param name="filter">Optional filter string</param>
             <param name="socketPath">Path to the UNIX socket file</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
             <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Init message could not be sent</exception>
         </member>
         <member name="M:DuetAPIClient.SubscribeConnection.GetMachineModel(System.Threading.CancellationToken)">
             <summary>
@@ -336,14 +354,16 @@
             </summary>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>The current machine model</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Receipt could not be acknowledged</exception>
         </member>
         <member name="M:DuetAPIClient.SubscribeConnection.GetSerializedMachineModel(System.Threading.CancellationToken)">
             <summary>
-            Optimized method to query the machine model JSON in any mode.
+            Optimized method to query the machine model UTF-8 JSON in any mode.
             May be used to get machine model patches as well.
             </summary>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Machine model JSON</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Receipt could not be acknowledged</exception>
         </member>
         <member name="M:DuetAPIClient.SubscribeConnection.GetMachineModelPatch(System.Threading.CancellationToken)">
             <summary>
@@ -353,8 +373,9 @@
             </summary>
             <param name="cancellationToken">An optional cancellation token</param>
             <returns>The partial update JSON</returns>
+            <exception cref="T:System.Net.Sockets.SocketException">Receipt could not be acknowledged</exception>
             <seealso cref="M:DuetAPIClient.SubscribeConnection.GetMachineModel(System.Threading.CancellationToken)"/>
-            <seealso cref="M:DuetAPI.Utility.JsonHelper.PatchObject(System.Object,Newtonsoft.Json.Linq.JObject)"/>
+            <seealso cref="M:DuetAPI.Utility.JsonPatch.Patch(System.Object,System.Text.Json.JsonDocument)"/>
         </member>
     </members>
 </doc>

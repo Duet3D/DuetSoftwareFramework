@@ -88,9 +88,9 @@ namespace DuetAPI.Machine
                 throw new ArgumentException("Invalid type");
             }
 
-            Name = (other.Name != null) ? string.Copy(other.Name) : null;
-            Version = (other.Version != null) ? string.Copy(other.Version) : null;
-            Date = (other.Date != null) ? string.Copy(other.Date) : null;
+            Name = other.Name;
+            Version = other.Version;
+            Date = other.Date;
         }
 
         /// <summary>
@@ -101,9 +101,9 @@ namespace DuetAPI.Machine
         {
             return new Firmware
             {
-                Name = (Name != null) ? string.Copy(Name) : null,
-                Version = (Version != null) ? string.Copy(Version) : null,
-                Date = (Date != null) ? string.Copy(Date) : null
+                Name = Name,
+                Version = Version,
+                Date = Date
             };
         }
     }

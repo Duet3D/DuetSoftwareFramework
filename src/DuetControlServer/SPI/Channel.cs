@@ -174,17 +174,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Indicates if this code channel is currently idle
-        /// </summary>
-        public bool IsIdle
-        {
-            get => !IsBusy &&
-                (PendingCodes.Count == 0) && (BufferedCodes.Count == 0) && (SuspendedCodes.Count == 0) &&
-                (NestedMacros.Count == 0) &&
-                (PendingLockRequests.Count == 0);
-        }
-
-        /// <summary>
         /// Process pending requests on this channel
         /// </summary>
         /// <returns>If anything more can be done on this channel</returns>

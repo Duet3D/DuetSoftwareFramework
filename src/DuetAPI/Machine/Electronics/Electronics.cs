@@ -24,7 +24,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Version of the Duet Software Framework package
         /// </summary>
-        public Version Version
+        public string Version
         {
             get => _version;
             set
@@ -36,7 +36,7 @@ namespace DuetAPI.Machine
                 }
             }
         }
-        private Version _version;
+        private string _version;
 
         /// <summary>
         /// Type name of the main board
@@ -161,13 +161,14 @@ namespace DuetAPI.Machine
                 throw new ArgumentException("Invalid type");
             }
 
-            ShortName = (other.ShortName != null) ? string.Copy(other.ShortName) : null;
-            Name = (other.Name != null) ? string.Copy(other.Name) : null;
-            Type = (other.Type != null) ? string.Copy(other.Type) : null;
-            Name = (other.Name != null) ? string.Copy(other.Name) : null;
-            Revision = (other.Revision != null) ? string.Copy(other.Revision) : null;
+            Version = other.Version;
+            ShortName = other.ShortName;
+            Name = other.Name;
+            Type = other.Type;
+            Name = other.Name;
+            Revision = other.Revision;
             Firmware.Assign(other.Firmware);
-            ProcessorID = (other.ProcessorID != null) ? string.Copy(other.ProcessorID) : null;
+            ProcessorID = other.ProcessorID;
             VIn.Assign(other.VIn);
             McuTemp.Assign(other.McuTemp);
             ListHelpers.AssignList(ExpansionBoards, other.ExpansionBoards);
@@ -181,12 +182,13 @@ namespace DuetAPI.Machine
         {
             Electronics clone = new Electronics
             {
-                Type = (Type != null) ? string.Copy(Type) : null,
-                Name = (Name != null) ? string.Copy(Name) : null,
-                ShortName = (ShortName != null) ? string.Copy(ShortName) : null,
-                Revision = (Revision != null) ? string.Copy(Revision) : null,
+                Version= Version,
+                Type = Type,
+                Name = Name,
+                ShortName = ShortName,
+                Revision = Revision,
                 Firmware = (Firmware)Firmware.Clone(),
-                ProcessorID = (ProcessorID != null) ? string.Copy(ProcessorID) : null,
+                ProcessorID = ProcessorID,
                 VIn = (MinMaxCurrent<float?>)VIn.Clone(),
                 McuTemp = (MinMaxCurrent<float?>)McuTemp.Clone()
             };

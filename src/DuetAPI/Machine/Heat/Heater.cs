@@ -131,7 +131,7 @@ namespace DuetAPI.Machine
             }
 
             Current = other.Current;
-            Name = (other.Name != null) ? string.Copy(other.Name) : null;
+            Name = other.Name;
             State = other.State;
             Model.Assign(other.Model);
             Max = other.Max;
@@ -147,7 +147,7 @@ namespace DuetAPI.Machine
             return new Heater
             {
                 Current = Current,
-                Name = (Name != null) ? string.Copy(Name) : null,
+                Name = Name,
                 State = State,
                 Model = (HeaterModel)Model.Clone(),
                 Max = Max,

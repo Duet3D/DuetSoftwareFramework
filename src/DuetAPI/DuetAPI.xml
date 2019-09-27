@@ -134,6 +134,11 @@
             </summary>
             <returns>Command result</returns>
         </member>
+        <member name="T:DuetAPI.Commands.Cancel">
+            <summary>
+            Cancel a code in <see cref="T:DuetAPI.Connection.InterceptionMode"/>
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.Code">
             <summary>
             A parsed representation of a generic G/M/T-code
@@ -150,6 +155,12 @@
             Create a new Code instance and attempt to parse the given code string
             </summary>
             <param name="code">G/M/T-Code</param>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.Result">
+            <summary>
+            Result of this code. This property is only set when the code has finished its excution.
+            It remains null if the code has been cancelled
+            </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.Type">
             <summary>
@@ -374,36 +385,6 @@
             Override every other code and send it to the firmware as quickly as possible
             </summary>
         </member>
-        <member name="T:DuetAPI.Commands.CodeFlagsConverter">
-            <summary>
-            Class to convert a <see cref="T:DuetAPI.Commands.CodeFlags"/> instance to an int
-            </summary>
-        </member>
-        <member name="M:DuetAPI.Commands.CodeFlagsConverter.WriteJson(Newtonsoft.Json.JsonWriter,System.Object,Newtonsoft.Json.JsonSerializer)">
-            <summary>
-            Write code flags to JSON
-            </summary>
-            <param name="writer">JSON writer</param>
-            <param name="value">Code flag value</param>
-            <param name="serializer">JON serializer</param>
-        </member>
-        <member name="M:DuetAPI.Commands.CodeFlagsConverter.ReadJson(Newtonsoft.Json.JsonReader,System.Type,System.Object,Newtonsoft.Json.JsonSerializer)">
-            <summary>
-            Read code flags from JSON
-            </summary>
-            <param name="reader">JSON reader</param>
-            <param name="objectType">Object type</param>
-            <param name="existingValue">Existing value</param>
-            <param name="serializer">JSON serializer</param>
-            <returns>Deserialized code flags</returns>
-        </member>
-        <member name="M:DuetAPI.Commands.CodeFlagsConverter.CanConvert(System.Type)">
-            <summary>
-            Check if the type can be converted
-            </summary>
-            <param name="objectType">Object type</param>
-            <returns>Whether the type can be converted</returns>
-        </member>
         <member name="T:DuetAPI.Commands.CodeParameter">
             <summary>
             Represents a parsed parameter of a G/M/T-code
@@ -581,30 +562,22 @@
             Converts a <see cref="T:DuetAPI.Commands.CodeParameter"/> instance to JSON
             </summary>
         </member>
-        <member name="M:DuetAPI.Commands.CodeParameterConverter.WriteJson(Newtonsoft.Json.JsonWriter,System.Object,Newtonsoft.Json.JsonSerializer)">
+        <member name="M:DuetAPI.Commands.CodeParameterConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
             <summary>
-            Writes a code parameter to JSON
-            </summary>
-            <param name="writer">JSON writer</param>
-            <param name="serializer">JSON Serializer</param>
-            <param name="value">Value to write</param>
-        </member>
-        <member name="M:DuetAPI.Commands.CodeParameterConverter.ReadJson(Newtonsoft.Json.JsonReader,System.Type,System.Object,Newtonsoft.Json.JsonSerializer)">
-            <summary>
-            Reads a code parameters from JSON
+            Read a CodeParameter object from JSON
             </summary>
             <param name="reader">JSON reader</param>
-            <param name="objectType">Object type</param>
-            <param name="existingValue">Existing value</param>
-            <param name="serializer">JSON serializer</param>
-            <returns>Deserialized CodeParameter</returns>
+            <param name="typeToConvert">Type to convert</param>
+            <param name="options"></param>
+            <returns>Read value</returns>
         </member>
-        <member name="M:DuetAPI.Commands.CodeParameterConverter.CanConvert(System.Type)">
+        <member name="M:DuetAPI.Commands.CodeParameterConverter.Write(System.Text.Json.Utf8JsonWriter,DuetAPI.Commands.CodeParameter,System.Text.Json.JsonSerializerOptions)">
             <summary>
-            Checks if the corresponding type can be converted
+            Write a CodeParameter to JSON
             </summary>
-            <param name="objectType">Object type to check</param>
-            <returns>Whether the object can be converted</returns>
+            <param name="writer">JSON writer</param>
+            <param name="value">Value to serialize</param>
+            <param name="options">Write options</param>
         </member>
         <member name="T:DuetAPI.Commands.CodeParserException">
             <summary>
@@ -782,9 +755,14 @@
             Result of the command
             </summary>
         </member>
+        <member name="M:DuetAPI.Commands.Response`1.#ctor">
+            <summary>
+            Default constructor for a response
+            </summary>
+        </member>
         <member name="M:DuetAPI.Commands.Response`1.#ctor(`0)">
             <summary>
-            Creates a new Response instance
+            Creates a new Response instance from the given result
             </summary>
             <param name="result"></param>
         </member>
@@ -986,6 +964,18 @@
             Type of the subscription
             </summary>
         </member>
+        <member name="P:DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter">
+            <summary>
+            Optional filter path for <see cref="F:DuetAPI.Connection.SubscriptionMode.Patch"/> mode
+            </summary>
+            <remarks>
+            The style of a filter is similar to XPath. For example, if you want to monitor only the current heater temperatures,
+            you can use the filter expression "heat/heaters[*]/current". Wildcards are supported either for full names or indices.
+            To get updates for an entire namespace, the ** wildcard can be used (for example heat/** for everything heat-related),
+            however it can be only used at the end of a filter expression. Multiple filters can be used on one connection and they
+            have to be delimited by one of these charaters: ['|', ',', ' ', '\r', '\n']
+            </remarks>
+        </member>
         <member name="T:DuetAPI.Connection.InterceptionMode">
             <summary>
             Type of the intercepting connection
@@ -1002,6 +992,11 @@
             Intercept codes after the initial processing of the control server but before they are forwarded to the RepRapFirmware controller
             </summary>
         </member>
+        <member name="F:DuetAPI.Connection.InterceptionMode.Executed">
+            <summary>
+            Receive a notification for executed codes. In this state the final result can be still changed
+            </summary>
+        </member>
         <member name="T:DuetAPI.Connection.SubscriptionMode">
             <summary>
             Type of the model subscription
@@ -1012,6 +1007,10 @@
             <summary>
             Receive full object model after every update
             </summary>
+            <remarks>
+            Generic messages may or may not be included in the full object model. To keep track of messages reliably,
+            it is strongly advised to create a subscription in <see cref="F:DuetAPI.Connection.SubscriptionMode.Patch"/> mode.
+            </remarks>
         </member>
         <member name="F:DuetAPI.Connection.SubscriptionMode.Patch">
             <summary>
@@ -2644,6 +2643,29 @@
             Unknown geometry
             </summary>
         </member>
+        <member name="T:DuetAPI.Machine.GeometryTypeConverter">
+            <summary>
+            Class to convert a GeometryType to and from JSON
+            </summary>
+            <remarks>These enum values are primarily supplied by RepRapFirmware</remarks>
+        </member>
+        <member name="M:DuetAPI.Machine.GeometryTypeConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Read a GeometryType from JSON
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="typeToConvert">Type to convert</param>
+            <param name="options"></param>
+            <returns>Read value</returns>
+        </member>
+        <member name="M:DuetAPI.Machine.GeometryTypeConverter.Write(System.Text.Json.Utf8JsonWriter,DuetAPI.Machine.GeometryType,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Write a GeometryType to JSON
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="value">Value to serialize</param>
+            <param name="options">Write options</param>
+        </member>
         <member name="T:DuetAPI.Machine.MotorsIdleControl">
             <summary>
             Idle factor parameters for automatic motor current reduction
@@ -3843,36 +3865,6 @@
             </summary>
             <returns>A clone of this instance</returns>
         </member>
-        <member name="T:DuetAPI.Utility.CharEnumConverter">
-            <summary>
-            Helper class for Newtonsoft.Json to convert char enums to strings and vice versa
-            </summary>
-        </member>
-        <member name="M:DuetAPI.Utility.CharEnumConverter.CanConvert(System.Type)">
-            <summary>
-            Checks if the object can be converted
-            </summary>
-            <param name="objectType">Object type to check</param>
-            <returns>Whether the object can be converted</returns>
-        </member>
-        <member name="M:DuetAPI.Utility.CharEnumConverter.WriteJson(Newtonsoft.Json.JsonWriter,System.Object,Newtonsoft.Json.JsonSerializer)">
-            <summary>
-            Writes a char enum to JSON
-            </summary>
-            <param name="writer">JSON writer</param>
-            <param name="serializer">JSON Serializer</param>
-            <param name="value">Value to write</param>
-        </member>
-        <member name="M:DuetAPI.Utility.CharEnumConverter.ReadJson(Newtonsoft.Json.JsonReader,System.Type,System.Object,Newtonsoft.Json.JsonSerializer)">
-            <summary>
-            Reads a char enum from JSON
-            </summary>
-            <param name="reader">JSON reader</param>
-            <param name="objectType">Object type</param>
-            <param name="existingValue">Existing value</param>
-            <param name="serializer">JSON serializer</param>
-            <returns>Deserialized char enum</returns>
-        </member>
         <member name="T:DuetAPI.Utility.Heightmap">
             <summary>
             Class representing a heightmap
@@ -3955,46 +3947,137 @@
             </summary>
             <param name="from">Source object</param>
         </member>
+        <member name="T:DuetAPI.Utility.JsonCamelCaseStringEnumConverter">
+            <summary>
+            Class for easier access to JsonStringEnumConverter with camel-case naming
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonCamelCaseStringEnumConverter.#ctor">
+            <summary>
+            Creates a new instance
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonCamelCaseStringEnumConverter.CanConvert(System.Type)">
+            <summary>
+            Checks if the given type can be converted
+            </summary>
+            <param name="typeToConvert">Type to convert</param>
+            <returns>Whether the type can be converted</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonCamelCaseStringEnumConverter.CreateConverter(System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Creates a new JSON converter
+            </summary>
+            <param name="typeToConvert">Type to convert</param>
+            <param name="options">Conversion options</param>
+            <returns>JSON converter</returns>
+        </member>
+        <member name="T:DuetAPI.Utility.JsonCharEnumConverter">
+            <summary>
+            Helper class to convert char enums to strings and vice versa
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonCharEnumConverter.CanConvert(System.Type)">
+            <summary>
+            Checks if the given type can be converted
+            </summary>
+            <param name="typeToConvert">Type to convert</param>
+            <returns>Whether the type can be converted</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonCharEnumConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Read from JSON
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="typeToConvert">Type to convert</param>
+            <param name="options">Read options</param>
+            <returns>Read value</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonCharEnumConverter.Write(System.Text.Json.Utf8JsonWriter,System.Object,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Write a CodeParameter to JSON
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="value">Value to serialize</param>
+            <param name="options">Write options</param>
+        </member>
+        <member name="T:DuetAPI.Utility.JsonGrowingListAttribute">
+            <summary>
+            Flags a property so that a JSON patch creates only added items or an empty list in case it is cleared
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonGrowingListAttribute.#ctor">
+            <summary>
+            Creates a new instance of this type
+            </summary>
+        </member>
         <member name="T:DuetAPI.Utility.JsonHelper">
             <summary>
             Helper class for JSON serialization, deserialization, patch creation and patch application
             </summary>
         </member>
-        <member name="F:DuetAPI.Utility.JsonHelper.DefaultSettings">
+        <member name="F:DuetAPI.Utility.JsonHelper.DefaultJsonOptions">
             <summary>
-            Default JSON settings for serialization and deserialization.
-            It is strongly recommended to use these settings with Newtonsoft.Json!
+            Default JSON (de-)serialization options
             </summary>
         </member>
-        <member name="F:DuetAPI.Utility.JsonHelper.DefaultSerializer">
+        <member name="M:DuetAPI.Utility.JsonHelper.ReceiveUtf8Json(System.Net.Sockets.Socket,System.Threading.CancellationToken)">
             <summary>
-            Default JSON serializer.
-            It is strongly recommended to use this serializer with Newtonsoft.Json!
+            Receive a serialized JSON object from a socket in UTF-8 format
+            </summary>
+            <param name="socket">Socket to read from</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Plain JSON</returns>
+        </member>
+        <member name="T:DuetAPI.Utility.JsonLowerCaseStringEnumConverter">
+            <summary>
+            Class to convert enums to and from lowercase JSON strings
             </summary>
         </member>
-        <member name="M:DuetAPI.Utility.JsonHelper.DiffObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)">
+        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.CanConvert(System.Type)">
+            <summary>
+            Checks if the type can be converted
+            </summary>
+            <param name="typeToConvert">Type to convert</param>
+            <returns></returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Read an enum value from JSON
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="typeToConvert">Type to convert</param>
+            <param name="options">Read options</param>
+            <returns></returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Write(System.Text.Json.Utf8JsonWriter,System.Object,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Write an enum value to lowercase JSON
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="value">Value to write</param>
+            <param name="options">Write options</param>
+        </member>
+        <member name="T:DuetAPI.Utility.JsonPatch">
+            <summary>
+            Helper class to create and apply JSON diffs
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonPatch.Diff``1(``0,``0)">
             <summary>
             Create a JSON patch
             </summary>
-            <param name="from">Source object</param>
-            <param name="to">Updated object</param>
-            <returns>JSON patch</returns>
-            <seealso cref="M:DuetAPI.Utility.JsonHelper.PatchObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)"/>
+            <typeparam name="T">Type of the objects to compare</typeparam>
+            <param name="a">Old object</param>
+            <param name="b">New object</param>
+            <returns>Differences as UTF-8 or null both objects are equal</returns>
         </member>
-        <member name="M:DuetAPI.Utility.JsonHelper.PatchObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)">
+        <member name="M:DuetAPI.Utility.JsonPatch.Patch(System.Object,System.Text.Json.JsonDocument)">
             <summary>
-            Apply an arbitrary JSON patch
+            Apply JSON patch
             </summary>
             <param name="obj">Object to patch</param>
-            <param name="diff">JSON patch to apply</param>
-        </member>
-        <member name="M:DuetAPI.Utility.JsonHelper.PatchObject(System.Object,Newtonsoft.Json.Linq.JObject)">
-            <summary>
-            Apply an arbitrary JSON patch
-            </summary>
-            <param name="obj">Object to patch</param>
-            <param name="diff">JSON patch to apply</param>
-            <seealso cref="M:DuetAPI.Utility.JsonHelper.DiffObject(Newtonsoft.Json.Linq.JObject,Newtonsoft.Json.Linq.JObject)"/>
+            <param name="diff">JSON diff</param>
         </member>
         <member name="T:DuetAPI.Utility.ListHelpers">
             <summary>

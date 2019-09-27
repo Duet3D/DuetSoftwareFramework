@@ -74,7 +74,7 @@ namespace DuetControlServer.SPI
         /// Retrieve the current heightmap from the firmware
         /// </summary>
         /// <returns>Heightmap in use</returns>
-        /// <exception cref="TaskCanceledException">Operation could not finish</exception>
+        /// <exception cref="OperationCanceledException">Operation could not finish</exception>
         public static Task<Heightmap> GetHeightmap()
         {
             using (_heightmapLock.Lock())
@@ -93,7 +93,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="map">Heightmap to set</param>
         /// <returns>Asynchronous task</returns>
-        /// <exception cref="TaskCanceledException">Operation could not finish</exception>
+        /// <exception cref="OperationCanceledException">Operation could not finish</exception>
         /// <exception cref="InvalidOperationException">Heightmap is already being set</exception>
         public static Task SetHeightmap(Heightmap map)
         {
@@ -269,8 +269,8 @@ namespace DuetControlServer.SPI
             }
 
             // Get the CRC16 checksum of the firmware binary
-            byte[] firmwareBlob = /*stackalloc*/ new byte[_firmwareStream.Length];
-            _firmwareStream.Read(firmwareBlob);
+            byte[] firmwareBlob = new byte[_firmwareStream.Length];
+            await _firmwareStream.ReadAsync(firmwareBlob, 0, (int)_firmwareStream.Length);
             ushort crc16 = CRC16.Calculate(firmwareBlob);
 
             // Send the IAP binary to the firmware
@@ -506,10 +506,7 @@ namespace DuetControlServer.SPI
                 _channels.ResetBusyChannels();
 
                 // Wait a moment
-                if (IsIdle)
-                {
-                    await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
-                }
+                await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
             }
             while (!Program.CancelSource.IsCancellationRequested);
         }
@@ -534,24 +531,6 @@ namespace DuetControlServer.SPI
                 return true;
             }
             return false;
-        }
-
-        private static bool IsIdle
-        {
-            get
-            {
-                foreach (ChannelInformation channel in _channels)
-                {
-                    using (channel.Lock())
-                    {
-                        if (!channel.IsIdle)
-                        {
-                            return false;
-                        }
-                    }
-                }
-                return true;
-            }
         }
 
         private static Task ProcessPacket(PacketHeader packet)
@@ -607,7 +586,7 @@ namespace DuetControlServer.SPI
 
         private static async Task HandleObjectModel()
         {
-            DataTransfer.ReadObjectModel(out byte module, out string json);
+            DataTransfer.ReadObjectModel(out byte module, out byte[] json);
 
             // Check which module to query next
             using (await Model.Provider.AccessReadOnlyAsync())
@@ -821,14 +800,13 @@ namespace DuetControlServer.SPI
             try
             {
                 string filePath = await FilePath.ToPhysicalAsync(filename, "sys");
-                using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                using FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read)
                 {
-                    fs.Position = offset;
-
-                    byte[] buffer = /*stackalloc*/ new byte[maxLength];
-                    int bytesRead = await fs.ReadAsync(buffer, 0, (int)maxLength);
-                    DataTransfer.WriteFileChunk(buffer.AsSpan(0, bytesRead), fs.Length);
-                }
+                    Position = offset
+                };
+                byte[] buffer = new byte[maxLength];
+                int bytesRead = await fs.ReadAsync(buffer, 0, (int)maxLength);
+                DataTransfer.WriteFileChunk(buffer.AsSpan(0, bytesRead), fs.Length);
             }
             catch (Exception e)
             {

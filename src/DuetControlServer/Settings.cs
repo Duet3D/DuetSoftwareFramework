@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
-using Newtonsoft.Json;
 
 namespace DuetControlServer
 {
@@ -10,134 +11,114 @@ namespace DuetControlServer
     /// Settings provider
     /// </summary>
     /// <remarks>This class cannot be static because JSON.NET requires an instance for deserialization</remarks>
-    public /*static*/ class Settings
+    public static class Settings
     {
-        private static readonly string DefaultConfigFile = "/opt/dsf/conf/config.json";
+        private const string DefaultConfigFile = "/opt/dsf/conf/config.json";
         private const RegexOptions RegexFlags = RegexOptions.IgnoreCase | RegexOptions.Singleline;
 
         /// <summary>
         /// Path to the UNIX socket for IPC
         /// </summary>
         /// <seealso cref="DuetAPI"/>
-        [JsonProperty]
         public static string SocketPath { get; set; } = DuetAPI.Connection.Defaults.SocketPath;
 
         /// <summary>
         /// Maximum number of pending IPC connection
         /// </summary>
-        [JsonProperty]
         public static int Backlog { get; set; } = 4;
 
         /// <summary>
         /// Virtual SD card directory.
         /// Paths starting with 0:/ are mapped to this directory
         /// </summary>
-        [JsonProperty]
         public static string BaseDirectory { get; set; } = "/opt/dsf/sd";
 
         /// <summary>
         /// Internal model update interval after which properties of the machine model from
         /// the host controller (e.g. network information and mass storages) are updated (in ms)
         /// </summary>
-        [JsonProperty]
         public static int HostUpdateInterval { get; set; } = 4000;
 
         /// <summary>
         /// How frequently the config response is polled (in ms; temporary; will be removed once the new object model has been finished)
         /// </summary>
-        [JsonProperty]
         public static int ConfigUpdateInterval { get; set; } = 5000;
 
         /// <summary>
         /// Maximum time to keep messages in the object model unless client(s) pick them up (in s).
         /// Note that messages are only cleared when the host update task runs.
         /// </summary>
-        [JsonProperty]
         public static double MaxMessageAge { get; set; } = 60.0;
 
         /// <summary>
         /// SPI device that is connected to RepRapFirmware
         /// </summary>
-        [JsonProperty]
         public static string SpiDevice = "/dev/spidev0.0";
 
         /// <summary>
         /// Frequency to use for SPI transfers
         /// </summary>
-        [JsonProperty]
         public static int SpiFrequency = 2_000_000;
 
         /// <summary>
         /// Maximum allowed delay between data exchanges during a full transfer (in ms)
         /// </summary>
-        [JsonProperty]
         public static int SpiTransferTimeout { get; set; } = 500;
 
         /// <summary>
         /// Maximum number of sequential transfer retries
         /// </summary>
-        [JsonProperty]
         public static int MaxSpiRetries { get; set; } = 3;
 
         /// <summary>
         /// Time to wait after every transfer (in ms)
         /// </summary>
-        [JsonProperty]
         public static int SpiPollDelay { get; set; } = 25;
 
         /// <summary>
         /// Path to the GPIO chip device node
         /// </summary>
-        [JsonProperty]
         public static string GpioChipDevice { get; set; } = "/dev/gpiochip0";
 
         /// <summary>
         /// Number of the GPIO pin that is used by RepRapFirmware to flag its ready state
         /// </summary>
-        [JsonProperty]
         public static int TransferReadyPin { get; set; } = 25;      // Pin 22 on the RaspPi expansion header
 
         /// <summary>
         /// Number of codes to buffer in the internal print subsystem
         /// </summary>
-        [JsonProperty]
         public static int BufferedPrintCodes { get; set; } = 32;
 
         /// <summary>
         /// Number of codes to buffer per macro
         /// </summary>
-        [JsonProperty]
         public static int BufferedMacroCodes { get; set; } = 16;
 
         /// <summary>
         /// Maximum space of buffered codes per channel (in bytes). Must be greater than <see cref="SPI.Communication.Consts.MaxCodeBufferSize"/>
         /// </summary>
-        [JsonProperty]
         public static int MaxBufferSpacePerChannel { get; set; } = 768;
 
         /// <summary>
         /// Interval of regular status updates (in ms)
         /// </summary>
         /// <remarks>This is preliminary and will be removed from future versions</remarks>
-        [JsonProperty]
         public static double ModelUpdateInterval { get; set; } = 125.0;
 
         /// <summary>
         /// How many bytes to parse max at the beginning and end of a file to retrieve G-code file information (256KiB)
         /// </summary>
-        [JsonProperty]
         public static uint FileInfoReadLimit { get; set; } = 262144;
 
         /// <summary>
         /// Maximum allowed layer height. Used by the file info parser
         /// </summary>
-        [JsonProperty]
         public static double MaxLayerHeight { get; set; } = 0.9;
 
         /// <summary>
         /// Regular expressions for finding the layer height (case insensitive)
         /// </summary>
-        [JsonProperty]
         public static List<Regex> LayerHeightFilters { get; set; } = new List<Regex>
         {
             new Regex(@"layer_height\D+(?<mm>(\d+\.?\d*))", RegexFlags),                // Slic3r
@@ -150,7 +131,6 @@ namespace DuetControlServer
         /// <summary>
         /// Regular expressions for finding the filament consumption (case insensitive, single line)
         /// </summary>
-        [JsonProperty]
         public static List<Regex> FilamentFilters { get; set; } = new List<Regex>
         {
             new Regex(@"filament used\D+(((?<mm>\d+\.?\d*)mm)(\D+)?)+", RegexFlags),        // Slic3r (mm)
@@ -163,7 +143,6 @@ namespace DuetControlServer
         /// <summary>
         /// Regular expressions for finding the slicer (case insensitive)
         /// </summary>
-        [JsonProperty]
         public static List<Regex> GeneratedByFilters { get; set; } = new List<Regex>
         {
             new Regex(@"generated by\s+(.+)", RegexFlags),                              // Slic3r and Simplify3D
@@ -176,7 +155,6 @@ namespace DuetControlServer
         /// <summary>
         /// Regular expressions for finding the print time
         /// </summary>
-        [JsonProperty]
         public static List<Regex> PrintTimeFilters { get; set; } = new List<Regex>
         {
             new Regex(@"estimated printing time = ((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                                     // Slic3r PE
@@ -188,7 +166,6 @@ namespace DuetControlServer
         /// <summary>
         /// Regular expressions for finding the simulated time
         /// </summary>
-        [JsonProperty]
         public static List<Regex> SimulatedTimeFilters { get; set; } = new List<Regex>
         {
             new Regex(@"; Simulated print time\D+(?<s>(\d+\.?\d*))", RegexFlags)
@@ -211,17 +188,21 @@ namespace DuetControlServer
                 }
                 lastArg = arg;
             }
-            
+
             // See if the file exists and attempt to load the settings from it, otherwise create it
             if (File.Exists(config))
             {
-                string fileContent = File.ReadAllText(config);
-                LayerHeightFilters.Clear();
-                FilamentFilters.Clear();
-                GeneratedByFilters.Clear();
-                PrintTimeFilters.Clear();
-                SimulatedTimeFilters.Clear();
-                JsonConvert.DeserializeObject<Settings>(fileContent);
+                using FileStream fileStream = new FileStream(config, FileMode.Open, FileAccess.Read);
+                using JsonDocument jsonDoc = JsonDocument.Parse(fileStream);
+
+                foreach (PropertyInfo property in typeof(Settings).GetProperties(BindingFlags.Public))
+                {
+                    if (jsonDoc.RootElement.TryGetProperty(property.Name, out JsonElement element))
+                    {
+                        object newValue = JsonSerializer.Deserialize(element.GetRawText(), property.PropertyType);
+                        property.SetValue(null, newValue);
+                    }
+                }
 
                 if (MaxBufferSpacePerChannel < SPI.Communication.Consts.MaxCodeBufferSize)
                 {
@@ -230,8 +211,9 @@ namespace DuetControlServer
             }
             else
             {
-                string defaultSettings = JsonConvert.SerializeObject(new Settings(), Formatting.Indented);
-                File.WriteAllText(config, defaultSettings);
+                using FileStream fileStream = new FileStream(config, FileMode.Create, FileAccess.Write);
+                byte[] content = JsonSerializer.SerializeToUtf8Bytes(null, typeof(Settings));
+                fileStream.Write(content);
             }
             
             // Parse other command-line parameters
@@ -249,7 +231,7 @@ namespace DuetControlServer
                     Console.WriteLine("-s, --config: Set config file");
                     Console.WriteLine("-S, --socket: Specify the UNIX socket path");
                     Console.WriteLine("-b, --base-directory: Set the base path for system and G-code files");
-                    Console.WriteLine("-u, --update: Update RepRapFirmware when the board type has been determined");
+                    Console.WriteLine("-u, --update: Update RepRapFirmware and exit");
                 }
                 else if (lastArg == "-S" || lastArg == "--socket")
                 {

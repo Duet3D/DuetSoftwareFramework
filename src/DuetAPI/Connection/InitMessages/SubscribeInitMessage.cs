@@ -17,8 +17,17 @@ namespace DuetAPI.Connection.InitMessages
         /// Type of the subscription
         /// </summary>
         public SubscriptionMode SubscriptionMode { get; set; }
-        
-        // TODO Add Filtered mode and OM "Path" property here for the new selective mode
-        // TODO? Add optional debounce interval
+
+        /// <summary>
+        /// Optional filter path for <see cref="SubscriptionMode.Patch"/> mode
+        /// </summary>
+        /// <remarks>
+        /// The style of a filter is similar to XPath. For example, if you want to monitor only the current heater temperatures,
+        /// you can use the filter expression "heat/heaters[*]/current". Wildcards are supported either for full names or indices.
+        /// To get updates for an entire namespace, the ** wildcard can be used (for example heat/** for everything heat-related),
+        /// however it can be only used at the end of a filter expression. Multiple filters can be used on one connection and they
+        /// have to be delimited by one of these charaters: ['|', ',', ' ', '\r', '\n']
+        /// </remarks>
+        public string Filter { get; set; }
     }
 }

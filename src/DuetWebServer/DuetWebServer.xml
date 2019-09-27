@@ -164,7 +164,7 @@
             </summary>
             <param name="args">Command-line arguments</param>
         </member>
-        <member name="M:DuetWebServer.Program.CreateWebHostBuilder(System.String[])">
+        <member name="M:DuetWebServer.Program.CreateHostBuilder(System.String[])">
             <summary>
             Creates a new WebHost instance
             </summary>
@@ -188,7 +188,7 @@
             </summary>
             <param name="services">Service collection</param>
         </member>
-        <member name="M:DuetWebServer.Startup.Configure(Microsoft.AspNetCore.Builder.IApplicationBuilder,Microsoft.AspNetCore.Hosting.IHostingEnvironment)">
+        <member name="M:DuetWebServer.Startup.Configure(Microsoft.AspNetCore.Builder.IApplicationBuilder,Microsoft.AspNetCore.Hosting.IWebHostEnvironment)">
             <summary>
             Configure the HTTP request pipeline
             </summary>

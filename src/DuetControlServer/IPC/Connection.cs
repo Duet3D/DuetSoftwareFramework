@@ -3,13 +3,12 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Command = DuetControlServer.IPC.Processors.Command;
 
 namespace DuetControlServer.IPC
@@ -17,26 +16,14 @@ namespace DuetControlServer.IPC
     /// <summary>
     /// Wrapper around UNIX socket connections
     /// </summary>
-    public sealed class Connection : IDisposable
+    public sealed class Connection
     {
-        private readonly Socket _socket;
-
-        private readonly NetworkStream _networkStream;
-        private readonly StreamReader _streamReader;
-        private JsonReader _jsonReader;
+        private readonly Socket _unixSocket;
 
         /// <summary>
         /// Identifier of this connection
         /// </summary>
         public int Id { get; }
-
-        /// <summary>
-        /// Check the state of the connection
-        /// </summary>
-        public bool IsConnected
-        {
-            get => _socket.Connected;
-        }
 
         /// <summary>
         /// Constructor for new connections
@@ -45,48 +32,31 @@ namespace DuetControlServer.IPC
         /// <param name="id">Connection ID</param>
         public Connection(Socket socket, int id)
         {
-            _socket = socket;
+            _unixSocket = socket;
             Id = id;
-
-            _networkStream = new NetworkStream(socket);
-            _streamReader = new StreamReader(_networkStream);
-            InitReader();
-        }
-
-        private void InitReader()
-        {
-            _jsonReader = new JsonTextReader(_streamReader)
-            {
-                CloseInput = false,
-                SupportMultipleContent = true
-            };
         }
 
         /// <summary>
         /// Read a generic JSON object from the socket
         /// </summary>
-        /// <returns>Abstract JObject instance for deserialization or null if nothing could be read</returns>
+        /// <returns>JsonDocument for deserialization or null if the connection has been closed</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        public async Task<JObject> ReceiveJson()
+        public async Task<JsonDocument> ReceiveJson()
         {
             do
             {
                 try
                 {
-                    if (!await _jsonReader.ReadAsync(Program.CancelSource.Token))
+                    using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket);
+                    if (json.Length == 0)
                     {
                         return null;
                     }
-
-                    JToken token = await JToken.ReadFromAsync(_jsonReader, Program.CancelSource.Token);
-                    if (token.Type == JTokenType.Object)
-                    {
-                        return (JObject)token;
-                    }
+                    return await JsonDocument.ParseAsync(json);
                 }
-                catch (JsonReaderException e)
+                catch (JsonException e)
                 {
-                    InitReader();
+                    Console.WriteLine($"[warn] Received bad JSON: {e}");
                     await SendResponse(e);
                 }
             }
@@ -99,36 +69,39 @@ namespace DuetControlServer.IPC
         /// Receive a fully-populated instance of a BaseCommand from the client
         /// </summary>
         /// <returns>Received command or null if nothing could be read</returns>
-        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="ArgumentException">Bad command received</exception>
         public async Task<BaseCommand> ReceiveCommand()
         {
-            JObject obj = await ReceiveJson();
-            if (obj == null)
+            JsonDocument jsonDoc = await ReceiveJson();
+            if (jsonDoc == null)
             {
                 // Connection has been terminated
                 return null;
             }
-            BaseCommand command = obj.ToObject<BaseCommand>();
 
-            // Check if the requested command type is valid
-            Type commandType = GetCommandType(command.Command);
-            if (commandType == null)
+            foreach (var item in jsonDoc.RootElement.EnumerateObject())
             {
-                if (command.Command == nameof(BaseCommand))
+                if (item.Name.Equals(nameof(BaseCommand.Command), StringComparison.InvariantCultureIgnoreCase))
                 {
-                    throw new ArgumentException("Invalid command type");
+                    if (item.Value.ValueKind != JsonValueKind.String)
+                    {
+                        throw new ArgumentException("Command type must be a string");
+                    }
+
+                    Type commandType = GetCommandType(item.Value.GetString());
+                    if (!typeof(BaseCommand).IsAssignableFrom(commandType))
+                    {
+                        throw new ArgumentException("Command is not of type BaseCommand");
+                    }
+
+                    // Perform final deserialization and assign source identifier to this command
+                    BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonDoc.RootElement.GetRawText(), commandType, JsonHelper.DefaultJsonOptions);
+                    command.SourceConnection = Id;
+                    return command;
                 }
-                throw new ArgumentException($"Invalid command type '{command.Command}'");
-            }
-            if (!typeof(BaseCommand).IsAssignableFrom(commandType))
-            {
-                throw new ArgumentException("Command is not of type BaseCommand");
             }
 
-            // Perform final deserialization and assign source identifier to this command
-            command = (BaseCommand)obj.ToObject(commandType);
-            command.SourceConnection = Id;
-            return command;
+            throw new ArgumentException("Command type not found");
         }
 
         /// <summary>
@@ -151,50 +124,30 @@ namespace DuetControlServer.IPC
         }
 
         /// <summary>
-        /// Send a response to the client
+        /// Send a response to the client. The given object is send either in an empty, error, or standard response body
         /// </summary>
-        /// <remarks>
-        /// Wraps the object to send either in an empty, standard or error response.
-        /// Instances of type <see cref="ServerInitMessage"/> and <see cref="Code"/> are not encapsulated.
-        /// </remarks>
         /// <param name="obj">Object to send</param>
         /// <returns>Asynchronous task</returns>
-        public async Task SendResponse(object obj = null)
+        /// <exception cref="SocketException">Message could not be sent</exception>
+        public Task SendResponse(object obj = null)
         {
-            string json;
             if (obj == null)
             {
-                BaseResponse response = new BaseResponse();
-                json = JsonConvert.SerializeObject(response, JsonHelper.DefaultSettings);
+                return Send(new BaseResponse());
             }
-            else if (obj is Exception e)
+            
+            if (obj is Exception e)
             {
                 if (e is AggregateException ae)
                 {
-                    // Assume there is only one inner exception in this AggregateException
-                    // and get it so that it can be properly passed through to the client
                     e = ae.InnerException;
                 }
-
-                if (!(e is TaskCanceledException))
-                {
-                    Console.Write("[warn] Handled exception: ");
-                    Console.WriteLine(e);
-                }
                 ErrorResponse errorResponse = new ErrorResponse(e);
-                json = JsonConvert.SerializeObject(errorResponse, JsonHelper.DefaultSettings);
-            }
-            else if (obj is ServerInitMessage || obj is Code)
-            {
-                json = JsonConvert.SerializeObject(obj, JsonHelper.DefaultSettings);
-            }
-            else
-            {
-                Response<object> response = new Response<object>(obj);
-                json = JsonConvert.SerializeObject(response, JsonHelper.DefaultSettings);
+                return Send(errorResponse);
             }
 
-            await Send(json + "\n");
+            Response<object> response = new Response<object>(obj);
+            return Send(response);
         }
         
         /// <summary>
@@ -202,36 +155,13 @@ namespace DuetControlServer.IPC
         /// </summary>
         /// <param name="obj">Object to send</param>
         /// <returns>Asynchronous task</returns>
-        public async Task Send(JObject obj)
+        /// <exception cref="SocketException">Message could not be sent</exception>
+        public async Task Send(object obj)
         {
-            await Send(obj.ToString(Formatting.None) + "\n");
-        }
-        
-        /// <summary>
-        /// Send plain text to the client
-        /// </summary>
-        /// <param name="text">Text to send</param>
-        /// <returns>Asynchronous task</returns>
-        public async Task Send(string text)
-        {
-            await _socket.SendAsync(Encoding.UTF8.GetBytes(text), SocketFlags.None);
-        }
-
-        /// <summary>
-        /// Close the connection
-        /// </summary>
-        public void Close()
-        {
-            Dispose();
-        }
-
-        /// <summary>
-        /// Dispose this instance
-        /// </summary>
-        public void Dispose()
-        {
-            _streamReader.Dispose();
-            _networkStream.Dispose();
+            byte[] toSend = (obj is byte[] byteArray) ? byteArray : JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
+            //Console.Write($"OUT {Encoding.UTF8.GetString(toSend)}");
+            await _unixSocket.SendAsync(toSend, SocketFlags.None);
+            //Console.WriteLine(" OK");
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
@@ -26,6 +27,7 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
+        /// <exception cref="SocketException">Init message could not be sent</exception>
         public Task Connect(string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default)
         {
             CommandInitMessage initMessage = new CommandInitMessage();

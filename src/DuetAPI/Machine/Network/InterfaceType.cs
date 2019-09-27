@@ -1,25 +1,22 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using System.Runtime.Serialization;
+﻿using DuetAPI.Utility;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.Machine
 {
     /// <summary>
     /// Supported types of network interfaces
     /// </summary>
-    [JsonConverter(typeof(StringEnumConverter))]
+    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
     public enum InterfaceType
     {
         /// <summary>
         /// Wireless network interface
         /// </summary>
-        [EnumMember(Value = "wifi")]
         WiFi,
 
         /// <summary>
         /// Wired network interface
         /// </summary>
-        [EnumMember(Value = "lan")]
         LAN
     }
 }

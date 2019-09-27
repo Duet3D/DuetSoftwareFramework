@@ -1,4 +1,6 @@
 using System.IO;
+using System.Net.Sockets;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
@@ -7,7 +9,6 @@ using DuetAPI.Connection.InitMessages;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetAPIClient.Exceptions;
-using Newtonsoft.Json.Linq;
 
 namespace DuetAPIClient
 {
@@ -28,18 +29,28 @@ namespace DuetAPIClient
         public SubscriptionMode Mode { get; private set; }
 
         /// <summary>
+        /// Filter expression
+        /// </summary>
+        /// <seealso cref="SubscribeInitMessage.Filter"/>
+        public string Filter { get; private set; }
+
+        /// <summary>
         /// Establishes a connection to the given UNIX socket file
         /// </summary>
         /// <param name="mode">Subscription mode</param>
+        /// <param name="filter">Optional filter string</param>
         /// <param name="socketPath">Path to the UNIX socket file</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
-        public Task Connect(SubscriptionMode mode, string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default(CancellationToken))
+        /// <exception cref="SocketException">Init message could not be sent</exception>
+        public Task Connect(SubscriptionMode mode, string filter = null, string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default)
         {
-            SubscribeInitMessage initMessage = new SubscribeInitMessage { SubscriptionMode = mode };
             Mode = mode;
+            Filter = filter;
+
+            SubscribeInitMessage initMessage = new SubscribeInitMessage { SubscriptionMode = mode, Filter = filter };
             return Connect(initMessage, socketPath, cancellationToken);
         }
         
@@ -49,23 +60,25 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>The current machine model</returns>
-        public async Task<MachineModel> GetMachineModel(CancellationToken cancellationToken = default(CancellationToken))
+        /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
+        public async Task<MachineModel> GetMachineModel(CancellationToken cancellationToken = default)
         {
             MachineModel model = await Receive<MachineModel>(cancellationToken);
-            await Send(new Acknowledge());
+            await Send(new Acknowledge(), cancellationToken);
             return model;
         }
         
         /// <summary>
-        /// Optimized method to query the machine model JSON in any mode.
+        /// Optimized method to query the machine model UTF-8 JSON in any mode.
         /// May be used to get machine model patches as well.
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Machine model JSON</returns>
-        public async Task<string> GetSerializedMachineModel(CancellationToken cancellationToken = default(CancellationToken))
+        /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
+        public async Task<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
         {
-            string json = await ReceiveSerializedJson(cancellationToken);
-            await Send(new Acknowledge());
+            MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            await Send(new Acknowledge(), cancellationToken);
             return json;
         }
         
@@ -76,12 +89,13 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">An optional cancellation token</param>
         /// <returns>The partial update JSON</returns>
+        /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
         /// <seealso cref="GetMachineModel"/>
-        /// <seealso cref="JsonHelper.PatchObject(object, JObject)"/>
-        public async Task<JObject> GetMachineModelPatch(CancellationToken cancellationToken = default(CancellationToken))
+        /// <seealso cref="JsonPatch.Patch(object, JsonDocument)"/>
+        public async Task<JsonDocument> GetMachineModelPatch(CancellationToken cancellationToken = default)
         {
-            JObject patch = await ReceiveJson(cancellationToken);
-            await Send(new Acknowledge());
+            JsonDocument patch = await ReceiveJson(cancellationToken);
+            await Send(new Acknowledge(), cancellationToken);
             return patch;
         }
     }

@@ -30,11 +30,8 @@ namespace DuetControlServer.IPC.Processors
         /// Constructor of the command interpreter
         /// </summary>
         /// <param name="conn">Connection instance</param>
-        /// <param name="initMessage">Initialization message</param>
-        public Command(Connection conn, ClientInitMessage initMessage) : base(conn, initMessage)
-        {
-        }
-        
+        public Command(Connection conn) : base(conn) { }
+                
         /// <summary>
         /// Reads incoming command requests and processes them. See <see cref="DuetAPI.Commands"/> namespace for a list
         /// of supported commands. The actual implementations can be found in <see cref="Commands"/>.
@@ -42,17 +39,19 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Asynchronous task</returns>
         public override async Task Process()
         {
+            DuetAPI.Commands.BaseCommand command = null;
             do
             {
                 try
                 {
                     // Read another command
-                    DuetAPI.Commands.BaseCommand command = await Connection.ReceiveCommand();
+                    command = await Connection.ReceiveCommand();
                     if (command == null)
                     {
                         break;
                     }
 
+                    // Check if it is supported at all
                     if (!SupportedCommands.Contains(command.GetType()))
                     {
                         throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
@@ -62,27 +61,17 @@ namespace DuetControlServer.IPC.Processors
                     object result = await command.Invoke();
                     await Connection.SendResponse(result);
                 }
-                catch (TaskCanceledException e)
-                {
-                    if (Connection.IsConnected)
-                    {
-                        await Connection.SendResponse(e);
-                    }
-                }
                 catch (Exception e)
                 {
-                    if (Connection.IsConnected)
+                    // Send errors back to the client
+                    if (!(e is OperationCanceledException))
                     {
-                        await Connection.SendResponse(e);
-                        Console.WriteLine(e);
+                        Console.WriteLine($"[err] Failed to execute command {command.Command}: {e}");
                     }
-                    else
-                    {
-                        throw;
-                    }
+                    await Connection.SendResponse(e);
                 }
             }
-            while (Connection.IsConnected);
+            while (!Program.CancelSource.IsCancellationRequested);
         }
     }
 }

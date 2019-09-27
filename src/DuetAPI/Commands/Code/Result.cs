@@ -20,25 +20,19 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="type">Message type</param>
         /// <param name="content">Message content</param>
-        public CodeResult(MessageType type, string content)
-        {
-            Add(type, content);
-        }
+        public CodeResult(MessageType type, string content) => Add(type, content);
 
         /// <summary>
         /// Add another message
         /// </summary>
         /// <param name="type">Message type</param>
         /// <param name="content">Message content</param>
-        public void Add(MessageType type, string content)
-        {
-            Add(new Message(type, content));
-        }
+        public void Add(MessageType type, string content) => Add(new Message(type, content));
 
         /// <summary>
         /// Checks if the message contains any data
         /// </summary>
-        public bool IsEmpty => !this.Any(item => item.Content != "");
+        public bool IsEmpty => !this.Any(item => !string.IsNullOrEmpty(item.Content));
 
         /// <summary>
         /// Indicates if the code could complete without an error
@@ -54,7 +48,10 @@ namespace DuetAPI.Commands
             StringBuilder builder = new StringBuilder();
             foreach (Message message in this)
             {
-                builder.AppendLine(message.ToString());
+                if (!string.IsNullOrEmpty(message.Content))
+                {
+                    builder.AppendLine(message.ToString());
+                }
             }
             return builder.ToString();
         }

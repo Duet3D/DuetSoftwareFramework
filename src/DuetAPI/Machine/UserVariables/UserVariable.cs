@@ -35,7 +35,7 @@ namespace DuetAPI.Machine
                 }
             }
         }
-        private string _name = "";
+        private string _name = string.Empty;
 
         /// <summary>
         /// Value of the user variable
@@ -52,7 +52,7 @@ namespace DuetAPI.Machine
                 }
             }
         }
-        private string _value = "";
+        private string _value = string.Empty;
 
         /// <summary>
         /// Assigns every property from another instance
@@ -71,8 +71,8 @@ namespace DuetAPI.Machine
                 throw new ArgumentException("Invalid type");
             }
 
-            Name = string.Copy(other.Name);
-            Value = string.Copy(other.Value);
+            Name = other.Name;
+            Value = other.Value;
         }
 
         /// <summary>
@@ -83,8 +83,8 @@ namespace DuetAPI.Machine
         {
             return new UserVariable
             {
-                Name = string.Copy(Name),
-                Value = string.Copy(Value)
+                Name = Name,
+                Value = Value
             };
         }
     }

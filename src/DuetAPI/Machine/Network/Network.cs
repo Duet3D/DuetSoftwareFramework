@@ -3,6 +3,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace DuetAPI.Machine
 {
@@ -60,15 +61,15 @@ namespace DuetAPI.Machine
         {
             get
             {
-                string hostname = "";
+                StringBuilder builder = new StringBuilder();
                 foreach (char c in Name)
                 {
                     if (char.IsLetterOrDigit(c) || c == '-' || c == '_')
                     {
-                        hostname += c;
+                        builder.Append(c);
                     }
                 }
-                return (hostname != "") ? hostname : DefaultHostname;
+                return (builder.Length != 0) ? builder.ToString() : DefaultHostname;
             }
         }
         
@@ -115,8 +116,8 @@ namespace DuetAPI.Machine
                 throw new ArgumentException("Invalid type");
             }
 
-            Name = (other.Name != null) ? string.Copy(other.Name) : null;
-            Password = (other.Password != null) ? string.Copy(other.Password) : null;
+            Name = other.Name;
+            Password = other.Password;
             ListHelpers.AssignList(Interfaces, other.Interfaces);
         }
 
@@ -128,8 +129,8 @@ namespace DuetAPI.Machine
         {
             Network clone = new Network
             {
-                Name = (Name != null) ? string.Copy(Name) : null,
-                Password = (Password != null) ? string.Copy(Password) : null
+                Name = Name,
+                Password = Password
             };
 
             ListHelpers.CloneItems(clone.Interfaces, Interfaces);
