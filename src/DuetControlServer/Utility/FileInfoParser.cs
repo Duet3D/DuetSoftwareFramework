@@ -41,7 +41,7 @@ namespace DuetControlServer
                     List<float> filamentConsumption = new List<float>();
                     await ParseHeader(reader, filamentConsumption, result);
                     await ParseFooter(reader, fileStream.Length, filamentConsumption, result);
-                    result.Filament = filamentConsumption.ToArray();
+                    result.Filament = filamentConsumption;
 
                     if (result.FirstLayerHeight + result.LayerHeight > 0F && result.Height > 0F)
                     {
@@ -132,7 +132,7 @@ namespace DuetControlServer
             CancellationToken token = Program.CancelSource.Token;
             reader.Seek(0, SeekOrigin.End);
 
-            bool inRelativeMode = false, lastLineHadInfo = false;
+            bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = filament.Count > 0;
             float? lastZ = null;
 
             do
@@ -195,8 +195,8 @@ namespace DuetControlServer
                 else if (code.Type == CodeType.Comment)
                 {
                     gotNewInfo |= partialFileInfo.LayerHeight == 0 && FindLayerHeight(line, ref partialFileInfo);
-                    gotNewInfo |= FindFilamentUsed(line, ref filament);
-                    // gotNewInfo |= partialFileInfo.GeneratedBy == string.Empty && FindGeneratedBy(line, ref partialFileInfo);
+                    gotNewInfo |= !hadFilament && FindFilamentUsed(line, ref filament);
+                    gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(line, ref partialFileInfo);
                     gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo);
                     gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo);
                 }

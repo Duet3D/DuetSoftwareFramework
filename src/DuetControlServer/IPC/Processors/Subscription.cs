@@ -262,7 +262,7 @@ namespace DuetControlServer.IPC.Processors
                         currentDictionary.Add(itemPathNode.Name, currentList);
                     }
 
-                    for (int k = currentList.Count; k > itemPathNode.Count; k++)
+                    for (int k = currentList.Count; k > itemPathNode.Count; k--)
                     {
                         currentList.RemoveAt(k - 1);
                     }
@@ -305,7 +305,29 @@ namespace DuetControlServer.IPC.Processors
                             break;
 
                         case Model.PropertyPathChangeType.ObjectCollection:
-                            // Object collection count is already updated by the call to GetPathNode()
+                            // Update number of object collection items
+                            Dictionary<string, object> objectCollectionNode = (Dictionary<string, object>)node;
+                            string objectCollectionName = (string)path[^1];
+                            List<object> objectCollectionList;
+                            if (objectCollectionNode.TryGetValue(objectCollectionName, out object objectCollection))
+                            {
+                                objectCollectionList = (List<object>)objectCollection;
+                            }
+                            else
+                            {
+                                objectCollectionList = new List<object>((int)value);
+                                objectCollectionNode.Add(objectCollectionName, objectCollectionList);
+                            }
+
+                            for (int k = objectCollectionList.Count; k > (int)value; k--)
+                            {
+                                objectCollectionList.RemoveAt(k - 1);
+                            }
+
+                            for (int k = objectCollectionList.Count; k < (int)value; k++)
+                            {
+                                objectCollectionList.Add(new Dictionary<string, object>());
+                            }
                             break;
 
                         case Model.PropertyPathChangeType.ValueCollection:

@@ -1,12 +1,103 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetAPI.Utility
 {
+    /// <summary>
+    /// JSON converter to read and write a list of regular expressions
+    /// </summary>
+    /// <remarks>
+    /// This class may become obsolete in a future .NET Core version.
+    /// For some reason it has no effect to add this converter to the default JSON options.
+    /// </remarks>
+    public class JsonRegexListConverter : JsonConverter<List<Regex>>
+    {
+        /// <summary>
+        /// Read a Regex list from JSON
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="typeToConvert">Type to convert</param>
+        /// <param name="options">Reader options</param>
+        /// <returns>Read value</returns>
+        public override List<Regex> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.StartArray)
+            {
+                List<Regex> regexList = new List<Regex>();
+
+                string pattern = null;
+                int optionsValue = 0;
+                string propertyName = string.Empty;
+
+                while (reader.Read())
+                {
+                    switch (reader.TokenType)
+                    {
+                        case JsonTokenType.StartObject:
+                            propertyName = string.Empty;
+                            pattern = null;
+                            optionsValue = 0;
+                            break;
+
+                        case JsonTokenType.PropertyName:
+                            propertyName = reader.GetString();
+                            break;
+
+                        case JsonTokenType.String:
+                            if (propertyName.Equals("Pattern", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                pattern = reader.GetString();
+                            }
+                            break;
+
+                        case JsonTokenType.Number:
+                            if (propertyName.Equals("Options", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                optionsValue = reader.GetInt32();
+                            }
+                            break;
+
+                        case JsonTokenType.EndObject:
+                            regexList.Add(new Regex(pattern, (RegexOptions)optionsValue));
+                            break;
+
+                        case JsonTokenType.EndArray:
+                            return regexList;
+                    }
+                }
+            }
+
+            throw new JsonException("Invalid regular expression");
+        }
+
+        /// <summary>
+        /// Write a Regex list to JSON
+        /// </summary>
+        /// <param name="writer">JSON writer</param>
+        /// <param name="value">Value to serialize</param>
+        /// <param name="options">Write options</param>
+        public override void Write(Utf8JsonWriter writer, List<Regex> value, JsonSerializerOptions options)
+        {
+            writer.WriteStartArray();
+            foreach (Regex regex in value)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("Pattern", regex.ToString());
+                writer.WriteNumber("Options", (int)regex.Options);
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+        }
+    }
+
     /// <summary>
     /// Helper class for JSON serialization, deserialization, patch creation and patch application
     /// </summary>

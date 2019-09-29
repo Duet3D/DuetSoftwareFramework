@@ -59,10 +59,45 @@ namespace DuetAPI.Machine
             }
         }
         private string _lastFileName;
+
+        /// <summary>
+        /// Indicates if the last file was aborted (unexpected cancellation)
+        /// </summary>
+        public bool LastFileAborted
+        {
+            get => _lastFileAborted;
+            set
+            {
+                if (_lastFileAborted != value)
+                {
+                    _lastFileAborted = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private bool _lastFileAborted;
         
+        /// <summary>
+        /// Indicates if the last file was cancelled (user cancelled)
+        /// </summary>
+        public bool LastFileCancelled
+        {
+            get => _lastFileCancelled;
+            set
+            {
+                if (_lastFileCancelled != value)
+                {
+                    _lastFileCancelled = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private bool _lastFileCancelled;
+
         /// <summary>
         /// Indicates if the last file processed was simulated
         /// </summary>
+        /// <remarks>This is not set if the file was aborted or cancelled</remarks>
         public bool LastFileSimulated
         {
             get => _lastFileSimulated;
@@ -182,6 +217,8 @@ namespace DuetAPI.Machine
             File.Assign(other.File);
             FilePosition = other.FilePosition;
             LastFileName = other.LastFileName;
+            LastFileAborted = other.LastFileAborted;
+            LastFileCancelled = other.LastFileCancelled;
             LastFileSimulated = other.LastFileSimulated;
             ListHelpers.SetList(ExtrudedRaw, other.ExtrudedRaw);
             Duration = other.Duration;
@@ -203,6 +240,8 @@ namespace DuetAPI.Machine
                 File = (ParsedFileInfo)File.Clone(),
                 FilePosition = FilePosition,
                 LastFileName = LastFileName,
+                LastFileAborted = LastFileAborted,
+                LastFileCancelled = LastFileCancelled,
                 LastFileSimulated = LastFileSimulated,
                 Duration = Duration,
                 Layer = Layer,

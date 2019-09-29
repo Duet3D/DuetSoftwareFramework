@@ -478,7 +478,7 @@ namespace DuetAPI.Commands
                             {
                                 letter = Convert.ToChar(reader.GetString());
                             }
-                            else if (propertyName.Equals("value"))
+                            else if (propertyName.Equals("value", StringComparison.InvariantCultureIgnoreCase))
                             {
                                 value = reader.GetString();
                             }

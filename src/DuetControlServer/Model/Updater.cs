@@ -82,21 +82,22 @@ namespace DuetControlServer.Model
                         Provider.Get.Move.BabystepZ = response.@params.babystep;
 
                         // Update drives and endstops
-                        int numDrives = response.coords.xyz.Count + response.coords.extr.Count;
-                        for (int drive = 0; drive < numDrives; drive++)
+                        for (int drive = 0; drive < Provider.Get.Move.Drives.Count; drive++)
                         {
-                            Drive driveObj;
-                            if (drive >= Provider.Get.Move.Drives.Count)
+                            Drive driveObj = Provider.Get.Move.Drives[drive];
+
+                            if (drive < response.axes)
                             {
-                                driveObj = new Drive();
-                                Provider.Get.Move.Drives.Add(driveObj);
+                                driveObj.Position = response.coords.xyz[drive];
+                            }
+                            else if (drive < response.axes + response.coords.extr.Count)
+                            {
+                                driveObj.Position = response.coords.extr[drive - response.axes];
                             }
                             else
                             {
-                                driveObj = Provider.Get.Move.Drives[drive];
+                                driveObj.Position = null;
                             }
-
-                            driveObj.Position = (drive < response.coords.xyz.Count) ? response.coords.xyz[drive] : response.coords.extr[drive - response.coords.xyz.Count];
 
                             Endstop endstopObj;
                             if (drive >= Provider.Get.Sensors.Endstops.Count)
@@ -110,14 +111,10 @@ namespace DuetControlServer.Model
                             }
                             endstopObj.Triggered = (response.endstops & (1 << drive)) != 0;
                         }
-                        for (int drive = Provider.Get.Move.Drives.Count; drive > numDrives; drive--)
-                        {
-                            Provider.Get.Move.Drives.RemoveAt(drive - 1);
-                            Provider.Get.Sensors.Endstops.RemoveAt(drive - 1);
-                        }
 
                         // Update axes
-                        for (int axis = 0; axis < response.coords.xyz.Count; axis++)
+                        int axis;
+                        for (axis = 0; axis < response.totalAxes; axis++)
                         {
                             Axis axisObj;
                             if (axis >= Provider.Get.Move.Axes.Count)
@@ -130,21 +127,32 @@ namespace DuetControlServer.Model
                                 axisObj = Provider.Get.Move.Axes[axis];
                             }
 
-                            axisObj.Letter = GetAxisLetter(axis);
-                            axisObj.Homed = response.coords.axesHomed[axis] != 0;
-                            axisObj.MachinePosition = response.coords.machine[axis];
+                            axisObj.Letter = response.axisNames[axis];
+                            if (axis < response.coords.xyz.Count)
+                            {
+                                axisObj.Homed = response.coords.axesHomed[axis] != 0;
+                                axisObj.MachinePosition = response.coords.machine[axis];
+                                axisObj.Visible = true;
+                            }
+                            else
+                            {
+                                axisObj.Homed = true;
+                                axisObj.MachinePosition = null;
+                                axisObj.Visible = false;
+                            }
                             axisObj.MinEndstop = axis;
                             axisObj.MaxEndstop = axis;
                         }
-                        for (int axis = Provider.Get.Move.Axes.Count; axis > response.coords.xyz.Count; axis--)
+                        for (axis = Provider.Get.Move.Axes.Count; axis > response.totalAxes; axis--)
                         {
                             Provider.Get.Move.Axes.RemoveAt(axis - 1);
                         }
 
                         // Update extruder drives
-                        Extruder extruderObj;
-                        for (int extruder = 0; extruder < response.coords.extr.Count; extruder++)
+                        int extruder;
+                        for (extruder = 0; extruder < response.coords.extr.Count; extruder++)
                         {
+                            Extruder extruderObj;
                             if (extruder >= Provider.Get.Move.Extruders.Count)
                             {
                                 extruderObj = new Extruder();
@@ -169,7 +177,7 @@ namespace DuetControlServer.Model
                                 extruderObj.Drives.Add(response.coords.xyz.Count + extruder);
                             }
                         }
-                        for (int extruder = Provider.Get.Move.Extruders.Count; extruder > response.coords.extr.Count; extruder--)
+                        for (extruder = Provider.Get.Move.Extruders.Count; extruder > response.coords.extr.Count; extruder--)
                         {
                             Provider.Get.Move.Extruders.RemoveAt(extruder - 1);
                         }
@@ -179,7 +187,8 @@ namespace DuetControlServer.Model
                         Provider.Get.Heat.ColdRetractTemperature = response.coldRetractTemp;
 
                         // Update heaters
-                        for (int heater = 0; heater < response.temps.current.Count; heater++)
+                        int heater;
+                        for (heater = 0; heater < response.temps.current.Count; heater++)
                         {
                             Heater heaterObj;
                             if (heater >= Provider.Get.Heat.Heaters.Count)
@@ -198,7 +207,7 @@ namespace DuetControlServer.Model
                             heaterObj.Sensor = heater;
                             heaterObj.State = (HeaterState)response.temps.state[heater];
                         }
-                        for (int heater = Provider.Get.Heat.Heaters.Count; heater > response.temps.current.Count; heater--)
+                        for (heater = Provider.Get.Heat.Heaters.Count; heater > response.temps.current.Count; heater--)
                         {
                             Provider.Get.Heat.Heaters.RemoveAt(heater - 1);
                         }
@@ -268,7 +277,8 @@ namespace DuetControlServer.Model
                         }
 
                         // Update extra heaters
-                        for (int extra = 0; extra < response.temps.extra.Count; extra++)
+                        int extra;
+                        for (extra = 0; extra < response.temps.extra.Count; extra++)
                         {
                             ExtraHeater extraObj;
                             if (extra >= Provider.Get.Heat.Extra.Count)
@@ -284,7 +294,7 @@ namespace DuetControlServer.Model
                             extraObj.Current = response.temps.extra[extra].temp;
                             extraObj.Name = response.temps.extra[extra].name;
                         }
-                        for (int extra = Provider.Get.Heat.Extra.Count; extra > response.temps.extra.Count; extra--)
+                        for (extra = Provider.Get.Heat.Extra.Count; extra > response.temps.extra.Count; extra--)
                         {
                             Provider.Get.Heat.Extra.RemoveAt(extra - 1);
                         }
@@ -354,9 +364,10 @@ namespace DuetControlServer.Model
                         Provider.Get.Network.Name = response.name;
 
                         // - Tools -
-                        Tool toolObj;
-                        for (int tool = 0; tool < response.tools.Count; tool++)
+                        int tool;
+                        for (tool = 0; tool < response.tools.Count; tool++)
                         {
+                            Tool toolObj;
                             if (tool >= Provider.Get.Tools.Count)
                             {
                                 toolObj = new Tool();
@@ -389,14 +400,14 @@ namespace DuetControlServer.Model
                             ListHelpers.SetList(toolObj.Fans, fanIndices);
                             ListHelpers.SetList(toolObj.Offsets, response.tools[tool].offsets);
                         }
-                        for (int tool = Provider.Get.Tools.Count; tool > response.tools.Count; tool--)
+                        for (tool = Provider.Get.Tools.Count; tool > response.tools.Count; tool--)
                         {
                             Utility.FilamentManager.ToolRemoved(Provider.Get.Tools[tool - 1]);
                             Provider.Get.Tools.RemoveAt(tool - 1);
                         }
                     }
 
-                    // Keep track of filaments. Deal with added tools here to avoid deadlocks
+                    // Notify FilamentManager about added tools. Deal with them here to avoid deadlocks
                     foreach (Tool toolObj in addedTools)
                     {
                         await Utility.FilamentManager.ToolAdded(toolObj);
@@ -491,12 +502,29 @@ namespace DuetControlServer.Model
                         }
 
                         // - Drives -
-                        for (int drive = 0; drive < Math.Min(Provider.Get.Move.Drives.Count, configResponse.accelerations.Count); drive++)
+                        int drive;
+                        for (drive = 0; drive < configResponse.accelerations.Count; drive++)
                         {
-                            Provider.Get.Move.Drives[drive].Acceleration = configResponse.accelerations[drive];
-                            Provider.Get.Move.Drives[drive].Current = configResponse.currents[drive];
-                            Provider.Get.Move.Drives[drive].MinSpeed = configResponse.minFeedrates[drive];
-                            Provider.Get.Move.Drives[drive].MaxSpeed = configResponse.maxFeedrates[drive];
+                            Drive driveObj;
+                            if (drive >= Provider.Get.Move.Drives.Count)
+                            {
+                                driveObj = new Drive();
+                                Provider.Get.Move.Drives.Add(driveObj);
+                            }
+                            else
+                            {
+                                driveObj = Provider.Get.Move.Drives[drive];
+                            }
+
+                            driveObj.Acceleration = configResponse.accelerations[drive];
+                            driveObj.Current = configResponse.currents[drive];
+                            driveObj.MinSpeed = configResponse.minFeedrates[drive];
+                            driveObj.MaxSpeed = configResponse.maxFeedrates[drive];
+                        }
+                        for (drive = Provider.Get.Move.Drives.Count; drive > configResponse.accelerations.Count; drive--)
+                        {
+                            Provider.Get.Move.Drives.RemoveAt(drive - 1);
+                            Provider.Get.Sensors.Endstops.RemoveAt(drive - 1);
                         }
 
                         // - Electronics -
@@ -556,25 +584,6 @@ namespace DuetControlServer.Model
                 'B' => MachineStatus.Busy,
                 'T' => MachineStatus.ChangingTool,
                 _ => MachineStatus.Idle,
-            };
-        }
-
-        // temporary - to be replaced with actual axis letter
-#warning FIXME this may not work for hidden axes
-        private static char GetAxisLetter(int axis)
-        {
-            return axis switch
-            {
-                0 => 'X',
-                1 => 'Y',
-                2 => 'Z',
-                3 => 'U',
-                4 => 'V',
-                5 => 'W',
-                6 => 'A',
-                7 => 'B',
-                8 => 'C',
-                _ => '?',
             };
         }
     }

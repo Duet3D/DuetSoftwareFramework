@@ -206,6 +206,10 @@ namespace DuetControlServer.SPI
         public static void SetPrintStopped(PrintStoppedReason stopReason)
         {
             _printStoppedReason = stopReason;
+            using (_channels[CodeChannel.File].Lock())
+            {
+                _channels[CodeChannel.File].InvalidateBuffer(false);
+            }
         }
 
         /// <summary>
@@ -700,7 +704,7 @@ namespace DuetControlServer.SPI
 
             if (abortAll && channel == CodeChannel.File)
             {
-                await Print.Cancel();
+                await Print.Abort();
             }
 
             _channels[channel].InvalidateBuffer(!abortAll);
@@ -825,7 +829,7 @@ namespace DuetControlServer.SPI
             bool outputMessage = Print.IsPrinting;
 
             // Cancel the file being printed
-            await Print.Cancel();
+            await Print.Abort();
 
             // Resolve pending macros, unbuffered (system) codes and flush requests
             foreach (ChannelInformation channel in _channels)

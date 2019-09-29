@@ -61,7 +61,7 @@ namespace DuetAPI.Utility
                 {
                     object diff = Attribute.IsDefined(property, typeof(JsonGrowingListAttribute))
                         ? DiffGrowingList((IList)valueA, (IList)valueB)
-                        : DiffList((IList)valueA, (IList)valueB);
+                        : DiffList((IList)valueA, (IList)valueB, property.PropertyType.GetGenericArguments().Single());
                     if (diff != null)
                     {
                         if (diffs == null)
@@ -102,12 +102,11 @@ namespace DuetAPI.Utility
             return diffs;
         }
 
-        private static object DiffList(IList a, IList b)
+        private static object DiffList(IList a, IList b, Type itemType)
         {
             bool hadDiffs = a.Count != b.Count;
             object[] diffs = new object[b.Count];
 
-            Type itemType = a.GetType().GetGenericArguments().Single();
             if (itemType.IsPrimitive || itemType.IsValueType)
             {
                 for (int i = 0; i < b.Count; i++)

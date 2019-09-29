@@ -53,7 +53,7 @@ namespace DuetControlServer.FileExecution
                 }
 
                 _file = new BaseFile(fileName, CodeChannel.File);
-                IsPaused = false;
+                IsPaused = IsAborted = false;
             }
 
             // Wait for all pending firmware codes on the source channel to finish first
@@ -139,14 +139,7 @@ namespace DuetControlServer.FileExecution
                 if (codes.TryDequeue(out code))
                 {
                     // Keep track of the next file position so we know where to resume in case the print is paused while a macro is being performed 
-                    if (codes.TryPeek(out Code nextCode))
-                    {
-                        LastFilePosition = nextCode.FilePosition;
-                    }
-                    else
-                    {
-                        LastFilePosition = file.Position;
-                    }
+                    LastFilePosition = (codes.TryPeek(out Code nextCode)) ? nextCode.FilePosition : file.Position;
 
                     // Wait the next code to finish
                     try
@@ -158,7 +151,8 @@ namespace DuetControlServer.FileExecution
                     {
                         if (!(e is OperationCanceledException))
                         {
-                            Console.WriteLine($"[err] {code} -> {e}");
+                            await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} threw an exception: [{e.GetType().Name}] {e.Message}");
+                            await Abort();
                         }
                     }
                 }
@@ -169,19 +163,34 @@ namespace DuetControlServer.FileExecution
                 }
             } while (!Program.CancelSource.IsCancellationRequested);
 
-            Console.WriteLine("[info] DCS has finished printing");
-
             // Update the last print filename
             using (await Model.Provider.AccessReadWriteAsync())
             {
+                Model.Provider.Get.Job.LastFileAborted = file.IsAborted && IsAborted;
+                Model.Provider.Get.Job.LastFileCancelled = file.IsAborted && !IsAborted;
                 Model.Provider.Get.Job.LastFileName = await FilePath.ToVirtualAsync(file.FileName);
                 // FIXME: Add support for simulation
             }
 
             // Notify the controller that the print has stopped
-            SPI.Communication.PrintStoppedReason stopReason = !file.IsAborted ? SPI.Communication.PrintStoppedReason.NormalCompletion
-                : (IsPaused ? SPI.Communication.PrintStoppedReason.UserCancelled : SPI.Communication.PrintStoppedReason.Abort);
-            SPI.Interface.SetPrintStopped(stopReason);
+            if (file.IsAborted)
+            {
+                Code.CancelPending(CodeChannel.File);
+                if (IsAborted)
+                {
+                    Console.WriteLine("[info] Aborted print");
+                    SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.Abort);
+                }
+                else
+                {
+                    Console.WriteLine("[info] Cancelled print");
+                    SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.UserCancelled);
+                }
+            }
+            {
+                Console.WriteLine("[info] Finished print");
+                SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.NormalCompletion);
+            }
 
             // Invalidate the file being printed
             _file = null;
@@ -215,6 +224,11 @@ namespace DuetControlServer.FileExecution
         /// Indicates if the file print has been paused
         /// </summary>
         public static bool IsPaused { get; private set; }
+
+        /// <summary>
+        /// Indicates if the file print has been aborted
+        /// </summary>
+        public static bool IsAborted { get; private set; }
 
         /// <summary>
         /// Called when the print is being paused
@@ -261,7 +275,7 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Called when the file print is supposed to be cancelled
+        /// Cancel the current print (e.g. when M0 is called)
         /// </summary>
         /// <returns>Asynchronous task</returns>
         public static async Task Cancel()
@@ -278,6 +292,28 @@ namespace DuetControlServer.FileExecution
                 {
                     Resume();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Abort the current print. This is called when the print could not complete as expected
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static async Task Abort()
+        {
+            using (await _lock.LockAsync())
+            {
+                if (_file != null)
+                {
+                    _file.Abort();
+                    _file = null;
+                }
+
+                if (IsPaused)
+                {
+                    Resume();
+                }
+                IsAborted = true;
             }
         }
     }

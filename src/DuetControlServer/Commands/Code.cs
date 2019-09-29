@@ -179,11 +179,19 @@ namespace DuetControlServer.Commands
                 Console.WriteLine($"[info] Processing {this}");
                 await Process();
             }
-            catch (OperationCanceledException)
+            catch (Exception e)
             {
                 // Cancelling a code clears the result
+                Result = null;
+                if (e is OperationCanceledException)
+                {
+                    Console.WriteLine($"[info] Cancelled {this}");
+                }
+                else
+                {
+                    Console.WriteLine($"[err] Code {this} caused an exception: {e}");
+                }
                 await CodeExecuted();
-                Console.WriteLine($"[info] Cancelled {this}");
                 throw;
             }
             finally
@@ -225,7 +233,7 @@ namespace DuetControlServer.Commands
                     }
                     catch (OperationCanceledException)
                     {
-                        // Cancelling a code clears the result
+                        // Deal with cancelled codes
                         await CodeExecuted();
                         Console.WriteLine($"[info] Cancelled {this}");
                         throw;

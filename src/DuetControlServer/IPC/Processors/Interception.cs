@@ -144,10 +144,8 @@ namespace DuetControlServer.IPC.Processors
                         BaseCommand command = await _commandQueue.TakeAsync(Program.CancelSource.Token);
 
                         // Code is cancelled. This invokes an OperationCanceledException on the code's task.
-                        // When a code is cancelled, its result is reset to null
                         if (command is Cancel)
                         {
-                            code.Result = null;
                             throw new OperationCanceledException();
                         }
 

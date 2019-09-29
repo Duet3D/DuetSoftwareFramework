@@ -48,7 +48,7 @@ namespace DuetControlServer.Commands
             catch (OperationCanceledException)
             {
                 // Report this code as cancelled
-                result = new CodeResult(DuetAPI.MessageType.Error, "Code has been cancelled");
+                result.Add(DuetAPI.MessageType.Error, "Code has been cancelled");
             }
 
             return result.ToString();

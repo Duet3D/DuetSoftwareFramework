@@ -141,11 +141,14 @@ namespace DuetAPI
         }
         private int? _numLayers;
 
-#pragma warning disable CA1819 // Properties should not return arrays
         /// <summary>
         /// Filament consumption per extruder drive (in mm)
         /// </summary>
-        public float[] Filament
+        /// <remarks>
+        /// Do NOT update items of this collection - replace it entirely instead.
+        /// This type will be replaced with an ObservableCollection as soon as JsonSerializer supports it.
+        /// </remarks>
+        public List<float> Filament
         {
             get => _filament;
             set
@@ -157,8 +160,7 @@ namespace DuetAPI
                 }
             }
         }
-        private float[] _filament = Array.Empty<float>();
-#pragma warning restore CA1819 // Properties should not return arrays
+        private List<float> _filament = new List<float>();
 
         /// <summary>
         /// Name of the application that generated this file

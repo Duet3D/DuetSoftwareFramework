@@ -35,7 +35,8 @@ namespace DuetControlServer.Model
                 // Wait for next update schedule
                 DateTime lastUpdateTime = DateTime.Now;
                 await Task.Delay(Settings.HostUpdateInterval, Program.CancelSource.Token);
-                if (DateTime.Now - lastUpdateTime > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 1000))
+                if (DateTime.Now - lastUpdateTime > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 1000) &&
+                    !System.Diagnostics.Debugger.IsAttached)
                 {
                     // System time has been changed - adjust date and time on the Duet
                     Console.WriteLine("[info] System time has been changed");

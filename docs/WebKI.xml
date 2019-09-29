@@ -670,6 +670,7 @@
   <HelpKINode Title="DuetAPI.Utility.JsonHelper class" Url="html/T_DuetAPI_Utility_JsonHelper.htm" />
   <HelpKINode Title="DuetAPI.Utility.JsonLowerCaseStringEnumConverter class" Url="html/T_DuetAPI_Utility_JsonLowerCaseStringEnumConverter.htm" />
   <HelpKINode Title="DuetAPI.Utility.JsonPatch class" Url="html/T_DuetAPI_Utility_JsonPatch.htm" />
+  <HelpKINode Title="DuetAPI.Utility.JsonRegexListConverter class" Url="html/T_DuetAPI_Utility_JsonRegexListConverter.htm" />
   <HelpKINode Title="DuetAPI.Utility.ListHelpers class" Url="html/T_DuetAPI_Utility_ListHelpers.htm" />
   <HelpKINode Title="DuetAPIClient namespace" Url="html/N_DuetAPIClient.htm" />
   <HelpKINode Title="DuetAPIClient.BaseCommandConnection class" Url="html/T_DuetAPIClient_BaseCommandConnection.htm" />
@@ -1177,6 +1178,8 @@
   <HelpKINode Title="Job.File property" Url="html/P_DuetAPI_Machine_Job_File.htm" />
   <HelpKINode Title="Job.FilePosition property" Url="html/P_DuetAPI_Machine_Job_FilePosition.htm" />
   <HelpKINode Title="Job.Job constructor" Url="html/M_DuetAPI_Machine_Job__ctor.htm" />
+  <HelpKINode Title="Job.LastFileAborted property" Url="html/P_DuetAPI_Machine_Job_LastFileAborted.htm" />
+  <HelpKINode Title="Job.LastFileCancelled property" Url="html/P_DuetAPI_Machine_Job_LastFileCancelled.htm" />
   <HelpKINode Title="Job.LastFileName property" Url="html/P_DuetAPI_Machine_Job_LastFileName.htm" />
   <HelpKINode Title="Job.LastFileSimulated property" Url="html/P_DuetAPI_Machine_Job_LastFileSimulated.htm" />
   <HelpKINode Title="Job.Layer property" Url="html/P_DuetAPI_Machine_Job_Layer.htm" />
@@ -1230,6 +1233,14 @@
   <HelpKINode Title="JsonPatch.Diff(Of T) method" Url="html/M_DuetAPI_Utility_JsonPatch_Diff__1.htm" />
   <HelpKINode Title="JsonPatch.Diff&lt;T&gt; method" Url="html/M_DuetAPI_Utility_JsonPatch_Diff__1.htm" />
   <HelpKINode Title="JsonPatch.Patch method" Url="html/M_DuetAPI_Utility_JsonPatch_Patch.htm" />
+  <HelpKINode Title="JsonRegexListConverter class">
+    <HelpKINode Title="JsonRegexListConverter Class" Url="html/T_DuetAPI_Utility_JsonRegexListConverter.htm" />
+    <HelpKINode Title="constructor" Url="html/M_DuetAPI_Utility_JsonRegexListConverter__ctor.htm" />
+    <HelpKINode Title="methods" Url="html/Methods_T_DuetAPI_Utility_JsonRegexListConverter.htm" />
+  </HelpKINode>
+  <HelpKINode Title="JsonRegexListConverter.JsonRegexListConverter constructor" Url="html/M_DuetAPI_Utility_JsonRegexListConverter__ctor.htm" />
+  <HelpKINode Title="JsonRegexListConverter.Read method" Url="html/M_DuetAPI_Utility_JsonRegexListConverter_Read.htm" />
+  <HelpKINode Title="JsonRegexListConverter.Write method" Url="html/M_DuetAPI_Utility_JsonRegexListConverter_Write.htm" />
   <HelpKINode Title="Keyword property" Url="html/P_DuetAPI_Commands_Code_Keyword.htm" />
   <HelpKINode Title="KeywordArgument property" Url="html/P_DuetAPI_Commands_Code_KeywordArgument.htm" />
   <HelpKINode Title="KeywordType enumeration" Url="html/T_DuetAPI_Commands_KeywordType.htm" />
@@ -1249,6 +1260,8 @@
   <HelpKINode Title="Laser.PropertyChanged event" Url="html/E_DuetAPI_Machine_Laser_PropertyChanged.htm" />
   <HelpKINode Title="Laser.RequestedPwm property" Url="html/P_DuetAPI_Machine_Laser_RequestedPwm.htm" />
   <HelpKINode Title="Lasers property" Url="html/P_DuetAPI_Machine_MachineModel_Lasers.htm" />
+  <HelpKINode Title="LastFileAborted property" Url="html/P_DuetAPI_Machine_Job_LastFileAborted.htm" />
+  <HelpKINode Title="LastFileCancelled property" Url="html/P_DuetAPI_Machine_Job_LastFileCancelled.htm" />
   <HelpKINode Title="LastFileName property" Url="html/P_DuetAPI_Machine_Job_LastFileName.htm" />
   <HelpKINode Title="LastFileSimulated property" Url="html/P_DuetAPI_Machine_Job_LastFileSimulated.htm" />
   <HelpKINode Title="LastModified property" Url="html/P_DuetAPI_ParsedFileInfo_LastModified.htm" />
@@ -1687,6 +1700,7 @@
     <HelpKINode Title="GeometryTypeConverter.Read Method " Url="html/M_DuetAPI_Machine_GeometryTypeConverter_Read.htm" />
     <HelpKINode Title="JsonCharEnumConverter.Read Method " Url="html/M_DuetAPI_Utility_JsonCharEnumConverter_Read.htm" />
     <HelpKINode Title="JsonLowerCaseStringEnumConverter.Read Method " Url="html/M_DuetAPI_Utility_JsonLowerCaseStringEnumConverter_Read.htm" />
+    <HelpKINode Title="JsonRegexListConverter.Read Method " Url="html/M_DuetAPI_Utility_JsonRegexListConverter_Read.htm" />
   </HelpKINode>
   <HelpKINode Title="Receive(Of T) method" Url="html/M_DuetAPIClient_BaseConnection_Receive__1.htm" />
   <HelpKINode Title="Receive&lt;T&gt; method" Url="html/M_DuetAPIClient_BaseConnection_Receive__1.htm" />
@@ -2085,6 +2099,7 @@
     <HelpKINode Title="GeometryTypeConverter.Write Method " Url="html/M_DuetAPI_Machine_GeometryTypeConverter_Write.htm" />
     <HelpKINode Title="JsonCharEnumConverter.Write Method " Url="html/M_DuetAPI_Utility_JsonCharEnumConverter_Write.htm" />
     <HelpKINode Title="JsonLowerCaseStringEnumConverter.Write Method " Url="html/M_DuetAPI_Utility_JsonLowerCaseStringEnumConverter_Write.htm" />
+    <HelpKINode Title="JsonRegexListConverter.Write Method " Url="html/M_DuetAPI_Utility_JsonRegexListConverter_Write.htm" />
   </HelpKINode>
   <HelpKINode Title="WriteMessage class">
     <HelpKINode Title="WriteMessage Class" Url="html/T_DuetAPI_Commands_WriteMessage.htm" />

@@ -209,7 +209,7 @@ namespace DuetUnitTest.SPI
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
-            
+
             ParsedFileInfo info = new ParsedFileInfo
             {
                 Size = 452432,
@@ -219,7 +219,7 @@ namespace DuetUnitTest.SPI
                 Height = 53.4F,
                 LastModified = new DateTime(2014, 11, 23),
                 NumLayers = 343,
-                Filament = new float[] { 123.45F, 678.9F },
+                Filament = new List<float> { 123.45F, 678.9F },
                 LayerHeight = 0.2F,
                 PrintTime = 12355,
                 SimulatedTime = 10323

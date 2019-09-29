@@ -226,8 +226,8 @@ namespace DuetControlServer.SPI
                 // If there is any, start executing it in the background. An interceptor may also generate extra codes
                 if (code != null)
                 {
-                    // Note that Code.Enqueue is not used here to avoid potential deadlocks that would occur when
-                    // firmware calls (e.g. load heightmap) are made while the code is being enqueued
+                    // Note the following code is executed asynchronously to avoid potential deadlocks that would occur when
+                    // SPI data is awaited (e.g. heightmap queries) by the following code
                     queuedCode = new QueuedCode(code);
                     NestedMacroCodes.Enqueue(queuedCode);
                     _ = Task.Run(async () =>

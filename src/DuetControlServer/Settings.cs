@@ -1,8 +1,10 @@
-﻿using System;
+﻿using DuetAPI.Utility;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace DuetControlServer
@@ -53,12 +55,12 @@ namespace DuetControlServer
         /// <summary>
         /// SPI device that is connected to RepRapFirmware
         /// </summary>
-        public static string SpiDevice = "/dev/spidev0.0";
+        public static string SpiDevice { get; set; } = "/dev/spidev0.0";
 
         /// <summary>
         /// Frequency to use for SPI transfers
         /// </summary>
-        public static int SpiFrequency = 2_000_000;
+        public static int SpiFrequency { get; set; } = 2_000_000;
 
         /// <summary>
         /// Maximum allowed delay between data exchanges during a full transfer (in ms)
@@ -172,10 +174,10 @@ namespace DuetControlServer
         };
 
         /// <summary>
-        /// Load settings from the config file or create it if it does not already exist
+        /// Initialize settings and load them from the config file or create it if it does not exist
         /// </summary>
         /// <param name="args">Command-line arguments</param>
-        internal static void Load(string[] args)
+        internal static void Init(string[] args)
         {
             // Attempt to parse the config file path from the command-line arguments
             string lastArg = null, config = DefaultConfigFile;
@@ -192,17 +194,7 @@ namespace DuetControlServer
             // See if the file exists and attempt to load the settings from it, otherwise create it
             if (File.Exists(config))
             {
-                using FileStream fileStream = new FileStream(config, FileMode.Open, FileAccess.Read);
-                using JsonDocument jsonDoc = JsonDocument.Parse(fileStream);
-
-                foreach (PropertyInfo property in typeof(Settings).GetProperties(BindingFlags.Public))
-                {
-                    if (jsonDoc.RootElement.TryGetProperty(property.Name, out JsonElement element))
-                    {
-                        object newValue = JsonSerializer.Deserialize(element.GetRawText(), property.PropertyType);
-                        property.SetValue(null, newValue);
-                    }
-                }
+                LoadFromFile(config);
 
                 if (MaxBufferSpacePerChannel < SPI.Communication.Consts.MaxCodeBufferSize)
                 {
@@ -211,9 +203,7 @@ namespace DuetControlServer
             }
             else
             {
-                using FileStream fileStream = new FileStream(config, FileMode.Create, FileAccess.Write);
-                byte[] content = JsonSerializer.SerializeToUtf8Bytes(null, typeof(Settings));
-                fileStream.Write(content);
+                SaveToFile(config);
             }
             
             // Parse other command-line parameters
@@ -243,6 +233,134 @@ namespace DuetControlServer
                 }
                 lastArg = arg;
             }
+        }
+
+        private static void LoadFromFile(string fileName)
+        {
+            byte[] content;
+            using (FileStream fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read))
+            {
+                content = new byte[fileStream.Length];
+                fileStream.Read(content, 0, (int)fileStream.Length);
+            }
+
+            Utf8JsonReader reader = new Utf8JsonReader(content);
+            PropertyInfo property = null;
+            while (reader.Read())
+            {
+                switch (reader.TokenType)
+                {
+                    case JsonTokenType.PropertyName:
+                        string propertyName = reader.GetString();
+                        property = typeof(Settings).GetProperty(propertyName, BindingFlags.Static | BindingFlags.Public | BindingFlags.IgnoreCase);
+                        if (property == null || !Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
+                        {
+                            // Skip non-existent and ignored properties
+                            if (reader.Read())
+                            {
+                                if (reader.TokenType == JsonTokenType.StartArray)
+                                {
+                                    while (reader.Read() && reader.TokenType != JsonTokenType.EndArray) { }
+                                }
+                                else if (reader.TokenType == JsonTokenType.StartObject)
+                                {
+                                    while (reader.Read() && reader.TokenType != JsonTokenType.EndObject) { }
+                                }
+                            }
+                        }
+                        break;
+
+                    case JsonTokenType.Number:
+                        if (property.PropertyType == typeof(int))
+                        {
+                            property.SetValue(null, reader.GetInt32());
+                        }
+                        else if (property.PropertyType == typeof(uint))
+                        {
+                            property.SetValue(null, reader.GetUInt32());
+                        }
+                        else if (property.PropertyType == typeof(float))
+                        {
+                            property.SetValue(null, reader.GetSingle());
+                        }
+                        else if (property.PropertyType == typeof(double))
+                        {
+                            property.SetValue(null, reader.GetDouble());
+                        }
+                        else
+                        {
+                            throw new JsonException($"Bad number type: {property.PropertyType.Name}");
+                        }
+                        break;
+
+                    case JsonTokenType.String:
+                        if (property.PropertyType == typeof(string))
+                        {
+                            property.SetValue(null, reader.GetString());
+                        }
+                        else
+                        {
+                            throw new JsonException($"Bad string type: {property.PropertyType.Name}");
+                        }
+                        break;
+
+                    case JsonTokenType.StartArray:
+                        if (property.PropertyType == typeof(List<Regex>))
+                        {
+                            JsonRegexListConverter regexListConverter = new JsonRegexListConverter();
+                            property.SetValue(null, regexListConverter.Read(ref reader, typeof(List<Regex>), null));
+                        }
+                        else
+                        {
+                            throw new JsonException($"Bad list type: {property.PropertyType.Name}");
+                        }
+                        break;
+                }
+            }
+        }
+
+        private static void SaveToFile(string fileName)
+        {
+            using FileStream fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write);
+            using Utf8JsonWriter writer = new Utf8JsonWriter(fileStream, new JsonWriterOptions() { Indented = true });
+
+            writer.WriteStartObject();
+            foreach (PropertyInfo property in typeof(Settings).GetProperties(BindingFlags.Static | BindingFlags.Public))
+            {
+                object value = property.GetValue(null);
+                if (value is string stringValue)
+                {
+                    writer.WriteString(property.Name, stringValue);
+                }
+                else if (value is int intValue)
+                {
+                    writer.WriteNumber(property.Name, intValue);
+                }
+                else if (value is uint uintValue)
+                {
+                    writer.WriteNumber(property.Name, uintValue);
+                }
+                else if (value is float floatValue)
+                {
+                    writer.WriteNumber(property.Name, floatValue);
+                }
+                else if (value is double doubleValue)
+                {
+                    writer.WriteNumber(property.Name, doubleValue);
+                }
+                else if (value is List<Regex> regexList)
+                {
+                    writer.WritePropertyName(property.Name);
+
+                    JsonRegexListConverter regexListConverter = new JsonRegexListConverter();
+                    regexListConverter.Write(writer, regexList, null);
+                }
+                else
+                {
+                    throw new JsonException($"Unknown value type {property.PropertyType.Name}");
+                }
+            }
+            writer.WriteEndObject();
         }
     }
 }

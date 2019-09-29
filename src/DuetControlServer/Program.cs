@@ -64,7 +64,7 @@ namespace DuetControlServer
             Write("Loading settings... ");
             try
             {
-                Settings.Load(args);
+                Settings.Init(args);
                 WriteLine("Done!");
             }
             catch (Exception e)

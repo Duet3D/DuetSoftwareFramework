@@ -344,6 +344,11 @@
             Indicates if the file print has been paused
             </summary>
         </member>
+        <member name="P:DuetControlServer.FileExecution.Print.IsAborted">
+            <summary>
+            Indicates if the file print has been aborted
+            </summary>
+        </member>
         <member name="M:DuetControlServer.FileExecution.Print.Pause">
             <summary>
             Called when the print is being paused
@@ -364,7 +369,13 @@
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Cancel">
             <summary>
-            Called when the file print is supposed to be cancelled
+            Cancel the current print (e.g. when M0 is called)
+            </summary>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.Print.Abort">
+            <summary>
+            Abort the current print. This is called when the print could not complete as expected
             </summary>
             <returns>Asynchronous task</returns>
         </member>
@@ -825,12 +836,12 @@
             Note that messages are only cleared when the host update task runs.
             </summary>
         </member>
-        <member name="F:DuetControlServer.Settings.SpiDevice">
+        <member name="P:DuetControlServer.Settings.SpiDevice">
             <summary>
             SPI device that is connected to RepRapFirmware
             </summary>
         </member>
-        <member name="F:DuetControlServer.Settings.SpiFrequency">
+        <member name="P:DuetControlServer.Settings.SpiFrequency">
             <summary>
             Frequency to use for SPI transfers
             </summary>
@@ -916,9 +927,9 @@
             Regular expressions for finding the simulated time
             </summary>
         </member>
-        <member name="M:DuetControlServer.Settings.Load(System.String[])">
+        <member name="M:DuetControlServer.Settings.Init(System.String[])">
             <summary>
-            Load settings from the config file or create it if it does not already exist
+            Initialize settings and load them from the config file or create it if it does not exist
             </summary>
             <param name="args">Command-line arguments</param>
         </member>

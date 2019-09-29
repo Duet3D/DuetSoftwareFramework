@@ -1870,10 +1870,21 @@
             Name of the last file processed or null if none
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Job.LastFileAborted">
+            <summary>
+            Indicates if the last file was aborted (unexpected cancellation)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.LastFileCancelled">
+            <summary>
+            Indicates if the last file was cancelled (user cancelled)
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Job.LastFileSimulated">
             <summary>
             Indicates if the last file processed was simulated
             </summary>
+            <remarks>This is not set if the file was aborted or cancelled</remarks>
         </member>
         <member name="P:DuetAPI.Machine.Job.ExtrudedRaw">
             <summary>
@@ -3835,6 +3846,10 @@
             <summary>
             Filament consumption per extruder drive (in mm)
             </summary>
+            <remarks>
+            Do NOT update items of this collection - replace it entirely instead.
+            This type will be replaced with an ObservableCollection as soon as JsonSerializer supports it.
+            </remarks>
         </member>
         <member name="P:DuetAPI.ParsedFileInfo.GeneratedBy">
             <summary>
@@ -4010,6 +4025,32 @@
             <summary>
             Creates a new instance of this type
             </summary>
+        </member>
+        <member name="T:DuetAPI.Utility.JsonRegexListConverter">
+            <summary>
+            JSON converter to read and write a list of regular expressions
+            </summary>
+            <remarks>
+            This class may become obsolete in a future .NET Core version.
+            For some reason it has no effect to add this converter to the default JSON options.
+            </remarks>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonRegexListConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Read a Regex list from JSON
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="typeToConvert">Type to convert</param>
+            <param name="options">Reader options</param>
+            <returns>Read value</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonRegexListConverter.Write(System.Text.Json.Utf8JsonWriter,System.Collections.Generic.List{System.Text.RegularExpressions.Regex},System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Write a Regex list to JSON
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="value">Value to serialize</param>
+            <param name="options">Write options</param>
         </member>
         <member name="T:DuetAPI.Utility.JsonHelper">
             <summary>
