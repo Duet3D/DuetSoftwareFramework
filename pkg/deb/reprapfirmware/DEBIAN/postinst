@@ -1,8 +1,10 @@
 #!/bin/sh
 
 # Instruct DuetControlServer to update the firmware.
-# Do this only if GPIO and SPI devices are available
-GPIOCHIP_DEVICES=ls /dev/gpiochip 2>/dev/null
-SPI_DEVICES=ls /dev/spidev 2>/dev/null
-[ ! -z $GPIPCHIP_DEVICES ] && [ ! -z $SPI_DEVICES ] && /opt/dsf/bin/DuetControlServer -u
+# Do this only if GPIO and SPI nodes are available in SysFS
+if [ -e /opt/dsf/bin/DuetControlServer ] && [ -d /sys/class/gpio ] && [ -d /sys/module/spidev ]; then
+	/opt/dsf/bin/DuetControlServer -u
+else
+	echo "Skipping RepRapFirmware auto-update because no DCS, GPIO and/or SPI devices could be detected"
+fi
 exit 0

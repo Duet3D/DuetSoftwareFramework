@@ -7,10 +7,11 @@
   "Kestrel": {
     "Endpoints": {
       "Http": {
-        "Url": "http://0.0.0.0"
+        "Url": "http://*"
       }
     }
   },
+  "KeepAliveInterval": 30,
   "UseCors": true,
   "UseStaticFiles": true,
   "SocketPath": "/var/run/duet.sock"

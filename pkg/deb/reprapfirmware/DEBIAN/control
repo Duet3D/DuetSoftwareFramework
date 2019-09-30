@@ -1,7 +1,7 @@
 Package: reprapfirmware
-Version: DCSVER-1
+Version: VERSION
 Architecture: all
-Depends: duetcontrolserver (>= 1.0.3.4), duetsd
+Depends: duetcontrolserver (>= 1.0.3.4), duetsd (>= 1.0.4)
 Priority: standard
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com

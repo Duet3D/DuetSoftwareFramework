@@ -142,13 +142,15 @@ build_progs() {
 	mv $DEST_DIR/files/web.config $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duettools_$dcsver/
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $TOP_DIR/examples/CodeConsole/CodeConsole.csproj
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $TOP_DIR/examples/CodeLogger/CodeLogger.csproj
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CodeConsole/CodeConsole.csproj
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CodeLogger/CodeLogger.csproj
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/ModelObserver/ModelObserver.csproj
 	mkdir -p $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	[ -d $COMMON_DIR/duettools/ ] && $RSYNC $COMMON_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
 	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
 	mv $DEST_DIR/files/CodeConsole* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	mv $DEST_DIR/files/CodeLogger* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
+	mv $DEST_DIR/files/ModelObserver* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duetruntime_$dcsver
 	mkdir -p $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin
@@ -180,7 +182,7 @@ build_dwc() {
 		echo "- Using existing repository in $DEST_DIR/DuetWebControl"
 	fi
 
-	dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)-5
+	dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)-6
 	>/dev/null pushd $DEST_DIR/DuetWebControl
 
 	echo "- Installing dependencies..."
