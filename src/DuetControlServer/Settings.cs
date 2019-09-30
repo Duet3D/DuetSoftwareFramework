@@ -253,7 +253,7 @@ namespace DuetControlServer
                     case JsonTokenType.PropertyName:
                         string propertyName = reader.GetString();
                         property = typeof(Settings).GetProperty(propertyName, BindingFlags.Static | BindingFlags.Public | BindingFlags.IgnoreCase);
-                        if (property == null || !Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
+                        if (property == null || Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
                         {
                             // Skip non-existent and ignored properties
                             if (reader.Read())
