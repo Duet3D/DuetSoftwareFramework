@@ -450,14 +450,13 @@ namespace DuetControlServer.SPI
                             Console.WriteLine("[err] Read invalid packet");
                             break;
                         }
+                        await ProcessPacket(packet.Value);
                     }
                     catch (ArgumentOutOfRangeException)
                     {
                         DataTransfer.DumpMalformedPacket();
                         throw;
                     }
-
-                    await ProcessPacket(packet.Value);
                 }
                 _bytesReserved = 0;
 
@@ -470,7 +469,7 @@ namespace DuetControlServer.SPI
                     {
                         using (channel.Lock())
                         {
-                            if (!channel.IsBusy)
+                            if (!channel.IsBlocked)
                             {
                                 if (channel.ProcessRequests())
                                 {
@@ -480,7 +479,7 @@ namespace DuetControlServer.SPI
                                 else
                                 {
                                     // Cannot do any more on this channel
-                                    channel.IsBusy = true;
+                                    channel.IsBlocked = true;
                                 }
                             }
                         }
@@ -507,7 +506,7 @@ namespace DuetControlServer.SPI
 
                 // Do another full SPI transfer
                 DataTransfer.PerformFullTransfer();
-                _channels.ResetBusyChannels();
+                _channels.ResetBlockedChannels();
 
                 // Wait a moment
                 await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);

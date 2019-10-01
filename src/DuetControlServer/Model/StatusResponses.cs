@@ -26,7 +26,7 @@ namespace DuetControlServer.Model
         public string title { get; set; }
         public int mode { get; set; }
         public int seq { get; set; }
-        public float timeout { get; set; }
+        //public float timeout { get; set; }
         public int controls { get; set; }
     }
 
@@ -103,7 +103,7 @@ namespace DuetControlServer.Model
         public Params @params { get; set; }
         public Sensors sensors { get; set; }
         public Temps temps { get; set; }
-        public float time { get; set; }
+        //public float time { get; set; }
     }
 
     public class ProbeItem

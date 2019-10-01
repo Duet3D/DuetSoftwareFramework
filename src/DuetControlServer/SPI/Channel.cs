@@ -35,7 +35,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Indicates if this channel is blocked until the next full transfer
         /// </summary>
-        public bool IsBusy { get; set; }
+        public bool IsBlocked { get; set; }
 
         /// <summary>
         /// Lock used when accessing this instance
@@ -189,7 +189,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Block this channel until every priority code is gone
-                IsBusy = true;
+                IsBlocked = true;
             }
                 
             // 2. Suspended codes being resumed (may include suspended codes from nested macros)
@@ -226,8 +226,8 @@ namespace DuetControlServer.SPI
                 // If there is any, start executing it in the background. An interceptor may also generate extra codes
                 if (code != null)
                 {
-                    // Note the following code is executed asynchronously to avoid potential deadlocks that would occur when
-                    // SPI data is awaited (e.g. heightmap queries) by the following code
+                    // Note that the following code is executed asynchronously to avoid potential
+                    // deadlocks which would occur when SPI data is awaited (e.g. heightmap queries)
                     queuedCode = new QueuedCode(code);
                     NestedMacroCodes.Enqueue(queuedCode);
                     _ = Task.Run(async () =>
@@ -572,7 +572,7 @@ namespace DuetControlServer.SPI
             }
 
             // Do not send codes to RRF until it has cleared its internal buffer
-            IsBusy = true;
+            IsBlocked = true;
         }
 
         /// <summary>
@@ -617,7 +617,7 @@ namespace DuetControlServer.SPI
             SuspendedCodes.Push(suspendedItems);
 
             // Do not send codes to RRF until it has cleared its internal buffer
-            IsBusy = true;
+            IsBlocked = true;
         }
 
         /// <summary>
@@ -709,7 +709,7 @@ namespace DuetControlServer.SPI
             }
             BufferedCodes.Clear();
 
-            IsBusy = true;
+            IsBlocked = true;
             BytesBuffered = 0;
 
             return resourceInvalidated;
@@ -751,11 +751,11 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Reset busy channels
         /// </summary>
-        public void ResetBusyChannels()
+        public void ResetBlockedChannels()
         {
             foreach (ChannelInformation channel in _channels)
             {
-                channel.IsBusy = false;
+                channel.IsBlocked = false;
             }
         }
 

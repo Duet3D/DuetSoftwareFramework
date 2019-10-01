@@ -73,7 +73,7 @@ namespace DuetControlServer
         public static int MaxSpiRetries { get; set; } = 3;
 
         /// <summary>
-        /// Time to wait after every transfer (in ms)
+        /// Time to wait after every full transfer (in ms)
         /// </summary>
         public static int SpiPollDelay { get; set; } = 25;
 
@@ -100,7 +100,7 @@ namespace DuetControlServer
         /// <summary>
         /// Maximum space of buffered codes per channel (in bytes). Must be greater than <see cref="SPI.Communication.Consts.MaxCodeBufferSize"/>
         /// </summary>
-        public static int MaxBufferSpacePerChannel { get; set; } = 768;
+        public static int MaxBufferSpacePerChannel { get; set; } = 1536;
 
         /// <summary>
         /// Interval of regular status updates (in ms)

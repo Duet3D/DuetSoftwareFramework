@@ -58,8 +58,7 @@ namespace DuetControlServer.Codes
         /// <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
         public static async Task CodeExecuted(Code code)
         {
-            // Only process successfully finished code results
-            if (code.Result == null || !code.Result.IsSuccessful)
+            if (!code.Result.IsSuccessful)
             {
                 return;
             }

@@ -151,6 +151,7 @@ namespace DuetControlServer.FileExecution
                     {
                         if (!(e is OperationCanceledException))
                         {
+                            Console.WriteLine($"[err] {e}");
                             await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} threw an exception: [{e.GetType().Name}] {e.Message}");
                             await Abort();
                         }
@@ -187,6 +188,7 @@ namespace DuetControlServer.FileExecution
                     SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.UserCancelled);
                 }
             }
+            else
             {
                 Console.WriteLine("[info] Finished print");
                 SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.NormalCompletion);

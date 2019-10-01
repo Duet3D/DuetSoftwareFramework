@@ -327,43 +327,46 @@ namespace DuetControlServer.Commands
             // Start the next code if that hasn't happened yet
             StartNextCode();
 
-            // Process code result
-            switch (Type)
+            if (Result != null)
             {
-                case CodeType.GCode:
-                    await GCodes.CodeExecuted(this);
-                    break;
-
-                case CodeType.MCode:
-                    await MCodes.CodeExecuted(this);
-                    break;
-
-                case CodeType.TCode:
-                    await TCodes.CodeExecuted(this);
-                    break;
-            }
-
-            // RepRapFirmware generally prefixes error messages with the code itself.
-            // Do this only for error messages that originate either from a print or from a macro file
-            if (Flags.HasFlag(CodeFlags.IsFromMacro) || Channel == CodeChannel.File)
-            {
-                foreach (Message msg in Result)
+                // Process the code result
+                switch (Type)
                 {
-                    if (msg.Type == MessageType.Error)
+                    case CodeType.GCode:
+                        await GCodes.CodeExecuted(this);
+                        break;
+
+                    case CodeType.MCode:
+                        await MCodes.CodeExecuted(this);
+                        break;
+
+                    case CodeType.TCode:
+                        await TCodes.CodeExecuted(this);
+                        break;
+                }
+
+                // RepRapFirmware generally prefixes error messages with the code itself.
+                // Do this only for error messages that originate either from a print or from a macro file
+                if (Flags.HasFlag(CodeFlags.IsFromMacro) || Channel == CodeChannel.File)
+                {
+                    foreach (Message msg in Result)
                     {
-                        msg.Content = ToShortString() + ": " + msg.Content;
+                        if (msg.Type == MessageType.Error)
+                        {
+                            msg.Content = ToShortString() + ": " + msg.Content;
+                        }
                     }
                 }
-            }
 
-            // Log warning and error replies after the code has been processed internally
-            if (InternallyProcessed && Result != null)
-            {
-                foreach (Message msg in Result)
+                // Log warning and error replies after the code has been processed internally
+                if (InternallyProcessed)
                 {
-                    if (msg.Type != MessageType.Success || Channel == CodeChannel.File)
+                    foreach (Message msg in Result)
                     {
-                        await Utility.Logger.Log(msg);
+                        if (msg.Type != MessageType.Success && Channel != CodeChannel.File)
+                        {
+                            await Utility.Logger.Log(msg);
+                        }
                     }
                 }
             }

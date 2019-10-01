@@ -755,12 +755,17 @@
         </member>
         <member name="M:DuetControlServer.Model.Updater.MergeData(System.Byte,System.Byte[])">
             <summary>
-            Merge received data into the object model.
-            This code is temporary and will be replaced once the new object is finished
+            Merge received data into the object model
             </summary>
             <param name="module">Module that is supposed to be merged</param>
             <param name="json">JSON data</param>
             <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.Model.Updater.ProcessUpdates">
+            <summary>
+            Process status updates in the background
+            </summary>
+            <returns></returns>
         </member>
         <member name="T:DuetControlServer.Model.UpdateTask">
             <summary>
@@ -858,7 +863,7 @@
         </member>
         <member name="P:DuetControlServer.Settings.SpiPollDelay">
             <summary>
-            Time to wait after every transfer (in ms)
+            Time to wait after every full transfer (in ms)
             </summary>
         </member>
         <member name="P:DuetControlServer.Settings.GpioChipDevice">
@@ -949,7 +954,7 @@
             What code channel this class is about
             </summary>
         </member>
-        <member name="P:DuetControlServer.SPI.ChannelInformation.IsBusy">
+        <member name="P:DuetControlServer.SPI.ChannelInformation.IsBlocked">
             <summary>
             Indicates if this channel is blocked until the next full transfer
             </summary>
@@ -1102,7 +1107,7 @@
             <param name="channel">Channel to retrieve information about</param>
             <returns>Information about the code channel</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.ChannelStore.ResetBusyChannels">
+        <member name="M:DuetControlServer.SPI.ChannelStore.ResetBlockedChannels">
             <summary>
             Reset busy channels
             </summary>

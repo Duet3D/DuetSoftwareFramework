@@ -160,8 +160,9 @@ namespace DuetControlServer
             // Start main tasks in the background
             Task spiTask = Task.Run(SPI.Interface.Run, CancelSource.Token);
             Task ipcTask = Task.Run(Server.AcceptConnections, CancelSource.Token);
-            Task modelUpdateTask = Task.Run(Model.UpdateTask.UpdatePeriodically, CancelSource.Token);
-            Task[] taskList = { spiTask, ipcTask, modelUpdateTask };
+            Task updateTask = Task.Run(Model.Updater.ProcessUpdates, CancelSource.Token);
+            Task periodicUpdateTask = Task.Run(Model.UpdateTask.UpdatePeriodically, CancelSource.Token);
+            Task[] taskList = { spiTask, ipcTask, updateTask, periodicUpdateTask };
 
             // Deal with program termination requests (SIGTERM) and wait for program termination
             AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) =>
@@ -185,7 +186,8 @@ namespace DuetControlServer
                 Console.Write("[crit] Abnormal program termination: ");
                 if (spiTask.IsCompleted) { Console.WriteLine("SPI task terminated");  }
                 if (ipcTask.IsCompleted) { Console.WriteLine("IPC task terminated");  }
-                if (modelUpdateTask.IsCompleted) { Console.WriteLine("Model task terminated"); }
+                if (updateTask.IsCompleted) { Console.WriteLine("Update task terminated"); }
+                if (periodicUpdateTask.IsCompleted) { Console.WriteLine("Periodic update task terminated"); }
                 CancelSource.Cancel();
             }
 
