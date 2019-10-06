@@ -315,6 +315,7 @@ namespace DuetControlServer.Codes
                             {
                                 await SPI.Interface.SetHeightmap(map);
                                 await SPI.Interface.UnlockAll(code.Channel);
+                                return new CodeResult(DuetAPI.MessageType.Success, $"Height map loaded from file {file}");
                             }
                         }
                         catch (AggregateException ae)
