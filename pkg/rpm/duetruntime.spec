@@ -10,7 +10,7 @@
 
 Name:    duetruntime
 Version: %{_tversion}
-Release: 900
+Release: 901
 Summary: DSF Common Runtime Components
 Group:   3D Printing
 Source0: duetruntime_%{_tversion}
@@ -32,32 +32,6 @@ DSF Common Runtime Components
 rsync -vaH %{S:0}/. %{buildroot}/
 
 %files
-%defattr(-,root,root,-)
-%{dsfoptdir}/bin/Zhaobang.IO.SeekableStreamReader.dll
-%{dsfoptdir}/bin/System.*
-%{dsfoptdir}/bin/Nito.*
-%{dsfoptdir}/bin/Newtonsoft.*
-%{dsfoptdir}/bin/netstandard.dll
-%{dsfoptdir}/bin/Microsoft.*
-%{dsfoptdir}/bin/LinuxDevices.*
-%{dsfoptdir}/bin/libclrjit.so
-%{dsfoptdir}/bin/libcoreclr.so
-%{dsfoptdir}/bin/libhostfxr.so
-%{dsfoptdir}/bin/libhostpolicy.so
-%{dsfoptdir}/bin/DuetAPI.*
-%{dsfoptdir}/bin/DuetAPIClient.*
-
-%{dsfoptdir}/bin/WindowsBase.dll
-%{dsfoptdir}/bin/SOS.NETCore.dll
-%{dsfoptdir}/bin/sosdocsunix.txt
-%{dsfoptdir}/bin/mscorlib.dll
-%{dsfoptdir}/bin/libsos.so
-%{dsfoptdir}/bin/libmscordbi.so
-%{dsfoptdir}/bin/libmscordaccore.so
-%{dsfoptdir}/bin/libdbgshim.so
-%{dsfoptdir}/bin/libcoreclrtraceptprovider.so
-%{dsfoptdir}/bin/Remotion.Linq.dll
-
-%if %{?_build_type} == "Debug"
-%{dsfoptdir}/bin/libsosplugin.so
-%endif
+%defattr(0644,root,root,-)
+%{dsfoptdir}/bin/*
+%attr(0755,root,root) %{dsfoptdir}/bin/createdump

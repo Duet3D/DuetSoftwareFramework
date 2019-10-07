@@ -78,7 +78,7 @@ sdver=$(cat $PKG_DIR/deb/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
 export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
 
 case $TARGET_ARCH in
-	armhf|armhfp|arm|armv6h|armv7h) DOTNET_ARCH=linux-arm ;;
+	armhf|armhfp|arm|armv6h|armv7h|armv7hl) DOTNET_ARCH=linux-arm ;;
 	arm64|aarch64) DOTNET_ARCH=linux-arm64 ;;
 	x86_64) DOTNET_ARCH=linux-x64 ;;
 	i386|i686|x86_32)  DOTNET_ARCH=linux-x86 ;;
@@ -163,6 +163,10 @@ build_sd() {
 	echo "Building virtual SD card package v$sdver..."
 	rm -rf $DEST_DIR/duetsd_$sdver
 	mkdir -p $DEST_DIR/duetsd_$sdver
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/filaments
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/gcodes
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/macros
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/sys
 	[ -d $COMMON_DIR/duetsd/ ] && $RSYNC $COMMON_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
 	[ -d $PACKAGER_DIR/duetsd/ ] && $RSYNC $PACKAGER_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
 }
