@@ -2,7 +2,7 @@
 
 set -e
 
-PKG_DIR=$(readlink -f $(dirname @0))
+PKG_DIR=$(readlink -f $(dirname $0))
 COMMON_DIR=$PKG_DIR/common
 PACKAGE_TYPES="deb"
 HELP=0

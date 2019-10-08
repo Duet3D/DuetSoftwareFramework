@@ -10,7 +10,7 @@
 
 Name:    duettools
 Version: %{_tversion}
-Release: 900
+Release: 901
 Summary: DSF Tools
 Group:   3D Printing
 Source0: duettools_%{_tversion}
@@ -33,6 +33,10 @@ DSF Tools
 rsync -vaH %{S:0}/. %{buildroot}/
 
 %files
-%defattr(-,root,root,-)
-%{dsfoptdir}/bin/CodeLogger*
-%{dsfoptdir}/bin/CodeConsole*
+%defattr(0664,root,root,-)
+%attr(0755, root, root) %{dsfoptdir}/bin/CodeLogger
+%{dsfoptdir}/bin/CodeLogger.*
+%attr(0755, root, root) %{dsfoptdir}/bin/CodeConsole
+%{dsfoptdir}/bin/CodeConsole.*
+%attr(0755, root, root) %{dsfoptdir}/bin/ModelObserver
+%{dsfoptdir}/bin/ModelObserver.*

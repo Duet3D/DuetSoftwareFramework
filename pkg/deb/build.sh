@@ -39,11 +39,6 @@ pkg_progs() {
 pkg_sd() {
 	echo "- Packaging virtual SD card package v$sdver..."
 
-	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/filaments
-	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/gcodes
-	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/macros
-	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/sys
-
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetsd_$sdver/DEBIAN/control
 	sed -i "s/SDVER/$sdver/g" $DEST_DIR/duetsd_$sdver/DEBIAN/control
 	dpkg-deb --build $DEST_DIR/duetsd_$sdver $DEST_DIR

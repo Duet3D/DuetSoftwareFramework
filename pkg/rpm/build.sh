@@ -16,19 +16,19 @@ mkdir -p $DEST_DIR
 pkg_progs() {
 	echo "- Packaging programs..."
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -bb ${PACKAGER_DIR}/duetcontrolserver.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -ba ${PACKAGER_DIR}/duetcontrolserver.spec
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dwsver" -bb ${PACKAGER_DIR}/duetwebserver.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dwsver" -ba ${PACKAGER_DIR}/duetwebserver.spec
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -bb ${PACKAGER_DIR}/duettools.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -ba ${PACKAGER_DIR}/duettools.spec
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -bb ${PACKAGER_DIR}/duetruntime.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -ba ${PACKAGER_DIR}/duetruntime.spec
 }
 
 pkg_sd() {
 	echo "- Packaging virtual SD card package v$sdver..."
 	rpmbuild --target=noarch --define="%_topdir $RPMBUILD_DIR" --define="%_arch noarch" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $sdver" -bb ${PACKAGER_DIR}/duetsd.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $sdver" -ba ${PACKAGER_DIR}/duetsd.spec
 }
 
 pkg_dwc() {
@@ -37,13 +37,13 @@ pkg_dwc() {
 
 	rpmbuild --target=noarch --define="%_topdir $RPMBUILD_DIR" --define="%_arch noarch" \
 		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion ${dwcver%%-*}"  --define="%_release ${dwcver##*-}" \
-		-bb ${PACKAGER_DIR}/duetwebcontrol.spec
+		-ba ${PACKAGER_DIR}/duetwebcontrol.spec
 }
 
 pkg_meta() {
 	echo "- Packaging meta..."
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -bb ${PACKAGER_DIR}/duetsoftwareframework.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -ba ${PACKAGER_DIR}/duetsoftwareframework.spec
 }
 
 [ $BUILD_PROGS -eq 1 ] && { [ $BUILD -eq 1 ] && build_progs || : ; } && [ $PKGS -eq 1 ] && pkg_progs

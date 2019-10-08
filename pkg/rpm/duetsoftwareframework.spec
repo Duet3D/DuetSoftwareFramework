@@ -10,12 +10,12 @@
 
 Name:    duetsoftwareframework
 Version: %{_tversion}
-Release: 900
+Release: 901
 Summary: Duet Software Framework
 Group:   3D Printing
 License: GPLv3
 URL:     https://github.com/chrishamm/DuetSoftwareFramework
-Source0: duetsoftwareframework-%{version}-%{release}
+Source0: duetsoftwareframework_%{_tversion}
 
 BuildRequires: rpm >= 4.7.2-2
 

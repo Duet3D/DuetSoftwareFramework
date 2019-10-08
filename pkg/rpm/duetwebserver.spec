@@ -10,7 +10,7 @@
 
 Name:    duetwebserver
 Version: %{_tversion}
-Release: 900
+Release: 901
 Summary: DSF Web Server
 Group:   3D Printing
 Source0: duetwebserver_%{_tversion}
@@ -19,6 +19,7 @@ URL:     https://github.com/chrishamm/DuetSoftwareFramework
 BuildRequires: rpm >= 4.7.2-2
 Requires: duetcontrolserver
 Requires: duetruntime
+%systemd_requires
 
 AutoReq:  0
 
@@ -33,18 +34,26 @@ DSF Web Server
 %install
 rsync -vaH %{S:0}/. %{buildroot}/
 
+%pre
+if [ $1 -gt 1 ] && systemctl -q is-active %{name}.service ; then
+# upgrade
+	systemctl stop %{name}.service > /dev/null 2>&1 || :
+fi
+
 %post
-/bin/systemctl daemon-reload >/dev/null 2>&1 || :
-/bin/systemctl enable duetwebserver.service >/dev/null 2>&1 || :
+systemctl daemon-reload >/dev/null 2>&1 || :
 
 %preun
-if [ "$1" -eq "0" ]; then
-	/bin/systemctl --no-reload disable duetwebserver.service > /dev/null 2>&1 || :
-	/bin/systemctl stop duetwebserver.service > /dev/null 2>&1 || :
+if [ $1 -eq 0 ] ; then
+# remove
+	systemctl --no-reload disable %{name}.service >/dev/null 2>&1 || :
 fi
 
 %postun
-/bin/systemctl daemon-reload >/dev/null 2>&1 || :
+if [ $1 -eq 1 ] && systemctl -q is-enabled %{name}.service ; then
+# upgrade
+	systemctl start %{name}.service
+fi
 
 %files
 %defattr(-,root,root,-)
