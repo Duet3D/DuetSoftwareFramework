@@ -16,7 +16,8 @@
   "BufferedMacroCodes": 16,
   "MaxBufferSpacePerChannel": 1536,
   "ModelUpdateInterval": 125,
-  "FileInfoReadLimit": 262144,
+  "FileInfoReadLimitHeader": 12288,
+  "FileInfoReadLimitFooter": 262144,
   "MaxLayerHeight": 0.9,
   "LayerHeightFilters": [
     {
