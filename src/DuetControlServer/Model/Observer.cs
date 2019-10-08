@@ -101,7 +101,7 @@ namespace DuetControlServer.Model
 
             Provider.Get.Electronics.PropertyChanged += PropertyChanged("electronics");
             Provider.Get.Electronics.Firmware.PropertyChanged += PropertyChanged("electronics", "firmware");
-            Provider.Get.Electronics.VIn.PropertyChanged += PropertyChanged("electronics", "vin");
+            Provider.Get.Electronics.VIn.PropertyChanged += PropertyChanged("electronics", "vIn");
             Provider.Get.Electronics.McuTemp.PropertyChanged += PropertyChanged("electronics", "mcuTemp");
             Provider.Get.Electronics.ExpansionBoards.CollectionChanged += ObjectCollectionChanged("electronics", "expansionBoards");
 
@@ -249,7 +249,7 @@ namespace DuetControlServer.Model
                         if (newItem is ExpansionBoard board)
                         {
                             RegisterItemPropertyChanged(path, board.Firmware, index, senderList, "firmware");
-                            RegisterItemPropertyChanged(path, board.Firmware, index, senderList, "vin");
+                            RegisterItemPropertyChanged(path, board.Firmware, index, senderList, "vIn");
                             RegisterItemPropertyChanged(path, board.Firmware, index, senderList, "mcuTemp");
                         }
                         else if (newItem is Fan fan)

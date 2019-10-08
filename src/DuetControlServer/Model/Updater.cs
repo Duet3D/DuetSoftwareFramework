@@ -131,10 +131,17 @@ namespace DuetControlServer.Model
                                 {
                                     axisObj = new Axis();
                                     Provider.Get.Move.Axes.Add(axisObj);
+
+                                    axisObj.Drives.Add(axis);
                                 }
                                 else
                                 {
                                     axisObj = Provider.Get.Move.Axes[axis];
+
+                                    if (axisObj.Drives[0] != axis)
+                                    {
+                                        axisObj.Drives[0] = axis;
+                                    }
                                 }
 
                                 axisObj.Letter = response.axisNames[axis];

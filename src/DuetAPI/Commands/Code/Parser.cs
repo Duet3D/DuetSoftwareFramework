@@ -237,7 +237,7 @@ namespace DuetAPI.Commands
                                 if (int.TryParse(args[0], out int majorNumber))
                                 {
                                     result.MajorNumber = majorNumber;
-                                    unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 30 || majorNumber == 32);
+                                    unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36);
                                 }
                                 else
                                 {
@@ -326,6 +326,10 @@ namespace DuetAPI.Commands
                         }
                         else if (letter == '\0' || result.Parameter(letter) == null)
                         {
+                            if (!unprecedentedParameter)
+                            {
+                                letter = char.ToUpperInvariant(letter);
+                            }
                             AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
                         }
                         else

@@ -429,7 +429,7 @@
             <summary>
             Creates a new CodeParameter instance and with the given value
             </summary>
-            <param name="letter">Letter of the code parameter</param>
+            <param name="letter">Letter of the code parameter (automatically converted to upper-case)</param>
             <param name="value">Value of this parameter</param>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameter.ConvertDriverIds">

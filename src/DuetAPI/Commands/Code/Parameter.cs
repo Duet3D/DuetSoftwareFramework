@@ -128,7 +128,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Creates a new CodeParameter instance and with the given value
         /// </summary>
-        /// <param name="letter">Letter of the code parameter</param>
+        /// <param name="letter">Letter of the code parameter (automatically converted to upper-case)</param>
         /// <param name="value">Value of this parameter</param>
         public CodeParameter(char letter, object value)
         {
@@ -215,10 +215,19 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator float(CodeParameter codeParameter)
         {
-            if (codeParameter._parsedValue is int || codeParameter._parsedValue is uint || codeParameter._parsedValue is float)
+            if (codeParameter._parsedValue is float floatValue)
             {
-                return Convert.ToSingle(codeParameter._parsedValue);
+                return floatValue;
             }
+            if (codeParameter._parsedValue is int intValue)
+            {
+                return Convert.ToSingle(intValue);
+            }
+            if (codeParameter._parsedValue is uint uintValue)
+            {
+                return Convert.ToSingle(uintValue);
+            }
+            // long won't fit
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to float (value {codeParameter._stringValue})");
         }
         
@@ -230,11 +239,15 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator int(CodeParameter codeParameter)
         {
-            if (codeParameter._parsedValue is int || codeParameter._parsedValue is float)
+            if (codeParameter._parsedValue is int intValue)
             {
-                return Convert.ToInt32(codeParameter._parsedValue);
+                return intValue;
             }
-
+            if (codeParameter._parsedValue is float floatValue)
+            {
+                return Convert.ToInt32(floatValue);
+            }
+            // long and uint won't fit
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to integer (value {codeParameter._stringValue})");
         }
 
@@ -246,10 +259,19 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator uint(CodeParameter codeParameter)
         {
-            if (codeParameter._parsedValue is uint || codeParameter._parsedValue is int || codeParameter._parsedValue is float)
+            if (codeParameter._parsedValue is uint uintValue)
             {
-                return Convert.ToUInt32(codeParameter._parsedValue);
+                return uintValue;
             }
+            if (codeParameter._parsedValue is int intValue)
+            {
+                return Convert.ToUInt32(intValue);
+            }
+            if (codeParameter._parsedValue is float floatValue)
+            {
+                return Convert.ToUInt32(floatValue);
+            }
+            // long won't fit
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to unsigned integer (value {codeParameter._stringValue})");
         }
 
@@ -261,9 +283,21 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator long(CodeParameter codeParameter)
         {
-            if (codeParameter._parsedValue is uint || codeParameter._parsedValue is int || codeParameter._parsedValue is float)
+            if (codeParameter._parsedValue is long longValue)
             {
-                return Convert.ToInt64(codeParameter._parsedValue);
+                return longValue;
+            }
+            if (codeParameter._parsedValue is int intValue)
+            {
+                return Convert.ToInt64(intValue);
+            }
+            if (codeParameter._parsedValue is uint uintValue)
+            {
+                return Convert.ToInt64(uintValue);
+            }
+            if (codeParameter._parsedValue is float floatValue)
+            {
+                return Convert.ToInt64(floatValue);
             }
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to long (value {codeParameter._stringValue})");
         }
@@ -291,26 +325,31 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator float[](CodeParameter codeParameter)
         {
-            if (codeParameter._parsedValue is float[])
+            if (codeParameter._parsedValue is float[] floatArray)
             {
-                return (float[])codeParameter._parsedValue;
+                return floatArray;
+            }
+            if (codeParameter._parsedValue is float floatValue)
+            {
+                return new float[] { floatValue };
             }
             if (codeParameter._parsedValue is int intValue)
             {
-                return new float[] { intValue };
+                return new float[] { Convert.ToSingle(intValue) };
             }
             if (codeParameter._parsedValue is uint uintValue)
             {
-                return new float[] { uintValue };
+                return new float[] { Convert.ToSingle(uintValue) };
             }
-            if (codeParameter._parsedValue is int[])
+            if (codeParameter._parsedValue is int[] intArray)
             {
-                return ((int[])codeParameter._parsedValue).Select(Convert.ToSingle).ToArray();
+                return intArray.Select(Convert.ToSingle).ToArray();
             }
-            if (codeParameter._parsedValue is uint[])
+            if (codeParameter._parsedValue is uint[] uintArray)
             {
-                return ((uint[])codeParameter._parsedValue).Select(Convert.ToSingle).ToArray();
+                return uintArray.Select(Convert.ToSingle).ToArray();
             }
+            // long won't fit
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to float array (value {codeParameter._stringValue})");
         }
 
@@ -322,18 +361,23 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator int[] (CodeParameter codeParameter)
         {
-            if (codeParameter._parsedValue is int[])
+            if (codeParameter._parsedValue is int[] intArray)
             {
-                return (int[])codeParameter._parsedValue;
+                return intArray;
             }
             if (codeParameter._parsedValue is int intValue)
             {
                 return new int[] { intValue };
             }
-            if (codeParameter._parsedValue is float[])
+            if (codeParameter._parsedValue is float floatValue)
             {
-                return ((float[])codeParameter._parsedValue).Select(Convert.ToInt32).ToArray();
+                return new int[] { Convert.ToInt32(floatValue) };
             }
+            if (codeParameter._parsedValue is float[] floatArray)
+            {
+                return floatArray.Select(Convert.ToInt32).ToArray();
+            }
+            // uint and long won't fit
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to integer array (value {codeParameter._stringValue})");
         }
 
@@ -345,22 +389,31 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator uint[] (CodeParameter codeParameter)
         {
-            if (codeParameter._parsedValue is uint[])
+            if (codeParameter._parsedValue is uint[] uintArray)
             {
-                return (uint[])codeParameter._parsedValue;
-            }
-            if (codeParameter._parsedValue is int intValue && intValue >= 0)
-            {
-                return new uint[] { (uint)intValue };
+                return uintArray;
             }
             if (codeParameter._parsedValue is uint uintValue)
             {
                 return new uint[] { uintValue };
             }
-            if (codeParameter._parsedValue is float[])
+            if (codeParameter._parsedValue is int intValue && intValue >= 0)
             {
-                return ((float[])codeParameter._parsedValue).Select(Convert.ToUInt32).ToArray();
+                return new uint[] { Convert.ToUInt32(intValue) };
             }
+            if (codeParameter._parsedValue is int[] intArray && intArray.All(value => value >= 0))
+            {
+                return intArray.Select(Convert.ToUInt32).ToArray();
+            }
+            if (codeParameter._parsedValue is float floatValue && floatValue >= 0F)
+            {
+                return new uint[] { Convert.ToUInt32(floatValue) };
+            }
+            if (codeParameter._parsedValue is float[] floatArray && floatArray.All(value => value >= 0F))
+            {
+                return floatArray.Select(Convert.ToUInt32).ToArray();
+            }
+            // long won't fit
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to unsigned integer array (value {codeParameter._stringValue})");
         }
 
@@ -372,25 +425,37 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator long[] (CodeParameter codeParameter)
         {
-            if (codeParameter._parsedValue is long[])
+            if (codeParameter._parsedValue is long[] longArray)
             {
-                return (long[])codeParameter._parsedValue;
-            }
-            if (codeParameter._parsedValue is int intValue)
-            {
-                return new long[] { intValue };
-            }
-            if (codeParameter._parsedValue is uint uintValue)
-            {
-                return new long[] { uintValue };
+                return longArray;
             }
             if (codeParameter._parsedValue is long longValue)
             {
                 return new long[] { longValue };
             }
-            if (codeParameter._parsedValue is int[] || codeParameter._parsedValue is uint[] || codeParameter._parsedValue is float[])
+            if (codeParameter._parsedValue is int intValue)
             {
-                return ((long[])codeParameter._parsedValue).Select(Convert.ToInt64).ToArray();
+                return new long[] { Convert.ToInt64(intValue) };
+            }
+            if (codeParameter._parsedValue is uint uintValue)
+            {
+                return new long[] { Convert.ToInt64(uintValue) };
+            }
+            if (codeParameter._parsedValue is float floatValue)
+            {
+                return new long[] { Convert.ToInt64(floatValue) };
+            }
+            if (codeParameter._parsedValue is int[] intArray)
+            {
+                return intArray.Select(Convert.ToInt64).ToArray();
+            }
+            if (codeParameter._parsedValue is int[] uintArray)
+            {
+                return uintArray.Select(Convert.ToInt64).ToArray();
+            }
+            if (codeParameter._parsedValue is float[] floatArray)
+            {
+                return floatArray.Select(Convert.ToInt64).ToArray();
             }
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to long array (value {codeParameter._stringValue})");
         }
