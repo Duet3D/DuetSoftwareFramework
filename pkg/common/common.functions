@@ -186,7 +186,7 @@ build_dwc() {
 		echo "- Using existing repository in $DEST_DIR/DuetWebControl"
 	fi
 
-	dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)-7
+	dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)-1
 	>/dev/null pushd $DEST_DIR/DuetWebControl
 
 	echo "- Installing dependencies..."
