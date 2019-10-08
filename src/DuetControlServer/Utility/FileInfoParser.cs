@@ -124,7 +124,7 @@ namespace DuetControlServer
                 }
                 lastLineHadInfo = gotNewInfo;
             }
-            while (reader.Position < Settings.FileInfoReadLimit);
+            while (reader.Position < Settings.FileInfoReadLimitHeader);
         }
 
         private static async Task ParseFooter(SeekableStreamReader reader, long length, List<float> filament, ParsedFileInfo partialFileInfo)
@@ -207,7 +207,7 @@ namespace DuetControlServer
                 }
                 lastLineHadInfo = gotNewInfo;
             }
-            while (length - reader.Position < Settings.FileInfoReadLimit);
+            while (length - reader.Position < Settings.FileInfoReadLimitFooter);
 
             if (lastZ != null && partialFileInfo.Height == 0)
             {

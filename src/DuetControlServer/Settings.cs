@@ -109,9 +109,14 @@ namespace DuetControlServer
         public static double ModelUpdateInterval { get; set; } = 125.0;
 
         /// <summary>
-        /// How many bytes to parse max at the beginning and end of a file to retrieve G-code file information (256KiB)
+        /// How many bytes to parse max at the beginning of a file to retrieve G-code file information (12KiB)
         /// </summary>
-        public static uint FileInfoReadLimit { get; set; } = 262144;
+        public static uint FileInfoReadLimitHeader { get; set; } = 12288;
+
+        /// <summary>
+        /// How many bytes to parse max at the end of a file to retrieve G-code file information (256KiB)
+        /// </summary>
+        public static uint FileInfoReadLimitFooter { get; set; } = 262144;
 
         /// <summary>
         /// Maximum allowed layer height. Used by the file info parser
