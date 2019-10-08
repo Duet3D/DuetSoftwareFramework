@@ -21,27 +21,41 @@ namespace DuetControlServer.Codes
             {
                 // Load heightmap
                 case 29:
-                    if (code.Parameter('S', 0) == 1)
+                    CodeParameter cp = code.Parameter('S', 0);
+                    if (cp == 1 || cp == 3)
                     {
                         if (await SPI.Interface.Flush(code.Channel))
                         {
                             string file = await FilePath.ToPhysicalAsync(code.Parameter('P', FilePath.DefaultHeightmapFile), "sys");
                             try
                             {
-                                Heightmap map = new Heightmap();
-                                await map.Load(file);
-
+                                Heightmap map = null;
+                                if (cp == 1)
+                                {
+                                    map = new Heightmap();
+                                    await map.Load(file);
+                                }
                                 if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
                                 {
-                                    await SPI.Interface.SetHeightmap(map);
-                                    await SPI.Interface.UnlockAll(code.Channel);
+                                    if (cp == 1)
+                                    {
+                                        await SPI.Interface.SetHeightmap(map);
+                                        await SPI.Interface.UnlockAll(code.Channel);
+                                        return new CodeResult(DuetAPI.MessageType.Success, $"Height map loaded from file {file}");
+                                    }
+                                    else
+                                    {
+                                        map = await SPI.Interface.GetHeightmap();
+                                        await SPI.Interface.UnlockAll(code.Channel);
+                                        await map.Save(file);
+                                        return new CodeResult(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
+                                    }
                                 }
                             }
                             catch (AggregateException ae)
                             {
-                                return new CodeResult(DuetAPI.MessageType.Error, $"Failed to load height map from file {file}: {ae.InnerException.Message}");
+                                return new CodeResult(DuetAPI.MessageType.Error, $"Failed to {(cp == 1 ? "load" : "save")} height map {(cp == 1 ? "from" : "to")} file {file}: {ae.InnerException.Message}");
                             }
-                            return new CodeResult();
                         }
                         throw new OperationCanceledException();
                     }
@@ -105,7 +119,7 @@ namespace DuetControlServer.Codes
                 case 29:
                     if (code.Parameter('S', 0) == 0)
                     {
-                        string file = code.Parameter('P', "heightmap.csv");
+                        string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
                         try
                         {
                             if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
