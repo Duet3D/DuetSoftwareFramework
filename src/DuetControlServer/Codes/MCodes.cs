@@ -389,6 +389,7 @@ namespace DuetControlServer.Codes
                     if (await SPI.Interface.Flush(code.Channel))
                     {
                         await Utility.ConfigOverride.Save(code);
+                        return new CodeResult(MessageType.Success, $"{FilePath.ConfigOverrideFile} written successfully");
                     }
                     throw new OperationCanceledException();
 
