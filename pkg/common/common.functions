@@ -78,9 +78,9 @@ sdver=$(cat $PKG_DIR/deb/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
 export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
 
 case $TARGET_ARCH in
-	armhf|armhfp|arm|armv6h|armv7h|armv7hl) DOTNET_ARCH=linux-arm ;;
+	armhf|armhfp|armv7h|armv7hl) DOTNET_ARCH=linux-arm ;;
 	arm64|aarch64) DOTNET_ARCH=linux-arm64 ;;
-	x86_64) DOTNET_ARCH=linux-x64 ;;
+	amd64|x86_64) DOTNET_ARCH=linux-x64 ;;
 	i386|i686|x86_32)  DOTNET_ARCH=linux-x86 ;;
 	*) echo "Unknown TARGET_ARCH: $TARGET_ARCH" ; return 1 ;;
 esac
