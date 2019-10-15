@@ -294,6 +294,10 @@ namespace DuetControlServer.Codes
                                 return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
                             }
                         }
+                        catch (IOException ioe)
+                        {
+                            return new CodeResult(DuetAPI.MessageType.Error, ioe.Message);
+                        }
                         catch (AggregateException ae)
                         {
                             return new CodeResult(MessageType.Error, $"Failed to save height map to file {file}: {ae.InnerException.Message}");
@@ -317,6 +321,10 @@ namespace DuetControlServer.Codes
                                 await SPI.Interface.UnlockAll(code.Channel);
                                 return new CodeResult(DuetAPI.MessageType.Success, $"Height map loaded from file {file}");
                             }
+                        }
+                        catch (IOException ioe)
+                        {
+                            return new CodeResult(DuetAPI.MessageType.Error, ioe.Message);
                         }
                         catch (AggregateException ae)
                         {

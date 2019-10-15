@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Utility;
@@ -51,6 +52,10 @@ namespace DuetControlServer.Codes
                                         return new CodeResult(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
                                     }
                                 }
+                            }
+                            catch(IOException ioe)
+                            {
+                                return new CodeResult(DuetAPI.MessageType.Error, ioe.Message);
                             }
                             catch (AggregateException ae)
                             {
@@ -130,6 +135,10 @@ namespace DuetControlServer.Codes
                                 await map.Save(await FilePath.ToPhysicalAsync(file, "sys"));
                                 code.Result.Add(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
                             }
+                        }
+                        catch (IOException ioe)
+                        {
+                            code.Result.Add(DuetAPI.MessageType.Error, ioe.Message);
                         }
                         catch (AggregateException ae)
                         {
