@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# If running, stop duetcontrolserver before updating it
+if (systemctl -q is-active duetcontrolserver); then
+    systemctl -q stop duetcontrolserver
+fi

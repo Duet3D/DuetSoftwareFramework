@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# If running, stop duetwebserver before updating it
+if (systemctl -q is-active duetwebserver); then
+    systemctl -q stop duetwebserver
+fi

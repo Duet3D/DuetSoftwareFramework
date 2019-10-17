@@ -33,6 +33,11 @@ DSF Control Server
 %install
 rsync -vaH %{S:0}/. %{buildroot}/
 
+%pre
+if (systemctl -q is-active duetcontrolserver.service); then
+    systemctl -q stop duetcontrolserver.service >/dev/null 2>&1 || :
+fi
+
 %post
 /bin/systemctl daemon-reload >/dev/null 2>&1 || :
 /bin/systemctl enable duetcontrolserver.service >/dev/null 2>&1 || :
