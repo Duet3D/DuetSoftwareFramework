@@ -9,6 +9,20 @@ HELP=0
 
 source $COMMON_DIR/parse_args
 
+# Check for required binaries. If missing, bail.
+REQUIRED_BINARIES=(xmllint jq npm dotnet)
+MISSING_BINS=false
+for BIN in ${REQUIRED_BINARIES[@]}; do
+	if ! (which $BIN &>/dev/null); then
+		echo "Missing required binary: ${BIN}"
+		MISSING_BINS=true
+	fi
+done
+if $MISSING_BINS; then
+	echo "Please install the above binaries before continuing"
+	exit 1
+fi
+
 print_help_top_level() {
 cat <<EOF
 Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | aarch64 > ]
