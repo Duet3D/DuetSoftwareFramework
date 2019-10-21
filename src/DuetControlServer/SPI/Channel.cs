@@ -94,11 +94,6 @@ namespace DuetControlServer.SPI
         public readonly Queue<TaskCompletionSource<bool>> PendingFlushRequests = new Queue<TaskCompletionSource<bool>>();
 
         /// <summary>
-        /// Indicates if this channel is blocked and waiting for a message acknowledgement
-        /// </summary>
-        public bool WaitingForMessageAcknowledgement { get; set; }
-
-        /// <summary>
         /// Lock access to this code channel
         /// </summary>
         /// <returns>Disposable lock</returns>
@@ -161,11 +156,6 @@ namespace DuetControlServer.SPI
                 channelDiagostics.AppendLine($"Number of flush requests: {PendingFlushRequests.Count}");
             }
 
-            if (WaitingForMessageAcknowledgement)
-            {
-                channelDiagostics.AppendLine("Waiting for message acknowledgment");
-            }
-
             if (channelDiagostics.Length != 0)
             {
                 builder.AppendLine($"{Channel}:");
@@ -199,13 +189,6 @@ namespace DuetControlServer.SPI
                 return _resumingBuffer;
             }
 
-            // FIXME This doesn't work yet for non-M292 codes. Needs more refactoring
-            if (WaitingForMessageAcknowledgement)
-            {
-                // Still waiting for M292...
-                return false;
-            }
-
             // 3. Macro codes
             if (NestedMacroCodes.TryPeek(out queuedCode) && (queuedCode.IsFinished || (queuedCode.IsReadyToSend && BufferCode(queuedCode))))
             {
@@ -220,7 +203,14 @@ namespace DuetControlServer.SPI
                 Commands.Code code = null;
                 if (!macroFile.IsFinished && NestedMacroCodes.Count < Settings.BufferedMacroCodes)
                 {
-                    code = macroFile.ReadCode();
+                    try
+                    {
+                        code = macroFile.ReadCode();
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"[err] Failed to read code from macro file: [{e.GetType().Name}] {e.Message}");
+                    }
                 }
 
                 // If there is any, start executing it in the background. An interceptor may also generate extra codes
@@ -249,10 +239,15 @@ namespace DuetControlServer.SPI
                         {
                             // Something has gone wrong and the SPI connector has invalidated everything - don't deal with this (yet?)
                         }
-                        catch (AggregateException ae)
+                        catch (Exception e)
                         {
+                            if (e is AggregateException ae)
+                            {
+                                e = ae.InnerException;
+                            }
+
                             // FIXME: Should this terminate the macro being executed?
-                            Console.WriteLine($"[err] {code} -> {ae.InnerException.Message}");
+                            await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{e.GetType().Name}] {e.Message}");
                         }
                     });
 
@@ -310,29 +305,9 @@ namespace DuetControlServer.SPI
 
         private bool BufferCode(QueuedCode queuedCode)
         {
-            if (queuedCode.Code.Type == CodeType.MCode && queuedCode.Code.MajorNumber == 291)
-            {
-                int sParam = queuedCode.Code.Parameter('S', 0);
-                if (sParam == 2 || sParam == 3)
-                {
-                    // This M291 call interrupts the G-code flow, wait for M292 next
-                    WaitingForMessageAcknowledgement = true;
-                }
-            }
-            else if (queuedCode.Code.Type == CodeType.MCode && queuedCode.Code.MajorNumber == 292)
-            {
-                // The pending message box is about to be closed
-                WaitingForMessageAcknowledgement = false;
-            }
-            else if (WaitingForMessageAcknowledgement)
-            {
-                // Still waiting for M292...
-                return false;
-            }
-
-            // Try to send this code to the firmware
             try
             {
+                // Try to send this code to the firmware
                 if (Interface.BufferCode(queuedCode, out int codeLength))
                 {
                     BytesBuffered += codeLength;
@@ -665,7 +640,8 @@ namespace DuetControlServer.SPI
                 }
             }
             _resumingBuffer = false;
-            WaitingForMessageAcknowledgement = SystemMacroHasFinished = false;
+
+            SystemMacroHasFinished = false;
 
             while (NestedMacroCodes.TryDequeue(out QueuedCode item))
             {

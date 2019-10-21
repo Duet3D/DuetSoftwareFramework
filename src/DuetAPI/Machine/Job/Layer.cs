@@ -39,7 +39,7 @@ namespace DuetAPI.Machine
         private float _duration;
 
         /// <summary>
-        /// Height of the layer (in mm or null if unknown)
+        /// Height of the layer (in mm or 0 if unknown)
         /// </summary>
         public float Height
         {
@@ -73,7 +73,7 @@ namespace DuetAPI.Machine
         private List<float> _filament = new List<float>();
 
         /// <summary>
-        /// Fraction of the file printed during this layer (0..1 or null if unknown)
+        /// Fraction of the file printed during this layer (0..1)
         /// </summary>
         public float FractionPrinted
         {

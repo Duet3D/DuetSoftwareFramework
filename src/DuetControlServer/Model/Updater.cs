@@ -338,6 +338,10 @@ namespace DuetControlServer.Model
                                 {
                                     ListHelpers.SetList(probeObj.SecondaryValues, response.sensors.probeSecondary);
                                 }
+                                else if (probeObj.SecondaryValues.Count > 0)
+                                {
+                                    probeObj.SecondaryValues.Clear();
+                                }
                             }
                             else if (Provider.Get.Sensors.Probes.Count != 0)
                             {

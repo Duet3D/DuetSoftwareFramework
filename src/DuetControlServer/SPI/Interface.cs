@@ -809,6 +809,7 @@ namespace DuetControlServer.SPI
                 };
                 byte[] buffer = new byte[maxLength];
                 int bytesRead = await fs.ReadAsync(buffer, 0, (int)maxLength);
+
                 DataTransfer.WriteFileChunk(buffer.AsSpan(0, bytesRead), fs.Length);
             }
             catch (Exception e)

@@ -446,9 +446,9 @@ namespace DuetControlServer.SPI
             {
                 return Serialization.Writer.WriteCode(span, code);
             }
-            catch (ArgumentOutOfRangeException)
+            catch (ArgumentException)
             {
-                throw new ArgumentException("Value is too big", nameof(code));
+                throw new ArgumentException("Code is too long");
             }
         }
 

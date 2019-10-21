@@ -198,8 +198,16 @@ namespace DuetControlServer.SPI.Serialization
                 NumY = header.NumY
             };
 
-            ReadOnlySpan<byte> zCoordinates = from.Slice(Marshal.SizeOf(header), Marshal.SizeOf(typeof(float)) * map.NumX * map.NumY);
-            map.ZCoordinates = MemoryMarshal.Cast<byte, float>(zCoordinates).ToArray();
+            if (from.Length > Marshal.SizeOf(header))
+            {
+                ReadOnlySpan<byte> zCoordinates = from.Slice(Marshal.SizeOf(header), Marshal.SizeOf(typeof(float)) * map.NumX * map.NumY);
+                map.ZCoordinates = MemoryMarshal.Cast<byte, float>(zCoordinates).ToArray();
+            }
+            else
+            {
+                map.NumX = map.NumY = 0;
+                map.ZCoordinates = Array.Empty<float>();
+            }
             return Marshal.SizeOf(header) + map.ZCoordinates.Length * Marshal.SizeOf(typeof(float));
         }
 

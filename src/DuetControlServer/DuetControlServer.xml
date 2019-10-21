@@ -1020,11 +1020,6 @@
             Queue of pending flush requests
             </summary>
         </member>
-        <member name="P:DuetControlServer.SPI.ChannelInformation.WaitingForMessageAcknowledgement">
-            <summary>
-            Indicates if this channel is blocked and waiting for a message acknowledgement
-            </summary>
-        </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.Lock">
             <summary>
             Lock access to this code channel

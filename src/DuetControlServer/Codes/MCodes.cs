@@ -35,7 +35,7 @@ namespace DuetControlServer.Codes
                 // Cancel print
                 case 0:
                 case 1:
-                    if (await SPI.Interface.Flush(code.Channel) && Print.IsPrinting)
+                    if (await SPI.Interface.Flush(code.Channel) && (code.Channel == CodeChannel.File || Print.IsPaused))
                     {
                         // Invalidate the print file to make sure no more codes are read from the file
                         await Print.Cancel();
@@ -164,9 +164,9 @@ namespace DuetControlServer.Codes
 
                 // Return file information
                 case 36:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (code.Parameters.Count > 0)
                     {
-                        if (code.Parameters.Count > 0)
+                        if (await SPI.Interface.Flush(code.Channel))
                         {
                             try
                             {
@@ -181,8 +181,9 @@ namespace DuetControlServer.Codes
                                 return new CodeResult(MessageType.Success, "{\"err\":1}");
                             }
                         }
+                        throw new OperationCanceledException();
                     }
-                    throw new OperationCanceledException();
+                    break;
 
                 // Simulate file
                 case 37:
@@ -283,6 +284,7 @@ namespace DuetControlServer.Codes
                     if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
+                        string physicalFile = await FilePath.ToPhysicalAsync(file, "sys");
                         try
                         {
                             if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
@@ -290,13 +292,21 @@ namespace DuetControlServer.Codes
                                 Heightmap map = await SPI.Interface.GetHeightmap();
                                 await SPI.Interface.UnlockAll(code.Channel);
 
-                                await map.Save(await FilePath.ToPhysicalAsync(file, "sys"));
-                                return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
+                                if (map.NumX * map.NumY > 0)
+                                {
+                                    await map.Save(await FilePath.ToPhysicalAsync(physicalFile, "sys"));
+                                    return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
+                                }
+                                return new CodeResult();
                             }
                         }
-                        catch (AggregateException ae)
+                        catch (Exception e)
                         {
-                            return new CodeResult(MessageType.Error, $"Failed to save height map to file {file}: {ae.InnerException.Message}");
+                            if (e is AggregateException ae)
+                            {
+                                e = ae.InnerException;
+                            }
+                            return new CodeResult(MessageType.Error, $"Failed to save height map to file {file}: {e.Message}");
                         }
                     }
                     throw new OperationCanceledException();
@@ -305,11 +315,12 @@ namespace DuetControlServer.Codes
                 case 375:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        string file = await FilePath.ToPhysicalAsync(code.Parameter('P', FilePath.DefaultHeightmapFile), "sys");
+                        string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
+                        string physicalFile = await FilePath.ToPhysicalAsync(file, "sys");
                         try
                         {
                             Heightmap map = new Heightmap();
-                            await map.Load(file);
+                            await map.Load(physicalFile);
 
                             if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
                             {
@@ -318,9 +329,13 @@ namespace DuetControlServer.Codes
                                 return new CodeResult(DuetAPI.MessageType.Success, $"Height map loaded from file {file}");
                             }
                         }
-                        catch (AggregateException ae)
+                        catch (Exception e)
                         {
-                            return new CodeResult(MessageType.Error, $"Failed to load height map from file {file}: {ae.InnerException.Message}");
+                            if (e is AggregateException ae)
+                            {
+                                e = ae.InnerException;
+                            }
+                            return new CodeResult(MessageType.Error, $"Failed to load height map from file {file}: {e.Message}");
                         }
                     }
                     throw new OperationCanceledException();
@@ -389,6 +404,7 @@ namespace DuetControlServer.Codes
                     if (await SPI.Interface.Flush(code.Channel))
                     {
                         await Utility.ConfigOverride.Save(code);
+                        return new CodeResult();
                     }
                     throw new OperationCanceledException();
 
