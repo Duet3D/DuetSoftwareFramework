@@ -30,11 +30,12 @@ namespace DuetControlServer.Utility
                     await WriteCalibrationParameters(writer);
                     await WriteModelParameters(writer);
                     await WriteAxisLimits(writer);
-                    if (code.Parameter('P') == 31)
+                    int[] p = code.Parameter('P', new int[0]);
+                    if (p.Contains(31))
                     {
                         await WriteProbeValues(writer);
                     }
-                    await WriteToolParameters(writer);
+                    await WriteToolParameters(writer, p.Contains(10));
                     await WriteWorkplaceCoordinates(writer);
                 }
             }
@@ -135,21 +136,21 @@ namespace DuetControlServer.Utility
             }
         }
 
-        private static async Task WriteToolParameters(StreamWriter writer)
+        private static async Task WriteToolParameters(StreamWriter writer, bool forceWriteOffsets)
         {
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                if (Model.Provider.Get.Tools.Any(tool => tool.OffsetsProbed != 0))
+                if (forceWriteOffsets || Model.Provider.Get.Tools.Any(tool => tool.OffsetsProbed != 0))
                 {
                     await writer.WriteLineAsync("; Probed tool offsets");
                     foreach (Tool tool in Model.Provider.Get.Tools)
                     {
-                        if (tool.OffsetsProbed != 0)
+                        if (tool.OffsetsProbed != 0 || forceWriteOffsets)
                         {
                             List<string> values = new List<string>();
                             for (int axis = 0; axis < Model.Provider.Get.Move.Axes.Count; axis++)
                             {
-                                if ((tool.OffsetsProbed & (1 << axis)) != 0)
+                                if ((tool.OffsetsProbed & (1 << axis)) != 0 || forceWriteOffsets)
                                 {
                                     char axisLetter = Model.Provider.Get.Move.Axes[axis].Letter;
                                     values.Add($"{axisLetter}{tool.Offsets[axis]:F2}");
