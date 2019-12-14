@@ -17,6 +17,9 @@ namespace DuetUnitTest.Machine
 
             Assert.AreEqual(original.UserVariables.Count, clone.UserVariables.Count);
             Assert.AreEqual(original.UserVariables[0].Name, clone.UserVariables[0].Name);
+            Assert.AreEqual(original.UserVariables[0].Value, clone.UserVariables[0].Value);
+            Assert.AreEqual(original.UserVariables[1].Name, clone.UserVariables[1].Name);
+            Assert.AreEqual(original.UserVariables[1].Value, clone.UserVariables[1].Value);
         }
 
         [Test]
@@ -31,6 +34,9 @@ namespace DuetUnitTest.Machine
 
             Assert.AreEqual(original.UserVariables.Count, assigned.UserVariables.Count);
             Assert.AreEqual(original.UserVariables[0].Name, assigned.UserVariables[0].Name);
+            Assert.AreEqual(original.UserVariables[0].Value, assigned.UserVariables[0].Value);
+            Assert.AreEqual(original.UserVariables[1].Name, assigned.UserVariables[1].Name);
+            Assert.AreEqual(original.UserVariables[1].Value, assigned.UserVariables[1].Value);
         }
     }
 }

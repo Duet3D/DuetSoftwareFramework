@@ -9,20 +9,22 @@
             MVC Controller for /machine requests
             </summary>
         </member>
+        <member name="F:DuetWebServer.Controllers.MachineController._configuration">
+            <summary>
+            App configuration
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Controllers.MachineController._logger">
+            <summary>
+            Logger instance
+            </summary>
+        </member>
         <member name="M:DuetWebServer.Controllers.MachineController.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Controllers.MachineController})">
             <summary>
             Create a new controller instance
             </summary>
             <param name="configuration">Launch configuration</param>
             <param name="logger">Logger instance</param>
-        </member>
-        <member name="M:DuetWebServer.Controllers.MachineController.Get">
-            <summary>
-            WS /machine
-            Provide WebSocket for continuous model updates. This is primarily used to keep DWC2 up-to-date
-            </summary>
-            <returns>WebSocket, HTTP status code: (400) Bad request</returns>
-            <seealso cref="M:DuetWebServer.Controllers.WebSocketController.Process(System.Net.WebSockets.WebSocket,System.String,Microsoft.Extensions.Logging.ILogger)"/>
         </member>
         <member name="M:DuetWebServer.Controllers.MachineController.Status">
             <summary>
@@ -34,7 +36,7 @@
         <member name="M:DuetWebServer.Controllers.MachineController.DoCode">
             <summary>
             POST /machine/code
-            Execute a plain G/M/T-code from the request body and return the G-code response when done.
+            Execute plain G/M/T-code(s) from the request body and return the G-code response when done.
             </summary>
             <returns>HTTP status code: (200) G-Code response as text/plain (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
         </member>
@@ -57,7 +59,7 @@
         <member name="M:DuetWebServer.Controllers.MachineController.GetFileinfo(System.String)">
             <summary>
             GET /machine/fileinfo/{filename}
-            Retrieve file info from the specified G-code file.
+            Parse a given G-code file and return information about this job file as a JSON object.
             </summary>
             <param name="filename">G-code file to analyze</param>
             <returns>HTTP status code: (200) File info as application/json (404) File not found (500) Generic error (502) Incompatible DCS (503) DCS is unavailable</returns>
@@ -97,18 +99,53 @@
         </member>
         <member name="T:DuetWebServer.Controllers.WebSocketController">
             <summary>
-            This class takes care of WebSocket-based communication.
-            At the moment it is only used to provide continuous machine model updates.
+            MVC controller for WebSocket requests
             </summary>
         </member>
-        <member name="M:DuetWebServer.Controllers.WebSocketController.Process(System.Net.WebSockets.WebSocket,System.String,Microsoft.Extensions.Logging.ILogger)">
+        <member name="F:DuetWebServer.Controllers.WebSocketController.PONG">
+            <summary>
+            PONG response when a PING is received
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Controllers.WebSocketController._configuration">
+            <summary>
+            Configuration of the application
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Controllers.WebSocketController._logger">
+            <summary>
+            Logger instance
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Controllers.WebSocketController.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Controllers.WebSocketController})">
+            <summary>
+            Constructor of a new WebSocket controller
+            </summary>
+            <param name="configuration">Configuration of this application</param>
+            <param name="logger">Logger instance</param>
+        </member>
+        <member name="M:DuetWebServer.Controllers.WebSocketController.Get">
+            <summary>
+            WS /machine
+            Provide WebSocket for continuous model updates. This is primarily used to keep DWC2 up-to-date
+            </summary>
+            <returns>WebSocket, HTTP status code: (400) Bad request</returns>
+        </member>
+        <member name="M:DuetWebServer.Controllers.WebSocketController.Process(System.Net.WebSockets.WebSocket)">
             <summary>
             Deal with a newly opened WebSocket.
             A client may receive one of the WS codes: (1001) Endpoint unavailable (1003) Invalid command (1011) Internal error
             </summary>
             <param name="webSocket">WebSocket connection</param>
-            <param name="socketPath">Path to the UNIX socket</param>
-            <param name="logger">Logger instance</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetWebServer.Controllers.WebSocketController.CloseConnection(System.Net.WebSockets.WebSocket,System.Net.WebSockets.WebSocketCloseStatus,System.String)">
+            <summary>
+            Close the WebSocket connection again
+            </summary>
+            <param name="webSocket">WebSocket to close</param>
+            <param name="status">Close status to transmit</param>
+            <param name="message">Close message</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetWebServer.FileProviders.DuetFileProvider">
@@ -143,6 +180,208 @@
             <param name="filter">Watch filter</param>
             <returns>Change token</returns>
         </member>
+        <member name="T:DuetWebServer.Middleware.CustomEndpointMiddleware">
+            <summary>
+            Middleware providing with custom HTTP/WebSocket endpoints
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Middleware.CustomEndpointMiddleware._endpoints">
+            <summary>
+            Dictionary of registered third-party paths vs third-party HTTP endpoints
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Middleware.CustomEndpointMiddleware._userSessions">
+            <summary>
+            Dictionary holding the current user sessions in the form IP vs Id
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Middleware.CustomEndpointMiddleware._next">
+            <summary>
+            Next request delegate to call
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Middleware.CustomEndpointMiddleware._configuration">
+            <summary>
+            Configuration of this application
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Middleware.CustomEndpointMiddleware._logger">
+            <summary>
+            Logger instance
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.#ctor(Microsoft.AspNetCore.Http.RequestDelegate,Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Middleware.CustomEndpointMiddleware})">
+            <summary>
+            Constructor of this middleware
+            </summary>
+            <param name="next">Next request delegate</param>
+            <param name="configuration">Application configuration</param>
+            <param name="logger">Logger instance</param>
+        </member>
+        <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.SynchronizeModel">
+            <summary>
+            Synchronize all registered endpoints and user sessions
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext)">
+            <summary>
+            Called when a new HTTP request is received
+            </summary>
+            <param name="context">HTTP context</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.ReadFromWebSocket(System.Net.WebSockets.WebSocket,DuetWebServer.Middleware.HttpEndpointConnection,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Process incoming data from the WebSocket
+            </summary>
+            <param name="webSocket">Remote WebSocket</param>
+            <param name="endpointConnection">Local UNIX socket connection</param>
+            <param name="sessionId">Session ID</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.ReadFromUnixSocket(System.Net.WebSockets.WebSocket,DuetWebServer.Middleware.HttpEndpointConnection,System.Threading.CancellationToken)">
+            <summary>
+            Process incoming data from the UNIX socket
+            </summary>
+            <param name="webSocket">Remote WebSocket</param>
+            <param name="endpointConnection">Local UNIX socket connection</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.CloseConnection(System.Net.WebSockets.WebSocket,System.Net.WebSockets.WebSocketCloseStatus,System.String)">
+            <summary>
+            Close the WebSocket connection again
+            </summary>
+            <param name="webSocket">WebSocket to close</param>
+            <param name="status">Close status to transmit</param>
+            <param name="message">Close message</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.ProcessRestRequst(Microsoft.AspNetCore.Http.HttpContext,DuetWebServer.Middleware.HttpEndpointConnection,System.Int32)">
+            <summary>
+            Process a RESTful HTTP request
+            </summary>
+            <param name="context">HTTP context</param>
+            <param name="endpointConnection">Endpoint connection</param>
+            <param name="sessionId">Session ID</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="T:DuetWebServer.Middleware.FallbackMiddleware">
+            <summary>
+            Middleware class to redirect GET requests without dot in the path to the main index file
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Middleware.FallbackMiddleware._next">
+            <summary>
+            Next request delegate in the pipeline
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Middleware.FallbackMiddleware._logger">
+            <summary>
+            Logger instance
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Middleware.FallbackMiddleware.#ctor(Microsoft.AspNetCore.Http.RequestDelegate,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Middleware.FallbackMiddleware})">
+            <summary>
+            Constructor of this middleware
+            </summary>
+            <param name="next">Next request delegate</param>
+            <param name="logger">Logger instance</param>
+        </member>
+        <member name="M:DuetWebServer.Middleware.FallbackMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext)">
+            <summary>
+            Method that is invoked when a new request is coming in.
+            Redirects pages that could not be found to the index page
+            </summary>
+            <param name="context">HTTP context</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="T:DuetWebServer.Middleware.HttpEndpointConnection">
+            <summary>
+            Base class for connections that access the control server via the Duet API using a UNIX socket
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Middleware.HttpEndpointConnection._unixSocket">
+            <summary>
+            Socket used for inter-process communication
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.Connect(System.String)">
+            <summary>
+            Establishes a connection to the given UNIX socket file
+            </summary>
+            <param name="socketPath">Path to the UNIX socket file</param>
+            <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
+        </member>
+        <member name="F:DuetWebServer.Middleware.HttpEndpointConnection.disposed">
+            <summary>
+            Indicates if this instance has been disposed
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.Dispose">
+            <summary>
+            Cleans up the current connection and all resources associated to it
+            </summary>
+        </member>
+        <member name="P:DuetWebServer.Middleware.HttpEndpointConnection.IsConnected">
+            <summary>
+            Returns true if the socket is still connected
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.Close">
+            <summary>
+            Closes the current connection and disposes it
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.SendHttpRequest(DuetAPI.Commands.ReceivedHttpRequest,System.Threading.CancellationToken)">
+            <summary>
+            Send an HTTP request notification to the endpoint provider
+            </summary>
+            <param name="httpRequest">Received HTTP request</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
+        </member>
+        <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.GetHttpResponse(System.Threading.CancellationToken)">
+            <summary>
+            Read a response to an HTTP request from the endpoint provider
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>HTTP response to send</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
+        </member>
+        <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.Receive``1(System.Threading.CancellationToken)">
+            <summary>
+            Receive a deserialized object from the server
+            </summary>
+            <param name="cancellationToken">Cancellation token</param>
+            <typeparam name="T">Type of the received object</typeparam>
+            <returns>Received object</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
+        </member>
+        <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.ReceiveJson(System.Threading.CancellationToken)">
+            <summary>
+            Receive partially deserialized object from the server
+            </summary>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Partially deserialized data</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
+        </member>
+        <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.Send(System.Object,System.Threading.CancellationToken)">
+            <summary>
+            Serialize an arbitrary object into JSON and send it to the server plus NL
+            </summary>
+            <param name="obj">Object to send</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
+        </member>
         <member name="T:DuetWebServer.Program">
             <summary>
             Main class of the ASP.NET Core endpoint
@@ -153,7 +392,7 @@
             Default path to the configuration file
             </summary>
         </member>
-        <member name="F:DuetWebServer.Program.CancelSource">
+        <member name="P:DuetWebServer.Program.CancelSource">
             <summary>
             Global cancel source for program termination
             </summary>
@@ -174,6 +413,16 @@
         <member name="T:DuetWebServer.Startup">
             <summary>
             Class used to start the ASP.NET Core endpoint
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Startup.CorsPolicy">
+            <summary>
+            Name of the CORS policy to use
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Startup._configuration">
+            <summary>
+            Copy of the app configuration
             </summary>
         </member>
         <member name="M:DuetWebServer.Startup.#ctor(Microsoft.Extensions.Configuration.IConfiguration)">

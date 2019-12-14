@@ -260,5 +260,8 @@ paket-files/
 __pycache__/
 *.pyc
 
-# Generated documentation (SHFB)
-docs/LastBuild.log
+# DocFX
+src/Documentation/api
+!src/Documentation/api/index.md
+!src/Documentation/api/toc.yml
+src/Documentation/obj

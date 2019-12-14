@@ -10,7 +10,7 @@ namespace LinuxDevices
     /// <summary>
     /// Class for event-based polling of pin level changes
     /// </summary>
-    public class InputGpioPin : IDisposable
+    public sealed class InputGpioPin : IDisposable
     {
         private const uint GPIO_GET_LINEEVENT_IOCTL = 0xc030b404;
         private const uint GPIOHANDLE_GET_LINE_VALUES_IOCTL = 0xc040b408;
@@ -72,6 +72,45 @@ namespace LinuxDevices
         }
 
         /// <summary>
+        /// Finalizer of this instance
+        /// </summary>
+        ~InputGpioPin() => Dispose(false);
+
+        /// <summary>
+        /// Disposes this instance
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Indicates if this instance has been disposed
+        /// </summary>
+        private bool disposed = false;
+
+        /// <summary>
+        /// Dispose this instance internally
+        /// </summary>
+        /// <param name="disposing"></param>
+        private void Dispose(bool disposing)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            if (_deviceFileDescriptor >= 0)
+            {
+                Interop.close(_deviceFileDescriptor);
+                _deviceFileDescriptor = _reqFd = -1;
+            }
+
+            disposed = true;
+        }
+
+        /// <summary>
         /// Current value of this pin
         /// </summary>
         public bool Value { get; private set; }
@@ -91,7 +130,7 @@ namespace LinuxDevices
         /// <summary>
         /// Start polling for pin events
         /// </summary>
-        /// <param name="cancellationToken"></param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         public unsafe void StartMonitoring(CancellationToken cancellationToken = default)
         {
             if (_reqFd < 0)
@@ -119,15 +158,6 @@ namespace LinuxDevices
                     }
                 } while (!cancellationToken.IsCancellationRequested);
             }, cancellationToken);
-        }
-
-        public void Dispose()
-        {
-            if (_deviceFileDescriptor >= 0)
-            {
-                Interop.close(_deviceFileDescriptor);
-                _deviceFileDescriptor = _reqFd = -1;
-            }
         }
     }
 }

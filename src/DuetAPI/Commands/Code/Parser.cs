@@ -237,7 +237,7 @@ namespace DuetAPI.Commands
                                 if (int.TryParse(args[0], out int majorNumber))
                                 {
                                     result.MajorNumber = majorNumber;
-                                    unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36);
+                                    // Codes with unprecedented parameters are not dot-separated
                                 }
                                 else
                                 {
@@ -255,9 +255,9 @@ namespace DuetAPI.Commands
                             else if (int.TryParse(value, out int majorNumber))
                             {
                                 result.MajorNumber = majorNumber;
-                                unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 30 || majorNumber == 32);
+                                unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
                             }
-                            else
+                            else if (!string.IsNullOrWhiteSpace(value) || result.Type != CodeType.TCode)
                             {
                                 throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})");
                             }

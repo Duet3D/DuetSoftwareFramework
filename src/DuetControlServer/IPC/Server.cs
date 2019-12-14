@@ -1,9 +1,8 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
@@ -17,151 +16,170 @@ namespace DuetControlServer.IPC
     /// </summary>
     public static class Server
     {
-        private static readonly Socket unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-        
-        private static readonly ConcurrentDictionary<Socket, int> clientSockets = new ConcurrentDictionary<Socket, int>();
-        private static int LastConnectionID;
+        /// <summary>
+        /// UNIX socket for inter-process communication
+        /// </summary>
+        private static Socket _unixSocket;
 
         /// <summary>
-        /// Create the UNIX socket for IPC
+        /// Initialize the IPC subsystem and start listening for connections
         /// </summary>
-        public static void CreateSocket()
+        public static void Init()
         {
-            // Clean up socket path again in case of unclean exit
-            File.Delete(Settings.SocketPath);
-            
+            // Make sure the parent directory exists but the socket file does not
+            if (File.Exists(Settings.FullSocketPath))
+            {
+                File.Delete(Settings.FullSocketPath);
+            }
+            else
+            {
+                Directory.CreateDirectory(Settings.SocketDirectory);
+            }
+
             // Create a new UNIX socket and start listening
+            _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
             try
             {
-                UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(Settings.SocketPath);
-                unixSocket.Bind(endPoint);
-                unixSocket.Listen(Settings.Backlog);
+                UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(Settings.FullSocketPath);
+                _unixSocket.Bind(endPoint);
+                _unixSocket.Listen(Settings.Backlog);
             }
             catch
             {
-                unixSocket.Close();
                 throw;
             }
         }
 
         /// <summary>
-        /// Accept incoming connections as long as this program is runnning
+        /// Process incoming connections
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task AcceptConnections()
+        public static async Task Run()
         {
-            do
+            // Make sure to terminate the main socket when the application is being terminated
+            Program.CancelSource.Token.Register(_unixSocket.Close, false);
+
+            // Start accepting incoming connections
+            List<Task> connectionTasks = new List<Task>();
+            try
             {
-                try
+                do
                 {
-                    Socket socket = await unixSocket.AcceptAsync();
-                    ConnectionEstablished(socket);
+                    Socket socket = await _unixSocket.AcceptAsync();
+
+                    Task connectionTask = Task.Run(async () => await ProcessConnection(socket));
+                    lock (connectionTasks)
+                    {
+                        for (int i = connectionTasks.Count - 1; i >= 0; i--)
+                        {
+                            Task task = connectionTasks[i];
+                            if (task.IsCompleted)
+                            {
+                                connectionTasks.Remove(task);
+                            }
+                        }
+                        connectionTasks.Add(connectionTask);
+                    }
                 }
-                catch (SocketException)
-                {
-                    throw new OperationCanceledException(Program.CancelSource.Token);
-                }
+                while (true);
             }
-            while (!Program.CancelSource.IsCancellationRequested);
+            catch (SocketException)
+            {
+                // expected when the program terminates
+            }
+
+            // Wait for pending connections to go
+            await Task.WhenAll(connectionTasks);
+
+            // Remove the UNIX socket file again
+            File.Delete(Settings.FullSocketPath);
         }
 
-        private static async void ConnectionEstablished(Socket socket)
+        /// <summary>
+        /// Function that is called when a new connection has been established
+        /// </summary>
+        /// <param name="socket">Socket of the new connection</param>
+        /// <returns>Asynchronous task</returns>
+        private static async Task ProcessConnection(Socket socket)
         {
-            // Register the new connection first
-            int id = Interlocked.Increment(ref LastConnectionID);
-            clientSockets.TryAdd(socket, id);
-            
-            // Wrap it
-            Connection conn = new Connection(socket, id);
+            using Connection connection = new Connection(socket);
             try
             {
                 // Send server-side init message to the client
-                await conn.Send(new ServerInitMessage { Id = id });
+                connection.Logger.Debug("Got new UNIX connection, checking mode...");
+                await connection.Send(new ServerInitMessage { Id = connection.Id });
 
                 // Read client-side init message and switch mode
-                Base processor = await GetConnectionProcessor(conn);
+                Base processor = await GetConnectionProcessor(connection);
                 if (processor != null)
                 {
                     // Send success message
-                    await conn.SendResponse();
+                    await connection.SendResponse();
 
                     // Let the processor deal with the connection
                     await processor.Process();
                 }
+                else
+                {
+                    connection.Logger.Debug("Failed to find processor");
+                }
             }
             catch (Exception e)
             {
-                // We get here as well when the connection has been terminated (IOException, SocketException -> Broken pipe)
-                if (!(e is OperationCanceledException))
+                if (!(e is OperationCanceledException) && !(e is SocketException))
                 {
-                    Console.WriteLine($"[warn] Connection error: {e}");
+                    // Log unexpected errors
+                    connection.Logger.Error(e, "Terminating connection because an unexpected exception was thrown");
                 }
             }
             finally
             {
-                // Remove this connection again
-                clientSockets.TryRemove(socket, out _);
-                if (socket.Connected)
+                connection.Logger.Debug("Connection closed");
+
+                // Unlock the machine model again in case the client application crashed
+                if (LockManager.Connection == connection.Id)
                 {
-                    socket.Disconnect(true);
+                    LockManager.UnlockMachineModel();
                 }
             }
         }
 
-        private class DeserializableInitMessage : ClientInitMessage { }
-
+        /// <summary>
+        /// Attempt to retrieve a processor for the given connection
+        /// </summary>
+        /// <param name="conn">Connection to get a processor for</param>
+        /// <returns>Instance of a base processor</returns>
         private static async Task<Base> GetConnectionProcessor(Connection conn)
         {
             try
             {
                 JsonDocument response = await conn.ReceiveJson();
-                if (response == null)
-                {
-                    return null;
-                }
-
                 ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
                 switch (initMessage.Mode)
                 {
                     case ConnectionMode.Command:
                         initMessage = JsonSerializer.Deserialize<CommandInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
                         return new Command(conn);
-                    
+
                     case ConnectionMode.Intercept:
                         initMessage = JsonSerializer.Deserialize<InterceptInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
                         return new Interception(conn, initMessage);
-                    
+
                     case ConnectionMode.Subscribe:
                         initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
                         return new Subscription(conn, initMessage);
-                    
+
                     default:
                         throw new ArgumentException("Invalid connection mode");
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[err] Failed to get connection processor: {e}");
+                conn.Logger.Error(e, "Failed to get connection processor");
                 await conn.SendResponse(e);
             }
 
             return null;
-        }
-
-        /// <summary>
-        /// Close every connection and clean up the UNIX socket
-        /// </summary>
-        public static void Shutdown()
-        {
-            // Disconnect every client
-            foreach (Socket socket in clientSockets.Keys)
-            {
-                socket.Close();
-            }
-
-            // Clean up again
-            unixSocket.Close();
-            File.Delete(Settings.SocketPath);
         }
     }
 }

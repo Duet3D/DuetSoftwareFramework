@@ -62,7 +62,7 @@ namespace DuetWebServer.FileProviders
         {
             using (CommandConnection connection = new CommandConnection())
             {
-                await connection.Connect(_configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.SocketPath));
+                await connection.Connect(_configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.FullSocketPath));
                 string wwwRoot = await connection.ResolvePath("0:/www");
                 if (wwwRoot != _wwwRoot)
                 {

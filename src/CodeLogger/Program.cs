@@ -2,34 +2,56 @@
 using DuetAPI.Connection;
 using DuetAPIClient;
 using System;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace CodeLogger
 {
-    class Program
+    public static class Program
     {
-        static async Task Main(string[] args)
+        public static async Task Main(string[] args)
         {
+            // Parse the command line arguments
+            string lastArg = null, socketPath = Defaults.FullSocketPath;
+            bool quiet = false;
+            foreach (string arg in args)
+            {
+                if (lastArg == "-s" || lastArg == "--socket")
+                {
+                    socketPath = arg;
+                }
+                else if (arg == "-q" || lastArg == "--quiet")
+                {
+                    quiet = true;
+                }
+                else if (arg == "-h" || arg == "--help")
+                {
+                    Console.WriteLine("Available command line arguments:");
+                    Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
+                    Console.WriteLine("-q, --quiet: Do not display when a connection has been established");
+                    Console.WriteLine("-h, --help: Display this help text");
+                    return;
+                }
+                lastArg = arg;
+            }
+
             // Connect to DCS
             using InterceptConnection preConnection = new InterceptConnection();
             using InterceptConnection postConnection = new InterceptConnection();
             using InterceptConnection executedConnection = new InterceptConnection();
-            if (args.Length == 0)
+
+            await preConnection.Connect(InterceptionMode.Pre, socketPath);
+            await postConnection.Connect(InterceptionMode.Post, socketPath);
+            await executedConnection.Connect(InterceptionMode.Executed, socketPath);
+
+            if (!quiet)
             {
-                await preConnection.Connect(InterceptionMode.Pre);
-                await postConnection.Connect(InterceptionMode.Post);
-                await executedConnection.Connect(InterceptionMode.Executed);
+                Console.WriteLine("Connected!");
             }
-            else
-            {
-                await preConnection.Connect(InterceptionMode.Pre, args[0]);
-                await postConnection.Connect(InterceptionMode.Post, args[0]);
-                await executedConnection.Connect(InterceptionMode.Executed, args[0]);
-            }
-            Console.WriteLine("Connected!");
 
             // Start waiting for incoming codes
-            Task[] tasks = new Task[] {
+            Task[] tasks = new Task[]
+            {
                 PrintIncomingCodes("pre", preConnection),
                 PrintIncomingCodes("post", postConnection),
                 PrintIncomingCodes("executed", executedConnection)
@@ -39,26 +61,28 @@ namespace CodeLogger
             await Task.WhenAll(tasks);
         }
 
-        static async Task PrintIncomingCodes(string prefix, InterceptConnection connection)
+        private static async Task PrintIncomingCodes(string prefix, InterceptConnection connection)
         {
-            Code code;
-            do
+            try
             {
-                code = await connection.ReceiveCode();
-                if (code == null)
+                Code code;
+                do
                 {
-                    // Lost connection
-                    break;
+                    code = await connection.ReceiveCode();
+
+                    // If you do not wish to let the received code execute, you can run connection.ResolveCode instead.
+                    // Before you call one of Cancel, Ignore, or Resolve you may execute as many commands as you want.
+                    // Codes initiated from the intercepting connection cannot be intercepted from the same connection.
+                    await connection.IgnoreCode();
+
+                    Console.WriteLine($"[{prefix}] {code.Channel}: {code}");
                 }
-
-                // If you do not wish to let the received code execute, you can run connection.ResolveCode instead.
-                // Before you call one of Cancel, Ignore, or Resolve you may execute as many commands as you want.
-                // Codes initiated from the intercepting connection cannot be intercepted from the same connection.
-                await connection.IgnoreCode();
-
-                Console.WriteLine($"[{prefix}] {code.Channel}: {code}");
+                while (true);
             }
-            while (true);
+            catch (SocketException)
+            {
+                // Server has closed the connection
+            }
         }
     }
 }

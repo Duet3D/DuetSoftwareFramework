@@ -31,6 +31,11 @@ namespace DuetAPI.Machine
         public Heat Heat { get; private set; } = new Heat();
 
         /// <summary>
+        /// List of registered third-party HTTP endpoints
+        /// </summary>
+        public ObservableCollection<HttpEndpoint> HttpEndpoints { get; } = new ObservableCollection<HttpEndpoint>();
+
+        /// <summary>
         /// Information about the current file job (if any)
         /// </summary>
         public Job Job { get; private set; } = new Job();
@@ -97,6 +102,11 @@ namespace DuetAPI.Machine
         public ObservableCollection<Tool> Tools { get; } = new ObservableCollection<Tool>();
 
         /// <summary>
+        /// List of user sessions
+        /// </summary>
+        public ObservableCollection<UserSession> UserSessions { get; set; } = new ObservableCollection<UserSession>();
+
+        /// <summary>
         /// List of user-defined variables
         /// </summary>
         /// <seealso cref="UserVariable"/>
@@ -123,6 +133,7 @@ namespace DuetAPI.Machine
             Electronics.Assign(other.Electronics);
             ListHelpers.AssignList(Fans, other.Fans);
             Heat.Assign(other.Heat);
+            ListHelpers.AssignList(HttpEndpoints, other.HttpEndpoints);
             Job.Assign(other.Job);
             ListHelpers.AssignList(Lasers, other.Lasers);
             MessageBox.Assign(other.MessageBox);
@@ -135,6 +146,7 @@ namespace DuetAPI.Machine
             State.Assign(other.State);
             ListHelpers.AssignList(Storages, other.Storages);
             ListHelpers.AssignList(Tools, other.Tools);
+            ListHelpers.AssignList(UserSessions, other.UserSessions);
             ListHelpers.AssignList(UserVariables, other.UserVariables);
         }
 
@@ -159,11 +171,13 @@ namespace DuetAPI.Machine
             };
 
             ListHelpers.CloneItems(clone.Fans, Fans);
+            ListHelpers.CloneItems(clone.HttpEndpoints, HttpEndpoints);
             ListHelpers.CloneItems(clone.Lasers, Lasers);
             ListHelpers.CloneItems(clone.Messages, Messages);
             ListHelpers.CloneItems(clone.Spindles, Spindles);
             ListHelpers.CloneItems(clone.Storages, Storages);
             ListHelpers.CloneItems(clone.Tools, Tools);
+            ListHelpers.CloneItems(clone.UserSessions, UserSessions);
             ListHelpers.CloneItems(clone.UserVariables, UserVariables);
 
             return clone;

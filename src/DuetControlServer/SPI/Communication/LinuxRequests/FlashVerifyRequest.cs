@@ -6,7 +6,7 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
     /// Used as the last message to check if the firmware has been flashed successfully
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Size = 8)]
-    struct FlashVerifyRequest
+    internal struct FlashVerifyRequest
     {
         /// <summary>
         /// Length of the flashed firmware

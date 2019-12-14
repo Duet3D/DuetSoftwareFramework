@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -44,8 +45,9 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
-        /// <exception cref="SocketException">Init message could not be sent</exception>
-        public Task Connect(SubscriptionMode mode, string filter = null, string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default)
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Init message could not be processed</exception>
+        public Task Connect(SubscriptionMode mode, string filter = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
             Mode = mode;
             Filter = filter;
@@ -60,6 +62,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>The current machine model</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
         public async Task<MachineModel> GetMachineModel(CancellationToken cancellationToken = default)
         {
@@ -74,6 +77,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Machine model JSON</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
         public async Task<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
         {
@@ -89,6 +93,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">An optional cancellation token</param>
         /// <returns>The partial update JSON</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
         /// <seealso cref="GetMachineModel"/>
         /// <seealso cref="JsonPatch.Patch(object, JsonDocument)"/>

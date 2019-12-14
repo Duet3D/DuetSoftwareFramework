@@ -1,17 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-      <TargetFramework>netcoreapp3.0</TargetFramework>
+      <TargetFramework>netcoreapp3.1</TargetFramework>
       <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
       <PackageLicenseExpression>LGPL-3.0</PackageLicenseExpression>
+      <AssemblyVersion>1.2.0.0</AssemblyVersion>
+      <FileVersion>1.2.0.0</FileVersion>
+      <Version>1.2.0</Version>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+  <PropertyGroup>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DocumentationFile>C:\Users\Christian\Source\repos\DuetSoftwareFramework\src\LinuxDevices\LinuxDevices.xml</DocumentationFile>
   </PropertyGroup>
 
 </Project>

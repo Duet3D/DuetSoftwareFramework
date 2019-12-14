@@ -1,5 +1,4 @@
-﻿using DuetWebServer.FileProviders;
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
@@ -14,7 +13,14 @@ namespace DuetWebServer
     /// </summary>
     public class Startup
     {
+        /// <summary>
+        /// Name of the CORS policy to use
+        /// </summary>
         private const string CorsPolicy = "cors-policy";
+
+        /// <summary>
+        /// Copy of the app configuration
+        /// </summary>
         private readonly IConfiguration _configuration;
 
         /// <summary>
@@ -30,7 +36,7 @@ namespace DuetWebServer
         /// Configure web services and add service to the container
         /// </summary>
         /// <param name="services">Service collection</param>
-        public void ConfigureServices(IServiceCollection services)
+        public static void ConfigureServices(IServiceCollection services)
         {
             // Register CORS policy (may or may not be used)
             services.AddCors(options =>
@@ -38,7 +44,7 @@ namespace DuetWebServer
                 options.AddPolicy(CorsPolicy,
                 builder =>
                 {
-                    // Allow very unrestrictive CORS requests (for now)
+                    // Create a rule for very unrestrictive CORS requests
                     builder
                         .AllowAnyOrigin()
                         .AllowAnyHeader()
@@ -73,43 +79,40 @@ namespace DuetWebServer
             {
                 app.UseCors(CorsPolicy);
             }
-            
+
             // Use static files from 0:/www if applicable
             if (_configuration.GetValue("UseStaticFiles", true))
             {
-                // Redirect pages that could not be found to the index page
-                app.Use(async (context, next) =>
-                {
-                    await next();
-
-                    if (context.Response.StatusCode == 404 && !context.Response.HasStarted &&
-                        !context.Request.Path.Value.StartsWith("/rr_") && !context.Request.Path.Value.Contains("."))
-                    {
-                        context.Request.Path = "/";
-                        await next();
-                    }
-                });
-                
-                // Provide static files from the virtual SD card (0:/www)
                 app.UseStaticFiles();
                 app.UseFileServer(new FileServerOptions
                 {
-                    FileProvider = new DuetFileProvider(_configuration)
+                    FileProvider = new FileProviders.DuetFileProvider(_configuration)
                 });
             }
 
+            // Define a keep-alive interval for operation as a reverse proxy
             app.UseWebSockets(new WebSocketOptions
             {
                 KeepAliveInterval = TimeSpan.FromSeconds(_configuration.GetValue("KeepAliveInterval", 30))
             }); ;
+
+
+            // Define endpoints
             app.UseEndpoints(endpoints =>
             {
+                endpoints.MapControllerRoute("WebSocket", "{controller=WebSocket}");
                 endpoints.MapControllerRoute("default", "{controller=Machine}");
                 if (_configuration.GetValue("UseCors", true))
                 {
                     endpoints.MapControllers().RequireCors(CorsPolicy);
                 }
             });
+
+            // Use middleware for third-pary HTTP requests
+            app.UseMiddleware(typeof(Middleware.CustomEndpointMiddleware));
+
+            // Use fallback middlware
+            app.UseMiddleware(typeof(Middleware.FallbackMiddleware));
         }
     }
 }

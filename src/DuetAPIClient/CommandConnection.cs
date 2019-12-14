@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
@@ -18,7 +19,7 @@ namespace DuetAPIClient
         /// Create a new connection in command mode
         /// </summary>
         public CommandConnection() : base(ConnectionMode.Command) { }
-        
+
         /// <summary>
         /// Establish a connection to the given UNIX socket file
         /// </summary>
@@ -27,8 +28,9 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
-        /// <exception cref="SocketException">Init message could not be sent</exception>
-        public Task Connect(string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default)
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Init message could not be processed</exception>
+        public Task Connect(string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
             CommandInitMessage initMessage = new CommandInitMessage();
             return Connect(initMessage, socketPath, cancellationToken);

@@ -15,10 +15,30 @@ namespace DuetControlServer.FileExecution
     /// </summary>
     public static class Print
     {
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// Lock for thread-safe access
+        /// </summary>
         private static readonly AsyncLock _lock = new AsyncLock();
+
+        /// <summary>
+        /// Job file being read from
+        /// </summary>
         private static BaseFile _file;
+
+        /// <summary>
+        /// Position in bytes at which the print was paused
+        /// </summary>
         private static long _pausePosition;
-        private static readonly AsyncAutoResetEvent _resumeEvent = new AsyncAutoResetEvent();
+
+        /// <summary>
+        /// Event to trigger when the job is supposed to be resumed. It is also triggered after a print has been cancelled
+        /// </summary>
+        private static readonly AsyncManualResetEvent _resumeEvent = new AsyncManualResetEvent();
 
         /// <summary>
         /// Print diagnostics of this class
@@ -56,15 +76,6 @@ namespace DuetControlServer.FileExecution
                 IsPaused = IsAborted = false;
             }
 
-            // Wait for all pending firmware codes on the source channel to finish first
-            await SPI.Interface.Flush(source);
-
-            // Reset the resume event
-            if (_resumeEvent.IsSet)
-            {
-                await _resumeEvent.WaitAsync();
-            }
-
             // Analyze it and update the object model
             ParsedFileInfo info = await FileInfoParser.Parse(fileName);
             using (await Model.Provider.AccessReadWriteAsync())
@@ -74,9 +85,10 @@ namespace DuetControlServer.FileExecution
             }
 
             // Notify RepRapFirmware and start processing the file in the background
-            Console.WriteLine($"[info] Printing file '{fileName}'");
+            _logger.Info("Printing file {0}", fileName);
             SPI.Interface.SetPrintStarted();
-            _ = Task.Run(RunPrint);
+            _resumeEvent.Reset();
+            RunPrint();
 
             // Return a result
             using (await Model.Provider.AccessReadOnlyAsync())
@@ -92,7 +104,10 @@ namespace DuetControlServer.FileExecution
             }
         }
 
-        private static async Task RunPrint()
+        /// <summary>
+        /// Perform the actual print job
+        /// </summary>
+        private static async void RunPrint()
         {
             BaseFile file = _file;
 
@@ -119,6 +134,13 @@ namespace DuetControlServer.FileExecution
                     codeTasks.Clear();
 
                     await _resumeEvent.WaitAsync(Program.CancelSource.Token);
+                    _resumeEvent.Reset();
+
+                    if (Program.CancelSource.IsCancellationRequested)
+                    {
+                        // Stop if the program is being terminated
+                        return;
+                    }
                 }
 
                 // Fill up the code buffer
@@ -151,7 +173,6 @@ namespace DuetControlServer.FileExecution
                     {
                         if (!(e is OperationCanceledException))
                         {
-                            Console.WriteLine($"[err] {e}");
                             await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} threw an exception: [{e.GetType().Name}] {e.Message}");
                             await Abort();
                         }
@@ -179,18 +200,18 @@ namespace DuetControlServer.FileExecution
                 Code.CancelPending(CodeChannel.File);
                 if (IsAborted)
                 {
-                    Console.WriteLine("[info] Aborted print");
+                    _logger.Info("Aborted print");
                     SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.Abort);
                 }
                 else
                 {
-                    Console.WriteLine("[info] Cancelled print");
+                    _logger.Info("Cancelled print");
                     SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.UserCancelled);
                 }
             }
             else
             {
-                Console.WriteLine("[info] Finished print");
+                _logger.Info("Finished print");
                 SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.NormalCompletion);
             }
 

@@ -88,5 +88,23 @@ namespace DuetAPI.Utility
                 destination.Add((T)item?.Clone());
             }
         }
+
+        /// <summary>
+        /// Helper functionto remove a specific item from a list of assignable items
+        /// </summary>
+        /// <remarks>
+        /// This must be used to ensure Patch mode keeps working when DCS removes certain items like user sessions or HTTP endpoints
+        /// </remarks>
+        /// <typeparam name="T">Item type</typeparam>
+        /// <param name="list">List to remove an item from</param>
+        /// <param name="index">Index of the item to remove</param>
+        public static void RemoveItem<T>(IList<T> list, int index) where T : IAssignable
+        {
+            for (int i = list.Count - 1; i > index; i--)
+            {
+                list[i - 1].Assign(list[i]);
+            }
+            list.RemoveAt(list.Count - 1);
+        }
     }
 }

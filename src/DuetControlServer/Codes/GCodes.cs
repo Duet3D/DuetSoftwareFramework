@@ -42,6 +42,10 @@ namespace DuetControlServer.Codes
                                     {
                                         await SPI.Interface.SetHeightmap(map);
                                         await SPI.Interface.UnlockAll(code.Channel);
+                                        using (await Model.Provider.AccessReadWriteAsync())
+                                        {
+                                            Model.Provider.Get.Move.HeightmapFile = await FilePath.ToVirtualAsync(physicalFile);
+                                        }
                                         return new CodeResult(DuetAPI.MessageType.Success, $"Height map loaded from file {file}");
                                     }
                                     else
@@ -51,6 +55,10 @@ namespace DuetControlServer.Codes
                                         if (map.NumX * map.NumY > 0)
                                         {
                                             await map.Save(physicalFile);
+                                            using (await Model.Provider.AccessReadWriteAsync())
+                                            {
+                                                Model.Provider.Get.Move.HeightmapFile = await FilePath.ToVirtualAsync(physicalFile);
+                                            }
                                             return new CodeResult(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
                                         }
                                         return new CodeResult();
@@ -140,6 +148,10 @@ namespace DuetControlServer.Codes
                                 if (map.NumX * map.NumY > 0)
                                 {
                                     await map.Save(physicalFile);
+                                    using (await Model.Provider.AccessReadWriteAsync())
+                                    {
+                                        Model.Provider.Get.Move.HeightmapFile = await FilePath.ToVirtualAsync(physicalFile);
+                                    }
                                     code.Result.Add(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
                                 }
                             }

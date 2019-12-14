@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -119,19 +118,25 @@ namespace DuetAPI.Utility
         /// <param name="socket">Socket to read from</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Plain JSON</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
         public static async Task<MemoryStream> ReceiveUtf8Json(Socket socket, CancellationToken cancellationToken = default)
         {
-            //Console.Write("IN ");
-
-            MemoryStream json = new MemoryStream();
+            MemoryStream jsonStream = new MemoryStream();
             bool inJson = false, inQuotes = false, isEscaped = false;
             int numBraces = 0;
 
             byte[] readData = new byte[1];
-            while ((!inJson || numBraces > 0) && await socket.ReceiveAsync(readData, SocketFlags.None, cancellationToken) > 0)
+            while (!inJson || numBraces > 0)
             {
+                if (await socket.ReceiveAsync(readData, SocketFlags.None, cancellationToken) <= 0)
+                {
+                    // Do not keep reading if the connection has been gracefully closed
+                    jsonStream.Dispose();
+                    throw new SocketException((int)SocketError.NotConnected);
+                }
+
                 char c = (char)readData[0];
-                //Console.Write(c);
                 if (inQuotes)
                 {
                     if (isEscaped)
@@ -163,13 +168,12 @@ namespace DuetAPI.Utility
 
                 if (inJson)
                 {
-                    json.WriteByte(readData[0]);
+                    jsonStream.WriteByte(readData[0]);
                 }
             }
 
-            //Console.WriteLine(" OK");
-            json.Seek(0, SeekOrigin.Begin);
-            return json;
+            jsonStream.Seek(0, SeekOrigin.Begin);
+            return jsonStream;
         }
     }
 }

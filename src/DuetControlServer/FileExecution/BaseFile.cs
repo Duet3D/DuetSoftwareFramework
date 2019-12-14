@@ -11,7 +11,14 @@ namespace DuetControlServer.FileExecution
     /// </summary>
     public class BaseFile : IDisposable
     {
+        /// <summary>
+        /// File being read from
+        /// </summary>
         private readonly FileStream _fileStream;
+
+        /// <summary>
+        /// Reader for the file stream
+        /// </summary>
         private readonly SeekableStreamReader _reader;
 
         /// <summary>
@@ -27,7 +34,8 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Gets or sets the current file position in bytes
         /// </summary>
-        public long Position {
+        public long Position
+        {
             get => _fileStream.Position;
             set
             {
@@ -39,7 +47,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Number of the current line
         /// </summary>
-        public long LineNumber { get; set; }
+        public long LineNumber { get; private set; }
 
         /// <summary>
         /// Returns the length of the file in bytes
@@ -62,7 +70,7 @@ namespace DuetControlServer.FileExecution
         public bool IsFinished { get; private set; }
 
         /// <summary>
-        /// Create a file reader
+        /// Create the base for reading from a G-code file
         /// </summary>
         /// <param name="fileName">Name of the file to process</param>
         /// <param name="channel">Channel to send the codes to</param>
@@ -73,6 +81,45 @@ namespace DuetControlServer.FileExecution
 
             FileName = fileName;
             Channel = channel;
+        }
+
+        /// <summary>
+        /// Finalizer of a base file
+        /// </summary>
+        ~BaseFile() => Dispose(false);
+
+        /// <summary>
+        /// Dispose this instance
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Indicates if this instance has been disposed
+        /// </summary>
+        private bool disposed;
+
+        /// <summary>
+        /// Dispose this instance internally
+        /// </summary>
+        /// <param name="disposing">True if this instance is being disposed</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            if (disposing)
+            {
+                _reader.Dispose();
+                _fileStream.Dispose();
+            }
+
+            disposed = true;
         }
 
         /// <summary>
@@ -114,15 +161,6 @@ namespace DuetControlServer.FileExecution
                 return null;
             }
             return code;
-        }
-
-        /// <summary>
-        /// Dispose this instance
-        /// </summary>
-        public void Dispose()
-        {
-            _reader.Dispose();
-            _fileStream.Dispose();
         }
     }
 }

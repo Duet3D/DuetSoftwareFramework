@@ -1,90 +1,219 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using DuetControlServer.IPC;
 
 namespace DuetControlServer
 {
     /// <summary>
     /// Main program class
     /// </summary>
-    static class Program
+    public static class Program
     {
         /// <summary>
-        /// Global cancel source for program termination
+        /// Logger instance
         /// </summary>
-        public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
-        /// Indicates if this program is only launched to update the Duet 3 firmware
+        /// Global cancellation source that is triggered when the program is supposed to terminate
         /// </summary>
-        public static bool UpdateOnly;
-
-        private static void Write(string message)
-        {
-            if (!UpdateOnly)
-            {
-                Console.Write(message);
-            }
-        }
-
-        private static void WriteLine(string line = "")
-        {
-            if (!UpdateOnly)
-            {
-                Console.WriteLine(line);
-            }
-        }
+        public static CancellationTokenSource CancelSource { get; } = new CancellationTokenSource();
 
         /// <summary>
         /// Entry point of the program
         /// </summary>
         /// <param name="args">Command-line arguments</param>
-        /// <returns>Asynchronous task</returns>
-        static async Task Main(string[] args)
+        private static async Task Main(string[] args)
         {
-            // Check if only the firmware is supposed to be updated
-            foreach (string arg in args)
+            // Performing an update implies a reduced log level
+            if (args.Contains("-u") && !args.Contains("--update"))
             {
-                if (arg == "-u" || arg == "--update")
-                {
-                    UpdateOnly = true;
-                    break;
-                }
+                List<string> newArgs = new List<string>() { "--log-level", "warn" };
+                newArgs.AddRange(args);
+                args = newArgs.ToArray();
+            }
+            else
+            {
+                Console.WriteLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
+                Console.WriteLine("Written by Christian Hammacher for Duet3D");
+                Console.WriteLine("Licensed under the terms of the GNU Public License Version 3");
+                Console.WriteLine();
             }
 
-            // Display welcome message
-            WriteLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
-            WriteLine("Written by Christian Hammacher for Duet3D");
-            WriteLine("Licensed under the terms of the GNU Public License Version 3");
-            WriteLine();
-
             // Initialize settings
-            Write("Loading settings... ");
             try
             {
-                Settings.Init(args);
-                WriteLine("Done!");
+                if (!Settings.Init(args))
+                {
+                    return;
+                }
+                _logger.Info("Settings loaded");
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Error: {e.Message}");
+                _logger.Error(e, "Failed to load settings");
                 return;
             }
 
             // Check if another instance is already running
-            using (DuetAPIClient.CommandConnection testConnection = new DuetAPIClient.CommandConnection())
+            if (await CheckForAnotherInstance())
+            {
+                return;
+            }
+
+            // Initialize everything
+            try
+            {
+                Commands.Code.InitScheduler();
+                Model.Provider.Init();
+                Model.Observer.Init();
+                _logger.Info("Environment initialized");
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to initialize environment");
+                return;
+            }
+
+            // Connect to RRF controller
+            if (Settings.NoSpiTask)
+            {
+                _logger.Warn("Connection to Duet is NOT established, things may not work as expected");
+            }
+            else
             {
                 try
                 {
-                    await testConnection.Connect(Settings.SocketPath);
-                    if (UpdateOnly)
+                    SPI.Interface.Init();
+                    if (SPI.Interface.Connect())
+                    {
+                        _logger.Info("Connection to Duet established");
+                    }
+                    else
+                    {
+                        _logger.Error("Duet is not available");
+                        return;
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.Error(e, "Failed to connect to Duet");
+                    return;
+                }
+            }
+
+            // Start up IPC server
+            try
+            {
+                IPC.Server.Init();
+                _logger.Info("IPC socket created at {0}", Settings.FullSocketPath);
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to initialize IPC socket");
+                return;
+            }
+
+            // Start main tasks in the background
+            Dictionary<Task, string> mainTasks = new Dictionary<Task, string>
+            {
+                { Task.Run(Model.Updater.Run), "Update" },
+                { Task.Run(SPI.Interface.Run), "SPI" },
+                { Task.Run(IPC.Server.Run), "IPC" },
+                { Task.Run(Model.PeriodicUpdater.Run), "Periodic update" }
+            };
+
+            // Deal with program termination requests (SIGTERM and Ctrl+C)
+            AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+            {
+                if (!CancelSource.IsCancellationRequested)
+                {
+                    _logger.Warn("Received SIGTERM, shutting down...");
+                    CancelSource.Cancel();
+                }
+            };
+            Console.CancelKeyPress += (sender, e) =>
+            {
+                if (!CancelSource.IsCancellationRequested)
+                {
+                    _logger.Warn("Received SIGINT, shutting down...");
+                    e.Cancel = true;
+                    CancelSource.Cancel();
+                }
+            };
+            
+            // Wait for the first task to terminate.
+            // In case this is an unusual shutdown, log this event and shut down the application
+            Task terminatedTask = await Task.WhenAny(mainTasks.Keys);
+            if (!CancelSource.IsCancellationRequested)
+            {
+                if (!Settings.UpdateOnly)
+                {
+                    _logger.Fatal("Abnormal program termination");
+                }
+                CancelSource.Cancel();
+            }
+
+            // Wait for the other tasks to finish
+            do
+            {
+                string taskName = mainTasks[terminatedTask];
+                if (terminatedTask.IsFaulted && !terminatedTask.IsCanceled)
+                {
+                    foreach (Exception ie in terminatedTask.Exception.InnerExceptions)
+                    {
+                        _logger.Fatal(ie, "{0} task faulted", taskName);
+                    }
+                }
+                else
+                {
+                    _logger.Debug("{0} task terminated", taskName);
+                }
+
+                mainTasks.Remove(terminatedTask);
+                if (mainTasks.Count > 0)
+                {
+                    // FIXME: At present, calls to Task.WhenAny in this context may cause the .NET Core application to
+                    // terminate suddently and without an exception. Hence the output may be truncated when shutting down
+                    terminatedTask = await Task.WhenAny(mainTasks.Keys);
+                }
+            }
+            while (mainTasks.Count > 0);
+
+            // End
+            _logger.Debug("Application has shut down");
+            NLog.LogManager.Shutdown();
+        }
+
+        private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
+        {
+            if (!CancelSource.IsCancellationRequested)
+            {
+                _logger.Warn("Received SIGTERM, shutting down...");
+                CancelSource.Cancel();
+            }
+        }
+
+        /// <summary>
+        /// Check if another instance is already running
+        /// </summary>
+        /// <returns>True if another instance is running</returns>
+        private static async Task<bool> CheckForAnotherInstance()
+        {
+            using (DuetAPIClient.CommandConnection connection = new DuetAPIClient.CommandConnection())
+            {
+                try
+                {
+                    await connection.Connect(Settings.FullSocketPath);
+                    if (Settings.UpdateOnly)
                     {
                         Console.Write("Sending update request to DCS... ");
                         try
                         {
-                            await testConnection.PerformCode(new DuetAPI.Commands.Code
+                            await connection.PerformCode(new DuetAPI.Commands.Code
                             {
                                 Type = DuetAPI.Commands.CodeType.MCode,
                                 MajorNumber = 997,
@@ -92,128 +221,24 @@ namespace DuetControlServer
                             });
                             Console.WriteLine("Done!");
                         }
-                        catch (Exception e)
+                        catch
                         {
-                            Console.WriteLine($"Error: {e.Message}");
+                            Console.WriteLine("Error: Failed to send update request");
+                            throw;
                         }
                     }
                     else
                     {
                         Console.WriteLine("Error: Another instance is already running. Stopping.");
                     }
-                    return;
+                    return true;
                 }
                 catch
                 {
                     // expected
                 }
             }
-
-            // Initialise object model
-            Write("Initialising variables... ");
-            try
-            {
-                Commands.Code.InitScheduler();
-                Model.Provider.Init();
-                Model.Observer.Init();
-                WriteLine("Done!");
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"Error: {e.Message}");
-                return;
-            }
-
-            // Connect to RRF controller
-            Write("Connecting to RepRapFirmware... ");
-            try
-            {
-                SPI.Interface.Init();
-                if (!SPI.Interface.Connect())
-                {
-                    Console.WriteLine("Error: Duet is not available");
-                    return;
-                }
-                WriteLine("Done!");
-            }
-            catch (AggregateException ae)
-            {
-                Console.WriteLine($"Error: {ae.InnerException.Message}");
-                return;
-            }
-
-            // Start up IPC server
-            Write("Creating IPC socket... ");
-            try
-            {
-                Server.CreateSocket();
-                WriteLine("Done!");
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"Error: {e.Message}");
-                return;
-            }
-            
-            WriteLine();
-
-            // Start main tasks in the background
-            Task spiTask = Task.Run(SPI.Interface.Run, CancelSource.Token);
-            Task ipcTask = Task.Run(Server.AcceptConnections, CancelSource.Token);
-            Task updateTask = Task.Run(Model.Updater.ProcessUpdates, CancelSource.Token);
-            Task periodicUpdateTask = Task.Run(Model.UpdateTask.UpdatePeriodically, CancelSource.Token);
-            Task[] taskList = { spiTask, ipcTask, updateTask, periodicUpdateTask };
-
-            // Deal with program termination requests (SIGTERM) and wait for program termination
-            AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) =>
-            {
-                if (!CancelSource.IsCancellationRequested)
-                {
-                    Console.WriteLine("[info] Received SIGTERM, shutting down...");
-                    CancelSource.Cancel();
-                }
-            };
-
-            await Task.WhenAny(taskList);
-
-            // Tell other tasks to stop in case this is an abnormal program termination
-            if (UpdateOnly)
-            {
-                CancelSource.Cancel();
-            }
-            else if (!CancelSource.IsCancellationRequested)
-            {
-                Console.Write("[crit] Abnormal program termination: ");
-                if (spiTask.IsCompleted) { Console.WriteLine("SPI task terminated");  }
-                if (ipcTask.IsCompleted) { Console.WriteLine("IPC task terminated");  }
-                if (updateTask.IsCompleted) { Console.WriteLine("Update task terminated"); }
-                if (periodicUpdateTask.IsCompleted) { Console.WriteLine("Periodic update task terminated"); }
-                CancelSource.Cancel();
-            }
-
-            // Stop logging
-            await Utility.Logger.Stop();
-
-            // Stop the IPC subsystem. This has to happen here because Socket.AcceptAsync() does not have a CancellationToken parameter
-            Server.Shutdown();
-
-            // Wait for all tasks to finish
-            try
-            {
-                // Do not use Task.WhenAll() here because it does not throw exceptions for already completed tasks
-                Task.WaitAll(taskList);
-            }
-            catch (AggregateException ae)
-            {
-                foreach (Exception e in ae.InnerExceptions)
-                {
-                    if (!(e is OperationCanceledException))
-                    {
-                        Console.Write("[crit] ");
-                        Console.WriteLine(e);
-                    }
-                }
-            }
+            return false;
         }
     }
 }

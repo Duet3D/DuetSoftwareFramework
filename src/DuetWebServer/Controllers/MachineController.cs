@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
-using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -24,7 +23,14 @@ namespace DuetWebServer.Controllers
     [Route("[controller]")]
     public class MachineController : ControllerBase
     {
+        /// <summary>
+        /// App configuration
+        /// </summary>
         private readonly IConfiguration _configuration;
+
+        /// <summary>
+        /// Logger instance
+        /// </summary>
         private readonly ILogger _logger;
 
         /// <summary>
@@ -40,26 +46,6 @@ namespace DuetWebServer.Controllers
 
         #region General requests
         /// <summary>
-        /// WS /machine
-        /// Provide WebSocket for continuous model updates. This is primarily used to keep DWC2 up-to-date
-        /// </summary>
-        /// <returns>WebSocket, HTTP status code: (400) Bad request</returns>
-        /// <seealso cref="WebSocketController.Process"/>
-        [HttpGet]
-        public async Task Get()
-        {
-            if (HttpContext.WebSockets.IsWebSocketRequest)
-            {
-                WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-                await WebSocketController.Process(webSocket, _configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.SocketPath),_logger);
-            }
-            else
-            {
-                HttpContext.Response.StatusCode = 400;
-            }
-        }
-
-        /// <summary>
         /// GET /machine/status
         /// Retrieve the full object model as JSON.
         /// </summary>
@@ -71,7 +57,11 @@ namespace DuetWebServer.Controllers
             {
                 using CommandConnection connection = await BuildConnection();
                 MemoryStream json = await connection.GetSerializedMachineModel();
-                return new FileStreamResult(json, "application/json");
+                if (json != null)
+                {
+                    return new FileStreamResult(json, "application/json");
+                }
+                return new NoContentResult();
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
@@ -92,7 +82,7 @@ namespace DuetWebServer.Controllers
 
         /// <summary>
         /// POST /machine/code
-        /// Execute a plain G/M/T-code from the request body and return the G-code response when done.
+        /// Execute plain G/M/T-code(s) from the request body and return the G-code response when done.
         /// </summary>
         /// <returns>HTTP status code: (200) G-Code response as text/plain (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
         [HttpPost("code")]
@@ -121,11 +111,6 @@ namespace DuetWebServer.Controllers
             {
                 _logger.LogError($"[{nameof(DoCode)}] DCS is unavailable");
                 return StatusCode(503, ae.InnerException.Message);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogWarning($"[{nameof(DoCode)}] Code {code} has been cancelled");
-                return Content("Error: Code has been cancelled");
             }
             catch (Exception e)
             {
@@ -227,7 +212,7 @@ namespace DuetWebServer.Controllers
 
         /// <summary>
         /// GET /machine/fileinfo/{filename}
-        /// Retrieve file info from the specified G-code file.
+        /// Parse a given G-code file and return information about this job file as a JSON object.
         /// </summary>
         /// <param name="filename">G-code file to analyze</param>
         /// <returns>HTTP status code: (200) File info as application/json (404) File not found (500) Generic error (502) Incompatible DCS (503) DCS is unavailable</returns>
@@ -489,7 +474,7 @@ namespace DuetWebServer.Controllers
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new CommandConnection();
-            await connection.Connect(_configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.SocketPath));
+            await connection.Connect(_configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.FullSocketPath));
             return connection;
         }
 

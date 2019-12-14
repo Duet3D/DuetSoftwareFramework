@@ -9,7 +9,7 @@ namespace DuetWebServer
     /// <summary>
     /// Main class of the ASP.NET Core endpoint
     /// </summary>
-    public class Program
+    public static class Program
     {
         /// <summary>
         /// Default path to the configuration file
@@ -19,7 +19,7 @@ namespace DuetWebServer
         /// <summary>
         /// Global cancel source for program termination
         /// </summary>
-        public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
+        public static CancellationTokenSource CancelSource { get; } = new CancellationTokenSource();
 
         /// <summary>
         /// Called when the application is launched

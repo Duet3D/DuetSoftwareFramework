@@ -15,17 +15,25 @@ namespace DuetControlServer.Model
     public static class Provider
     {
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// Wrapper around the writer lock which notifies subscribers whenever an update has been processed
         /// </summary>
         private class WriterLockWrapper : IDisposable
         {
-            private readonly IDisposable lockItem;
+            /// <summary>
+            /// Internal lock
+            /// </summary>
+            private readonly IDisposable _lock;
 
             /// <summary>
             /// Constructor of the lock wrapper
             /// </summary>
             /// <param name="item">Actual lock</param>
-            internal WriterLockWrapper(IDisposable item) => lockItem = item;
+            internal WriterLockWrapper(IDisposable item) => _lock = item;
 
             /// <summary>
             /// Dipose method that is called when the lock is released
@@ -43,24 +51,23 @@ namespace DuetControlServer.Model
                 }
 
                 // Dispose the lock again 
-                lockItem.Dispose();
+                _lock.Dispose();
             }
         }
 
+        /// <summary>
+        /// Lock for read/write access
+        /// </summary>
         private static readonly AsyncReaderWriterLock _lock = new AsyncReaderWriterLock();
 
         /// <summary>
-        /// Initialize the object model provider
+        /// Initialize the object model provider with values that are not expected to change
         /// </summary>
         public static void Init()
         {
-            // Initialize electronics
             Get.Electronics.Version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
             Get.Electronics.Type = "duet3";
             Get.Electronics.Name = "Duet 3";
-
-            // Initialize machine name
-            Get.Network.Name = Environment.MachineName;
         }
 
         /// <summary>
@@ -108,11 +115,22 @@ namespace DuetControlServer.Model
         {
             if (!string.IsNullOrWhiteSpace(message?.Content))
             {
-                // Output the message
-                message.Print();
+                // Print the message to the DCS log
+                switch (message.Type)
+                {
+                    case MessageType.Error:
+                        _logger.Error(message.Content);
+                        break;
+                    case MessageType.Warning:
+                        _logger.Warn(message.Content);
+                        break;
+                    default:
+                        _logger.Info(message.Content);
+                        break;
+                }
 
                 // Attempt to forward messages directly to subscribers. If none are available,
-                // append it to the object model so potential clients can fetch it for a limited time...
+                // append it to the object model so potential clients can fetch it for a limited period of time
                 using (await AccessReadWriteAsync())
                 {
                     Get.Messages.Add(message);

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 namespace DuetControlServer.Commands
 {
     /// <summary>
-    /// Implementation of the <see cref="DuetAPI.Commands.GetMachineModel"/> command
+    /// Implementation of the <see cref="DuetAPI.Commands.Command"/> command
     /// </summary>
     public class GetMachineModel : DuetAPI.Commands.GetMachineModel
     {

@@ -1,7 +1,6 @@
 ﻿using DuetAPI.Machine;
 using NUnit.Framework;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 
 namespace DuetUnitTest.Machine
 {

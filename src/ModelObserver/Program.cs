@@ -2,22 +2,47 @@
 using DuetAPIClient;
 using System;
 using System.IO;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace ModelObserver
 {
-    class Program
+    public static class Program
     {
-        static async Task Main(string[] args)
+        private static async Task Main(string[] args)
         {
-            // Get an optional filter string
-            string filter;
-            if (args.Length > 0 && args[0] != "-")
+            // Parse the command line arguments
+            string lastArg = null, socketPath = Defaults.FullSocketPath, filter = null;
+            bool quiet = false;
+            foreach (string arg in args)
             {
-                filter = args[0];
+                if (lastArg == "-s" || lastArg == "--socket")
+                {
+                    socketPath = arg;
+                }
+                else if (lastArg == "-f" || lastArg == "--filter")
+                {
+                    filter = arg;
+                }
+                else if (arg == "-q" || arg == "--quiet")
+                {
+                    quiet = true;
+                }
+                else if (arg == "-h" || arg == "--help")
+                {
+                    Console.WriteLine("Available command line arguments:");
+                    Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
+                    Console.WriteLine("-f, --filter <filter>: UNIX socket to connect to");
+                    Console.WriteLine("-q, --quiet: Do not display when a connection has been established");
+                    Console.WriteLine("-h, --help: Display this help text");
+                    return;
+                }
+                lastArg = arg;
             }
-            else
+
+            // Get an optional filter string
+            if (string.IsNullOrWhiteSpace(filter))
             {
                 Console.WriteLine("Please enter a filter expression or press RETURN to receive partial model updates:");
                 filter = Console.ReadLine().Trim();
@@ -25,29 +50,35 @@ namespace ModelObserver
 
             // Connect to DCS
             using SubscribeConnection connection = new SubscribeConnection();
-            if (args.Length < 2)
-            {
-                await connection.Connect(SubscriptionMode.Patch, filter);
-            }
-            else
-            {
-                await connection.Connect(SubscriptionMode.Patch, filter, args[1]);
-            }
-            Console.WriteLine("Connected!");
+            await connection.Connect(SubscriptionMode.Patch, filter, socketPath);
 
-            // In Patch mode the whole object model is sent over after connecting. Dump it (or call connection.GetMachineModel() to deserialize it)
+            if (!quiet)
+            {
+                Console.WriteLine("Connected!");
+            }
+
+            // In Patch mode the whole object model is sent over after connecting.
+            // Dump it (or call connection.GetMachineModel() to deserialize it)
             _ = await connection.GetSerializedMachineModel();
 
             // Then keep listening for (filtered) patches
-            while (connection.IsConnected)
+            do
             {
-                using JsonDocument patch = await connection.GetMachineModelPatch();
-                if (patch == null)
+                try
                 {
+                    using JsonDocument patch = await connection.GetMachineModelPatch();
+                    Console.WriteLine(GetIndentedJson(patch));
+                }
+                catch (SocketException)
+                {
+                    if (!quiet)
+                    {
+                        Console.WriteLine("Server has closed the connection");
+                    }
                     break;
                 }
-                Console.WriteLine(GetIndentedJson(patch));
             }
+            while (true);
         }
 
         public static string GetIndentedJson(JsonDocument jsonDocument)

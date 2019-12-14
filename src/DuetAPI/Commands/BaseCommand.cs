@@ -12,31 +12,18 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Creates a new instance of the BaseCommand
         /// </summary>
-        protected BaseCommand()
-        {
-            Command = GetType().UnderlyingSystemType.Name;
-        }
+        protected BaseCommand() => Command = GetType().UnderlyingSystemType.Name;
         
         /// <summary>
-        /// Name of the command.
-        /// In the .NET library this is automatically set to the actual class name representing the command name.
+        /// Name of the command to execute
         /// </summary>
         public string Command { get; set; }
-
-        /// <summary>
-        /// The connection ID this command was received from. It is automatically overwritten by the control server
-        /// once the full command has been deserialized. If this is 0, the command comes from an internal request.
-        /// </summary>
-        public int SourceConnection { get; set; }
 
         /// <summary>
         /// Invokes the command implementation
         /// </summary>
         /// <returns>Result of the command</returns>
-        public virtual Task<object> Invoke()
-        {
-            throw new NotImplementedException($"{Command} not implemented");
-        }
+        public virtual Task<object> Invoke() => throw new NotImplementedException($"{Command} not implemented");
     }
     
     /// <summary>
@@ -48,10 +35,7 @@ namespace DuetAPI.Commands
         /// Reserved for the actual command implementation in the control server
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public virtual Task Execute()
-        {
-            throw new NotImplementedException($"{Command} not implemented");
-        }
+        public virtual Task Execute() => throw new NotImplementedException($"{Command} not implemented");
 
         /// <summary>
         /// Invokes the command implementation
@@ -74,10 +58,7 @@ namespace DuetAPI.Commands
         /// Reserved for the actual command implementation in the control server
         /// </summary>
         /// <returns>Command result</returns>
-        public virtual Task<T> Execute()
-        {
-            throw new NotImplementedException($"{Command}<{nameof(T)}> not implemented");
-        }
+        public virtual Task<T> Execute() => throw new NotImplementedException($"{Command}<{nameof(T)}> not implemented");
 
         /// <summary>
         /// Invokes the command implementation

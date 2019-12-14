@@ -1,0 +1,12 @@
+- name: DuetAPI
+  href: api/
+  homepage: api/DuetAPI.yml
+- name: DuetAPIClient
+  href: api/
+  homepage: api/DuetAPIClient.yml
+- name: DuetControlServer
+  href: api/
+  homepage: api/DuetControlServer.yml
+- name: DuetWebServer
+  href: api/
+  homepage: api/DuetWebServer.yml

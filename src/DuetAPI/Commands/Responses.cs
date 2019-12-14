@@ -35,7 +35,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Creates a new Response instance from the given result
         /// </summary>
-        /// <param name="result"></param>
+        /// <param name="result">Response result</param>
         public Response(T result)
         {
             Result = result;

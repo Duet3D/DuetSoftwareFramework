@@ -13,7 +13,7 @@ namespace DuetAPI.Utility
         /// Checks if the type can be converted
         /// </summary>
         /// <param name="typeToConvert">Type to convert</param>
-        /// <returns></returns>
+        /// <returns>True if the type can be converted</returns>
         public override bool CanConvert(Type typeToConvert)
         {
             return typeToConvert.IsEnum;
@@ -25,7 +25,7 @@ namespace DuetAPI.Utility
         /// <param name="reader">JSON reader</param>
         /// <param name="typeToConvert">Type to convert</param>
         /// <param name="options">Read options</param>
-        /// <returns></returns>
+        /// <returns>Deserialized enum value</returns>
         public override object Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType == JsonTokenType.Number)

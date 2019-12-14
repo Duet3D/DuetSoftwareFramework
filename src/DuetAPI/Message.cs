@@ -25,26 +25,6 @@ namespace DuetAPI
         }
 
         /// <summary>
-        /// Print this message to the console
-        /// </summary>
-        public void Print()
-        {
-            switch (Type)
-            {
-                case MessageType.Error:
-                    Console.Write("[err] ");
-                    break;
-                case MessageType.Warning:
-                    Console.Write("[warn] ");
-                    break;
-                case MessageType.Success:
-                    Console.Write("[info] ");
-                    break;
-            }
-            Console.WriteLine(Content);
-        }
-
-        /// <summary>
         /// Time at which the message was generated
         /// </summary>
         public DateTime Time { get; set; } = DateTime.Now;

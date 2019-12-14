@@ -1,6 +1,10 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
+using DuetAPI.Commands;
+using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -11,47 +15,107 @@ namespace DuetControlServer.Commands
     public class SimpleCode : DuetAPI.Commands.SimpleCode
     {
         /// <summary>
+        /// Locks to avoid race conditions when executing multiple text-based codes via the same channel
+        /// </summary>
+        private static AsyncLock[] _channelLocks;
+
+        /// <summary>
+        /// Source connection of this command
+        /// </summary>
+        public int SourceConnection { get; set; }
+
+        /// <summary>
+        /// Creates a new instance
+        /// </summary>
+        public SimpleCode()
+        {
+            if (_channelLocks == null)
+            {
+                int numCodeChannels = Enum.GetValues(typeof(CodeChannel)).Length;
+
+                _channelLocks = new AsyncLock[numCodeChannels];
+                for (int i = 0; i < numCodeChannels; i++)
+                {
+                    _channelLocks[i] = new AsyncLock();
+                }
+            }
+        }
+
+        /// <summary>
         /// Converts simple G/M/T-codes to a regular Code instances, executes them and returns the result as text
         /// </summary>
         /// <returns>Code result as text</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         public override async Task<string> Execute()
         {
-            CodeResult result = new CodeResult();
-
+            // Parse the input string
+            List<Code> codes = new List<Code>(), priorityCodes = new List<Code>();
             try
             {
-                List<Code> codes = Commands.Code.ParseMultiple(Code);
-                foreach (Code code in codes)
+                foreach (Code code in ParseCodes())
                 {
                     // M112, M122, and M999 always go to the Daemon channel so we (hopefully) get a low-latency response
                     if (code.Type == CodeType.MCode && (code.MajorNumber == 112 || code.MajorNumber == 122 || code.MajorNumber == 999))
                     {
-                        code.Channel = DuetAPI.CodeChannel.Daemon;
+                        code.Channel = CodeChannel.Daemon;
                         code.Flags |= CodeFlags.IsPrioritized;
+                        priorityCodes.Add(code);
                     }
                     else
                     {
-                        code.Channel = Channel;
+                        codes.Add(code);
                     }
-
-                    // Execute the code and append the result
-                    CodeResult codeResult = await code.Execute();
-                    result.AddRange(codeResult);
                 }
             }
             catch (CodeParserException e)
             {
                 // Report parsing errors as an error message
-                result = new CodeResult(DuetAPI.MessageType.Error, e.Message);
+                return (new CodeResult(MessageType.Error, e.Message)).ToString();
+            }
+
+            CodeResult result = new CodeResult();
+            try
+            {
+                // Execute priority codes first
+                foreach (Code priorityCode in priorityCodes)
+                {
+                    CodeResult codeResult = await priorityCode.Execute();
+                    result.AddRange(codeResult);
+                }
+
+                // Execute normal codes next. Use a lock here because multiple codes may be queued for the same channel
+                using (await _channelLocks[(int)Channel].LockAsync())
+                {
+                    foreach (Code code in codes)
+                    {
+                        CodeResult codeResult = await code.Execute();
+                        result.AddRange(codeResult);
+                    }
+                }
             }
             catch (OperationCanceledException)
             {
-                // Report this code as cancelled
-                result.Add(DuetAPI.MessageType.Error, "Code has been cancelled");
+                // Report when a code is cancelled
+                result.Add(MessageType.Error, "Code has been cancelled");
             }
-
             return result.ToString();
+        }
+
+        /// <summary>
+        /// Parse codes from the given input string
+        /// </summary>
+        /// <returns>Parsed G/M/T-codes</returns>
+        public IEnumerable<Code> ParseCodes()
+        {
+            using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(Code));
+            using StreamReader reader = new StreamReader(stream);
+            bool enforcingAbsolutePosition = false;
+            while (!reader.EndOfStream)
+            {
+                Code code = new Code() { Channel = Channel, SourceConnection = SourceConnection };
+                DuetAPI.Commands.Code.Parse(reader, code, ref enforcingAbsolutePosition);
+                yield return code;
+            }
         }
     }
 }

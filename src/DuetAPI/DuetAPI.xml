@@ -62,13 +62,56 @@
             Code channel that executes macros on power fail, heater faults and filament out
             </summary>
         </member>
-        <member name="T:DuetAPI.Commands.Acknowledge">
+        <member name="T:DuetAPI.Commands.AddHttpEndpoint">
             <summary>
-            Acknowledge a (partial) model update.
+            Register a new HTTP endpoint via DuetWebServer. This wil create a new HTTP endpoint under /machine/{Namespace}/{EndpointPath}.
+            Returns a path to the UNIX socket which DuetWebServer will connect to whenever a matching HTTP request is received.
+            A plugin using this command has to open a new UNIX socket with the given path that DuetWebServer can connect to
             </summary>
-            <remarks>
-            This command is only permitted in <see cref="F:DuetAPI.Connection.ConnectionMode.Subscribe"/> mode
-            </remarks>
+            <seealso cref="T:DuetAPI.Commands.ReceivedHttpRequest"/>.
+            <seealso cref="T:DuetAPI.Commands.SendHttpResponse"/>
+        </member>
+        <member name="P:DuetAPI.Commands.AddHttpEndpoint.EndpointType">
+            <summary>
+            Type of the HTTP request
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.AddHttpEndpoint.Namespace">
+            <summary>
+            Namespace of the plugin wanting to create a new third-party endpoint
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.AddHttpEndpoint.Path">
+            <summary>
+            Path to the endpoint to register
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.AddUserSession">
+            <summary>
+            Register a new user session.
+            Returns the ID of the new user session
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.AddUserSession.AccessLevel">
+            <summary>
+            Access level of this session
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.AddUserSession.SessionType">
+            <summary>
+            Type of this session
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.AddUserSession.Origin">
+            <summary>
+            Origin of this session. For remote sessions, this equals the remote IP address
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.AddUserSession.OriginPort">
+            <summary>
+            Corresponding identifier of the origin.
+            If it is a remote session, it is the remote port, else it defaults to the PID of the current process
+            </summary>
         </member>
         <member name="T:DuetAPI.Commands.BaseCommand">
             <summary>
@@ -85,12 +128,6 @@
             <summary>
             Name of the command.
             In the .NET library this is automatically set to the actual class name representing the command name.
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Commands.BaseCommand.SourceConnection">
-            <summary>
-            The connection ID this command was received from. It is automatically overwritten by the control server
-            once the full command has been deserialized. If this is 0, the command comes from an internal request.
             </summary>
         </member>
         <member name="M:DuetAPI.Commands.BaseCommand.Invoke">
@@ -134,11 +171,6 @@
             </summary>
             <returns>Command result</returns>
         </member>
-        <member name="T:DuetAPI.Commands.Cancel">
-            <summary>
-            Cancel a code in <see cref="T:DuetAPI.Connection.InterceptionMode"/>
-            </summary>
-        </member>
         <member name="T:DuetAPI.Commands.Code">
             <summary>
             A parsed representation of a generic G/M/T-code
@@ -155,6 +187,11 @@
             Create a new Code instance and attempt to parse the given code string
             </summary>
             <param name="code">G/M/T-Code</param>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.SourceConnection">
+            <summary>
+            The connection ID this code was received from. If this is 0, the code originates from an internal DCS task
+            </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.Result">
             <summary>
@@ -568,7 +605,7 @@
             </summary>
             <param name="reader">JSON reader</param>
             <param name="typeToConvert">Type to convert</param>
-            <param name="options"></param>
+            <param name="options">Serializer options</param>
             <returns>Read value</returns>
         </member>
         <member name="M:DuetAPI.Commands.CodeParameterConverter.Write(System.Text.Json.Utf8JsonWriter,DuetAPI.Commands.CodeParameter,System.Text.Json.JsonSerializerOptions)">
@@ -671,12 +708,13 @@
         <member name="T:DuetAPI.Commands.Flush">
             <summary>
             Wait for all pending codes of the given channel to finish.
-            If the flush command was successful, this command returns true
+            This effectively guarantees that all buffered codes are processed by RRF before this command finishes.
+            If the flush request is successful, true is returned
             </summary>
         </member>
         <member name="P:DuetAPI.Commands.Flush.Channel">
             <summary>
-            Code channel to wait for
+            Code channel to flush
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.GetFileInfo">
@@ -694,6 +732,11 @@
             Get the current RepRapFirmware machine model
             </summary>
             <seealso cref="T:DuetAPI.Machine.MachineModel"/>
+        </member>
+        <member name="T:DuetAPI.Commands.Cancel">
+            <summary>
+            Cancel a code in <see cref="T:DuetAPI.Connection.InterceptionMode"/>
+            </summary>
         </member>
         <member name="T:DuetAPI.Commands.Ignore">
             <summary>
@@ -719,6 +762,75 @@
         <member name="P:DuetAPI.Commands.Resolve.Content">
             <summary>
             Content of the resolving message
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.LockMachineModel">
+            <summary>
+            Lock the machine model for read/write access.
+            This may be used to update the machine model and to change array items
+            </summary>
+            <seealso cref="T:DuetAPI.Commands.UnlockMachineModel"/>
+        </member>
+        <member name="T:DuetAPI.Commands.ReceivedHttpRequest">
+            <summary>
+            Notification sent by the webserver when a new HTTP request is received
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.ReceivedHttpRequest.SessionId">
+            <summary>
+            Identifier of the corresponding user session. This is -1 if it is an anonymous request
+            </summary>
+            <seealso cref="T:DuetAPI.Machine.UserSession"/>
+        </member>
+        <member name="P:DuetAPI.Commands.ReceivedHttpRequest.Queries">
+            <summary>
+            List of HTTP query pairs
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.ReceivedHttpRequest.Headers">
+            <summary>
+            List of HTTP header pairs
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.ReceivedHttpRequest.ContentType">
+            <summary>
+            Type of the body content
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.ReceivedHttpRequest.Body">
+            <summary>
+            Body content as plain text
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.RemoveHttpEndpoint">
+            <summary>
+            Remove an existing HTTP endpoint.
+            Returns true if the endpoint could be successfully removed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.RemoveHttpEndpoint.EndpointType">
+            <summary>
+            Type of the endpoint
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.RemoveHttpEndpoint.Namespace">
+            <summary>
+            Namespace of the endpoint
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.RemoveHttpEndpoint.Path">
+            <summary>
+            Endpoint path to unregister
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.RemoveUserSession">
+            <summary>
+            Remove an existing user session
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.RemoveUserSession.Id">
+            <summary>
+            Identifier of the user session to remove
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.ResolvePath">
@@ -764,7 +876,7 @@
             <summary>
             Creates a new Response instance from the given result
             </summary>
-            <param name="result"></param>
+            <param name="result">Response result</param>
         </member>
         <member name="T:DuetAPI.Commands.ErrorResponse">
             <summary>
@@ -793,6 +905,71 @@
             </summary>
             <param name="e">Exception to report</param>
         </member>
+        <member name="T:DuetAPI.Commands.SendHttpResponse">
+            <summary>
+            Send a response to a received HTTP request
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.SendHttpResponse.StatusCode">
+            <summary>
+            HTTP or WebSocket status code to return. If this is greater than or equal to 1000, the WebSocket is closed
+            </summary>
+            <remarks>Codes greater than 1000 represent WebSocket status codes (1000 = normal close)</remarks>
+        </member>
+        <member name="P:DuetAPI.Commands.SendHttpResponse.Response">
+            <summary>
+            Content to return. If this is null or empty and a WebSocket is connected, the connection is closed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.SendHttpResponse.ResponseType">
+            <summary>
+            Type of the content to return. Ignored if a WebSocket is connected
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.HttpResponseType">
+            <summary>
+            Enumeration of supported HTTP responses
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.HttpResponseType.StatusCode">
+            <summary>
+            HTTP status code without payload
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.HttpResponseType.PlainText">
+            <summary>
+            Plain text (UTF-8)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.HttpResponseType.JSON">
+            <summary>
+            JSON-formatted data
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.HttpResponseType.File">
+            <summary>
+            File content. Response must hold the absolute path to the file to return
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.SetMachineModel">
+            <summary>
+            Set an atomic property in the machine model. Make sure to acquire the read/write lock first!
+            Returns true if the field could be updated
+            </summary>
+            <seealso cref="T:DuetAPI.Commands.LockMachineModel"/>
+            <seealso cref="T:DuetAPI.Commands.UnlockMachineModel"/>
+        </member>
+        <member name="P:DuetAPI.Commands.SetMachineModel.PropertyPath">
+            <summary>
+            Path to the property in the machine model
+            </summary>
+            <seealso cref="P:DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter"/>
+        </member>
+        <member name="P:DuetAPI.Commands.SetMachineModel.Value">
+            <summary>
+            String representation of the value to set
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.SimpleCode">
             <summary>
             Perform a simple G/M/T-code
@@ -813,9 +990,23 @@
             Destination channel
             </summary>
         </member>
+        <member name="T:DuetAPI.Commands.Acknowledge">
+            <summary>
+            Acknowledge a (partial) model update.
+            </summary>
+            <remarks>
+            This command is only permitted in <see cref="F:DuetAPI.Connection.ConnectionMode.Subscribe"/> mode
+            </remarks>
+        </member>
         <member name="T:DuetAPI.Commands.SyncMachineModel">
             <summary>
             Wait for the machine model to be fully updated from RepRapFirmware
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.UnlockMachineModel">
+            <summary>
+            Unlock the machine model after obtaining read/write access.
+            This is mandatory after <see cref="T:DuetAPI.Commands.LockMachineModel"/> has been invoked
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.WriteMessage">
@@ -878,9 +1069,19 @@
             Static class that holds the connection defaults
             </summary>
         </member>
-        <member name="F:DuetAPI.Connection.Defaults.SocketPath">
+        <member name="F:DuetAPI.Connection.Defaults.SocketDirectory">
             <summary>
-            Default path to the UNIX file socket
+            Default directory in which DSF-related UNIX sockets reside
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Connection.Defaults.SocketFile">
+            <summary>
+            Default UNIX socket file for DuetControlServer
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Connection.Defaults.FullSocketPath">
+            <summary>
+            Default fully-qualified path to the UNIX socket for DuetControlServer
             </summary>
         </member>
         <member name="F:DuetAPI.Connection.Defaults.Channel">
@@ -1845,6 +2046,97 @@
             Heater is offline
             </summary>
         </member>
+        <member name="T:DuetAPI.Machine.HttpEndpoint">
+            <summary>
+            Class representing an extra HTTP endpoint
+            </summary>
+            <seealso cref="T:DuetAPI.Commands.AddHttpEndpoint"/>
+            <seealso cref="T:DuetAPI.Commands.RemoveHttpEndpoint"/>
+        </member>
+        <member name="E:DuetAPI.Machine.HttpEndpoint.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.HttpEndpoint.EndpointType">
+            <summary>
+            HTTP type of this endpoint
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.HttpEndpoint.Namespace">
+            <summary>
+            Namespace of the endpoint
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.HttpEndpoint.Path">
+            <summary>
+            Path to the endpoint
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.HttpEndpoint.UnixSocket">
+            <summary>
+            Path to the UNIX socket
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.HttpEndpoint.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
+        <member name="M:DuetAPI.Machine.HttpEndpoint.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>Clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.HttpEndpointType">
+            <summary>
+            Enumeration of supported HTTP request types
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.HttpEndpointType.GET">
+            <summary>
+            HTTP GET request
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.HttpEndpointType.POST">
+            <summary>
+            HTTP POST request
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.HttpEndpointType.PUT">
+            <summary>
+            HTTP PUT request
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.HttpEndpointType.PATCH">
+            <summary>
+            HTTP PATCH request
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.HttpEndpointType.TRACE">
+            <summary>
+            HTTP TRACE request
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.HttpEndpointType.DELETE">
+            <summary>
+            HTTP DELETE request
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.HttpEndpointType.OPTIONS">
+            <summary>
+            HTTP DELETE request
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.HttpEndpointType.WebSocket">
+            <summary>
+            WebSocket request. This has not been implemented yet but it is reserved for future usage
+            </summary>
+        </member>
         <member name="T:DuetAPI.Machine.Job">
             <summary>
             Information about the current file job (if any)
@@ -2079,6 +2371,11 @@
             Information about the heat subsystem
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.MachineModel.HttpEndpoints">
+            <summary>
+            List of registered third-party HTTP endpoints
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.MachineModel.Job">
             <summary>
             Information about the current file job (if any)
@@ -2143,6 +2440,11 @@
             List of configured tools
             </summary>
             <seealso cref="T:DuetAPI.Machine.Tool"/>
+        </member>
+        <member name="P:DuetAPI.Machine.MachineModel.UserSessions">
+            <summary>
+            List of user sessions
+            </summary>
         </member>
         <member name="P:DuetAPI.Machine.MachineModel.UserVariables">
             <summary>
@@ -2666,7 +2968,7 @@
             </summary>
             <param name="reader">JSON reader</param>
             <param name="typeToConvert">Type to convert</param>
-            <param name="options"></param>
+            <param name="options">Serializer options</param>
             <returns>Read value</returns>
         </member>
         <member name="M:DuetAPI.Machine.GeometryTypeConverter.Write(System.Text.Json.Utf8JsonWriter,DuetAPI.Machine.GeometryType,System.Text.Json.JsonSerializerOptions)">
@@ -2739,7 +3041,12 @@
         </member>
         <member name="P:DuetAPI.Machine.Move.Compensation">
             <summary>
-            Name of the currently used bed compensation
+            Name of the currently used bed compensation (one of "Mesh", "[n] Point", "None")
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.HeightmapFile">
+            <summary>
+            Path to the current heightmap file if Compensation is "Mesh"
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Move.Drives">
@@ -2762,6 +3069,11 @@
         <member name="P:DuetAPI.Machine.Move.Idle">
             <summary>
             Idle current reduction parameters
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.ProbeGrid">
+            <summary>
+            Information about the configured mesh compensation (see M557)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Move.SpeedFactor">
@@ -2789,6 +3101,66 @@
             <exception cref="T:System.ArgumentException">Types do not match</exception>
         </member>
         <member name="M:DuetAPI.Machine.Move.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
+        </member>
+        <member name="T:DuetAPI.Machine.ProbeGrid">
+            <summary>
+            Information about the configured probe grid (see M557)
+            </summary>
+            <seealso cref="T:DuetAPI.Utility.Heightmap"/>
+        </member>
+        <member name="E:DuetAPI.Machine.ProbeGrid.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ProbeGrid.XMin">
+            <summary>
+            X start coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ProbeGrid.XMax">
+            <summary>
+            X end coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ProbeGrid.XSpacing">
+            <summary>
+            Spacing between the probe points in X direction
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ProbeGrid.YMin">
+            <summary>
+            Y start coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ProbeGrid.YMax">
+            <summary>
+            Y end coordinate of the heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ProbeGrid.YSpacing">
+            <summary>
+            Spacing between the probe points in Y direction
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ProbeGrid.Radius">
+            <summary>
+            Probing radius on delta geometries
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.ProbeGrid.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
+        <member name="M:DuetAPI.Machine.ProbeGrid.Clone">
             <summary>
             Creates a clone of this instance
             </summary>
@@ -3685,6 +4057,91 @@
             </summary>
             <returns>Clone of this instance</returns>
         </member>
+        <member name="T:DuetAPI.Machine.AccessLevel">
+            <summary>
+            Defines what a user is allowed to do
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.AccessLevel.ReadOnly">
+            <summary>
+            Changes to the system and/or operation are not permitted
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.AccessLevel.ReadWrite">
+            <summary>
+            Changes to the system and/or operation are permitted
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.SessionType">
+            <summary>
+            Types of user sessions
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.SessionType.Local">
+            <summary>
+            Local client
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.SessionType.HTTP">
+            <summary>
+            Remote client via HTTP
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.SessionType.Telnet">
+            <summary>
+            Remote client via Telnet
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.UserSession">
+            <summary>
+            Class representing a user session
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.UserSession.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.UserSession.Id">
+            <summary>
+            Identifier of this session
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.UserSession.AccessLevel">
+            <summary>
+            Access level of this session
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.UserSession.SessionType">
+            <summary>
+            Type of this sessionSessionAccessLevel
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.UserSession.Origin">
+            <summary>
+            Origin of this session. For remote sessions, this equals the remote IP address
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.UserSession.OriginId">
+            <summary>
+            Corresponding identifier of the origin.
+            If it is a remote session, it is the remote port, else it defaults to the PID of the current process
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.UserSession.Assign(System.Object)">
+            <summary>
+            Assigns every property from another instance
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
+        <member name="M:DuetAPI.Machine.UserSession.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>Clone of this instance</returns>
+        </member>
         <member name="T:DuetAPI.Machine.UserVariable">
             <summary>
             Class holding information about a user variable
@@ -3735,11 +4192,6 @@
             </summary>
             <param name="type">Message type</param>
             <param name="content">Message content</param>
-        </member>
-        <member name="M:DuetAPI.Message.Print">
-            <summary>
-            Print this message to the console
-            </summary>
         </member>
         <member name="P:DuetAPI.Message.Time">
             <summary>
@@ -4069,6 +4521,8 @@
             <param name="socket">Socket to read from</param>
             <param name="cancellationToken">Cancellation token</param>
             <returns>Plain JSON</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
         </member>
         <member name="T:DuetAPI.Utility.JsonLowerCaseStringEnumConverter">
             <summary>
@@ -4080,7 +4534,7 @@
             Checks if the type can be converted
             </summary>
             <param name="typeToConvert">Type to convert</param>
-            <returns></returns>
+            <returns>True if the type can be converted</returns>
         </member>
         <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
             <summary>
@@ -4089,7 +4543,7 @@
             <param name="reader">JSON reader</param>
             <param name="typeToConvert">Type to convert</param>
             <param name="options">Read options</param>
-            <returns></returns>
+            <returns>Deserialized enum value</returns>
         </member>
         <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Write(System.Text.Json.Utf8JsonWriter,System.Object,System.Text.Json.JsonSerializerOptions)">
             <summary>
@@ -4157,6 +4611,17 @@
             <typeparam name="T">Item type</typeparam>
             <param name="destination">List to add the clones to</param>
             <param name="source">List to clone items from</param>
+        </member>
+        <member name="M:DuetAPI.Utility.ListHelpers.RemoveItem``1(System.Collections.Generic.IList{``0},System.Int32)">
+            <summary>
+            Helper functionto remove a specific item from a list of assignable items
+            </summary>
+            <remarks>
+            This must be used to ensure Patch mode keeps working when DCS removes certain items like user sessions or HTTP endpoints
+            </remarks>
+            <typeparam name="T">Item type</typeparam>
+            <param name="list">List to remove an item from</param>
+            <param name="index">Index of the item to remove</param>
         </member>
     </members>
 </doc>

@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -28,13 +28,46 @@ namespace DuetControlServer.IPC.Processors
             typeof(Resolve)
         };
         
-        private static readonly ConcurrentDictionary<Interception, InterceptionMode> _interceptors = new ConcurrentDictionary<Interception, InterceptionMode>();
-        
-        private readonly AsyncCollection<Code> _codeQueue = new AsyncCollection<Code>();
-        private readonly AsyncCollection<BaseCommand> _commandQueue = new AsyncCollection<BaseCommand>();
+        /// <summary>
+        /// Class to hold intercepting connections and a corresponding lock
+        /// </summary>
+        private class InterceptionContainer
+        {
+            /// <summary>
+            /// Asynchronous lock for this interception type
+            /// </summary>
+            public AsyncLock Lock { get; } = new AsyncLock();
 
+            /// <summary>
+            /// List of intercepting connections
+            /// </summary>
+            public List<Interception> Items = new List<Interception>();
+        }
+
+        /// <summary>
+        /// Dictionary of interception mode vs item containers
+        /// </summary>
+        private static readonly Dictionary<InterceptionMode, InterceptionContainer> _containers = new Dictionary<InterceptionMode, InterceptionContainer>
+        {
+            { InterceptionMode.Pre, new InterceptionContainer() },
+            { InterceptionMode.Post, new InterceptionContainer() },
+            { InterceptionMode.Executed, new InterceptionContainer() }
+        };
+
+        /// <summary>
+        /// Mode of this interceptor
+        /// </summary>
         private readonly InterceptionMode _mode;
-        private readonly AsyncLock _lock = new AsyncLock();
+
+        /// <summary>
+        /// Codes that have been queued for this interceptor
+        /// </summary>
+        private readonly AsyncCollection<Code> _codeQueue = new AsyncCollection<Code>();
+
+        /// <summary>
+        /// Commands that have been queued by the processor for the codes being intercepted
+        /// </summary>
+        private readonly AsyncCollection<BaseCommand> _commandQueue = new AsyncCollection<BaseCommand>();
 
         /// <summary>
         /// Constructor of the interception processor
@@ -46,7 +79,11 @@ namespace DuetControlServer.IPC.Processors
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
 
-            _interceptors.TryAdd(this, _mode);
+            using (_containers[_mode].Lock.Lock())
+            {
+                _containers[_mode].Items.Add(this);
+            }
+            conn.Logger.Debug("Interception processor registered");
         }
         
         /// <summary>
@@ -77,11 +114,6 @@ namespace DuetControlServer.IPC.Processors
                     {
                         // Read another command from the IPC connection
                         command = await Connection.ReceiveCommand();
-                        if (command == null)
-                        {
-                            break;
-                        }
-
                         if (Command.SupportedCommands.Contains(command.GetType()))
                         {
                             // Interpret regular Command codes here
@@ -117,7 +149,11 @@ namespace DuetControlServer.IPC.Processors
             finally
             {
                 _commandQueue.CompleteAdding();
-                _interceptors.TryRemove(this, out _);
+                using (_containers[_mode].Lock.Lock())
+                {
+                    _containers[_mode].Items.Remove(this);
+                }
+                Connection.Logger.Debug("Interception processor unregistered");
             }
         }
 
@@ -129,41 +165,37 @@ namespace DuetControlServer.IPC.Processors
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         private async Task<bool> Intercept(Code code)
         {
-            // Avoid race conditions. A client can deal with only one code at once!
-            using (await _lock.LockAsync(Program.CancelSource.Token))
+            // Send it to the IPC client
+            await _codeQueue.AddAsync(code);
+
+            // Keep on processing commands from the interceptor until a handling result is returned.
+            // This must be either a Cancel, Ignore, or Resolve instruction!
+            try
             {
-                // Send it to the IPC client
-                await _codeQueue.AddAsync(code);
-
-                // Keep on processing commands from the interceptor until a handling result is returned.
-                // This must be either a Cancel, Ignore, or Resolve instruction!
-                try
+                if (await _commandQueue.OutputAvailableAsync(Program.CancelSource.Token))
                 {
-                    if (await _commandQueue.OutputAvailableAsync(Program.CancelSource.Token))
+                    BaseCommand command = await _commandQueue.TakeAsync(Program.CancelSource.Token);
+
+                    // Code is cancelled. This invokes an OperationCanceledException on the code's task.
+                    if (command is Cancel)
                     {
-                        BaseCommand command = await _commandQueue.TakeAsync(Program.CancelSource.Token);
-
-                        // Code is cancelled. This invokes an OperationCanceledException on the code's task.
-                        if (command is Cancel)
-                        {
-                            throw new OperationCanceledException();
-                        }
-
-                        // Code is resolved with a given result and the request is acknowledged
-                        if (command is Resolve resolveCommand)
-                        {
-                            code.Result = (resolveCommand.Content == null) ? new CodeResult() : new CodeResult(resolveCommand.Type, resolveCommand.Content);
-                            return true;
-                        }
-
-                        // Code is ignored. Don't do anything
+                        throw new OperationCanceledException();
                     }
+
+                    // Code is resolved with a given result and the request is acknowledged
+                    if (command is Resolve resolveCommand)
+                    {
+                        code.Result = (resolveCommand.Content == null) ? new CodeResult() : new CodeResult(resolveCommand.Type, resolveCommand.Content);
+                        return true;
+                    }
+
+                    // Code is ignored. Don't do anything
                 }
-                catch (Exception e) when (!(e is OperationCanceledException))
-                {
-                    _codeQueue.CompleteAdding();
-                    Console.WriteLine($"[err] Interception handler enocuntered an exception: {e}");
-                }
+            }
+            catch (Exception e) when (!(e is OperationCanceledException))
+            {
+                _codeQueue.CompleteAdding();
+                Connection.Logger.Error(e, "Interception processor caught an exception");
             }
             return false;
         }
@@ -177,17 +209,31 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>True if the code has been resolved</returns>
         public static async Task<bool> Intercept(Code code, InterceptionMode type)
         {
-            foreach (var pair in _interceptors)
+            using (await _containers[type].Lock.LockAsync())
             {
-                if (code.SourceConnection != pair.Key.Connection.Id && pair.Value == type)
+                foreach (Interception processor in _containers[type].Items)
                 {
-                    if (await pair.Key.Intercept(code))
+                    if (code.SourceConnection != processor.Connection.Id)
                     {
-                        return true;
+                        try
+                        {
+                            processor.Connection.Logger.Debug("Intercepting code {0} ({1})", code, type);
+                            if (await processor.Intercept(code))
+                            {
+                                processor.Connection.Logger.Debug("Code has been resolved");
+                                return true;
+                            }
+                            processor.Connection.Logger.Debug("Code has been ignored");
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            processor.Connection.Logger.Debug("Code has been cancelled");
+                            throw;
+                        }
                     }
                 }
+                return false;
             }
-            return false;
         }
     }
 }

@@ -3,7 +3,6 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace DuetAPI.Machine
 {
@@ -59,19 +58,17 @@ namespace DuetAPI.Machine
         /// </summary>
         public string Hostname
         {
-            get
+            get => _hostname;
+            set
             {
-                StringBuilder builder = new StringBuilder();
-                foreach (char c in Name)
+                if (_hostname != value)
                 {
-                    if (char.IsLetterOrDigit(c) || c == '-' || c == '_')
-                    {
-                        builder.Append(c);
-                    }
+                    _hostname = value;
+                    NotifyPropertyChanged();
                 }
-                return (builder.Length != 0) ? builder.ToString() : DefaultHostname;
             }
         }
+        private string _hostname = DefaultHostname;
         
         /// <summary>
         /// Password required to access this machine

@@ -77,7 +77,7 @@ namespace DuetAPI.Machine
         /// </summary>
         /// <param name="reader">JSON reader</param>
         /// <param name="typeToConvert">Type to convert</param>
-        /// <param name="options"></param>
+        /// <param name="options">Serializer options</param>
         /// <returns>Read value</returns>
         public override GeometryType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

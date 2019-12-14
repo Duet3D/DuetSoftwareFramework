@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
@@ -28,6 +29,9 @@ namespace DuetControlServer.IPC.Processors
             typeof(Acknowledge)
         };
         
+        /// <summary>
+        /// List of active subscribers
+        /// </summary>
         private static readonly List<Subscription> _subscriptions = new List<Subscription>();
 
         /// <summary>
@@ -42,10 +46,24 @@ namespace DuetControlServer.IPC.Processors
             }
         }
 
+        /// <summary>
+        /// Mode of this subscriber
+        /// </summary>
         private readonly SubscriptionMode _mode;
+
+        /// <summary>
+        /// List of filters (in Patch mode)
+        /// </summary>
         private readonly string[][] _filters;
 
+        /// <summary>
+        /// Dictionary of updated fields (in Patch mode)
+        /// </summary>
         private readonly Dictionary<string, object> _patch = new Dictionary<string, object>();
+
+        /// <summary>
+        /// Event that is triggered when the object model has been updated
+        /// </summary>
         private readonly AsyncAutoResetEvent _updateAvailableEvent = new AsyncAutoResetEvent();
         
         /// <summary>
@@ -67,6 +85,7 @@ namespace DuetControlServer.IPC.Processors
             {
                 _subscriptions.Add(this);
             }
+            conn.Logger.Debug("Subscription processor registered");
         }
         
         /// <summary>
@@ -96,22 +115,37 @@ namespace DuetControlServer.IPC.Processors
                     if (jsonData != null)
                     {
                         await Connection.Send(jsonData);
+                        jsonData = null;
 
                         // Wait for an acknowledgement from the client
                         BaseCommand command = await Connection.ReceiveCommand();
-                        if (command == null)
-                        {
-                            return;
-                        }
-
                         if (!SupportedCommands.Contains(command.GetType()))
                         {
+                            // Take care of unsupported commands
                             throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
                         }
                     }
 
                     // Wait for an object model update to complete
-                    await _updateAvailableEvent.WaitAsync(Program.CancelSource.Token);
+                    using (CancellationTokenSource pollCts = new CancellationTokenSource(Settings.SocketPollInterval))
+                    {
+                        using CancellationTokenSource combinedCts = CancellationTokenSource.CreateLinkedTokenSource(pollCts.Token, Program.CancelSource.Token);
+                        try
+                        {
+                            await _updateAvailableEvent.WaitAsync(combinedCts.Token);
+                            Program.CancelSource.Token.ThrowIfCancellationRequested();
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            if (pollCts.IsCancellationRequested)
+                            {
+                                Connection.Poll();
+                                continue;
+                            }
+                            Connection.Logger.Debug("Subscriber connection requested to terminate");
+                            throw;
+                        }
+                    }
 
                     // Get the (diff) JSON
                     if (_mode == SubscriptionMode.Patch)
@@ -122,10 +156,6 @@ namespace DuetControlServer.IPC.Processors
                             {
                                 jsonData = JsonSerializer.SerializeToUtf8Bytes(_patch, JsonHelper.DefaultJsonOptions);
                                 _patch.Clear();
-                            }
-                            else
-                            {
-                                jsonData = null;
                             }
                         }
                     }
@@ -141,10 +171,9 @@ namespace DuetControlServer.IPC.Processors
             }
             catch (Exception e)
             {
-                // Socket exceptions are expected.
-                // They occur when data is sent after the remote end had acknowledged an update but then terminated the connection
                 if (!(e is SocketException))
                 {
+                    // Don't throw this exception if the connection has been termianted
                     throw;
                 }
             }
@@ -159,15 +188,22 @@ namespace DuetControlServer.IPC.Processors
                 {
                     Model.Observer.OnPropertyPathChanged -= MachineModelPropertyChanged;
                 }
+                Connection.Logger.Debug("Subscription processor unregistered");
             }
         }
 
-        private bool CheckFilter(object[] path, string[] filter)
+        /// <summary>
+        /// Checks if one of the given filters applies to the path
+        /// </summary>
+        /// <param name="path">Patch path</param>
+        /// <param name="filters">Subscription filters</param>
+        /// <returns>True if a filter applies</returns>
+        private bool CheckFilter(object[] path, string[] filters)
         {
-            for (int i = 0; i < filter.Length; i++)
+            for (int i = 0; i < filters.Length; i++)
             {
-                string arg = filter[i];
-                if (arg == "**")
+                string filter = filters[i];
+                if (filter == "**")
                 {
                     return true;
                 }
@@ -180,25 +216,30 @@ namespace DuetControlServer.IPC.Processors
                 object pathItem = path[i];
                 if (pathItem is string stringItem)
                 {
-                    if (arg != "*" &&
-                        !arg.Equals(stringItem, StringComparison.InvariantCultureIgnoreCase))
+                    if (filter != "*" && !filter.Equals(stringItem, StringComparison.InvariantCultureIgnoreCase))
                     {
                         return false;
                     }
                 }
                 else if (pathItem is Model.ItemPathNode listItem)
                 {
-                    if (!arg.Equals($"{listItem.Name}[*]", StringComparison.InvariantCultureIgnoreCase) &&
-                        !arg.Equals($"{listItem.Name}[{listItem.Index}]", StringComparison.InvariantCultureIgnoreCase))
+                    if (!filter.Equals(listItem.Name, StringComparison.InvariantCultureIgnoreCase) &&
+                        !filter.Equals($"{listItem.Name}[*]", StringComparison.InvariantCultureIgnoreCase) &&
+                        !filter.Equals($"{listItem.Name}[{listItem.Index}]", StringComparison.InvariantCultureIgnoreCase))
                     {
                         return false;
                     }
                 }
             }
 
-            return (path.Length == filter.Length);
+            return (path.Length == filters.Length);
         }
 
+        /// <summary>
+        /// Check if the change of the given path has to be recorded
+        /// </summary>
+        /// <param name="path">Change path</param>
+        /// <returns>True if a filter applies</returns>
         private bool CheckFilter(object[] path)
         {
             if (_filters == null)
@@ -216,6 +257,11 @@ namespace DuetControlServer.IPC.Processors
             return false;
         }
 
+        /// <summary>
+        /// Get the object from a path node
+        /// </summary>
+        /// <param name="path">Path node</param>
+        /// <returns>Dictionary or list</returns>
         private object GetPathNode(object[] path)
         {
             Dictionary<string, object> currentDictionary = _patch;
@@ -283,6 +329,12 @@ namespace DuetControlServer.IPC.Processors
             return currentList;
         }
 
+        /// <summary>
+        /// Method that is called when a property of the machine model has changed
+        /// </summary>
+        /// <param name="path">Path to the property</param>
+        /// <param name="pathType">Type of the path</param>
+        /// <param name="value">New value</param>
         private void MachineModelPropertyChanged(object[] path, Model.PropertyPathChangeType pathType, object value)
         {
             if (!CheckFilter(path))
@@ -391,8 +443,7 @@ namespace DuetControlServer.IPC.Processors
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"Failed to record {string.Join('/', path)} = {value} ({pathType}):");
-                    Console.WriteLine(e);
+                    Connection.Logger.Error(e, "Failed to record {0} = {1} ({2})", string.Join('/', path), value, pathType);
                 }
             }
         }

@@ -18,6 +18,11 @@ namespace DuetControlServer.SPI
     /// </summary>
     public static class DataTransfer
     {
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
         // General transfer variables
         private static InputGpioPin _transferReadyPin;
         private static SpiDevice _spiDevice;
@@ -69,13 +74,12 @@ namespace DuetControlServer.SPI
                 int maxSpiBufferSize = int.Parse(File.ReadAllText("/sys/module/spidev/parameters/bufsiz"));
                 if (maxSpiBufferSize < Communication.Consts.BufferSize)
                 {
-                    Console.WriteLine($"[warn] Kernel SPI buffer size is smaller than RepRapFirmware buffer size ({maxSpiBufferSize} configured vs {Communication.Consts.BufferSize} required)");
+                    _logger.Warn("Kernel SPI buffer size is smaller than RepRapFirmware buffer size ({0} configured vs {1} required)", maxSpiBufferSize, Communication.Consts.BufferSize);
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine("[warn] Failed to retrieve Kernel SPI buffer size:");
-                Console.WriteLine(e);
+                _logger.Warn(e, "Failed to retrieve Kernel SPI buffer size");
             }
         }
 
@@ -123,9 +127,9 @@ namespace DuetControlServer.SPI
             _txHeader.NumPackets = _packetId;
             _txHeader.SequenceNumber++;
             _txHeader.DataLength = (ushort)_txPointer;
-            _txHeader.ChecksumData = CRC16.Calculate(_txBuffers[_txBufferIndex].Slice(0, _txPointer).Span);
+            _txHeader.ChecksumData = Utility.CRC16.Calculate(_txBuffers[_txBufferIndex].Slice(0, _txPointer).Span);
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-            _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf(typeof(ushort))).Span);
+            _txHeader.ChecksumHeader = Utility.CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf(typeof(ushort))).Span);
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
 
             do
@@ -153,8 +157,7 @@ namespace DuetControlServer.SPI
                             {
                                 Model.Provider.Get.State.Status = MachineStatus.Idle;
                             }
-                            Model.Provider.Get.Messages.Add(new Message(MessageType.Success, "Connection to Duet established"));
-                            Console.WriteLine("[info] Connection to Duet established");
+                            Utility.Logger.LogOutput(MessageType.Success, "Connection to Duet established");
                         }
                         _hadTimeout = _resetting = false;
                     }
@@ -192,8 +195,7 @@ namespace DuetControlServer.SPI
                             {
                                 _waitingForFirstTransfer = _hadTimeout = true;
                                 Model.Provider.Get.State.Status = MachineStatus.Off;
-                                Model.Provider.Get.Messages.Add(new Message(MessageType.Warning, $"Lost connection to Duet ({e.Message})"));
-                                Console.WriteLine($"[warn] Lost connection to Duet ({e.Message})");
+                                Utility.Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
                             }
                         }
                     }
@@ -355,7 +357,7 @@ namespace DuetControlServer.SPI
                 stream.Write(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
             }
 
-            string dump = "[err] Received malformed packet:\n";
+            string dump = "Received malformed packet:\n";
             dump += $"=== Packet #{_lastPacket.Id} from offset {_rxPointer} request {_lastPacket.Request} (length {_lastPacket.Length}) ===\n";
             foreach(byte c in _packetData.Span)
             {
@@ -369,7 +371,7 @@ namespace DuetControlServer.SPI
             }
             dump += "\n";
             dump += "====================";
-            Console.WriteLine(dump);
+            _logger.Error(dump);
         }
         #endregion
 
@@ -702,7 +704,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Flash another segment of the firmware via the IAP binary
         /// </summary>
-        /// <param name="stream"></param>
+        /// <param name="stream">Stream of the firmware binary</param>
         /// <returns>Whether another segment could be sent</returns>
         public static bool FlashFirmwareSegment(Stream stream)
         {
@@ -767,8 +769,8 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Assign a filament name to the given extruder drive
         /// </summary>
-        /// <param name="extruder"></param>
-        /// <param name="filamentName"></param>
+        /// <param name="extruder">Extruder index</param>
+        /// <param name="filamentName">Filament name</param>
         /// <returns>Whether the firmware has been written successfully</returns>
         public static bool WriteAssignFilament(int extruder, string filamentName)
         {
@@ -846,7 +848,8 @@ namespace DuetControlServer.SPI
         {
             if (_updating)
             {
-                _transferReadyEvent.Wait(Program.CancelSource.Token);
+                // Ignore program termination requests if an update is in progress
+                _transferReadyEvent.Wait();
             }
             else if (_waitingForFirstTransfer)
             {
@@ -894,7 +897,7 @@ namespace DuetControlServer.SPI
                 uint responseCode = MemoryMarshal.Read<uint>(_rxHeaderBuffer.Span);
                 if (responseCode == Communication.TransferResponse.BadResponse)
                 {
-                    Console.WriteLine("[warn] Restarting transfer because the Duet received a bad response (header)");
+                    _logger.Warn("Restarting transfer because the Duet received a bad response (header)");
                     return false;
                 }
 
@@ -905,19 +908,19 @@ namespace DuetControlServer.SPI
                     throw new OperationCanceledException("Board is not available (no header)");
                 }
 
-                ushort checksum = CRC16.Calculate(_rxHeaderBuffer.Slice(0, Marshal.SizeOf(_rxHeader) - Marshal.SizeOf(typeof(ushort))).Span);
+                ushort checksum = Utility.CRC16.Calculate(_rxHeaderBuffer.Slice(0, Marshal.SizeOf(_rxHeader) - Marshal.SizeOf(typeof(ushort))).Span);
                 if (_rxHeader.ChecksumHeader != checksum)
                 {
-                    Console.WriteLine($"[warn] Bad header checksum (expected 0x{_rxHeader.ChecksumHeader:x4}, got 0x{checksum:x4})");
+                    _logger.Warn("Bad header checksum (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader.ToString("x4"), checksum.ToString("x4"));
                     responseCode = ExchangeResponse(Communication.TransferResponse.BadHeaderChecksum);
                     if (responseCode == Communication.TransferResponse.BadResponse)
                     {
-                        Console.WriteLine("[warn] Restarting transfer because the Duet received a bad response (header response)");
+                        _logger.Warn("Restarting transfer because the Duet received a bad response (header response)");
                         return false;
                     }
                     if (responseCode != Communication.TransferResponse.Success)
                     {
-                        Console.WriteLine($"[warn] Note: RepRapFirmware didn't receive valid data either (code 0x{responseCode:x8})");
+                        _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
                     }
                     continue;
                 }
@@ -959,21 +962,21 @@ namespace DuetControlServer.SPI
                         throw new Exception("RepRapFirmware refused data length");
 
                     case Communication.TransferResponse.BadHeaderChecksum:
-                        Console.WriteLine("[warn] RepRapFirmware got a bad header checksum");
+                        _logger.Warn("RepRapFirmware got a bad header checksum");
                         continue;
 
                     case Communication.TransferResponse.BadResponse:
-                        Console.WriteLine("[warn] Restarting transfer because RepRapFirmware received a bad response (header response)");
+                        _logger.Warn("Restarting transfer because RepRapFirmware received a bad response (header response)");
                         return false;
 
                     default:
-                        Console.WriteLine($"[warn] Restarting transfer because a bad header response was received (0x{response:x8})");
+                        _logger.Warn("Restarting transfer because a bad header response was received (0x{0})", response.ToString("x8"));
                         ExchangeResponse(Communication.TransferResponse.BadResponse);
                         return false;
                 }
             }
 
-            Console.WriteLine("[warn] Restarting transfer because the number of maximum retries has been exceeded");
+            _logger.Warn("Restarting transfer because the number of maximum retries has been exceeded");
             ExchangeResponse(Communication.TransferResponse.BadResponse);
             return false;
         }
@@ -1000,24 +1003,24 @@ namespace DuetControlServer.SPI
                 uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);
                 if (responseCode == Communication.TransferResponse.BadResponse)
                 {
-                    Console.WriteLine("[warn] Restarting transfer because RepRapFirmware received a bad response (data content)");
+                    _logger.Warn("Restarting transfer because RepRapFirmware received a bad response (data content)");
                     return false;
                 }
 
                 // Inspect received data
-                ushort checksum = CRC16.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+                ushort checksum = Utility.CRC16.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
                 if (_rxHeader.ChecksumData != checksum)
                 {
-                    Console.WriteLine($"[warn] Bad data checksum (expected 0x{_rxHeader.ChecksumData:x4}, got 0x{checksum:x4})");
+                    _logger.Warn("Bad data checksum (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData.ToString("x4"), checksum.ToString("x4"));
                     responseCode = ExchangeResponse(Communication.TransferResponse.BadDataChecksum);
                     if (responseCode == Communication.TransferResponse.BadResponse)
                     {
-                        Console.WriteLine("[warn] Restarting transfer because the Duet received a bad response (data response)");
+                        _logger.Warn("Restarting transfer because the Duet received a bad response (data response)");
                         return false;
                     }
                     if (responseCode != Communication.TransferResponse.Success)
                     {
-                        Console.WriteLine($"[warn] Note: RepRapFirmware didn't receive valid data either (code 0x{responseCode:x8})");
+                        _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
                     }
                     continue;
                 }
@@ -1033,21 +1036,21 @@ namespace DuetControlServer.SPI
                         return true;
 
                     case Communication.TransferResponse.BadDataChecksum:
-                        Console.WriteLine("[warn] RepRapFirmware got a bad data checksum");
+                        _logger.Warn("RepRapFirmware got a bad data checksum");
                         continue;
 
                     case Communication.TransferResponse.BadResponse:
-                        Console.WriteLine("[warn] Restarting transfer because RepRapFirmware received a bad response (data response)");
+                        _logger.Warn("Restarting transfer because RepRapFirmware received a bad response (data response)");
                         return false;
 
                     default:
-                        Console.WriteLine($"[warn] Restarting transfer because a bad data response was received (0x{response:x8})");
+                        _logger.Warn("Restarting transfer because a bad data response was received (0x{0})", response.ToString("x8"));
                         ExchangeResponse(Communication.TransferResponse.BadResponse);
                         return false;
                 }
             }
 
-            Console.WriteLine("[warn] Restarting transfer because the number of maximum retries has been exceeded");
+            _logger.Warn("Restarting transfer because the number of maximum retries has been exceeded");
             ExchangeResponse(Communication.TransferResponse.BadResponse);
             return false;
         }

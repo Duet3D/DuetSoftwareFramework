@@ -6,9 +6,19 @@
     public static class Defaults
     {
         /// <summary>
-        /// Default path to the UNIX file socket
+        /// Default directory in which DSF-related UNIX sockets reside
         /// </summary>
-        public const string SocketPath = "/var/run/duet.sock";
+        public const string SocketDirectory = "/var/run/dsf";
+
+        /// <summary>
+        /// Default UNIX socket file for DuetControlServer
+        /// </summary>
+        public const string SocketFile = "dcs.sock";
+
+        /// <summary>
+        /// Default fully-qualified path to the UNIX socket for DuetControlServer
+        /// </summary>
+        public const string FullSocketPath = "/var/run/dsf/dcs.sock";
 
         /// <summary>
         /// Default code channel to use

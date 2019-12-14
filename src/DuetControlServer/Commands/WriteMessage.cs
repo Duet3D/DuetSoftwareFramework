@@ -1,5 +1,4 @@
 ﻿using DuetAPI;
-using System;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -9,6 +8,11 @@ namespace DuetControlServer.Commands
     /// </summary>
     public class WriteMessage : DuetAPI.Commands.WriteMessage
     {
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
         /// <summary>
         /// Write an arbitrary message
         /// </summary>
@@ -26,7 +30,8 @@ namespace DuetControlServer.Commands
             }
             if (!LogMessage && !OutputMessage)
             {
-                Console.WriteLine(msg.ToString());
+                // If the message is supposed to be written neither to the object model nor to the log file, send it to the DCS log
+                _logger.Info(msg.ToString());
             }
         }
     }

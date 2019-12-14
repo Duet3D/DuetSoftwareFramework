@@ -1,4 +1,7 @@
 ﻿using DuetAPI.Utility;
+using NLog;
+using NLog.Config;
+using NLog.Targets;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,15 +22,54 @@ namespace DuetControlServer
         private const RegexOptions RegexFlags = RegexOptions.IgnoreCase | RegexOptions.Singleline;
 
         /// <summary>
-        /// Path to the UNIX socket for IPC
+        /// Indicates if this program is only launched to update the Duet 3 firmware
         /// </summary>
-        /// <seealso cref="DuetAPI"/>
-        public static string SocketPath { get; set; } = DuetAPI.Connection.Defaults.SocketPath;
+        [JsonIgnore]
+        public static bool UpdateOnly { get; set; }
 
         /// <summary>
-        /// Maximum number of pending IPC connection
+        /// Do NOT start the SPI task. This is meant entirely for development purposes and should not be used!
+        /// </summary>
+        [JsonIgnore]
+        public static bool NoSpiTask { get; set; }
+
+        /// <summary>
+        /// Path to the configuration file
+        /// </summary>
+        [JsonIgnore]
+        public static string ConfigFilename { get; set; } = DefaultConfigFile;
+
+        /// <summary>
+        /// Minimum log level for console output
+        /// </summary>
+        public static LogLevel LogLevel { get; set; } = LogLevel.Info;
+
+        /// <summary>
+        /// Directory in which DSF-related UNIX sockets reside
+        /// </summary>
+        public static string SocketDirectory { get; set; } = DuetAPI.Connection.Defaults.SocketDirectory;
+
+        /// <summary>
+        /// UNIX socket file for DuetControlServer
+        /// </summary>
+        /// <seealso cref="DuetAPI"/>
+        public static string SocketFile { get; set; } = DuetAPI.Connection.Defaults.SocketFile;
+
+        /// <summary>
+        /// Fully-qualified path to the main IPC UNIX socket (evaluated during runtime)
+        /// </summary>
+        [JsonIgnore]
+        public static string FullSocketPath { get => Path.Combine(SocketDirectory, SocketFile); }
+
+        /// <summary>
+        /// Maximum number of simultaneously pending IPC connections
         /// </summary>
         public static int Backlog { get; set; } = 4;
+
+        /// <summary>
+        /// Poll interval for connected IPC clients
+        /// </summary>
+        public static int SocketPollInterval { get; set; } = 2000;
 
         /// <summary>
         /// Virtual SD card directory.
@@ -181,25 +223,39 @@ namespace DuetControlServer
         /// <summary>
         /// Initialize settings and load them from the config file or create it if it does not exist
         /// </summary>
-        /// <param name="args">Command-line arguments</param>
-        internal static void Init(string[] args)
+        /// <returns>False if the application is supposed to terminate</returns>
+        public static bool Init(string[] args)
         {
-            // Attempt to parse the config file path from the command-line arguments
-            string lastArg = null, config = DefaultConfigFile;
+            // Check if a custom config is supposed to be loaded
+            string lastArg = null;
             foreach (string arg in args)
             {
-                if (lastArg == "-s" || lastArg == "--config")
+                if (lastArg == "-c" || lastArg == "--config")
                 {
-                    config = arg;
-                    break;
+                    ConfigFilename = arg;
                 }
-                lastArg = arg;
+                else if (arg == "-h" || arg == "--help")
+                {
+                    Console.WriteLine("Available command line arguments:");
+                    Console.WriteLine("-u, --update: Update RepRapFirmware and exit");
+                    Console.WriteLine("-l, --log-level [trace,debug,info,warn,error,fatal,off]: Set minimum log level");
+                    Console.WriteLine("-c, --config: Override path to the JSON config file");
+                    Console.WriteLine("-S, --socket-directory: Specify the UNIX socket directory");
+                    Console.WriteLine("-s, --socket-file: Specify the UNIX socket file");
+                    Console.WriteLine("-u, --socket-user <user>: Specify the owning user of the UNIX socket file");
+                    Console.WriteLine("-g, --socket-group <group>: Specify the owning group of the UNIX socket file");
+                    Console.WriteLine("-b, --base-directory: Set the virtual SD card base directory");
+                    // Console.WriteLine("--no-spi-task: Do NOT start the SPI task. This is only intended for development purposes!");
+                    Console.WriteLine("-h, --help: Display this text");
+                    return false;
+                }
             }
 
             // See if the file exists and attempt to load the settings from it, otherwise create it
-            if (File.Exists(config))
+            if (File.Exists(ConfigFilename))
             {
-                LoadFromFile(config);
+                LoadFromFile(ConfigFilename);
+                ParseParameters(args);
 
                 if (MaxBufferSpacePerChannel < SPI.Communication.Consts.MaxCodeBufferSize)
                 {
@@ -208,38 +264,74 @@ namespace DuetControlServer
             }
             else
             {
-                SaveToFile(config);
+                ParseParameters(args);
+                SaveToFile(ConfigFilename);
             }
-            
-            // Parse other command-line parameters
-            ParseParameters(args);
+
+            // Initialize logging
+            LoggingConfiguration logConfig = new LoggingConfiguration();
+            ColoredConsoleTarget logConsoleTarget = new ColoredConsoleTarget
+            {
+                // Create a layout for messages like:
+                // [trace] Really verbose stuff
+                // [debug] Verbose debugging stuff
+                // [info] This is a regular log message
+                // [warning] Something not too nice
+                // [error] IPC#3: This is an IPC error message
+                //         System.Exception: Foobar
+                //         at { ... }
+                // [error] That is some other error message
+                //         System.Exception: Yada yada
+                //         at { ... }
+                // [fatal] System.Exception: Blah blah
+                //         at { ... }
+                Layout = @"[${level:lowercase=true}] ${when:when=!contains('${logger}','.'):inner=${logger}${literal:text=\:} }${message}${onexception:when='${message}'!='${exception:format=ToString}'):${newline}   ${exception:format=ToString}}"
+            };
+            logConfig.AddRule(LogLevel, LogLevel.Fatal, logConsoleTarget);
+            LogManager.AutoShutdown = false;
+            LogManager.Configuration = logConfig;
+
+            // Go on
+            return true;
         }
 
+        /// <summary>
+        /// Parse the command line parameters
+        /// </summary>
+        /// <param name="args">Command-line arguments</param>
         private static void ParseParameters(string[] args)
         {
             string lastArg = null;
             foreach (string arg in args)
             {
-                if (arg == "-i" || arg == "--info")
+                if (lastArg == "-l" || lastArg == "--log-level")
                 {
-                    Console.WriteLine("-i, --info: Display this reference");
-                    Console.WriteLine("-s, --config: Set config file");
-                    Console.WriteLine("-S, --socket: Specify the UNIX socket path");
-                    Console.WriteLine("-b, --base-directory: Set the base path for system and G-code files");
-                    Console.WriteLine("-u, --update: Update RepRapFirmware and exit");
+                    LogLevel = LogLevel.FromString(arg);
                 }
-                else if (lastArg == "-S" || lastArg == "--socket")
+                else if (lastArg == "-S" || lastArg == "--socket-directory")
                 {
-                    SocketPath = arg;
+                    SocketDirectory = arg;
+                }
+                else if (lastArg == "-s" || lastArg == "--socket-file")
+                {
+                    SocketFile = arg;
                 }
                 else if (lastArg == "-b" || lastArg == "--base-directory")
                 {
                     BaseDirectory = arg;
                 }
+                else if (arg == "--no-spi-task")
+                {
+                    NoSpiTask = true;
+                }
                 lastArg = arg;
             }
         }
 
+        /// <summary>
+        /// Load the settings from a given file
+        /// </summary>
+        /// <param name="fileName">File to load the settings from</param>
         private static void LoadFromFile(string fileName)
         {
             byte[] content;
@@ -303,6 +395,10 @@ namespace DuetControlServer
                         {
                             property.SetValue(null, reader.GetString());
                         }
+                        else if (property.PropertyType == typeof(LogLevel))
+                        {
+                            property.SetValue(null, LogLevel.FromString(reader.GetString()));
+                        }
                         else
                         {
                             throw new JsonException($"Bad string type: {property.PropertyType.Name}");
@@ -324,6 +420,10 @@ namespace DuetControlServer
             }
         }
 
+        /// <summary>
+        /// Save the settings to a given file
+        /// </summary>
+        /// <param name="fileName">File to save the settings to</param>
         private static void SaveToFile(string fileName)
         {
             using FileStream fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write);
@@ -332,37 +432,44 @@ namespace DuetControlServer
             writer.WriteStartObject();
             foreach (PropertyInfo property in typeof(Settings).GetProperties(BindingFlags.Static | BindingFlags.Public))
             {
-                object value = property.GetValue(null);
-                if (value is string stringValue)
+                if (!Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
                 {
-                    writer.WriteString(property.Name, stringValue);
-                }
-                else if (value is int intValue)
-                {
-                    writer.WriteNumber(property.Name, intValue);
-                }
-                else if (value is uint uintValue)
-                {
-                    writer.WriteNumber(property.Name, uintValue);
-                }
-                else if (value is float floatValue)
-                {
-                    writer.WriteNumber(property.Name, floatValue);
-                }
-                else if (value is double doubleValue)
-                {
-                    writer.WriteNumber(property.Name, doubleValue);
-                }
-                else if (value is List<Regex> regexList)
-                {
-                    writer.WritePropertyName(property.Name);
+                    object value = property.GetValue(null);
+                    if (value is string stringValue)
+                    {
+                        writer.WriteString(property.Name, stringValue);
+                    }
+                    else if (value is int intValue)
+                    {
+                        writer.WriteNumber(property.Name, intValue);
+                    }
+                    else if (value is uint uintValue)
+                    {
+                        writer.WriteNumber(property.Name, uintValue);
+                    }
+                    else if (value is float floatValue)
+                    {
+                        writer.WriteNumber(property.Name, floatValue);
+                    }
+                    else if (value is double doubleValue)
+                    {
+                        writer.WriteNumber(property.Name, doubleValue);
+                    }
+                    else if (value is List<Regex> regexList)
+                    {
+                        writer.WritePropertyName(property.Name);
 
-                    JsonRegexListConverter regexListConverter = new JsonRegexListConverter();
-                    regexListConverter.Write(writer, regexList, null);
-                }
-                else
-                {
-                    throw new JsonException($"Unknown value type {property.PropertyType.Name}");
+                        JsonRegexListConverter regexListConverter = new JsonRegexListConverter();
+                        regexListConverter.Write(writer, regexList, null);
+                    }
+                    else if (value is LogLevel logLevelValue)
+                    {
+                        writer.WriteString(property.Name, logLevelValue.ToString().ToLowerInvariant());
+                    }
+                    else
+                    {
+                        throw new JsonException($"Unknown value type {property.PropertyType.Name}");
+                    }
                 }
             }
             writer.WriteEndObject();

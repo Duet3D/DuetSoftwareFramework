@@ -7,7 +7,7 @@ namespace LinuxDevices
     /// <summary>
     /// Driver class for SPI transfers. Most of this is copied from the System.Device.Gpio library
     /// </summary>
-    public class SpiDevice : IDisposable
+    public sealed class SpiDevice : IDisposable
     {
         private const uint SPI_IOC_MESSAGE_1 = 0x40206b00;
         private int _deviceFileDescriptor = -1;
@@ -56,6 +56,45 @@ namespace LinuxDevices
         }
 
         /// <summary>
+        /// Finalizer of this class
+        /// </summary>
+        ~SpiDevice() => Dispose(false);
+
+        /// <summary>
+        /// Disposes this instance
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Indicates if this instance has been disposed
+        /// </summary>
+        private bool disposed = false;
+
+        /// <summary>
+        /// Dispose this instance internally
+        /// </summary>
+        /// <param name="disposing"></param>
+        private void Dispose(bool disposing)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            if (_deviceFileDescriptor >= 0)
+            {
+                Interop.close(_deviceFileDescriptor);
+                _deviceFileDescriptor = -1;
+            }
+
+            disposed = true;
+        }
+
+        /// <summary>
         /// Writes and reads data from the SPI device.
         /// </summary>
         /// <param name="writeBuffer">The buffer that contains the data to be written to the SPI device.</param>
@@ -92,15 +131,6 @@ namespace LinuxDevices
             if (result < 1)
             {
                 throw new IOException($"Error {Marshal.GetLastWin32Error()} performing SPI data transfer.");
-            }
-        }
-
-        public void Dispose()
-        {
-            if (_deviceFileDescriptor >= 0)
-            {
-                Interop.close(_deviceFileDescriptor);
-                _deviceFileDescriptor = -1;
             }
         }
     }

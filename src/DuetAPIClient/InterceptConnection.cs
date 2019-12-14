@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
@@ -35,8 +36,9 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
-        /// <exception cref="SocketException">Init message could not be sent</exception>
-        public Task Connect(InterceptionMode mode, string socketPath = Defaults.SocketPath, CancellationToken cancellationToken = default)
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Init message could not be processed</exception>
+        public Task Connect(InterceptionMode mode, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
             Mode = mode;
 
@@ -49,6 +51,8 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Code being intercepted or null if the connection has been closed</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
         public Task<Code> ReceiveCode(CancellationToken cancellationToken = default) => Receive<Code>(cancellationToken);
 
         /// <summary>
@@ -56,7 +60,8 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        /// <exception cref="SocketException">Command could not be sent</exception>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="Cancel"/>
         public Task CancelCode(CancellationToken cancellationToken = default) => Send(new Cancel(), cancellationToken);
 
@@ -65,7 +70,8 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        /// <exception cref="SocketException">Command could not be sent</exception>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="Ignore"/>
         public Task IgnoreCode(CancellationToken cancellationToken = default) => Send(new Ignore(), cancellationToken);
 
@@ -76,7 +82,8 @@ namespace DuetAPIClient
         /// <param name="content">Content of the resolving message</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        /// <exception cref="SocketException">Command could not be sent</exception>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="Message"/>
         /// <seealso cref="Resolve"/>
         public Task ResolveCode(MessageType type, string content, CancellationToken cancellationToken = default)

@@ -12,7 +12,10 @@
     }
   },
   "KeepAliveInterval": 30,
+  "ModelRetryDelay": 5000,
+  "ObjectModelUpdateTimeout": 2000,
   "UseCors": true,
   "UseStaticFiles": true,
-  "SocketPath": "/var/run/duet.sock"
+  "SocketPath": "/var/run/dsf/dcs.sock",
+  "WebSocketBufferSize": 8192
 }

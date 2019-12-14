@@ -16,9 +16,30 @@ namespace DuetControlServer.Utility
         /// </summary>
         public const string DefaultLogFile = "eventlog.txt";
 
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// Lock for the file
+        /// </summary>
         private static readonly AsyncLock _lock = new AsyncLock();
+
+        /// <summary>
+        /// Filestream of the log file
+        /// </summary>
         private static FileStream _fileStream;
+
+        /// <summary>
+        /// Writer for logging data
+        /// </summary>
         private static StreamWriter _writer;
+
+        /// <summary>
+        /// Registration that is triggered when the log is supposed to be closed
+        /// </summary>
+        private static IDisposable _logCloseEvent;
 
         /// <summary>
         /// Start logging to a file
@@ -27,14 +48,17 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task Start(string filename)
         {
-            using (_lock.Lock())
+            using (await _lock.LockAsync())
             {
                 // Close any open file
                 await StopInternal();
 
-                // Start logging to the specified file
+                // Initialize access to the log file
                 _fileStream = new FileStream(filename, FileMode.Append, FileAccess.Write);
                 _writer = new StreamWriter(_fileStream) { AutoFlush = true };
+                _logCloseEvent = Program.CancelSource.Token.Register(Stop().Wait);
+
+                // Write the first line
                 await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging started");
             }
         }
@@ -51,6 +75,10 @@ namespace DuetControlServer.Utility
             }
         }
 
+        /// <summary>
+        /// Stop logging internally
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task StopInternal()
         {
             if (_writer != null)
@@ -65,6 +93,12 @@ namespace DuetControlServer.Utility
                 _fileStream.Close();
                 _fileStream = null;
             }
+
+            if (_logCloseEvent != null)
+            {
+                _logCloseEvent.Dispose();
+                _logCloseEvent = null;
+            }
         }
 
         /// <summary>
@@ -75,17 +109,16 @@ namespace DuetControlServer.Utility
         {
             using (await _lock.LockAsync())
             {
-                if (_writer != null)
+                if (_writer != null && !string.IsNullOrWhiteSpace(msg.Content))
                 {
                     try
                     {
                         await _writer.WriteAsync(msg.Time.ToString("yyyy-MM-dd HH:mm:ss "));
                         await _writer.WriteLineAsync(msg.ToString());
                     }
-                    catch (AggregateException ae)
+                    catch (Exception e)
                     {
-                        Console.Write("[err] Failed to write to log file: ");
-                        Console.WriteLine(ae.InnerException);
+                        _logger.Error(e, "Failed to write to log file");
                         await StopInternal();
                     }
                 }
@@ -129,7 +162,7 @@ namespace DuetControlServer.Utility
         /// Log and output a code result
         /// </summary>
         /// <param name="result">Code result</param>
-        /// <returns></returns>
+        /// <returns>Asynchronous task</returns>
         public static async Task LogOutput(DuetAPI.Commands.CodeResult result)
         {
             if (result != null)

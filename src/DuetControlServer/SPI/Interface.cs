@@ -19,6 +19,11 @@ namespace DuetControlServer.SPI
     /// </summary>
     public static class Interface
     {
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
         // Information about the code channels
         private static readonly ChannelStore _channels = new ChannelStore();
         private static int _bytesReserved = 0, _bufferSpace = 0;
@@ -41,8 +46,9 @@ namespace DuetControlServer.SPI
         private static TaskCompletionSource<object> _firmwareUpdateRequest;
 
         // Special requests
-        private static bool _emergencyStopRequested, _resetRequested, _printStarted;
+        private static readonly AsyncLock _printStopppedReasonLock = new AsyncLock();
         private static PrintStoppedReason? _printStoppedReason;
+        private static volatile bool _emergencyStopRequested, _resetRequested, _printStarted;
         private static readonly Queue<Tuple<int, string>> _extruderFilamentUpdates = new Queue<Tuple<int, string>>();
 
         // Partial messages (if any)
@@ -205,7 +211,10 @@ namespace DuetControlServer.SPI
         /// <param name="stopReason">Reason why the print has stopped</param>
         public static void SetPrintStopped(PrintStoppedReason stopReason)
         {
-            _printStoppedReason = stopReason;
+            using (_printStopppedReasonLock.Lock())
+            {
+                _printStoppedReason = stopReason;
+            }
             using (_channels[CodeChannel.File].Lock())
             {
                 _channels[CodeChannel.File].InvalidateBuffer(false);
@@ -275,25 +284,22 @@ namespace DuetControlServer.SPI
             // Get the CRC16 checksum of the firmware binary
             byte[] firmwareBlob = new byte[_firmwareStream.Length];
             await _firmwareStream.ReadAsync(firmwareBlob, 0, (int)_firmwareStream.Length);
-            ushort crc16 = CRC16.Calculate(firmwareBlob);
+            ushort crc16 = Utility.CRC16.Calculate(firmwareBlob);
 
             // Send the IAP binary to the firmware
-            Console.Write("[info] Flashing IAP binary");
+            _logger.Info("Flashing IAP binary");
             bool dataSent;
             do
             {
                 dataSent = DataTransfer.WriteIapSegment(_iapStream);
                 DataTransfer.PerformFullTransfer();
-                Console.Write('.');
             }
             while (dataSent);
-            Console.WriteLine();
-
-            _iapStream.Close();
-            _iapStream = null;
 
             // Start the IAP binary
+            _logger.Debug("Starting IAP binary");
             DataTransfer.StartIap();
+            _logger.Debug("IAP started");
 
             // Send the firmware binary to the IAP program
             int numRetries = 0;
@@ -301,42 +307,31 @@ namespace DuetControlServer.SPI
             {
                 if (numRetries != 0)
                 {
-                    Console.WriteLine("Error");
+                    _logger.Error("Firmware checksum verification failed");
                 }
 
-                Console.Write("[info] Flashing RepRapFirmware");
+                _logger.Info("Flashing RepRapFirmware");
                 _firmwareStream.Seek(0, SeekOrigin.Begin);
-                while (DataTransfer.FlashFirmwareSegment(_firmwareStream))
-                {
-                    Console.Write('.');
-                }
-                Console.WriteLine();
+                while (DataTransfer.FlashFirmwareSegment(_firmwareStream)) { }
 
-                Console.Write("[info] Verifying checksum... ");
+                _logger.Info("Verifying checksum");
             }
             while (++numRetries < 3 && !DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
 
             if (numRetries == 3)
             {
-                Console.WriteLine("Error");
-
                 // Failed to flash the firmware
                 await Utility.Logger.LogOutput(MessageType.Error, "Could not flash the firmware binary after 3 attempts. Please install it manually via bossac.");
                 Program.CancelSource.Cancel();
             }
             else
             {
-                Console.WriteLine("OK");
-
                 // Wait for the IAP binary to restart the controller
                 DataTransfer.WaitForIapReset();
-                Console.WriteLine("[info] Firmware update successful!");
+                _logger.Info("Firmware update successful!");
             }
 
-            _firmwareStream.Close();
-            _firmwareStream = null;
-
-            using (_firmwareUpdateLock.Lock())
+            using (await _firmwareUpdateLock.LockAsync())
             {
                 _firmwareUpdateRequest.SetResult(null);
                 _firmwareUpdateRequest = null;
@@ -369,13 +364,19 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
+            if (Settings.NoSpiTask)
+            {
+                await Task.Delay(-1, Program.CancelSource.Token);
+                return;
+            }
+
             do
             {
                 // Check if an emergency stop has been requested
                 if (_emergencyStopRequested && DataTransfer.WriteEmergencyStop())
                 {
                     _emergencyStopRequested = false;
-                    Console.WriteLine("[info] Emergency stop");
+                    _logger.Warn("Emergency stop");
                     DataTransfer.PerformFullTransfer();
                 }
 
@@ -383,7 +384,7 @@ namespace DuetControlServer.SPI
                 if (_resetRequested && DataTransfer.WriteReset())
                 {
                     _resetRequested = false;
-                    Console.WriteLine("[info] Resetting controller");
+                    _logger.Warn("Resetting controller");
                     DataTransfer.PerformFullTransfer();
                 }
 
@@ -392,7 +393,7 @@ namespace DuetControlServer.SPI
                 {
                     await Invalidate("Firmware update imminent");
                     await PerformFirmwareUpdate();
-                    if (Program.UpdateOnly)
+                    if (Settings.UpdateOnly)
                     {
                         // Stop after installing the firmware update
                         break;
@@ -410,14 +411,20 @@ namespace DuetControlServer.SPI
                 // The packet providing file info has be sent first because it includes a time_t value that must reside on a 64-bit boundary!
                 if (_printStarted)
                 {
-                    using (Model.Provider.AccessReadOnly())
+                    using (await Model.Provider.AccessReadOnlyAsync())
                     {
                         _printStarted = !DataTransfer.WritePrintStarted(Model.Provider.Get.Job.File);
                     }
                 }
-                else if (_printStoppedReason.HasValue && DataTransfer.WritePrintStopped(_printStoppedReason.Value))
+                else
                 {
-                    _printStoppedReason = null;
+                    using (await _printStopppedReasonLock.LockAsync())
+                    {
+                        if (_printStoppedReason.HasValue && DataTransfer.WritePrintStopped(_printStoppedReason.Value))
+                        {
+                            _printStoppedReason = null;
+                        }
+                    }
                 }
 
                 // Deal with heightmap requests
@@ -447,7 +454,7 @@ namespace DuetControlServer.SPI
                         packet = DataTransfer.ReadPacket();
                         if (!packet.HasValue)
                         {
-                            Console.WriteLine("[err] Read invalid packet");
+                            _logger.Error("Read invalid packet");
                             break;
                         }
                         await ProcessPacket(packet.Value);
@@ -467,7 +474,7 @@ namespace DuetControlServer.SPI
                     dataProcessed = false;
                     foreach (ChannelInformation channel in _channels)
                     {
-                        using (channel.Lock())
+                        using (await channel.LockAsync())
                         {
                             if (!channel.IsBlocked)
                             {
@@ -511,7 +518,7 @@ namespace DuetControlServer.SPI
                 // Wait a moment
                 await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
             }
-            while (!Program.CancelSource.IsCancellationRequested);
+            while (true);
         }
 
         /// <summary>
@@ -524,23 +531,28 @@ namespace DuetControlServer.SPI
         public static bool BufferCode(QueuedCode queuedCode, out int codeLength)
         {
             codeLength = Consts.BufferedCodeHeaderSize + DataTransfer.GetCodeSize(queuedCode.Code);
-            if (_bufferSpace > codeLength && _channels[queuedCode.Code.Channel].BytesBuffered + codeLength <= Settings.MaxBufferSpacePerChannel &&
+            if (_bufferSpace > codeLength &&
+                _channels[queuedCode.Code.Channel].BytesBuffered + codeLength <= Settings.MaxBufferSpacePerChannel &&
                 DataTransfer.WriteCode(queuedCode.Code))
             {
                 _bytesReserved += codeLength;
                 _bufferSpace -= codeLength;
                 queuedCode.BinarySize = codeLength;
-                Console.WriteLine($"[info] Sent {queuedCode.Code}, remaining space {Settings.MaxBufferSpacePerChannel - _channels[queuedCode.Code.Channel].BytesBuffered - codeLength} ({_bufferSpace} total), needed {codeLength}");
                 return true;
             }
             return false;
         }
 
+        /// <summary>
+        /// Process a packet from RepRapFirmware
+        /// </summary>
+        /// <param name="packet">Received packet</param>
+        /// <returns>Asynchronous task</returns>
         private static Task ProcessPacket(PacketHeader packet)
         {
             Communication.FirmwareRequests.Request request = (Communication.FirmwareRequests.Request)packet.Request;
 
-            if (Program.UpdateOnly && request != Communication.FirmwareRequests.Request.ObjectModel)
+            if (Settings.UpdateOnly && request != Communication.FirmwareRequests.Request.ObjectModel)
             {
                 // Don't process any requests except for object model responses if only the firmware is supposed to be updated
                 return Task.CompletedTask;
@@ -587,6 +599,10 @@ namespace DuetControlServer.SPI
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Process an object model response
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task HandleObjectModel()
         {
             DataTransfer.ReadObjectModel(out byte module, out byte[] json);
@@ -622,16 +638,22 @@ namespace DuetControlServer.SPI
             }
 
             // Merge the data into our own object model
-            await Model.Updater.MergeData(module, json);
+            await Model.Updater.ProcessResponse(module, json);
         }
 
+        /// <summary>
+        /// Update the amount of buffer space
+        /// </summary>
         private static void HandleCodeBufferUpdate()
         {
             DataTransfer.ReadCodeBufferUpdate(out ushort bufferSpace);
             _bufferSpace = bufferSpace - _bytesReserved;
-            //Console.WriteLine($"[info] Buffer space available: {_bufferSpace}");
+            _logger.Trace("Buffer space available: {0}", _bufferSpace);
         }
 
+        /// <summary>
+        /// Process a code reply
+        /// </summary>
         private static void HandleCodeReply()
         {
             DataTransfer.ReadCodeReply(out MessageTypeFlags flags, out string reply);
@@ -671,6 +693,11 @@ namespace DuetControlServer.SPI
             }
         }
 
+        /// <summary>
+        /// Output a generic message
+        /// </summary>
+        /// <param name="flags">Message flags</param>
+        /// <param name="reply">Message content</param>
         private static void OutputGenericMessage(MessageTypeFlags flags, string reply)
         {
             _partialGenericMessage += reply;
@@ -687,6 +714,10 @@ namespace DuetControlServer.SPI
             }
         }
 
+        /// <summary>
+        /// Handle a macro request
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task HandleMacroRequest()
         {
             DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename);
@@ -696,10 +727,14 @@ namespace DuetControlServer.SPI
             }
         }
 
+        /// <summary>
+        /// Handle a file abort request
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task HandleAbortFileRequest()
         {
             DataTransfer.ReadAbortFile(out CodeChannel channel, out bool abortAll);
-            Console.WriteLine($"[info] Received file abort request on channel {channel} for {(abortAll ? "all files" : "the last file")}");
+            _logger.Info("Received file abort request on channel {0} for {1}", channel, abortAll ? "all files" : "the last file");
 
             if (abortAll && channel == CodeChannel.File)
             {
@@ -719,6 +754,10 @@ namespace DuetControlServer.SPI
             }
         }
 
+        /// <summary>
+        /// Handle a stack event (may be dropped in the future)
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task HandleStackEvent()
         {
             DataTransfer.ReadStackEvent(out CodeChannel channel, out byte stackDepth, out Communication.FirmwareRequests.StackFlags stackFlags, out float feedrate);
@@ -735,6 +774,10 @@ namespace DuetControlServer.SPI
             }
         }
 
+        /// <summary>
+        /// Deal with paused print events
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task HandlePrintPaused()
         {
             DataTransfer.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
@@ -744,7 +787,7 @@ namespace DuetControlServer.SPI
                 // In this case, RRF has no way to determine the file position so we have to care of that.
                 filePosition = (uint)(Print.LastFilePosition ?? Print.Length);
             }
-            Console.WriteLine($"[info] Print paused at file position {filePosition}. Reason: {pauseReason}");
+            _logger.Info("Print paused at file position {0}. Reason: {1}", filePosition, pauseReason);
 
             // Make the print stop and rewind back to the given file position
             await Print.OnPause(filePosition);
@@ -766,23 +809,24 @@ namespace DuetControlServer.SPI
             }
         }
 
+        /// <summary>
+        /// Process a received height map
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task HandleHeightMap()
         {
             DataTransfer.ReadHeightMap(out Heightmap map);
             using (await _heightmapLock.LockAsync())
             {
-                if (_getHeightmapRequest == null)
-                {
-                    Console.WriteLine("[err] Got heightmap response although it was not requested");
-                }
-                else
-                {
-                    _getHeightmapRequest.SetResult(map);
-                    _getHeightmapRequest = null;
-                }
+                _getHeightmapRequest?.SetResult(map);
+                _getHeightmapRequest = null;
             }
         }
 
+        /// <summary>
+        /// Deal with the confirmation that a resource has been locked
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task HandleResourceLocked()
         {
             DataTransfer.ReadResourceLocked(out CodeChannel channel);
@@ -796,10 +840,15 @@ namespace DuetControlServer.SPI
             }
         }
 
+        /// <summary>
+        /// Process a request for a chunk of a given file
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task HandleFileChunkRequest()
         {
             DataTransfer.ReadFileChunkRequest(out string filename, out uint offset, out uint maxLength);
-            Console.WriteLine($"[trace] Received file chunk request for {filename}, offset {offset}, maxLength {maxLength}");
+            _logger.Trace("Received file chunk request for {0}, offset {1}, maxLength {2}", filename, offset, maxLength);
+
             try
             {
                 string filePath = await FilePath.ToPhysicalAsync(filename, "sys");
@@ -814,7 +863,7 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[err] Failed to send requested file chunk of {filename}: {e.Message}");
+                _logger.Error(e, "Failed to send requested file chunk of {0}", filename);
                 DataTransfer.WriteFileChunk(null, 0);
             }
         }

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
+using System.Net.Sockets;
 using System.Threading.Tasks;
-using DuetAPI.Connection.InitMessages;
 using DuetControlServer.Commands;
 
 namespace DuetControlServer.IPC.Processors
@@ -16,13 +16,20 @@ namespace DuetControlServer.IPC.Processors
         /// </summary>
         public static readonly Type[] SupportedCommands =
         {
+            typeof(AddHttpEndpoint),
+            typeof(AddUserSession),
             typeof(Code),
             typeof(GetFileInfo),
             typeof(GetMachineModel),
             typeof(Flush),
+            typeof(LockMachineModel),
+            typeof(RemoveHttpEndpoint),
+            typeof(RemoveUserSession),
             typeof(ResolvePath),
+            typeof(SetMachineModel),
             typeof(SimpleCode),
             typeof(SyncMachineModel),
+            typeof(UnlockMachineModel),
             typeof(WriteMessage)
         };
         
@@ -30,8 +37,8 @@ namespace DuetControlServer.IPC.Processors
         /// Constructor of the command interpreter
         /// </summary>
         /// <param name="conn">Connection instance</param>
-        public Command(Connection conn) : base(conn) { }
-                
+        public Command(Connection conn) : base(conn) => conn.Logger.Debug("Command processor added");
+
         /// <summary>
         /// Reads incoming command requests and processes them. See <see cref="DuetAPI.Commands"/> namespace for a list
         /// of supported commands. The actual implementations can be found in <see cref="Commands"/>.
@@ -44,29 +51,29 @@ namespace DuetControlServer.IPC.Processors
             {
                 try
                 {
-                    // Read another command
+                    // Read another command from the IPC connection
                     command = await Connection.ReceiveCommand();
-                    if (command == null)
-                    {
-                        break;
-                    }
-
-                    // Check if it is supported at all
                     if (!SupportedCommands.Contains(command.GetType()))
                     {
+                        // Take care of unsupported commands
                         throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
                     }
-                    
+
                     // Execute it and send back the result
                     object result = await command.Invoke();
                     await Connection.SendResponse(result);
+                }
+                catch (SocketException)
+                {
+                    // Connection has been terminated
+                    break;
                 }
                 catch (Exception e)
                 {
                     // Send errors back to the client
                     if (!(e is OperationCanceledException))
                     {
-                        Console.WriteLine($"[err] Failed to execute command {command.Command}: {e}");
+                        Connection.Logger.Error(e, "Failed to execute {0}", command.Command);
                     }
                     await Connection.SendResponse(e);
                 }

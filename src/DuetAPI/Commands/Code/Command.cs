@@ -30,6 +30,14 @@ namespace DuetAPI.Commands
         }
 
         /// <summary>
+        /// The connection ID this code was received from. If this is 0, the code originates from an internal DCS task
+        /// </summary>
+        /// <remarks>
+        /// Usually there is no need to populate this property. It is internally overwritten by the control server on receipt
+        /// </remarks>
+        public int SourceConnection { get; set; }
+
+        /// <summary>
         /// Result of this code. This property is only set when the code has finished its excution.
         /// It remains null if the code has been cancelled
         /// </summary>

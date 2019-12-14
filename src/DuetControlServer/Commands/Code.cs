@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,6 +18,11 @@ namespace DuetControlServer.Commands
     /// </summary>
     public class Code : DuetAPI.Commands.Code
     {
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
         #region Code Scheduler
         /// <summary>
         /// Queue of semaphores to guarantee the ordered execution of incoming G/M/T-codes
@@ -64,6 +67,10 @@ namespace DuetControlServer.Commands
             }
         }
 
+        /// <summary>
+        /// Get the next ticket for a code being enqueued for execution
+        /// </summary>
+        /// <returns>Ticket semaphore</returns>
         private AsyncSemaphore GetTicket()
         {
             lock (_codeTickets)
@@ -85,6 +92,11 @@ namespace DuetControlServer.Commands
             }
         }
 
+        /// <summary>
+        /// Wait until the given ticket flags readiness for the next code to be executed
+        /// </summary>
+        /// <param name="ticket">Ticket to wait for</param>
+        /// <returns>Asynchronous task</returns>
         private async Task WaitForExecution(AsyncSemaphore ticket)
         {
             // Get the current cancellation token of this channel
@@ -95,12 +107,18 @@ namespace DuetControlServer.Commands
             }
 
             // Wait until the last code has been processed or sent to RRF
-            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, channelToken);
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(channelToken, Program.CancelSource.Token);
             await ticket.WaitAsync(cts.Token);
         }
 
+        /// <summary>
+        /// Indicates if this code has already started the next one
+        /// </summary>
         private bool nextCodeStarted;
 
+        /// <summary>
+        /// Start the next available G/M/T-code unless this code has already started one
+        /// </summary>
         private void StartNextCode()
         {
             if (!nextCodeStarted)
@@ -135,27 +153,6 @@ namespace DuetControlServer.Commands
         public bool InternallyProcessed { get; set; }
 
         /// <summary>
-        /// Parse multiple codes from the given input string
-        /// </summary>
-        /// <param name="codeString">Codes to parse</param>
-        /// <returns>Enumeration of parsed G/M/T-codes</returns>
-        public static List<Code> ParseMultiple(string codeString)
-        {
-            // NB: Even though "yield return" seems like a good idea, it is safer to parse all the codes before any code is actually started...
-            List<Code> codes = new List<Code>();
-            using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(codeString));
-            using StreamReader reader = new StreamReader(stream);
-            bool enforcingAbsolutePosition = false;
-            while (!reader.EndOfStream)
-            {
-                Code code = new Code();
-                Parse(reader, code, ref enforcingAbsolutePosition);
-                codes.Add(code);
-            }
-            return codes;
-        }
-
-        /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish
         /// </summary>
         /// <returns>Result of the code</returns>
@@ -176,7 +173,7 @@ namespace DuetControlServer.Commands
             try
             {
                 // Process this code
-                Console.WriteLine($"[info] Processing {this}");
+                _logger.Debug("Processing {0}", this);
                 await Process();
             }
             catch (Exception e)
@@ -185,11 +182,11 @@ namespace DuetControlServer.Commands
                 Result = null;
                 if (e is OperationCanceledException)
                 {
-                    Console.WriteLine($"[info] Cancelled {this}");
+                    _logger.Debug("Cancelled {0}", this);
                 }
                 else
                 {
-                    Console.WriteLine($"[err] Code {this} caused an exception: {e}");
+                    _logger.Error(e, "Code {0} has caused an exception", this);
                 }
                 await CodeExecuted();
                 throw;
@@ -198,7 +195,7 @@ namespace DuetControlServer.Commands
             {
                 // Always interpret the result of this code
                 await CodeExecuted();
-                Console.WriteLine($"[info] Completed {this}");
+                _logger.Debug("Completed {0}", this);
             }
             return Result;
         }
@@ -235,7 +232,7 @@ namespace DuetControlServer.Commands
                     {
                         // Deal with cancelled codes
                         await CodeExecuted();
-                        Console.WriteLine($"[info] Cancelled {this}");
+                        _logger.Debug("Cancelled {0}", this);
                         throw;
                     }
                     catch (Exception e)
@@ -245,13 +242,13 @@ namespace DuetControlServer.Commands
                         {
                             e = ae.InnerException;
                         }
-                        Console.WriteLine($"[err] Failed to execute {this} asynchronously: {e}");
+                        _logger.Error(e, "Failed to execute {0} asynchronously", this);
                     }
                     finally
                     {
                         // Always interpret the result of this code
                         await CodeExecuted();
-                        Console.WriteLine($"[info] Completed {this} asynchronously");
+                        _logger.Debug("Completed {0} asynchronously", this);
                     }
                 });
 
@@ -273,10 +270,10 @@ namespace DuetControlServer.Commands
             // Pre-process this code
             if (!Flags.HasFlag(CodeFlags.IsPreProcessed))
             {
-                bool intercepted = await Interception.Intercept(this, InterceptionMode.Pre);
+                bool resolved = await Interception.Intercept(this, InterceptionMode.Pre);
                 Flags |= CodeFlags.IsPreProcessed;
 
-                if (intercepted)
+                if (resolved)
                 {
                     InternallyProcessed = true;
                     return true;
@@ -308,10 +305,10 @@ namespace DuetControlServer.Commands
             // If the code could not be interpreted internally, post-process it
             if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
             {
-                bool intercepted = await Interception.Intercept(this, InterceptionMode.Post);
+                bool resolved = await Interception.Intercept(this, InterceptionMode.Post);
                 Flags |= CodeFlags.IsPostProcessed;
 
-                if (intercepted)
+                if (resolved)
                 {
                     InternallyProcessed = true;
                     return true;

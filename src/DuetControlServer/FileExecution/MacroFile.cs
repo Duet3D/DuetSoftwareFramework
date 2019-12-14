@@ -12,12 +12,24 @@ namespace DuetControlServer.FileExecution
     /// </summary>
     public class MacroFile : BaseFile
     {
+        /// <summary>
+        /// Extra steps to perform before config.g is processed
+        /// </summary>
         private enum ConfigExtraSteps
         {
             SendHostname,
             SendDateTime,
             Done
         }
+
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private readonly NLog.Logger _logger;
+
+        /// <summary>
+        /// Current extra step being performed (provided config.g is being executed)
+        /// </summary>
         private ConfigExtraSteps _extraStep = ConfigExtraSteps.SendHostname;
 
         /// <summary>
@@ -51,7 +63,8 @@ namespace DuetControlServer.FileExecution
             }
             StartCode = startCode;
 
-            Console.WriteLine($"[info] Executing {((startCode == null) ? "system" : "nested")} macro file '{fileName}' on channel {channel}");
+            _logger = NLog.LogManager.GetLogger(Path.GetFileName(fileName));
+            _logger.Info("Executing {0} macro file on channel {1}", (startCode == null) ? "system" : "nested", channel);
         }
 
         /// <summary>
@@ -59,7 +72,7 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         public override void Abort()
         {
-            Console.WriteLine($"[info] Aborted macro file '{FileName}'");
+            _logger.Info("Aborted macro file");
             if (StartCode != null)
             {
                 StartCode.DoingNestedMacro = false;
@@ -81,6 +94,7 @@ namespace DuetControlServer.FileExecution
                 switch (_extraStep)
                 {
                     case ConfigExtraSteps.SendHostname:
+                        _logger.Debug("Sending hostname");
                         result = new Code
                         {
                             Channel = Channel,
@@ -93,6 +107,7 @@ namespace DuetControlServer.FileExecution
                         break;
 
                     case ConfigExtraSteps.SendDateTime:
+                        _logger.Debug("Sending datetime");
                         result = new Code
                         {
                             Channel = Channel,

@@ -520,7 +520,7 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="reader">JSON reader</param>
         /// <param name="typeToConvert">Type to convert</param>
-        /// <param name="options"></param>
+        /// <param name="options">Serializer options</param>
         /// <returns>Read value</returns>
         public override CodeParameter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

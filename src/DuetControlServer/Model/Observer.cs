@@ -31,7 +31,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Convert an item node to a string (for debugging)
         /// </summary>
-        /// <returns></returns>
+        /// <returns>String representation of this node</returns>
         public override string ToString() => $"{Name}[{Index} of {Count}]";
     }
 
@@ -113,6 +113,8 @@ namespace DuetControlServer.Model
             Provider.Get.Heat.Extra.CollectionChanged += ObjectCollectionChanged("heat", "extra");
             Provider.Get.Heat.Heaters.CollectionChanged += ObjectCollectionChanged("heat", "heaters");
 
+            Provider.Get.HttpEndpoints.CollectionChanged += ObjectCollectionChanged("httpEndpoints");
+
             Provider.Get.Job.PropertyChanged += PropertyChanged("job");
             Provider.Get.Job.ExtrudedRaw.CollectionChanged += ValueCollectionChanged("job", "extrudedRaw");
             Provider.Get.Job.File.PropertyChanged += PropertyChanged("job", "file");
@@ -156,6 +158,8 @@ namespace DuetControlServer.Model
             Provider.Get.Tools.CollectionChanged += ObjectCollectionChanged("tools");
 
             Provider.Get.UserVariables.CollectionChanged += DictionaryChanged<string, string>("userVariables");
+
+            Provider.Get.UserSessions.CollectionChanged += ObjectCollectionChanged("userSessions");
         }
 
         private static PropertyChangedEventHandler PropertyChanged(params object[] path)

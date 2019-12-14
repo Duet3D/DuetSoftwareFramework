@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Net.Sockets;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,12 +17,15 @@ namespace DuetAPIClient
     /// </summary>
     public abstract class BaseConnection : IDisposable
     {
+        /// <summary>
+        /// Mode of this connection
+        /// </summary>
         private readonly ConnectionMode _connectionMode;
         
         /// <summary>
         /// Socket used for inter-process communication
         /// </summary>
-        protected Socket _unixSocket;
+        protected readonly Socket _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 
         /// <summary>
         /// Create a new connection instance
@@ -32,6 +34,44 @@ namespace DuetAPIClient
         protected BaseConnection(ConnectionMode mode)
         {
             _connectionMode = mode;
+        }
+
+        /// <summary>
+        /// Finalizer of this class
+        /// </summary>
+        ~BaseConnection() => Dispose(false);
+
+        /// <summary>
+        /// Indicates if this instance has been disposed
+        /// </summary>
+        private bool disposed;
+
+        /// <summary>
+        /// Cleans up the current connection and all resources associated to it
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Protected dipose implementation
+        /// </summary>
+        /// <param name="disposing">True if this instance is being disposed</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            if (disposing)
+            {
+                _unixSocket.Dispose();
+            }
+
+            disposed = true;
         }
 
         /// <summary>
@@ -49,11 +89,12 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
         /// <exception cref="IOException">Connection mode is unavailable</exception>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
         protected async Task Connect(ClientInitMessage initMessage, string socketPath, CancellationToken cancellationToken)
         {
             // Create a new connection
             UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(socketPath);
-            _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
             _unixSocket.Connect(endPoint);
 
             // Verify server init message
@@ -71,7 +112,7 @@ namespace DuetAPIClient
             BaseResponse response = await ReceiveResponse(cancellationToken);
             if (!response.Success)
             {
-                ErrorResponse errorResponse = (ErrorResponse) response;
+                ErrorResponse errorResponse = (ErrorResponse)response;
                 throw new IOException($"Could not set connection type {_connectionMode} ({errorResponse.ErrorType}: {errorResponse.ErrorMessage})");
             }
         }
@@ -81,25 +122,19 @@ namespace DuetAPIClient
         /// </summary>
         public bool IsConnected
         {
-            get => (_unixSocket != null) && (_unixSocket.Connected);
+            get => !disposed && _unixSocket.Connected;
         }
 
         /// <summary>
         /// Closes the current connection and disposes it
         /// </summary>
-        public void Close()
-        {
-            Dispose();
-        }
+        public void Close() => Dispose();
 
         /// <summary>
-        /// Cleans up the current connection and all resources associated to it
+        /// Check if the connection is still alive
         /// </summary>
-        public void Dispose()
-        {
-            _unixSocket?.Dispose();
-            _unixSocket = null;
-        }
+        /// <exception cref="SocketException">Connection is no longer available</exception>
+        public void Poll() => _unixSocket.Send(Array.Empty<byte>());
 
         /// <summary>
         /// Perform an arbitrary command
@@ -107,8 +142,9 @@ namespace DuetAPIClient
         /// <param name="command">Command to run</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Command result</returns>
-        /// <exception cref="TaskCanceledException">Operation has been cancelled</exception>
         /// <exception cref="InternalServerException">Deserialized internal error from DCS</exception>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
         protected async Task PerformCommand(BaseCommand command, CancellationToken cancellationToken)
         {
             await Send(command, cancellationToken);
@@ -132,8 +168,9 @@ namespace DuetAPIClient
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Command result</returns>
         /// <typeparam name="T">Type of the command result</typeparam>
-        /// <exception cref="TaskCanceledException">Operation has been cancelled</exception>
         /// <exception cref="InternalServerException">Deserialized internal error from DCS</exception>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
         protected async Task<T> PerformCommand<T>(BaseCommand command, CancellationToken cancellationToken)
         {
             await Send(command, cancellationToken);
@@ -158,14 +195,11 @@ namespace DuetAPIClient
         /// <param name="cancellationToken">Cancellation token</param>
         /// <typeparam name="T">Type of the received object</typeparam>
         /// <returns>Received object</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
         protected async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
             using JsonDocument jsonDoc = await ReceiveJson(cancellationToken);
-            if (jsonDoc == null)
-            {
-                return default;
-            }
-
             if (typeof(T) == typeof(DuetAPI.Machine.MachineModel))
             {
                 // FIXME: JsonSerializer does not populate readonly properties like ObservableCollections (yet)
@@ -179,14 +213,16 @@ namespace DuetAPIClient
             }
         }
 
+        /// <summary>
+        /// Receive a base response from the server
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Deserialized base response</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
         private async Task<BaseResponse> ReceiveResponse(CancellationToken cancellationToken)
         {
             using JsonDocument jsonDoc = await ReceiveJson(cancellationToken);
-            if (jsonDoc == null)
-            {
-                return null;
-            }
-
             foreach (var item in jsonDoc.RootElement.EnumerateObject())
             {
                 if (item.Name.Equals(nameof(BaseResponse.Success), StringComparison.InvariantCultureIgnoreCase) &&
@@ -201,14 +237,17 @@ namespace DuetAPIClient
             return JsonSerializer.Deserialize<ErrorResponse>(jsonDoc.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
         }
 
+        /// <summary>
+        /// Receive a response from the server
+        /// </summary>
+        /// <typeparam name="T">Response type</typeparam>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Deserialized response</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
         private async Task<BaseResponse> ReceiveResponse<T>(CancellationToken cancellationToken)
         {
             using JsonDocument jsonDoc = await ReceiveJson(cancellationToken);
-            if (jsonDoc == null)
-            {
-                return null;
-            }
-
             foreach (var item in jsonDoc.RootElement.EnumerateObject())
             {
                 if (item.Name.Equals(nameof(BaseResponse.Success), StringComparison.InvariantCultureIgnoreCase) &&
@@ -227,15 +266,12 @@ namespace DuetAPIClient
         /// Receive partially deserialized object from the server
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Partially deserialized data or null if the connection is gone</returns>
-        /// <exception cref="IOException">Received no or invalid JSON object</exception>
+        /// <returns>Partially deserialized data</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
         protected async Task<JsonDocument> ReceiveJson(CancellationToken cancellationToken)
         {
             using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
-            if (json.Length == 0)
-            {
-                return null;
-            }
             return await JsonDocument.ParseAsync(json);
         }
 
@@ -245,7 +281,8 @@ namespace DuetAPIClient
         /// <param name="obj">Object to send</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        /// <exception cref="SocketException">Message could not be sent</exception>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Message could not be processed</exception>
         protected async Task Send(object obj, CancellationToken cancellationToken)
         {
             byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);

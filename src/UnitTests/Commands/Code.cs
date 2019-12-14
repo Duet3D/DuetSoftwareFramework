@@ -45,7 +45,7 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseG53Line()
         {
-            IList<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.Code.ParseMultiple("G53 G1 X100 G0 Y200\nG1 Z50");
+            IList<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.SimpleCode.ParseMultiple("G53 G1 X100 G0 Y200\nG1 Z50");
             Assert.AreEqual(3, codes.Count);
 
             Assert.AreEqual(1, codes[0].MajorNumber);
@@ -363,7 +363,7 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseMultipleCodesSpace()
         {
-            List<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.Code.ParseMultiple("G91 G1 X5 Y2").ToList();
+            List<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.SimpleCode.ParseMultiple("G91 G1 X5 Y2").ToList();
 
             Assert.AreEqual(2, codes.Count);
 
@@ -382,7 +382,7 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseMultipleCodesNL()
         {
-            List<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.Code.ParseMultiple("G91\nG1 X5 Y2").ToList();
+            List<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.SimpleCode.ParseMultiple("G91\nG1 X5 Y2").ToList();
 
             Assert.AreEqual(2, codes.Count);
 

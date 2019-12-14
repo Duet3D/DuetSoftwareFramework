@@ -3,7 +3,6 @@ using DuetAPI.Commands;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.FileExecution;
-using Nito.AsyncEx;
 using System;
 using System.Globalization;
 using System.IO;
@@ -20,7 +19,9 @@ namespace DuetControlServer.Codes
     /// </summary>
     public static class MCodes
     {
-        private static readonly AsyncLock _fileToPrintLock = new AsyncLock();
+        /// <summary>
+        /// Selected file to print
+        /// </summary>
         private static string _fileToPrint;
 
         /// <summary>
@@ -49,7 +50,7 @@ namespace DuetControlServer.Codes
                         string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), "gcodes");
                         if (File.Exists(file))
                         {
-                            using (await _fileToPrintLock.LockAsync())
+                            lock (_fileToPrint)
                             {
                                 _fileToPrint = file;
                             }
@@ -67,7 +68,7 @@ namespace DuetControlServer.Codes
                         if (!Print.IsPaused)
                         {
                             string file;
-                            using (await _fileToPrintLock.LockAsync())
+                            lock (_fileToPrint)
                             {
                                 file = _fileToPrint;
                             }
@@ -152,7 +153,7 @@ namespace DuetControlServer.Codes
                         string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), "gcodes");
                         if (File.Exists(file))
                         {
-                            using (await _fileToPrintLock.LockAsync())
+                            lock (_fileToPrint)
                             {
                                 _fileToPrint = file;
                             }
@@ -294,7 +295,11 @@ namespace DuetControlServer.Codes
 
                                 if (map.NumX * map.NumY > 0)
                                 {
-                                    await map.Save(await FilePath.ToPhysicalAsync(physicalFile, "sys"));
+                                    await map.Save(physicalFile);
+                                    using (await Model.Provider.AccessReadWriteAsync())
+                                    {
+                                        Model.Provider.Get.Move.HeightmapFile = await FilePath.ToVirtualAsync(physicalFile);
+                                    }
                                     return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
                                 }
                                 return new CodeResult();
@@ -326,7 +331,11 @@ namespace DuetControlServer.Codes
                             {
                                 await SPI.Interface.SetHeightmap(map);
                                 await SPI.Interface.UnlockAll(code.Channel);
-                                return new CodeResult(DuetAPI.MessageType.Success, $"Height map loaded from file {file}");
+                                using (await Model.Provider.AccessReadWriteAsync())
+                                {
+                                    Model.Provider.Get.Move.HeightmapFile = await FilePath.ToVirtualAsync(physicalFile);
+                                }
+                                return new CodeResult(MessageType.Success, $"Height map loaded from file {file}");
                             }
                         }
                         catch (Exception e)
@@ -562,7 +571,11 @@ namespace DuetControlServer.Codes
                             {
                                 if (!string.IsNullOrEmpty(Model.Provider.Get.Electronics.ShortName))
                                 {
-                                    iapFile = await FilePath.ToPhysicalAsync($"Duet3iap_spi_{Model.Provider.Get.Electronics.ShortName}.bin", "sys");
+                                    string iapFilename = Model.Provider.Get.Electronics.Firmware.Version.Contains("3.0beta")
+                                        ? $"Duet3iap_spi_{Model.Provider.Get.Electronics.ShortName}.bin"
+                                        : $"Duet3_SBCiap_{Model.Provider.Get.Electronics.ShortName}.bin";
+                                    Console.WriteLine("Using IAP {0}", iapFilename);
+                                    iapFile = await FilePath.ToPhysicalAsync(iapFilename, "sys");
                                     firmwareFile = await FilePath.ToPhysicalAsync($"Duet3Firmware_{Model.Provider.Get.Electronics.ShortName}.bin", "sys");
                                 }
                                 else
@@ -582,8 +595,8 @@ namespace DuetControlServer.Codes
                                 return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
                             }
 
-                            FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
-                            FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
+                            using FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
+                            using FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
                             await SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
                             return new CodeResult();
                         }
@@ -653,6 +666,11 @@ namespace DuetControlServer.Codes
             }
         }
 
+        /// <summary>
+        /// Print the diagnostics
+        /// </summary>
+        /// <param name="result">Target to write to</param>
+        /// <returns>Asynchronous task</returns>
         private static async Task Diagnostics(CodeResult result)
         {
             StringBuilder builder = new StringBuilder();

@@ -50,7 +50,7 @@ namespace DuetAPI.Machine
         public CurrentMove CurrentMove { get; private set; } = new CurrentMove();
 
         /// <summary>
-        /// Name of the currently used bed compensation
+        /// Name of the currently used bed compensation (one of "Mesh", "[n] Point", "None")
         /// </summary>
         public string Compensation
         {
@@ -65,6 +65,23 @@ namespace DuetAPI.Machine
             }
         }
         private string _compensation = "None";
+
+        /// <summary>
+        /// Path to the current heightmap file if Compensation is "Mesh"
+        /// </summary>
+        public string HeightmapFile
+        {
+            get => _heightmapFile;
+            set
+            {
+                if (_heightmapFile != value)
+                {
+                    _heightmapFile = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private string _heightmapFile;
         
         /// <summary>
         /// List of configured drives
@@ -87,6 +104,11 @@ namespace DuetAPI.Machine
         /// Idle current reduction parameters
         /// </summary>
         public MotorsIdleControl Idle { get; private set; } = new MotorsIdleControl();
+
+        /// <summary>
+        /// Information about the configured mesh compensation (see M557)
+        /// </summary>
+        public ProbeGrid ProbeGrid { get; private set; } = new ProbeGrid();
         
         /// <summary>
         /// Speed factor applied to every regular move (1.0 equals 100%)
@@ -153,6 +175,7 @@ namespace DuetAPI.Machine
             ListHelpers.AssignList(Extruders, other.Extruders);
             Geometry.Assign(other.Geometry);
             Idle.Assign(other.Idle);
+            ProbeGrid.Assign(other.ProbeGrid);
             SpeedFactor = other.SpeedFactor;
             CurrentWorkplace = other.CurrentWorkplace;
             ListHelpers.SetList(WorkplaceCoordinates, other.WorkplaceCoordinates);
@@ -171,6 +194,7 @@ namespace DuetAPI.Machine
                 Compensation = Compensation,
                 Geometry = (Geometry)Geometry.Clone(),
                 Idle = (MotorsIdleControl)Idle.Clone(),
+                ProbeGrid = (ProbeGrid)ProbeGrid.Clone(),
                 SpeedFactor = SpeedFactor
             };
 
