@@ -224,6 +224,11 @@
             Implementation of the <see cref="T:DuetAPI.Commands.LockMachineModel"/> command
             </summary>
         </member>
+        <member name="P:DuetControlServer.Commands.LockMachineModel.SourceConnection">
+            <summary>
+            Source connection of this command. Needed to register the owner of the lock
+            </summary>
+        </member>
         <member name="M:DuetControlServer.Commands.LockMachineModel.Execute">
             <summary>
             Lock the machine model for write access
@@ -284,6 +289,11 @@
             Locks to avoid race conditions when executing multiple text-based codes via the same channel
             </summary>
         </member>
+        <member name="P:DuetControlServer.Commands.SimpleCode.SourceConnection">
+            <summary>
+            Source connection of this command
+            </summary>
+        </member>
         <member name="M:DuetControlServer.Commands.SimpleCode.#ctor">
             <summary>
             Creates a new instance
@@ -296,12 +306,11 @@
             <returns>Code result as text</returns>
             <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
         </member>
-        <member name="M:DuetControlServer.Commands.SimpleCode.ParseMultiple(System.String)">
+        <member name="M:DuetControlServer.Commands.SimpleCode.ParseCodes">
             <summary>
-            Parse multiple codes from the given input string
+            Parse codes from the given input string
             </summary>
-            <param name="codeString">Codes to parse</param>
-            <returns>Enumeration of parsed G/M/T-codes</returns>
+            <returns>Parsed G/M/T-codes</returns>
         </member>
         <member name="T:DuetControlServer.Commands.SyncMachineModel">
             <summary>
@@ -599,7 +608,7 @@
             Wrapper around UNIX socket connections
             </summary>
         </member>
-        <member name="F:DuetControlServer.IPC.Connection.IdCounter">
+        <member name="F:DuetControlServer.IPC.Connection._idCounter">
             <summary>
             Counter for new connections
             </summary>
@@ -609,14 +618,14 @@
             Logger instance
             </summary>
         </member>
-        <member name="F:DuetControlServer.IPC.Connection._unixSocket">
-            <summary>
-            Socket holding the connection of the UNIX socket
-            </summary>
-        </member>
         <member name="P:DuetControlServer.IPC.Connection.Id">
             <summary>
             Identifier of this connection
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.IPC.Connection._unixSocket">
+            <summary>
+            Socket holding the connection of the UNIX socket
             </summary>
         </member>
         <member name="M:DuetControlServer.IPC.Connection.#ctor(System.Net.Sockets.Socket)">
@@ -657,6 +666,12 @@
             </summary>
             <param name="name">Name of the command</param>
             <returns>Type of the command or null if none found</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Connection.SetSourceConnection(DuetAPI.Commands.BaseCommand)">
+            <summary>
+            Assign the source connection to a command
+            </summary>
+            <param name="command">Deserialized command</param>
         </member>
         <member name="M:DuetControlServer.IPC.Connection.SendResponse(System.Object)">
             <summary>
@@ -930,18 +945,15 @@
             Static class that holds main functionality for inter-process communication
             </summary>
         </member>
-        <member name="F:DuetControlServer.IPC.Server._connectionTasks">
+        <member name="F:DuetControlServer.IPC.Server._unixSocket">
             <summary>
-            List of active client connections
+            UNIX socket for inter-process communication
             </summary>
         </member>
         <member name="M:DuetControlServer.IPC.Server.Init">
             <summary>
-            Initialize the IPC subsystem
+            Initialize the IPC subsystem and start listening for connections
             </summary>
-            <remarks>
-            This makes sure the parent directory exists but the socket file does not
-            </remarks>
         </member>
         <member name="M:DuetControlServer.IPC.Server.Run">
             <summary>
@@ -953,7 +965,7 @@
             <summary>
             Function that is called when a new connection has been established
             </summary>
-            <param name="sock">Socket of the new connection</param>
+            <param name="socket">Socket of the new connection</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.IPC.Server.GetConnectionProcessor(DuetControlServer.IPC.Connection)">

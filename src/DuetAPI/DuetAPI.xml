@@ -126,8 +126,7 @@
         </member>
         <member name="P:DuetAPI.Commands.BaseCommand.Command">
             <summary>
-            Name of the command.
-            In the .NET library this is automatically set to the actual class name representing the command name.
+            Name of the command to execute
             </summary>
         </member>
         <member name="M:DuetAPI.Commands.BaseCommand.Invoke">
@@ -192,6 +191,9 @@
             <summary>
             The connection ID this code was received from. If this is 0, the code originates from an internal DCS task
             </summary>
+            <remarks>
+            Usually there is no need to populate this property. It is internally overwritten by the control server on receipt
+            </remarks>
         </member>
         <member name="P:DuetAPI.Commands.Code.Result">
             <summary>
