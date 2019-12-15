@@ -79,8 +79,8 @@ namespace DuetControlServer.Utility
 
                     // Heater model
                     await writer.WriteLineAsync("M307 " +
-                        $"H{item.Model.Gain} A{item.Model.TimeConstant:F1} C{item.Model.DeadTime:F1} D{item.Model.MaxPwm:F1} " +
-                        $"S{item.Model.StandardVoltage:F1} B{(item.Model.UsePID ? 0 : 1)}");
+                        $"H{heater} A{item.Model.Gain} C{item.Model.TimeConstant:F1} D{item.Model.DeadTime:F1} S{item.Model.MaxPwm:F1} " +
+                        $"V{item.Model.StandardVoltage:F1} B{(item.Model.UsePID ? 0 : 1)}");
 
                     // Custom PID parameters
                     if (item.Model.CustomPID)
@@ -130,7 +130,7 @@ namespace DuetControlServer.Utility
                     Probe probe = Model.Provider.Get.Sensors.Probes[0];
 
                     await writer.WriteLineAsync("; Z probe parameters");
-                    await writer.WriteLineAsync($"G31 T{probe.Type} P{probe.Threshold} X{probe.Offsets[0]:F1} Y{probe.Offsets[2]:F1} Z{probe.TriggerHeight:F2}");
+                    await writer.WriteLineAsync($"G31 P{probe.Threshold} X{probe.Offsets[0]:F1} Y{probe.Offsets[1]:F1} Z{probe.TriggerHeight:F2}");
                 }
             }
         }
