@@ -126,8 +126,7 @@
         </member>
         <member name="P:DuetAPI.Commands.BaseCommand.Command">
             <summary>
-            Name of the command.
-            In the .NET library this is automatically set to the actual class name representing the command name.
+            Name of the command to execute
             </summary>
         </member>
         <member name="M:DuetAPI.Commands.BaseCommand.Invoke">
@@ -192,6 +191,9 @@
             <summary>
             The connection ID this code was received from. If this is 0, the code originates from an internal DCS task
             </summary>
+            <remarks>
+            Usually there is no need to populate this property. It is internally overwritten by the control server on receipt
+            </remarks>
         </member>
         <member name="P:DuetAPI.Commands.Code.Result">
             <summary>
@@ -255,7 +257,12 @@
         </member>
         <member name="P:DuetAPI.Commands.Code.FilePosition">
             <summary>
-            File position in bytes (optional)
+            File position of this code in bytes (optional)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.Code.Length">
+            <summary>
+            Length of the original code in bytes (optional)
             </summary>
         </member>
         <member name="P:DuetAPI.Commands.Code.Parameters">
@@ -266,7 +273,7 @@
         </member>
         <member name="M:DuetAPI.Commands.Code.Parameter(System.Char)">
             <summary>
-            Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!
+            Retrieve the parameter whose letter equals c. Note that this look-up is case-insensitive
             </summary>
             <param name="c">Letter of the parameter to find</param>
             <returns>The parsed parameter instance or null if none could be found</returns>
@@ -281,7 +288,8 @@
         </member>
         <member name="M:DuetAPI.Commands.Code.GetUnprecedentedString(System.Boolean)">
             <summary>
-            Reconstruct an unprecedented string from the parameter list
+            Reconstruct an unprecedented string from the parameter list or
+            retrieve the parameter which does not have a letter assigned
             </summary>
             <param name="quoteStrings">Encapsulate strings in double quotes</param>
             <returns>Unprecedented string</returns>
@@ -1288,6 +1296,11 @@
             <seealso cref="T:DuetAPI.CodeChannel"/>
             </summary>
         </member>
+        <member name="F:DuetAPI.Machine.Channels.Total">
+            <summary>
+            Total number of code channels
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Channels.HTTP">
             <summary>
             G/M/T-code channel for HTTP requests
@@ -1398,6 +1411,55 @@
             <summary>
             Special emulation for NanoDLP
             </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Directories">
+            <summary>
+            Information about the machine state
+            </summary>
+        </member>
+        <member name="E:DuetAPI.Machine.Directories.PropertyChanged">
+            <summary>
+            Event to trigger when a property has changed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Directories.Filaments">
+            <summary>
+            Path to the Filaments directory
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Directories.GCodes">
+            <summary>
+            Path to the G-Codes directory
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Directories.Macros">
+            <summary>
+            Path to the macros directory
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Directories.System">
+            <summary>
+            Path to the system directory
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Directories.WWW">
+            <summary>
+            Path to the web directory
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.Directories.Assign(System.Object)">
+            <summary>
+            Assigns every property of another instance of this one
+            </summary>
+            <param name="from">Object to assign from</param>
+            <exception cref="T:System.ArgumentNullException">other is null</exception>
+            <exception cref="T:System.ArgumentException">Types do not match</exception>
+        </member>
+        <member name="M:DuetAPI.Machine.Directories.Clone">
+            <summary>
+            Creates a clone of this instance
+            </summary>
+            <returns>A clone of this instance</returns>
         </member>
         <member name="T:DuetAPI.Machine.Electronics">
             <summary>
@@ -2355,6 +2417,11 @@
             Information about every available G/M/T-code channel
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.MachineModel.Directories">
+            <summary>
+            Information about the individual directories
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.MachineModel.Electronics">
             <summary>
             Information about the main and expansion boards
@@ -3149,7 +3216,7 @@
         </member>
         <member name="P:DuetAPI.Machine.ProbeGrid.Radius">
             <summary>
-            Probing radius on delta geometries
+            Probing radius for delta kinematics
             </summary>
         </member>
         <member name="M:DuetAPI.Machine.ProbeGrid.Assign(System.Object)">

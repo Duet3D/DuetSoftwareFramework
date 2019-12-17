@@ -10,7 +10,10 @@ namespace DuetControlServer.SPI
     /// </summary>
     public class ChannelStore : IEnumerable<ChannelInformation>
     {
-        private readonly ChannelInformation[] _channels;
+        /// <summary>
+        /// List of different channels
+        /// </summary>
+        private readonly ChannelInformation[] _channels = new ChannelInformation[DuetAPI.Machine.Channels.Total];
 
         /// <summary>
         /// Constructor of the channel store
@@ -18,8 +21,6 @@ namespace DuetControlServer.SPI
         public ChannelStore()
         {
             CodeChannel[] channels = (CodeChannel[])Enum.GetValues(typeof(CodeChannel));
-
-            _channels = new ChannelInformation[channels.Length];
             foreach (CodeChannel channel in channels)
             {
                 this[channel] = new ChannelInformation(channel);

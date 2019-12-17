@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,28 +22,29 @@ namespace DuetControlServer.Commands
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
-        #region Code Scheduler
+        #region Code Scheduling
         /// <summary>
         /// Queue of semaphores to guarantee the ordered execution of incoming G/M/T-codes
         /// </summary>
-        private static Queue<AsyncSemaphore>[] _codeTickets;
+        /// <remarks>
+        /// AsyncLock implements an internal waiter queue, so it is safe to rely on it for
+        /// maintaining the right order of codes being executed per code channel
+        /// </remarks>
+        private static readonly AsyncLock[] _codeChannelLocks = new AsyncLock[DuetAPI.Machine.Channels.Total];
 
         /// <summary>
         /// List of cancellation tokens to cancel pending codes while they are waiting for their execution
         /// </summary>
-        private static CancellationTokenSource[] _cancellationTokenSources;
+        private static readonly CancellationTokenSource[] _cancellationTokenSources = new CancellationTokenSource[DuetAPI.Machine.Channels.Total];
 
         /// <summary>
         /// Initialize the code scheduler
         /// </summary>
-        public static void InitScheduler()
+        public static void Init()
         {
-            int numCodeChannels = Enum.GetValues(typeof(CodeChannel)).Length;
-            _codeTickets = new Queue<AsyncSemaphore>[numCodeChannels];
-            _cancellationTokenSources = new CancellationTokenSource[numCodeChannels];
-            for (int i = 0; i < numCodeChannels; i++)
+            for (int i = 0; i < DuetAPI.Machine.Channels.Total; i++)
             {
-                _codeTickets[i] = new Queue<AsyncSemaphore>();
+                _codeChannelLocks[i] = new AsyncLock();
                 _cancellationTokenSources[i] = new CancellationTokenSource();
             }
         }
@@ -68,83 +68,94 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
-        /// Get the next ticket for a code being enqueued for execution
+        /// Lock that is maintained as long as this code blocks the execution of the next code
         /// </summary>
-        /// <returns>Ticket semaphore</returns>
-        private AsyncSemaphore GetTicket()
-        {
-            lock (_codeTickets)
-            {
-                Queue<AsyncSemaphore> tickets = _codeTickets[(int)Channel];
-                if (tickets.TryPeek(out _))
-                {
-                    // There are codes being executed. Create a new semaphore
-                    AsyncSemaphore semaphore = new AsyncSemaphore(1);
-                    tickets.Enqueue(semaphore);
-                    return semaphore;
-                }
-                else
-                {
-                    // No codes are being executed, we don't need to wait for execution
-                    tickets.Enqueue(null);
-                    return null;
-                }
-            }
-        }
+        private IDisposable _codeChannelLock;
 
         /// <summary>
-        /// Wait until the given ticket flags readiness for the next code to be executed
+        /// Copy of the cancellation token at the time this code is created
         /// </summary>
-        /// <param name="ticket">Ticket to wait for</param>
+        private CancellationToken _cancellationToken;
+
+        /// <summary>
+        /// Wait until this code can be executed
+        /// </summary>
         /// <returns>Asynchronous task</returns>
-        private async Task WaitForExecution(AsyncSemaphore ticket)
+        /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
+        private async Task WaitForExecution()
         {
-            // Get the current cancellation token of this channel
-            CancellationToken channelToken;
+            CancellationToken myToken;
             lock (_cancellationTokenSources)
             {
-                channelToken = _cancellationTokenSources[(int)Channel].Token;
+                myToken = _cancellationToken;
             }
 
-            // Wait until the last code has been processed or sent to RRF
-            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(channelToken, Program.CancelSource.Token);
-            await ticket.WaitAsync(cts.Token);
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, Program.CancelSource.Token);
+            IDisposable myLock = null;
+            try
+            {
+                myLock = await _codeChannelLocks[(int)Channel].LockAsync(myToken);
+                cts.Token.ThrowIfCancellationRequested();
+                _codeChannelLock = myLock;
+            }
+            catch
+            {
+                myLock?.Dispose();
+                throw;
+            }
         }
-
-        /// <summary>
-        /// Indicates if this code has already started the next one
-        /// </summary>
-        private bool nextCodeStarted;
 
         /// <summary>
         /// Start the next available G/M/T-code unless this code has already started one
         /// </summary>
         private void StartNextCode()
         {
-            if (!nextCodeStarted)
-            {
-                lock (_codeTickets)
-                {
-                    if (_codeTickets[(int)Channel].TryDequeue(out AsyncSemaphore semaphore))
-                    {
-                        semaphore?.Release();
-                    }
-                }
-                nextCodeStarted = true;
-            }
+            _codeChannelLock?.Dispose();
+            _codeChannelLock = null;
         }
-        #endregion
 
         /// <summary>
         /// Create an empty Code instance
         /// </summary>
-        public Code() { }
+        public Code() : base()
+        {
+            lock (_cancellationTokenSources)
+            {
+                CancellationTokenSource cts = _cancellationTokenSources[(int)Channel];
+                _cancellationToken = (cts != null) ? cts.Token : default;
+            }
+        }
 
         /// <summary>
         /// Create a new Code instance and attempt to parse the given code string
         /// </summary>
         /// <param name="code">G/M/T-Code</param>
-        public Code(string code) : base(code) { }
+        public Code(string code) : base(code)
+        {
+            lock (_cancellationTokenSources)
+            {
+                CancellationTokenSource cts = _cancellationTokenSources[(int)Channel];
+                _cancellationToken = (cts != null) ? cts.Token : default;
+            }
+        }
+
+        /// <summary>
+        /// Overridden code channel property to upate the cancellation token when necessary
+        /// </summary>
+        public override CodeChannel Channel
+        {
+            get => base.Channel;
+            set
+            {
+                base.Channel = value;
+                lock (_cancellationTokenSources)
+                {
+                    CancellationTokenSource cts = _cancellationTokenSources[(int)Channel];
+                    _cancellationToken = (cts != null) ? cts.Token : default;
+                }
+            }
+        }
+        #endregion
 
         /// <summary>
         /// Indicates whether the code has been internally processed
@@ -159,15 +170,10 @@ namespace DuetControlServer.Commands
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         public override async Task<CodeResult> Execute()
         {
+            // Wait for this code to be executed in the right order
             if (!Flags.HasFlag(CodeFlags.IsPrioritized) && !Flags.HasFlag(CodeFlags.IsFromMacro))
             {
-                // Take a ticket and wait until it is our turn to execute.
-                // This ensures that the order of executing G/M/T-codes is sequential
-                AsyncSemaphore ticket = GetTicket();
-                if (ticket != null)
-                {
-                    await WaitForExecution(ticket);
-                }
+                await WaitForExecution();
             }
 
             try
@@ -182,7 +188,14 @@ namespace DuetControlServer.Commands
                 Result = null;
                 if (e is OperationCanceledException)
                 {
-                    _logger.Debug("Cancelled {0}", this);
+                    if (_logger.IsTraceEnabled)
+                    {
+                        _logger.Debug(e, "Cancelled {0}", this);
+                    }
+                    else
+                    {
+                        _logger.Debug("Cancelled {0}", this);
+                    }
                 }
                 else
                 {
@@ -200,15 +213,28 @@ namespace DuetControlServer.Commands
             return Result;
         }
 
+        /// <summary>
+        /// Process the code
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private async Task Process()
         {
+            // Starting this code. Make sure to set the file position pointing to the next code if applicable
+            if (Channel == CodeChannel.File && FilePosition != null && Length != null)
+            {
+                using (await FileExecution.Print.LockAsync())
+                {
+                    FileExecution.Print.NextFilePosition = FilePosition + Length;
+                }
+            }
+
             // Attempt to process the code internally first
             if (!InternallyProcessed && await ProcessInternally())
             {
                 return;
             }
 
-            // Comments are resolved in DCS
+            // Comments are resolved in DCS but they may be interpreted by third-party plugins
             if (Type == CodeType.Comment)
             {
                 Result = new CodeResult();
@@ -243,6 +269,7 @@ namespace DuetControlServer.Commands
                             e = ae.InnerException;
                         }
                         _logger.Error(e, "Failed to execute {0} asynchronously", this);
+                        throw;
                     }
                     finally
                     {

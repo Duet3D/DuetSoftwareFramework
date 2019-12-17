@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetControlServer.SPI;
@@ -26,6 +27,12 @@ namespace DuetControlServer.FileExecution
         /// Logger instance
         /// </summary>
         private readonly NLog.Logger _logger;
+
+        /// <summary>
+        /// Indicates if config.g is being processed
+        /// </summary>
+        public static bool RunningConfig { get => _runningConfig; }
+        private static volatile bool _runningConfig;
 
         /// <summary>
         /// Current extra step being performed (provided config.g is being executed)
@@ -58,13 +65,38 @@ namespace DuetControlServer.FileExecution
             if (startCode == null)
             {
                 string name = Path.GetFileName(fileName);
-                IsConfig = (name == FilePath.ConfigFile || name == FilePath.ConfigFileFallback);
+                if (name == FilePath.ConfigFile || name == FilePath.ConfigFileFallback)
+                {
+                    IsConfig = true;
+                    _runningConfig = true;
+                }
                 IsConfigOverride = (name == FilePath.ConfigOverrideFile);
             }
             StartCode = startCode;
 
             _logger = NLog.LogManager.GetLogger(Path.GetFileName(fileName));
             _logger.Info("Executing {0} macro file on channel {1}", (startCode == null) ? "system" : "nested", channel);
+        }
+
+        /// <summary>
+        /// Called when this instance is being disposed
+        /// </summary>
+        /// <param name="disposing">True if managed resources are being disposed</param>
+        protected override void Dispose(bool disposing)
+        {
+            // Synchronize the machine model one last time while config.g is being run.
+            // This makes sure the filaments can be properly assigned
+            if (IsConfig)
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Model.Updater.WaitForFullUpdate();
+                    _runningConfig = false;
+                });
+            }
+
+            // Dispose this instance
+            base.Dispose(disposing);
         }
 
         /// <summary>
@@ -142,6 +174,7 @@ namespace DuetControlServer.FileExecution
                 return result;
             }
 
+            // File has finished
             return null;
         }
     }

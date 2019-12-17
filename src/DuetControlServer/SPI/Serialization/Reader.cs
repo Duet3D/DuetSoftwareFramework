@@ -13,7 +13,6 @@ namespace DuetControlServer.SPI.Serialization
     /// It is expected that each data block occupies entire 4-byte blocks.
     /// Make sure to keep the data returned by these functions only as long as the underlying buffer is actually valid!
     /// </summary>
-    /// <remarks>Once .NET Core 3.0 is out, the performance of this can be further improved (without relying on unsafe code) by using <c>Span.AsRef()</c></remarks>
     public static class Reader
     {
         /// <summary>

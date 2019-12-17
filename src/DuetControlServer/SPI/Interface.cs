@@ -45,11 +45,14 @@ namespace DuetControlServer.SPI
         private static Stream _iapStream, _firmwareStream;
         private static TaskCompletionSource<object> _firmwareUpdateRequest;
 
+        // Filament mapping
+        private static readonly AsyncLock _filamentMappingLock = new AsyncLock();
+        private static readonly Queue<Tuple<int, string>> _extruderFilamentUpdates = new Queue<Tuple<int, string>>();
+
         // Special requests
         private static readonly AsyncLock _printStopppedReasonLock = new AsyncLock();
         private static PrintStoppedReason? _printStoppedReason;
         private static volatile bool _emergencyStopRequested, _resetRequested, _printStarted;
-        private static readonly Queue<Tuple<int, string>> _extruderFilamentUpdates = new Queue<Tuple<int, string>>();
 
         // Partial messages (if any)
         private static string _partialGenericMessage;
@@ -83,15 +86,21 @@ namespace DuetControlServer.SPI
         /// <exception cref="OperationCanceledException">Operation could not finish</exception>
         public static Task<Heightmap> GetHeightmap()
         {
+            TaskCompletionSource<Heightmap> tcs;
             using (_heightmapLock.Lock())
             {
                 if (_getHeightmapRequest == null)
                 {
+                    tcs = new TaskCompletionSource<Heightmap>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    _getHeightmapRequest = tcs;
                     _isHeightmapRequested = false;
-                    _getHeightmapRequest = new TaskCompletionSource<Heightmap>(TaskCreationOptions.RunContinuationsAsynchronously);
                 }
-                return _getHeightmapRequest.Task;
+                else
+                {
+                    tcs = _getHeightmapRequest;
+                }
             }
+            return tcs.Task;
         }
 
         /// <summary>
@@ -103,6 +112,7 @@ namespace DuetControlServer.SPI
         /// <exception cref="InvalidOperationException">Heightmap is already being set</exception>
         public static Task SetHeightmap(Heightmap map)
         {
+            TaskCompletionSource<object> tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (_heightmapLock.Lock())
             {
                 if (_setHeightmapRequest != null)
@@ -111,9 +121,9 @@ namespace DuetControlServer.SPI
                 }
 
                 _heightmapToSet = map;
-                _setHeightmapRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-                return _setHeightmapRequest.Task;
+                _setHeightmapRequest = tcs;
             }
+            return tcs.Task;
         }
 
         /// <summary>
@@ -200,10 +210,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Notify the firmware that a file print has started
         /// </summary>
-        public static void SetPrintStarted()
-        {
-            _printStarted = true;
-        }
+        public static void SetPrintStarted() => _printStarted = true;
 
         /// <summary>
         /// Notify the firmware that the file print has been stopped
@@ -257,84 +264,105 @@ namespace DuetControlServer.SPI
         /// <param name="iapStream">IAP binary</param>
         /// <param name="firmwareStream">Firmware binary</param>
         /// <exception cref="InvalidOperationException">Firmware is already being updated</exception>
-        public static Task UpdateFirmware(Stream iapStream, Stream firmwareStream)
+        /// <returns>Asynchronous task</returns>
+        public static async Task UpdateFirmware(Stream iapStream, Stream firmwareStream)
         {
-            using (_firmwareUpdateLock.Lock())
+            TaskCompletionSource<object> tcs;
+            using (await _firmwareUpdateLock.LockAsync())
             {
                 if (_firmwareUpdateRequest != null)
                 {
                     throw new InvalidOperationException("Firmware is already being updated");
                 }
 
+                tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _iapStream = iapStream;
                 _firmwareStream = firmwareStream;
-                _firmwareUpdateRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-                return _firmwareUpdateRequest.Task;
+                _firmwareUpdateRequest = tcs;
             }
+            await tcs.Task;
         }
 
         private static async Task PerformFirmwareUpdate()
         {
-            // Notify clients that we are now installing a firmware update
             using (await Model.Provider.AccessReadWriteAsync())
             {
                 Model.Provider.Get.State.Status = MachineStatus.Updating;
             }
+            DataTransfer.Updating = true;
 
-            // Get the CRC16 checksum of the firmware binary
-            byte[] firmwareBlob = new byte[_firmwareStream.Length];
-            await _firmwareStream.ReadAsync(firmwareBlob, 0, (int)_firmwareStream.Length);
-            ushort crc16 = Utility.CRC16.Calculate(firmwareBlob);
-
-            // Send the IAP binary to the firmware
-            _logger.Info("Flashing IAP binary");
-            bool dataSent;
-            do
+            try
             {
-                dataSent = DataTransfer.WriteIapSegment(_iapStream);
-                DataTransfer.PerformFullTransfer();
-            }
-            while (dataSent);
+                // Get the CRC16 checksum of the firmware binary
+                byte[] firmwareBlob = new byte[_firmwareStream.Length];
+                await _firmwareStream.ReadAsync(firmwareBlob, 0, (int)_firmwareStream.Length);
+                ushort crc16 = Utility.CRC16.Calculate(firmwareBlob);
 
-            // Start the IAP binary
-            _logger.Debug("Starting IAP binary");
-            DataTransfer.StartIap();
-            _logger.Debug("IAP started");
-
-            // Send the firmware binary to the IAP program
-            int numRetries = 0;
-            do
-            {
-                if (numRetries != 0)
+                // Send the IAP binary to the firmware
+                _logger.Info("Flashing IAP binary");
+                bool dataSent;
+                do
                 {
-                    _logger.Error("Firmware checksum verification failed");
+                    dataSent = DataTransfer.WriteIapSegment(_iapStream);
+                    await DataTransfer.PerformFullTransfer();
+                    if (_logger.IsDebugEnabled)
+                    {
+                        Console.Write('.');
+                    }
+                }
+                while (dataSent);
+                if (_logger.IsDebugEnabled)
+                {
+                    Console.WriteLine();
                 }
 
-                _logger.Info("Flashing RepRapFirmware");
-                _firmwareStream.Seek(0, SeekOrigin.Begin);
-                while (DataTransfer.FlashFirmwareSegment(_firmwareStream)) { }
+                // Start the IAP binary
+                await DataTransfer.StartIap();
 
-                _logger.Info("Verifying checksum");
-            }
-            while (++numRetries < 3 && !DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
+                // Send the firmware binary to the IAP program
+                int numRetries = 0;
+                do
+                {
+                    if (numRetries != 0)
+                    {
+                        _logger.Error("Firmware checksum verification failed");
+                    }
 
-            if (numRetries == 3)
-            {
-                // Failed to flash the firmware
-                await Utility.Logger.LogOutput(MessageType.Error, "Could not flash the firmware binary after 3 attempts. Please install it manually via bossac.");
-                Program.CancelSource.Cancel();
-            }
-            else
-            {
-                // Wait for the IAP binary to restart the controller
-                DataTransfer.WaitForIapReset();
-                _logger.Info("Firmware update successful!");
-            }
+                    _logger.Info("Flashing RepRapFirmware");
+                    _firmwareStream.Seek(0, SeekOrigin.Begin);
+                    while (await DataTransfer.FlashFirmwareSegment(_firmwareStream))
+                    {
+                        if (_logger.IsDebugEnabled)
+                        {
+                            Console.Write('.');
+                        }
+                    }
+                    if (_logger.IsDebugEnabled)
+                    {
+                        Console.WriteLine();
+                    }
 
-            using (await _firmwareUpdateLock.LockAsync())
+                    _logger.Info("Verifying checksum");
+                }
+                while (++numRetries < 3 && !await DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
+
+                if (numRetries == 3)
+                {
+                    // Failed to flash the firmware
+                    await Utility.Logger.LogOutput(MessageType.Error, "Could not flash the firmware binary after 3 attempts. Please install it manually via bossac.");
+                    Program.CancelSource.Cancel();
+                }
+                else
+                {
+                    // Wait for the IAP binary to restart the controller
+                    DataTransfer.WaitForIapReset();
+                    _logger.Info("Firmware update successful");
+                }
+            }
+            finally
             {
-                _firmwareUpdateRequest.SetResult(null);
-                _firmwareUpdateRequest = null;
+                DataTransfer.Updating = false;
+                // Machine state is reset when the next status response is processed
             }
         }
 
@@ -343,9 +371,9 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="extruder">Extruder drive</param>
         /// <param name="filament">Loaded filament</param>
-        public static void AssignFilament(int extruder, string filament)
+        public static async Task AssignFilament(int extruder, string filament)
         {
-            lock (_extruderFilamentUpdates)
+            using (await _filamentMappingLock.LockAsync())
             {
                 _extruderFilamentUpdates.Enqueue(new Tuple<int, string>(extruder, filament));
             }
@@ -356,7 +384,7 @@ namespace DuetControlServer.SPI
         /// This is only called once on initialization
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static bool Connect() => DataTransfer.PerformFullTransfer(false);
+        public static Task<bool> Connect() => DataTransfer.PerformFullTransfer(false);
 
         /// <summary>
         /// Perform communication with the RepRapFirmware controller
@@ -377,7 +405,7 @@ namespace DuetControlServer.SPI
                 {
                     _emergencyStopRequested = false;
                     _logger.Warn("Emergency stop");
-                    DataTransfer.PerformFullTransfer();
+                    await DataTransfer.PerformFullTransfer();
                 }
 
                 // Check if a firmware reset has been requested
@@ -385,18 +413,44 @@ namespace DuetControlServer.SPI
                 {
                     _resetRequested = false;
                     _logger.Warn("Resetting controller");
-                    DataTransfer.PerformFullTransfer();
+                    await DataTransfer.PerformFullTransfer();
                 }
 
                 // Check if a firmware update is supposed to be performed
-                if (_iapStream != null && _firmwareStream != null)
+                using (await _firmwareUpdateLock.LockAsync())
                 {
-                    await Invalidate("Firmware update imminent");
-                    await PerformFirmwareUpdate();
-                    if (Settings.UpdateOnly)
+                    if (_iapStream != null && _firmwareStream != null)
                     {
-                        // Stop after installing the firmware update
-                        break;
+                        await Invalidate("Firmware update imminent");
+
+                        try
+                        {
+                            await PerformFirmwareUpdate();
+
+                            _firmwareUpdateRequest?.SetResult(null);
+                            _firmwareUpdateRequest = null;
+                        }
+                        catch (Exception e)
+                        {
+                            _firmwareUpdateRequest?.SetException(e);
+                            _firmwareUpdateRequest = null;
+
+                            if (e is OperationCanceledException)
+                            {
+                                _logger.Debug(e, "Firmware update cancelled");
+                            }
+                            else
+                            {
+                                throw;
+                            }
+                        }
+
+                        _iapStream = _firmwareStream = null;
+                        if (Settings.UpdateOnly)
+                        {
+                            Program.CancelSource.Cancel();
+                            return;
+                        }
                     }
                 }
 
@@ -502,7 +556,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Update filament assignment per extruder drive
-                lock (_extruderFilamentUpdates)
+                using (await _filamentMappingLock.LockAsync())
                 {
                     if (_extruderFilamentUpdates.TryPeek(out Tuple<int, string> filamentMapping) &&
                         DataTransfer.WriteAssignFilament(filamentMapping.Item1, filamentMapping.Item2))
@@ -512,7 +566,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Do another full SPI transfer
-                DataTransfer.PerformFullTransfer();
+                await DataTransfer.PerformFullTransfer();
                 _channels.ResetBlockedChannels();
 
                 // Wait a moment
@@ -738,7 +792,10 @@ namespace DuetControlServer.SPI
 
             if (abortAll && channel == CodeChannel.File)
             {
-                await Print.Abort();
+                using (await Print.LockAsync())
+                {
+                    Print.Abort();
+                }
             }
 
             _channels[channel].InvalidateBuffer(!abortAll);
@@ -781,16 +838,20 @@ namespace DuetControlServer.SPI
         private static async Task HandlePrintPaused()
         {
             DataTransfer.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
-            if (filePosition == Consts.NoFilePosition)
-            {
-                // We get an invalid file position from RRF if the print is paused during a macro file.
-                // In this case, RRF has no way to determine the file position so we have to care of that.
-                filePosition = (uint)(Print.LastFilePosition ?? Print.Length);
-            }
-            _logger.Info("Print paused at file position {0}. Reason: {1}", filePosition, pauseReason);
 
-            // Make the print stop and rewind back to the given file position
-            await Print.OnPause(filePosition);
+            using (await Print.LockAsync())
+            {
+                if (filePosition == Consts.NoFilePosition)
+                {
+                    // We get an invalid file position from RRF if the print is paused during a macro file.
+                    // In this case, RRF has no way to determine the file position so we have to care of that.
+                    filePosition = (uint)(Print.NextFilePosition ?? Print.Length);
+                }
+                _logger.Info("Print paused at file position {0}. Reason: {1}", filePosition, pauseReason);
+
+                // Make the print stop and rewind back to the given file position
+                Print.Pause(filePosition);
+            }
 
             // Update the object model
             using (await Model.Provider.AccessReadWriteAsync())
@@ -851,7 +912,7 @@ namespace DuetControlServer.SPI
 
             try
             {
-                string filePath = await FilePath.ToPhysicalAsync(filename, "sys");
+                string filePath = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
                 using FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read)
                 {
                     Position = offset
@@ -878,7 +939,10 @@ namespace DuetControlServer.SPI
             bool outputMessage = Print.IsPrinting;
 
             // Cancel the file being printed
-            await Print.Abort();
+            using (await Print.LockAsync())
+            {
+                Print.Abort();
+            }
 
             // Resolve pending macros, unbuffered (system) codes and flush requests
             foreach (ChannelInformation channel in _channels)

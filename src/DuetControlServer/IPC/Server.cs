@@ -19,13 +19,19 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// UNIX socket for inter-process communication
         /// </summary>
-        private static Socket _unixSocket;
+        private static readonly Socket _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 
         /// <summary>
         /// Initialize the IPC subsystem and start listening for connections
         /// </summary>
         public static void Init()
         {
+            if (Settings.UpdateOnly)
+            {
+                // Don't do anything if only the firmware is supposed to be updated
+                return;
+            }
+
             // Make sure the parent directory exists but the socket file does not
             if (File.Exists(Settings.FullSocketPath))
             {
@@ -37,17 +43,9 @@ namespace DuetControlServer.IPC
             }
 
             // Create a new UNIX socket and start listening
-            _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-            try
-            {
-                UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(Settings.FullSocketPath);
-                _unixSocket.Bind(endPoint);
-                _unixSocket.Listen(Settings.Backlog);
-            }
-            catch
-            {
-                throw;
-            }
+            UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(Settings.FullSocketPath);
+            _unixSocket.Bind(endPoint);
+            _unixSocket.Listen(Settings.Backlog);
         }
 
         /// <summary>
@@ -56,6 +54,13 @@ namespace DuetControlServer.IPC
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
+            // Don't listen for incoming connections if only the firmware is updated
+            if (Settings.UpdateOnly)
+            {
+                await Task.Delay(-1, Program.CancelSource.Token);
+                return;
+            }
+
             // Make sure to terminate the main socket when the application is being terminated
             Program.CancelSource.Token.Register(_unixSocket.Close, false);
 
@@ -75,7 +80,7 @@ namespace DuetControlServer.IPC
                             Task task = connectionTasks[i];
                             if (task.IsCompleted)
                             {
-                                connectionTasks.Remove(task);
+                                connectionTasks.RemoveAt(i);
                             }
                         }
                         connectionTasks.Add(connectionTask);
@@ -137,10 +142,7 @@ namespace DuetControlServer.IPC
                 connection.Logger.Debug("Connection closed");
 
                 // Unlock the machine model again in case the client application crashed
-                if (LockManager.Connection == connection.Id)
-                {
-                    LockManager.UnlockMachineModel();
-                }
+                LockManager.UnlockMachineModel(connection.Id);
             }
         }
 

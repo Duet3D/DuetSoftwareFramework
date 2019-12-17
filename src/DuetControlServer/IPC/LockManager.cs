@@ -11,7 +11,12 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Source connection that acquired the current lock
         /// </summary>
-        public static int Connection { get; private set; } = -1;
+        private static int _lockConnection = -1;
+
+        /// <summary>
+        /// Indicates if a third-party application has locked the object model for writing
+        /// </summary>
+        public static bool IsLocked { get => _lockConnection != -1; }
 
         /// <summary>
         /// Read/write lock held by a third-party plugins
@@ -26,17 +31,21 @@ namespace DuetControlServer.IPC
         public static async Task LockMachineModel(int sourceConnection)
         {
             _lock = await Model.Provider.AccessReadWriteAsync();
-            Connection = sourceConnection;
+            _lockConnection = sourceConnection;
         }
 
         /// <summary>
         /// Unlock the machine model again
         /// </summary>
-        public static void UnlockMachineModel()
+        /// <param name="sourceConnection">Source connection</param>
+        public static void UnlockMachineModel(int sourceConnection)
         {
-            Connection = -1;
-            _lock?.Dispose();
-            _lock = null;
+            if (_lockConnection == sourceConnection)
+            {
+                _lockConnection = -1;
+                _lock?.Dispose();
+                _lock = null;
+            }
         }
     }
 }

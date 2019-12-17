@@ -13,7 +13,6 @@
   },
   "KeepAliveInterval": 30,
   "ModelRetryDelay": 5000,
-  "ObjectModelUpdateTimeout": 2000,
   "UseCors": true,
   "UseStaticFiles": true,
   "SocketPath": "/var/run/dsf/dcs.sock",

@@ -93,7 +93,7 @@ namespace LinuxDevices
         /// <summary>
         /// Dispose this instance internally
         /// </summary>
-        /// <param name="disposing"></param>
+        /// <param name="disposing">Release managed resources</param>
         private void Dispose(bool disposing)
         {
             if (disposed)

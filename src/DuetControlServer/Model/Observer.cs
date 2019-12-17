@@ -66,18 +66,18 @@ namespace DuetControlServer.Model
     }
 
     /// <summary>
-    /// Delegate to call when a property is being changed
-    /// </summary>
-    /// <param name="path">Path to the value that changed</param>
-    /// <param name="changeType">Type of the modification</param>
-    /// <param name="value">New value</param>
-    public delegate void PropertyPathChanged(object[] path, PropertyPathChangeType changeType, object value);
-
-    /// <summary>
     /// Static class that observes the main machine model and calls an event whenever a deep value has changed
     /// </summary>
     public static class Observer
     {
+        /// <summary>
+        /// Delegate to call when a property is being changed
+        /// </summary>
+        /// <param name="path">Path to the value that changed</param>
+        /// <param name="changeType">Type of the modification</param>
+        /// <param name="value">New value</param>
+        public delegate void PropertyPathChanged(object[] path, PropertyPathChangeType changeType, object value);
+
         /// <summary>
         /// Event to call when a deep value has changed
         /// </summary>
@@ -98,6 +98,8 @@ namespace DuetControlServer.Model
             Provider.Get.Channels.SPI.PropertyChanged += PropertyChanged("channels", "spi");
             Provider.Get.Channels.Telnet.PropertyChanged += PropertyChanged("channels", "telnet");
             Provider.Get.Channels.USB.PropertyChanged += PropertyChanged("channels", "usb");
+
+            Provider.Get.Directories.PropertyChanged += PropertyChanged("directories");
 
             Provider.Get.Electronics.PropertyChanged += PropertyChanged("electronics");
             Provider.Get.Electronics.Firmware.PropertyChanged += PropertyChanged("electronics", "firmware");

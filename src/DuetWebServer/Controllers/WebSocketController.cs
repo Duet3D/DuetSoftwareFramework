@@ -12,6 +12,7 @@ using DuetAPIClient.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Nito.AsyncEx;
 
 namespace DuetWebServer.Controllers
 {
@@ -26,6 +27,11 @@ namespace DuetWebServer.Controllers
         /// PONG response when a PING is received
         /// </summary>
         private static readonly byte[] PONG = Encoding.UTF8.GetBytes("PONG\n");
+
+        /// <summary>
+        /// Response that is sent when a command is unsupported
+        /// </summary>
+        private const string UnsupportedCommandResponse = "Unsupported command. The only supported commands are 'OK' and 'PING'";
 
         /// <summary>
         /// Configuration of the application
@@ -76,17 +82,17 @@ namespace DuetWebServer.Controllers
         public async Task Process(WebSocket webSocket)
         {
             string socketPath = _configuration.GetValue("SocketPath", Defaults.FullSocketPath);
-            using CommandConnection cmdConnection = new CommandConnection();
 
             // 1. Authentification. This will require an extra API command
+            using CommandConnection commandConnection = new CommandConnection();
             // TODO
 
             // 2. Connect to DCS
-            using SubscribeConnection subscription = new SubscribeConnection();
+            using SubscribeConnection subscribeConnection = new SubscribeConnection();
             try
             {
                 // Subscribe to object model updates
-                await subscription.Connect(SubscriptionMode.Patch, null, socketPath, Program.CancelSource.Token);
+                await subscribeConnection.Connect(SubscriptionMode.Patch, null, socketPath);
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {
@@ -101,93 +107,51 @@ namespace DuetWebServer.Controllers
                 return;
             }
 
-            // 3. Register this client and keep it up-to-date
+            // 3. Log this event
+            string ipAddress = HttpContext.Connection.RemoteIpAddress.ToString();
+            int port = HttpContext.Connection.RemotePort;
+            _logger.LogInformation("WebSocket connected from {0}:{1}", ipAddress, port);
+
+            // 4. Register this client and keep it up-to-date
             int sessionId = -1;
             try
             {
-                _logger.LogInformation("WebSocket connected");
+                // 4a. Register this user session. Once authentification has been implemented, the access level may vary
+                await commandConnection.Connect(socketPath);
+                sessionId = await commandConnection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, ipAddress, port);
 
-                // 3a. Register this user session. Once authentification has been implemented, the access level may vary
-                await cmdConnection.Connect(socketPath, Program.CancelSource.Token);
-                string ipAddress = HttpContext.Connection.RemoteIpAddress.ToString();
-                int port = HttpContext.Connection.RemotePort;
-                sessionId = await cmdConnection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, ipAddress, port, Program.CancelSource.Token);
-
-                // 3b. Fetch full model copy and send it over initially
-                using (MemoryStream json = await subscription.GetSerializedMachineModel(Program.CancelSource.Token))
+                // 4b. Fetch full model copy and send it over initially
+                using (MemoryStream json = await subscribeConnection.GetSerializedMachineModel())
                 {
-                    await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, Program.CancelSource.Token);
+                    await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, default);
                 }
 
-                // 3c. Keep sending updates to the client and wait for "OK" after each update
-                do
+                // 4c. Deal with this connection in full-duplex mode
+                using CancellationTokenSource cts = new CancellationTokenSource();
+                AsyncAutoResetEvent dataAcknowledged = new AsyncAutoResetEvent();
+                Task rxTask = ReadFromClient(webSocket, dataAcknowledged, cts.Token);
+                Task txTask = WriteToClient(webSocket, subscribeConnection, dataAcknowledged, cts.Token);
+
+                // 4d. Deal with the tasks' lifecycles
+                Task terminatedTask = await Task.WhenAny(rxTask, txTask);
+                cts.Cancel();
+                if (terminatedTask.IsFaulted)
                 {
-                    // 3d. Wait for response from the client
-                    byte[] receivedBytes = new byte[8];
-                    WebSocketReceiveResult result = await webSocket.ReceiveAsync(receivedBytes, Program.CancelSource.Token);
-                    if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        // Remote end is closing this connection
-                        break;
-                    }
-                    if (result.MessageType == WebSocketMessageType.Binary)
-                    {
-                        // Terminate the connection if binary content is received
-                        await CloseConnection(webSocket, WebSocketCloseStatus.InvalidMessageType, "Only text commands are supported");
-                        break;
-                    }
-                    string receivedData = Encoding.UTF8.GetString(receivedBytes);
-
-                    // 3e. Deal with incoming requests
-                    if (receivedData.Equals("PING\n", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        // Send PONG back to the client
-                        await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, Program.CancelSource.Token);
-                        continue;
-                    }
-                    else if (!receivedData.Equals("OK\n", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        // OK is supported to acknowledge the receipt of an object model (patch).
-                        // Terminate the connection if anything else is received
-                        await CloseConnection(webSocket, WebSocketCloseStatus.ProtocolError, "Invalid command");
-                        break;
-                    }
-
-                    // 3f. Check for another update and send it to the client but wait for updates only for a limited period of time
-                    try
-                    {
-                        using CancellationTokenSource timeoutCts = new CancellationTokenSource(_configuration.GetValue("ObjectModelUpdateTimeout", 2000));
-                        using CancellationTokenSource combinedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, Program.CancelSource.Token);
-
-                        using MemoryStream json = await subscription.GetSerializedMachineModel(combinedCts.Token);
-                        await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, Program.CancelSource.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // expected
-                    }
-                } while (!Program.CancelSource.IsCancellationRequested && webSocket.State == WebSocketState.Open);
+                    throw terminatedTask.Exception;
+                }
             }
             catch (Exception e)
             {
-                if (e is OperationCanceledException)
-                {
-                    await CloseConnection(webSocket, WebSocketCloseStatus.NormalClosure, "DuetWebServer shutting down");
-                }
-                else
-                {
-                    _logger.LogError(e, "WebSocket terminated with an exception");
-                    await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, e.Message);
-                }
+                _logger.LogError(e, "WebSocket from {0}:{1} terminated with an exception", ipAddress, port);
+                await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, e.Message);
             }
             finally
             {
-                _logger.LogInformation("WebSocket disconnected");
-
+                _logger.LogInformation("WebSocket disconnected from {0}:{1}", ipAddress, port);
                 try
                 {
                     // Try to remove this user session again
-                    await cmdConnection.RemoveUserSession(sessionId);
+                    await commandConnection.RemoveUserSession(sessionId);
                 }
                 catch (Exception e)
                 {
@@ -200,17 +164,97 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
+        /// Keep reading from the client
+        /// </summary>
+        /// <param name="webSocket">WebSocket to read from</param>
+        /// <param name="dataAcknowledged">Event to trigger when the client has acknowledged data</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        private async Task ReadFromClient(WebSocket webSocket, AsyncAutoResetEvent dataAcknowledged, CancellationToken cancellationToken)
+        {
+            byte[] receiveBuffer = new byte[128];
+            do
+            {
+                WebSocketReceiveResult readResult = await webSocket.ReceiveAsync(receiveBuffer, cancellationToken);
+                if (readResult.MessageType == WebSocketMessageType.Close)
+                {
+                    // Remote end is closing this connection
+                    break;
+                }
+                if (readResult.MessageType == WebSocketMessageType.Binary)
+                {
+                    // Terminate the connection if binary content is received
+                    await CloseConnection(webSocket, WebSocketCloseStatus.InvalidMessageType, "Only text commands are supported");
+                    break;
+                }
+                if (!readResult.EndOfMessage)
+                {
+                    // Don't allow too long messages
+                    await CloseConnection(webSocket, WebSocketCloseStatus.InvalidPayloadData, "Message is too long");
+                    break;
+                }
+
+                string[] receivedLines = Encoding.UTF8.GetString(receiveBuffer, 0, readResult.Count).Split('\r', '\n');
+                foreach (string line in receivedLines)
+                {
+                    if (line == "OK")
+                    {
+                        // Client is ready to receive the next JSON object
+                        dataAcknowledged.Set();
+                    }
+                    else if (line == "PING")
+                    {
+                        // Client hasn't received an update in a while, send back a PONG response
+                        await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, cancellationToken);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        _logger.LogWarning("Received unsupported line from WebSocket: '{0}'", line);
+                        await CloseConnection(webSocket, WebSocketCloseStatus.InvalidMessageType, UnsupportedCommandResponse);
+                        break;
+                    }
+                }
+            }
+            while (webSocket.State == WebSocketState.Open);
+        }
+
+        /// <summary>
+        /// Keep writing object model updates to the client
+        /// </summary>
+        /// <param name="webSocket">WebSocket to write to</param>
+        /// <param name="subscribeConnection">IPC connection to supply model updates</param>
+        /// <param name="dataAcknowledged">Event that is triggered when the client has acknowledged data</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        private async Task WriteToClient(WebSocket webSocket, SubscribeConnection subscribeConnection, AsyncAutoResetEvent dataAcknowledged, CancellationToken cancellationToken)
+        {
+            do
+            {
+                // Wait for the client to acknowledge the receipt of the last JSON object
+                await dataAcknowledged.WaitAsync(cancellationToken);
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                // Wait for another object model update and send it to the client
+                using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedMachineModel(cancellationToken);
+                await webSocket.SendAsync(objectModelPatch.ToArray(), WebSocketMessageType.Text, true, cancellationToken);
+            }
+            while (webSocket.State == WebSocketState.Open);
+        }
+
+        /// <summary>
         /// Close the WebSocket connection again
         /// </summary>
         /// <param name="webSocket">WebSocket to close</param>
         /// <param name="status">Close status to transmit</param>
         /// <param name="message">Close message</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task CloseConnection(WebSocket webSocket, WebSocketCloseStatus status, string message)
+        private async Task CloseConnection(WebSocket webSocket, WebSocketCloseStatus status, string message)
         {
             if (webSocket.State == WebSocketState.Open)
             {
-                // Do not use the main cancellation token here because this may be used when the application is being shut down
                 await webSocket.CloseAsync(status, message, default);
             }
         }

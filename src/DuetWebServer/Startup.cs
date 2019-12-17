@@ -86,7 +86,7 @@ namespace DuetWebServer
                 app.UseStaticFiles();
                 app.UseFileServer(new FileServerOptions
                 {
-                    FileProvider = new FileProviders.DuetFileProvider(_configuration)
+                    FileProvider = new FileProviders.DuetFileProvider()
                 });
             }
 

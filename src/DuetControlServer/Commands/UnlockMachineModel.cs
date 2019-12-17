@@ -8,12 +8,17 @@ namespace DuetControlServer.Commands
     public class UnlockMachineModel : DuetAPI.Commands.UnlockMachineModel
     {
         /// <summary>
+        /// Source connection of this command. Needed to register the owner of the lock
+        /// </summary>
+        public int SourceConnection { get; set; }
+
+        /// <summary>
         /// Unlock the machine model again
         /// </summary>
         /// <returns>Asynchronous task</returns>
         public override Task Execute()
         {
-            IPC.LockManager.UnlockMachineModel();
+            IPC.LockManager.UnlockMachineModel(SourceConnection);
             return Task.CompletedTask;
         }
     }

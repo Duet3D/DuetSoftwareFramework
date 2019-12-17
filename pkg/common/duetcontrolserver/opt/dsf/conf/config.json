@@ -1,6 +1,9 @@
 {
-  "SocketPath": "/var/run/duet.sock",
+  "LogLevel": "info",
+  "SocketDirectory": "/var/run/dsf",
+  "SocketFile": "dcs.sock",
   "Backlog": 4,
+  "SocketPollInterval": 2000,
   "BaseDirectory": "/opt/dsf/sd",
   "HostUpdateInterval": 4000,
   "ConfigUpdateInterval": 5000,
@@ -16,6 +19,7 @@
   "BufferedMacroCodes": 16,
   "MaxBufferSpacePerChannel": 1536,
   "ModelUpdateInterval": 125,
+  "MaxMachineModelLockTime": -1,
   "FileInfoReadLimitHeader": 12288,
   "FileInfoReadLimitFooter": 262144,
   "MaxLayerHeight": 0.9,

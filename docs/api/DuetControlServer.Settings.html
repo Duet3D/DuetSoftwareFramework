@@ -285,6 +285,9 @@
                             <a href="DuetAPI.Machine.CurrentMove.html" title="CurrentMove" class="">CurrentMove</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.Directories.html" title="Directories" class="">Directories</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.Drive.html" title="Drive" class="">Drive</a>
                           </li>
                           <li class="">
@@ -522,6 +525,9 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.FileDirectory.html" title="FileDirectory" class="">FileDirectory</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.FileInfoParser.html" title="FileInfoParser" class="">FileInfoParser</a>
                           </li>
                           <li class="">
@@ -678,6 +684,9 @@
                             <a href="DuetControlServer.Model.Observer.html" title="Observer" class="">Observer</a>
                           </li>
                           <li class="">
+                            <a href="DuetControlServer.Model.Observer.PropertyPathChanged.html" title="Observer.PropertyPathChanged" class="">Observer.PropertyPathChanged</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.Model.Output.html" title="Output" class="">Output</a>
                           </li>
                           <li class="">
@@ -691,9 +700,6 @@
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.ProbeItem.html" title="ProbeItem" class="">ProbeItem</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.Model.PropertyPathChanged.html" title="PropertyPathChanged" class="">PropertyPathChanged</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.PropertyPathChangeType.html" title="PropertyPathChangeType" class="">PropertyPathChangeType</a>
@@ -952,6 +958,18 @@
                           </li>
                           <li class="">
                             <a href="DuetWebServer.Middleware.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Services.html" title="DuetWebServer.Services" class="">DuetWebServer.Services</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.html" title="ModelObserver" class="">ModelObserver</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.WebDirectoryChanged.html" title="ModelObserver.WebDirectoryChanged" class="">ModelObserver.WebDirectoryChanged</a>
                           </li>
                         </ul>  </li>
                   </ul>        </div>
@@ -1421,6 +1439,31 @@ the host controller (e.g. network information and mass storages) are updated (in
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_Settings_MaxMachineModelLockTime_" data-uid="DuetControlServer.Settings.MaxMachineModelLockTime*"></a>
+  <h4 id="DuetControlServer_Settings_MaxMachineModelLockTime" data-uid="DuetControlServer.Settings.MaxMachineModelLockTime">MaxMachineModelLockTime</h4>
+  <div class="markdown level1 summary"><p>Maximum lock time of the object model. If this time is exceeded, a deadlock is reported and the application is terminated.
+Set this to -1 to disable the automatic deadlock detection</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int MaxMachineModelLockTime { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_Settings_MaxMessageAge_" data-uid="DuetControlServer.Settings.MaxMessageAge*"></a>
   <h4 id="DuetControlServer_Settings_MaxMessageAge" data-uid="DuetControlServer.Settings.MaxMessageAge">MaxMessageAge</h4>
   <div class="markdown level1 summary"><p>Maximum time to keep messages in the object model unless client(s) pick them up (in s).
@@ -1622,30 +1665,6 @@ public static bool NoSpiTask { get; set; }</code></pre>
   <div class="seealso">
       <div><a class="xref" href="DuetAPI.html">DuetAPI</a></div>
   </div>
-  <a id="DuetControlServer_Settings_SocketGroup_" data-uid="DuetControlServer.Settings.SocketGroup*"></a>
-  <h4 id="DuetControlServer_Settings_SocketGroup" data-uid="DuetControlServer.Settings.SocketGroup">SocketGroup</h4>
-  <div class="markdown level1 summary"><p>Owning group of the UNIX socket</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static string SocketGroup { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_Settings_SocketPollInterval_" data-uid="DuetControlServer.Settings.SocketPollInterval*"></a>
   <h4 id="DuetControlServer_Settings_SocketPollInterval" data-uid="DuetControlServer.Settings.SocketPollInterval">SocketPollInterval</h4>
   <div class="markdown level1 summary"><p>Poll interval for connected IPC clients</p>
@@ -1666,30 +1685,6 @@ public static bool NoSpiTask { get; set; }</code></pre>
     <tbody>
       <tr>
         <td><span class="xref">System.Int32</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_Settings_SocketUser_" data-uid="DuetControlServer.Settings.SocketUser*"></a>
-  <h4 id="DuetControlServer_Settings_SocketUser" data-uid="DuetControlServer.Settings.SocketUser">SocketUser</h4>
-  <div class="markdown level1 summary"><p>Owning user of the UNIX socket</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static string SocketUser { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.String</span></td>
         <td></td>
       </tr>
     </tbody>

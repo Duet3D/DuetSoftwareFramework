@@ -60,6 +60,12 @@ namespace DuetControlServer.Utility
 
                 // Write the first line
                 await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging started");
+
+                // Update the object model
+                using (await Model.Provider.AccessReadWriteAsync())
+                {
+                    Model.Provider.Get.State.LogFile = filename;
+                }
             }
         }
 
@@ -98,6 +104,11 @@ namespace DuetControlServer.Utility
             {
                 _logCloseEvent.Dispose();
                 _logCloseEvent = null;
+            }
+
+            using (await Model.Provider.AccessReadWriteAsync())
+            {
+                Model.Provider.Get.State.LogFile = null;
             }
         }
 

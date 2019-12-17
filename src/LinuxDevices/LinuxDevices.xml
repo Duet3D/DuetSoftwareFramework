@@ -36,7 +36,7 @@
             <summary>
             Dispose this instance internally
             </summary>
-            <param name="disposing"></param>
+            <param name="disposing">Release managed resources</param>
         </member>
         <member name="P:LinuxDevices.InputGpioPin.Value">
             <summary>
@@ -92,7 +92,7 @@
             <summary>
             Dispose this instance internally
             </summary>
-            <param name="disposing"></param>
+            <param name="disposing">Release managed resourcess</param>
         </member>
         <member name="M:LinuxDevices.SpiDevice.TransferFullDuplex(System.ReadOnlySpan{System.Byte},System.Span{System.Byte})">
             <summary>

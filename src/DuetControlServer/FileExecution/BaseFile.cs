@@ -2,7 +2,6 @@
 using DuetControlServer.Commands;
 using System;
 using System.IO;
-using Zhaobang.IO;
 
 namespace DuetControlServer.FileExecution
 {
@@ -19,7 +18,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Reader for the file stream
         /// </summary>
-        private readonly SeekableStreamReader _reader;
+        private readonly StreamReader _reader;
 
         /// <summary>
         /// File path to the file being executed
@@ -36,18 +35,22 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         public long Position
         {
-            get => _fileStream.Position;
+            get => _position;
             set
             {
-                // FIXME: Update LineNumber here
+                IsFinished = false;
                 _fileStream.Seek(value, SeekOrigin.Begin);
+                _reader.DiscardBufferedData();
+                _position = value;
+                LineNumber = (value == 0) ? (long?)0 : null;
             }
         }
+        private long _position;
 
         /// <summary>
         /// Number of the current line
         /// </summary>
-        public long LineNumber { get; private set; }
+        public long? LineNumber { get; private set; } = 0;
 
         /// <summary>
         /// Returns the length of the file in bytes
@@ -77,7 +80,7 @@ namespace DuetControlServer.FileExecution
         public BaseFile(string fileName, CodeChannel channel)
         {
             _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-            _reader = new SeekableStreamReader(_fileStream);
+            _reader = new StreamReader(_fileStream);
 
             FileName = fileName;
             Channel = channel;
@@ -143,16 +146,17 @@ namespace DuetControlServer.FileExecution
             {
                 Channel = Channel,
                 LineNumber = LineNumber,
-                FilePosition = _reader.Position
+                FilePosition = Position
             };
 
             bool codeRead, enforcingAbsolutePosition = false;
             do
             {
                 codeRead = DuetAPI.Commands.Code.Parse(_reader, code, ref enforcingAbsolutePosition);
-                LineNumber = code.LineNumber.Value;
+                _position += code.Length.Value;
+                LineNumber = code.LineNumber;
             }
-            while (!codeRead && _reader.Position != _fileStream.Length);
+            while (!codeRead && !_reader.EndOfStream);
 
             // Return it
             if (!codeRead)

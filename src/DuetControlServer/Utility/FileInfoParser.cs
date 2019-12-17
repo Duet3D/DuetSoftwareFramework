@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
-using Zhaobang.IO;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer
@@ -23,57 +23,46 @@ namespace DuetControlServer
         /// <returns>Information about the file</returns>
         public static async Task<ParsedFileInfo> Parse(string fileName)
         {
-            FileStream fileStream = new FileStream(fileName, FileMode.Open);
-            SeekableStreamReader reader = new SeekableStreamReader(fileStream);
-            try
+            using FileStream fileStream = new FileStream(fileName, FileMode.Open);
+            using StreamReader reader = new StreamReader(fileStream);
+            ParsedFileInfo result = new ParsedFileInfo
             {
-                ParsedFileInfo result = new ParsedFileInfo
-                {
-                    FileName = await FilePath.ToVirtualAsync(fileName),
-                    Size = fileStream.Length,
-                    LastModified = File.GetLastWriteTime(fileName)
-                };
+                FileName = await FilePath.ToVirtualAsync(fileName),
+                Size = fileStream.Length,
+                LastModified = File.GetLastWriteTime(fileName)
+            };
 
-                if (fileStream.Length > 0)
-                {
-                    List<float> filamentConsumption = new List<float>();
-                    await ParseHeader(reader, filamentConsumption, result);
-                    await ParseFooter(reader, fileStream.Length, filamentConsumption, result);
-                    result.Filament = filamentConsumption;
+            if (fileStream.Length > 0)
+            {
+                List<float> filamentConsumption = new List<float>();
+                await ParseHeader(reader, filamentConsumption, result);
+                await ParseFooter(reader, filamentConsumption, result);
+                result.Filament = filamentConsumption;
 
-                    if (result.FirstLayerHeight + result.LayerHeight > 0F && result.Height > 0F)
-                    {
-                        result.NumLayers = (int?)(Math.Round((result.Height - result.FirstLayerHeight) / result.LayerHeight) + 1);
-                    }
+                if (result.FirstLayerHeight + result.LayerHeight > 0F && result.Height > 0F)
+                {
+                    result.NumLayers = (int?)(Math.Round((result.Height - result.FirstLayerHeight) / result.LayerHeight) + 1);
                 }
-
-                reader.Close();
-                fileStream.Close();
-                return result;
             }
-            catch
-            {
-                reader.Close();
-                fileStream.Close();
-                throw;
-            }
+            return result;
         }
 
-        private static async Task ParseHeader(SeekableStreamReader reader, List<float> filament, ParsedFileInfo partialFileInfo)
+        private static async Task ParseHeader(StreamReader reader, List<float> filament, ParsedFileInfo partialFileInfo)
         {
             // Every time CTS.Token is accessed a copy is generated. Hence we cache one until this method completes
             CancellationToken token = Program.CancelSource.Token;
 
+            long bytesRead = 0;
             bool inRelativeMode = false, lastLineHadInfo = false;
             do
             {
                 token.ThrowIfCancellationRequested();
-
                 string line = await reader.ReadLineAsync();
                 if (line == null)
                 {
                     break;
                 }
+                bytesRead += reader.CurrentEncoding.GetByteCount(line) + 1;     // This may be off by one byte in case '\r\n' is used
                 bool gotNewInfo = false;
 
                 // See what code to deal with
@@ -122,31 +111,35 @@ namespace DuetControlServer
                 }
                 lastLineHadInfo = gotNewInfo;
             }
-            while (reader.Position < Settings.FileInfoReadLimitHeader);
+            while (bytesRead < Settings.FileInfoReadLimitHeader);
         }
 
-        private static async Task ParseFooter(SeekableStreamReader reader, long length, List<float> filament, ParsedFileInfo partialFileInfo)
+        private static async Task ParseFooter(StreamReader reader, List<float> filament, ParsedFileInfo partialFileInfo)
         {
             CancellationToken token = Program.CancelSource.Token;
-            reader.Seek(0, SeekOrigin.End);
+            reader.BaseStream.Seek(0, SeekOrigin.End);
 
             bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = filament.Count > 0;
-            float? lastZ = null;
 
+            char[] buffer = new char[512];
+            int bufferPointer = 0;
+            long bytesRead = 0;
             do
             {
                 token.ThrowIfCancellationRequested();
 
                 // Read another line
-                string line = await ReadLineFromEndAsync(reader);
-                if (line == null)
+                ReadLineFromEndResult readResult = await ReadLineFromEndAsync(reader, buffer, bufferPointer);
+                if (readResult == null)
                 {
                     break;
                 }
+                bufferPointer = readResult.BufferPointer;
+                bytesRead += reader.CurrentEncoding.GetByteCount(readResult.Line) + 1;     // This may be off by one byte in case '\r\n' is used
                 bool gotNewInfo = false;
 
                 // See what code to deal with
-                Code code = new Code(line);
+                Code code = new Code(readResult.Line);
                 if (code.Type == CodeType.GCode && partialFileInfo.Height == 0)
                 {
                     if (code.MajorNumber == 90)
@@ -163,40 +156,22 @@ namespace DuetControlServer
                     }
                     else if (code.MajorNumber == 0 || code.MajorNumber == 1)
                     {
-                        // G0/G1 is a move, see if there is a Z parameter present
-                        // Users tend to place their own lift Z code at the end, so attempt to read two G0/G1 Z
-                        // codes and check the height differene between them
+                        // G0/G1 is an absolute move, see if there is a Z parameter present
                         CodeParameter zParam = code.Parameter('Z');
                         if (zParam != null && (code.Comment == null || !code.Comment.TrimStart().StartsWith("E")))
                         {
                             gotNewInfo = true;
-                            if (lastZ == null)
-                            {
-                                lastZ = zParam;
-                            }
-                            else
-                            {
-                                float z = zParam;
-                                if (lastZ - z > Settings.MaxLayerHeight)
-                                {
-                                    partialFileInfo.Height = z;
-                                }
-                                else
-                                {
-                                    partialFileInfo.Height = lastZ.Value;
-                                }
-                                break;
-                            }
+                            partialFileInfo.Height = zParam;
                         }
                     }
                 }
                 else if (code.Type == CodeType.Comment)
                 {
-                    gotNewInfo |= partialFileInfo.LayerHeight == 0 && FindLayerHeight(line, ref partialFileInfo);
-                    gotNewInfo |= !hadFilament && FindFilamentUsed(line, ref filament);
-                    gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(line, ref partialFileInfo);
-                    gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo);
-                    gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo);
+                    gotNewInfo |= partialFileInfo.LayerHeight == 0 && FindLayerHeight(readResult.Line, ref partialFileInfo);
+                    gotNewInfo |= !hadFilament && FindFilamentUsed(readResult.Line, ref filament);
+                    gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(readResult.Line, ref partialFileInfo);
+                    gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(readResult.Line, ref partialFileInfo);
+                    gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(readResult.Line, ref partialFileInfo);
                 }
 
                 if (!gotNewInfo && !lastLineHadInfo && IsFileInfoComplete(partialFileInfo, filament))
@@ -205,44 +180,68 @@ namespace DuetControlServer
                 }
                 lastLineHadInfo = gotNewInfo;
             }
-            while (length - reader.Position < Settings.FileInfoReadLimitFooter);
-
-            if (lastZ != null && partialFileInfo.Height == 0)
-            {
-                partialFileInfo.Height = lastZ.Value;
-            }
+            while (bytesRead < Settings.FileInfoReadLimitFooter);
         }
 
-        private static async Task<string> ReadLineFromEndAsync(SeekableStreamReader reader)
+        /// <summary>
+        /// Result for wrapping the buffer pointer because ref parameters are not supported for async functions
+        /// </summary>
+        private class ReadLineFromEndResult
         {
-            const int bufferSize = 128;
-            char[] buffer = new char[bufferSize];
+            /// <summary>
+            /// Read line
+            /// </summary>
+            public string Line;
 
-            string line = string.Empty;
-            while (reader.Position > 0)
+            /// <summary>
+            /// New pointer in the buffer
+            /// </summary>
+            public int BufferPointer;
+        }
+
+        /// <summary>
+        /// Read another line from the end of a file
+        /// </summary>
+        /// <param name="reader">Stream reader</param>
+        /// <param name="buffer">Internal buffer</param>
+        /// <param name="bufferPointer">Pointer to the next byte in the buffer</param>
+        /// <returns>Read result</returns>
+        private static async Task<ReadLineFromEndResult> ReadLineFromEndAsync(StreamReader reader, char[] buffer, int bufferPointer)
+        {
+            string line = "";
+            do
             {
-                // Read a chunk. Do not do this char-wise for performance reasons
-                long bytesToRead = Math.Min(reader.Position, bufferSize);
-                reader.Seek(-bytesToRead, SeekOrigin.Current);
-                int bytesRead = await reader.ReadBlockAsync(buffer);
-                reader.Seek(-bytesRead, SeekOrigin.Current);
-
-                // Keep reading until a NL is found
-                for (int i = (int)Math.Min(bytesRead - 1, reader.Position); i >= 0; i--)
+                if (bufferPointer == 0)
                 {
-                    char c = buffer[i];
-                    if (c == '\n')
+                    if (reader.BaseStream.Position == 0)
                     {
-                        reader.Seek(i, SeekOrigin.Current);
-                        return line;
+                        return null;
                     }
-                    if (c != '\r')
+
+                    int bytesToRewind = (int)Math.Min(reader.BaseStream.Position, buffer.Length);
+                    long newPosition = reader.BaseStream.Position - bytesToRewind;
+                    reader.BaseStream.Seek(newPosition, SeekOrigin.Begin);
+                    reader.DiscardBufferedData();
+                    bufferPointer = await reader.ReadBlockAsync(buffer);
+                    reader.BaseStream.Seek(newPosition, SeekOrigin.Begin);
+                    reader.DiscardBufferedData();
+                }
+
+                char c = buffer[--bufferPointer];
+                if (c == '\n')
+                {
+                    return new ReadLineFromEndResult
                     {
-                        line = c + line;
-                    }
+                        Line = line,
+                        BufferPointer = bufferPointer
+                    };
+                }
+                if (c != '\r')
+                {
+                    line = c + line;
                 }
             }
-            return null;
+            while (true);
         }
 
         private static bool IsFileInfoComplete(ParsedFileInfo result, List<float> filament)

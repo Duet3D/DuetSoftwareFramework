@@ -124,7 +124,7 @@ namespace DuetAPI.Machine
         private float _ySpacing;
 
         /// <summary>
-        /// Probing radius on delta geometries
+        /// Probing radius for delta kinematics
         /// </summary>
         public float Radius
         {

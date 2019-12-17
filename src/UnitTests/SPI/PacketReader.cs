@@ -9,7 +9,7 @@ using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Serialization;
 using NUnit.Framework;
 
-namespace DuetUnitTest.SPI
+namespace UnitTests.SPI
 {
     [TestFixture]
     public class PacketReader

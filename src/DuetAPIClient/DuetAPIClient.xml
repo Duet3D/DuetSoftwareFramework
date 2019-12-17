@@ -227,7 +227,7 @@
             <summary>
             Identifier of this connection
             </summary>
-            <seealso cref="!:BaseCommand.SourceConnection"/>
+            <seealso cref="P:DuetAPI.Commands.Code.SourceConnection"/>
         </member>
         <member name="M:DuetAPIClient.BaseConnection.Connect(DuetAPI.Connection.InitMessages.ClientInitMessage,System.String,System.Threading.CancellationToken)">
             <summary>

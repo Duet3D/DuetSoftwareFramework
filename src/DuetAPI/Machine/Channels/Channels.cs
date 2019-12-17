@@ -11,6 +11,11 @@ namespace DuetAPI.Machine
     public sealed class Channels : IAssignable, ICloneable
     {
         /// <summary>
+        /// Total number of code channels
+        /// </summary>
+        public static readonly int Total = Enum.GetValues(typeof(CodeChannel)).Length;
+
+        /// <summary>
         /// G/M/T-code channel for HTTP requests
         /// </summary>
         public Channel HTTP { get; private set; } = new Channel();

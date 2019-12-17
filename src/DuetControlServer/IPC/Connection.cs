@@ -121,7 +121,16 @@ namespace DuetControlServer.IPC
                     {
                         throw new ArgumentException("Command is not of type BaseCommand");
                     }
-                    Logger.Debug("Received command {0}", item.Value.GetString());
+
+                    // Log this
+                    if (commandType == typeof(Acknowledge))
+                    {
+                        Logger.Trace("Received command {0}", item.Value.GetString());
+                    }
+                    else
+                    {
+                        Logger.Debug("Received command {0}", item.Value.GetString());
+                    }
 
                     // Perform final deserialization and assign source identifier to this command
                     BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonDoc.RootElement.GetRawText(), commandType, JsonHelper.DefaultJsonOptions);
@@ -168,6 +177,10 @@ namespace DuetControlServer.IPC
             else if (command is Commands.LockMachineModel lockCommand)
             {
                 lockCommand.SourceConnection = Id;
+            }
+            else if (command is Commands.UnlockMachineModel unlockCommand)
+            {
+                unlockCommand.SourceConnection = Id;
             }
         }
 

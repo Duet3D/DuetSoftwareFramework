@@ -2,7 +2,7 @@
 using NUnit.Framework;
 using System.IO;
 
-namespace DuetUnitTest.Utility
+namespace UnitTests.Utility
 {
     [TestFixture]
     public class HeightMap

@@ -107,6 +107,11 @@
             PONG response when a PING is received
             </summary>
         </member>
+        <member name="F:DuetWebServer.Controllers.WebSocketController.UnsupportedCommandResponse">
+            <summary>
+            Response that is sent when a command is unsupported
+            </summary>
+        </member>
         <member name="F:DuetWebServer.Controllers.WebSocketController._configuration">
             <summary>
             Configuration of the application
@@ -139,6 +144,25 @@
             <param name="webSocket">WebSocket connection</param>
             <returns>Asynchronous task</returns>
         </member>
+        <member name="M:DuetWebServer.Controllers.WebSocketController.ReadFromClient(System.Net.WebSockets.WebSocket,Nito.AsyncEx.AsyncAutoResetEvent,System.Threading.CancellationToken)">
+            <summary>
+            Keep reading from the client
+            </summary>
+            <param name="webSocket">WebSocket to read from</param>
+            <param name="dataAcknowledged">Event to trigger when the client has acknowledged data</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetWebServer.Controllers.WebSocketController.WriteToClient(System.Net.WebSockets.WebSocket,DuetAPIClient.SubscribeConnection,Nito.AsyncEx.AsyncAutoResetEvent,System.Threading.CancellationToken)">
+            <summary>
+            Keep writing object model updates to the client
+            </summary>
+            <param name="webSocket">WebSocket to write to</param>
+            <param name="subscribeConnection">IPC connection to supply model updates</param>
+            <param name="dataAcknowledged">Event that is triggered when the client has acknowledged data</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="M:DuetWebServer.Controllers.WebSocketController.CloseConnection(System.Net.WebSockets.WebSocket,System.Net.WebSockets.WebSocketCloseStatus,System.String)">
             <summary>
             Close the WebSocket connection again
@@ -153,11 +177,25 @@
             Static file provider that uses DCS to resolve file paths
             </summary>
         </member>
-        <member name="M:DuetWebServer.FileProviders.DuetFileProvider.#ctor(Microsoft.Extensions.Configuration.IConfiguration)">
+        <member name="P:DuetWebServer.FileProviders.DuetFileProvider.Instance">
+            <summary>
+            Singleton to the file provider
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.FileProviders.DuetFileProvider._provider">
+            <summary>
+            Physical file provider
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.FileProviders.DuetFileProvider.#ctor">
             <summary>
             Creates a new file resolver instance
             </summary>
-            <param name="configuration">Configuration provider</param>
+        </member>
+        <member name="M:DuetWebServer.FileProviders.DuetFileProvider.Finalize">
+            <summary>
+            Finalizer of this instance
+            </summary>
         </member>
         <member name="M:DuetWebServer.FileProviders.DuetFileProvider.GetFileInfo(System.String)">
             <summary>
@@ -180,19 +218,15 @@
             <param name="filter">Watch filter</param>
             <returns>Change token</returns>
         </member>
+        <member name="M:DuetWebServer.FileProviders.DuetFileProvider.SetWebDirectory(System.String)">
+            <summary>
+            Set the directory of the file provider
+            </summary>
+            <param name="webDirectory">New web directory</param>
+        </member>
         <member name="T:DuetWebServer.Middleware.CustomEndpointMiddleware">
             <summary>
             Middleware providing with custom HTTP/WebSocket endpoints
-            </summary>
-        </member>
-        <member name="F:DuetWebServer.Middleware.CustomEndpointMiddleware._endpoints">
-            <summary>
-            Dictionary of registered third-party paths vs third-party HTTP endpoints
-            </summary>
-        </member>
-        <member name="F:DuetWebServer.Middleware.CustomEndpointMiddleware._userSessions">
-            <summary>
-            Dictionary holding the current user sessions in the form IP vs Id
             </summary>
         </member>
         <member name="F:DuetWebServer.Middleware.CustomEndpointMiddleware._next">
@@ -217,11 +251,6 @@
             <param name="next">Next request delegate</param>
             <param name="configuration">Application configuration</param>
             <param name="logger">Logger instance</param>
-        </member>
-        <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.SynchronizeModel">
-            <summary>
-            Synchronize all registered endpoints and user sessions
-            </summary>
         </member>
         <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext)">
             <summary>
@@ -392,11 +421,6 @@
             Default path to the configuration file
             </summary>
         </member>
-        <member name="P:DuetWebServer.Program.CancelSource">
-            <summary>
-            Global cancel source for program termination
-            </summary>
-        </member>
         <member name="M:DuetWebServer.Program.Main(System.String[])">
             <summary>
             Called when the application is launched
@@ -409,6 +433,100 @@
             </summary>
             <param name="args">Command-line arguments</param>
             <returns>Web host builder</returns>
+        </member>
+        <member name="T:DuetWebServer.Services.ModelObserver">
+            <summary>
+            Class used to observe the machine model
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Services.ModelObserver.Endpoints">
+            <summary>
+            Dictionary of registered third-party paths vs third-party HTTP endpoints
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Services.ModelObserver.UserSessions">
+            <summary>
+            Dictionary holding the current user sessions in the form IP vs Id
+            </summary>
+        </member>
+        <member name="P:DuetWebServer.Services.ModelObserver.WebDirectory">
+            <summary>
+            Path to the web directory
+            </summary>
+        </member>
+        <member name="T:DuetWebServer.Services.ModelObserver.WebDirectoryChanged">
+            <summary>
+            Delegate for an event that is triggered when the path of the web directory changes
+            </summary>
+            <param name="webDirectory">New web directory</param>
+        </member>
+        <member name="F:DuetWebServer.Services.ModelObserver._commandConnection">
+            <summary>
+            Conenction to resolve file paths
+            </summary>
+        </member>
+        <member name="E:DuetWebServer.Services.ModelObserver.OnWebDirectoryChanged">
+            <summary>
+            Event that is triggered whenever the web directory path changes
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Services.ModelObserver._configuration">
+            <summary>
+            Configuration of this application
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Services.ModelObserver._logger">
+            <summary>
+            Logger instance
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Services.ModelObserver._task">
+            <summary>
+            Task representing the lifecycle of this service
+            </summary>
+        </member>
+        <member name="F:DuetWebServer.Services.ModelObserver._stopRequest">
+            <summary>
+            Cancellation token source that is triggered when the service is supposed to shut down
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Services.ModelObserver.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Services.ModelObserver})">
+            <summary>
+            Constructor of this service class
+            </summary>
+            <param name="configuration">App configuration</param>
+            <param name="logger">Logger instance</param>
+        </member>
+        <member name="M:DuetWebServer.Services.ModelObserver.Dispose">
+            <summary>
+            Dispose this instance
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Services.ModelObserver.StartAsync(System.Threading.CancellationToken)">
+            <summary>
+            Start this service
+            </summary>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetWebServer.Services.ModelObserver.StopAsync(System.Threading.CancellationToken)">
+            <summary>
+            Stop this service
+            </summary>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetWebServer.Services.ModelObserver.Execute">
+            <summary>
+            Synchronize all registered endpoints and user sessions
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Services.ModelObserver.Directories_PropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)">
+            <summary>
+            Handler for property changes of the Directories namespace in the machine model
+            </summary>
+            <param name="sender">Sender object</param>
+            <param name="e">Information about the changed property</param>
         </member>
         <member name="T:DuetWebServer.Startup">
             <summary>

@@ -10,7 +10,7 @@ using DuetControlServer.SPI.Serialization;
 using NUnit.Framework;
 using Code = DuetControlServer.Commands.Code;
 
-namespace DuetUnitTest.SPI
+namespace UnitTests.SPI
 {
     [TestFixture]
     public class PacketWriter

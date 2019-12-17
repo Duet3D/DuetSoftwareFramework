@@ -2,7 +2,7 @@
 using DuetAPI.Machine;
 using NUnit.Framework;
 
-namespace DuetUnitTest.Machine
+namespace UnitTests.Machine
 {
     [TestFixture]
     public class Output

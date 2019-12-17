@@ -17,7 +17,18 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Locks to avoid race conditions when executing multiple text-based codes via the same channel
         /// </summary>
-        private static AsyncLock[] _channelLocks;
+        private static readonly AsyncLock[] _channelLocks = new AsyncLock[DuetAPI.Machine.Channels.Total];
+
+        /// <summary>
+        /// Initialize this class
+        /// </summary>
+        public static void Init()
+        {
+            for (int i = 0; i < DuetAPI.Machine.Channels.Total; i++)
+            {
+                _channelLocks[i] = new AsyncLock();
+            }
+        }
 
         /// <summary>
         /// Source connection of this command
@@ -25,19 +36,19 @@ namespace DuetControlServer.Commands
         public int SourceConnection { get; set; }
 
         /// <summary>
-        /// Creates a new instance
+        /// Parse codes from the given input string
         /// </summary>
-        public SimpleCode()
+        /// <returns>Parsed G/M/T-codes</returns>
+        public IEnumerable<Code> Parse()
         {
-            if (_channelLocks == null)
+            using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(Code));
+            using StreamReader reader = new StreamReader(stream);
+            bool enforcingAbsolutePosition = false;
+            while (!reader.EndOfStream)
             {
-                int numCodeChannels = Enum.GetValues(typeof(CodeChannel)).Length;
-
-                _channelLocks = new AsyncLock[numCodeChannels];
-                for (int i = 0; i < numCodeChannels; i++)
-                {
-                    _channelLocks[i] = new AsyncLock();
-                }
+                Code code = new Code() { Channel = Channel, SourceConnection = SourceConnection };
+                DuetAPI.Commands.Code.Parse(reader, code, ref enforcingAbsolutePosition);
+                yield return code;
             }
         }
 
@@ -52,7 +63,7 @@ namespace DuetControlServer.Commands
             List<Code> codes = new List<Code>(), priorityCodes = new List<Code>();
             try
             {
-                foreach (Code code in ParseCodes())
+                foreach (Code code in Parse())
                 {
                     // M112, M122, and M999 always go to the Daemon channel so we (hopefully) get a low-latency response
                     if (code.Type == CodeType.MCode && (code.MajorNumber == 112 || code.MajorNumber == 122 || code.MajorNumber == 999))
@@ -99,23 +110,6 @@ namespace DuetControlServer.Commands
                 result.Add(MessageType.Error, "Code has been cancelled");
             }
             return result.ToString();
-        }
-
-        /// <summary>
-        /// Parse codes from the given input string
-        /// </summary>
-        /// <returns>Parsed G/M/T-codes</returns>
-        public IEnumerable<Code> ParseCodes()
-        {
-            using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(Code));
-            using StreamReader reader = new StreamReader(stream);
-            bool enforcingAbsolutePosition = false;
-            while (!reader.EndOfStream)
-            {
-                Code code = new Code() { Channel = Channel, SourceConnection = SourceConnection };
-                DuetAPI.Commands.Code.Parse(reader, code, ref enforcingAbsolutePosition);
-                yield return code;
-            }
         }
     }
 }

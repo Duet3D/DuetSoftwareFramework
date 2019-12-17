@@ -119,8 +119,11 @@ namespace DuetControlServer.Model
                         }
 
                         // Notify waiting clients about the model update
-                        _updateEvent.Set();
-                        _updateEvent.Reset();
+                        if (_module == 2)
+                        {
+                            _updateEvent.Set();
+                            _updateEvent.Reset();
+                        }
                     }
                     catch (JsonException e)
                     {
@@ -677,6 +680,7 @@ namespace DuetControlServer.Model
             if (configResponse.boardName != null && Settings.UpdateOnly && !_updatingFirmware)
             {
                 _updatingFirmware = true;
+                Console.Write("Updating the firmware...");
 
                 Code updateCode = new Code
                 {
@@ -684,7 +688,19 @@ namespace DuetControlServer.Model
                     MajorNumber = 997,
                     Flags = DuetAPI.Commands.CodeFlags.IsPrioritized
                 };
-                _ = updateCode.Execute();
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await updateCode.Execute();
+                        Console.WriteLine("Done!");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Error: Failed to send update request");
+                        Console.WriteLine(e);
+                    }
+                });
             }
         }
 

@@ -18,7 +18,7 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override Task<bool> Execute()
         {
-            if (IPC.LockManager.Connection == -1)
+            if (!IPC.LockManager.IsLocked)
             {
                 throw new InvalidOperationException("Machine model has not been locked");
             }

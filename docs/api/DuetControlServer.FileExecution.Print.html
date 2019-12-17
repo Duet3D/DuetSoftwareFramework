@@ -285,6 +285,9 @@
                             <a href="DuetAPI.Machine.CurrentMove.html" title="CurrentMove" class="">CurrentMove</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.Directories.html" title="Directories" class="">Directories</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.Drive.html" title="Drive" class="">Drive</a>
                           </li>
                           <li class="">
@@ -522,6 +525,9 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.FileDirectory.html" title="FileDirectory" class="">FileDirectory</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.FileInfoParser.html" title="FileInfoParser" class="">FileInfoParser</a>
                           </li>
                           <li class="">
@@ -678,6 +684,9 @@
                             <a href="DuetControlServer.Model.Observer.html" title="Observer" class="">Observer</a>
                           </li>
                           <li class="">
+                            <a href="DuetControlServer.Model.Observer.PropertyPathChanged.html" title="Observer.PropertyPathChanged" class="">Observer.PropertyPathChanged</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.Model.Output.html" title="Output" class="">Output</a>
                           </li>
                           <li class="">
@@ -691,9 +700,6 @@
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.ProbeItem.html" title="ProbeItem" class="">ProbeItem</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.Model.PropertyPathChanged.html" title="PropertyPathChanged" class="">PropertyPathChanged</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.PropertyPathChangeType.html" title="PropertyPathChangeType" class="">PropertyPathChangeType</a>
@@ -954,6 +960,18 @@
                             <a href="DuetWebServer.Middleware.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
                           </li>
                         </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Services.html" title="DuetWebServer.Services" class="">DuetWebServer.Services</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.html" title="ModelObserver" class="">ModelObserver</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.WebDirectoryChanged.html" title="ModelObserver.WebDirectoryChanged" class="">ModelObserver.WebDirectoryChanged</a>
+                          </li>
+                        </ul>  </li>
                   </ul>        </div>
               </div>
             </div>
@@ -966,7 +984,8 @@
   
   <h1 id="DuetControlServer_FileExecution_Print" data-uid="DuetControlServer.FileExecution.Print" class="text-break">Class Print
   </h1>
-  <div class="markdown level0 summary"><p>Implementation of a file being printed</p>
+  <div class="markdown level0 summary"><p>Main class dealing with file prints.
+Lock this class whenver it is accessed (except for Diagnostics)</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -1078,30 +1097,6 @@
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_FileExecution_Print_LastFilePosition_" data-uid="DuetControlServer.FileExecution.Print.LastFilePosition*"></a>
-  <h4 id="DuetControlServer_FileExecution_Print_LastFilePosition" data-uid="DuetControlServer.FileExecution.Print.LastFilePosition">LastFilePosition</h4>
-  <div class="markdown level1 summary"><p>Holds the file position after the current code being executed</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static long? LastFilePosition { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Nullable</span>&lt;<span class="xref">System.Int64</span>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_FileExecution_Print_Length_" data-uid="DuetControlServer.FileExecution.Print.Length*"></a>
   <h4 id="DuetControlServer_FileExecution_Print_Length" data-uid="DuetControlServer.FileExecution.Print.Length">Length</h4>
   <div class="markdown level1 summary"><p>Returns the length of the file being printed in bytes</p>
@@ -1122,6 +1117,30 @@
     <tbody>
       <tr>
         <td><span class="xref">System.Int64</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_FileExecution_Print_NextFilePosition_" data-uid="DuetControlServer.FileExecution.Print.NextFilePosition*"></a>
+  <h4 id="DuetControlServer_FileExecution_Print_NextFilePosition" data-uid="DuetControlServer.FileExecution.Print.NextFilePosition">NextFilePosition</h4>
+  <div class="markdown level1 summary"><p>Holds the file position after the current code being executed</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static long? NextFilePosition { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Nullable</span>&lt;<span class="xref">System.Int64</span>&gt;</td>
         <td></td>
       </tr>
     </tbody>
@@ -1159,24 +1178,8 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task Abort()</code></pre>
+    <pre><code class="lang-csharp hljs">public static void Abort()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
-        <td><p>Asynchronous task</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_FileExecution_Print_Cancel_" data-uid="DuetControlServer.FileExecution.Print.Cancel*"></a>
   <h4 id="DuetControlServer_FileExecution_Print_Cancel" data-uid="DuetControlServer.FileExecution.Print.Cancel">Cancel()</h4>
   <div class="markdown level1 summary"><p>Cancel the current print (e.g. when M0 is called)</p>
@@ -1184,24 +1187,8 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task Cancel()</code></pre>
+    <pre><code class="lang-csharp hljs">public static void Cancel()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
-        <td><p>Asynchronous task</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_FileExecution_Print_Diagnostics_" data-uid="DuetControlServer.FileExecution.Print.Diagnostics*"></a>
   <h4 id="DuetControlServer_FileExecution_Print_Diagnostics_System_Text_StringBuilder_" data-uid="DuetControlServer.FileExecution.Print.Diagnostics(System.Text.StringBuilder)">Diagnostics(StringBuilder)</h4>
   <div class="markdown level1 summary"><p>Print diagnostics of this class</p>
@@ -1245,14 +1232,39 @@
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_FileExecution_Print_OnPause_" data-uid="DuetControlServer.FileExecution.Print.OnPause*"></a>
-  <h4 id="DuetControlServer_FileExecution_Print_OnPause_System_Int64_" data-uid="DuetControlServer.FileExecution.Print.OnPause(System.Int64)">OnPause(Int64)</h4>
-  <div class="markdown level1 summary"><p>Called when the file print has been paused</p>
+  <a id="DuetControlServer_FileExecution_Print_LockAsync_" data-uid="DuetControlServer.FileExecution.Print.LockAsync*"></a>
+  <h4 id="DuetControlServer_FileExecution_Print_LockAsync" data-uid="DuetControlServer.FileExecution.Print.LockAsync">LockAsync()</h4>
+  <div class="markdown level1 summary"><p>Lock this class asynchronously</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task OnPause(long filePosition)</code></pre>
+    <pre><code class="lang-csharp hljs">public static AwaitableDisposable&lt;IDisposable&gt; LockAsync()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">Nito.AsyncEx.AwaitableDisposable</span>&lt;<span class="xref">System.IDisposable</span>&gt;</td>
+        <td><p>Disposable lock</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_FileExecution_Print_Pause_" data-uid="DuetControlServer.FileExecution.Print.Pause*"></a>
+  <h4 id="DuetControlServer_FileExecution_Print_Pause_System_Nullable_System_Int64__" data-uid="DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64})">Pause(Nullable&lt;Int64&gt;)</h4>
+  <div class="markdown level1 summary"><p>Called when the print is being paused</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void Pause(long? filePosition = default(long? ))</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1265,51 +1277,9 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Int64</span></td>
+        <td><span class="xref">System.Nullable</span>&lt;<span class="xref">System.Int64</span>&gt;</td>
         <td><span class="parametername">filePosition</span></td>
-        <td><p>Position at which the file was paused</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
-        <td><p>Asynchronous task</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_FileExecution_Print_Pause_" data-uid="DuetControlServer.FileExecution.Print.Pause*"></a>
-  <h4 id="DuetControlServer_FileExecution_Print_Pause" data-uid="DuetControlServer.FileExecution.Print.Pause">Pause()</h4>
-  <div class="markdown level1 summary"><p>Called when the print is being paused</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task Pause()</code></pre>
-  </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
-        <td><p>Asynchronous task</p>
-</td>
+        <td></td>
       </tr>
     </tbody>
   </table>
@@ -1322,6 +1292,30 @@
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static void Resume()</code></pre>
   </div>
+  <a id="DuetControlServer_FileExecution_Print_Run_" data-uid="DuetControlServer.FileExecution.Print.Run*"></a>
+  <h4 id="DuetControlServer_FileExecution_Print_Run" data-uid="DuetControlServer.FileExecution.Print.Run">Run()</h4>
+  <div class="markdown level1 summary"><p>Perform actual print jobs</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task Run()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_FileExecution_Print_Start_" data-uid="DuetControlServer.FileExecution.Print.Start*"></a>
   <h4 id="DuetControlServer_FileExecution_Print_Start_System_String_DuetAPI_CodeChannel_" data-uid="DuetControlServer.FileExecution.Print.Start(System.String,DuetAPI.CodeChannel)">Start(String, CodeChannel)</h4>
   <div class="markdown level1 summary"><p>Begin a file print</p>

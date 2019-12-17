@@ -11,6 +11,11 @@ namespace DuetControlServer.Codes
     public static class GCodes
     {
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// Process a G-code that should be interpreted by the control server
         /// </summary>
         /// <param name="code">Code to process</param>
@@ -19,7 +24,7 @@ namespace DuetControlServer.Codes
         {
             switch (code.MajorNumber)
             {
-                // Load heightmap
+                // Save or load heightmap
                 case 29:
                     CodeParameter cp = code.Parameter('S', 0);
                     if (cp == 1 || cp == 3)
@@ -27,7 +32,8 @@ namespace DuetControlServer.Codes
                         if (await SPI.Interface.Flush(code.Channel))
                         {
                             string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
-                            string physicalFile = await FilePath.ToPhysicalAsync(file, "sys");
+                            string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.System);
+
                             try
                             {
                                 Heightmap map = null;
@@ -67,6 +73,7 @@ namespace DuetControlServer.Codes
                             }
                             catch (Exception e)
                             {
+                                _logger.Debug(e, "Failed to access height map file");
                                 if (e is AggregateException ae)
                                 {
                                     e = ae.InnerException;
@@ -137,7 +144,8 @@ namespace DuetControlServer.Codes
                     if (code.Parameter('S', 0) == 0)
                     {
                         string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
-                        string physicalFile = await FilePath.ToPhysicalAsync(file, "sys");
+                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.System);
+
                         try
                         {
                             if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
@@ -158,6 +166,7 @@ namespace DuetControlServer.Codes
                         }
                         catch (Exception e)
                         {
+                            _logger.Debug(e, "Failed to access height map file");
                             if (e is AggregateException ae)
                             {
                                 e = ae.InnerException;

@@ -51,7 +51,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Code channel to send this code to
         /// </summary>
-        public CodeChannel Channel { get; set; } = Defaults.Channel;
+        public virtual CodeChannel Channel { get; set; } = Defaults.Channel;
 
         /// <summary>
         /// Line number of this code
@@ -98,9 +98,14 @@ namespace DuetAPI.Commands
         public string Comment { get; set; }
 
         /// <summary>
-        /// File position in bytes (optional)
+        /// File position of this code in bytes (optional)
         /// </summary>
         public long? FilePosition { get; set; }
+
+        /// <summary>
+        /// Length of the original code in bytes (optional)
+        /// </summary>
+        public int? Length { get; set; }
 
         /// <summary>
         /// List of parsed code parameters (see <see cref="CodeParameter"/> for further information)
@@ -109,7 +114,7 @@ namespace DuetAPI.Commands
         public List<CodeParameter> Parameters { get; set; } = new List<CodeParameter>();
 
         /// <summary>
-        /// Retrieve the parameter whose letter equals c. Note that this look-up is case-sensitive!
+        /// Retrieve the parameter whose letter equals c. Note that this look-up is case-insensitive
         /// </summary>
         /// <param name="c">Letter of the parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
@@ -128,12 +133,21 @@ namespace DuetAPI.Commands
         public CodeParameter Parameter(char c, object defaultValue) => Parameter(c) ?? new CodeParameter(c, defaultValue);
 
         /// <summary>
-        /// Reconstruct an unprecedented string from the parameter list
+        /// Reconstruct an unprecedented string from the parameter list or
+        /// retrieve the parameter which does not have a letter assigned
         /// </summary>
         /// <param name="quoteStrings">Encapsulate strings in double quotes</param>
         /// <returns>Unprecedented string</returns>
         public string GetUnprecedentedString(bool quoteStrings = false)
         {
+            foreach (CodeParameter p in Parameters)
+            {
+                if (p.Letter == '\0')
+                {
+                    return p;
+                }
+            }
+
             StringBuilder builder = new StringBuilder();
             foreach (CodeParameter p in Parameters)
             {
@@ -141,10 +155,7 @@ namespace DuetAPI.Commands
                 {
                     builder.Append(' ');
                 }
-                if (p.Letter != '\0')
-                {
-                    builder.Append(p.Letter);
-                }
+                builder.Append(p.Letter);
                 if (quoteStrings && p.Type == typeof(string))
                 {
                     builder.Append('"');
@@ -197,7 +208,7 @@ namespace DuetAPI.Commands
             // If this code has finished, append the code result
             if (Result != null && !Result.IsEmpty)
             {
-                builder.AppendLine();
+                builder.Append(" => ");
                 builder.Append(Result.ToString().TrimEnd());
             }
 

@@ -4,7 +4,7 @@ using NUnit.Framework;
 using System;
 using System.IO;
 
-namespace DuetUnitTest.File
+namespace UnitTests.File
 {
     [TestFixture]
     public class Config

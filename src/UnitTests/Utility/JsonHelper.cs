@@ -3,7 +3,7 @@ using DuetAPI.Utility;
 using NUnit.Framework;
 using System.Text.Json;
 
-namespace DuetUnitTest.Utility
+namespace UnitTests.Utility
 {
     [TestFixture]
     public class Json

@@ -285,6 +285,9 @@
                             <a href="DuetAPI.Machine.CurrentMove.html" title="CurrentMove" class="">CurrentMove</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.Directories.html" title="Directories" class="">Directories</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.Drive.html" title="Drive" class="">Drive</a>
                           </li>
                           <li class="">
@@ -522,6 +525,9 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.FileDirectory.html" title="FileDirectory" class="">FileDirectory</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.FileInfoParser.html" title="FileInfoParser" class="">FileInfoParser</a>
                           </li>
                           <li class="active">
@@ -678,6 +684,9 @@
                             <a href="DuetControlServer.Model.Observer.html" title="Observer" class="">Observer</a>
                           </li>
                           <li class="">
+                            <a href="DuetControlServer.Model.Observer.PropertyPathChanged.html" title="Observer.PropertyPathChanged" class="">Observer.PropertyPathChanged</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.Model.Output.html" title="Output" class="">Output</a>
                           </li>
                           <li class="">
@@ -691,9 +700,6 @@
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.ProbeItem.html" title="ProbeItem" class="">ProbeItem</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.Model.PropertyPathChanged.html" title="PropertyPathChanged" class="">PropertyPathChanged</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.PropertyPathChangeType.html" title="PropertyPathChangeType" class="">PropertyPathChangeType</a>
@@ -954,6 +960,18 @@
                             <a href="DuetWebServer.Middleware.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
                           </li>
                         </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Services.html" title="DuetWebServer.Services" class="">DuetWebServer.Services</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.html" title="ModelObserver" class="">ModelObserver</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.WebDirectoryChanged.html" title="ModelObserver.WebDirectoryChanged" class="">ModelObserver.WebDirectoryChanged</a>
+                          </li>
+                        </ul>  </li>
                   </ul>        </div>
               </div>
             </div>
@@ -1146,15 +1164,15 @@
   </table>
   <h3 id="methods">Methods
   </h3>
-  <a id="DuetControlServer_FilePath_ToPhysical_" data-uid="DuetControlServer.FilePath.ToPhysical*"></a>
-  <h4 id="DuetControlServer_FilePath_ToPhysical_System_String_System_String_" data-uid="DuetControlServer.FilePath.ToPhysical(System.String,System.String)">ToPhysical(String, String)</h4>
-  <div class="markdown level1 summary"><p>Resolve a RepRapFirmware/FatFs-style file path to a physical file path.
-The first drive (0:/) is reserved for usage with the base directory as specified in the settings.</p>
+  <a id="DuetControlServer_FilePath_ToPhysicalAsync_" data-uid="DuetControlServer.FilePath.ToPhysicalAsync*"></a>
+  <h4 id="DuetControlServer_FilePath_ToPhysicalAsync_System_String_DuetControlServer_FileDirectory_" data-uid="DuetControlServer.FilePath.ToPhysicalAsync(System.String,DuetControlServer.FileDirectory)">ToPhysicalAsync(String, FileDirectory)</h4>
+  <div class="markdown level1 summary"><p>Resolve a RepRapFirmware/FatFs-style file path to a physical file path asynchronously.
+The first drive (0:/) is reserved for usage with the base directory as specified in the settings</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static string ToPhysical(string filePath, string directory = null)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;string&gt; ToPhysicalAsync(string filePath, FileDirectory directory)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1173,9 +1191,9 @@ The first drive (0:/) is reserved for usage with the base directory as specified
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.String</span></td>
+        <td><a class="xref" href="DuetControlServer.FileDirectory.html">FileDirectory</a></td>
         <td><span class="parametername">directory</span></td>
-        <td><p>Directory of the file path if none is specified</p>
+        <td><p>Directory containing filePath if it is not absolute is specified</p>
 </td>
       </tr>
     </tbody>
@@ -1190,7 +1208,7 @@ The first drive (0:/) is reserved for usage with the base directory as specified
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.String</span></td>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.String</span>&gt;</td>
         <td><p>Resolved file path</p>
 </td>
       </tr>
@@ -1225,7 +1243,7 @@ The first drive (0:/) is reserved for usage with the base directory as specified
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">directory</span></td>
-        <td><p>Directory of the file path if none is specified</p>
+        <td><p>Directory containing filePath if it is not absolute is specified</p>
 </td>
       </tr>
     </tbody>
@@ -1241,50 +1259,6 @@ The first drive (0:/) is reserved for usage with the base directory as specified
     <tbody>
       <tr>
         <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.String</span>&gt;</td>
-        <td><p>Resolved file path</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_FilePath_ToVirtual_" data-uid="DuetControlServer.FilePath.ToVirtual*"></a>
-  <h4 id="DuetControlServer_FilePath_ToVirtual_System_String_" data-uid="DuetControlServer.FilePath.ToVirtual(System.String)">ToVirtual(String)</h4>
-  <div class="markdown level1 summary"><p>Convert a physical ile path to a RRF-style file path.
-The first drive (0:/) is reserved for usage with the base directory as specified in the settings.</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static string ToVirtual(string filePath)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">filePath</span></td>
-        <td><p>File path to convert</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.String</span></td>
         <td><p>Resolved file path</p>
 </td>
       </tr>

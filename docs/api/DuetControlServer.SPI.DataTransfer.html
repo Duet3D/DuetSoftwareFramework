@@ -285,6 +285,9 @@
                             <a href="DuetAPI.Machine.CurrentMove.html" title="CurrentMove" class="">CurrentMove</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.Directories.html" title="Directories" class="">Directories</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.Drive.html" title="Drive" class="">Drive</a>
                           </li>
                           <li class="">
@@ -522,6 +525,9 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.FileDirectory.html" title="FileDirectory" class="">FileDirectory</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.FileInfoParser.html" title="FileInfoParser" class="">FileInfoParser</a>
                           </li>
                           <li class="">
@@ -678,6 +684,9 @@
                             <a href="DuetControlServer.Model.Observer.html" title="Observer" class="">Observer</a>
                           </li>
                           <li class="">
+                            <a href="DuetControlServer.Model.Observer.PropertyPathChanged.html" title="Observer.PropertyPathChanged" class="">Observer.PropertyPathChanged</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.Model.Output.html" title="Output" class="">Output</a>
                           </li>
                           <li class="">
@@ -691,9 +700,6 @@
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.ProbeItem.html" title="ProbeItem" class="">ProbeItem</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.Model.PropertyPathChanged.html" title="PropertyPathChanged" class="">PropertyPathChanged</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.PropertyPathChangeType.html" title="PropertyPathChangeType" class="">PropertyPathChangeType</a>
@@ -954,6 +960,18 @@
                             <a href="DuetWebServer.Middleware.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
                           </li>
                         </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Services.html" title="DuetWebServer.Services" class="">DuetWebServer.Services</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.html" title="ModelObserver" class="">ModelObserver</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.WebDirectoryChanged.html" title="ModelObserver.WebDirectoryChanged" class="">ModelObserver.WebDirectoryChanged</a>
+                          </li>
+                        </ul>  </li>
                   </ul>        </div>
               </div>
             </div>
@@ -1030,6 +1048,30 @@
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_SPI_DataTransfer_Updating_" data-uid="DuetControlServer.SPI.DataTransfer.Updating*"></a>
+  <h4 id="DuetControlServer_SPI_DataTransfer_Updating" data-uid="DuetControlServer.SPI.DataTransfer.Updating">Updating</h4>
+  <div class="markdown level1 summary"><p>Indicates if an update is in progress</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool Updating { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="methods">Methods
   </h3>
   <a id="DuetControlServer_SPI_DataTransfer_Diagnostics_" data-uid="DuetControlServer.SPI.DataTransfer.Diagnostics*"></a>
@@ -1075,7 +1117,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static bool FlashFirmwareSegment(Stream stream)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; FlashFirmwareSegment(Stream stream)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1105,7 +1147,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
         <td><p>Whether another segment could be sent</p>
 </td>
       </tr>
@@ -1195,7 +1237,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static bool PerformFullTransfer(bool mustSucceed = true)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; PerformFullTransfer(bool mustSucceed = true)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1225,7 +1267,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
         <td><p>Whether new data could be transferred</p>
 </td>
       </tr>
@@ -1632,8 +1674,24 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void StartIap()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task StartIap()</code></pre>
   </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_DataTransfer_VerifyFirmwareChecksum_" data-uid="DuetControlServer.SPI.DataTransfer.VerifyFirmwareChecksum*"></a>
   <h4 id="DuetControlServer_SPI_DataTransfer_VerifyFirmwareChecksum_System_Int64_System_UInt16_" data-uid="DuetControlServer.SPI.DataTransfer.VerifyFirmwareChecksum(System.Int64,System.UInt16)">VerifyFirmwareChecksum(Int64, UInt16)</h4>
   <div class="markdown level1 summary"><p>Send the CRC16 checksum of the firmware binary to the IAP program and verify the written data</p>
@@ -1641,7 +1699,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; VerifyFirmwareChecksum(long firmwareLength, ushort crc16)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1677,7 +1735,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
         <td><p>Whether the firmware has been written successfully</p>
 </td>
       </tr>

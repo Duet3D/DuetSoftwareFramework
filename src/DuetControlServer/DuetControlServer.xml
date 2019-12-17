@@ -9,6 +9,11 @@
             Static class that processes G-codes in the control server
             </summary>
         </member>
+        <member name="F:DuetControlServer.Codes.GCodes._logger">
+            <summary>
+            Logger instance
+            </summary>
+        </member>
         <member name="M:DuetControlServer.Codes.GCodes.Process(DuetAPI.Commands.Code)">
             <summary>
             Process a G-code that should be interpreted by the control server
@@ -27,6 +32,16 @@
         <member name="T:DuetControlServer.Codes.MCodes">
             <summary>
             Static class that processes M-codes in the control server
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Codes.MCodes._logger">
+            <summary>
+            Logger instance
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Codes.MCodes._fileToPrintLock">
+            <summary>
+            Lock for <see cref="F:DuetControlServer.Codes.MCodes._fileToPrint"/>
             </summary>
         </member>
         <member name="F:DuetControlServer.Codes.MCodes._fileToPrint">
@@ -119,17 +134,21 @@
             Logger instance
             </summary>
         </member>
-        <member name="F:DuetControlServer.Commands.Code._codeTickets">
+        <member name="F:DuetControlServer.Commands.Code._codeChannelLocks">
             <summary>
             Queue of semaphores to guarantee the ordered execution of incoming G/M/T-codes
             </summary>
+            <remarks>
+            AsyncLock implements an internal waiter queue, so it is safe to rely on it for
+            maintaining the right order of codes being executed per code channel
+            </remarks>
         </member>
         <member name="F:DuetControlServer.Commands.Code._cancellationTokenSources">
             <summary>
             List of cancellation tokens to cancel pending codes while they are waiting for their execution
             </summary>
         </member>
-        <member name="M:DuetControlServer.Commands.Code.InitScheduler">
+        <member name="M:DuetControlServer.Commands.Code.Init">
             <summary>
             Initialize the code scheduler
             </summary>
@@ -140,23 +159,22 @@
             </summary>
             <param name="channel">Channel to cancel codes from</param>
         </member>
-        <member name="M:DuetControlServer.Commands.Code.GetTicket">
+        <member name="F:DuetControlServer.Commands.Code._codeChannelLock">
             <summary>
-            Get the next ticket for a code being enqueued for execution
+            Lock that is maintained as long as this code blocks the execution of the next code
             </summary>
-            <returns>Ticket semaphore</returns>
         </member>
-        <member name="M:DuetControlServer.Commands.Code.WaitForExecution(Nito.AsyncEx.AsyncSemaphore)">
+        <member name="F:DuetControlServer.Commands.Code._cancellationToken">
             <summary>
-            Wait until the given ticket flags readiness for the next code to be executed
+            Copy of the cancellation token at the time this code is created
             </summary>
-            <param name="ticket">Ticket to wait for</param>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.WaitForExecution">
+            <summary>
+            Wait until this code can be executed
+            </summary>
             <returns>Asynchronous task</returns>
-        </member>
-        <member name="F:DuetControlServer.Commands.Code.nextCodeStarted">
-            <summary>
-            Indicates if this code has already started the next one
-            </summary>
+            <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
         </member>
         <member name="M:DuetControlServer.Commands.Code.StartNextCode">
             <summary>
@@ -174,6 +192,11 @@
             </summary>
             <param name="code">G/M/T-Code</param>
         </member>
+        <member name="P:DuetControlServer.Commands.Code.Channel">
+            <summary>
+            Overridden code channel property to upate the cancellation token when necessary
+            </summary>
+        </member>
         <member name="P:DuetControlServer.Commands.Code.InternallyProcessed">
             <summary>
             Indicates whether the code has been internally processed
@@ -185,6 +208,12 @@
             </summary>
             <returns>Result of the code</returns>
             <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.Process">
+            <summary>
+            Process the code
+            </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.Commands.Flush">
             <summary>
@@ -222,6 +251,11 @@
         <member name="T:DuetControlServer.Commands.LockMachineModel">
             <summary>
             Implementation of the <see cref="T:DuetAPI.Commands.LockMachineModel"/> command
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Commands.LockMachineModel.SourceConnection">
+            <summary>
+            Source connection of this command. Needed to register the owner of the lock
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.LockMachineModel.Execute">
@@ -284,10 +318,21 @@
             Locks to avoid race conditions when executing multiple text-based codes via the same channel
             </summary>
         </member>
-        <member name="M:DuetControlServer.Commands.SimpleCode.#ctor">
+        <member name="M:DuetControlServer.Commands.SimpleCode.Init">
             <summary>
-            Creates a new instance
+            Initialize this class
             </summary>
+        </member>
+        <member name="P:DuetControlServer.Commands.SimpleCode.SourceConnection">
+            <summary>
+            Source connection of this command
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.SimpleCode.Parse">
+            <summary>
+            Parse codes from the given input string
+            </summary>
+            <returns>Parsed G/M/T-codes</returns>
         </member>
         <member name="M:DuetControlServer.Commands.SimpleCode.Execute">
             <summary>
@@ -295,13 +340,6 @@
             </summary>
             <returns>Code result as text</returns>
             <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
-        </member>
-        <member name="M:DuetControlServer.Commands.SimpleCode.ParseMultiple(System.String)">
-            <summary>
-            Parse multiple codes from the given input string
-            </summary>
-            <param name="codeString">Codes to parse</param>
-            <returns>Enumeration of parsed G/M/T-codes</returns>
         </member>
         <member name="T:DuetControlServer.Commands.SyncMachineModel">
             <summary>
@@ -317,6 +355,11 @@
         <member name="T:DuetControlServer.Commands.UnlockMachineModel">
             <summary>
             Implementation of the <see cref="T:DuetAPI.Commands.UnlockMachineModel"/> command
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Commands.UnlockMachineModel.SourceConnection">
+            <summary>
+            Source connection of this command. Needed to register the owner of the lock
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.UnlockMachineModel.Execute">
@@ -445,6 +488,11 @@
             Logger instance
             </summary>
         </member>
+        <member name="P:DuetControlServer.FileExecution.MacroFile.RunningConfig">
+            <summary>
+            Indicates if config.g is being processed
+            </summary>
+        </member>
         <member name="F:DuetControlServer.FileExecution.MacroFile._extraStep">
             <summary>
             Current extra step being performed (provided config.g is being executed)
@@ -473,6 +521,12 @@
             <param name="channel">Channel to send the codes to</param>
             <param name="startCode">Which code is starting this macro file</param>
         </member>
+        <member name="M:DuetControlServer.FileExecution.MacroFile.Dispose(System.Boolean)">
+            <summary>
+            Called when this instance is being disposed
+            </summary>
+            <param name="disposing">True if managed resources are being disposed</param>
+        </member>
         <member name="M:DuetControlServer.FileExecution.MacroFile.Abort">
             <summary>
             Abort the execution of this file
@@ -486,7 +540,8 @@
         </member>
         <member name="T:DuetControlServer.FileExecution.Print">
             <summary>
-            Implementation of a file being printed
+            Main class dealing with file prints.
+            Lock this class whenver it is accessed (except for Diagnostics)
             </summary>
         </member>
         <member name="F:DuetControlServer.FileExecution.Print._logger">
@@ -494,59 +549,20 @@
             Logger instance
             </summary>
         </member>
-        <member name="F:DuetControlServer.FileExecution.Print._lock">
+        <member name="F:DuetControlServer.FileExecution.Print._monitor">
             <summary>
-            Lock for thread-safe access
+            Monitor for the print tasks
             </summary>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.Print.LockAsync">
+            <summary>
+            Lock this class asynchronously
+            </summary>
+            <returns>Disposable lock</returns>
         </member>
         <member name="F:DuetControlServer.FileExecution.Print._file">
             <summary>
             Job file being read from
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.FileExecution.Print._pausePosition">
-            <summary>
-            Position in bytes at which the print was paused
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.FileExecution.Print._resumeEvent">
-            <summary>
-            Event to trigger when the job is supposed to be resumed. It is also triggered after a print has been cancelled
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.FileExecution.Print.Diagnostics(System.Text.StringBuilder)">
-            <summary>
-            Print diagnostics of this class
-            </summary>
-            <param name="builder">String builder</param>
-            <returns>Asynchronous task</returns>
-        </member>
-        <member name="M:DuetControlServer.FileExecution.Print.Start(System.String,DuetAPI.CodeChannel)">
-            <summary>
-            Begin a file print
-            </summary>
-            <param name="fileName">File to print</param>
-            <param name="source">Channel that requested the file to be printed</param>
-            <returns>Code result</returns>
-        </member>
-        <member name="M:DuetControlServer.FileExecution.Print.RunPrint">
-            <summary>
-            Perform the actual print job
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.FileExecution.Print.Position">
-            <summary>
-            Reports the current file position
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.FileExecution.Print.LastFilePosition">
-            <summary>
-            Holds the file position after the current code being executed
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.FileExecution.Print.Length">
-            <summary>
-            Returns the length of the file being printed in bytes
             </summary>
         </member>
         <member name="P:DuetControlServer.FileExecution.Print.IsPrinting">
@@ -564,23 +580,45 @@
             Indicates if the file print has been aborted
             </summary>
         </member>
-        <member name="M:DuetControlServer.FileExecution.Print.Pause">
+        <member name="P:DuetControlServer.FileExecution.Print.Length">
+            <summary>
+            Returns the length of the file being printed in bytes
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.Print.Position">
+            <summary>
+            Reports the current file position
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.Print.NextFilePosition">
+            <summary>
+            Holds the file position after the current code being executed
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.Print.Start(System.String,DuetAPI.CodeChannel)">
+            <summary>
+            Begin a file print
+            </summary>
+            <param name="fileName">File to print</param>
+            <param name="source">Channel that requested the file to be printed</param>
+            <returns>Code result</returns>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.Print.Run">
+            <summary>
+            Perform actual print jobs
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64})">
             <summary>
             Called when the print is being paused
             </summary>
-            <returns>Asynchronous task</returns>
-        </member>
-        <member name="M:DuetControlServer.FileExecution.Print.OnPause(System.Int64)">
-            <summary>
-            Called when the file print has been paused
-            </summary>
-            <param name="filePosition">Position at which the file was paused</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Resume">
             <summary>
             Resume a paused print
             </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Cancel">
             <summary>
@@ -594,12 +632,19 @@
             </summary>
             <returns>Asynchronous task</returns>
         </member>
+        <member name="M:DuetControlServer.FileExecution.Print.Diagnostics(System.Text.StringBuilder)">
+            <summary>
+            Print diagnostics of this class
+            </summary>
+            <param name="builder">String builder</param>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="T:DuetControlServer.IPC.Connection">
             <summary>
             Wrapper around UNIX socket connections
             </summary>
         </member>
-        <member name="F:DuetControlServer.IPC.Connection.IdCounter">
+        <member name="F:DuetControlServer.IPC.Connection._idCounter">
             <summary>
             Counter for new connections
             </summary>
@@ -609,14 +654,14 @@
             Logger instance
             </summary>
         </member>
-        <member name="F:DuetControlServer.IPC.Connection._unixSocket">
-            <summary>
-            Socket holding the connection of the UNIX socket
-            </summary>
-        </member>
         <member name="P:DuetControlServer.IPC.Connection.Id">
             <summary>
             Identifier of this connection
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.IPC.Connection._unixSocket">
+            <summary>
+            Socket holding the connection of the UNIX socket
             </summary>
         </member>
         <member name="M:DuetControlServer.IPC.Connection.#ctor(System.Net.Sockets.Socket)">
@@ -658,6 +703,12 @@
             <param name="name">Name of the command</param>
             <returns>Type of the command or null if none found</returns>
         </member>
+        <member name="M:DuetControlServer.IPC.Connection.SetSourceConnection(DuetAPI.Commands.BaseCommand)">
+            <summary>
+            Assign the source connection to a command
+            </summary>
+            <param name="command">Deserialized command</param>
+        </member>
         <member name="M:DuetControlServer.IPC.Connection.SendResponse(System.Object)">
             <summary>
             Send a response to the client. The given object is send either in an empty, error, or standard response body
@@ -685,9 +736,14 @@
             Static class to manage read/write locks of third-party plugins
             </summary>
         </member>
-        <member name="P:DuetControlServer.IPC.LockManager.Connection">
+        <member name="F:DuetControlServer.IPC.LockManager._lockConnection">
             <summary>
             Source connection that acquired the current lock
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.IPC.LockManager.IsLocked">
+            <summary>
+            Indicates if a third-party application has locked the object model for writing
             </summary>
         </member>
         <member name="F:DuetControlServer.IPC.LockManager._lock">
@@ -702,10 +758,11 @@
             <param name="sourceConnection">Source connection acquiring the lock</param>
             <returns>Asynchronous task</returns>
         </member>
-        <member name="M:DuetControlServer.IPC.LockManager.UnlockMachineModel">
+        <member name="M:DuetControlServer.IPC.LockManager.UnlockMachineModel(System.Int32)">
             <summary>
             Unlock the machine model again
             </summary>
+            <param name="sourceConnection">Source connection</param>
         </member>
         <member name="T:DuetControlServer.IPC.Processors.Base">
             <summary>
@@ -930,18 +987,15 @@
             Static class that holds main functionality for inter-process communication
             </summary>
         </member>
-        <member name="F:DuetControlServer.IPC.Server._connectionTasks">
+        <member name="F:DuetControlServer.IPC.Server._unixSocket">
             <summary>
-            List of active client connections
+            UNIX socket for inter-process communication
             </summary>
         </member>
         <member name="M:DuetControlServer.IPC.Server.Init">
             <summary>
-            Initialize the IPC subsystem
+            Initialize the IPC subsystem and start listening for connections
             </summary>
-            <remarks>
-            This makes sure the parent directory exists but the socket file does not
-            </remarks>
         </member>
         <member name="M:DuetControlServer.IPC.Server.Run">
             <summary>
@@ -953,7 +1007,7 @@
             <summary>
             Function that is called when a new connection has been established
             </summary>
-            <param name="sock">Socket of the new connection</param>
+            <param name="socket">Socket of the new connection</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.IPC.Server.GetConnectionProcessor(DuetControlServer.IPC.Connection)">
@@ -1018,18 +1072,18 @@
             </summary>
             <remarks>If value is null, the list has been cleared, else only the added items are passed</remarks>
         </member>
-        <member name="T:DuetControlServer.Model.PropertyPathChanged">
+        <member name="T:DuetControlServer.Model.Observer">
+            <summary>
+            Static class that observes the main machine model and calls an event whenever a deep value has changed
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.Model.Observer.PropertyPathChanged">
             <summary>
             Delegate to call when a property is being changed
             </summary>
             <param name="path">Path to the value that changed</param>
             <param name="changeType">Type of the modification</param>
             <param name="value">New value</param>
-        </member>
-        <member name="T:DuetControlServer.Model.Observer">
-            <summary>
-            Static class that observes the main machine model and calls an event whenever a deep value has changed
-            </summary>
         </member>
         <member name="E:DuetControlServer.Model.Observer.OnPropertyPathChanged">
             <summary>
@@ -1089,23 +1143,35 @@
             Logger instance
             </summary>
         </member>
-        <member name="T:DuetControlServer.Model.Provider.WriterLockWrapper">
+        <member name="T:DuetControlServer.Model.Provider.LockWrapper">
             <summary>
-            Wrapper around the writer lock which notifies subscribers whenever an update has been processed
+            Wrapper around the lock which notifies subscribers whenever an update has been processed.
+            It is also able to detect the origin of model-related deadlocks
             </summary>
         </member>
-        <member name="F:DuetControlServer.Model.Provider.WriterLockWrapper._lock">
+        <member name="F:DuetControlServer.Model.Provider.LockWrapper._lock">
             <summary>
             Internal lock
             </summary>
         </member>
-        <member name="M:DuetControlServer.Model.Provider.WriterLockWrapper.#ctor(System.IDisposable)">
+        <member name="F:DuetControlServer.Model.Provider.LockWrapper._releaseCts">
+            <summary>
+            CTS to trigger when the lock is being released
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Model.Provider.LockWrapper._combinedCts">
+            <summary>
+            CTS to trigger when the lock is released or the program is being terminated
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Model.Provider.LockWrapper.#ctor(System.IDisposable,System.Boolean)">
             <summary>
             Constructor of the lock wrapper
             </summary>
-            <param name="item">Actual lock</param>
+            <param name="lockItem">Actual lock</param>
+            <param name="isWriteLock">Whether the lock is a read/write lock</param>
         </member>
-        <member name="M:DuetControlServer.Model.Provider.WriterLockWrapper.Dispose">
+        <member name="M:DuetControlServer.Model.Provider.LockWrapper.Dispose">
             <summary>
             Dipose method that is called when the lock is released
             </summary>
@@ -1120,21 +1186,9 @@
             Initialize the object model provider with values that are not expected to change
             </summary>
         </member>
-        <member name="M:DuetControlServer.Model.Provider.AccessReadOnly">
-            <summary>
-            Access the machine model for read operations only
-            </summary>
-            <returns>Disposable lock object to be used with a using directive</returns>
-        </member>
         <member name="M:DuetControlServer.Model.Provider.AccessReadOnlyAsync">
             <summary>
             Access the machine model asynchronously for read operations only
-            </summary>
-            <returns>Disposable lock object to be used with a using directive</returns>
-        </member>
-        <member name="M:DuetControlServer.Model.Provider.AccessReadWrite">
-            <summary>
-            Access the machine model for read/write operations
             </summary>
             <returns>Disposable lock object to be used with a using directive</returns>
         </member>
@@ -1425,6 +1479,12 @@
             </summary>
             <remarks>This is preliminary and will be removed from future versions</remarks>
         </member>
+        <member name="P:DuetControlServer.Settings.MaxMachineModelLockTime">
+            <summary>
+            Maximum lock time of the object model. If this time is exceeded, a deadlock is reported and the application is terminated.
+            Set this to -1 to disable the automatic deadlock detection
+            </summary>
+        </member>
         <member name="P:DuetControlServer.Settings.FileInfoReadLimitHeader">
             <summary>
             How many bytes to parse max at the beginning of a file to retrieve G-code file information (12KiB)
@@ -1656,6 +1716,11 @@
         <member name="T:DuetControlServer.SPI.ChannelStore">
             <summary>
             Class used to hold internal information about all the code channels
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.ChannelStore._channels">
+            <summary>
+            List of different channels
             </summary>
         </member>
         <member name="M:DuetControlServer.SPI.ChannelStore.#ctor">
@@ -2767,6 +2832,12 @@
             Set up the SPI device and the controller for the transfer ready pin
             </summary>
         </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.GetFullTransfersPerSecond">
+            <summary>
+            Get the nubmer of full transfers per second
+            </summary>
+            <returns>Full transfers per second</returns>
+        </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.Diagnostics(System.Text.StringBuilder)">
             <summary>
             Print diagnostics to the given string builder
@@ -2785,6 +2856,11 @@
             Check if the controller has been reset
             </summary>
             <returns>Whether the controller has been reset</returns>
+        </member>
+        <member name="P:DuetControlServer.SPI.DataTransfer.Updating">
+            <summary>
+            Indicates if an update is in progress
+            </summary>
         </member>
         <member name="P:DuetControlServer.SPI.DataTransfer.PacketsToRead">
             <summary>
@@ -2983,6 +3059,7 @@
             <summary>
             Instruct the firmware to start the IAP binary
             </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.FlashFirmwareSegment(System.IO.Stream)">
             <summary>
@@ -3019,6 +3096,52 @@
             <param name="data">File chunk data</param>
             <param name="fileLength">Total length of the file in bytes</param>
             <returns>Whether the firmware has been written successfully</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.CanWritePacket(System.Int32)">
+            <summary>
+            Checks if there is enough remaining space to accomodate a packet header plus payload data
+            </summary>
+            <param name="dataLength">Payload data length</param>
+            <returns>True if there is enough space</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.WritePacket(DuetControlServer.SPI.Communication.LinuxRequests.Request,System.Int32)">
+            <summary>
+            Write a packet
+            </summary>
+            <param name="request">Linux request to send</param>
+            <param name="dataLength">Length of the extra payload</param>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.GetWriteBuffer(System.Int32)">
+            <summary>
+            Get a span on a 4-byte bounary for writing packet data
+            </summary>
+            <param name="dataLength">Required data length</param>
+            <returns>Data span</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.WaitForTransfer">
+            <summary>
+            Wait for the Duet to flag when it is ready to transfer data
+            </summary>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.ExchangeHeader">
+            <summary>
+            Exchange the transfer header
+            </summary>
+            <returns>True on success</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.ExchangeResponse(System.UInt32)">
+            <summary>
+            Exchange a response code
+            </summary>
+            <param name="response">Response to send</param>
+            <returns>Received response</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.ExchangeData">
+            <summary>
+            Exchange the transfer body
+            </summary>
+            <returns>True on success</returns>
         </member>
         <member name="T:DuetControlServer.SPI.Interface">
             <summary>
@@ -3116,6 +3239,7 @@
             <param name="iapStream">IAP binary</param>
             <param name="firmwareStream">Firmware binary</param>
             <exception cref="T:System.InvalidOperationException">Firmware is already being updated</exception>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.AssignFilament(System.Int32,System.String)">
             <summary>
@@ -3312,6 +3436,11 @@
             Queued lock/unlock request
             </summary>
         </member>
+        <member name="F:DuetControlServer.SPI.QueuedLockRequest._tcs">
+            <summary>
+            Task completion source that completes when the lock request has been resolved
+            </summary>
+        </member>
         <member name="P:DuetControlServer.SPI.QueuedLockRequest.IsLockRequest">
             <summary>
             Indicates if this is a lock or unlock request
@@ -3346,7 +3475,6 @@
             It is expected that each data block occupies entire 4-byte blocks.
             Make sure to keep the data returned by these functions only as long as the underlying buffer is actually valid!
             </summary>
-            <remarks>Once .NET Core 3.0 is out, the performance of this can be further improved (without relying on unsafe code) by using <c>Span.AsRef()</c></remarks>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadPacketHeader(System.ReadOnlySpan{System.Byte})">
             <summary>
@@ -3612,6 +3740,34 @@
             </summary>
             <param name="tool">Tool being removed</param>
         </member>
+        <member name="M:DuetControlServer.Utility.FilamentManager.ToolPropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)">
+            <summary>
+            Called when a tool property has changed
+            </summary>
+            <param name="sender">Changed tool</param>
+            <param name="e">Information about the changed property</param>
+        </member>
+        <member name="M:DuetControlServer.Utility.FilamentManager.UpdateTool(DuetAPI.Machine.Tool)">
+            <summary>
+            Update the filament assigned to a tool
+            </summary>
+            <param name="tool">Tool to update</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.Utility.FilamentManager.LoadMapping(System.String)">
+            <summary>
+            Load the filament mapping from a filaments CSV file
+            </summary>
+            <param name="filename">Path to the file</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.Utility.FilamentManager.SaveMapping(System.String)">
+            <summary>
+            Save the filament mapping to a file
+            </summary>
+            <param name="filename">Path to the file</param>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="T:DuetControlServer.Utility.Logger">
             <summary>
             Class for message logging
@@ -3719,6 +3875,60 @@
             <param name="fileName">File to analyze</param>
             <returns>Information about the file</returns>
         </member>
+        <member name="T:DuetControlServer.FileInfoParser.ReadLineFromEndResult">
+            <summary>
+            Result for wrapping the buffer pointer because ref parameters are not supported for async functions
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.FileInfoParser.ReadLineFromEndResult.Line">
+            <summary>
+            Read line
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.FileInfoParser.ReadLineFromEndResult.BufferPointer">
+            <summary>
+            New pointer in the buffer
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.FileInfoParser.ReadLineFromEndAsync(System.IO.StreamReader,System.Char[],System.Int32)">
+            <summary>
+            Read another line from the end of a file
+            </summary>
+            <param name="reader">Stream reader</param>
+            <param name="buffer">Internal buffer</param>
+            <param name="bufferPointer">Pointer to the next byte in the buffer</param>
+            <returns>Read result</returns>
+        </member>
+        <member name="T:DuetControlServer.FileDirectory">
+            <summary>
+            Shortcut for ToPhysicalAsync() to avoid multiple nested locks
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.FileDirectory.Filaments">
+            <summary>
+            Filaments directory
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.FileDirectory.GCodes">
+            <summary>
+            GCodes directory
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.FileDirectory.Macros">
+            <summary>
+            Macros directory
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.FileDirectory.System">
+            <summary>
+            System directory
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.FileDirectory.WWW">
+            <summary>
+            WWW directory
+            </summary>
+        </member>
         <member name="T:DuetControlServer.FilePath">
             <summary>
             Static class used to provide functions for file path resolution
@@ -3754,13 +3964,13 @@
             Macro file to run when a file print is being started
             </summary>
         </member>
-        <member name="M:DuetControlServer.FilePath.ToPhysical(System.String,System.String)">
+        <member name="M:DuetControlServer.FilePath.ToPhysicalAsync(System.String,DuetControlServer.FileDirectory)">
             <summary>
-            Resolve a RepRapFirmware/FatFs-style file path to a physical file path.
-            The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
+            Resolve a RepRapFirmware/FatFs-style file path to a physical file path asynchronously.
+            The first drive (0:/) is reserved for usage with the base directory as specified in the settings
             </summary>
             <param name="filePath">File path to resolve</param>
-            <param name="directory">Directory of the file path if none is specified</param>
+            <param name="directory">Directory containing filePath if it is not absolute is specified</param>
             <returns>Resolved file path</returns>
         </member>
         <member name="M:DuetControlServer.FilePath.ToPhysicalAsync(System.String,System.String)">
@@ -3769,15 +3979,7 @@
             The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
             </summary>
             <param name="filePath">File path to resolve</param>
-            <param name="directory">Directory of the file path if none is specified</param>
-            <returns>Resolved file path</returns>
-        </member>
-        <member name="M:DuetControlServer.FilePath.ToVirtual(System.String)">
-            <summary>
-            Convert a physical ile path to a RRF-style file path.
-            The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
-            </summary>
-            <param name="filePath">File path to convert</param>
+            <param name="directory">Directory containing filePath if it is not absolute is specified</param>
             <returns>Resolved file path</returns>
         </member>
         <member name="M:DuetControlServer.FilePath.ToVirtualAsync(System.String)">

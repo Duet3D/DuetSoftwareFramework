@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace DuetAPI.Commands
 {
@@ -31,20 +32,24 @@ namespace DuetAPI.Commands
             bool readingAtStart = true, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
             bool wasQuoted = false, wasExpression = false;
 
+            Encoding encoding = (reader is StreamReader sr) ? sr.CurrentEncoding : Encoding.UTF8;
+            result.Length = 0;
             do
             {
+                // Read the next character
                 int currentChar = reader.Read();
-                if (currentChar == '\n' && !hadLineNumber && result.LineNumber.HasValue)
-                {
-                    // Keep track of the line number (if possible)
-                    result.LineNumber++;
-                }
-
                 c = (currentChar < 0) ? '\n' : (char)currentChar;
+                result.Length += encoding.GetByteCount(new char[] { c });
+
                 if (c == '\r')
                 {
                     // Ignore CR
                     continue;
+                }
+                if (currentChar == '\n' && !hadLineNumber && result.LineNumber.HasValue)
+                {
+                    // Keep track of the line number (if possible)
+                    result.LineNumber++;
                 }
 
                 if (inFinalComment)
@@ -143,6 +148,7 @@ namespace DuetAPI.Commands
                                 // Treat subsequent double quotes as a single quote char
                                 value += '"';
                                 reader.Read();
+                                result.Length++;
                             }
                             else
                             {
@@ -195,6 +201,10 @@ namespace DuetAPI.Commands
                     isLineNumber = (char.ToUpperInvariant(c) == 'N');
                     if (char.IsWhiteSpace(c) && c != '\n')
                     {
+                        if (result.Indent == byte.MaxValue)
+                        {
+                            throw new CodeParserException("Indentation too big");
+                        }
                         result.Indent++;
                     }
                     else

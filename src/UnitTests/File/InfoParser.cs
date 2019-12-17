@@ -5,7 +5,7 @@ using DuetControlServer;
 using Newtonsoft.Json;
 using NUnit.Framework;
 
-namespace DuetUnitTest.File
+namespace UnitTests.File
 {
     [TestFixture]
     public class InfoParser
@@ -44,7 +44,7 @@ namespace DuetUnitTest.File
             Assert.IsNotNull(info.FileName);
             Assert.AreNotEqual(0, info.Size);
             Assert.IsNotNull(info.LastModified);
-            Assert.AreEqual(0, info.Height);
+            Assert.AreEqual(0.5, info.Height);
             Assert.AreEqual(0.5, info.FirstLayerHeight);
             Assert.AreEqual(0, info.LayerHeight);
             Assert.AreEqual(0, info.Filament.Count);

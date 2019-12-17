@@ -15,6 +15,11 @@ namespace DuetAPI.Machine
         public Channels Channels { get; private set; } = new Channels();
 
         /// <summary>
+        /// Information about the individual directories
+        /// </summary>
+        public Directories Directories { get; private set; } = new Directories();
+
+        /// <summary>
         /// Information about the main and expansion boards
         /// </summary>
         public Electronics Electronics { get; private set; } = new Electronics();
@@ -130,6 +135,7 @@ namespace DuetAPI.Machine
             }
 
             Channels.Assign(other.Channels);
+            Directories.Assign(other.Directories);
             Electronics.Assign(other.Electronics);
             ListHelpers.AssignList(Fans, other.Fans);
             Heat.Assign(other.Heat);
@@ -159,6 +165,7 @@ namespace DuetAPI.Machine
             MachineModel clone = new MachineModel
             {
                 Channels = (Channels)Channels.Clone(),
+                Directories = (Directories)Directories.Clone(),
                 Electronics = (Electronics)Electronics.Clone(),
                 Heat = (Heat)Heat.Clone(),
                 Job = (Job)Job.Clone(),

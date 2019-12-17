@@ -151,6 +151,12 @@ namespace DuetControlServer
         public static double ModelUpdateInterval { get; set; } = 125.0;
 
         /// <summary>
+        /// Maximum lock time of the object model. If this time is exceeded, a deadlock is reported and the application is terminated.
+        /// Set this to -1 to disable the automatic deadlock detection
+        /// </summary>
+        public static int MaxMachineModelLockTime { get; set; } = -1;
+
+        /// <summary>
         /// How many bytes to parse max at the beginning of a file to retrieve G-code file information (12KiB)
         /// </summary>
         public static uint FileInfoReadLimitHeader { get; set; } = 12288;
@@ -319,6 +325,10 @@ namespace DuetControlServer
                 else if (lastArg == "-b" || lastArg == "--base-directory")
                 {
                     BaseDirectory = arg;
+                }
+                else if (arg == "-u" || lastArg == "--update")
+                {
+                    UpdateOnly = true;
                 }
                 else if (arg == "--no-spi-task")
                 {

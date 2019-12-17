@@ -233,19 +233,6 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Commands.BaseCommand.Invoke
   nameWithType: BaseCommand.Invoke
-- uid: DuetAPI.Commands.BaseCommand.SourceConnection
-  name: SourceConnection
-  href: api/DuetAPI.Commands.BaseCommand.html#DuetAPI_Commands_BaseCommand_SourceConnection
-  commentId: P:DuetAPI.Commands.BaseCommand.SourceConnection
-  fullName: DuetAPI.Commands.BaseCommand.SourceConnection
-  nameWithType: BaseCommand.SourceConnection
-- uid: DuetAPI.Commands.BaseCommand.SourceConnection*
-  name: SourceConnection
-  href: api/DuetAPI.Commands.BaseCommand.html#DuetAPI_Commands_BaseCommand_SourceConnection_
-  commentId: Overload:DuetAPI.Commands.BaseCommand.SourceConnection
-  isSpec: "True"
-  fullName: DuetAPI.Commands.BaseCommand.SourceConnection
-  nameWithType: BaseCommand.SourceConnection
 - uid: DuetAPI.Commands.BaseResponse
   name: BaseResponse
   href: api/DuetAPI.Commands.BaseResponse.html
@@ -400,6 +387,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Commands.Code.KeywordArgument
   nameWithType: Code.KeywordArgument
+- uid: DuetAPI.Commands.Code.Length
+  name: Length
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Length
+  commentId: P:DuetAPI.Commands.Code.Length
+  fullName: DuetAPI.Commands.Code.Length
+  nameWithType: Code.Length
+- uid: DuetAPI.Commands.Code.Length*
+  name: Length
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Length_
+  commentId: Overload:DuetAPI.Commands.Code.Length
+  isSpec: "True"
+  fullName: DuetAPI.Commands.Code.Length
+  nameWithType: Code.Length
 - uid: DuetAPI.Commands.Code.LineNumber
   name: LineNumber
   href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_LineNumber
@@ -500,6 +500,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Commands.Code.Result
   nameWithType: Code.Result
+- uid: DuetAPI.Commands.Code.SourceConnection
+  name: SourceConnection
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_SourceConnection
+  commentId: P:DuetAPI.Commands.Code.SourceConnection
+  fullName: DuetAPI.Commands.Code.SourceConnection
+  nameWithType: Code.SourceConnection
+- uid: DuetAPI.Commands.Code.SourceConnection*
+  name: SourceConnection
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_SourceConnection_
+  commentId: Overload:DuetAPI.Commands.Code.SourceConnection
+  isSpec: "True"
+  fullName: DuetAPI.Commands.Code.SourceConnection
+  nameWithType: Code.SourceConnection
 - uid: DuetAPI.Commands.Code.ToShortString
   name: ToShortString()
   href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_ToShortString
@@ -2654,6 +2667,12 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Channels.Telnet
   nameWithType: Channels.Telnet
+- uid: DuetAPI.Machine.Channels.Total
+  name: Total
+  href: api/DuetAPI.Machine.Channels.html#DuetAPI_Machine_Channels_Total
+  commentId: F:DuetAPI.Machine.Channels.Total
+  fullName: DuetAPI.Machine.Channels.Total
+  nameWithType: Channels.Total
 - uid: DuetAPI.Machine.Channels.USB
   name: USB
   href: api/DuetAPI.Machine.Channels.html#DuetAPI_Machine_Channels_USB
@@ -2779,6 +2798,109 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.CurrentMove.TopSpeed
   nameWithType: CurrentMove.TopSpeed
+- uid: DuetAPI.Machine.Directories
+  name: Directories
+  href: api/DuetAPI.Machine.Directories.html
+  commentId: T:DuetAPI.Machine.Directories
+  fullName: DuetAPI.Machine.Directories
+  nameWithType: Directories
+- uid: DuetAPI.Machine.Directories.Assign(System.Object)
+  name: Assign(Object)
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_Assign_System_Object_
+  commentId: M:DuetAPI.Machine.Directories.Assign(System.Object)
+  fullName: DuetAPI.Machine.Directories.Assign(System.Object)
+  nameWithType: Directories.Assign(Object)
+- uid: DuetAPI.Machine.Directories.Assign*
+  name: Assign
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_Assign_
+  commentId: Overload:DuetAPI.Machine.Directories.Assign
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Directories.Assign
+  nameWithType: Directories.Assign
+- uid: DuetAPI.Machine.Directories.Clone
+  name: Clone()
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_Clone
+  commentId: M:DuetAPI.Machine.Directories.Clone
+  fullName: DuetAPI.Machine.Directories.Clone()
+  nameWithType: Directories.Clone()
+- uid: DuetAPI.Machine.Directories.Clone*
+  name: Clone
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_Clone_
+  commentId: Overload:DuetAPI.Machine.Directories.Clone
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Directories.Clone
+  nameWithType: Directories.Clone
+- uid: DuetAPI.Machine.Directories.Filaments
+  name: Filaments
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_Filaments
+  commentId: P:DuetAPI.Machine.Directories.Filaments
+  fullName: DuetAPI.Machine.Directories.Filaments
+  nameWithType: Directories.Filaments
+- uid: DuetAPI.Machine.Directories.Filaments*
+  name: Filaments
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_Filaments_
+  commentId: Overload:DuetAPI.Machine.Directories.Filaments
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Directories.Filaments
+  nameWithType: Directories.Filaments
+- uid: DuetAPI.Machine.Directories.GCodes
+  name: GCodes
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_GCodes
+  commentId: P:DuetAPI.Machine.Directories.GCodes
+  fullName: DuetAPI.Machine.Directories.GCodes
+  nameWithType: Directories.GCodes
+- uid: DuetAPI.Machine.Directories.GCodes*
+  name: GCodes
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_GCodes_
+  commentId: Overload:DuetAPI.Machine.Directories.GCodes
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Directories.GCodes
+  nameWithType: Directories.GCodes
+- uid: DuetAPI.Machine.Directories.Macros
+  name: Macros
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_Macros
+  commentId: P:DuetAPI.Machine.Directories.Macros
+  fullName: DuetAPI.Machine.Directories.Macros
+  nameWithType: Directories.Macros
+- uid: DuetAPI.Machine.Directories.Macros*
+  name: Macros
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_Macros_
+  commentId: Overload:DuetAPI.Machine.Directories.Macros
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Directories.Macros
+  nameWithType: Directories.Macros
+- uid: DuetAPI.Machine.Directories.PropertyChanged
+  name: PropertyChanged
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_PropertyChanged
+  commentId: E:DuetAPI.Machine.Directories.PropertyChanged
+  fullName: DuetAPI.Machine.Directories.PropertyChanged
+  nameWithType: Directories.PropertyChanged
+- uid: DuetAPI.Machine.Directories.System
+  name: System
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_System
+  commentId: P:DuetAPI.Machine.Directories.System
+  fullName: DuetAPI.Machine.Directories.System
+  nameWithType: Directories.System
+- uid: DuetAPI.Machine.Directories.System*
+  name: System
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_System_
+  commentId: Overload:DuetAPI.Machine.Directories.System
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Directories.System
+  nameWithType: Directories.System
+- uid: DuetAPI.Machine.Directories.WWW
+  name: WWW
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_WWW
+  commentId: P:DuetAPI.Machine.Directories.WWW
+  fullName: DuetAPI.Machine.Directories.WWW
+  nameWithType: Directories.WWW
+- uid: DuetAPI.Machine.Directories.WWW*
+  name: WWW
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_WWW_
+  commentId: Overload:DuetAPI.Machine.Directories.WWW
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Directories.WWW
+  nameWithType: Directories.WWW
 - uid: DuetAPI.Machine.Drive
   name: Drive
   href: api/DuetAPI.Machine.Drive.html
@@ -5223,6 +5345,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.MachineModel.Clone
   nameWithType: MachineModel.Clone
+- uid: DuetAPI.Machine.MachineModel.Directories
+  name: Directories
+  href: api/DuetAPI.Machine.MachineModel.html#DuetAPI_Machine_MachineModel_Directories
+  commentId: P:DuetAPI.Machine.MachineModel.Directories
+  fullName: DuetAPI.Machine.MachineModel.Directories
+  nameWithType: MachineModel.Directories
+- uid: DuetAPI.Machine.MachineModel.Directories*
+  name: Directories
+  href: api/DuetAPI.Machine.MachineModel.html#DuetAPI_Machine_MachineModel_Directories_
+  commentId: Overload:DuetAPI.Machine.MachineModel.Directories
+  isSpec: "True"
+  fullName: DuetAPI.Machine.MachineModel.Directories
+  nameWithType: MachineModel.Directories
 - uid: DuetAPI.Machine.MachineModel.Electronics
   name: Electronics
   href: api/DuetAPI.Machine.MachineModel.html#DuetAPI_Machine_MachineModel_Electronics
@@ -7707,19 +7842,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.UserSession.Origin
   nameWithType: UserSession.Origin
-- uid: DuetAPI.Machine.UserSession.OriginPort
-  name: OriginPort
-  href: api/DuetAPI.Machine.UserSession.html#DuetAPI_Machine_UserSession_OriginPort
-  commentId: P:DuetAPI.Machine.UserSession.OriginPort
-  fullName: DuetAPI.Machine.UserSession.OriginPort
-  nameWithType: UserSession.OriginPort
-- uid: DuetAPI.Machine.UserSession.OriginPort*
-  name: OriginPort
-  href: api/DuetAPI.Machine.UserSession.html#DuetAPI_Machine_UserSession_OriginPort_
-  commentId: Overload:DuetAPI.Machine.UserSession.OriginPort
+- uid: DuetAPI.Machine.UserSession.OriginId
+  name: OriginId
+  href: api/DuetAPI.Machine.UserSession.html#DuetAPI_Machine_UserSession_OriginId
+  commentId: P:DuetAPI.Machine.UserSession.OriginId
+  fullName: DuetAPI.Machine.UserSession.OriginId
+  nameWithType: UserSession.OriginId
+- uid: DuetAPI.Machine.UserSession.OriginId*
+  name: OriginId
+  href: api/DuetAPI.Machine.UserSession.html#DuetAPI_Machine_UserSession_OriginId_
+  commentId: Overload:DuetAPI.Machine.UserSession.OriginId
   isSpec: "True"
-  fullName: DuetAPI.Machine.UserSession.OriginPort
-  nameWithType: UserSession.OriginPort
+  fullName: DuetAPI.Machine.UserSession.OriginId
+  nameWithType: UserSession.OriginId
 - uid: DuetAPI.Machine.UserSession.PropertyChanged
   name: PropertyChanged
   href: api/DuetAPI.Machine.UserSession.html#DuetAPI_Machine_UserSession_PropertyChanged
@@ -8680,12 +8815,15 @@ references:
   isSpec: "True"
   fullName: DuetAPIClient.BaseCommandConnection.AddHttpEndpoint
   nameWithType: BaseCommandConnection.AddHttpEndpoint
-- uid: DuetAPIClient.BaseCommandConnection.AddUserSession(DuetAPI.Machine.AccessLevel,DuetAPI.Machine.SessionType,System.String,System.Int32,System.Threading.CancellationToken)
-  name: AddUserSession(AccessLevel, SessionType, String, Int32, CancellationToken)
-  href: api/DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_AddUserSession_DuetAPI_Machine_AccessLevel_DuetAPI_Machine_SessionType_System_String_System_Int32_System_Threading_CancellationToken_
-  commentId: M:DuetAPIClient.BaseCommandConnection.AddUserSession(DuetAPI.Machine.AccessLevel,DuetAPI.Machine.SessionType,System.String,System.Int32,System.Threading.CancellationToken)
-  fullName: DuetAPIClient.BaseCommandConnection.AddUserSession(DuetAPI.Machine.AccessLevel, DuetAPI.Machine.SessionType, System.String, System.Int32, System.Threading.CancellationToken)
-  nameWithType: BaseCommandConnection.AddUserSession(AccessLevel, SessionType, String, Int32, CancellationToken)
+- uid: DuetAPIClient.BaseCommandConnection.AddUserSession(DuetAPI.Machine.AccessLevel,DuetAPI.Machine.SessionType,System.String,System.Nullable{System.Int32},System.Threading.CancellationToken)
+  name: AddUserSession(AccessLevel, SessionType, String, Nullable<Int32>, CancellationToken)
+  href: api/DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_AddUserSession_DuetAPI_Machine_AccessLevel_DuetAPI_Machine_SessionType_System_String_System_Nullable_System_Int32__System_Threading_CancellationToken_
+  commentId: M:DuetAPIClient.BaseCommandConnection.AddUserSession(DuetAPI.Machine.AccessLevel,DuetAPI.Machine.SessionType,System.String,System.Nullable{System.Int32},System.Threading.CancellationToken)
+  name.vb: AddUserSession(AccessLevel, SessionType, String, Nullable(Of Int32), CancellationToken)
+  fullName: DuetAPIClient.BaseCommandConnection.AddUserSession(DuetAPI.Machine.AccessLevel, DuetAPI.Machine.SessionType, System.String, System.Nullable<System.Int32>, System.Threading.CancellationToken)
+  fullName.vb: DuetAPIClient.BaseCommandConnection.AddUserSession(DuetAPI.Machine.AccessLevel, DuetAPI.Machine.SessionType, System.String, System.Nullable(Of System.Int32), System.Threading.CancellationToken)
+  nameWithType: BaseCommandConnection.AddUserSession(AccessLevel, SessionType, String, Nullable<Int32>, CancellationToken)
+  nameWithType.vb: BaseCommandConnection.AddUserSession(AccessLevel, SessionType, String, Nullable(Of Int32), CancellationToken)
 - uid: DuetAPIClient.BaseCommandConnection.AddUserSession*
   name: AddUserSession
   href: api/DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_AddUserSession_
@@ -9706,6 +9844,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.Code.CancelPending
   nameWithType: Code.CancelPending
+- uid: DuetControlServer.Commands.Code.Channel
+  name: Channel
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Channel
+  commentId: P:DuetControlServer.Commands.Code.Channel
+  fullName: DuetControlServer.Commands.Code.Channel
+  nameWithType: Code.Channel
+- uid: DuetControlServer.Commands.Code.Channel*
+  name: Channel
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Channel_
+  commentId: Overload:DuetControlServer.Commands.Code.Channel
+  isSpec: "True"
+  fullName: DuetControlServer.Commands.Code.Channel
+  nameWithType: Code.Channel
 - uid: DuetControlServer.Commands.Code.Execute
   name: Execute()
   href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Execute
@@ -9719,19 +9870,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.Code.Execute
   nameWithType: Code.Execute
-- uid: DuetControlServer.Commands.Code.InitScheduler
-  name: InitScheduler()
-  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_InitScheduler
-  commentId: M:DuetControlServer.Commands.Code.InitScheduler
-  fullName: DuetControlServer.Commands.Code.InitScheduler()
-  nameWithType: Code.InitScheduler()
-- uid: DuetControlServer.Commands.Code.InitScheduler*
-  name: InitScheduler
-  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_InitScheduler_
-  commentId: Overload:DuetControlServer.Commands.Code.InitScheduler
+- uid: DuetControlServer.Commands.Code.Init
+  name: Init()
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Init
+  commentId: M:DuetControlServer.Commands.Code.Init
+  fullName: DuetControlServer.Commands.Code.Init()
+  nameWithType: Code.Init()
+- uid: DuetControlServer.Commands.Code.Init*
+  name: Init
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Init_
+  commentId: Overload:DuetControlServer.Commands.Code.Init
   isSpec: "True"
-  fullName: DuetControlServer.Commands.Code.InitScheduler
-  nameWithType: Code.InitScheduler
+  fullName: DuetControlServer.Commands.Code.Init
+  nameWithType: Code.Init
 - uid: DuetControlServer.Commands.Code.InternallyProcessed
   name: InternallyProcessed
   href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_InternallyProcessed
@@ -9821,6 +9972,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.LockMachineModel.Execute
   nameWithType: LockMachineModel.Execute
+- uid: DuetControlServer.Commands.LockMachineModel.SourceConnection
+  name: SourceConnection
+  href: api/DuetControlServer.Commands.LockMachineModel.html#DuetControlServer_Commands_LockMachineModel_SourceConnection
+  commentId: P:DuetControlServer.Commands.LockMachineModel.SourceConnection
+  fullName: DuetControlServer.Commands.LockMachineModel.SourceConnection
+  nameWithType: LockMachineModel.SourceConnection
+- uid: DuetControlServer.Commands.LockMachineModel.SourceConnection*
+  name: SourceConnection
+  href: api/DuetControlServer.Commands.LockMachineModel.html#DuetControlServer_Commands_LockMachineModel_SourceConnection_
+  commentId: Overload:DuetControlServer.Commands.LockMachineModel.SourceConnection
+  isSpec: "True"
+  fullName: DuetControlServer.Commands.LockMachineModel.SourceConnection
+  nameWithType: LockMachineModel.SourceConnection
 - uid: DuetControlServer.Commands.RemoveHttpEndpoint
   name: RemoveHttpEndpoint
   href: api/DuetControlServer.Commands.RemoveHttpEndpoint.html
@@ -9903,19 +10067,6 @@ references:
   commentId: T:DuetControlServer.Commands.SimpleCode
   fullName: DuetControlServer.Commands.SimpleCode
   nameWithType: SimpleCode
-- uid: DuetControlServer.Commands.SimpleCode.#ctor
-  name: SimpleCode()
-  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode__ctor
-  commentId: M:DuetControlServer.Commands.SimpleCode.#ctor
-  fullName: DuetControlServer.Commands.SimpleCode.SimpleCode()
-  nameWithType: SimpleCode.SimpleCode()
-- uid: DuetControlServer.Commands.SimpleCode.#ctor*
-  name: SimpleCode
-  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode__ctor_
-  commentId: Overload:DuetControlServer.Commands.SimpleCode.#ctor
-  isSpec: "True"
-  fullName: DuetControlServer.Commands.SimpleCode.SimpleCode
-  nameWithType: SimpleCode.SimpleCode
 - uid: DuetControlServer.Commands.SimpleCode.Execute
   name: Execute()
   href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_Execute
@@ -9929,19 +10080,45 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.SimpleCode.Execute
   nameWithType: SimpleCode.Execute
-- uid: DuetControlServer.Commands.SimpleCode.ParseCodes
-  name: ParseCodes()
-  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_ParseCodes
-  commentId: M:DuetControlServer.Commands.SimpleCode.ParseCodes
-  fullName: DuetControlServer.Commands.SimpleCode.ParseCodes()
-  nameWithType: SimpleCode.ParseCodes()
-- uid: DuetControlServer.Commands.SimpleCode.ParseCodes*
-  name: ParseCodes
-  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_ParseCodes_
-  commentId: Overload:DuetControlServer.Commands.SimpleCode.ParseCodes
+- uid: DuetControlServer.Commands.SimpleCode.Init
+  name: Init()
+  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_Init
+  commentId: M:DuetControlServer.Commands.SimpleCode.Init
+  fullName: DuetControlServer.Commands.SimpleCode.Init()
+  nameWithType: SimpleCode.Init()
+- uid: DuetControlServer.Commands.SimpleCode.Init*
+  name: Init
+  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_Init_
+  commentId: Overload:DuetControlServer.Commands.SimpleCode.Init
   isSpec: "True"
-  fullName: DuetControlServer.Commands.SimpleCode.ParseCodes
-  nameWithType: SimpleCode.ParseCodes
+  fullName: DuetControlServer.Commands.SimpleCode.Init
+  nameWithType: SimpleCode.Init
+- uid: DuetControlServer.Commands.SimpleCode.Parse
+  name: Parse()
+  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_Parse
+  commentId: M:DuetControlServer.Commands.SimpleCode.Parse
+  fullName: DuetControlServer.Commands.SimpleCode.Parse()
+  nameWithType: SimpleCode.Parse()
+- uid: DuetControlServer.Commands.SimpleCode.Parse*
+  name: Parse
+  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_Parse_
+  commentId: Overload:DuetControlServer.Commands.SimpleCode.Parse
+  isSpec: "True"
+  fullName: DuetControlServer.Commands.SimpleCode.Parse
+  nameWithType: SimpleCode.Parse
+- uid: DuetControlServer.Commands.SimpleCode.SourceConnection
+  name: SourceConnection
+  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_SourceConnection
+  commentId: P:DuetControlServer.Commands.SimpleCode.SourceConnection
+  fullName: DuetControlServer.Commands.SimpleCode.SourceConnection
+  nameWithType: SimpleCode.SourceConnection
+- uid: DuetControlServer.Commands.SimpleCode.SourceConnection*
+  name: SourceConnection
+  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_SourceConnection_
+  commentId: Overload:DuetControlServer.Commands.SimpleCode.SourceConnection
+  isSpec: "True"
+  fullName: DuetControlServer.Commands.SimpleCode.SourceConnection
+  nameWithType: SimpleCode.SourceConnection
 - uid: DuetControlServer.Commands.SyncMachineModel
   name: SyncMachineModel
   href: api/DuetControlServer.Commands.SyncMachineModel.html
@@ -9980,6 +10157,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.UnlockMachineModel.Execute
   nameWithType: UnlockMachineModel.Execute
+- uid: DuetControlServer.Commands.UnlockMachineModel.SourceConnection
+  name: SourceConnection
+  href: api/DuetControlServer.Commands.UnlockMachineModel.html#DuetControlServer_Commands_UnlockMachineModel_SourceConnection
+  commentId: P:DuetControlServer.Commands.UnlockMachineModel.SourceConnection
+  fullName: DuetControlServer.Commands.UnlockMachineModel.SourceConnection
+  nameWithType: UnlockMachineModel.SourceConnection
+- uid: DuetControlServer.Commands.UnlockMachineModel.SourceConnection*
+  name: SourceConnection
+  href: api/DuetControlServer.Commands.UnlockMachineModel.html#DuetControlServer_Commands_UnlockMachineModel_SourceConnection_
+  commentId: Overload:DuetControlServer.Commands.UnlockMachineModel.SourceConnection
+  isSpec: "True"
+  fullName: DuetControlServer.Commands.UnlockMachineModel.SourceConnection
+  nameWithType: UnlockMachineModel.SourceConnection
 - uid: DuetControlServer.Commands.WriteMessage
   name: WriteMessage
   href: api/DuetControlServer.Commands.WriteMessage.html
@@ -9999,6 +10189,42 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.WriteMessage.Execute
   nameWithType: WriteMessage.Execute
+- uid: DuetControlServer.FileDirectory
+  name: FileDirectory
+  href: api/DuetControlServer.FileDirectory.html
+  commentId: T:DuetControlServer.FileDirectory
+  fullName: DuetControlServer.FileDirectory
+  nameWithType: FileDirectory
+- uid: DuetControlServer.FileDirectory.Filaments
+  name: Filaments
+  href: api/DuetControlServer.FileDirectory.html#DuetControlServer_FileDirectory_Filaments
+  commentId: F:DuetControlServer.FileDirectory.Filaments
+  fullName: DuetControlServer.FileDirectory.Filaments
+  nameWithType: FileDirectory.Filaments
+- uid: DuetControlServer.FileDirectory.GCodes
+  name: GCodes
+  href: api/DuetControlServer.FileDirectory.html#DuetControlServer_FileDirectory_GCodes
+  commentId: F:DuetControlServer.FileDirectory.GCodes
+  fullName: DuetControlServer.FileDirectory.GCodes
+  nameWithType: FileDirectory.GCodes
+- uid: DuetControlServer.FileDirectory.Macros
+  name: Macros
+  href: api/DuetControlServer.FileDirectory.html#DuetControlServer_FileDirectory_Macros
+  commentId: F:DuetControlServer.FileDirectory.Macros
+  fullName: DuetControlServer.FileDirectory.Macros
+  nameWithType: FileDirectory.Macros
+- uid: DuetControlServer.FileDirectory.System
+  name: System
+  href: api/DuetControlServer.FileDirectory.html#DuetControlServer_FileDirectory_System
+  commentId: F:DuetControlServer.FileDirectory.System
+  fullName: DuetControlServer.FileDirectory.System
+  nameWithType: FileDirectory.System
+- uid: DuetControlServer.FileDirectory.WWW
+  name: WWW
+  href: api/DuetControlServer.FileDirectory.html#DuetControlServer_FileDirectory_WWW
+  commentId: F:DuetControlServer.FileDirectory.WWW
+  fullName: DuetControlServer.FileDirectory.WWW
+  nameWithType: FileDirectory.WWW
 - uid: DuetControlServer.FileExecution
   name: DuetControlServer.FileExecution
   href: api/DuetControlServer.FileExecution.html
@@ -10205,6 +10431,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.MacroFile.Abort
   nameWithType: MacroFile.Abort
+- uid: DuetControlServer.FileExecution.MacroFile.Dispose(System.Boolean)
+  name: Dispose(Boolean)
+  href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_Dispose_System_Boolean_
+  commentId: M:DuetControlServer.FileExecution.MacroFile.Dispose(System.Boolean)
+  fullName: DuetControlServer.FileExecution.MacroFile.Dispose(System.Boolean)
+  nameWithType: MacroFile.Dispose(Boolean)
+- uid: DuetControlServer.FileExecution.MacroFile.Dispose*
+  name: Dispose
+  href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_Dispose_
+  commentId: Overload:DuetControlServer.FileExecution.MacroFile.Dispose
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.MacroFile.Dispose
+  nameWithType: MacroFile.Dispose
 - uid: DuetControlServer.FileExecution.MacroFile.IsConfig
   name: IsConfig
   href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_IsConfig
@@ -10244,6 +10483,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.MacroFile.ReadCode
   nameWithType: MacroFile.ReadCode
+- uid: DuetControlServer.FileExecution.MacroFile.RunningConfig
+  name: RunningConfig
+  href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_RunningConfig
+  commentId: P:DuetControlServer.FileExecution.MacroFile.RunningConfig
+  fullName: DuetControlServer.FileExecution.MacroFile.RunningConfig
+  nameWithType: MacroFile.RunningConfig
+- uid: DuetControlServer.FileExecution.MacroFile.RunningConfig*
+  name: RunningConfig
+  href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_RunningConfig_
+  commentId: Overload:DuetControlServer.FileExecution.MacroFile.RunningConfig
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.MacroFile.RunningConfig
+  nameWithType: MacroFile.RunningConfig
 - uid: DuetControlServer.FileExecution.MacroFile.StartCode
   name: StartCode
   href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_StartCode
@@ -10341,19 +10593,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Print.IsPrinting
   nameWithType: Print.IsPrinting
-- uid: DuetControlServer.FileExecution.Print.LastFilePosition
-  name: LastFilePosition
-  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_LastFilePosition
-  commentId: P:DuetControlServer.FileExecution.Print.LastFilePosition
-  fullName: DuetControlServer.FileExecution.Print.LastFilePosition
-  nameWithType: Print.LastFilePosition
-- uid: DuetControlServer.FileExecution.Print.LastFilePosition*
-  name: LastFilePosition
-  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_LastFilePosition_
-  commentId: Overload:DuetControlServer.FileExecution.Print.LastFilePosition
-  isSpec: "True"
-  fullName: DuetControlServer.FileExecution.Print.LastFilePosition
-  nameWithType: Print.LastFilePosition
 - uid: DuetControlServer.FileExecution.Print.Length
   name: Length
   href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_Length
@@ -10367,25 +10606,41 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Print.Length
   nameWithType: Print.Length
-- uid: DuetControlServer.FileExecution.Print.OnPause(System.Int64)
-  name: OnPause(Int64)
-  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_OnPause_System_Int64_
-  commentId: M:DuetControlServer.FileExecution.Print.OnPause(System.Int64)
-  fullName: DuetControlServer.FileExecution.Print.OnPause(System.Int64)
-  nameWithType: Print.OnPause(Int64)
-- uid: DuetControlServer.FileExecution.Print.OnPause*
-  name: OnPause
-  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_OnPause_
-  commentId: Overload:DuetControlServer.FileExecution.Print.OnPause
+- uid: DuetControlServer.FileExecution.Print.LockAsync
+  name: LockAsync()
+  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_LockAsync
+  commentId: M:DuetControlServer.FileExecution.Print.LockAsync
+  fullName: DuetControlServer.FileExecution.Print.LockAsync()
+  nameWithType: Print.LockAsync()
+- uid: DuetControlServer.FileExecution.Print.LockAsync*
+  name: LockAsync
+  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_LockAsync_
+  commentId: Overload:DuetControlServer.FileExecution.Print.LockAsync
   isSpec: "True"
-  fullName: DuetControlServer.FileExecution.Print.OnPause
-  nameWithType: Print.OnPause
-- uid: DuetControlServer.FileExecution.Print.Pause
-  name: Pause()
-  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_Pause
-  commentId: M:DuetControlServer.FileExecution.Print.Pause
-  fullName: DuetControlServer.FileExecution.Print.Pause()
-  nameWithType: Print.Pause()
+  fullName: DuetControlServer.FileExecution.Print.LockAsync
+  nameWithType: Print.LockAsync
+- uid: DuetControlServer.FileExecution.Print.NextFilePosition
+  name: NextFilePosition
+  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_NextFilePosition
+  commentId: P:DuetControlServer.FileExecution.Print.NextFilePosition
+  fullName: DuetControlServer.FileExecution.Print.NextFilePosition
+  nameWithType: Print.NextFilePosition
+- uid: DuetControlServer.FileExecution.Print.NextFilePosition*
+  name: NextFilePosition
+  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_NextFilePosition_
+  commentId: Overload:DuetControlServer.FileExecution.Print.NextFilePosition
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.Print.NextFilePosition
+  nameWithType: Print.NextFilePosition
+- uid: DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64})
+  name: Pause(Nullable<Int64>)
+  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_Pause_System_Nullable_System_Int64__
+  commentId: M:DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64})
+  name.vb: Pause(Nullable(Of Int64))
+  fullName: DuetControlServer.FileExecution.Print.Pause(System.Nullable<System.Int64>)
+  fullName.vb: DuetControlServer.FileExecution.Print.Pause(System.Nullable(Of System.Int64))
+  nameWithType: Print.Pause(Nullable<Int64>)
+  nameWithType.vb: Print.Pause(Nullable(Of Int64))
 - uid: DuetControlServer.FileExecution.Print.Pause*
   name: Pause
   href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_Pause_
@@ -10419,6 +10674,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Print.Resume
   nameWithType: Print.Resume
+- uid: DuetControlServer.FileExecution.Print.Run
+  name: Run()
+  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_Run
+  commentId: M:DuetControlServer.FileExecution.Print.Run
+  fullName: DuetControlServer.FileExecution.Print.Run()
+  nameWithType: Print.Run()
+- uid: DuetControlServer.FileExecution.Print.Run*
+  name: Run
+  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_Run_
+  commentId: Overload:DuetControlServer.FileExecution.Print.Run
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.Print.Run
+  nameWithType: Print.Run
 - uid: DuetControlServer.FileExecution.Print.Start(System.String,DuetAPI.CodeChannel)
   name: Start(String, CodeChannel)
   href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_Start_System_String_DuetAPI_CodeChannel_
@@ -10493,19 +10761,12 @@ references:
   commentId: F:DuetControlServer.FilePath.StartMacroFile
   fullName: DuetControlServer.FilePath.StartMacroFile
   nameWithType: FilePath.StartMacroFile
-- uid: DuetControlServer.FilePath.ToPhysical(System.String,System.String)
-  name: ToPhysical(String, String)
-  href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_ToPhysical_System_String_System_String_
-  commentId: M:DuetControlServer.FilePath.ToPhysical(System.String,System.String)
-  fullName: DuetControlServer.FilePath.ToPhysical(System.String, System.String)
-  nameWithType: FilePath.ToPhysical(String, String)
-- uid: DuetControlServer.FilePath.ToPhysical*
-  name: ToPhysical
-  href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_ToPhysical_
-  commentId: Overload:DuetControlServer.FilePath.ToPhysical
-  isSpec: "True"
-  fullName: DuetControlServer.FilePath.ToPhysical
-  nameWithType: FilePath.ToPhysical
+- uid: DuetControlServer.FilePath.ToPhysicalAsync(System.String,DuetControlServer.FileDirectory)
+  name: ToPhysicalAsync(String, FileDirectory)
+  href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_ToPhysicalAsync_System_String_DuetControlServer_FileDirectory_
+  commentId: M:DuetControlServer.FilePath.ToPhysicalAsync(System.String,DuetControlServer.FileDirectory)
+  fullName: DuetControlServer.FilePath.ToPhysicalAsync(System.String, DuetControlServer.FileDirectory)
+  nameWithType: FilePath.ToPhysicalAsync(String, FileDirectory)
 - uid: DuetControlServer.FilePath.ToPhysicalAsync(System.String,System.String)
   name: ToPhysicalAsync(String, String)
   href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_ToPhysicalAsync_System_String_System_String_
@@ -10519,19 +10780,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FilePath.ToPhysicalAsync
   nameWithType: FilePath.ToPhysicalAsync
-- uid: DuetControlServer.FilePath.ToVirtual(System.String)
-  name: ToVirtual(String)
-  href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_ToVirtual_System_String_
-  commentId: M:DuetControlServer.FilePath.ToVirtual(System.String)
-  fullName: DuetControlServer.FilePath.ToVirtual(System.String)
-  nameWithType: FilePath.ToVirtual(String)
-- uid: DuetControlServer.FilePath.ToVirtual*
-  name: ToVirtual
-  href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_ToVirtual_
-  commentId: Overload:DuetControlServer.FilePath.ToVirtual
-  isSpec: "True"
-  fullName: DuetControlServer.FilePath.ToVirtual
-  nameWithType: FilePath.ToVirtual
 - uid: DuetControlServer.FilePath.ToVirtualAsync(System.String)
   name: ToVirtualAsync(String)
   href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_ToVirtualAsync_System_String_
@@ -10673,19 +10921,19 @@ references:
   commentId: T:DuetControlServer.IPC.LockManager
   fullName: DuetControlServer.IPC.LockManager
   nameWithType: LockManager
-- uid: DuetControlServer.IPC.LockManager.Connection
-  name: Connection
-  href: api/DuetControlServer.IPC.LockManager.html#DuetControlServer_IPC_LockManager_Connection
-  commentId: P:DuetControlServer.IPC.LockManager.Connection
-  fullName: DuetControlServer.IPC.LockManager.Connection
-  nameWithType: LockManager.Connection
-- uid: DuetControlServer.IPC.LockManager.Connection*
-  name: Connection
-  href: api/DuetControlServer.IPC.LockManager.html#DuetControlServer_IPC_LockManager_Connection_
-  commentId: Overload:DuetControlServer.IPC.LockManager.Connection
+- uid: DuetControlServer.IPC.LockManager.IsLocked
+  name: IsLocked
+  href: api/DuetControlServer.IPC.LockManager.html#DuetControlServer_IPC_LockManager_IsLocked
+  commentId: P:DuetControlServer.IPC.LockManager.IsLocked
+  fullName: DuetControlServer.IPC.LockManager.IsLocked
+  nameWithType: LockManager.IsLocked
+- uid: DuetControlServer.IPC.LockManager.IsLocked*
+  name: IsLocked
+  href: api/DuetControlServer.IPC.LockManager.html#DuetControlServer_IPC_LockManager_IsLocked_
+  commentId: Overload:DuetControlServer.IPC.LockManager.IsLocked
   isSpec: "True"
-  fullName: DuetControlServer.IPC.LockManager.Connection
-  nameWithType: LockManager.Connection
+  fullName: DuetControlServer.IPC.LockManager.IsLocked
+  nameWithType: LockManager.IsLocked
 - uid: DuetControlServer.IPC.LockManager.LockMachineModel(System.Int32)
   name: LockMachineModel(Int32)
   href: api/DuetControlServer.IPC.LockManager.html#DuetControlServer_IPC_LockManager_LockMachineModel_System_Int32_
@@ -10699,12 +10947,12 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.IPC.LockManager.LockMachineModel
   nameWithType: LockManager.LockMachineModel
-- uid: DuetControlServer.IPC.LockManager.UnlockMachineModel
-  name: UnlockMachineModel()
-  href: api/DuetControlServer.IPC.LockManager.html#DuetControlServer_IPC_LockManager_UnlockMachineModel
-  commentId: M:DuetControlServer.IPC.LockManager.UnlockMachineModel
-  fullName: DuetControlServer.IPC.LockManager.UnlockMachineModel()
-  nameWithType: LockManager.UnlockMachineModel()
+- uid: DuetControlServer.IPC.LockManager.UnlockMachineModel(System.Int32)
+  name: UnlockMachineModel(Int32)
+  href: api/DuetControlServer.IPC.LockManager.html#DuetControlServer_IPC_LockManager_UnlockMachineModel_System_Int32_
+  commentId: M:DuetControlServer.IPC.LockManager.UnlockMachineModel(System.Int32)
+  fullName: DuetControlServer.IPC.LockManager.UnlockMachineModel(System.Int32)
+  nameWithType: LockManager.UnlockMachineModel(Int32)
 - uid: DuetControlServer.IPC.LockManager.UnlockMachineModel*
   name: UnlockMachineModel
   href: api/DuetControlServer.IPC.LockManager.html#DuetControlServer_IPC_LockManager_UnlockMachineModel_
@@ -11637,6 +11885,12 @@ references:
   commentId: E:DuetControlServer.Model.Observer.OnPropertyPathChanged
   fullName: DuetControlServer.Model.Observer.OnPropertyPathChanged
   nameWithType: Observer.OnPropertyPathChanged
+- uid: DuetControlServer.Model.Observer.PropertyPathChanged
+  name: Observer.PropertyPathChanged
+  href: api/DuetControlServer.Model.Observer.PropertyPathChanged.html
+  commentId: T:DuetControlServer.Model.Observer.PropertyPathChanged
+  fullName: DuetControlServer.Model.Observer.PropertyPathChanged
+  nameWithType: Observer.PropertyPathChanged
 - uid: DuetControlServer.Model.Output
   name: Output
   href: api/DuetControlServer.Model.Output.html
@@ -11979,12 +12233,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Model.ProbeItem.type
   nameWithType: ProbeItem.type
-- uid: DuetControlServer.Model.PropertyPathChanged
-  name: PropertyPathChanged
-  href: api/DuetControlServer.Model.PropertyPathChanged.html
-  commentId: T:DuetControlServer.Model.PropertyPathChanged
-  fullName: DuetControlServer.Model.PropertyPathChanged
-  nameWithType: PropertyPathChanged
 - uid: DuetControlServer.Model.PropertyPathChangeType
   name: PropertyPathChangeType
   href: api/DuetControlServer.Model.PropertyPathChangeType.html
@@ -12021,19 +12269,6 @@ references:
   commentId: T:DuetControlServer.Model.Provider
   fullName: DuetControlServer.Model.Provider
   nameWithType: Provider
-- uid: DuetControlServer.Model.Provider.AccessReadOnly
-  name: AccessReadOnly()
-  href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadOnly
-  commentId: M:DuetControlServer.Model.Provider.AccessReadOnly
-  fullName: DuetControlServer.Model.Provider.AccessReadOnly()
-  nameWithType: Provider.AccessReadOnly()
-- uid: DuetControlServer.Model.Provider.AccessReadOnly*
-  name: AccessReadOnly
-  href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadOnly_
-  commentId: Overload:DuetControlServer.Model.Provider.AccessReadOnly
-  isSpec: "True"
-  fullName: DuetControlServer.Model.Provider.AccessReadOnly
-  nameWithType: Provider.AccessReadOnly
 - uid: DuetControlServer.Model.Provider.AccessReadOnlyAsync
   name: AccessReadOnlyAsync()
   href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadOnlyAsync
@@ -12047,19 +12282,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Model.Provider.AccessReadOnlyAsync
   nameWithType: Provider.AccessReadOnlyAsync
-- uid: DuetControlServer.Model.Provider.AccessReadWrite
-  name: AccessReadWrite()
-  href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadWrite
-  commentId: M:DuetControlServer.Model.Provider.AccessReadWrite
-  fullName: DuetControlServer.Model.Provider.AccessReadWrite()
-  nameWithType: Provider.AccessReadWrite()
-- uid: DuetControlServer.Model.Provider.AccessReadWrite*
-  name: AccessReadWrite
-  href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadWrite_
-  commentId: Overload:DuetControlServer.Model.Provider.AccessReadWrite
-  isSpec: "True"
-  fullName: DuetControlServer.Model.Provider.AccessReadWrite
-  nameWithType: Provider.AccessReadWrite
 - uid: DuetControlServer.Model.Provider.AccessReadWriteAsync
   name: AccessReadWriteAsync()
   href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadWriteAsync
@@ -13053,6 +13275,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Settings.MaxLayerHeight
   nameWithType: Settings.MaxLayerHeight
+- uid: DuetControlServer.Settings.MaxMachineModelLockTime
+  name: MaxMachineModelLockTime
+  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_MaxMachineModelLockTime
+  commentId: P:DuetControlServer.Settings.MaxMachineModelLockTime
+  fullName: DuetControlServer.Settings.MaxMachineModelLockTime
+  nameWithType: Settings.MaxMachineModelLockTime
+- uid: DuetControlServer.Settings.MaxMachineModelLockTime*
+  name: MaxMachineModelLockTime
+  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_MaxMachineModelLockTime_
+  commentId: Overload:DuetControlServer.Settings.MaxMachineModelLockTime
+  isSpec: "True"
+  fullName: DuetControlServer.Settings.MaxMachineModelLockTime
+  nameWithType: Settings.MaxMachineModelLockTime
 - uid: DuetControlServer.Settings.MaxMessageAge
   name: MaxMessageAge
   href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_MaxMessageAge
@@ -13157,19 +13392,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Settings.SocketFile
   nameWithType: Settings.SocketFile
-- uid: DuetControlServer.Settings.SocketGroup
-  name: SocketGroup
-  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SocketGroup
-  commentId: P:DuetControlServer.Settings.SocketGroup
-  fullName: DuetControlServer.Settings.SocketGroup
-  nameWithType: Settings.SocketGroup
-- uid: DuetControlServer.Settings.SocketGroup*
-  name: SocketGroup
-  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SocketGroup_
-  commentId: Overload:DuetControlServer.Settings.SocketGroup
-  isSpec: "True"
-  fullName: DuetControlServer.Settings.SocketGroup
-  nameWithType: Settings.SocketGroup
 - uid: DuetControlServer.Settings.SocketPollInterval
   name: SocketPollInterval
   href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SocketPollInterval
@@ -13183,19 +13405,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Settings.SocketPollInterval
   nameWithType: Settings.SocketPollInterval
-- uid: DuetControlServer.Settings.SocketUser
-  name: SocketUser
-  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SocketUser
-  commentId: P:DuetControlServer.Settings.SocketUser
-  fullName: DuetControlServer.Settings.SocketUser
-  nameWithType: Settings.SocketUser
-- uid: DuetControlServer.Settings.SocketUser*
-  name: SocketUser
-  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SocketUser_
-  commentId: Overload:DuetControlServer.Settings.SocketUser
-  isSpec: "True"
-  fullName: DuetControlServer.Settings.SocketUser
-  nameWithType: Settings.SocketUser
 - uid: DuetControlServer.Settings.SpiDevice
   name: SpiDevice
   href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SpiDevice
@@ -15230,6 +15439,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.DataTransfer.StartIap
   nameWithType: DataTransfer.StartIap
+- uid: DuetControlServer.SPI.DataTransfer.Updating
+  name: Updating
+  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_Updating
+  commentId: P:DuetControlServer.SPI.DataTransfer.Updating
+  fullName: DuetControlServer.SPI.DataTransfer.Updating
+  nameWithType: DataTransfer.Updating
+- uid: DuetControlServer.SPI.DataTransfer.Updating*
+  name: Updating
+  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_Updating_
+  commentId: Overload:DuetControlServer.SPI.DataTransfer.Updating
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.DataTransfer.Updating
+  nameWithType: DataTransfer.Updating
 - uid: DuetControlServer.SPI.DataTransfer.VerifyFirmwareChecksum(System.Int64,System.UInt16)
   name: VerifyFirmwareChecksum(Int64, UInt16)
   href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_VerifyFirmwareChecksum_System_Int64_System_UInt16_
@@ -16712,12 +16934,12 @@ references:
   commentId: T:DuetWebServer.FileProviders.DuetFileProvider
   fullName: DuetWebServer.FileProviders.DuetFileProvider
   nameWithType: DuetFileProvider
-- uid: DuetWebServer.FileProviders.DuetFileProvider.#ctor(Microsoft.Extensions.Configuration.IConfiguration)
-  name: DuetFileProvider(IConfiguration)
-  href: api/DuetWebServer.FileProviders.DuetFileProvider.html#DuetWebServer_FileProviders_DuetFileProvider__ctor_Microsoft_Extensions_Configuration_IConfiguration_
-  commentId: M:DuetWebServer.FileProviders.DuetFileProvider.#ctor(Microsoft.Extensions.Configuration.IConfiguration)
-  fullName: DuetWebServer.FileProviders.DuetFileProvider.DuetFileProvider(Microsoft.Extensions.Configuration.IConfiguration)
-  nameWithType: DuetFileProvider.DuetFileProvider(IConfiguration)
+- uid: DuetWebServer.FileProviders.DuetFileProvider.#ctor
+  name: DuetFileProvider()
+  href: api/DuetWebServer.FileProviders.DuetFileProvider.html#DuetWebServer_FileProviders_DuetFileProvider__ctor
+  commentId: M:DuetWebServer.FileProviders.DuetFileProvider.#ctor
+  fullName: DuetWebServer.FileProviders.DuetFileProvider.DuetFileProvider()
+  nameWithType: DuetFileProvider.DuetFileProvider()
 - uid: DuetWebServer.FileProviders.DuetFileProvider.#ctor*
   name: DuetFileProvider
   href: api/DuetWebServer.FileProviders.DuetFileProvider.html#DuetWebServer_FileProviders_DuetFileProvider__ctor_
@@ -16725,6 +16947,19 @@ references:
   isSpec: "True"
   fullName: DuetWebServer.FileProviders.DuetFileProvider.DuetFileProvider
   nameWithType: DuetFileProvider.DuetFileProvider
+- uid: DuetWebServer.FileProviders.DuetFileProvider.Finalize
+  name: Finalize()
+  href: api/DuetWebServer.FileProviders.DuetFileProvider.html#DuetWebServer_FileProviders_DuetFileProvider_Finalize
+  commentId: M:DuetWebServer.FileProviders.DuetFileProvider.Finalize
+  fullName: DuetWebServer.FileProviders.DuetFileProvider.Finalize()
+  nameWithType: DuetFileProvider.Finalize()
+- uid: DuetWebServer.FileProviders.DuetFileProvider.Finalize*
+  name: Finalize
+  href: api/DuetWebServer.FileProviders.DuetFileProvider.html#DuetWebServer_FileProviders_DuetFileProvider_Finalize_
+  commentId: Overload:DuetWebServer.FileProviders.DuetFileProvider.Finalize
+  isSpec: "True"
+  fullName: DuetWebServer.FileProviders.DuetFileProvider.Finalize
+  nameWithType: DuetFileProvider.Finalize
 - uid: DuetWebServer.FileProviders.DuetFileProvider.GetDirectoryContents(System.String)
   name: GetDirectoryContents(String)
   href: api/DuetWebServer.FileProviders.DuetFileProvider.html#DuetWebServer_FileProviders_DuetFileProvider_GetDirectoryContents_System_String_
@@ -16751,6 +16986,19 @@ references:
   isSpec: "True"
   fullName: DuetWebServer.FileProviders.DuetFileProvider.GetFileInfo
   nameWithType: DuetFileProvider.GetFileInfo
+- uid: DuetWebServer.FileProviders.DuetFileProvider.Instance
+  name: Instance
+  href: api/DuetWebServer.FileProviders.DuetFileProvider.html#DuetWebServer_FileProviders_DuetFileProvider_Instance
+  commentId: P:DuetWebServer.FileProviders.DuetFileProvider.Instance
+  fullName: DuetWebServer.FileProviders.DuetFileProvider.Instance
+  nameWithType: DuetFileProvider.Instance
+- uid: DuetWebServer.FileProviders.DuetFileProvider.Instance*
+  name: Instance
+  href: api/DuetWebServer.FileProviders.DuetFileProvider.html#DuetWebServer_FileProviders_DuetFileProvider_Instance_
+  commentId: Overload:DuetWebServer.FileProviders.DuetFileProvider.Instance
+  isSpec: "True"
+  fullName: DuetWebServer.FileProviders.DuetFileProvider.Instance
+  nameWithType: DuetFileProvider.Instance
 - uid: DuetWebServer.FileProviders.DuetFileProvider.Watch(System.String)
   name: Watch(String)
   href: api/DuetWebServer.FileProviders.DuetFileProvider.html#DuetWebServer_FileProviders_DuetFileProvider_Watch_System_String_
@@ -16930,19 +17178,6 @@ references:
   commentId: T:DuetWebServer.Program
   fullName: DuetWebServer.Program
   nameWithType: Program
-- uid: DuetWebServer.Program.CancelSource
-  name: CancelSource
-  href: api/DuetWebServer.Program.html#DuetWebServer_Program_CancelSource
-  commentId: P:DuetWebServer.Program.CancelSource
-  fullName: DuetWebServer.Program.CancelSource
-  nameWithType: Program.CancelSource
-- uid: DuetWebServer.Program.CancelSource*
-  name: CancelSource
-  href: api/DuetWebServer.Program.html#DuetWebServer_Program_CancelSource_
-  commentId: Overload:DuetWebServer.Program.CancelSource
-  isSpec: "True"
-  fullName: DuetWebServer.Program.CancelSource
-  nameWithType: Program.CancelSource
 - uid: DuetWebServer.Program.CreateHostBuilder(System.String[])
   name: CreateHostBuilder(String[])
   href: api/DuetWebServer.Program.html#DuetWebServer_Program_CreateHostBuilder_System_String___
@@ -16981,6 +17216,123 @@ references:
   isSpec: "True"
   fullName: DuetWebServer.Program.Main
   nameWithType: Program.Main
+- uid: DuetWebServer.Services
+  name: DuetWebServer.Services
+  href: api/DuetWebServer.Services.html
+  commentId: N:DuetWebServer.Services
+  fullName: DuetWebServer.Services
+  nameWithType: DuetWebServer.Services
+- uid: DuetWebServer.Services.ModelObserver
+  name: ModelObserver
+  href: api/DuetWebServer.Services.ModelObserver.html
+  commentId: T:DuetWebServer.Services.ModelObserver
+  fullName: DuetWebServer.Services.ModelObserver
+  nameWithType: ModelObserver
+- uid: DuetWebServer.Services.ModelObserver.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Services.ModelObserver})
+  name: ModelObserver(IConfiguration, ILogger<ModelObserver>)
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver__ctor_Microsoft_Extensions_Configuration_IConfiguration_Microsoft_Extensions_Logging_ILogger_DuetWebServer_Services_ModelObserver__
+  commentId: M:DuetWebServer.Services.ModelObserver.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Services.ModelObserver})
+  name.vb: ModelObserver(IConfiguration, ILogger(Of ModelObserver))
+  fullName: DuetWebServer.Services.ModelObserver.ModelObserver(Microsoft.Extensions.Configuration.IConfiguration, Microsoft.Extensions.Logging.ILogger<DuetWebServer.Services.ModelObserver>)
+  fullName.vb: DuetWebServer.Services.ModelObserver.ModelObserver(Microsoft.Extensions.Configuration.IConfiguration, Microsoft.Extensions.Logging.ILogger(Of DuetWebServer.Services.ModelObserver))
+  nameWithType: ModelObserver.ModelObserver(IConfiguration, ILogger<ModelObserver>)
+  nameWithType.vb: ModelObserver.ModelObserver(IConfiguration, ILogger(Of ModelObserver))
+- uid: DuetWebServer.Services.ModelObserver.#ctor*
+  name: ModelObserver
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver__ctor_
+  commentId: Overload:DuetWebServer.Services.ModelObserver.#ctor
+  isSpec: "True"
+  fullName: DuetWebServer.Services.ModelObserver.ModelObserver
+  nameWithType: ModelObserver.ModelObserver
+- uid: DuetWebServer.Services.ModelObserver.Dispose
+  name: Dispose()
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_Dispose
+  commentId: M:DuetWebServer.Services.ModelObserver.Dispose
+  fullName: DuetWebServer.Services.ModelObserver.Dispose()
+  nameWithType: ModelObserver.Dispose()
+- uid: DuetWebServer.Services.ModelObserver.Dispose*
+  name: Dispose
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_Dispose_
+  commentId: Overload:DuetWebServer.Services.ModelObserver.Dispose
+  isSpec: "True"
+  fullName: DuetWebServer.Services.ModelObserver.Dispose
+  nameWithType: ModelObserver.Dispose
+- uid: DuetWebServer.Services.ModelObserver.Endpoints
+  name: Endpoints
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_Endpoints
+  commentId: F:DuetWebServer.Services.ModelObserver.Endpoints
+  fullName: DuetWebServer.Services.ModelObserver.Endpoints
+  nameWithType: ModelObserver.Endpoints
+- uid: DuetWebServer.Services.ModelObserver.Execute
+  name: Execute()
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_Execute
+  commentId: M:DuetWebServer.Services.ModelObserver.Execute
+  fullName: DuetWebServer.Services.ModelObserver.Execute()
+  nameWithType: ModelObserver.Execute()
+- uid: DuetWebServer.Services.ModelObserver.Execute*
+  name: Execute
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_Execute_
+  commentId: Overload:DuetWebServer.Services.ModelObserver.Execute
+  isSpec: "True"
+  fullName: DuetWebServer.Services.ModelObserver.Execute
+  nameWithType: ModelObserver.Execute
+- uid: DuetWebServer.Services.ModelObserver.OnWebDirectoryChanged
+  name: OnWebDirectoryChanged
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_OnWebDirectoryChanged
+  commentId: E:DuetWebServer.Services.ModelObserver.OnWebDirectoryChanged
+  fullName: DuetWebServer.Services.ModelObserver.OnWebDirectoryChanged
+  nameWithType: ModelObserver.OnWebDirectoryChanged
+- uid: DuetWebServer.Services.ModelObserver.StartAsync(System.Threading.CancellationToken)
+  name: StartAsync(CancellationToken)
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_StartAsync_System_Threading_CancellationToken_
+  commentId: M:DuetWebServer.Services.ModelObserver.StartAsync(System.Threading.CancellationToken)
+  fullName: DuetWebServer.Services.ModelObserver.StartAsync(System.Threading.CancellationToken)
+  nameWithType: ModelObserver.StartAsync(CancellationToken)
+- uid: DuetWebServer.Services.ModelObserver.StartAsync*
+  name: StartAsync
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_StartAsync_
+  commentId: Overload:DuetWebServer.Services.ModelObserver.StartAsync
+  isSpec: "True"
+  fullName: DuetWebServer.Services.ModelObserver.StartAsync
+  nameWithType: ModelObserver.StartAsync
+- uid: DuetWebServer.Services.ModelObserver.StopAsync(System.Threading.CancellationToken)
+  name: StopAsync(CancellationToken)
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_StopAsync_System_Threading_CancellationToken_
+  commentId: M:DuetWebServer.Services.ModelObserver.StopAsync(System.Threading.CancellationToken)
+  fullName: DuetWebServer.Services.ModelObserver.StopAsync(System.Threading.CancellationToken)
+  nameWithType: ModelObserver.StopAsync(CancellationToken)
+- uid: DuetWebServer.Services.ModelObserver.StopAsync*
+  name: StopAsync
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_StopAsync_
+  commentId: Overload:DuetWebServer.Services.ModelObserver.StopAsync
+  isSpec: "True"
+  fullName: DuetWebServer.Services.ModelObserver.StopAsync
+  nameWithType: ModelObserver.StopAsync
+- uid: DuetWebServer.Services.ModelObserver.UserSessions
+  name: UserSessions
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_UserSessions
+  commentId: F:DuetWebServer.Services.ModelObserver.UserSessions
+  fullName: DuetWebServer.Services.ModelObserver.UserSessions
+  nameWithType: ModelObserver.UserSessions
+- uid: DuetWebServer.Services.ModelObserver.WebDirectory
+  name: WebDirectory
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_WebDirectory
+  commentId: P:DuetWebServer.Services.ModelObserver.WebDirectory
+  fullName: DuetWebServer.Services.ModelObserver.WebDirectory
+  nameWithType: ModelObserver.WebDirectory
+- uid: DuetWebServer.Services.ModelObserver.WebDirectory*
+  name: WebDirectory
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver_WebDirectory_
+  commentId: Overload:DuetWebServer.Services.ModelObserver.WebDirectory
+  isSpec: "True"
+  fullName: DuetWebServer.Services.ModelObserver.WebDirectory
+  nameWithType: ModelObserver.WebDirectory
+- uid: DuetWebServer.Services.ModelObserver.WebDirectoryChanged
+  name: ModelObserver.WebDirectoryChanged
+  href: api/DuetWebServer.Services.ModelObserver.WebDirectoryChanged.html
+  commentId: T:DuetWebServer.Services.ModelObserver.WebDirectoryChanged
+  fullName: DuetWebServer.Services.ModelObserver.WebDirectoryChanged
+  nameWithType: ModelObserver.WebDirectoryChanged
 - uid: DuetWebServer.Startup
   name: Startup
   href: api/DuetWebServer.Startup.html

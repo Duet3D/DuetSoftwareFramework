@@ -171,9 +171,9 @@ namespace DuetControlServer.IPC.Processors
             }
             catch (Exception e)
             {
+                // Don't throw this exception if the connection has been termianted
                 if (!(e is SocketException))
                 {
-                    // Don't throw this exception if the connection has been termianted
                     throw;
                 }
             }

@@ -2,7 +2,7 @@
 using NUnit.Framework;
 using System.Collections.Generic;
 
-namespace DuetUnitTest.Machine
+namespace UnitTests.Machine
 {
     [TestFixture]
     public class Job

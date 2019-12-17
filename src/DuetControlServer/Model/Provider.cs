@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Machine;
@@ -20,9 +22,10 @@ namespace DuetControlServer.Model
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
-        /// Wrapper around the writer lock which notifies subscribers whenever an update has been processed
+        /// Wrapper around the lock which notifies subscribers whenever an update has been processed.
+        /// It is also able to detect the origin of model-related deadlocks
         /// </summary>
-        private class WriterLockWrapper : IDisposable
+        private sealed class LockWrapper : IDisposable
         {
             /// <summary>
             /// Internal lock
@@ -30,10 +33,46 @@ namespace DuetControlServer.Model
             private readonly IDisposable _lock;
 
             /// <summary>
+            /// CTS to trigger when the lock is being released
+            /// </summary>
+            private readonly CancellationTokenSource _releaseCts;
+
+            /// <summary>
+            /// CTS to trigger when the lock is released or the program is being terminated
+            /// </summary>
+            private readonly CancellationTokenSource _combinedCts;
+
+            /// <summary>
             /// Constructor of the lock wrapper
             /// </summary>
-            /// <param name="item">Actual lock</param>
-            internal WriterLockWrapper(IDisposable item) => _lock = item;
+            /// <param name="lockItem">Actual lock</param>
+            /// <param name="isWriteLock">Whether the lock is a read/write lock</param>
+            internal LockWrapper(IDisposable lockItem, bool isWriteLock)
+            {
+                _lock = lockItem;
+
+                if (Settings.MaxMachineModelLockTime > 0)
+                {
+                    _releaseCts = new CancellationTokenSource();
+                    _combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_releaseCts.Token, Program.CancelSource.Token);
+
+                    StackTrace stackTrace = new StackTrace(true);
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await Task.Delay(Settings.MaxMachineModelLockTime, _combinedCts.Token);
+                            _logger.Fatal("{0} deadlock detected, stack trace of the deadlock:\n{1}", isWriteLock ? "Writer" : "Reader", stackTrace);
+                            Program.CancelSource.Cancel();
+                        }
+                        finally
+                        {
+                            _combinedCts.Dispose();
+                            _releaseCts.Dispose();
+                        }
+                    });
+                }
+            }
 
             /// <summary>
             /// Dipose method that is called when the lock is released
@@ -48,6 +87,12 @@ namespace DuetControlServer.Model
                     {
                         Get.Messages.Clear();
                     }
+                }
+
+                // Stop the deadlock detection task
+                if (!Program.CancelSource.IsCancellationRequested)
+                {
+                    _releaseCts?.Cancel();
                 }
 
                 // Dispose the lock again 
@@ -71,22 +116,13 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
-        /// Access the machine model for read operations only
-        /// </summary>
-        /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static IDisposable AccessReadOnly() => _lock.ReaderLock();
-        
-        /// <summary>
         /// Access the machine model asynchronously for read operations only
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static AwaitableDisposable<IDisposable> AccessReadOnlyAsync() =>  _lock.ReaderLockAsync();
-
-        /// <summary>
-        /// Access the machine model for read/write operations
-        /// </summary>
-        /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static IDisposable AccessReadWrite() => new WriterLockWrapper(_lock.WriterLock());
+        public static async Task<IDisposable> AccessReadOnlyAsync()
+        {
+            return new LockWrapper(await _lock.ReaderLockAsync(Program.CancelSource.Token), false);
+        }
 
         /// <summary>
         /// Access the machine model asynchronously for read/write operations
@@ -94,8 +130,7 @@ namespace DuetControlServer.Model
         /// <returns>Disposable lock object to be used with a using directive</returns>
         public static async Task<IDisposable> AccessReadWriteAsync()
         {
-            IDisposable lockItem = await _lock.WriterLockAsync();
-            return new WriterLockWrapper(lockItem);
+            return new LockWrapper(await _lock.WriterLockAsync(Program.CancelSource.Token), true);
         }
 
         /// <summary>

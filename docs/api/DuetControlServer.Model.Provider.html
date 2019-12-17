@@ -285,6 +285,9 @@
                             <a href="DuetAPI.Machine.CurrentMove.html" title="CurrentMove" class="">CurrentMove</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.Directories.html" title="Directories" class="">Directories</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.Drive.html" title="Drive" class="">Drive</a>
                           </li>
                           <li class="">
@@ -522,6 +525,9 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.FileDirectory.html" title="FileDirectory" class="">FileDirectory</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.FileInfoParser.html" title="FileInfoParser" class="">FileInfoParser</a>
                           </li>
                           <li class="">
@@ -678,6 +684,9 @@
                             <a href="DuetControlServer.Model.Observer.html" title="Observer" class="">Observer</a>
                           </li>
                           <li class="">
+                            <a href="DuetControlServer.Model.Observer.PropertyPathChanged.html" title="Observer.PropertyPathChanged" class="">Observer.PropertyPathChanged</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.Model.Output.html" title="Output" class="">Output</a>
                           </li>
                           <li class="">
@@ -691,9 +700,6 @@
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.ProbeItem.html" title="ProbeItem" class="">ProbeItem</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.Model.PropertyPathChanged.html" title="PropertyPathChanged" class="">PropertyPathChanged</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.PropertyPathChangeType.html" title="PropertyPathChangeType" class="">PropertyPathChangeType</a>
@@ -954,6 +960,18 @@
                             <a href="DuetWebServer.Middleware.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
                           </li>
                         </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Services.html" title="DuetWebServer.Services" class="">DuetWebServer.Services</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.html" title="ModelObserver" class="">ModelObserver</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.WebDirectoryChanged.html" title="ModelObserver.WebDirectoryChanged" class="">ModelObserver.WebDirectoryChanged</a>
+                          </li>
+                        </ul>  </li>
                   </ul>        </div>
               </div>
             </div>
@@ -1040,31 +1058,6 @@ so that pending updates can be performed as quickly as possible.</p>
   </div>
   <h3 id="methods">Methods
   </h3>
-  <a id="DuetControlServer_Model_Provider_AccessReadOnly_" data-uid="DuetControlServer.Model.Provider.AccessReadOnly*"></a>
-  <h4 id="DuetControlServer_Model_Provider_AccessReadOnly" data-uid="DuetControlServer.Model.Provider.AccessReadOnly">AccessReadOnly()</h4>
-  <div class="markdown level1 summary"><p>Access the machine model for read operations only</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static IDisposable AccessReadOnly()</code></pre>
-  </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.IDisposable</span></td>
-        <td><p>Disposable lock object to be used with a using directive</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_Model_Provider_AccessReadOnlyAsync_" data-uid="DuetControlServer.Model.Provider.AccessReadOnlyAsync*"></a>
   <h4 id="DuetControlServer_Model_Provider_AccessReadOnlyAsync" data-uid="DuetControlServer.Model.Provider.AccessReadOnlyAsync">AccessReadOnlyAsync()</h4>
   <div class="markdown level1 summary"><p>Access the machine model asynchronously for read operations only</p>
@@ -1072,7 +1065,7 @@ so that pending updates can be performed as quickly as possible.</p>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static AwaitableDisposable&lt;IDisposable&gt; AccessReadOnlyAsync()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;IDisposable&gt; AccessReadOnlyAsync()</code></pre>
   </div>
   <h5 class="returns">Returns</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1084,32 +1077,7 @@ so that pending updates can be performed as quickly as possible.</p>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">Nito.AsyncEx.AwaitableDisposable</span>&lt;<span class="xref">System.IDisposable</span>&gt;</td>
-        <td><p>Disposable lock object to be used with a using directive</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_Model_Provider_AccessReadWrite_" data-uid="DuetControlServer.Model.Provider.AccessReadWrite*"></a>
-  <h4 id="DuetControlServer_Model_Provider_AccessReadWrite" data-uid="DuetControlServer.Model.Provider.AccessReadWrite">AccessReadWrite()</h4>
-  <div class="markdown level1 summary"><p>Access the machine model for read/write operations</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static IDisposable AccessReadWrite()</code></pre>
-  </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.IDisposable</span></td>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.IDisposable</span>&gt;</td>
         <td><p>Disposable lock object to be used with a using directive</p>
 </td>
       </tr>

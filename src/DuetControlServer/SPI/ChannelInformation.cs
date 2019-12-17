@@ -438,19 +438,20 @@ namespace DuetControlServer.SPI
             }
 
             // Locate the macro file
-            string path = await FilePath.ToPhysicalAsync(filename, "sys");
-            if (!File.Exists(path))
+            string physicalFile = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
+            if (!File.Exists(physicalFile))
             {
                 if (filename == FilePath.ConfigFile)
                 {
-                    path = await FilePath.ToPhysicalAsync(FilePath.ConfigFileFallback, "sys");
-                    if (File.Exists(path))
+                    physicalFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFileFallback, FileDirectory.System);
+                    if (File.Exists(physicalFile))
                     {
                         // Use config.b.bak if config.g cannot be found
                         _logger.Warn("Using fallback file {0} because {1} could not be found", FilePath.ConfigFileFallback, FilePath.ConfigFile);
                     }
                     else
                     {
+                        // No configuration file found
                         await Utility.Logger.LogOutput(MessageType.Error, $"Macro files {FilePath.ConfigFile} and {FilePath.ConfigFileFallback} not found");
                     }
                 }
@@ -475,7 +476,7 @@ namespace DuetControlServer.SPI
             // Open the file
             try
             {
-                MacroFile macro = new MacroFile(path, Channel, startingCode);
+                MacroFile macro = new MacroFile(physicalFile, Channel, startingCode);
                 NestedMacros.Push(macro);
             }
             catch (Exception e)

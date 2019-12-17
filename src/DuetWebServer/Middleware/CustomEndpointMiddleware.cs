@@ -1,15 +1,11 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.Machine;
-using DuetAPIClient;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Net.WebSockets;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,16 +16,6 @@ namespace DuetWebServer.Middleware
     /// </summary>
     public class CustomEndpointMiddleware
     {
-        /// <summary>
-        /// Dictionary of registered third-party paths vs third-party HTTP endpoints
-        /// </summary>
-        private readonly Dictionary<string, HttpEndpoint> _endpoints = new Dictionary<string, HttpEndpoint>();
-
-        /// <summary>
-        /// Dictionary holding the current user sessions in the form IP vs Id
-        /// </summary>
-        private readonly Dictionary<string, int> _userSessions = new Dictionary<string, int>();
-
         /// <summary>
         /// Next request delegate to call
         /// </summary>
@@ -56,95 +42,6 @@ namespace DuetWebServer.Middleware
             _next = next;
             _configuration = configuration;
             _logger = logger;
-
-            SynchronizeModel();
-        }
-
-        /// <summary>
-        /// Synchronize all registered endpoints and user sessions
-        /// </summary>
-        private async void SynchronizeModel()
-        {
-            string unixSocket = _configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.FullSocketPath);
-            int retryDelay = _configuration.GetValue("ModelRetryDelay", 5000);
-
-            MachineModel model;
-            try
-            {
-                do
-                {
-                    try
-                    {
-                        // Establish a connection to DCS
-                        using SubscribeConnection connection = new SubscribeConnection();
-                        await connection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, "httpEndpoints/**|userSessions/**", unixSocket);
-
-                        // Get the machine model and keep it up-to-date
-                        model = await connection.GetMachineModel(Program.CancelSource.Token);
-                        lock (_endpoints)
-                        {
-                            foreach (HttpEndpoint ep in model.HttpEndpoints)
-                            {
-                                string fullPath = $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
-                                _endpoints[fullPath] = ep;
-                                _logger.LogInformation("Registered HTTP {0} endpoint via /machine/{1}/{2}", ep.EndpointType, ep.Namespace, ep.Path);
-                            }
-                        }
-
-                        do
-                        {
-                            // Wait for more updates
-                            using JsonDocument jsonPatch = await connection.GetMachineModelPatch(Program.CancelSource.Token);
-                            DuetAPI.Utility.JsonPatch.Patch(model, jsonPatch);
-
-                            // Check if the HTTP sessions have changed and rebuild them on demand
-                            if (jsonPatch.RootElement.TryGetProperty("httpEndpoints", out _))
-                            {
-                                _logger.LogInformation("New number of custom HTTP endpoints: {0}", model.HttpEndpoints.Count);
-
-
-                                lock (_endpoints)
-                                {
-                                    _endpoints.Clear();
-                                    foreach (HttpEndpoint ep in model.HttpEndpoints)
-                                    {
-                                        string fullPath = $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
-                                        _endpoints[fullPath] = ep;
-                                        _logger.LogInformation("Registered HTTP {0} endpoint via /machine/{1}/{2}", ep.EndpointType, ep.Namespace, ep.Path);
-                                    }
-                                }
-                            }
-
-                            // Rebuild the list of user sessions on demand
-                            if (jsonPatch.RootElement.TryGetProperty("userSessions", out _))
-                            {
-                                lock (_userSessions)
-                                {
-                                    _userSessions.Clear();
-                                    foreach (UserSession session in model.UserSessions)
-                                    {
-                                        _userSessions[session.Origin] = session.Id;
-                                    }
-                                }
-                            }
-                        }
-                        while (!Program.CancelSource.IsCancellationRequested);
-                    }
-                    catch (Exception e) when (!(e is OperationCanceledException))
-                    {
-                        _logger.LogWarning(e, "Failed to synchronize machine model");
-                        await Task.Delay(retryDelay, Program.CancelSource.Token);
-                    }
-                }
-                while (!Program.CancelSource.IsCancellationRequested);
-            }
-            catch (Exception e)
-            {
-                if (!(e is OperationCanceledException))
-                {
-                    _logger.LogError(e, "Failed to synchronize object model");
-                }
-            }
         }
 
         /// <summary>
@@ -156,10 +53,10 @@ namespace DuetWebServer.Middleware
         {
             // Check if this endpoint is reserved for any route
             HttpEndpoint httpEndpoint = null;
-            lock (_endpoints)
+            lock (Services.ModelObserver.Endpoints)
             {
                 string method = context.WebSockets.IsWebSocketRequest ? "WebSocket" : context.Request.Method.ToString();
-                if (_endpoints.TryGetValue($"{method}{context.Request.Path.Value}", out HttpEndpoint ep))
+                if (Services.ModelObserver.Endpoints.TryGetValue($"{method}{context.Request.Path.Value}", out HttpEndpoint ep))
                 {
                     httpEndpoint = ep;
                 }
@@ -177,10 +74,10 @@ namespace DuetWebServer.Middleware
 
                 // Try to find a user session
                 int sessionId = -1;
-                lock (_userSessions)
+                lock (Services.ModelObserver.UserSessions)
                 {
                     string ipAddress = context.Connection.RemoteIpAddress.ToString();
-                    if (_userSessions.TryGetValue(ipAddress, out int foundSessionId))
+                    if (Services.ModelObserver.UserSessions.TryGetValue(ipAddress, out int foundSessionId))
                     {
                         sessionId = foundSessionId;
                     }
@@ -192,9 +89,8 @@ namespace DuetWebServer.Middleware
                     using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
                     using CancellationTokenSource cts = new CancellationTokenSource();
-                    using CancellationTokenSource combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, Program.CancelSource.Token);
-                    Task webSocketTask = ReadFromWebSocket(webSocket, endpointConnection, sessionId, combinedCts.Token);
-                    Task unixSocketTask = ReadFromUnixSocket(webSocket, endpointConnection, combinedCts.Token);
+                    Task webSocketTask = ReadFromWebSocket(webSocket, endpointConnection, sessionId, cts.Token);
+                    Task unixSocketTask = ReadFromUnixSocket(webSocket, endpointConnection, cts.Token);
 
                     await Task.WhenAny(webSocketTask, unixSocketTask);
                     cts.Cancel();
@@ -290,7 +186,7 @@ namespace DuetWebServer.Middleware
         {
             if (webSocket.State == WebSocketState.Open)
             {
-                await webSocket.CloseAsync(status, message, Program.CancelSource.Token);
+                await webSocket.CloseAsync(status, message, default);
             }
         }
 
@@ -329,8 +225,8 @@ namespace DuetWebServer.Middleware
             }
 
             // Send it to the third-party application and get a response type
-            await endpointConnection.SendHttpRequest(receivedHttpRequest, Program.CancelSource.Token);
-            SendHttpResponse httpResponse = await endpointConnection.GetHttpResponse(Program.CancelSource.Token);
+            await endpointConnection.SendHttpRequest(receivedHttpRequest);
+            SendHttpResponse httpResponse = await endpointConnection.GetHttpResponse();
 
             // Send the response to the HTTP client
             context.Response.StatusCode = httpResponse.StatusCode;

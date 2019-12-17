@@ -7,6 +7,9 @@ namespace DuetControlServer.SPI
     /// </summary>
     public class QueuedLockRequest
     {
+        /// <summary>
+        /// Task completion source that completes when the lock request has been resolved
+        /// </summary>
         private readonly TaskCompletionSource<bool> _tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         /// <summary>

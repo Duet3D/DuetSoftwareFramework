@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.FileExecution;
+using Nito.AsyncEx;
 using System;
 using System.Globalization;
 using System.IO;
@@ -20,6 +21,16 @@ namespace DuetControlServer.Codes
     public static class MCodes
     {
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// Lock for <see cref="_fileToPrint"/>
+        /// </summary>
+        private static readonly AsyncLock _fileToPrintLock = new AsyncLock();
+
+        /// <summary>
         /// Selected file to print
         /// </summary>
         private static string _fileToPrint;
@@ -36,10 +47,16 @@ namespace DuetControlServer.Codes
                 // Cancel print
                 case 0:
                 case 1:
-                    if (await SPI.Interface.Flush(code.Channel) && (code.Channel == CodeChannel.File || Print.IsPaused))
+                    if (await SPI.Interface.Flush(code.Channel))
                     {
-                        // Invalidate the print file to make sure no more codes are read from the file
-                        await Print.Cancel();
+                        using (await Print.LockAsync())
+                        {
+                            if (code.Channel == CodeChannel.File || Print.IsPaused)
+                            {
+                                // Invalidate the print file and make sure no more codes are read from the file
+                                Print.Cancel();
+                            }
+                        }
                     }
                     break;
 
@@ -47,16 +64,18 @@ namespace DuetControlServer.Codes
                 case 23:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), "gcodes");
-                        if (File.Exists(file))
+                        string file = code.GetUnprecedentedString();
+                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
+
+                        if (File.Exists(physicalFile))
                         {
-                            lock (_fileToPrint)
+                            using (await _fileToPrintLock.LockAsync())
                             {
-                                _fileToPrint = file;
+                                _fileToPrint = physicalFile;
                             }
-                            return new CodeResult(MessageType.Success, $"File {code.GetUnprecedentedString()} selected for printing");
+                            return new CodeResult(MessageType.Success, $"File {file} selected for printing");
                         }
-                        return new CodeResult(MessageType.Error, $"Could not find file {code.GetUnprecedentedString()}");
+                        return new CodeResult(MessageType.Error, $"Could not find file {file}");
                     }
                     throw new OperationCanceledException();
 
@@ -65,20 +84,27 @@ namespace DuetControlServer.Codes
                     if (await SPI.Interface.Flush(code.Channel))
                     {
                         // See if a file print is supposed to be started
-                        if (!Print.IsPaused)
+                        using (await Print.LockAsync())
                         {
-                            string file;
-                            lock (_fileToPrint)
+                            if (!Print.IsPaused)
                             {
-                                file = _fileToPrint;
-                            }
+                                string file;
+                                using (await _fileToPrintLock.LockAsync())
+                                {
+                                    file = _fileToPrint;
+                                }
 
-                            if (string.IsNullOrEmpty(file))
-                            {
-                                return new CodeResult(MessageType.Error, "Cannot print, because no file is selected!");
-                            }
+                                if (string.IsNullOrEmpty(file))
+                                {
+                                    return new CodeResult(MessageType.Error, "Cannot print, because no file is selected!");
+                                }
+                                if (!File.Exists(file))
+                                {
+                                    return new CodeResult(MessageType.Error, "Selected file not found");
+                                }
 
-                            return await Print.Start(file, code.Channel);
+                                return await Print.Start(file, code.Channel);
+                            }
                         }
 
                         // Let RepRapFirmware process this request so it can invoke resume.g
@@ -91,10 +117,16 @@ namespace DuetControlServer.Codes
                 case 226:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        if (Print.IsPrinting && !Print.IsPaused)
+                        using (await Print.LockAsync())
                         {
-                            // Stop reading any more codes from the file being printed. Everything else is handled by RRF
-                            await Print.Pause();
+                            if (Print.IsPrinting && !Print.IsPaused)
+                            {
+                                // Invalidate the code's file position because it must not be used for pausing
+                                code.FilePosition = null;
+
+                                // Stop reading any more codes from the file being printed. Everything else is handled by RRF
+                                Print.Pause();
+                            }
                         }
 
                         // Let RepRapFirmware pause the print
@@ -106,10 +138,18 @@ namespace DuetControlServer.Codes
                 case 26:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        CodeParameter sParam = code.Parameter('S');
-                        if (sParam != null)
+                        using (await Print.LockAsync())
                         {
-                            Print.Position = sParam;
+                            if (!Print.IsPrinting)
+                            {
+                                return new CodeResult(MessageType.Error, "Not printing a file");
+                            }
+
+                            CodeParameter sParam = code.Parameter('S');
+                            if (sParam != null)
+                            {
+                                Print.Position = sParam;
+                            }
                         }
 
                         // P is not supported yet
@@ -122,25 +162,39 @@ namespace DuetControlServer.Codes
                 case 27:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        if (Print.IsPrinting)
+                        using (await Print.LockAsync())
                         {
-                            return new CodeResult(MessageType.Success, $"SD printing byte {Print.Position}/{Print.Length}");
+                            if (Print.IsPrinting)
+                            {
+                                return new CodeResult(MessageType.Success, $"SD printing byte {Print.Position}/{Print.Length}");
+                            }
+                            return new CodeResult(MessageType.Success, "Not SD printing.");
                         }
-                        return new CodeResult(MessageType.Success, "Not SD printing.");
                     }
                     throw new OperationCanceledException();
+
+                // Begin write to SD card
+                case 28:
+                    return new CodeResult(MessageType.Error, "M28 is not supported");
+
+                // End write to SD card
+                case 29:
+                    return new CodeResult(MessageType.Error, "M29 is not supported");
 
                 // Delete a file on the SD card
                 case 30:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = code.GetUnprecedentedString();
+                        string physicalFile = await FilePath.ToPhysicalAsync(file);
+
                         try
                         {
-                            File.Delete(await FilePath.ToPhysicalAsync(file));
+                            File.Delete(physicalFile);
                         }
                         catch (Exception e)
                         {
+                            _logger.Debug(e, "Failed to delete file");
                             return new CodeResult(MessageType.Error, $"Failed to delete file {file}: {e.Message}");
                         }
                     }
@@ -150,16 +204,22 @@ namespace DuetControlServer.Codes
                 case 32:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), "gcodes");
-                        if (File.Exists(file))
+                        string file = code.GetUnprecedentedString();
+                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
+
+                        if (File.Exists(physicalFile))
                         {
-                            lock (_fileToPrint)
+                            using (await _fileToPrintLock.LockAsync())
                             {
-                                _fileToPrint = file;
+                                _fileToPrint = physicalFile;
                             }
-                            return await Print.Start(file, code.Channel);
+
+                            using (await Print.LockAsync())
+                            {
+                                return await Print.Start(physicalFile, code.Channel);
+                            }
                         }
-                        return new CodeResult(MessageType.Error, $"Could not find file {code.GetUnprecedentedString()}");
+                        return new CodeResult(MessageType.Error, $"Could not find file {file}");
                     }
                     throw new OperationCanceledException();
 
@@ -169,16 +229,17 @@ namespace DuetControlServer.Codes
                     {
                         if (await SPI.Interface.Flush(code.Channel))
                         {
+                            string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
                             try
                             {
-                                string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
                                 ParsedFileInfo info = await FileInfoParser.Parse(file);
 
                                 string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
                                 return new CodeResult(MessageType.Success, "{\"err\":0," + json.Substring(1));
                             }
-                            catch
+                            catch (Exception e)
                             {
+                                _logger.Debug(e, "Failed to return file information");
                                 return new CodeResult(MessageType.Success, "{\"err\":1}");
                             }
                         }
@@ -201,20 +262,27 @@ namespace DuetControlServer.Codes
                 case 38:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
+                        string file = code.GetUnprecedentedString();
+                        string physicalFile = await FilePath.ToPhysicalAsync(file);
+
                         try
                         {
                             using FileStream stream = new FileStream(file, FileMode.Open, FileAccess.Read);
+
                             byte[] hash;
-                            using (var sha1 = System.Security.Cryptography.SHA1.Create())
-                            {
-                                hash = await Task.Run(() => sha1.ComputeHash(stream), Program.CancelSource.Token);
-                            }
+                            using System.Security.Cryptography.SHA1 sha1 = System.Security.Cryptography.SHA1.Create();
+                            hash = await Task.Run(() => sha1.ComputeHash(stream), Program.CancelSource.Token);
+
                             return new CodeResult(MessageType.Success, BitConverter.ToString(hash).Replace("-", string.Empty));
                         }
-                        catch (AggregateException ae)
+                        catch (Exception e)
                         {
-                            return new CodeResult(MessageType.Error, $"Could not compute SHA1 checksum for file {file}: {ae.InnerException.Message}");
+                            _logger.Debug(e, "Failed to compute SHA1 checksum");
+                            if (e is AggregateException ae)
+                            {
+                                e = ae.InnerException;
+                            }
+                            return new CodeResult(MessageType.Error, $"Could not compute SHA1 checksum for file {file}: {e.Message}");
                         }
                     }
                     throw new OperationCanceledException();
@@ -285,7 +353,8 @@ namespace DuetControlServer.Codes
                     if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
-                        string physicalFile = await FilePath.ToPhysicalAsync(file, "sys");
+                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.System);
+
                         try
                         {
                             if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
@@ -307,6 +376,7 @@ namespace DuetControlServer.Codes
                         }
                         catch (Exception e)
                         {
+                            _logger.Debug(e, "Failed to save height map");
                             if (e is AggregateException ae)
                             {
                                 e = ae.InnerException;
@@ -321,7 +391,8 @@ namespace DuetControlServer.Codes
                     if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
-                        string physicalFile = await FilePath.ToPhysicalAsync(file, "sys");
+                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.System);
+
                         try
                         {
                             Heightmap map = new Heightmap();
@@ -340,6 +411,7 @@ namespace DuetControlServer.Codes
                         }
                         catch (Exception e)
                         {
+                            _logger.Debug(e, "Failed to load height map");
                             if (e is AggregateException ae)
                             {
                                 e = ae.InnerException;
@@ -358,13 +430,15 @@ namespace DuetControlServer.Codes
                         {
                             return new CodeResult(MessageType.Error, "Missing directory name");
                         }
+                        string physicalPath = await FilePath.ToPhysicalAsync(path);
 
                         try
                         {
-                            Directory.CreateDirectory(await FilePath.ToPhysicalAsync(path));
+                            Directory.CreateDirectory(physicalPath);
                         }
                         catch (Exception e)
                         {
+                            _logger.Debug(e, "Failed to create directory");
                             return new CodeResult(MessageType.Error, $"Failed to create directory {path}: {e.Message}");
                         }
                     }
@@ -403,6 +477,7 @@ namespace DuetControlServer.Codes
                         }
                         catch (Exception e)
                         {
+                            _logger.Debug(e, "Failed to rename file or directory");
                             return new CodeResult(MessageType.Error, $"Failed to rename file or directory {from} to {to}: {e.Message}");
                         }
                     }
@@ -421,19 +496,38 @@ namespace DuetControlServer.Codes
                 case 503:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        string configFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFile, "sys");
+                        string configFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFile, FileDirectory.System);
                         if (File.Exists(configFile))
                         {
                             string content = await File.ReadAllTextAsync(configFile);
                             return new CodeResult(MessageType.Success, content);
                         }
-                        configFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFileFallback, "sys");
-                        if (File.Exists(configFile))
+
+                        string configFileFallback = await FilePath.ToPhysicalAsync(FilePath.ConfigFileFallback, FileDirectory.System);
+                        if (File.Exists(configFileFallback))
                         {
-                            string content = await File.ReadAllTextAsync(configFile);
+                            string content = await File.ReadAllTextAsync(configFileFallback);
                             return new CodeResult(MessageType.Success, content);
                         }
                         return new CodeResult(MessageType.Error, "Configuration file not found");
+                    }
+                    throw new OperationCanceledException();
+
+                // Set configuration file folder
+                case 505:
+                    if (await SPI.Interface.Flush(code.Channel))
+                    {
+                        string directory = code.Parameter('P'), physicalDirectory = await FilePath.ToPhysicalAsync(directory, "sys");
+                        if (Directory.Exists(physicalDirectory))
+                        {
+                            string actualDirectory = await FilePath.ToVirtualAsync(physicalDirectory);
+                            using (await Model.Provider.AccessReadWriteAsync())
+                            {
+                                Model.Provider.Get.Directories.System = actualDirectory;
+                            }
+                            return new CodeResult();
+                        }
+                        return new CodeResult(MessageType.Error, "Directory not found");
                     }
                     throw new OperationCanceledException();
 
@@ -476,6 +570,18 @@ namespace DuetControlServer.Codes
 
                         // Hostname is legit - pretend we didn't see this code so RRF can interpret it
                         return null;
+                    }
+                    throw new OperationCanceledException();
+
+                // Filament management
+                case 701:
+                case 702:
+                case 703:
+                    // The machine model has to be in-sync for the filament functions to work...
+                    if (await SPI.Interface.Flush(code.Channel))
+                    {
+                        await Model.Updater.WaitForFullUpdate();
+                        break;
                     }
                     throw new OperationCanceledException();
 
@@ -535,28 +641,21 @@ namespace DuetControlServer.Codes
 
                         if (sParam > 0)
                         {
-                            string filename = code.Parameter('P', Utility.Logger.DefaultLogFile);
-                            if (string.IsNullOrWhiteSpace(filename))
+                            string file = code.Parameter('P', Utility.Logger.DefaultLogFile);
+                            if (string.IsNullOrWhiteSpace(file))
                             {
                                 return new CodeResult(MessageType.Error, "Missing filename in M929 command");
                             }
 
-                            using (await Model.Provider.AccessReadWriteAsync())
-                            {
-                                string physicalFilename = await FilePath.ToPhysicalAsync(filename, "sys");
-                                await Utility.Logger.Start(physicalFilename);
-
-                                Model.Provider.Get.State.LogFile = filename;
-                            }
-
-                            return new CodeResult();
+                            string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.System);
+                            await Utility.Logger.Start(physicalFile);
                         }
-
-                        using (await Model.Provider.AccessReadWriteAsync())
+                        else
                         {
                             await Utility.Logger.Stop();
-                            Model.Provider.Get.State.LogFile = null;
                         }
+
+                        return new CodeResult();
                     }
                     throw new OperationCanceledException();
 
@@ -571,25 +670,27 @@ namespace DuetControlServer.Codes
                             {
                                 if (!string.IsNullOrEmpty(Model.Provider.Get.Electronics.ShortName))
                                 {
-                                    string iapFilename = Model.Provider.Get.Electronics.Firmware.Version.Contains("3.0beta")
+                                    // There are now two different IAP binaries, check which one to use
+                                    iapFile = Model.Provider.Get.Electronics.Firmware.Version.Contains("3.0beta")
                                         ? $"Duet3iap_spi_{Model.Provider.Get.Electronics.ShortName}.bin"
                                         : $"Duet3_SBCiap_{Model.Provider.Get.Electronics.ShortName}.bin";
-                                    Console.WriteLine("Using IAP {0}", iapFilename);
-                                    iapFile = await FilePath.ToPhysicalAsync(iapFilename, "sys");
-                                    firmwareFile = await FilePath.ToPhysicalAsync($"Duet3Firmware_{Model.Provider.Get.Electronics.ShortName}.bin", "sys");
+                                    firmwareFile = $"Duet3Firmware_{Model.Provider.Get.Electronics.ShortName}.bin";
                                 }
                                 else
                                 {
-                                    iapFile = await FilePath.ToPhysicalAsync($"Duet3iap_spi.bin", "sys");
-                                    firmwareFile = await FilePath.ToPhysicalAsync("Duet3Firmware.bin", "sys");
+                                    // ShortName field is not present - this must be a really old firmware version
+                                    iapFile = $"Duet3iap_spi.bin";
+                                    firmwareFile = "Duet3Firmware.bin";
                                 }
                             }
 
+                            iapFile = await FilePath.ToPhysicalAsync(iapFile, FileDirectory.System);
                             if (!File.Exists(iapFile))
                             {
                                 return new CodeResult(MessageType.Error, $"Failed to find IAP file {iapFile}");
                             }
 
+                            firmwareFile = await FilePath.ToPhysicalAsync(firmwareFile, FileDirectory.System);
                             if (!File.Exists(firmwareFile))
                             {
                                 return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
@@ -633,10 +734,13 @@ namespace DuetControlServer.Codes
             {
                 // Resume print
                 case 24:
-                    if (Print.IsPaused)
+                    using (await Print.LockAsync())
                     {
-                        // Resume sending file instructions to the firmware
-                        Print.Resume();
+                        if (Print.IsPaused)
+                        {
+                            // Resume sending file instructions to the firmware
+                            Print.Resume();
+                        }
                     }
                     break;
 

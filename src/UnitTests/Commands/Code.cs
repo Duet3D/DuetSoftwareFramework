@@ -4,7 +4,7 @@ using NUnit.Framework;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace DuetUnitTest.Commands
+namespace UnitTests.Commands
 {
     [TestFixture]
     public class Code
@@ -45,7 +45,8 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseG53Line()
         {
-            IList<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.SimpleCode.ParseMultiple("G53 G1 X100 G0 Y200\nG1 Z50");
+            DuetControlServer.Commands.SimpleCode simpleCode = new DuetControlServer.Commands.SimpleCode { Code = "G53 G1 X100 G0 Y200\nG1 Z50" };
+            IList<DuetControlServer.Commands.Code> codes = simpleCode.Parse().ToList();
             Assert.AreEqual(3, codes.Count);
 
             Assert.AreEqual(1, codes[0].MajorNumber);
@@ -363,7 +364,8 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseMultipleCodesSpace()
         {
-            List<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.SimpleCode.ParseMultiple("G91 G1 X5 Y2").ToList();
+            DuetControlServer.Commands.SimpleCode simpleCode = new DuetControlServer.Commands.SimpleCode { Code = "G91 G1 X5 Y2" };
+            IList<DuetControlServer.Commands.Code> codes = simpleCode.Parse().ToList();
 
             Assert.AreEqual(2, codes.Count);
 
@@ -382,7 +384,8 @@ namespace DuetUnitTest.Commands
         [Test]
         public void ParseMultipleCodesNL()
         {
-            List<DuetControlServer.Commands.Code> codes = DuetControlServer.Commands.SimpleCode.ParseMultiple("G91\nG1 X5 Y2").ToList();
+            DuetControlServer.Commands.SimpleCode simpleCode = new DuetControlServer.Commands.SimpleCode { Code = "G91\nG1 X5 Y2" };
+            IList<DuetControlServer.Commands.Code> codes = simpleCode.Parse().ToList();
 
             Assert.AreEqual(2, codes.Count);
 

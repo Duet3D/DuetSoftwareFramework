@@ -1,6 +1,3 @@
-using System.Threading.Tasks;
-using DuetAPIClient;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Primitives;
 
@@ -11,20 +8,35 @@ namespace DuetWebServer.FileProviders
     /// </summary>
     public class DuetFileProvider : IFileProvider
     {
-        private string _wwwRoot;
+        /// <summary>
+        /// Singleton to the file provider
+        /// </summary>
+        public static DuetFileProvider Instance { get; private set; }
+
+        /// <summary>
+        /// Physical file provider
+        /// </summary>
         private PhysicalFileProvider _provider;
-        
-        private readonly IConfiguration _configuration;
 
         /// <summary>
         /// Creates a new file resolver instance
         /// </summary>
-        /// <param name="configuration">Configuration provider</param>
-        public DuetFileProvider(IConfiguration configuration)
+        public DuetFileProvider()
         {
-            _configuration = configuration;
+            Instance = this;
+
+            Services.ModelObserver.OnWebDirectoryChanged += SetWebDirectory;
+            _provider = new PhysicalFileProvider(Services.ModelObserver.WebDirectory);
         }
-        
+
+        /// <summary>
+        /// Finalizer of this instance
+        /// </summary>
+        ~DuetFileProvider()
+        {
+            Services.ModelObserver.OnWebDirectoryChanged -= SetWebDirectory;
+        }
+
         /// <summary>
         /// Gets the file info of the specified path
         /// </summary>
@@ -32,8 +44,10 @@ namespace DuetWebServer.FileProviders
         /// <returns>File info</returns>
         public IFileInfo GetFileInfo(string subpath)
         {
-            ValidateProvider().Wait();
-            return _provider.GetFileInfo(subpath);
+            lock (this)
+            {
+                return _provider.GetFileInfo(subpath);
+            }
         }
 
         /// <summary>
@@ -43,8 +57,10 @@ namespace DuetWebServer.FileProviders
         /// <returns>Directory contents</returns>
         public IDirectoryContents GetDirectoryContents(string subpath)
         {
-            ValidateProvider().Wait();
-            return _provider.GetDirectoryContents(subpath);
+            lock (this)
+            {
+                return _provider.GetDirectoryContents(subpath);
+            }
         }
 
         /// <summary>
@@ -54,21 +70,22 @@ namespace DuetWebServer.FileProviders
         /// <returns>Change token</returns>
         public IChangeToken Watch(string filter)
         {
-            ValidateProvider().Wait();
-            return _provider.Watch(filter);
+            lock (this)
+            {
+                return _provider.Watch(filter);
+            }
         }
 
-        private async Task ValidateProvider()
+        /// <summary>
+        /// Set the directory of the file provider
+        /// </summary>
+        /// <param name="webDirectory">New web directory</param>
+        private void SetWebDirectory(string webDirectory)
         {
-            using (CommandConnection connection = new CommandConnection())
+            lock (this)
             {
-                await connection.Connect(_configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.FullSocketPath));
-                string wwwRoot = await connection.ResolvePath("0:/www");
-                if (wwwRoot != _wwwRoot)
-                {
-                    _provider = new PhysicalFileProvider(wwwRoot);
-                    _wwwRoot = wwwRoot;
-                }
+                _provider.Dispose();
+                _provider = new PhysicalFileProvider(webDirectory);
             }
         }
     }

@@ -77,7 +77,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Identifier of this connection
         /// </summary>
-        /// <seealso cref="BaseCommand.SourceConnection"/>
+        /// <seealso cref="Code.SourceConnection"/>
         public int Id { get; private set; }
         
         /// <summary>

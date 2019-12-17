@@ -285,6 +285,9 @@
                             <a href="DuetAPI.Machine.CurrentMove.html" title="CurrentMove" class="">CurrentMove</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.Directories.html" title="Directories" class="">Directories</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.Drive.html" title="Drive" class="">Drive</a>
                           </li>
                           <li class="">
@@ -522,6 +525,9 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.FileDirectory.html" title="FileDirectory" class="">FileDirectory</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.FileInfoParser.html" title="FileInfoParser" class="">FileInfoParser</a>
                           </li>
                           <li class="">
@@ -678,6 +684,9 @@
                             <a href="DuetControlServer.Model.Observer.html" title="Observer" class="">Observer</a>
                           </li>
                           <li class="">
+                            <a href="DuetControlServer.Model.Observer.PropertyPathChanged.html" title="Observer.PropertyPathChanged" class="">Observer.PropertyPathChanged</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.Model.Output.html" title="Output" class="">Output</a>
                           </li>
                           <li class="">
@@ -691,9 +700,6 @@
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.ProbeItem.html" title="ProbeItem" class="">ProbeItem</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.Model.PropertyPathChanged.html" title="PropertyPathChanged" class="">PropertyPathChanged</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.PropertyPathChangeType.html" title="PropertyPathChangeType" class="">PropertyPathChangeType</a>
@@ -954,6 +960,18 @@
                             <a href="DuetWebServer.Middleware.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
                           </li>
                         </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Services.html" title="DuetWebServer.Services" class="">DuetWebServer.Services</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.html" title="ModelObserver" class="">ModelObserver</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.WebDirectoryChanged.html" title="ModelObserver.WebDirectoryChanged" class="">ModelObserver.WebDirectoryChanged</a>
+                          </li>
+                        </ul>  </li>
                   </ul>        </div>
               </div>
             </div>
@@ -1011,34 +1029,51 @@
   <h3 id="constructors">Constructors
   </h3>
   <a id="DuetWebServer_FileProviders_DuetFileProvider__ctor_" data-uid="DuetWebServer.FileProviders.DuetFileProvider.#ctor*"></a>
-  <h4 id="DuetWebServer_FileProviders_DuetFileProvider__ctor_Microsoft_Extensions_Configuration_IConfiguration_" data-uid="DuetWebServer.FileProviders.DuetFileProvider.#ctor(Microsoft.Extensions.Configuration.IConfiguration)">DuetFileProvider(IConfiguration)</h4>
+  <h4 id="DuetWebServer_FileProviders_DuetFileProvider__ctor" data-uid="DuetWebServer.FileProviders.DuetFileProvider.#ctor">DuetFileProvider()</h4>
   <div class="markdown level1 summary"><p>Creates a new file resolver instance</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public DuetFileProvider(IConfiguration configuration)</code></pre>
+    <pre><code class="lang-csharp hljs">public DuetFileProvider()</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
+  <h3 id="properties">Properties
+  </h3>
+  <a id="DuetWebServer_FileProviders_DuetFileProvider_Instance_" data-uid="DuetWebServer.FileProviders.DuetFileProvider.Instance*"></a>
+  <h4 id="DuetWebServer_FileProviders_DuetFileProvider_Instance" data-uid="DuetWebServer.FileProviders.DuetFileProvider.Instance">Instance</h4>
+  <div class="markdown level1 summary"><p>Singleton to the file provider</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static DuetFileProvider Instance { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
         <th>Type</th>
-        <th>Name</th>
         <th>Description</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">Microsoft.Extensions.Configuration.IConfiguration</span></td>
-        <td><span class="parametername">configuration</span></td>
-        <td><p>Configuration provider</p>
-</td>
+        <td><a class="xref" href="DuetWebServer.FileProviders.DuetFileProvider.html">DuetFileProvider</a></td>
+        <td></td>
       </tr>
     </tbody>
   </table>
   <h3 id="methods">Methods
   </h3>
+  <a id="DuetWebServer_FileProviders_DuetFileProvider_Finalize_" data-uid="DuetWebServer.FileProviders.DuetFileProvider.Finalize*"></a>
+  <h4 id="DuetWebServer_FileProviders_DuetFileProvider_Finalize" data-uid="DuetWebServer.FileProviders.DuetFileProvider.Finalize">Finalize()</h4>
+  <div class="markdown level1 summary"><p>Finalizer of this instance</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected void Finalize()</code></pre>
+  </div>
   <a id="DuetWebServer_FileProviders_DuetFileProvider_GetDirectoryContents_" data-uid="DuetWebServer.FileProviders.DuetFileProvider.GetDirectoryContents*"></a>
   <h4 id="DuetWebServer_FileProviders_DuetFileProvider_GetDirectoryContents_System_String_" data-uid="DuetWebServer.FileProviders.DuetFileProvider.GetDirectoryContents(System.String)">GetDirectoryContents(String)</h4>
   <div class="markdown level1 summary"><p>Returns the contents of the given directory</p>

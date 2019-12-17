@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -67,7 +68,8 @@ namespace DuetControlServer
             // Initialize everything
             try
             {
-                Commands.Code.InitScheduler();
+                Commands.Code.Init();
+                Commands.SimpleCode.Init();
                 Model.Provider.Init();
                 Model.Observer.Init();
                 _logger.Info("Environment initialized");
@@ -88,7 +90,7 @@ namespace DuetControlServer
                 try
                 {
                     SPI.Interface.Init();
-                    if (SPI.Interface.Connect())
+                    if (await SPI.Interface.Connect())
                     {
                         _logger.Info("Connection to Duet established");
                     }
@@ -123,7 +125,8 @@ namespace DuetControlServer
                 { Task.Run(Model.Updater.Run), "Update" },
                 { Task.Run(SPI.Interface.Run), "SPI" },
                 { Task.Run(IPC.Server.Run), "IPC" },
-                { Task.Run(Model.PeriodicUpdater.Run), "Periodic update" }
+                { Task.Run(FileExecution.Print.Run), "Print" },
+                { Task.Run(Model.PeriodicUpdater.Run), "Periodic updater" }
             };
 
             // Deal with program termination requests (SIGTERM and Ctrl+C)
@@ -150,9 +153,11 @@ namespace DuetControlServer
             Task terminatedTask = await Task.WhenAny(mainTasks.Keys);
             if (!CancelSource.IsCancellationRequested)
             {
-                if (!Settings.UpdateOnly)
+                _logger.Fatal("Abnormal program termination");
+                if (terminatedTask.IsCanceled)
                 {
-                    _logger.Fatal("Abnormal program termination");
+                    string taskName = mainTasks[terminatedTask];
+                    _logger.Fatal(terminatedTask.Exception, "{0} task faulted", taskName);
                 }
                 CancelSource.Cancel();
             }
@@ -176,8 +181,6 @@ namespace DuetControlServer
                 mainTasks.Remove(terminatedTask);
                 if (mainTasks.Count > 0)
                 {
-                    // FIXME: At present, calls to Task.WhenAny in this context may cause the .NET Core application to
-                    // terminate suddently and without an exception. Hence the output may be truncated when shutting down
                     terminatedTask = await Task.WhenAny(mainTasks.Keys);
                 }
             }
@@ -203,42 +206,44 @@ namespace DuetControlServer
         /// <returns>True if another instance is running</returns>
         private static async Task<bool> CheckForAnotherInstance()
         {
-            using (DuetAPIClient.CommandConnection connection = new DuetAPIClient.CommandConnection())
+            using DuetAPIClient.CommandConnection connection = new DuetAPIClient.CommandConnection();
+            try
             {
+                await connection.Connect(Settings.FullSocketPath);
+            }
+            catch (SocketException)
+            {
+                return false;
+            }
+
+            if (Settings.UpdateOnly)
+            {
+                Console.Write("Sending update request to DCS... ");
                 try
                 {
-                    await connection.Connect(Settings.FullSocketPath);
-                    if (Settings.UpdateOnly)
+                    await connection.PerformCode(new DuetAPI.Commands.Code
                     {
-                        Console.Write("Sending update request to DCS... ");
-                        try
-                        {
-                            await connection.PerformCode(new DuetAPI.Commands.Code
-                            {
-                                Type = DuetAPI.Commands.CodeType.MCode,
-                                MajorNumber = 997,
-                                Flags = DuetAPI.Commands.CodeFlags.IsPrioritized
-                            });
-                            Console.WriteLine("Done!");
-                        }
-                        catch
-                        {
-                            Console.WriteLine("Error: Failed to send update request");
-                            throw;
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("Error: Another instance is already running. Stopping.");
-                    }
-                    return true;
+                        Type = DuetAPI.Commands.CodeType.MCode,
+                        MajorNumber = 997,
+                        Flags = DuetAPI.Commands.CodeFlags.IsPrioritized
+                    });
+                    Console.WriteLine("Done!");
                 }
                 catch
                 {
-                    // expected
+                    Console.WriteLine("Error: Failed to send update request");
+                    throw;
+                }
+                finally
+                {
+                    Program.CancelSource.Cancel();
                 }
             }
-            return false;
+            else
+            {
+                _logger.Fatal("Another instance is already running. Stopping.");
+            }
+            return true;
         }
     }
 }

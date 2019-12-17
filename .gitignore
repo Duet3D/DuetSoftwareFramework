@@ -261,6 +261,7 @@ __pycache__/
 *.pyc
 
 # DocFX
+src/Documentation/log.txt
 src/Documentation/api
 !src/Documentation/api/index.md
 !src/Documentation/api/toc.yml
