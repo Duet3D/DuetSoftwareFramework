@@ -3,7 +3,7 @@ Version: DWSVER
 Section: electronics
 Priority: optional
 Architecture: TARGET_ARCH
-Depends: duetcontrolserver (>= 1.1.0.0), duetruntime (>= 1.1.0.0), duetruntime (<< 1.2.0.0)
+Depends: duetcontrolserver (>= DCSVER), duetruntime (>= DCSVER)
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
 Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git
