@@ -41,9 +41,9 @@ namespace DuetControlServer.Model
         private static int _jsonLength;
 
         /// <summary>
-        /// Event that is triggered when the full object model has been updated
+        /// Monitor that is notified when the full object model has been updated
         /// </summary>
-        private static readonly AsyncManualResetEvent _updateEvent = new AsyncManualResetEvent();
+        private static readonly AsyncMonitor _updateEvent = new AsyncMonitor();
 
         /// <summary>
         /// Last-known Z height
@@ -61,8 +61,11 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task WaitForFullUpdate()
         {
-            await _updateEvent.WaitAsync(Program.CancelSource.Token);
-            Program.CancelSource.Token.ThrowIfCancellationRequested();
+            using (await _updateEvent.EnterAsync())
+            {
+                await _updateEvent.WaitAsync(Program.CancelSource.Token);
+                Program.CancelSource.Token.ThrowIfCancellationRequested();
+            }
         }
 
         /// <summary>
@@ -121,8 +124,7 @@ namespace DuetControlServer.Model
                         // Notify waiting clients about the model update
                         if (_module == 2)
                         {
-                            _updateEvent.Set();
-                            _updateEvent.Reset();
+                            _updateEvent.PulseAll();
                         }
                     }
                     catch (JsonException e)

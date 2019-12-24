@@ -188,13 +188,27 @@ namespace DuetAPI.Commands
             // After this append each parameter and encapsulate it in double quotes
             foreach(CodeParameter parameter in Parameters)
             {
-                if (parameter.Type == typeof(string))
+                if (parameter.Letter != '\0')
                 {
-                    builder.Append($" {parameter.Letter}\"{((string)parameter).Replace("\"", "\"\"")}\"");
+                    if (parameter.Type == typeof(string))
+                    {
+                        builder.Append($" {parameter.Letter}\"{((string)parameter).Replace("\"", "\"\"")}\"");
+                    }
+                    else
+                    {
+                        builder.Append($" {parameter.Letter}{(string)parameter}");
+                    }
                 }
                 else
                 {
-                    builder.Append($" {parameter.Letter}{(string)parameter}");
+                    if (parameter.Type == typeof(string))
+                    {
+                        builder.Append($" \"{((string)parameter).Replace("\"", "\"\"")}\"");
+                    }
+                    else
+                    {
+                        builder.Append($" {(string)parameter}");
+                    }
                 }
             }
 

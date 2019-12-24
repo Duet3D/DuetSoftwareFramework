@@ -60,7 +60,7 @@ namespace DuetControlServer.FileExecution
         /// <param name="fileName">Filename of the macro</param>
         /// <param name="channel">Channel to send the codes to</param>
         /// <param name="startCode">Which code is starting this macro file</param>
-        public MacroFile(string fileName, CodeChannel channel, QueuedCode startCode) : base(fileName, channel)
+        public MacroFile(string fileName, CodeChannel channel, QueuedCode startCode = null) : base(fileName, channel)
         {
             if (startCode == null)
             {

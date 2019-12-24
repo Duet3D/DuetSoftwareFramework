@@ -67,11 +67,6 @@ namespace DuetControlServer
         public const string FilamentsFile = "filaments.csv";
 
         /// <summary>
-        /// Macro file to run when a file print is being started
-        /// </summary>
-        public const string StartMacroFile = "start.g";
-
-        /// <summary>
         /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path asynchronously.
         /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings
         /// </summary>

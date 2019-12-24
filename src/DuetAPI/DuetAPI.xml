@@ -4399,6 +4399,39 @@
             </summary>
             <returns>A clone of this instance</returns>
         </member>
+        <member name="T:DuetAPI.Utility.FileLists">
+            <summary>
+            Helper class to generate RRF-style file lists
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.FileLists.MakeFileListContainer(System.Object,System.String,System.Int32)">
+            <summary>
+            Make a filelist container for M20
+            </summary>
+            <param name="items">Items to include</param>
+            <param name="directory">RRF directory</param>
+            <param name="startAt">First item</param>
+            <returns>JSON file list object</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.FileLists.GetFiles(System.String,System.String,System.Int32,System.Boolean)">
+            <summary>
+            Get a /rr_files or M20 files response
+            </summary>
+            <param name="directory">RRF path to the directory</param>
+            <param name="physicalDirectory">Physical directory</param>
+            <param name="startAt">First item to send</param>
+            <param name="flagDirs">Prefix directories with an asterisk</param>
+            <returns>JSON file list</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.FileLists.GetFileList(System.String,System.String,System.Int32)">
+            <summary>
+            Get a /rr_filelist or M20 files response
+            </summary>
+            <param name="directory">RRF path to the directory</param>
+            <param name="physicalDirectory">Physical directory</param>
+            <param name="startAt">First file index to return. Set startAt to -1 to omit error handling and the JSON object container</param>
+            <returns>JSON list</returns>
+        </member>
         <member name="T:DuetAPI.Utility.Heightmap">
             <summary>
             Class representing a heightmap

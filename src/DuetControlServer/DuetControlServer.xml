@@ -39,16 +39,6 @@
             Logger instance
             </summary>
         </member>
-        <member name="F:DuetControlServer.Codes.MCodes._fileToPrintLock">
-            <summary>
-            Lock for <see cref="F:DuetControlServer.Codes.MCodes._fileToPrint"/>
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Codes.MCodes._fileToPrint">
-            <summary>
-            Selected file to print
-            </summary>
-        </member>
         <member name="M:DuetControlServer.Codes.MCodes.Process(DuetControlServer.Commands.Code)">
             <summary>
             Process an M-code that should be interpreted by the control server
@@ -197,7 +187,23 @@
             Overridden code channel property to upate the cancellation token when necessary
             </summary>
         </member>
-        <member name="P:DuetControlServer.Commands.Code.InternallyProcessed">
+        <member name="F:DuetControlServer.Commands.Code.FileLocks">
+            <summary>
+            Lock around the files being written
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.FilesBeingWritten">
+            <summary>
+            Current stream writer of the files being written to (M28/M29)
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.EmulatingMarlin">
+            <summary>
+            Check if Marlin is being emulated
+            </summary>
+            <returns>True if Marlin is being emulated</returns>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternallyProcessed">
             <summary>
             Indicates whether the code has been internally processed
             </summary>
@@ -209,9 +215,27 @@
             <returns>Result of the code</returns>
             <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
         </member>
+        <member name="M:DuetControlServer.Commands.Code.ExecuteInternally">
+            <summary>
+            Execute the given code internally
+            </summary>
+            <returns>Result of the code</returns>
+        </member>
         <member name="M:DuetControlServer.Commands.Code.Process">
             <summary>
             Process the code
+            </summary>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.ProcessInternally">
+            <summary>
+            Attempt to process this code internally
+            </summary>
+            <returns>Whether the code could be processed internally</returns>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.CodeExecuted">
+            <summary>
+            Executed when the code has finished
             </summary>
             <returns>Asynchronous task</returns>
         </member>
@@ -549,9 +573,9 @@
             Logger instance
             </summary>
         </member>
-        <member name="F:DuetControlServer.FileExecution.Print._monitor">
+        <member name="F:DuetControlServer.FileExecution.Print._lock">
             <summary>
-            Monitor for the print tasks
+            Lock around the print class
             </summary>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.LockAsync">
@@ -560,14 +584,34 @@
             </summary>
             <returns>Disposable lock</returns>
         </member>
+        <member name="F:DuetControlServer.FileExecution.Print._resume">
+            <summary>
+            Condition to trigger when the print is supposed to resume
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.FileExecution.Print._finished">
+            <summary>
+            Condition to trigger when the print has finished
+            </summary>
+        </member>
         <member name="F:DuetControlServer.FileExecution.Print._file">
             <summary>
             Job file being read from
             </summary>
         </member>
+        <member name="P:DuetControlServer.FileExecution.Print.IsFileSelected">
+            <summary>
+            Indicates if a file has been selected for printing
+            </summary>
+        </member>
         <member name="P:DuetControlServer.FileExecution.Print.IsPrinting">
             <summary>
-            Indicates if a print is going on
+            Indicates if a print is live
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.Print.IsSimulating">
+            <summary>
+            Indicates if a file is being simulated
             </summary>
         </member>
         <member name="P:DuetControlServer.FileExecution.Print.IsPaused">
@@ -580,12 +624,7 @@
             Indicates if the file print has been aborted
             </summary>
         </member>
-        <member name="P:DuetControlServer.FileExecution.Print.Length">
-            <summary>
-            Returns the length of the file being printed in bytes
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.FileExecution.Print.Position">
+        <member name="P:DuetControlServer.FileExecution.Print.FilePosition">
             <summary>
             Reports the current file position
             </summary>
@@ -595,13 +634,18 @@
             Holds the file position after the current code being executed
             </summary>
         </member>
-        <member name="M:DuetControlServer.FileExecution.Print.Start(System.String,DuetAPI.CodeChannel)">
+        <member name="P:DuetControlServer.FileExecution.Print.FileLength">
             <summary>
-            Begin a file print
+            Returns the length of the file being printed in bytes
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.Print.SelectFile(System.String,System.Boolean)">
+            <summary>
+            Start a new file print
             </summary>
             <param name="fileName">File to print</param>
-            <param name="source">Channel that requested the file to be printed</param>
-            <returns>Code result</returns>
+            <param name="simulating">Whether the file is being simulated</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Run">
             <summary>
@@ -612,19 +656,16 @@
             <summary>
             Called when the print is being paused
             </summary>
-            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Resume">
             <summary>
-            Resume a paused print
+            Resume a file print
             </summary>
-            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Cancel">
             <summary>
             Cancel the current print (e.g. when M0 is called)
             </summary>
-            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Abort">
             <summary>
@@ -1260,7 +1301,7 @@
         </member>
         <member name="F:DuetControlServer.Model.Updater._updateEvent">
             <summary>
-            Event that is triggered when the full object model has been updated
+            Monitor that is notified when the full object model has been updated
             </summary>
         </member>
         <member name="F:DuetControlServer.Model.Updater._currentHeight">
@@ -3957,11 +3998,6 @@
         <member name="F:DuetControlServer.FilePath.FilamentsFile">
             <summary>
             File holding the filaments mapping
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.FilePath.StartMacroFile">
-            <summary>
-            Macro file to run when a file print is being started
             </summary>
         </member>
         <member name="M:DuetControlServer.FilePath.ToPhysicalAsync(System.String,DuetControlServer.FileDirectory)">

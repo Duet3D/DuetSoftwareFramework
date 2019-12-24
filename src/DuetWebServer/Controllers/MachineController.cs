@@ -399,24 +399,7 @@ namespace DuetWebServer.Controllers
                     _logger.LogWarning($"[{nameof(GetFileList)}] Could not find directory {directory} (resolved to {resolvedPath})");
                     return NotFound(HttpUtility.UrlPathEncode(directory));
                 }
-                List<object> fileList = new List<object>();
-
-                // List directories
-                foreach (string dir in Directory.EnumerateDirectories(resolvedPath))
-                {
-                    DirectoryInfo info = new DirectoryInfo(dir);
-                    fileList.Add(new { type = 'd', name = info.Name, date = info.LastWriteTime });
-                }
-                
-                // List files
-                foreach (string file in Directory.EnumerateFiles(resolvedPath))
-                {
-                    FileInfo info = new FileInfo(file);
-                    fileList.Add(new { type = 'f', name = info.Name, size = info.Length, date = info.LastWriteTime });
-                }
-                
-                string json = JsonSerializer.Serialize(fileList, JsonHelper.DefaultJsonOptions);
-                return Content(json, "application/json");
+                return Content(FileLists.GetFileList(directory, resolvedPath), "application/json");
             }
             catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
             {

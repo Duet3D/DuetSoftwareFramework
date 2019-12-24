@@ -63,7 +63,14 @@ namespace CodeConsole
                     try
                     {
                         string output = await connection.PerformSimpleCode(input);
-                        Console.Write(output);
+                        if (output.EndsWith('\n'))
+                        {
+                            Console.Write(output);
+                        }
+                        else
+                        {
+                            Console.WriteLine(output);
+                        }
                     }
                     catch (SocketException)
                     {
@@ -91,7 +98,14 @@ namespace CodeConsole
             {
                 // Execute only the given code(s) and quit
                 string output = await connection.PerformSimpleCode(codeToExecute);
-                Console.Write(output);
+                if (output.EndsWith('\n'))
+                {
+                    Console.Write(output);
+                }
+                else
+                {
+                    Console.WriteLine(output);
+                }
             }
         }
     }

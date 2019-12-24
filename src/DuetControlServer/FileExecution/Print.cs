@@ -1,6 +1,5 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -22,15 +21,25 @@ namespace DuetControlServer.FileExecution
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
-        /// Monitor for the print tasks
+        /// Lock around the print class
         /// </summary>
-        private static readonly AsyncMonitor _monitor = new AsyncMonitor();
+        private static readonly AsyncLock _lock = new AsyncLock();
 
         /// <summary>
         /// Lock this class asynchronously
         /// </summary>
         /// <returns>Disposable lock</returns>
-        public static AwaitableDisposable<IDisposable> LockAsync() => _monitor.EnterAsync();
+        public static AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync();
+
+        /// <summary>
+        /// Condition to trigger when the print is supposed to resume
+        /// </summary>
+        private static readonly AsyncConditionVariable _resume = new AsyncConditionVariable(_lock);
+
+        /// <summary>
+        /// Condition to trigger when the print has finished
+        /// </summary>
+        private static readonly AsyncConditionVariable _finished = new AsyncConditionVariable(_lock);
 
         /// <summary>
         /// Job file being read from
@@ -38,9 +47,19 @@ namespace DuetControlServer.FileExecution
         private static BaseFile _file;
 
         /// <summary>
-        /// Indicates if a print is going on
+        /// Indicates if a file has been selected for printing
         /// </summary>
-        public static bool IsPrinting { get => _file != null; }
+        public static bool IsFileSelected { get => _file != null; }
+
+        /// <summary>
+        /// Indicates if a print is live
+        /// </summary>
+        public static bool IsPrinting { get; private set; }
+
+        /// <summary>
+        /// Indicates if a file is being simulated
+        /// </summary>
+        public static bool IsSimulating { get; private set; }
 
         /// <summary>
         /// Indicates if the file print has been paused
@@ -53,14 +72,10 @@ namespace DuetControlServer.FileExecution
         public static bool IsAborted { get; private set; }
 
         /// <summary>
-        /// Returns the length of the file being printed in bytes
-        /// </summary>
-        public static long Length { get => _file.Length; }
-
-        /// <summary>
         /// Reports the current file position
         /// </summary>
-        public static long Position {
+        public static long FilePosition
+        {
             get => _file.Position;
             set => _file.Position = value;
         }
@@ -71,52 +86,44 @@ namespace DuetControlServer.FileExecution
         public static long? NextFilePosition { get; set; }
 
         /// <summary>
-        /// Begin a file print
+        /// Returns the length of the file being printed in bytes
+        /// </summary>
+        public static long FileLength { get => _file.Length; }
+
+        /// <summary>
+        /// Start a new file print
         /// </summary>
         /// <param name="fileName">File to print</param>
-        /// <param name="source">Channel that requested the file to be printed</param>
-        /// <returns>Code result</returns>
-        public static async Task<CodeResult> Start(string fileName, CodeChannel source)
+        /// <param name="simulating">Whether the file is being simulated</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task SelectFile(string fileName, bool simulating = false)
         {
-            // Initialize the file
-            if (_file != null)
-            {
-                if (source != CodeChannel.File)
-                {
-                    _logger.Info("Print is starting a new file");
-                    return new CodeResult(MessageType.Error, "A file is already being printed");
-                }
+            // Analyze and open the file
+            ParsedFileInfo info = await FileInfoParser.Parse(fileName);
+            BaseFile file = new BaseFile(fileName, CodeChannel.File);
 
-                // A file being printed may start another file print, deal with pending codes
-                Abort();
+            // A file being printed may start another file print
+            if (_file != null && IsPrinting)
+            {
+                Cancel();
+                Code.CancelPending(CodeChannel.File);
+                await _finished.WaitAsync(Program.CancelSource.Token);
             }
 
-            // Reset the state and analyze this file
+            // Update the state
             IsPaused = IsAborted = false;
-            _file = new BaseFile(fileName, CodeChannel.File);
-            ParsedFileInfo info = await FileInfoParser.Parse(fileName);
+            IsSimulating = simulating;
+            _file = file;
 
+            // Update the object model
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                // Update the object model
                 Model.Provider.Get.Channels[CodeChannel.File].VolumetricExtrusion = false;
                 Model.Provider.Get.Job.File.Assign(info);
-
-                // Notify RepRapFirmware and start processing the file in the background
-                _logger.Info("Printing file {0}", fileName);
-                SPI.Interface.SetPrintStarted();
-                _monitor.Pulse();
-
-                // Return a result
-                if (Model.Provider.Get.Channels[source].Compatibility == Compatibility.Marlin)
-                {
-                    return new CodeResult(MessageType.Success, "File opened\nFile selected");
-                }
-                else
-                {
-                    return new CodeResult();
-                }
             }
+
+            // Notify RepRapFirmware and start processing the file in the background
+            _logger.Info("Selected file {0}", _file.FileName);
         }
 
         /// <summary>
@@ -127,113 +134,129 @@ namespace DuetControlServer.FileExecution
             do
             {
                 // Wait for the next print to start
-                BaseFile file;
-                using (await _monitor.EnterAsync())
+                bool startingNewPrint;
+                using (await _lock.LockAsync())
                 {
-                    await _monitor.WaitAsync(Program.CancelSource.Token);
-                    file = _file;
+                    await _resume.WaitAsync(Program.CancelSource.Token);
+                    startingNewPrint = !_file.IsAborted;
+                    IsPrinting = startingNewPrint;
                 }
 
-                Queue<Code> codes = new Queue<Code>();
-                Queue<Task<CodeResult>> codeTasks = new Queue<Task<CodeResult>>();
-                do
+                // Deal with the file print
+                if (startingNewPrint)
                 {
-                    Code code;
-                    using (await _monitor.EnterAsync())
+                    _logger.Info("Starting file print");
+
+                    // Notify RRF
+                    SPI.Interface.SetPrintStarted();
+
+                    // Process the file
+                    Queue<Code> codes = new Queue<Code>();
+                    Queue<Task<CodeResult>> codeTasks = new Queue<Task<CodeResult>>();
+                    do
                     {
-                        // Check if the print is still going
-                        if (_file != file && _file != null)
+                        using (await _lock.LockAsync())
                         {
-                            // No longer printing the file we started with
-                            break;
-                        }
-
-                        if (IsPaused)
-                        {
-                            // Wait for print to resume
-                            await _monitor.WaitAsync(Program.CancelSource.Token);
-                        }
-
-                        // Fill up the code buffer
-                        while (codeTasks.Count == 0 || codeTasks.Count < Settings.BufferedPrintCodes)
-                        {
-                            code = file.ReadCode();
-                            if (code == null)
+                            // Check if the print has been paued
+                            if (IsPaused)
                             {
-                                // No more codes available
-                                break;
+                                IsPrinting = false;
+                                await _resume.WaitAsync(Program.CancelSource.Token);
                             }
 
-                            codes.Enqueue(code);
-                            codeTasks.Enqueue(code.Execute());
-                        }
-                    }
+                            // Fill up the code buffer
+                            while (codeTasks.Count == 0 || codeTasks.Count < Settings.BufferedPrintCodes)
+                            {
+                                Code readCode = _file.ReadCode();
+                                if (readCode == null)
+                                {
+                                    // Print complete
+                                    break;
+                                }
 
-                    // Is there anything more to do?
-                    if (codes.TryDequeue(out code))
-                    {
-                        // Wait for the next code to finish
-                        try
-                        {
-                            CodeResult result = await codeTasks.Dequeue();
-                            await Utility.Logger.LogOutput(result);
+                                codes.Enqueue(readCode);
+                                codeTasks.Enqueue(readCode.Execute());
+                            }
                         }
-                        catch (Exception e)
+
+                        // Is there anything more to do?
+                        if (codes.TryDequeue(out Code code))
                         {
-                            if (!(e is OperationCanceledException))
+                            try
+                            {
+                                CodeResult result = await codeTasks.Dequeue();
+                                await Utility.Logger.LogOutput(result);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                // May happen when the file being printed is exchanged or
+                                // when a third-party application decides to cancel a code
+                            }
+                            catch (Exception e)
                             {
                                 await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
-                                using (await _monitor.EnterAsync())
+                                using (await _lock.LockAsync())
                                 {
                                     Abort();
                                     break;
                                 }
                             }
                         }
-                    }
-                    else
-                    {
-                        // No more codes available - print must have finished
-                        using (await _monitor.EnterAsync())
+                        else
                         {
-                            NextFilePosition = null;
-                            _file = null;
+                            // No more codes available - print must have finished
+                            break;
                         }
-                        break;
                     }
-                } while (!Program.CancelSource.IsCancellationRequested && !IsAborted);
+                    while (!Program.CancelSource.IsCancellationRequested);
 
-                // Update the last print filename
-                using (await Model.Provider.AccessReadWriteAsync())
-                {
-                    Model.Provider.Get.Job.LastFileAborted = file.IsAborted && IsAborted;
-                    Model.Provider.Get.Job.LastFileCancelled = file.IsAborted && !IsAborted;
-                    Model.Provider.Get.Job.LastFileName = await FilePath.ToVirtualAsync(file.FileName);
-                    // FIXME: Add support for simulation
-                }
-
-                // Notify the controller that the print has stopped
-                if (file.IsAborted)
-                {
-                    if (IsAborted)
+                    using (await _lock.LockAsync())
                     {
-                        _logger.Info("Aborted print");
-                        SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.Abort);
+                        // Notify the controller that the print has stopped
+                        if (_file.IsAborted)
+                        {
+                            if (IsAborted)
+                            {
+                                _logger.Info("Aborted print");
+                                SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.Abort);
+                            }
+                            else
+                            {
+                                _logger.Info("Cancelled print");
+                                SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.UserCancelled);
+                            }
+                        }
+                        else
+                        {
+                            _logger.Info("Finished print");
+                            SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.NormalCompletion);
+                        }
+
+                        // Update the object model again
+                        using (await Model.Provider.AccessReadWriteAsync())
+                        {
+                            Model.Provider.Get.Job.LastFileAborted = _file.IsAborted && IsAborted;
+                            Model.Provider.Get.Job.LastFileCancelled = _file.IsAborted && !IsAborted;
+                            Model.Provider.Get.Job.LastFileName = Model.Provider.Get.Job.File.FileName;
+                            Model.Provider.Get.Job.File.Assign(new ParsedFileInfo());
+                            Model.Provider.Get.Job.FilePosition = null;
+                            Model.Provider.Get.Job.TimesLeft.Assign(new DuetAPI.Machine.TimesLeft());
+                            // FIXME: Add support for simulation
+                        }
                     }
-                    else
-                    {
-                        _logger.Info("Cancelled print");
-                        SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.UserCancelled);
-                    }
-                }
-                else
-                {
-                    _logger.Info("Finished print");
-                    SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.NormalCompletion);
                 }
 
-                // Dispose the file being printed
-                file.Dispose();
+                using (await _lock.LockAsync())
+                {
+                    // Dispose the file
+                    _file.Dispose();
+                    _file = null;
+                    NextFilePosition = null;
+
+                    // End
+                    IsPrinting = false;
+                    _finished.NotifyAll();
+                }
             }
             while (!Program.CancelSource.IsCancellationRequested);
         }
@@ -241,7 +264,6 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Called when the print is being paused
         /// </summary>
-        /// <returns>Asynchronous task</returns>
         public static void Pause(long? filePosition = null)
         {
             Code.CancelPending(CodeChannel.File);
@@ -255,35 +277,26 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Resume a paused print
+        /// Resume a file print
         /// </summary>
-        /// <returns>Asynchronous task</returns>
         public static void Resume()
         {
-            IsPaused = false;
-            _monitor.Pulse();
+            if (IsFileSelected && !IsPrinting)
+            {
+                IsPaused = false;
+                _resume.NotifyAll();
+            }
         }
 
         /// <summary>
         /// Cancel the current print (e.g. when M0 is called)
         /// </summary>
-        /// <returns>Asynchronous task</returns>
         public static void Cancel()
         {
             Code.CancelPending(CodeChannel.File);
             NextFilePosition = null;
-
-            if (_file != null)
-            {
-                _file.Abort();
-                _file = null;
-            }
-
-            if (IsPaused)
-            {
-                IsPaused = false;
-                _monitor.Pulse();
-            }
+            _file?.Abort();
+            Resume();
         }
 
         /// <summary>
@@ -292,21 +305,8 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public static void Abort()
         {
-            Code.CancelPending(CodeChannel.File);
-            NextFilePosition = null;
             IsAborted = true;
-
-            if (_file != null)
-            {
-                _file.Abort();
-                _file = null;
-            }
-
-            if (IsPaused)
-            {
-                IsPaused = false;
-                _monitor.Pulse();
-            }
+            Cancel();
         }
 
         /// <summary>
@@ -316,7 +316,7 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public static async Task Diagnostics(StringBuilder builder)
         {
-            using (await _monitor.EnterAsync())
+            using (await _lock.LockAsync())
             {
                 if (_file != null)
                 {

@@ -14,7 +14,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DocumentationFile>C:\Users\Christian\Source\repos\DuetSoftwareFramework\src\LinuxDevices\LinuxDevices.xml</DocumentationFile>
+    <DocumentationFile>LinuxDevices.xml</DocumentationFile>
   </PropertyGroup>
 
 </Project>

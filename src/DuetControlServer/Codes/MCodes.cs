@@ -3,7 +3,6 @@ using DuetAPI.Commands;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.FileExecution;
-using Nito.AsyncEx;
 using System;
 using System.Globalization;
 using System.IO;
@@ -24,16 +23,6 @@ namespace DuetControlServer.Codes
         /// Logger instance
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-        /// <summary>
-        /// Lock for <see cref="_fileToPrint"/>
-        /// </summary>
-        private static readonly AsyncLock _fileToPrintLock = new AsyncLock();
-
-        /// <summary>
-        /// Selected file to print
-        /// </summary>
-        private static string _fileToPrint;
 
         /// <summary>
         /// Process an M-code that should be interpreted by the control server
@@ -57,58 +46,138 @@ namespace DuetControlServer.Codes
                                 Print.Cancel();
                             }
                         }
+                        break;
                     }
-                    break;
+                    throw new OperationCanceledException();
+
+                // List SD card
+                case 20:
+                    if (await SPI.Interface.Flush(code.Channel))
+                    {
+                        CodeParameter pParam = code.Parameter('P');
+                        string directory = await FilePath.ToPhysicalAsync(pParam ?? "", FileDirectory.GCodes);
+                        int startAt = Math.Max(code.Parameter('R') ?? 0, 0);
+
+                        // Check if JSON file lists were requested
+                        CodeParameter sParam = code.Parameter('S', 0);
+                        if (sParam == 2)
+                        {
+                            string json = FileLists.GetFiles(pParam, directory, startAt);
+                            return new CodeResult(MessageType.Success, json);
+                        }
+                        if (sParam == 3)
+                        {
+                            string json = FileLists.GetFileList(pParam, directory, startAt);
+                            return new CodeResult(MessageType.Success, json);
+                        }
+
+                        // Print standard G-code response
+                        Compatibility compatibility;
+                        using (await Model.Provider.AccessReadOnlyAsync())
+                        {
+                            compatibility = Model.Provider.Get.Channels[code.Channel].Compatibility;
+                        }
+
+                        StringBuilder result = new StringBuilder();
+                        if (compatibility == Compatibility.Me || compatibility == Compatibility.RepRapFirmware)
+                        {
+                            result.AppendLine("GCode files:");
+                        }
+                        else if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
+                        {
+                            result.AppendLine("Begin file list:");
+                        }
+
+                        int numItems = 0;
+                        bool itemFound = false;
+                        foreach (string file in Directory.EnumerateFileSystemEntries(directory))
+                        {
+                            if (numItems++ >= startAt)
+                            {
+                                string filename = Path.GetFileName(file);
+                                if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
+                                {
+                                    result.AppendLine(filename);
+                                }
+                                else
+                                {
+                                    if (itemFound)
+                                    {
+                                        result.Append(',');
+                                    }
+                                    result.Append($"\"{filename}\"");
+                                }
+                                itemFound = true;
+                            }
+                        }
+
+                        if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
+                        {
+                            if (!itemFound)
+                            {
+                                result.AppendLine("NONE");
+                            }
+                            result.Append("End file list");
+                        }
+
+                        return new CodeResult(MessageType.Success, result.ToString());
+                    }
+                    throw new OperationCanceledException();
 
                 // Select a file to print
                 case 23:
+                case 32:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
                         string file = code.GetUnprecedentedString();
-                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
-
-                        if (File.Exists(physicalFile))
+                        if (string.IsNullOrWhiteSpace(file))
                         {
-                            using (await _fileToPrintLock.LockAsync())
-                            {
-                                _fileToPrint = physicalFile;
-                            }
-                            return new CodeResult(MessageType.Success, $"File {file} selected for printing");
+                            return new CodeResult(MessageType.Error, "Filename expected");
                         }
-                        return new CodeResult(MessageType.Error, $"Could not find file {file}");
+
+                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
+                        if (!File.Exists(physicalFile))
+                        {
+                            return new CodeResult(MessageType.Error, $"Could not find file {file}");
+                        }
+
+                        using (await Print.LockAsync())
+                        {
+                            if (code.Channel != CodeChannel.File && Print.IsPrinting)
+                            {
+                                return new CodeResult(MessageType.Error, "Cannot set file to print, because a file is already being printed");
+                            }
+
+                            await Print.SelectFile(physicalFile);
+                            if (code.MajorNumber == 32)
+                            {
+                                Print.Resume();
+                            }
+                        }
+
+                        if (await code.EmulatingMarlin())
+                        {
+                            return new CodeResult(MessageType.Success, "File opened\nFile selected");
+                        }
+                        return new CodeResult(MessageType.Success, $"File {file} selected for printing");
                     }
                     throw new OperationCanceledException();
+
 
                 // Resume a file print
                 case 24:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        // See if a file print is supposed to be started
                         using (await Print.LockAsync())
                         {
-                            if (!Print.IsPaused)
+                            if (!Print.IsFileSelected)
                             {
-                                string file;
-                                using (await _fileToPrintLock.LockAsync())
-                                {
-                                    file = _fileToPrint;
-                                }
-
-                                if (string.IsNullOrEmpty(file))
-                                {
-                                    return new CodeResult(MessageType.Error, "Cannot print, because no file is selected!");
-                                }
-                                if (!File.Exists(file))
-                                {
-                                    return new CodeResult(MessageType.Error, "Selected file not found");
-                                }
-
-                                return await Print.Start(file, code.Channel);
+                                return new CodeResult(MessageType.Error, "Cannot print, because no file is selected!");
                             }
                         }
 
-                        // Let RepRapFirmware process this request so it can invoke resume.g
-                        return null;
+                        // Let RepRapFirmware process this request so it can invoke resume.g. When M24 completes, the file is resumed
+                        break;
                     }
                     throw new OperationCanceledException();
 
@@ -130,7 +199,7 @@ namespace DuetControlServer.Codes
                         }
 
                         // Let RepRapFirmware pause the print
-                        return null;
+                        break;
                     }
                     throw new OperationCanceledException();
 
@@ -148,7 +217,7 @@ namespace DuetControlServer.Codes
                             CodeParameter sParam = code.Parameter('S');
                             if (sParam != null)
                             {
-                                Print.Position = sParam;
+                                Print.FilePosition = sParam;
                             }
                         }
 
@@ -166,7 +235,7 @@ namespace DuetControlServer.Codes
                         {
                             if (Print.IsPrinting)
                             {
-                                return new CodeResult(MessageType.Success, $"SD printing byte {Print.Position}/{Print.Length}");
+                                return new CodeResult(MessageType.Success, $"SD printing byte {Print.FilePosition}/{Print.FileLength}");
                             }
                             return new CodeResult(MessageType.Success, "Not SD printing.");
                         }
@@ -175,11 +244,64 @@ namespace DuetControlServer.Codes
 
                 // Begin write to SD card
                 case 28:
-                    return new CodeResult(MessageType.Error, "M28 is not supported");
+                    if (await SPI.Interface.Flush(code.Channel))
+                    {
+                        int numChannel = (int)code.Channel;
+                        using (await Commands.Code.FileLocks[numChannel].LockAsync())
+                        {
+                            if (Commands.Code.FilesBeingWritten[numChannel] != null)
+                            {
+                                return new CodeResult(MessageType.Error, "Another file is already being written to");
+                            }
+
+                            string file = code.GetUnprecedentedString();
+                            if (string.IsNullOrWhiteSpace(file))
+                            {
+                                return new CodeResult(MessageType.Error, "Filename expected");
+                            }
+
+                            string prefix = (await code.EmulatingMarlin()) ? "ok\n" : string.Empty;
+                            string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
+                            try
+                            {
+                                FileStream fileStream = new FileStream(physicalFile, FileMode.Create, FileAccess.Write);
+                                StreamWriter writer = new StreamWriter(fileStream);
+                                Commands.Code.FilesBeingWritten[numChannel] = writer;
+                                return new CodeResult(MessageType.Success, prefix + $"Writing to file: {file}");
+                            }
+                            catch (Exception e)
+                            {
+                                _logger.Debug(e, "Failed to open file for writing");
+                                return new CodeResult(MessageType.Error, prefix + $"Can't open file {file} for writing.");
+                            }
+                        }
+                    }
+                    throw new OperationCanceledException();
 
                 // End write to SD card
                 case 29:
-                    return new CodeResult(MessageType.Error, "M29 is not supported");
+                    if (await SPI.Interface.Flush(code.Channel))
+                    {
+                        int numChannel = (int)code.Channel;
+                        using (await Commands.Code.FileLocks[numChannel].LockAsync())
+                        {
+                            if (Commands.Code.FilesBeingWritten[numChannel] != null)
+                            {
+                                Stream stream = Commands.Code.FilesBeingWritten[numChannel].BaseStream;
+                                Commands.Code.FilesBeingWritten[numChannel].Dispose();
+                                Commands.Code.FilesBeingWritten[numChannel] = null;
+                                stream.Dispose();
+
+                                if (await code.EmulatingMarlin())
+                                {
+                                    return new CodeResult(MessageType.Success, "Done saving file.");
+                                }
+                                return new CodeResult();
+                            }
+                            break;
+                        }
+                    }
+                    throw new OperationCanceledException();
 
                 // Delete a file on the SD card
                 case 30:
@@ -200,28 +322,7 @@ namespace DuetControlServer.Codes
                     }
                     throw new OperationCanceledException();
 
-                // Start a file print
-                case 32:
-                    if (await SPI.Interface.Flush(code.Channel))
-                    {
-                        string file = code.GetUnprecedentedString();
-                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
-
-                        if (File.Exists(physicalFile))
-                        {
-                            using (await _fileToPrintLock.LockAsync())
-                            {
-                                _fileToPrint = physicalFile;
-                            }
-
-                            using (await Print.LockAsync())
-                            {
-                                return await Print.Start(physicalFile, code.Channel);
-                            }
-                        }
-                        return new CodeResult(MessageType.Error, $"Could not find file {file}");
-                    }
-                    throw new OperationCanceledException();
+                // For case 32, see case 23
 
                 // Return file information
                 case 36:
@@ -251,10 +352,33 @@ namespace DuetControlServer.Codes
                 case 37:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
-                        // TODO: Check if file exists
-                        // TODO: Execute and await pseudo-M37 with IsPreProcessed = true so the firmware enters the right simulation state
-                        // TODO: Start file print
-                        return new CodeResult(MessageType.Warning, "M37 is not supported yet");
+                        CodeParameter pParam = code.Parameter('P');
+                        if (pParam != null)
+                        {
+                            string file = pParam;
+                            if (string.IsNullOrWhiteSpace(file))
+                            {
+                                return new CodeResult(MessageType.Error, "Filename expected");
+                            }
+
+                            string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
+                            if (!File.Exists(physicalFile))
+                            {
+                                return new CodeResult(MessageType.Error, $"GCode file \"{file}\" not found\n");
+                            }
+
+                            using (await Print.LockAsync())
+                            {
+                                if (code.Channel != CodeChannel.File && Print.IsPrinting)
+                                {
+                                    return new CodeResult(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
+                                }
+
+                                await Print.SelectFile(physicalFile, true);
+                                // Simulation is started when M37 has been processed by the firmware
+                            }
+                        }
+                        break;
                     }
                     throw new OperationCanceledException();
 
@@ -345,6 +469,14 @@ namespace DuetControlServer.Codes
                         CodeResult result = new CodeResult();
                         await Diagnostics(result);
                         return result;
+                    }
+                    break;
+
+                // Display message and optionally wait for response
+                case 291:
+                    if (code.Parameter('S') == 2 || code.Parameter('S') == 3)
+                    {
+                        throw new NotSupportedException();
                     }
                     break;
 
@@ -569,7 +701,7 @@ namespace DuetControlServer.Codes
                         }
 
                         // Hostname is legit - pretend we didn't see this code so RRF can interpret it
-                        return null;
+                        break;
                     }
                     throw new OperationCanceledException();
 
@@ -661,7 +793,7 @@ namespace DuetControlServer.Codes
 
                 // Update the firmware
                 case 997:
-                    if (((int[])code.Parameter('S', new int[] { 0 })).Contains(0) && (int)code.Parameter('B', 0) == 0)
+                    if (((int[])code.Parameter('S', new int[] { 0 })).Contains(0) && code.Parameter('B', 0) == 0)
                     {
                         if (await SPI.Interface.Flush(code.Channel))
                         {
@@ -705,6 +837,10 @@ namespace DuetControlServer.Codes
                     }
                     break;
 
+                // Request resend of line
+                case 998:
+                    throw new NotSupportedException();
+
                 // Reset controller - unconditional and interpreteted immediately when read
                 case 999:
                     if (code.Parameters.Count == 0)
@@ -744,6 +880,18 @@ namespace DuetControlServer.Codes
                     }
                     break;
 
+                // Simulate file
+                case 37:
+                    using (await Print.LockAsync())
+                    {
+                        if (Print.IsFileSelected)
+                        {
+                            // Start the simulation
+                            Print.Resume();
+                        }
+                    }
+                    break;
+
                 // Absolute extrusion
                 case 82:
                     using (await Model.Provider.AccessReadWriteAsync())
@@ -765,6 +913,19 @@ namespace DuetControlServer.Codes
                     if (code.Parameter('B', 0) == 0 && code.GetUnprecedentedString() != "DSF")
                     {
                         await Diagnostics(code.Result);
+                    }
+                    break;
+
+                // Set compatibility
+                case 555:
+                    // Temporary until the machine model provides a field for this
+                    if (code.Parameter('P') != null)
+                    {
+                        Compatibility compatibility = (Compatibility)(int)code.Parameter('P');
+                        using (await Model.Provider.AccessReadWriteAsync())
+                        {
+                            Model.Provider.Get.Channels[code.Channel].Compatibility = compatibility;
+                        }
                     }
                     break;
             }

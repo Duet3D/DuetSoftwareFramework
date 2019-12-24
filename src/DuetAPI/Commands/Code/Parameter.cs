@@ -215,6 +215,10 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator float(CodeParameter codeParameter)
         {
+            if (codeParameter is null)
+            {
+                throw new ArgumentNullException(nameof(codeParameter));
+            }
             if (codeParameter._parsedValue is float floatValue)
             {
                 return floatValue;
@@ -239,6 +243,10 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator int(CodeParameter codeParameter)
         {
+            if (codeParameter is null)
+            {
+                throw new ArgumentNullException(nameof(codeParameter));
+            }
             if (codeParameter._parsedValue is int intValue)
             {
                 return intValue;
@@ -259,6 +267,10 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator uint(CodeParameter codeParameter)
         {
+            if (codeParameter is null)
+            {
+                throw new ArgumentNullException(nameof(codeParameter));
+            }
             if (codeParameter._parsedValue is uint uintValue)
             {
                 return uintValue;
@@ -283,6 +295,10 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator long(CodeParameter codeParameter)
         {
+            if (codeParameter is null)
+            {
+                throw new ArgumentNullException(nameof(codeParameter));
+            }
             if (codeParameter._parsedValue is long longValue)
             {
                 return longValue;
@@ -315,7 +331,7 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        public static implicit operator string(CodeParameter codeParameter) => codeParameter._stringValue;
+        public static implicit operator string(CodeParameter codeParameter) => codeParameter?._stringValue;
 
         /// <summary>
         /// Implicit conversion operator to float array
@@ -325,6 +341,10 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator float[](CodeParameter codeParameter)
         {
+            if (codeParameter is null)
+            {
+                return null;
+            }
             if (codeParameter._parsedValue is float[] floatArray)
             {
                 return floatArray;
@@ -361,6 +381,10 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator int[] (CodeParameter codeParameter)
         {
+            if (codeParameter is null)
+            {
+                return null;
+            }
             if (codeParameter._parsedValue is int[] intArray)
             {
                 return intArray;
@@ -389,6 +413,10 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator uint[] (CodeParameter codeParameter)
         {
+            if (codeParameter is null)
+            {
+                return null;
+            }
             if (codeParameter._parsedValue is uint[] uintArray)
             {
                 return uintArray;
@@ -425,6 +453,10 @@ namespace DuetAPI.Commands
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
         public static implicit operator long[] (CodeParameter codeParameter)
         {
+            if (codeParameter is null)
+            {
+                return null;
+            }
             if (codeParameter._parsedValue is long[] longArray)
             {
                 return longArray;

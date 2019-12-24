@@ -91,7 +91,10 @@ namespace DuetControlServer.Commands
                 foreach (Code priorityCode in priorityCodes)
                 {
                     CodeResult codeResult = await priorityCode.Execute();
-                    result.AddRange(codeResult);
+                    if (codeResult != null)
+                    {
+                        result.AddRange(codeResult);
+                    }
                 }
 
                 // Execute normal codes next. Use a lock here because multiple codes may be queued for the same channel
@@ -100,7 +103,10 @@ namespace DuetControlServer.Commands
                     foreach (Code code in codes)
                     {
                         CodeResult codeResult = await code.Execute();
-                        result.AddRange(codeResult);
+                        if (codeResult != null)
+                        {
+                            result.AddRange(codeResult);
+                        }
                     }
                 }
             }

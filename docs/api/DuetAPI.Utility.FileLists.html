@@ -5,10 +5,10 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Class HttpEndpointUnixSocket
+    <title>Class FileLists
    </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Class HttpEndpointUnixSocket
+    <meta name="title" content="Class FileLists
    ">
     <meta name="generator" content="docfx 2.48.0.0">
     
@@ -446,8 +446,8 @@
                       <a href="DuetAPI.Utility.html" title="DuetAPI.Utility" class="">DuetAPI.Utility</a>
                         
                         <ul class="nav level2">
-                          <li class="">
-                            <a href="DuetAPI.Utility.FileLists.html" title="FileLists" class="">FileLists</a>
+                          <li class="active">
+                            <a href="DuetAPI.Utility.FileLists.html" title="FileLists" class="active">FileLists</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Utility.Heightmap.html" title="Heightmap" class="">Heightmap</a>
@@ -497,8 +497,8 @@
                           <li class="">
                             <a href="DuetAPIClient.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
                           </li>
-                          <li class="active">
-                            <a href="DuetAPIClient.HttpEndpointUnixSocket.html" title="HttpEndpointUnixSocket" class="active">HttpEndpointUnixSocket</a>
+                          <li class="">
+                            <a href="DuetAPIClient.HttpEndpointUnixSocket.html" title="HttpEndpointUnixSocket" class="">HttpEndpointUnixSocket</a>
                           </li>
                           <li class="">
                             <a href="DuetAPIClient.HttpEndpointUnixSocket.EndpointRequestReceived.html" title="HttpEndpointUnixSocket.EndpointRequestReceived" class="">HttpEndpointUnixSocket.EndpointRequestReceived</a>
@@ -982,22 +982,18 @@
         </div>
         <div class="article row grid-right">
           <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="DuetAPIClient.HttpEndpointUnixSocket">
+            <article class="content wrap" id="_content" data-uid="DuetAPI.Utility.FileLists">
   
   
-  <h1 id="DuetAPIClient_HttpEndpointUnixSocket" data-uid="DuetAPIClient.HttpEndpointUnixSocket" class="text-break">Class HttpEndpointUnixSocket
+  <h1 id="DuetAPI_Utility_FileLists" data-uid="DuetAPI.Utility.FileLists" class="text-break">Class FileLists
   </h1>
-  <div class="markdown level0 summary"><p>Class for dealing with custom HTTP endpoints</p>
+  <div class="markdown level0 summary"><p>Helper class to generate RRF-style file lists</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
     <h5>Inheritance</h5>
     <div class="level0"><span class="xref">System.Object</span></div>
-    <div class="level1"><span class="xref">HttpEndpointUnixSocket</span></div>
-  </div>
-  <div classs="implements">
-    <h5>Implements</h5>
-    <div><span class="xref">System.IDisposable</span></div>
+    <div class="level1"><span class="xref">FileLists</span></div>
   </div>
   <div class="inheritedMembers">
     <h5>Inherited Members</h5>
@@ -1023,22 +1019,22 @@
       <span class="xref">System.Object.ToString()</span>
     </div>
   </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="DuetAPIClient.html">DuetAPIClient</a></h6>
-  <h6><strong>Assembly</strong>: DuetAPIClient.dll</h6>
-  <h5 id="DuetAPIClient_HttpEndpointUnixSocket_syntax">Syntax</h5>
+  <h6><strong>Namespace</strong>: <a class="xref" href="DuetAPI.Utility.html">DuetAPI.Utility</a></h6>
+  <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
+  <h5 id="DuetAPI_Utility_FileLists_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class HttpEndpointUnixSocket : IDisposable</code></pre>
+    <pre><code class="lang-csharp hljs">public static class FileLists</code></pre>
   </div>
-  <h3 id="constructors">Constructors
+  <h3 id="methods">Methods
   </h3>
-  <a id="DuetAPIClient_HttpEndpointUnixSocket__ctor_" data-uid="DuetAPIClient.HttpEndpointUnixSocket.#ctor*"></a>
-  <h4 id="DuetAPIClient_HttpEndpointUnixSocket__ctor_DuetAPI_Machine_HttpEndpointType_System_String_System_String_System_String_System_Int32_" data-uid="DuetAPIClient.HttpEndpointUnixSocket.#ctor(DuetAPI.Machine.HttpEndpointType,System.String,System.String,System.String,System.Int32)">HttpEndpointUnixSocket(HttpEndpointType, String, String, String, Int32)</h4>
-  <div class="markdown level1 summary"><p>Open a new UNIX socket on the given file path</p>
+  <a id="DuetAPI_Utility_FileLists_GetFileList_" data-uid="DuetAPI.Utility.FileLists.GetFileList*"></a>
+  <h4 id="DuetAPI_Utility_FileLists_GetFileList_System_String_System_String_System_Int32_" data-uid="DuetAPI.Utility.FileLists.GetFileList(System.String,System.String,System.Int32)">GetFileList(String, String, Int32)</h4>
+  <div class="markdown level1 summary"><p>Get a /rr_filelist or M20 files response</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public HttpEndpointUnixSocket(HttpEndpointType endpointType, string ns, string endpointPath, string socketPath, int backlog = 4)</code></pre>
+    <pre><code class="lang-csharp hljs">public static string GetFileList(string directory, string physicalDirectory, int startAt = -1)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1051,64 +1047,26 @@
     </thead>
     <tbody>
       <tr>
-        <td><a class="xref" href="DuetAPI.Machine.HttpEndpointType.html">HttpEndpointType</a></td>
-        <td><span class="parametername">endpointType</span></td>
-        <td><p>Type of this HTTP endpoint</p>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">directory</span></td>
+        <td><p>RRF path to the directory</p>
 </td>
       </tr>
       <tr>
         <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">ns</span></td>
-        <td><p>Namespace of this HTTP endpoint</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">endpointPath</span></td>
-        <td><p>Path of this HTTP endpoint</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">socketPath</span></td>
-        <td><p>Path to the UNIX socket file</p>
+        <td><span class="parametername">physicalDirectory</span></td>
+        <td><p>Physical directory</p>
 </td>
       </tr>
       <tr>
         <td><span class="xref">System.Int32</span></td>
-        <td><span class="parametername">backlog</span></td>
-        <td><p>Number of simultaneously pending connections</p>
+        <td><span class="parametername">startAt</span></td>
+        <td><p>First file index to return. Set startAt to -1 to omit error handling and the JSON object container</p>
 </td>
       </tr>
     </tbody>
   </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.IO.IOException</span></td>
-        <td><p>Socket could not be opened</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="fields">Fields
-  </h3>
-  <h4 id="DuetAPIClient_HttpEndpointUnixSocket_DefaultBacklog" data-uid="DuetAPIClient.HttpEndpointUnixSocket.DefaultBacklog">DefaultBacklog</h4>
-  <div class="markdown level1 summary"><p>Default number of pending connections</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public const int DefaultBacklog = 4</code></pre>
-  </div>
-  <h5 class="fieldValue">Field Value</h5>
+  <h5 class="returns">Returns</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
@@ -1117,24 +1075,59 @@
       </tr>
     </thead>
     <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><p>JSON list</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetAPI_Utility_FileLists_GetFiles_" data-uid="DuetAPI.Utility.FileLists.GetFiles*"></a>
+  <h4 id="DuetAPI_Utility_FileLists_GetFiles_System_String_System_String_System_Int32_System_Boolean_" data-uid="DuetAPI.Utility.FileLists.GetFiles(System.String,System.String,System.Int32,System.Boolean)">GetFiles(String, String, Int32, Boolean)</h4>
+  <div class="markdown level1 summary"><p>Get a /rr_files or M20 files response</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">directory</span></td>
+        <td><p>RRF path to the directory</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">physicalDirectory</span></td>
+        <td><p>Physical directory</p>
+</td>
+      </tr>
       <tr>
         <td><span class="xref">System.Int32</span></td>
-        <td></td>
+        <td><span class="parametername">startAt</span></td>
+        <td><p>First item to send</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="parametername">flagDirs</span></td>
+        <td><p>Prefix directories with an asterisk</p>
+</td>
       </tr>
     </tbody>
   </table>
-  <h3 id="properties">Properties
-  </h3>
-  <a id="DuetAPIClient_HttpEndpointUnixSocket_EndpointPath_" data-uid="DuetAPIClient.HttpEndpointUnixSocket.EndpointPath*"></a>
-  <h4 id="DuetAPIClient_HttpEndpointUnixSocket_EndpointPath" data-uid="DuetAPIClient.HttpEndpointUnixSocket.EndpointPath">EndpointPath</h4>
-  <div class="markdown level1 summary"><p>Path of this HTTP endpoint</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public string EndpointPath { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
+  <h5 class="returns">Returns</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
@@ -1145,122 +1138,11 @@
     <tbody>
       <tr>
         <td><span class="xref">System.String</span></td>
-        <td></td>
+        <td><p>JSON file list</p>
+</td>
       </tr>
     </tbody>
   </table>
-  <a id="DuetAPIClient_HttpEndpointUnixSocket_EndpointType_" data-uid="DuetAPIClient.HttpEndpointUnixSocket.EndpointType*"></a>
-  <h4 id="DuetAPIClient_HttpEndpointUnixSocket_EndpointType" data-uid="DuetAPIClient.HttpEndpointUnixSocket.EndpointType">EndpointType</h4>
-  <div class="markdown level1 summary"><p>Type of this HTTP endpoint</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public HttpEndpointType EndpointType { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="DuetAPI.Machine.HttpEndpointType.html">HttpEndpointType</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetAPIClient_HttpEndpointUnixSocket_Namespace_" data-uid="DuetAPIClient.HttpEndpointUnixSocket.Namespace*"></a>
-  <h4 id="DuetAPIClient_HttpEndpointUnixSocket_Namespace" data-uid="DuetAPIClient.HttpEndpointUnixSocket.Namespace">Namespace</h4>
-  <div class="markdown level1 summary"><p>Namespace of this HTTP endpoint</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public string Namespace { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetAPIClient_HttpEndpointUnixSocket_SocketPath_" data-uid="DuetAPIClient.HttpEndpointUnixSocket.SocketPath*"></a>
-  <h4 id="DuetAPIClient_HttpEndpointUnixSocket_SocketPath" data-uid="DuetAPIClient.HttpEndpointUnixSocket.SocketPath">SocketPath</h4>
-  <div class="markdown level1 summary"><p>Path to the UNIX socket file</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public string SocketPath { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-  </h3>
-  <a id="DuetAPIClient_HttpEndpointUnixSocket_Dispose_" data-uid="DuetAPIClient.HttpEndpointUnixSocket.Dispose*"></a>
-  <h4 id="DuetAPIClient_HttpEndpointUnixSocket_Dispose" data-uid="DuetAPIClient.HttpEndpointUnixSocket.Dispose">Dispose()</h4>
-  <div class="markdown level1 summary"><p>Disposes all used resources</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
-  </div>
-  <h3 id="events">Events
-  </h3>
-  <h4 id="DuetAPIClient_HttpEndpointUnixSocket_OnEndpointRequestReceived" data-uid="DuetAPIClient.HttpEndpointUnixSocket.OnEndpointRequestReceived">OnEndpointRequestReceived</h4>
-  <div class="markdown level1 summary"><p>Event that is triggered whenever a new HTTP request is received</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public event HttpEndpointUnixSocket.EndpointRequestReceived OnEndpointRequestReceived</code></pre>
-  </div>
-  <h5 class="eventType">Event Type</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="DuetAPIClient.HttpEndpointUnixSocket.EndpointRequestReceived.html">HttpEndpointUnixSocket.EndpointRequestReceived</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <span class="xref">System.IDisposable</span>
-  </div>
 </article>
           </div>
           

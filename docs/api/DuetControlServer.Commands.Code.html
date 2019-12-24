@@ -447,6 +447,9 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetAPI.Utility.FileLists.html" title="FileLists" class="">FileLists</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Utility.Heightmap.html" title="Heightmap" class="">Heightmap</a>
                           </li>
                           <li class="">
@@ -1126,6 +1129,77 @@
       </tr>
     </tbody>
   </table>
+  <h3 id="fields">Fields
+  </h3>
+  <h4 id="DuetControlServer_Commands_Code_FileLocks" data-uid="DuetControlServer.Commands.Code.FileLocks">FileLocks</h4>
+  <div class="markdown level1 summary"><p>Lock around the files being written</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static AsyncLock[] FileLocks</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">Nito.AsyncEx.AsyncLock</span>[]</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 id="DuetControlServer_Commands_Code_FilesBeingWritten" data-uid="DuetControlServer.Commands.Code.FilesBeingWritten">FilesBeingWritten</h4>
+  <div class="markdown level1 summary"><p>Current stream writer of the files being written to (M28/M29)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static StreamWriter[] FilesBeingWritten</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.IO.StreamWriter</span>[]</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 id="DuetControlServer_Commands_Code_InternallyProcessed" data-uid="DuetControlServer.Commands.Code.InternallyProcessed">InternallyProcessed</h4>
+  <div class="markdown level1 summary"><p>Indicates whether the code has been internally processed</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool InternallyProcessed</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="properties">Properties
   </h3>
   <a id="DuetControlServer_Commands_Code_Channel_" data-uid="DuetControlServer.Commands.Code.Channel*"></a>
@@ -1154,31 +1228,6 @@
   </table>
   <h5 class="overrides">Overrides</h5>
   <div><a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Channel">Code.Channel</a></div>
-  <a id="DuetControlServer_Commands_Code_InternallyProcessed_" data-uid="DuetControlServer.Commands.Code.InternallyProcessed*"></a>
-  <h4 id="DuetControlServer_Commands_Code_InternallyProcessed" data-uid="DuetControlServer.Commands.Code.InternallyProcessed">InternallyProcessed</h4>
-  <div class="markdown level1 summary"><p>Indicates whether the code has been internally processed</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">[JsonIgnore]
-public bool InternallyProcessed { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Boolean</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <h3 id="methods">Methods
   </h3>
   <a id="DuetControlServer_Commands_Code_CancelPending_" data-uid="DuetControlServer.Commands.Code.CancelPending*"></a>
@@ -1204,6 +1253,31 @@ public bool InternallyProcessed { get; set; }</code></pre>
         <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
         <td><span class="parametername">channel</span></td>
         <td><p>Channel to cancel codes from</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_Commands_Code_EmulatingMarlin_" data-uid="DuetControlServer.Commands.Code.EmulatingMarlin*"></a>
+  <h4 id="DuetControlServer_Commands_Code_EmulatingMarlin" data-uid="DuetControlServer.Commands.Code.EmulatingMarlin">EmulatingMarlin()</h4>
+  <div class="markdown level1 summary"><p>Check if Marlin is being emulated</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; EmulatingMarlin()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
+        <td><p>True if Marlin is being emulated</p>
 </td>
       </tr>
     </tbody>

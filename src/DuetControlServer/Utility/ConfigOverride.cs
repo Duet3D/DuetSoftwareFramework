@@ -20,7 +20,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task Save(Code code)
         {
-            int[] pParam = code.Parameter('P');
+            int[] pParam = code.Parameter('P', Array.Empty<int>());
 
             string file = await FilePath.ToPhysicalAsync(FilePath.ConfigOverrideFile, FileDirectory.System);
             using FileStream fs = new FileStream(file, FileMode.Create, FileAccess.Write);

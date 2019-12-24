@@ -43,17 +43,6 @@ namespace DuetAPI.Commands
         /// Converts the CodeResult to a string
         /// </summary>
         /// <returns>The CodeResult as a string</returns>
-        public override string ToString()
-        {
-            StringBuilder builder = new StringBuilder();
-            foreach (Message message in this)
-            {
-                if (!string.IsNullOrEmpty(message.Content))
-                {
-                    builder.AppendLine(message.ToString());
-                }
-            }
-            return builder.ToString();
-        }
+        public override string ToString() => string.Join(System.Environment.NewLine, this);
     }
 }

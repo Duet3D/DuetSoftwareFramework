@@ -845,7 +845,7 @@ namespace DuetControlServer.SPI
                 {
                     // We get an invalid file position from RRF if the print is paused during a macro file.
                     // In this case, RRF has no way to determine the file position so we have to care of that.
-                    filePosition = (uint)(Print.NextFilePosition ?? Print.Length);
+                    filePosition = (uint)(Print.NextFilePosition ?? Print.FileLength);
                 }
                 _logger.Info("Print paused at file position {0}. Reason: {1}", filePosition, pauseReason);
 

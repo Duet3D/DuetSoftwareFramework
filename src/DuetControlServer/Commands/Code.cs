@@ -1,10 +1,12 @@
 ﻿using System;
+using System.IO;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
+using DuetAPI.Machine;
 using DuetControlServer.Codes;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.SPI;
@@ -46,6 +48,8 @@ namespace DuetControlServer.Commands
             {
                 _codeChannelLocks[i] = new AsyncLock();
                 _cancellationTokenSources[i] = new CancellationTokenSource();
+
+                FileLocks[i] = new AsyncLock();
             }
         }
 
@@ -158,10 +162,32 @@ namespace DuetControlServer.Commands
         #endregion
 
         /// <summary>
+        /// Lock around the files being written
+        /// </summary>
+        public static AsyncLock[] FileLocks = new AsyncLock[DuetAPI.Machine.Channels.Total];
+
+        /// <summary>
+        /// Current stream writer of the files being written to (M28/M29)
+        /// </summary>
+        public static StreamWriter[] FilesBeingWritten = new StreamWriter[DuetAPI.Machine.Channels.Total];
+
+        /// <summary>
+        /// Check if Marlin is being emulated
+        /// </summary>
+        /// <returns>True if Marlin is being emulated</returns>
+        public async Task<bool> EmulatingMarlin()
+        {
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                Compatibility compatibility = Model.Provider.Get.Channels[Channel].Compatibility;
+                return compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP;
+            }
+        }
+
+        /// <summary>
         /// Indicates whether the code has been internally processed
         /// </summary>
-        [JsonIgnore]
-        public bool InternallyProcessed { get; set; }
+        public bool InternallyProcessed;
 
         /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish
@@ -170,45 +196,85 @@ namespace DuetControlServer.Commands
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         public override async Task<CodeResult> Execute()
         {
-            // Wait for this code to be executed in the right order
-            if (!Flags.HasFlag(CodeFlags.IsPrioritized) && !Flags.HasFlag(CodeFlags.IsFromMacro))
+            if (Flags.HasFlag(CodeFlags.Asynchronous))
             {
-                await WaitForExecution();
+                // Execute this code in the background
+                _ = Task.Run(ExecuteInternally);
+                return null;
             }
 
+            // Execute this code and wait for the result
+            return await ExecuteInternally();
+        }
+
+        /// <summary>
+        /// Execute the given code internally
+        /// </summary>
+        /// <returns>Result of the code</returns>
+        private async Task<CodeResult> ExecuteInternally()
+        {
+            string logSuffix = Flags.HasFlag(CodeFlags.Asynchronous) ? " asynchronously" : string.Empty;
+
+            // Check if this code is supposed to be written to a file
+            int numChannel = (int)Channel;
+            using (await FileLocks[numChannel].LockAsync())
+            {
+                if (FilesBeingWritten[numChannel] != null && Type != CodeType.MCode && MajorNumber != 29)
+                {
+                    _logger.Debug("Writing {0}{1}", this, logSuffix);
+                    FilesBeingWritten[numChannel].WriteLine(this);
+                    return new CodeResult();
+                }
+            }
+
+            // Execute it
             try
             {
-                // Process this code
-                _logger.Debug("Processing {0}", this);
-                await Process();
-            }
-            catch (Exception e)
-            {
-                // Cancelling a code clears the result
-                Result = null;
-                if (e is OperationCanceledException)
+                try
                 {
+                    // Wait for this code to be executed in the right order
+                    if (!Flags.HasFlag(CodeFlags.IsPrioritized) && !Flags.HasFlag(CodeFlags.IsFromMacro))
+                    {
+                        await WaitForExecution();
+                    }
+
+                    // Process this code
+                    _logger.Debug("Processing {0}{1}", this, logSuffix);
+                    await Process();
+                    _logger.Debug("Completed {0}{1}", this, logSuffix);
+                }
+                catch (OperationCanceledException oce)
+                {
+                    // Cancelling a code clears the result
+                    Result = null;
                     if (_logger.IsTraceEnabled)
                     {
-                        _logger.Debug(e, "Cancelled {0}", this);
+                        _logger.Debug(oce, "Cancelled {0}{1}", this, logSuffix);
                     }
                     else
                     {
-                        _logger.Debug("Cancelled {0}", this);
+                        _logger.Debug("Cancelled {0}{1}", this, logSuffix);
                     }
                 }
-                else
+                catch (NotSupportedException)
                 {
-                    _logger.Error(e, "Code {0} has caused an exception", this);
+                    // Some codes may not be supported yet
+                    Result = new CodeResult(MessageType.Error, "Code is not supported");
+                    _logger.Debug("{0} is not supported{1}", this, logSuffix);
                 }
+                catch (Exception e)
+                {
+                    // This code is no longer processed if an exception has occurred
+                    _logger.Error(e, "Code {0} has caused an exception{1}", this, logSuffix);
+                    throw;
+                }
+                // Code has finished
                 await CodeExecuted();
-                throw;
             }
             finally
             {
-                // Always interpret the result of this code
-                await CodeExecuted();
-                _logger.Debug("Completed {0}", this);
+                // Make sure the next code is started no matter what happened before
+                StartNextCode();
             }
             return Result;
         }
@@ -219,12 +285,16 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         private async Task Process()
         {
-            // Starting this code. Make sure to set the file position pointing to the next code if applicable
-            if (Channel == CodeChannel.File && FilePosition != null && Length != null)
+            // Starting this code. Make sure to update the file positions if applicable
+            if (Channel == CodeChannel.File && FilePosition != null)
             {
                 using (await FileExecution.Print.LockAsync())
                 {
-                    FileExecution.Print.NextFilePosition = FilePosition + Length;
+                    FileExecution.Print.NextFilePosition = (Length != null) ? FilePosition + Length : FilePosition;
+                }
+                using (await Model.Provider.AccessReadWriteAsync())
+                {
+                    Model.Provider.Get.Job.FilePosition = FilePosition;
                 }
             }
 
@@ -241,57 +311,17 @@ namespace DuetControlServer.Commands
                 return;
             }
 
-            // Send the code to RepRapFirmware
-            if (Flags.HasFlag(CodeFlags.Asynchronous))
-            {
-                // Enqueue the code for execution by RRF and return no result
-                Task<CodeResult> codeTask = Interface.ProcessCode(this);
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        // Process this code via RRF asynchronously
-                        Result = await codeTask;
-                        await Model.Provider.Output(Result);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // Deal with cancelled codes
-                        await CodeExecuted();
-                        _logger.Debug("Cancelled {0}", this);
-                        throw;
-                    }
-                    catch (Exception e)
-                    {
-                        // Deal with exeptions of asynchronous codes
-                        if (e is AggregateException ae)
-                        {
-                            e = ae.InnerException;
-                        }
-                        _logger.Error(e, "Failed to execute {0} asynchronously", this);
-                        throw;
-                    }
-                    finally
-                    {
-                        // Always interpret the result of this code
-                        await CodeExecuted();
-                        _logger.Debug("Completed {0} asynchronously", this);
-                    }
-                });
+            // RepRapFirmware buffers a number of codes so a new code can be started before the last one has finished
+            StartNextCode();
 
-                // Start the next code
-                StartNextCode();
-            }
-            else
-            {
-                // RepRapFirmware buffers a number of codes so a new code can be started before the last one has finished
-                StartNextCode();
-
-                // Wait for the code to complete
-                Result = await Interface.ProcessCode(this);
-            }
+            // Wait for the code to complete
+            Result = await Interface.ProcessCode(this);
         }
 
+        /// <summary>
+        /// Attempt to process this code internally
+        /// </summary>
+        /// <returns>Whether the code could be processed internally</returns>
         private async Task<bool> ProcessInternally()
         {
             // Pre-process this code
@@ -346,11 +376,12 @@ namespace DuetControlServer.Commands
             return false;
         }
 
+        /// <summary>
+        /// Executed when the code has finished
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private async Task CodeExecuted()
         {
-            // Start the next code if that hasn't happened yet
-            StartNextCode();
-
             if (Result != null)
             {
                 // Process the code result
@@ -379,6 +410,23 @@ namespace DuetControlServer.Commands
                         {
                             msg.Content = ToShortString() + ": " + msg.Content;
                         }
+                    }
+                }
+
+                // Deal with firmware emulation
+                if (!Flags.HasFlag(CodeFlags.IsFromMacro) && await EmulatingMarlin())
+                {
+                    if (Result.Count != 0 && Type == CodeType.MCode && MajorNumber == 105)
+                    {
+                        Result[0].Content = "ok " + Result[0].Content;
+                    }
+                    else if (Result.IsEmpty)
+                    {
+                        Result.Add(MessageType.Success, "ok\n");
+                    }
+                    else
+                    {
+                        Result[^1].Content += "\nok\n";
                     }
                 }
 

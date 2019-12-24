@@ -447,6 +447,9 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetAPI.Utility.FileLists.html" title="FileLists" class="">FileLists</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Utility.Heightmap.html" title="Heightmap" class="">Heightmap</a>
                           </li>
                           <li class="">
@@ -1025,6 +1028,54 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
   </div>
   <h3 id="properties">Properties
   </h3>
+  <a id="DuetControlServer_FileExecution_Print_FileLength_" data-uid="DuetControlServer.FileExecution.Print.FileLength*"></a>
+  <h4 id="DuetControlServer_FileExecution_Print_FileLength" data-uid="DuetControlServer.FileExecution.Print.FileLength">FileLength</h4>
+  <div class="markdown level1 summary"><p>Returns the length of the file being printed in bytes</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static long FileLength { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int64</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_FileExecution_Print_FilePosition_" data-uid="DuetControlServer.FileExecution.Print.FilePosition*"></a>
+  <h4 id="DuetControlServer_FileExecution_Print_FilePosition" data-uid="DuetControlServer.FileExecution.Print.FilePosition">FilePosition</h4>
+  <div class="markdown level1 summary"><p>Reports the current file position</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static long FilePosition { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int64</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_FileExecution_Print_IsAborted_" data-uid="DuetControlServer.FileExecution.Print.IsAborted*"></a>
   <h4 id="DuetControlServer_FileExecution_Print_IsAborted" data-uid="DuetControlServer.FileExecution.Print.IsAborted">IsAborted</h4>
   <div class="markdown level1 summary"><p>Indicates if the file print has been aborted</p>
@@ -1033,6 +1084,30 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static bool IsAborted { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_FileExecution_Print_IsFileSelected_" data-uid="DuetControlServer.FileExecution.Print.IsFileSelected*"></a>
+  <h4 id="DuetControlServer_FileExecution_Print_IsFileSelected" data-uid="DuetControlServer.FileExecution.Print.IsFileSelected">IsFileSelected</h4>
+  <div class="markdown level1 summary"><p>Indicates if a file has been selected for printing</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool IsFileSelected { get; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1075,7 +1150,7 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
   </table>
   <a id="DuetControlServer_FileExecution_Print_IsPrinting_" data-uid="DuetControlServer.FileExecution.Print.IsPrinting*"></a>
   <h4 id="DuetControlServer_FileExecution_Print_IsPrinting" data-uid="DuetControlServer.FileExecution.Print.IsPrinting">IsPrinting</h4>
-  <div class="markdown level1 summary"><p>Indicates if a print is going on</p>
+  <div class="markdown level1 summary"><p>Indicates if a print is live</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -1097,14 +1172,14 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_FileExecution_Print_Length_" data-uid="DuetControlServer.FileExecution.Print.Length*"></a>
-  <h4 id="DuetControlServer_FileExecution_Print_Length" data-uid="DuetControlServer.FileExecution.Print.Length">Length</h4>
-  <div class="markdown level1 summary"><p>Returns the length of the file being printed in bytes</p>
+  <a id="DuetControlServer_FileExecution_Print_IsSimulating_" data-uid="DuetControlServer.FileExecution.Print.IsSimulating*"></a>
+  <h4 id="DuetControlServer_FileExecution_Print_IsSimulating" data-uid="DuetControlServer.FileExecution.Print.IsSimulating">IsSimulating</h4>
+  <div class="markdown level1 summary"><p>Indicates if a file is being simulated</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static long Length { get; }</code></pre>
+    <pre><code class="lang-csharp hljs">public static bool IsSimulating { get; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1116,7 +1191,7 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Int64</span></td>
+        <td><span class="xref">System.Boolean</span></td>
         <td></td>
       </tr>
     </tbody>
@@ -1141,30 +1216,6 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
     <tbody>
       <tr>
         <td><span class="xref">System.Nullable</span>&lt;<span class="xref">System.Int64</span>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_FileExecution_Print_Position_" data-uid="DuetControlServer.FileExecution.Print.Position*"></a>
-  <h4 id="DuetControlServer_FileExecution_Print_Position" data-uid="DuetControlServer.FileExecution.Print.Position">Position</h4>
-  <div class="markdown level1 summary"><p>Reports the current file position</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static long Position { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int64</span></td>
         <td></td>
       </tr>
     </tbody>
@@ -1285,7 +1336,7 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
   </table>
   <a id="DuetControlServer_FileExecution_Print_Resume_" data-uid="DuetControlServer.FileExecution.Print.Resume*"></a>
   <h4 id="DuetControlServer_FileExecution_Print_Resume" data-uid="DuetControlServer.FileExecution.Print.Resume">Resume()</h4>
-  <div class="markdown level1 summary"><p>Resume a paused print</p>
+  <div class="markdown level1 summary"><p>Resume a file print</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -1316,14 +1367,14 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_FileExecution_Print_Start_" data-uid="DuetControlServer.FileExecution.Print.Start*"></a>
-  <h4 id="DuetControlServer_FileExecution_Print_Start_System_String_DuetAPI_CodeChannel_" data-uid="DuetControlServer.FileExecution.Print.Start(System.String,DuetAPI.CodeChannel)">Start(String, CodeChannel)</h4>
-  <div class="markdown level1 summary"><p>Begin a file print</p>
+  <a id="DuetControlServer_FileExecution_Print_SelectFile_" data-uid="DuetControlServer.FileExecution.Print.SelectFile*"></a>
+  <h4 id="DuetControlServer_FileExecution_Print_SelectFile_System_String_System_Boolean_" data-uid="DuetControlServer.FileExecution.Print.SelectFile(System.String,System.Boolean)">SelectFile(String, Boolean)</h4>
+  <div class="markdown level1 summary"><p>Start a new file print</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task&lt;CodeResult&gt; Start(string fileName, CodeChannel source)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task SelectFile(string fileName, bool simulating = false)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1342,9 +1393,9 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
 </td>
       </tr>
       <tr>
-        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
-        <td><span class="parametername">source</span></td>
-        <td><p>Channel that requested the file to be printed</p>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="parametername">simulating</span></td>
+        <td><p>Whether the file is being simulated</p>
 </td>
       </tr>
     </tbody>
@@ -1359,8 +1410,8 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<a class="xref" href="DuetAPI.Commands.CodeResult.html">CodeResult</a>&gt;</td>
-        <td><p>Code result</p>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
 </td>
       </tr>
     </tbody>
