@@ -144,12 +144,14 @@ build_progs() {
 	rm -rf $DEST_DIR/duettools_$dcsver/
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CodeConsole/CodeConsole.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CodeLogger/CodeLogger.csproj
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CustomHttpEndpoint/CustomHttpEndpoint.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/ModelObserver/ModelObserver.csproj
 	mkdir -p $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	[ -d $COMMON_DIR/duettools/ ] && $RSYNC $COMMON_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
 	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
 	mv $DEST_DIR/files/CodeConsole* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	mv $DEST_DIR/files/CodeLogger* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
+	mv $DEST_DIR/files/CustomHttpEndpoint* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	mv $DEST_DIR/files/ModelObserver* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duetruntime_$dcsver
@@ -175,9 +177,9 @@ build_dwc() {
 	echo "Building DWC2..."
 
 	if [ ! -d $DEST_DIR/DuetWebControl ] ; then
-		if [ -d ~/duet/DuetWebControl ] ; then
+		if [ -d ~/duet/DuetWebControl2 ] ; then
 			echo "- Using local repository..."
-			cp -r ~/duet/DuetWebControl $DEST_DIR/DuetWebControl
+			cp -r ~/duet/DuetWebControl2 $DEST_DIR/DuetWebControl
 		else
 			echo "- Cloning repository..."
 			git clone -q --single-branch --branch master https://github.com/chrishamm/DuetWebControl.git $DEST_DIR/DuetWebControl
