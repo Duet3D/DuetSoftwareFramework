@@ -453,8 +453,8 @@ namespace DuetControlServer.Model
                 {
                     if (response.output.beepFrequency != 0 && response.output.beepDuration != 0)
                     {
-                        beepDuration = response.output.beepFrequency;
-                        beepFrequency = response.output.beepDuration;
+                        beepDuration = response.output.beepDuration;
+                        beepFrequency = response.output.beepFrequency;
                     }
                     displayMessage = response.output.message;
                     if (response.output.msgBox != null)
@@ -485,9 +485,19 @@ namespace DuetControlServer.Model
                 Provider.Get.MessageBox.Mode = messageBoxMode;
 
                 // - State -
+                MachineStatus oldStatus = Provider.Get.State.Status, newStatus = GetStatus(response.status);
+                if ((newStatus == MachineStatus.Idle || newStatus == MachineStatus.Off) &&
+                    (oldStatus == MachineStatus.Paused || oldStatus == MachineStatus.Pausing || oldStatus == MachineStatus.Processing ||
+                     oldStatus == MachineStatus.Resuming || oldStatus == MachineStatus.Simulating))
+                {
+                    // No longer processing a file...
+                    Provider.Get.Job.File.Assign(new DuetAPI.ParsedFileInfo());
+                    Provider.Get.Job.FilePosition = null;
+                    Provider.Get.Job.TimesLeft.Assign(new DuetAPI.Machine.TimesLeft());
+                }
                 Provider.Get.State.AtxPower = (response.@params.atxPower == -1) ? null : (bool?)(response.@params.atxPower != 0);
                 Provider.Get.State.CurrentTool = response.currentTool;
-                Provider.Get.State.Status = GetStatus(response.status);
+                Provider.Get.State.Status = newStatus;
                 Provider.Get.State.Mode = (MachineMode)Enum.Parse(typeof(MachineMode), response.mode, true);
                 Provider.Get.Network.Name = response.name;
 
@@ -682,7 +692,7 @@ namespace DuetControlServer.Model
             if (configResponse.boardName != null && Settings.UpdateOnly && !_updatingFirmware)
             {
                 _updatingFirmware = true;
-                Console.Write("Updating the firmware...");
+                Console.Write("Updating the firmware... ");
 
                 Code updateCode = new Code
                 {

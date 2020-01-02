@@ -390,7 +390,7 @@ Once a connection has been established, DCS sends a welcome message in JSON form
 ```
 {
     "id": 12,
-    "version": 2
+    "version": 3
 }
 ```
 
@@ -625,3 +625,18 @@ To ensure flawless operation of the most critical components, Duet Software Fram
 - G-Code checksums and M998 are currently not supported
 - M291 S2/S3 are not working yet
 - Object model is only partially populated
+
+## Reporting issues
+
+Before reporting any new issues, please check if it is already a known issue or if it has been already reported on the [GitHub issues](https://github.com/chrishamm/DuetSoftwareFramework/issues) page.
+For general support questions, please check out the [forums](https://forum.duet3d.com/category/31/dsf-development).
+
+If the issue you encountered is easy to reproduce, please file a new issue in the GitHub issues page along with instructions on how to reproduce.
+
+If the issue only happens sporadically, please launch DuetControlServer with the log level `debug` and provide the log including a short note when the error occurred.
+To launch DuetControlServer with this log level on DuetPi, you may run the following commands from an SSH terminal:
+
+`
+sudo systemctl stop duetcontrolserver
+sudo /opt/dsf/bin/DuetControlServer --log-level debug
+`

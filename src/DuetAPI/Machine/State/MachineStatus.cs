@@ -45,7 +45,7 @@ namespace DuetAPI.Machine
         Processing,
         
         /// <summary>
-        /// The machine is simulating a file job to determine its printing time
+        /// The machine is simulating a file job to determine its processing time
         /// </summary>
         Simulating,
         

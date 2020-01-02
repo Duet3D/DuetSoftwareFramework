@@ -60,7 +60,11 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Initialize the SPI interface but do not connect yet
         /// </summary>
-        public static void Init() => DataTransfer.Init();
+        public static void Init()
+        {
+            DataTransfer.Init();
+            Program.CancelSource.Token.Register(() => _ = Invalidate(null));
+        }
 
         /// <summary>
         /// Print diagnostics of this class
@@ -216,13 +220,14 @@ namespace DuetControlServer.SPI
         /// Notify the firmware that the file print has been stopped
         /// </summary>
         /// <param name="stopReason">Reason why the print has stopped</param>
-        public static void SetPrintStopped(PrintStoppedReason stopReason)
+        /// <returns>Asynchronous task</returns>
+        public static async Task SetPrintStopped(PrintStoppedReason stopReason)
         {
-            using (_printStopppedReasonLock.Lock())
+            using (await _printStopppedReasonLock.LockAsync())
             {
                 _printStoppedReason = stopReason;
             }
-            using (_channels[CodeChannel.File].Lock())
+            using (await _channels[CodeChannel.File].LockAsync())
             {
                 _channels[CodeChannel.File].InvalidateBuffer(false);
             }
@@ -626,8 +631,7 @@ namespace DuetControlServer.SPI
                     break;
 
                 case Communication.FirmwareRequests.Request.CodeReply:
-                    HandleCodeReply();
-                    break;
+                    return HandleCodeReply();
 
                 case Communication.FirmwareRequests.Request.ExecuteMacro:
                     return HandleMacroRequest();
@@ -708,17 +712,16 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Process a code reply
         /// </summary>
-        private static void HandleCodeReply()
+        /// <returns>Asynchronous task</returns>
+        private static async Task HandleCodeReply()
         {
             DataTransfer.ReadCodeReply(out MessageTypeFlags flags, out string reply);
-
-            // TODO check for "File %s will print in %" PRIu32 "h %" PRIu32 "m plus heating time" and modify simulation time
 
             // Deal with generic replies
             if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage ||
                 flags == MessageTypeFlags.LogMessage || flags == (MessageTypeFlags.LogMessage | MessageTypeFlags.PushFlag))
             {
-                OutputGenericMessage(flags, reply);
+                await OutputGenericMessage(flags, reply);
                 return;
             }
 
@@ -731,7 +734,7 @@ namespace DuetControlServer.SPI
                     MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)channel.Channel);
                     if (flags.HasFlag(channelFlag))
                     {
-                        using (channel.Lock())
+                        using (await channel.LockAsync())
                         {
                             replyHandled = channel.HandleReply(flags, reply);
                         }
@@ -743,7 +746,7 @@ namespace DuetControlServer.SPI
             if (!replyHandled)
             {
                 // Must be a left-over error message...
-                OutputGenericMessage(flags, reply);
+                await OutputGenericMessage(flags, reply);
             }
         }
 
@@ -752,7 +755,8 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="flags">Message flags</param>
         /// <param name="reply">Message content</param>
-        private static void OutputGenericMessage(MessageTypeFlags flags, string reply)
+        /// <returns>Asynchronous task</returns>
+        private static async Task OutputGenericMessage(MessageTypeFlags flags, string reply)
         {
             _partialGenericMessage += reply;
             if (!flags.HasFlag(MessageTypeFlags.PushFlag))
@@ -762,7 +766,7 @@ namespace DuetControlServer.SPI
                     MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                                         : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                             : MessageType.Success;
-                    Utility.Logger.LogOutput(type, _partialGenericMessage.TrimEnd());
+                    await Utility.Logger.LogOutput(type, _partialGenericMessage.TrimEnd());
                 }
                 _partialGenericMessage = null;
             }
@@ -973,13 +977,16 @@ namespace DuetControlServer.SPI
             }
 
             // Keep this event in the log...
-            if (outputMessage)
+            if (!string.IsNullOrWhiteSpace(message))
             {
-                await Utility.Logger.LogOutput(MessageType.Warning, message);
-            }
-            else
-            {
-                await Utility.Logger.Log(MessageType.Warning, message);
+                if (outputMessage)
+                {
+                    await Utility.Logger.LogOutput(MessageType.Warning, message);
+                }
+                else
+                {
+                    await Utility.Logger.Log(MessageType.Warning, message);
+                }
             }
         }
     }

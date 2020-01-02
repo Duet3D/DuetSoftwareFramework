@@ -32,7 +32,7 @@ namespace DuetControlServer
             // Performing an update implies a reduced log level
             if (args.Contains("-u") && !args.Contains("--update"))
             {
-                List<string> newArgs = new List<string>() { "--log-level", "warn" };
+                List<string> newArgs = new List<string>() { "--log-level", "error" };
                 newArgs.AddRange(args);
                 args = newArgs.ToArray();
             }
@@ -122,11 +122,11 @@ namespace DuetControlServer
             // Start main tasks in the background
             Dictionary<Task, string> mainTasks = new Dictionary<Task, string>
             {
-                { Task.Run(Model.Updater.Run), "Update" },
-                { Task.Run(SPI.Interface.Run), "SPI" },
-                { Task.Run(IPC.Server.Run), "IPC" },
-                { Task.Run(FileExecution.Print.Run), "Print" },
-                { Task.Run(Model.PeriodicUpdater.Run), "Periodic updater" }
+                { Task.Factory.StartNew(Model.Updater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Update" },
+                { Task.Factory.StartNew(SPI.Interface.Run, TaskCreationOptions.LongRunning).Unwrap(), "SPI" },
+                { Task.Factory.StartNew(IPC.Server.Run, TaskCreationOptions.LongRunning).Unwrap(), "IPC" },
+                { Task.Factory.StartNew(FileExecution.Print.Run, TaskCreationOptions.LongRunning).Unwrap(), "Print" },
+                { Task.Factory.StartNew(Model.PeriodicUpdater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Periodic updater" }
             };
 
             // Deal with program termination requests (SIGTERM and Ctrl+C)
@@ -236,7 +236,7 @@ namespace DuetControlServer
                 }
                 finally
                 {
-                    Program.CancelSource.Cancel();
+                    CancelSource.Cancel();
                 }
             }
             else

@@ -56,7 +56,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Occupied space for buffered codes in bytes
         /// </summary>
-        public int BytesBuffered { get; set; }
+        public int BytesBuffered { get; private set; }
 
         /// <summary>
         /// List of buffered G/M/T-codes that are being processed by the firmware
@@ -71,7 +71,12 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Indicates whether the requested system macro file has finished
         /// </summary>
-        public bool SystemMacroHasFinished { get; set; }
+        public bool SystemMacroHasFinished { get; private set; }
+
+        /// <summary>
+        /// Indicates if the last requested sytem macro file could not be opened
+        /// </summary>
+        public bool SystemMacroHadError { get; private set; }
 
         /// <summary>
         /// Stack of nested macro files being executed
@@ -270,7 +275,14 @@ namespace DuetControlServer.SPI
                         SystemMacroHasFinished = true;
                     }
 
-                    _logger.Info("{0} macro file {1}", macroFile.IsAborted ? "Aborted" : "Finished", Path.GetFileName(macroFile.FileName));
+                    if (macroFile.IsAborted)
+                    {
+                        _logger.Info("Aborted macro file {0}", Path.GetFileName(macroFile.FileName));
+                    }
+                    else
+                    {
+                        _logger.Debug("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
+                    }
                     return false;
                 }
             }
@@ -365,6 +377,12 @@ namespace DuetControlServer.SPI
                 }
             }
 
+            if (SystemMacroHadError)
+            {
+                SystemMacroHadError = false;
+                return true;
+            }
+
             if (NestedMacros.TryPeek(out MacroFile macroFile) &&
                 ((macroFile.StartCode != null && !macroFile.StartCode.DoingNestedMacro) || (macroFile.StartCode == null && SystemMacroHasFinished)))
             {
@@ -374,14 +392,15 @@ namespace DuetControlServer.SPI
                     if (macroFile.IsFinished)
                     {
                         NestedMacros.Pop().Dispose();
-                        _logger.Info("Completed macro {0} + start code {1}", Path.GetFileName(macroFile.FileName), macroFile.StartCode);
+                        _logger.Info("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
+                        _logger.Debug("=> Starting code: {0}", macroFile.StartCode);
                     }
                 }
                 else if (!flags.HasFlag(MessageTypeFlags.PushFlag))
                 {
                     NestedMacros.Pop().Dispose();
                     SystemMacroHasFinished = false;
-                    _logger.Info("Completed system macro {0}", Path.GetFileName(macroFile.FileName));
+                    _logger.Info("Finished system macro file {0}", Path.GetFileName(macroFile.FileName));
                 }
                 return true;
             }
@@ -397,6 +416,7 @@ namespace DuetControlServer.SPI
                 return true;
             }
 
+            _logger.Warn("Out-of-order reply: '{0}'", reply);
             return false;
         }
 
@@ -422,7 +442,7 @@ namespace DuetControlServer.SPI
                     if (macroFile.IsFinished)
                     {
                         NestedMacros.Pop().Dispose();
-                        _logger.Info("Completed intermediate macro {0}", Path.GetFileName(macroFile.FileName));
+                        _logger.Info("Finished intermediate macro file {0}", Path.GetFileName(macroFile.FileName));
                     }
                 }
                 else if (BufferedCodes.Count > 0)
@@ -468,6 +488,7 @@ namespace DuetControlServer.SPI
                     _logger.Info("Optional macro file {0} not found", filename);
                 }
 
+                SystemMacroHadError = startingCode == null;
                 SuspendBuffer(startingCode);
                 MacroCompleted(startingCode, true);
                 return;
@@ -483,6 +504,7 @@ namespace DuetControlServer.SPI
             {
                 await Utility.Logger.LogOutput(MessageType.Error, $"Failed to open macro file '{filename}': {e.Message}");
 
+                SystemMacroHadError = startingCode == null;
                 SuspendBuffer(startingCode);
                 MacroCompleted(startingCode, true);
                 return;
@@ -555,7 +577,7 @@ namespace DuetControlServer.SPI
             }
 
             _resumingBuffer = invalidateLastFileCodes;
-            SystemMacroHasFinished = false;
+            SystemMacroHasFinished = SystemMacroHadError = false;
 
             // Resolve pending flush requests. At this point, codes waiting for a flush must stop executing
             while (PendingFlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
@@ -658,7 +680,7 @@ namespace DuetControlServer.SPI
             }
             _resumingBuffer = false;
 
-            SystemMacroHasFinished = false;
+            SystemMacroHasFinished = SystemMacroHadError = false;
 
             while (NestedMacroCodes.TryDequeue(out QueuedCode item))
             {

@@ -124,14 +124,19 @@
             Logger instance
             </summary>
         </member>
-        <member name="F:DuetControlServer.Commands.Code._codeChannelLocks">
+        <member name="F:DuetControlServer.Commands.Code._codeStartLocks">
             <summary>
-            Queue of semaphores to guarantee the ordered execution of incoming G/M/T-codes
+            Array of AsyncLocks to guarantee the ordered start of incoming G/M/T-codes
             </summary>
             <remarks>
             AsyncLock implements an internal waiter queue, so it is safe to rely on it for
             maintaining the right order of codes being executed per code channel
             </remarks>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code._codeFinishLocks">
+            <summary>
+            Array of AsyncLocks to guarantee the ordered finishing of incoming G/M/T-codes
+            </summary>
         </member>
         <member name="F:DuetControlServer.Commands.Code._cancellationTokenSources">
             <summary>
@@ -149,42 +154,27 @@
             </summary>
             <param name="channel">Channel to cancel codes from</param>
         </member>
+        <member name="F:DuetControlServer.Commands.Code._cancellationTokenSource">
+            <summary>
+            Source of the cancellation token that is triggered when the code is supposed to be cancelled
+            </summary>
+        </member>
         <member name="F:DuetControlServer.Commands.Code._codeChannelLock">
             <summary>
             Lock that is maintained as long as this code blocks the execution of the next code
             </summary>
         </member>
-        <member name="F:DuetControlServer.Commands.Code._cancellationToken">
-            <summary>
-            Copy of the cancellation token at the time this code is created
-            </summary>
-        </member>
         <member name="M:DuetControlServer.Commands.Code.WaitForExecution">
             <summary>
-            Wait until this code can be executed
+            Create a task that waits until this code can be executed.
+            It may be cancelled if this code is supposed to be cancelled before it is started
             </summary>
-            <returns>Asynchronous task</returns>
+            <returns>Lock to maintain while the code is being executed internally</returns>
             <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
         </member>
         <member name="M:DuetControlServer.Commands.Code.StartNextCode">
             <summary>
             Start the next available G/M/T-code unless this code has already started one
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.Commands.Code.#ctor">
-            <summary>
-            Create an empty Code instance
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.Commands.Code.#ctor(System.String)">
-            <summary>
-            Create a new Code instance and attempt to parse the given code string
-            </summary>
-            <param name="code">G/M/T-Code</param>
-        </member>
-        <member name="P:DuetControlServer.Commands.Code.Channel">
-            <summary>
-            Overridden code channel property to upate the cancellation token when necessary
             </summary>
         </member>
         <member name="F:DuetControlServer.Commands.Code.FileLocks">
@@ -197,16 +187,21 @@
             Current stream writer of the files being written to (M28/M29)
             </summary>
         </member>
+        <member name="M:DuetControlServer.Commands.Code.#ctor">
+            <summary>
+            Constructor of a new code
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.#ctor(System.String)">
+            <summary>
+            Constructor of a new code which also parses the given text-based G/M/T-code
+            </summary>
+        </member>
         <member name="M:DuetControlServer.Commands.Code.EmulatingMarlin">
             <summary>
             Check if Marlin is being emulated
             </summary>
             <returns>True if Marlin is being emulated</returns>
-        </member>
-        <member name="F:DuetControlServer.Commands.Code.InternallyProcessed">
-            <summary>
-            Indicates whether the code has been internally processed
-            </summary>
         </member>
         <member name="M:DuetControlServer.Commands.Code.Execute">
             <summary>
@@ -214,6 +209,11 @@
             </summary>
             <returns>Result of the code</returns>
             <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternallyProcessed">
+            <summary>
+            Indicates whether the code has been internally processed
+            </summary>
         </member>
         <member name="M:DuetControlServer.Commands.Code.ExecuteInternally">
             <summary>
@@ -453,21 +453,21 @@
             Indicates if this file is supposed to be aborted
             </summary>
         </member>
-        <member name="M:DuetControlServer.FileExecution.BaseFile.Abort">
-            <summary>
-            Request cancellation of this file
-            </summary>
-        </member>
         <member name="P:DuetControlServer.FileExecution.BaseFile.IsFinished">
             <summary>
             Indicates if the file has been finished
             </summary>
         </member>
+        <member name="M:DuetControlServer.FileExecution.BaseFile.Abort">
+            <summary>
+            Request cancellation of this file
+            </summary>
+        </member>
         <member name="M:DuetControlServer.FileExecution.BaseFile.#ctor(System.String,DuetAPI.CodeChannel)">
             <summary>
-            Create the base for reading from a G-code file
+            Constructor of the base class for reading from a G-code file
             </summary>
-            <param name="fileName">Name of the file to process</param>
+            <param name="fileName">Name of the file to process or null if it is optional</param>
             <param name="channel">Channel to send the codes to</param>
         </member>
         <member name="M:DuetControlServer.FileExecution.BaseFile.Finalize">
@@ -502,24 +502,14 @@
             Implementation of a macro file
             </summary>
         </member>
-        <member name="T:DuetControlServer.FileExecution.MacroFile.ConfigExtraSteps">
-            <summary>
-            Extra steps to perform before config.g is processed
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.FileExecution.MacroFile._logger">
-            <summary>
-            Logger instance
-            </summary>
-        </member>
         <member name="P:DuetControlServer.FileExecution.MacroFile.RunningConfig">
             <summary>
             Indicates if config.g is being processed
             </summary>
         </member>
-        <member name="F:DuetControlServer.FileExecution.MacroFile._extraStep">
+        <member name="F:DuetControlServer.FileExecution.MacroFile._logger">
             <summary>
-            Current extra step being performed (provided config.g is being executed)
+            Logger instance
             </summary>
         </member>
         <member name="P:DuetControlServer.FileExecution.MacroFile.IsConfig">
@@ -554,6 +544,16 @@
         <member name="M:DuetControlServer.FileExecution.MacroFile.Abort">
             <summary>
             Abort the execution of this file
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.FileExecution.MacroFile.ConfigExtraSteps">
+            <summary>
+            Extra steps to perform before config.g is processed
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.FileExecution.MacroFile._extraStep">
+            <summary>
+            Current extra step being performed (provided config.g is being executed)
             </summary>
         </member>
         <member name="M:DuetControlServer.FileExecution.MacroFile.ReadCode">
@@ -867,22 +867,27 @@
             In addition to these commands, commands of the <see cref="T:DuetControlServer.IPC.Processors.Command"/> interpreter are supported while a code is being intercepted
             </remarks>
         </member>
-        <member name="T:DuetControlServer.IPC.Processors.Interception.InterceptionContainer">
+        <member name="T:DuetControlServer.IPC.Processors.Interception.ConnectionContainer">
             <summary>
             Class to hold intercepting connections and a corresponding lock
             </summary>
         </member>
-        <member name="P:DuetControlServer.IPC.Processors.Interception.InterceptionContainer.Lock">
+        <member name="F:DuetControlServer.IPC.Processors.Interception.ConnectionContainer.Lock">
             <summary>
             Asynchronous lock for this interception type
             </summary>
         </member>
-        <member name="F:DuetControlServer.IPC.Processors.Interception.InterceptionContainer.Items">
+        <member name="F:DuetControlServer.IPC.Processors.Interception.ConnectionContainer.Items">
             <summary>
             List of intercepting connections
             </summary>
         </member>
-        <member name="F:DuetControlServer.IPC.Processors.Interception._containers">
+        <member name="F:DuetControlServer.IPC.Processors.Interception.ConnectionContainer.InterceptingConnection">
+            <summary>
+            Connection intercepting a running code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.IPC.Processors.Interception._connections">
             <summary>
             Dictionary of interception mode vs item containers
             </summary>
@@ -932,6 +937,13 @@
             <param name="code">Code to intercept</param>
             <param name="type">Type of the interception</param>
             <returns>True if the code has been resolved</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Interception.IsInterceptingConnection(System.Int32)">
+            <summary>
+            Checks if the given connection is currently intercepting a code
+            </summary>
+            <param name="connection">Connection ID to check</param>
+            <returns>True if the connection is intercepting a code</returns>
         </member>
         <member name="T:DuetControlServer.IPC.Processors.Subscription">
             <summary>
@@ -1644,6 +1656,11 @@
         <member name="P:DuetControlServer.SPI.ChannelInformation.SystemMacroHasFinished">
             <summary>
             Indicates whether the requested system macro file has finished
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.SPI.ChannelInformation.SystemMacroHadError">
+            <summary>
+            Indicates if the last requested sytem macro file could not be opened
             </summary>
         </member>
         <member name="P:DuetControlServer.SPI.ChannelInformation.NestedMacros">
@@ -3258,6 +3275,7 @@
             Notify the firmware that the file print has been stopped
             </summary>
             <param name="stopReason">Reason why the print has stopped</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.LockMovementAndWaitForStandstill(DuetAPI.CodeChannel)">
             <summary>
@@ -3333,6 +3351,7 @@
             <summary>
             Process a code reply
             </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.OutputGenericMessage(DuetControlServer.SPI.Communication.MessageTypeFlags,System.String)">
             <summary>
@@ -3340,6 +3359,7 @@
             </summary>
             <param name="flags">Message flags</param>
             <param name="reply">Message content</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.HandleMacroRequest">
             <summary>

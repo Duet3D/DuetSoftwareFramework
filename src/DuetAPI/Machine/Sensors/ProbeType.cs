@@ -11,7 +11,7 @@
         None = 0,
 
         /// <summary>
-        /// A simple umodulated probe (like dc42's infrared probe)
+        /// A simple unmodulated probe (like dc42's infrared probe)
         /// </summary>
         Unmodulated,
 

@@ -62,9 +62,9 @@ namespace DuetControlServer.SPI
             Serialization.Writer.InitTransferHeader(ref _txHeader);
 
             // Initialize transfer ready pin
-            _transferReadyPin = new InputGpioPin(Settings.GpioChipDevice, Settings.TransferReadyPin);
+            _transferReadyPin = new InputGpioPin(Settings.GpioChipDevice, Settings.TransferReadyPin, $"dcs-trp-{Settings.TransferReadyPin}");
             _transferReadyPin.PinChanged += (sender, pinValue) => _transferReadyEvent.Set();
-            _transferReadyPin.StartMonitoring(Program.CancelSource.Token);
+            _ = _transferReadyPin.StartMonitoring(Program.CancelSource.Token);
 
             // Initialize SPI device
             _spiDevice = new SpiDevice(Settings.SpiDevice, Settings.SpiFrequency);

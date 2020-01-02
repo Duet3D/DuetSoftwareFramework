@@ -14,14 +14,10 @@ namespace DuetControlServer.FileExecution
     public class MacroFile : BaseFile
     {
         /// <summary>
-        /// Extra steps to perform before config.g is processed
+        /// Indicates if config.g is being processed
         /// </summary>
-        private enum ConfigExtraSteps
-        {
-            SendHostname,
-            SendDateTime,
-            Done
-        }
+        public static bool RunningConfig { get => _runningConfig; }
+        private static volatile bool _runningConfig;
 
         /// <summary>
         /// Logger instance
@@ -29,25 +25,14 @@ namespace DuetControlServer.FileExecution
         private readonly NLog.Logger _logger;
 
         /// <summary>
-        /// Indicates if config.g is being processed
-        /// </summary>
-        public static bool RunningConfig { get => _runningConfig; }
-        private static volatile bool _runningConfig;
-
-        /// <summary>
-        /// Current extra step being performed (provided config.g is being executed)
-        /// </summary>
-        private ConfigExtraSteps _extraStep = ConfigExtraSteps.SendHostname;
-
-        /// <summary>
         /// Whether this file is config.g or config.g.bak
         /// </summary>
-        public bool IsConfig { get; set; }
+        public bool IsConfig { get; }
 
         /// <summary>
         /// Whether this file is config-override.g
         /// </summary>
-        public bool IsConfigOverride { get; set; }
+        public bool IsConfigOverride { get; }
 
         /// <summary>
         /// The queued code which originally started this macro file or null
@@ -62,9 +47,11 @@ namespace DuetControlServer.FileExecution
         /// <param name="startCode">Which code is starting this macro file</param>
         public MacroFile(string fileName, CodeChannel channel, QueuedCode startCode = null) : base(fileName, channel)
         {
+            StartCode = startCode;
+
+            string name = Path.GetFileName(fileName);
             if (startCode == null)
             {
-                string name = Path.GetFileName(fileName);
                 if (name == FilePath.ConfigFile || name == FilePath.ConfigFileFallback)
                 {
                     IsConfig = true;
@@ -72,10 +59,10 @@ namespace DuetControlServer.FileExecution
                 }
                 IsConfigOverride = (name == FilePath.ConfigOverrideFile);
             }
-            StartCode = startCode;
 
             _logger = NLog.LogManager.GetLogger(Path.GetFileName(fileName));
-            _logger.Info("Executing {0} macro file on channel {1}", (startCode == null) ? "system" : "nested", channel);
+            _logger.Info("Executing {0} macro file {1} on channel {2}", (startCode == null) ? "system" : "nested", name, channel);
+            _logger.Debug("=> Starting code: {0}", startCode);
         }
 
         /// <summary>
@@ -111,6 +98,21 @@ namespace DuetControlServer.FileExecution
             }
             base.Abort();
         }
+
+        /// <summary>
+        /// Extra steps to perform before config.g is processed
+        /// </summary>
+        private enum ConfigExtraSteps
+        {
+            SendHostname,
+            SendDateTime,
+            Done
+        }
+
+        /// <summary>
+        /// Current extra step being performed (provided config.g is being executed)
+        /// </summary>
+        private ConfigExtraSteps _extraStep = ConfigExtraSteps.SendHostname;
 
         /// <summary>
         /// Read another code from the file being executed asynchronously

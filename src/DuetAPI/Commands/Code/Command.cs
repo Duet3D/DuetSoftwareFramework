@@ -51,7 +51,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Code channel to send this code to
         /// </summary>
-        public virtual CodeChannel Channel { get; set; } = Defaults.Channel;
+        public CodeChannel Channel { get; set; } = Defaults.Channel;
 
         /// <summary>
         /// Line number of this code

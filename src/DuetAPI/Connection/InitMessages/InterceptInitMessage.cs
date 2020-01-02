@@ -3,6 +3,7 @@ namespace DuetAPI.Connection.InitMessages
     /// <summary>
     /// Enter interception mode
     /// Whenever a code is received, the connection must respond with one of
+    /// - <cref see="DuetAPI.Commands.Cancel">Cancel</cref> to pass through the code without modifications
     /// - <cref see="DuetAPI.Commands.Ignore">Ignore</cref> to pass through the code without modifications
     /// - <cref see="DuetAPI.Commands.Resolve">Resolve</cref> to resolve the current code and to return a message
     /// In addition the interceptor may issue custom commands once a code has been received
@@ -20,8 +21,7 @@ namespace DuetAPI.Connection.InitMessages
         }
         
         /// <summary>
-        /// Intercept codes either before they are internally processed (pre)
-        /// or intercept them before they are forwarded to RepRapFirmware (post)
+        /// Defines in what mode commands are supposed to be intercepted
         /// </summary>
         public InterceptionMode InterceptionMode { get; set; }
     }

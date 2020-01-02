@@ -15,7 +15,6 @@ namespace LinuxDevices
         private const uint GPIO_GET_LINEEVENT_IOCTL = 0xc030b404;
         private const uint GPIOHANDLE_GET_LINE_VALUES_IOCTL = 0xc040b408;
 
-        private readonly byte[] consumerLabel = Encoding.ASCII.GetBytes("dsf-event-monitor");
         private int _deviceFileDescriptor = -1, _reqFd;
 
         /// <summary>
@@ -23,8 +22,9 @@ namespace LinuxDevices
         /// </summary>
         /// <param name="devNode">Path to the GPIO chip device node</param>
         /// <param name="pin">Pin to open</param>
+        /// <param name="consumerLabel">Label of the consumer</param>
         /// <exception cref="IOException">Pin could not be initialized</exception>
-        public unsafe InputGpioPin(string devNode, int pin)
+        public unsafe InputGpioPin(string devNode, int pin, string consumerLabel)
         {
             // The given pin must not be available through sysfs when interfacing the GPIO chip directly...
             if (Directory.Exists($"/sys/class/gpio/gpio{pin}"))
@@ -46,11 +46,13 @@ namespace LinuxDevices
                 handle_flags = (uint)GpioHandleFlags.GPIOHANDLE_REQUEST_INPUT,
                 event_flags = (uint)GpioEventFlags.GPIOEVENT_REQUEST_BOTH_EDGES,
             };
-            for (int i = 0; i < consumerLabel.Length; i++)
+
+            byte[] label = Encoding.ASCII.GetBytes(consumerLabel);
+            for (int i = 0; i < label.Length; i++)
             {
-                tr.consumer_label[i] = consumerLabel[i];
+                tr.consumer_label[i] = label[i];
             }
-            tr.consumer_label[consumerLabel.Length] = 0;
+            tr.consumer_label[label.Length] = 0;
 
             int result = Interop.ioctl(_deviceFileDescriptor, GPIO_GET_LINEEVENT_IOCTL, new IntPtr(&tr));
             if (result < 0)
@@ -131,14 +133,15 @@ namespace LinuxDevices
         /// Start polling for pin events
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
-        public unsafe void StartMonitoring(CancellationToken cancellationToken = default)
+        /// <returns>Asynchronous task</returns>
+        public unsafe Task StartMonitoring(CancellationToken cancellationToken = default)
         {
             if (_reqFd < 0)
             {
                 throw new IOException("Pin is not configured");
             }
 
-            _ = Task.Run(() =>
+            return Task.Run(() =>
             {
                 gpioevent_data eventData = new gpioevent_data();
                 int sizeOfEventData = Marshal.SizeOf(typeof(gpioevent_data));
@@ -152,12 +155,11 @@ namespace LinuxDevices
                     }
                     else
                     {
-                        // FIXME: Handle exception here
-                        Console.WriteLine("Oh snap! Read returned invalid size");
-                        break;
+                        throw new IOException("Read returned invalid size");
                     }
-                } while (!cancellationToken.IsCancellationRequested);
-            }, cancellationToken);
+                }
+                while (!cancellationToken.IsCancellationRequested);
+            });
         }
     }
 }

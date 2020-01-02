@@ -9,12 +9,13 @@
             Class for event-based polling of pin level changes
             </summary>
         </member>
-        <member name="M:LinuxDevices.InputGpioPin.#ctor(System.String,System.Int32)">
+        <member name="M:LinuxDevices.InputGpioPin.#ctor(System.String,System.Int32,System.String)">
             <summary>
             Open a GPIO device and subscribe to pin level changes
             </summary>
             <param name="devNode">Path to the GPIO chip device node</param>
             <param name="pin">Pin to open</param>
+            <param name="consumerLabel">Label of the consumer</param>
             <exception cref="T:System.IO.IOException">Pin could not be initialized</exception>
         </member>
         <member name="M:LinuxDevices.InputGpioPin.Finalize">
@@ -60,6 +61,7 @@
             Start polling for pin events
             </summary>
             <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="T:LinuxDevices.SpiDevice">
             <summary>

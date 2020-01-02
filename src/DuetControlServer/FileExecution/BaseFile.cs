@@ -38,11 +38,14 @@ namespace DuetControlServer.FileExecution
             get => _position;
             set
             {
-                IsFinished = false;
-                _fileStream.Seek(value, SeekOrigin.Begin);
-                _reader.DiscardBufferedData();
-                _position = value;
-                LineNumber = (value == 0) ? (long?)0 : null;
+                if (!IsAborted)
+                {
+                    IsFinished = false;
+                    _fileStream.Seek(value, SeekOrigin.Begin);
+                    _reader.DiscardBufferedData();
+                    _position = value;
+                    LineNumber = (value == 0) ? (long?)0 : null;
+                }
             }
         }
         private long _position;
@@ -63,27 +66,27 @@ namespace DuetControlServer.FileExecution
         public bool IsAborted { get; private set; }
 
         /// <summary>
-        /// Request cancellation of this file
-        /// </summary>
-        public virtual void Abort() => IsAborted = true;
-
-        /// <summary>
         /// Indicates if the file has been finished
         /// </summary>
         public bool IsFinished { get; private set; }
 
         /// <summary>
-        /// Create the base for reading from a G-code file
+        /// Request cancellation of this file
         /// </summary>
-        /// <param name="fileName">Name of the file to process</param>
+        public virtual void Abort() => IsAborted = IsFinished = true;
+
+        /// <summary>
+        /// Constructor of the base class for reading from a G-code file
+        /// </summary>
+        /// <param name="fileName">Name of the file to process or null if it is optional</param>
         /// <param name="channel">Channel to send the codes to</param>
         public BaseFile(string fileName, CodeChannel channel)
         {
-            _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-            _reader = new StreamReader(_fileStream);
-
             FileName = fileName;
             Channel = channel;
+
+            _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
+            _reader = new StreamReader(_fileStream);
         }
 
         /// <summary>
@@ -134,10 +137,6 @@ namespace DuetControlServer.FileExecution
             // Deal with closed files
             if (IsFinished || IsAborted)
             {
-                if (!IsFinished)
-                {
-                    IsFinished = true;
-                }
                 return null;
             }
 

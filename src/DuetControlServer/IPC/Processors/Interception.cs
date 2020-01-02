@@ -31,27 +31,32 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Class to hold intercepting connections and a corresponding lock
         /// </summary>
-        private class InterceptionContainer
+        private class ConnectionContainer
         {
             /// <summary>
             /// Asynchronous lock for this interception type
             /// </summary>
-            public AsyncLock Lock { get; } = new AsyncLock();
+            public readonly AsyncLock Lock = new AsyncLock();
 
             /// <summary>
             /// List of intercepting connections
             /// </summary>
-            public List<Interception> Items = new List<Interception>();
+            public readonly List<Interception> Items = new List<Interception>();
+
+            /// <summary>
+            /// Connection intercepting a running code
+            /// </summary>
+            public volatile int InterceptingConnection = -1;
         }
 
         /// <summary>
         /// Dictionary of interception mode vs item containers
         /// </summary>
-        private static readonly Dictionary<InterceptionMode, InterceptionContainer> _containers = new Dictionary<InterceptionMode, InterceptionContainer>
+        private static readonly Dictionary<InterceptionMode, ConnectionContainer> _connections = new Dictionary<InterceptionMode, ConnectionContainer>
         {
-            { InterceptionMode.Pre, new InterceptionContainer() },
-            { InterceptionMode.Post, new InterceptionContainer() },
-            { InterceptionMode.Executed, new InterceptionContainer() }
+            { InterceptionMode.Pre, new ConnectionContainer() },
+            { InterceptionMode.Post, new ConnectionContainer() },
+            { InterceptionMode.Executed, new ConnectionContainer() }
         };
 
         /// <summary>
@@ -78,12 +83,6 @@ namespace DuetControlServer.IPC.Processors
         {
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
-
-            using (_containers[_mode].Lock.Lock())
-            {
-                _containers[_mode].Items.Add(this);
-            }
-            conn.Logger.Debug("Interception processor registered");
         }
         
         /// <summary>
@@ -93,6 +92,12 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Task that represents the lifecycle of the connection</returns>
         public override async Task Process()
         {
+            using (await _connections[_mode].Lock.LockAsync())
+            {
+                _connections[_mode].Items.Add(this);
+            }
+            Connection.Logger.Debug("Interception processor registered");
+
             try
             {
                 do
@@ -149,9 +154,9 @@ namespace DuetControlServer.IPC.Processors
             finally
             {
                 _commandQueue.CompleteAdding();
-                using (_containers[_mode].Lock.Lock())
+                using (await _connections[_mode].Lock.LockAsync())
                 {
-                    _containers[_mode].Items.Remove(this);
+                    _connections[_mode].Items.Remove(this);
                 }
                 Connection.Logger.Debug("Interception processor unregistered");
             }
@@ -209,31 +214,51 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>True if the code has been resolved</returns>
         public static async Task<bool> Intercept(Code code, InterceptionMode type)
         {
-            using (await _containers[type].Lock.LockAsync())
+            using (await _connections[type].Lock.LockAsync())
             {
-                foreach (Interception processor in _containers[type].Items)
+                foreach (Interception processor in _connections[type].Items)
                 {
                     if (code.SourceConnection != processor.Connection.Id)
                     {
+                        _connections[type].InterceptingConnection = processor.Connection.Id;
                         try
                         {
-                            processor.Connection.Logger.Debug("Intercepting code {0} ({1})", code, type);
-                            if (await processor.Intercept(code))
+                            try
                             {
-                                processor.Connection.Logger.Debug("Code has been resolved");
-                                return true;
+                                processor.Connection.Logger.Debug("Intercepting code {0} ({1})", code, type);
+                                if (await processor.Intercept(code))
+                                {
+                                    processor.Connection.Logger.Debug("Code has been resolved");
+                                    return true;
+                                }
+                                processor.Connection.Logger.Debug("Code has been ignored");
                             }
-                            processor.Connection.Logger.Debug("Code has been ignored");
+                            catch (OperationCanceledException)
+                            {
+                                processor.Connection.Logger.Debug("Code has been cancelled");
+                                throw;
+                            }
                         }
-                        catch (OperationCanceledException)
+                        finally
                         {
-                            processor.Connection.Logger.Debug("Code has been cancelled");
-                            throw;
+                            _connections[type].InterceptingConnection = -1;
                         }
                     }
                 }
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Checks if the given connection is currently intercepting a code
+        /// </summary>
+        /// <param name="connection">Connection ID to check</param>
+        /// <returns>True if the connection is intercepting a code</returns>
+        public static bool IsInterceptingConnection(int connection)
+        {
+            return (_connections[InterceptionMode.Pre].InterceptingConnection == connection) ||
+                   (_connections[InterceptionMode.Post].InterceptingConnection == connection) ||
+                   (_connections[InterceptionMode.Executed].InterceptingConnection == connection);
         }
     }
 }

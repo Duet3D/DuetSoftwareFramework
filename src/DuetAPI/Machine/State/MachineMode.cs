@@ -9,7 +9,7 @@ namespace DuetAPI.Machine
     public enum MachineMode
     {
         /// <summary>
-        /// Filament Fused Fabrication (default)
+        /// Fused Filament Fabrication (default)
         /// </summary>
         FFF,
         

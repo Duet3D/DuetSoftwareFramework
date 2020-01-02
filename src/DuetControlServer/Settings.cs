@@ -291,7 +291,7 @@ namespace DuetControlServer
                 //         at { ... }
                 // [fatal] System.Exception: Blah blah
                 //         at { ... }
-                Layout = @"[${level:lowercase=true}] ${when:when=!contains('${logger}','.'):inner=${logger}${literal:text=\:} }${message}${onexception:when='${message}'!='${exception:format=ToString}'):${newline}   ${exception:format=ToString}}"
+                Layout = @"[${level:lowercase=true}] ${when:when=!contains('${logger}','.') and !ends-with('${logger}','.g'):inner=${logger}${literal:text=\:} }${message}${onexception:when='${message}'!='${exception:format=ToString}'):${newline}   ${exception:format=ToString}}"
             };
             logConfig.AddRule(LogLevel, LogLevel.Fatal, logConsoleTarget);
             LogManager.AutoShutdown = false;

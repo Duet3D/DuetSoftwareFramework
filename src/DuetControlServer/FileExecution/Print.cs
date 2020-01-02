@@ -83,7 +83,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Holds the file position after the current code being executed
         /// </summary>
-        public static long? NextFilePosition { get; set; }
+        public static long? NextFilePosition { get; private set; }
 
         /// <summary>
         /// Returns the length of the file being printed in bytes
@@ -184,6 +184,15 @@ namespace DuetControlServer.FileExecution
                         {
                             try
                             {
+                                if (codes.TryPeek(out Code nextCode) && nextCode.FilePosition != null)
+                                {
+                                    using (await _lock.LockAsync())
+                                    {
+                                        // Keep track of the next code's file position in case a macro is being executed
+                                        NextFilePosition = nextCode.FilePosition;
+                                    }
+                                }
+
                                 CodeResult result = await codeTasks.Dequeue();
                                 await Utility.Logger.LogOutput(result);
                             }
@@ -212,24 +221,24 @@ namespace DuetControlServer.FileExecution
 
                     using (await _lock.LockAsync())
                     {
-                        // Notify the controller that the print has stopped
+                        // Notify RepRapFirmware that the print file has been closed
                         if (_file.IsAborted)
                         {
                             if (IsAborted)
                             {
-                                _logger.Info("Aborted print");
-                                SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.Abort);
+                                _logger.Info("Aborted print file");
+                                await SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.Abort);
                             }
                             else
                             {
-                                _logger.Info("Cancelled print");
-                                SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.UserCancelled);
+                                _logger.Info("Cancelled print file");
+                                await SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.UserCancelled);
                             }
                         }
                         else
                         {
-                            _logger.Info("Finished print");
-                            SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.NormalCompletion);
+                            _logger.Info("Finished print file");
+                            await SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.NormalCompletion);
                         }
 
                         // Update the object model again
@@ -238,10 +247,6 @@ namespace DuetControlServer.FileExecution
                             Model.Provider.Get.Job.LastFileAborted = _file.IsAborted && IsAborted;
                             Model.Provider.Get.Job.LastFileCancelled = _file.IsAborted && !IsAborted;
                             Model.Provider.Get.Job.LastFileName = Model.Provider.Get.Job.File.FileName;
-                            Model.Provider.Get.Job.File.Assign(new ParsedFileInfo());
-                            Model.Provider.Get.Job.FilePosition = null;
-                            Model.Provider.Get.Job.TimesLeft.Assign(new DuetAPI.Machine.TimesLeft());
-                            // FIXME: Add support for simulation
                         }
                     }
                 }
@@ -318,9 +323,26 @@ namespace DuetControlServer.FileExecution
         {
             using (await _lock.LockAsync())
             {
-                if (_file != null)
+                if (IsFileSelected)
                 {
-                    builder.AppendLine($"Processing print job {_file.FileName}");
+                    builder.Append($"File {_file.FileName} is selected");
+                    if (IsPrinting)
+                    {
+                        builder.Append(", printing");
+                    }
+                    if (IsSimulating)
+                    {
+                        builder.Append(", simulating");
+                    }
+                    if (IsPaused)
+                    {
+                        builder.Append(", paused");
+                    }
+                    if (IsAborted)
+                    {
+                        builder.Append(", aborted");
+                    }
+                    builder.AppendLine();
                 }
             }
         }

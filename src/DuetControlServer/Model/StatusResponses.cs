@@ -173,7 +173,7 @@ namespace DuetControlServer.Model
         public float currentLayerTime { get; set; }
         public List<float> extrRaw { get; set; }
         public float fractionPrinted { get; set; }
-        public int filePosition { get; set; }
+        public uint filePosition { get; set; }
         public float firstLayerDuration { get; set; }
         public float firstLayerHeight { get; set; }
         public float printDuration { get; set; }

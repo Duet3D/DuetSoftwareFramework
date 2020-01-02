@@ -26,27 +26,33 @@ namespace DuetControlServer.Commands
 
         #region Code Scheduling
         /// <summary>
-        /// Queue of semaphores to guarantee the ordered execution of incoming G/M/T-codes
+        /// Array of AsyncLocks to guarantee the ordered start of incoming G/M/T-codes
         /// </summary>
         /// <remarks>
         /// AsyncLock implements an internal waiter queue, so it is safe to rely on it for
         /// maintaining the right order of codes being executed per code channel
         /// </remarks>
-        private static readonly AsyncLock[] _codeChannelLocks = new AsyncLock[DuetAPI.Machine.Channels.Total];
+        private static readonly AsyncLock[] _codeStartLocks = new AsyncLock[Channels.Total];
+
+        /// <summary>
+        /// Array of AsyncLocks to guarantee the ordered finishing of incoming G/M/T-codes
+        /// </summary>
+        private static readonly AsyncLock[] _codeFinishLocks = new AsyncLock[Channels.Total];
 
         /// <summary>
         /// List of cancellation tokens to cancel pending codes while they are waiting for their execution
         /// </summary>
-        private static readonly CancellationTokenSource[] _cancellationTokenSources = new CancellationTokenSource[DuetAPI.Machine.Channels.Total];
+        private static readonly CancellationTokenSource[] _cancellationTokenSources = new CancellationTokenSource[Channels.Total];
 
         /// <summary>
         /// Initialize the code scheduler
         /// </summary>
         public static void Init()
         {
-            for (int i = 0; i < DuetAPI.Machine.Channels.Total; i++)
+            for (int i = 0; i < Channels.Total; i++)
             {
-                _codeChannelLocks[i] = new AsyncLock();
+                _codeStartLocks[i] = new AsyncLock();
+                _codeFinishLocks[i] = new AsyncLock();
                 _cancellationTokenSources[i] = new CancellationTokenSource();
 
                 FileLocks[i] = new AsyncLock();
@@ -72,41 +78,31 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
+        /// Source of the cancellation token that is triggered when the code is supposed to be cancelled
+        /// </summary>
+        private CancellationTokenSource _cancellationTokenSource;
+
+        /// <summary>
         /// Lock that is maintained as long as this code blocks the execution of the next code
         /// </summary>
         private IDisposable _codeChannelLock;
 
         /// <summary>
-        /// Copy of the cancellation token at the time this code is created
+        /// Create a task that waits until this code can be executed.
+        /// It may be cancelled if this code is supposed to be cancelled before it is started
         /// </summary>
-        private CancellationToken _cancellationToken;
-
-        /// <summary>
-        /// Wait until this code can be executed
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
+        /// <returns>Lock to maintain while the code is being executed internally</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        private async Task WaitForExecution()
+        private Task<IDisposable> WaitForExecution()
         {
-            CancellationToken myToken;
+            CancellationToken channelToken;
             lock (_cancellationTokenSources)
             {
-                myToken = _cancellationToken;
+                channelToken = _cancellationTokenSources[(int)Channel].Token;
             }
 
-            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, Program.CancelSource.Token);
-            IDisposable myLock = null;
-            try
-            {
-                myLock = await _codeChannelLocks[(int)Channel].LockAsync(myToken);
-                cts.Token.ThrowIfCancellationRequested();
-                _codeChannelLock = myLock;
-            }
-            catch
-            {
-                myLock?.Dispose();
-                throw;
-            }
+            _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(channelToken, Program.CancelSource.Token);
+            return _codeStartLocks[(int)Channel].LockAsync(_cancellationTokenSource.Token);
         }
 
         /// <summary>
@@ -114,62 +110,32 @@ namespace DuetControlServer.Commands
         /// </summary>
         private void StartNextCode()
         {
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
             _codeChannelLock?.Dispose();
             _codeChannelLock = null;
-        }
-
-        /// <summary>
-        /// Create an empty Code instance
-        /// </summary>
-        public Code() : base()
-        {
-            lock (_cancellationTokenSources)
-            {
-                CancellationTokenSource cts = _cancellationTokenSources[(int)Channel];
-                _cancellationToken = (cts != null) ? cts.Token : default;
-            }
-        }
-
-        /// <summary>
-        /// Create a new Code instance and attempt to parse the given code string
-        /// </summary>
-        /// <param name="code">G/M/T-Code</param>
-        public Code(string code) : base(code)
-        {
-            lock (_cancellationTokenSources)
-            {
-                CancellationTokenSource cts = _cancellationTokenSources[(int)Channel];
-                _cancellationToken = (cts != null) ? cts.Token : default;
-            }
-        }
-
-        /// <summary>
-        /// Overridden code channel property to upate the cancellation token when necessary
-        /// </summary>
-        public override CodeChannel Channel
-        {
-            get => base.Channel;
-            set
-            {
-                base.Channel = value;
-                lock (_cancellationTokenSources)
-                {
-                    CancellationTokenSource cts = _cancellationTokenSources[(int)Channel];
-                    _cancellationToken = (cts != null) ? cts.Token : default;
-                }
-            }
         }
         #endregion
 
         /// <summary>
         /// Lock around the files being written
         /// </summary>
-        public static AsyncLock[] FileLocks = new AsyncLock[DuetAPI.Machine.Channels.Total];
+        public static AsyncLock[] FileLocks = new AsyncLock[Channels.Total];
 
         /// <summary>
         /// Current stream writer of the files being written to (M28/M29)
         /// </summary>
-        public static StreamWriter[] FilesBeingWritten = new StreamWriter[DuetAPI.Machine.Channels.Total];
+        public static StreamWriter[] FilesBeingWritten = new StreamWriter[Channels.Total];
+
+        /// <summary>
+        /// Constructor of a new code
+        /// </summary>
+        public Code() : base() { }
+
+        /// <summary>
+        /// Constructor of a new code which also parses the given text-based G/M/T-code
+        /// </summary>
+        public Code(string code) : base(code) { }
 
         /// <summary>
         /// Check if Marlin is being emulated
@@ -185,27 +151,27 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
-        /// Indicates whether the code has been internally processed
-        /// </summary>
-        public bool InternallyProcessed;
-
-        /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish
         /// </summary>
         /// <returns>Result of the code</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        public override async Task<CodeResult> Execute()
+        public override Task<CodeResult> Execute()
         {
             if (Flags.HasFlag(CodeFlags.Asynchronous))
             {
                 // Execute this code in the background
                 _ = Task.Run(ExecuteInternally);
-                return null;
+                return Task.FromResult<CodeResult>(null);
             }
 
-            // Execute this code and wait for the result
-            return await ExecuteInternally();
+            // Execute this code now
+            return ExecuteInternally();
         }
+
+        /// <summary>
+        /// Indicates whether the code has been internally processed
+        /// </summary>
+        public bool InternallyProcessed;
 
         /// <summary>
         /// Execute the given code internally
@@ -215,38 +181,38 @@ namespace DuetControlServer.Commands
         {
             string logSuffix = Flags.HasFlag(CodeFlags.Asynchronous) ? " asynchronously" : string.Empty;
 
-            // Check if this code is supposed to be written to a file
-            int numChannel = (int)Channel;
-            using (await FileLocks[numChannel].LockAsync())
-            {
-                if (FilesBeingWritten[numChannel] != null && Type != CodeType.MCode && MajorNumber != 29)
-                {
-                    _logger.Debug("Writing {0}{1}", this, logSuffix);
-                    FilesBeingWritten[numChannel].WriteLine(this);
-                    return new CodeResult();
-                }
-            }
-
-            // Execute it
             try
             {
+                // Make sure to execute this code at the right time...
+                if (!Flags.HasFlag(CodeFlags.IsPrioritized) && !Flags.HasFlag(CodeFlags.IsFromMacro) &&
+                    !Interception.IsInterceptingConnection(SourceConnection))
+                {
+                    _logger.Debug("Waiting for execution of {0}", this);
+                    _codeChannelLock = await WaitForExecution();
+                }
+
+                // Check if this code is supposed to be written to a file
+                int numChannel = (int)Channel;
+                using (await FileLocks[numChannel].LockAsync())
+                {
+                    if (FilesBeingWritten[numChannel] != null && Type != CodeType.MCode && MajorNumber != 29)
+                    {
+                        _logger.Debug("Writing {0}{1}", this, logSuffix);
+                        FilesBeingWritten[numChannel].WriteLine(this);
+                        return new CodeResult();
+                    }
+                }
+
+                // Execute this code
                 try
                 {
-                    // Wait for this code to be executed in the right order
-                    if (!Flags.HasFlag(CodeFlags.IsPrioritized) && !Flags.HasFlag(CodeFlags.IsFromMacro))
-                    {
-                        await WaitForExecution();
-                    }
-
-                    // Process this code
                     _logger.Debug("Processing {0}{1}", this, logSuffix);
                     await Process();
                     _logger.Debug("Completed {0}{1}", this, logSuffix);
                 }
                 catch (OperationCanceledException oce)
                 {
-                    // Cancelling a code clears the result
-                    Result = null;
+                    // Code has been cancelled
                     if (_logger.IsTraceEnabled)
                     {
                         _logger.Debug(oce, "Cancelled {0}{1}", this, logSuffix);
@@ -265,11 +231,9 @@ namespace DuetControlServer.Commands
                 catch (Exception e)
                 {
                     // This code is no longer processed if an exception has occurred
-                    _logger.Error(e, "Code {0} has caused an exception{1}", this, logSuffix);
+                    _logger.Error(e, "Code {0} has thrown an exception{1}", this, logSuffix);
                     throw;
                 }
-                // Code has finished
-                await CodeExecuted();
             }
             finally
             {
@@ -285,22 +249,10 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         private async Task Process()
         {
-            // Starting this code. Make sure to update the file positions if applicable
-            if (Channel == CodeChannel.File && FilePosition != null)
-            {
-                using (await FileExecution.Print.LockAsync())
-                {
-                    FileExecution.Print.NextFilePosition = (Length != null) ? FilePosition + Length : FilePosition;
-                }
-                using (await Model.Provider.AccessReadWriteAsync())
-                {
-                    Model.Provider.Get.Job.FilePosition = FilePosition;
-                }
-            }
-
             // Attempt to process the code internally first
             if (!InternallyProcessed && await ProcessInternally())
             {
+                await CodeExecuted();
                 return;
             }
 
@@ -308,14 +260,31 @@ namespace DuetControlServer.Commands
             if (Type == CodeType.Comment)
             {
                 Result = new CodeResult();
+                await CodeExecuted();
                 return;
             }
 
             // RepRapFirmware buffers a number of codes so a new code can be started before the last one has finished
             StartNextCode();
 
-            // Wait for the code to complete
-            Result = await Interface.ProcessCode(this);
+            // It is necessary to use a lock here in order to maintain the order of finishing codes
+            Task<CodeResult> executingTask = Interface.ProcessCode(this);
+            using (await _codeFinishLocks[(int)Channel].LockAsync())
+            {
+                try
+                {
+                    // Wait for the code to be processed by RepRapFirmware
+                    Result = await executingTask;
+                    await CodeExecuted();
+                }
+                catch (OperationCanceledException)
+                {
+                    // Cancelling a code clears the result
+                    Result = null;
+                    await CodeExecuted();
+                    throw;
+                }
+            }
         }
 
         /// <summary>

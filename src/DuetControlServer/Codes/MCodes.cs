@@ -40,11 +40,8 @@ namespace DuetControlServer.Codes
                     {
                         using (await Print.LockAsync())
                         {
-                            if (code.Channel == CodeChannel.File || Print.IsPaused)
-                            {
-                                // Invalidate the print file and make sure no more codes are read from the file
-                                Print.Cancel();
-                            }
+                            // Invalidate the print file and make sure no more codes are read from it
+                            Print.Cancel();
                         }
                         break;
                     }
@@ -147,12 +144,7 @@ namespace DuetControlServer.Codes
                             {
                                 return new CodeResult(MessageType.Error, "Cannot set file to print, because a file is already being printed");
                             }
-
                             await Print.SelectFile(physicalFile);
-                            if (code.MajorNumber == 32)
-                            {
-                                Print.Resume();
-                            }
                         }
 
                         if (await code.EmulatingMarlin())
@@ -869,26 +861,15 @@ namespace DuetControlServer.Codes
             switch (code.MajorNumber)
             {
                 // Resume print
-                case 24:
-                    using (await Print.LockAsync())
-                    {
-                        if (Print.IsPaused)
-                        {
-                            // Resume sending file instructions to the firmware
-                            Print.Resume();
-                        }
-                    }
-                    break;
-
+                // Select file and start SD print
                 // Simulate file
+                case 24:
+                case 32:
                 case 37:
                     using (await Print.LockAsync())
                     {
-                        if (Print.IsFileSelected)
-                        {
-                            // Start the simulation
-                            Print.Resume();
-                        }
+                        // Start sending file instructions to RepRapFirmware
+                        Print.Resume();
                     }
                     break;
 

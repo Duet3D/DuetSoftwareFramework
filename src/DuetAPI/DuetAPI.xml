@@ -1123,6 +1123,7 @@
             <summary>
             Enter interception mode
             Whenever a code is received, the connection must respond with one of
+            - <cref see="DuetAPI.Commands.Cancel">Cancel</cref> to pass through the code without modifications
             - <cref see="DuetAPI.Commands.Ignore">Ignore</cref> to pass through the code without modifications
             - <cref see="DuetAPI.Commands.Resolve">Resolve</cref> to resolve the current code and to return a message
             In addition the interceptor may issue custom commands once a code has been received
@@ -1137,8 +1138,7 @@
         </member>
         <member name="P:DuetAPI.Connection.InitMessages.InterceptInitMessage.InterceptionMode">
             <summary>
-            Intercept codes either before they are internally processed (pre)
-            or intercept them before they are forwarded to RepRapFirmware (post)
+            Defines in what mode commands are supposed to be intercepted
             </summary>
         </member>
         <member name="T:DuetAPI.Connection.InitMessages.ServerInitMessage">
@@ -1148,9 +1148,9 @@
         </member>
         <member name="P:DuetAPI.Connection.InitMessages.ServerInitMessage.Version">
             <summary>
-            Version of the server-side API. A client is supposed to check if this API level s greater than or equal
-            to this value once a connection has been etablished in order to ensure that all of the required commands
-            are actually supported by the control server.
+            Version of the server-side API. A client is supposed to check if its API level is greater than or equal
+            to the received API level once a connection has been etablished. This is recommended to ensure that all
+            of the required commands are actually supported by the control server
             </summary>
         </member>
         <member name="P:DuetAPI.Connection.InitMessages.ServerInitMessage.Id">
@@ -1203,7 +1203,7 @@
         </member>
         <member name="F:DuetAPI.Connection.InterceptionMode.Executed">
             <summary>
-            Receive a notification for executed codes. In this state the final result can be still changed
+            Receive a notification for executed codes. In this state the final result can still be changed
             </summary>
         </member>
         <member name="T:DuetAPI.Connection.SubscriptionMode">
@@ -3705,7 +3705,7 @@
         </member>
         <member name="F:DuetAPI.Machine.ProbeType.Unmodulated">
             <summary>
-            A simple umodulated probe (like dc42's infrared probe)
+            A simple unmodulated probe (like dc42's infrared probe)
             </summary>
         </member>
         <member name="F:DuetAPI.Machine.ProbeType.Modulated">
@@ -3834,7 +3834,7 @@
         </member>
         <member name="F:DuetAPI.Machine.MachineMode.FFF">
             <summary>
-            Filament Fused Fabrication (default)
+            Fused Filament Fabrication (default)
             </summary>
         </member>
         <member name="F:DuetAPI.Machine.MachineMode.CNC">
@@ -3889,7 +3889,7 @@
         </member>
         <member name="F:DuetAPI.Machine.MachineStatus.Simulating">
             <summary>
-            The machine is simulating a file job to determine its printing time
+            The machine is simulating a file job to determine its processing time
             </summary>
         </member>
         <member name="F:DuetAPI.Machine.MachineStatus.Busy">

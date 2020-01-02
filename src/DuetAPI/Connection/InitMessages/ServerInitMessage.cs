@@ -6,9 +6,9 @@ namespace DuetAPI.Connection.InitMessages
     public sealed class ServerInitMessage
     {
         /// <summary>
-        /// Version of the server-side API. A client is supposed to check if this API level s greater than or equal
-        /// to this value once a connection has been etablished in order to ensure that all of the required commands
-        /// are actually supported by the control server.
+        /// Version of the server-side API. A client is supposed to check if its API level is greater than or equal
+        /// to the received API level once a connection has been etablished. This is recommended to ensure that all
+        /// of the required commands are actually supported by the control server
         /// </summary>
         public int Version { get; } = 2;
         

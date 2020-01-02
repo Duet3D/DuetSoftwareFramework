@@ -9876,19 +9876,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.Code.CancelPending
   nameWithType: Code.CancelPending
-- uid: DuetControlServer.Commands.Code.Channel
-  name: Channel
-  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Channel
-  commentId: P:DuetControlServer.Commands.Code.Channel
-  fullName: DuetControlServer.Commands.Code.Channel
-  nameWithType: Code.Channel
-- uid: DuetControlServer.Commands.Code.Channel*
-  name: Channel
-  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Channel_
-  commentId: Overload:DuetControlServer.Commands.Code.Channel
-  isSpec: "True"
-  fullName: DuetControlServer.Commands.Code.Channel
-  nameWithType: Code.Channel
 - uid: DuetControlServer.Commands.Code.EmulatingMarlin
   name: EmulatingMarlin()
   href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_EmulatingMarlin
@@ -11151,6 +11138,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.IPC.Processors.Interception.Intercept
   nameWithType: Interception.Intercept
+- uid: DuetControlServer.IPC.Processors.Interception.IsInterceptingConnection(System.Int32)
+  name: IsInterceptingConnection(Int32)
+  href: api/DuetControlServer.IPC.Processors.Interception.html#DuetControlServer_IPC_Processors_Interception_IsInterceptingConnection_System_Int32_
+  commentId: M:DuetControlServer.IPC.Processors.Interception.IsInterceptingConnection(System.Int32)
+  fullName: DuetControlServer.IPC.Processors.Interception.IsInterceptingConnection(System.Int32)
+  nameWithType: Interception.IsInterceptingConnection(Int32)
+- uid: DuetControlServer.IPC.Processors.Interception.IsInterceptingConnection*
+  name: IsInterceptingConnection
+  href: api/DuetControlServer.IPC.Processors.Interception.html#DuetControlServer_IPC_Processors_Interception_IsInterceptingConnection_
+  commentId: Overload:DuetControlServer.IPC.Processors.Interception.IsInterceptingConnection
+  isSpec: "True"
+  fullName: DuetControlServer.IPC.Processors.Interception.IsInterceptingConnection
+  nameWithType: Interception.IsInterceptingConnection
 - uid: DuetControlServer.IPC.Processors.Interception.Process
   name: Process()
   href: api/DuetControlServer.IPC.Processors.Interception.html#DuetControlServer_IPC_Processors_Interception_Process
@@ -13851,6 +13851,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.ChannelInformation.SuspendedCodes
   nameWithType: ChannelInformation.SuspendedCodes
+- uid: DuetControlServer.SPI.ChannelInformation.SystemMacroHadError
+  name: SystemMacroHadError
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_SystemMacroHadError
+  commentId: P:DuetControlServer.SPI.ChannelInformation.SystemMacroHadError
+  fullName: DuetControlServer.SPI.ChannelInformation.SystemMacroHadError
+  nameWithType: ChannelInformation.SystemMacroHadError
+- uid: DuetControlServer.SPI.ChannelInformation.SystemMacroHadError*
+  name: SystemMacroHadError
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_SystemMacroHadError_
+  commentId: Overload:DuetControlServer.SPI.ChannelInformation.SystemMacroHadError
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.ChannelInformation.SystemMacroHadError
+  nameWithType: ChannelInformation.SystemMacroHadError
 - uid: DuetControlServer.SPI.ChannelInformation.SystemMacroHasFinished
   name: SystemMacroHasFinished
   href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_SystemMacroHasFinished
