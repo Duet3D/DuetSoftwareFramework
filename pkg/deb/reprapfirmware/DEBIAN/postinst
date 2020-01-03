@@ -3,6 +3,8 @@
 # Instruct DuetControlServer to update the firmware.
 # Do this only if GPIO and SPI nodes are available in SysFS
 if [ -e /opt/dsf/bin/DuetControlServer ] && [ -d /sys/class/gpio ] && [ -d /sys/module/spidev ]; then
+	# Wait a few extra seconds to let DCS start after an update. This may be needed when running on slow SD cards
+	sleep 5
 	/opt/dsf/bin/DuetControlServer -u
 else
 	echo "Skipping RepRapFirmware auto-update because no DCS, GPIO and/or SPI devices could be detected"
