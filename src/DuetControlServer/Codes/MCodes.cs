@@ -33,13 +33,19 @@ namespace DuetControlServer.Codes
         {
             switch (code.MajorNumber)
             {
-                // Cancel print
+                // Stop or Unconditional stop
+                // Sleep or Conditional stop
                 case 0:
                 case 1:
                     if (await SPI.Interface.Flush(code.Channel))
                     {
                         using (await Print.LockAsync())
                         {
+                            if (Print.IsFileSelected && code.Channel != CodeChannel.File && !Print.IsPaused)
+                            {
+                                return new CodeResult(MessageType.Error, "Pause the print before attempting to cancel it");
+                            }
+
                             // Invalidate the print file and make sure no more codes are read from it
                             Print.Cancel();
                         }
