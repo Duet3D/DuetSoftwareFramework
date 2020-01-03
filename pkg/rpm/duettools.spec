@@ -38,5 +38,7 @@ rsync -vaH %{S:0}/. %{buildroot}/
 %{dsfoptdir}/bin/CodeLogger.*
 %attr(0755, root, root) %{dsfoptdir}/bin/CodeConsole
 %{dsfoptdir}/bin/CodeConsole.*
+%attr(0755, root, root) %{dsfoptdir}/bin/CustomHttpEndpoint
+%{dsfoptdir}/bin/CustomHttpEndpoint.*
 %attr(0755, root, root) %{dsfoptdir}/bin/ModelObserver
 %{dsfoptdir}/bin/ModelObserver.*

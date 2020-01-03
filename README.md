@@ -636,7 +636,7 @@ If the issue you encountered is easy to reproduce, please file a new issue in th
 If the issue only happens sporadically, please launch DuetControlServer with the log level `debug` and provide the log including a short note when the error occurred.
 To launch DuetControlServer with this log level on DuetPi, you may run the following commands from an SSH terminal:
 
-`
+```
 sudo systemctl stop duetcontrolserver
 sudo /opt/dsf/bin/DuetControlServer --log-level debug
-`
+```
