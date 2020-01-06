@@ -1,6 +1,6 @@
 # Duet Software Framework
 
-![Version](https://img.shields.io/github/v/release/chrishamm/DuetSoftwareFramework) ![License](https://img.shields.io/github/license/chrishamm/DuetSoftwareFramework?color=blue) ![Issues](https://img.shields.io/github/issues/chrishamm/DuetWebControl?color=blue)
+![Version](https://img.shields.io/github/v/release/chrishamm/DuetSoftwareFramework) ![License](https://img.shields.io/github/license/chrishamm/DuetSoftwareFramework?color=blue) ![Issues](https://img.shields.io/github/issues/chrishamm/DuetSoftwareFramework?color=blue)
 
 Duet Software Framework resembles a collection of programs to control an attached Duet3D board from a Linux-based mini computer (SBC). Since it is using .NET Core, it requires an ARM processor that supports ARMv7 instructions processor is required (Raspberry Pi 2 or newer).
 
