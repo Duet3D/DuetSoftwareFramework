@@ -79,7 +79,7 @@ Note that all the command-line options are case-sensitive.
 
 In order to connect to the firmware, a binary data protocol is used. DuetControlServer attaches to the Duet using an SPI connection (typically `/dev/spidev0.0`) in master mode. In addition, a GPIO pin (typically pin 22 on the Raspberry Pi header via `/dev/gpiochip0`) is required which is toggled by RepRapFirmware whenever the firmware is ready to exchange data.
 
-More technical documentation about this can be found [here](docs/api/DuetControlServer.SPI.Communication.html).
+More technical documentation about this can be found [here](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetControlServer.SPI.Communication.html).
 
 ### Inter-Process Communication
 
@@ -189,7 +189,7 @@ Returns one of these HTTP status codes:
 #### GET /machine/fileinfo/\{filename\}
 
 Parse a given G-code file and return information about this job file as a JSON object.
-See [API Documentation](docs/api/DuetAPI.ParsedFileInfo.html) for further information about the object returned.
+See [API Documentation](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.ParsedFileInfo.html) for further information about the object returned.
 
 Returns one of these HTTP status codes:
 
@@ -374,7 +374,7 @@ Of course you can compile the required components on the SBC itself. Once the .N
 
 DSF provides a powerful API aimed at expandability and flexibility. The easiest way to get started with it is to obtain the .NET Core package called `DuetAPIClient`.
 Both the API and the API client are available as nuget packages (see [here](https://www.nuget.org/packages/DuetAPI) and [here](https://www.nuget.org/packages/DuetAPIClient)).
-To get a basic idea how the .NET Core-based DuetAPIClient works, check out the source code of the [CodeConsole utility](src/CodeConsole/Program.cs) and the [code documentation](docs/api/DuetAPIClient.html).
+To get a basic idea how the .NET Core-based DuetAPIClient works, check out the source code of the [CodeConsole utility](src/CodeConsole/Program.cs) and the [code documentation](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPIClient.html).
 
 The .NET-based API libraries are - unlike the other DSF components - licensed under the terms of the LGPL 3.0 or later.
 If you wish to build your own API client, it is strongly recommended to follow the DuetAPIClient implementation because it properly documents and handles possible exceptions of every command.
@@ -403,7 +403,7 @@ Once this object has been received, the client is supposed to either close the c
 }
 ```
 
-where `mode` can be either `Command`, `Intercept`, or `Subscribe` (see [docs](docs/api/DuetAPI.Connection.ConnectionMode.html)). This is then acknowledged by the server:
+where `mode` can be either `Command`, `Intercept`, or `Subscribe` (see [docs](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Connection.ConnectionMode.html)). This is then acknowledged by the server:
 
 ```
 {
@@ -427,7 +427,7 @@ To see how JSON objects are exchanged in detail, you can start DuetControlServer
 #### Command Mode
 
 A command connection is a universal connection mode in which various commands can be performed.
-Check out the [code documentation](docs/api/DuetAPIClient.BaseCommandConnection.html#methods) for a list of supported commands.
+Check out the [code documentation](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPIClient.BaseCommandConnection.html#methods) for a list of supported commands.
 
 To put the new connection into `Command` mode, a client can respond to the first init message with
 
@@ -437,7 +437,7 @@ To put the new connection into `Command` mode, a client can respond to the first
 }
 ```
 
-Once this mode has been selected and the success response as described above has been processed by the client, the client may issue [supported commands](docs/api/DuetAPIClient.BaseCommandConnection.html#methods).
+Once this mode has been selected and the success response as described above has been processed by the client, the client may issue [supported commands](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPIClient.BaseCommandConnection.html#methods).
 For example:
 
 ```
@@ -497,13 +497,13 @@ After this the client has to listen for incoming codes until the connection has 
 }
 ```
 
-See the [documentation](docs/api/DuetAPI.Commands.Code.html#properties) for further information about the transmitted fields.
+See the [documentation](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Commands.Code.html#properties) for further information about the transmitted fields.
 
 After receipt, the code can be either:
 
-- [ignored](docs/api/DuetAPI.Commands.Ignore.html) which lets the code continue as expected,
-- [canceled](docs/api/DuetAPI.Commands.Ignore.html) which cancels the code and throws an `OperationCanceledException` on its task,
-- [resolved](docs/api/DuetAPI.Commands.Resolve.html) which resolves the code using a given result
+- [ignored](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Commands.Ignore.html) which lets the code continue as expected,
+- [canceled](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Commands.Ignore.html) which cancels the code and throws an `OperationCanceledException` on its task,
+- [resolved](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Commands.Resolve.html) which resolves the code using a given result
 
 Apart from that, you can run any commands like in the [command mode](#command-mode) while a code is being intercepted.
 Note that it is mandatory to send one of the three commands above to avoid deadlocks. If the connection is interrupted while a code is being intercepted, this happens automatically in the background.
@@ -520,17 +520,17 @@ After that, DuetControlServer will send the next code in the queue to the client
 
 #### Subscription Mode
 
-In many use-cases a third-party application wishes to receive updates about the [machine model](docs/api/DuetAPI.Machine.MachineModel.html#properties), which contains information like axis positions and other useful information.
+In many use-cases a third-party application wishes to receive updates about the [machine model](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Machine.MachineModel.html#properties), which contains information like axis positions and other useful information.
 For this purpose Duet Software Framework provides a mode in which machine model updates can be received whenever the machine model has been updated.
 
-In this mode, only a single command is supported: [Acknowledge](docs/api/DuetAPI.Commands.Acknowledge.html)
+In this mode, only a single command is supported: [Acknowledge](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Commands.Acknowledge.html)
 Send this command whenever the latest machine model update has been processed. Any other command will create an `ArgumentException`.
 Note that the `Acknowledge` command does NOT send back a standard response; instead the next model update is transferred as soon as it is available.
 
-This mode provides [two types of operation](docs/api/DuetAPI.Connection.SubscriptionMode.html):
+This mode provides [two types of operation](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Connection.SubscriptionMode.html):
 
 1. Full mode. Every time the machine model has been updated and parsed, the whole machine model is serialized and send to the API client
-2. Patch mode. In this mode, only the changed object model fields are transferred when an update occurs. In addition, you can specify a [filter](docs/api/DuetAPI.Connection.InitMessages.SubscribeInitMessage.html#DuetAPI_Connection_InitMessages_SubscribeInitMessage_Filter) in case you are only interested in a certain namespace.
+2. Patch mode. In this mode, only the changed object model fields are transferred when an update occurs. In addition, you can specify a [filter](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Connection.InitMessages.SubscribeInitMessage.html#DuetAPI_Connection_InitMessages_SubscribeInitMessage_Filter) in case you are only interested in a certain namespace.
 
 Regardless of the chosen mode, the first thing the client will receive is the full serialized machine model.
 In case a client wants to connect, an init message like this has to be sent first:
@@ -572,7 +572,7 @@ After that, the (partial) machine model is sent back to the client when needed.
 
 ### Custom HTTP endpoints
 
-For custom applications, it can be handy to register custom HTTP endpoints. For this purpose, there is a [command](docs/api/DuetAPI.Commands.AddHttpEndpoint.html#properties) that lets you create one.
+For custom applications, it can be handy to register custom HTTP endpoints. For this purpose, there is a [command](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Commands.AddHttpEndpoint.html#properties) that lets you create one.
 However, these endpoints only support plain text and no binary data. Consider this when designing your own API endpoints.
 
 #### Custom RESTful HTTP endpoints
@@ -598,8 +598,8 @@ which creates a response from DuetControlServer like
 ```
 
 where the `result` represents the path to the UNIX socket that DWS will use. As a consequence, the third-pary application has to start listening on the specified UNIX socket path in `SOCK_STREAM` mode.
-Whenever a new HTTP request is made, DuetWebServer will attempt to connect to the given UNIX socket path. After that, a serialized [ReceivedHttpRequest](docs/api/DuetAPI.Commands.ReceivedHttpRequest.html#properties) JSON object is sent.
-The endpoint server may then send back a serialized [SendHttpResponse](docs/api/DuetAPI.Commands.SendHttpResponse.html#properties) JSON object that specifies what result needs to be returned to the client.
+Whenever a new HTTP request is made, DuetWebServer will attempt to connect to the given UNIX socket path. After that, a serialized [ReceivedHttpRequest](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Commands.ReceivedHttpRequest.html#properties) JSON object is sent.
+The endpoint server may then send back a serialized [SendHttpResponse](https://chrishamm.github.io/DuetSoftwareFramework/api/DuetAPI.Commands.SendHttpResponse.html#properties) JSON object that specifies what result needs to be returned to the client.
 
 #### Custom WebSockets
 
