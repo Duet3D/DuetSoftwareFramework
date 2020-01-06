@@ -124,6 +124,12 @@
             Logger instance
             </summary>
         </member>
+        <member name="F:DuetControlServer.Commands.Code.NumCodeTypes">
+            <summary>
+            Number of code types. This is roughly equivalent to a priority level but since
+            there is no real preference, it is not called that way
+            </summary>
+        </member>
         <member name="F:DuetControlServer.Commands.Code._codeStartLocks">
             <summary>
             Array of AsyncLocks to guarantee the ordered start of incoming G/M/T-codes
@@ -135,7 +141,7 @@
         </member>
         <member name="F:DuetControlServer.Commands.Code._codeFinishLocks">
             <summary>
-            Array of AsyncLocks to guarantee the ordered finishing of incoming G/M/T-codes
+            Array of AsyncLocks to guarantee the ordered finishing of G/M/T-codes
             </summary>
         </member>
         <member name="F:DuetControlServer.Commands.Code._cancellationTokenSources">
@@ -154,9 +160,9 @@
             </summary>
             <param name="channel">Channel to cancel codes from</param>
         </member>
-        <member name="F:DuetControlServer.Commands.Code._cancellationTokenSource">
+        <member name="F:DuetControlServer.Commands.Code._codeType">
             <summary>
-            Source of the cancellation token that is triggered when the code is supposed to be cancelled
+            Internal type assigned by the code scheduler
             </summary>
         </member>
         <member name="F:DuetControlServer.Commands.Code._codeChannelLock">

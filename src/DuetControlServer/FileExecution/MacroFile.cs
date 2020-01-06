@@ -62,7 +62,7 @@ namespace DuetControlServer.FileExecution
 
             _logger = NLog.LogManager.GetLogger(Path.GetFileName(fileName));
             _logger.Info("Executing {0} macro file {1} on channel {2}", (startCode == null) ? "system" : "nested", name, channel);
-            _logger.Debug("=> Starting code: {0}", startCode);
+            _logger.Debug("==> Starting code: {0}", startCode);
         }
 
         /// <summary>

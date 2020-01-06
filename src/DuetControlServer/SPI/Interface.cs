@@ -140,7 +140,7 @@ namespace DuetControlServer.SPI
             QueuedCode item = null;
             using (_channels[code.Channel].Lock())
             {
-                if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
+                if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || IPC.Processors.Interception.IsInterceptingConnection(code.SourceConnection))
                 {
                     // This code is supposed to override every other queued code
                     item = new QueuedCode(code);

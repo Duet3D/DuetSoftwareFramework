@@ -106,7 +106,6 @@ namespace DuetControlServer.FileExecution
             if (_file != null && IsPrinting)
             {
                 Cancel();
-                Code.CancelPending(CodeChannel.File);
                 await _finished.WaitAsync(Program.CancelSource.Token);
             }
 

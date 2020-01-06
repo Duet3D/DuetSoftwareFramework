@@ -26,18 +26,24 @@ namespace DuetControlServer.Commands
 
         #region Code Scheduling
         /// <summary>
+        /// Number of code types. This is roughly equivalent to a priority level but since
+        /// there is no real preference, it is not called that way
+        /// </summary>
+        private const int NumCodeTypes = 4;
+
+        /// <summary>
         /// Array of AsyncLocks to guarantee the ordered start of incoming G/M/T-codes
         /// </summary>
         /// <remarks>
         /// AsyncLock implements an internal waiter queue, so it is safe to rely on it for
         /// maintaining the right order of codes being executed per code channel
         /// </remarks>
-        private static readonly AsyncLock[] _codeStartLocks = new AsyncLock[Channels.Total];
+        private static readonly AsyncLock[,] _codeStartLocks = new AsyncLock[Channels.Total, NumCodeTypes];
 
         /// <summary>
-        /// Array of AsyncLocks to guarantee the ordered finishing of incoming G/M/T-codes
+        /// Array of AsyncLocks to guarantee the ordered finishing of G/M/T-codes
         /// </summary>
-        private static readonly AsyncLock[] _codeFinishLocks = new AsyncLock[Channels.Total];
+        private static readonly AsyncLock[,] _codeFinishLocks = new AsyncLock[Channels.Total, NumCodeTypes];
 
         /// <summary>
         /// List of cancellation tokens to cancel pending codes while they are waiting for their execution
@@ -51,9 +57,12 @@ namespace DuetControlServer.Commands
         {
             for (int i = 0; i < Channels.Total; i++)
             {
-                _codeStartLocks[i] = new AsyncLock();
-                _codeFinishLocks[i] = new AsyncLock();
-                _cancellationTokenSources[i] = new CancellationTokenSource();
+                for (int k = 0; k < NumCodeTypes; k++)
+                {
+                    _codeStartLocks[i, k] = new AsyncLock();
+                    _codeFinishLocks[i, k] = new AsyncLock();
+                }
+                _cancellationTokenSources[i] = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token);
 
                 FileLocks[i] = new AsyncLock();
             }
@@ -78,9 +87,9 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
-        /// Source of the cancellation token that is triggered when the code is supposed to be cancelled
+        /// Internal type assigned by the code scheduler
         /// </summary>
-        private CancellationTokenSource _cancellationTokenSource;
+        private int _codeType;
 
         /// <summary>
         /// Lock that is maintained as long as this code blocks the execution of the next code
@@ -95,14 +104,27 @@ namespace DuetControlServer.Commands
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         private Task<IDisposable> WaitForExecution()
         {
-            CancellationToken channelToken;
+            // Enqueued codes may be cancelled as long as they're not being executed
+            CancellationToken cancellationToken;
             lock (_cancellationTokenSources)
             {
-                channelToken = _cancellationTokenSources[(int)Channel].Token;
+                cancellationToken = _cancellationTokenSources[(int)Channel].Token;
             }
 
-            _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(channelToken, Program.CancelSource.Token);
-            return _codeStartLocks[(int)Channel].LockAsync(_cancellationTokenSource.Token);
+            // Assign a priority to this code and create a task that completes when it can be started
+            if (Interception.IsInterceptingConnection(SourceConnection))
+            {
+                _codeType = 3;
+            }
+            else if (Flags.HasFlag(CodeFlags.IsPrioritized))
+            {
+                _codeType = 2;
+            }
+            else if (Flags.HasFlag(CodeFlags.IsFromMacro))
+            {
+                _codeType = 1;
+            }
+            return _codeStartLocks[(int)Channel, _codeType].LockAsync(cancellationToken);
         }
 
         /// <summary>
@@ -110,8 +132,6 @@ namespace DuetControlServer.Commands
         /// </summary>
         private void StartNextCode()
         {
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = null;
             _codeChannelLock?.Dispose();
             _codeChannelLock = null;
         }
@@ -157,15 +177,23 @@ namespace DuetControlServer.Commands
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         public override Task<CodeResult> Execute()
         {
-            if (Flags.HasFlag(CodeFlags.Asynchronous))
+            // Wait until this code can be executed and then start it
+            Task<CodeResult> executingTask = WaitForExecution().ContinueWith(task =>
             {
-                // Execute this code in the background
-                _ = Task.Run(ExecuteInternally);
-                return Task.FromResult<CodeResult>(null);
-            }
+                if (_codeType > 0)
+                {
+                    _logger.Debug("Waiting for execution of {0} (type {1})", this, _codeType);
+                }
+                else
+                {
+                    _logger.Debug("Waiting for execution of {0}", this);
+                }
+                _codeChannelLock = task.Result;
+                return ExecuteInternally();
+            }).Unwrap();
 
-            // Execute this code now
-            return ExecuteInternally();
+            // Return either the task itself or null and let it finish in the background
+            return Flags.HasFlag(CodeFlags.Asynchronous) ? null : executingTask;
         }
 
         /// <summary>
@@ -183,14 +211,6 @@ namespace DuetControlServer.Commands
 
             try
             {
-                // Make sure to execute this code at the right time...
-                if (!Flags.HasFlag(CodeFlags.IsPrioritized) && !Flags.HasFlag(CodeFlags.IsFromMacro) &&
-                    !Interception.IsInterceptingConnection(SourceConnection))
-                {
-                    _logger.Debug("Waiting for execution of {0}", this);
-                    _codeChannelLock = await WaitForExecution();
-                }
-
                 // Check if this code is supposed to be written to a file
                 int numChannel = (int)Channel;
                 using (await FileLocks[numChannel].LockAsync())
@@ -264,12 +284,12 @@ namespace DuetControlServer.Commands
                 return;
             }
 
-            // RepRapFirmware buffers a number of codes so a new code can be started before the last one has finished
+            // Let RepRapFirmware process this code and start the next one while it is busy
+            Task<CodeResult> executingTask = Interface.ProcessCode(this);
             StartNextCode();
 
-            // It is necessary to use a lock here in order to maintain the order of finishing codes
-            Task<CodeResult> executingTask = Interface.ProcessCode(this);
-            using (await _codeFinishLocks[(int)Channel].LockAsync())
+            // Obtain a lock here to maintain the order of finishing codes since TCSs may resume execution in the wrong order
+            using (await _codeFinishLocks[(int)Channel, _codeType].LockAsync())
             {
                 try
                 {

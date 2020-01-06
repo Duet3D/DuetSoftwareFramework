@@ -11,6 +11,7 @@ using Code = DuetControlServer.Commands.Code;
 using Nito.AsyncEx;
 using LinuxDevices;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace DuetControlServer.SPI
 {
@@ -45,10 +46,11 @@ namespace DuetControlServer.SPI
         private static readonly Memory<byte> _rxResponseBuffer = new byte[4];
         private static readonly Memory<byte> _txResponseBuffer = new byte[4];
 
-        // Transfer data. Keep two TX buffers so resend requests can be processed
+        // Transfer data. Keep three TX buffers so resend requests can be processed
+        private const int NumTxBuffers = 3;
         private static readonly Memory<byte> _rxBuffer = new byte[Communication.Consts.BufferSize];
-        private static readonly Memory<byte>[] _txBuffers = { new byte[Communication.Consts.BufferSize], new byte[Communication.Consts.BufferSize] };
-        private static int _txBufferIndex;
+        private static readonly LinkedList<Memory<byte>> _txBuffers = new LinkedList<Memory<byte>>();
+        private static LinkedListNode<Memory<byte>> _txBuffer;
         private static int _rxPointer, _txPointer;
         private static Communication.PacketHeader _lastPacket;
         private static ReadOnlyMemory<byte> _packetData;
@@ -60,6 +62,13 @@ namespace DuetControlServer.SPI
         {
             // Initialize TX header. This only needs to happen once
             Serialization.Writer.InitTransferHeader(ref _txHeader);
+
+            // Initialize TX buffers
+            for (int i = 0; i < NumTxBuffers; i++)
+            {
+                _txBuffers.AddLast(new byte[Communication.Consts.BufferSize]);
+            }
+            _txBuffer = _txBuffers.First;
 
             // Initialize transfer ready pin
             _transferReadyPin = new InputGpioPin(Settings.GpioChipDevice, Settings.TransferReadyPin, $"dcs-trp-{Settings.TransferReadyPin}");
@@ -132,7 +141,7 @@ namespace DuetControlServer.SPI
             _txHeader.NumPackets = _packetId;
             _txHeader.SequenceNumber++;
             _txHeader.DataLength = (ushort)_txPointer;
-            _txHeader.ChecksumData = Utility.CRC16.Calculate(_txBuffers[_txBufferIndex].Slice(0, _txPointer).Span);
+            _txHeader.ChecksumData = Utility.CRC16.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
             _txHeader.ChecksumHeader = Utility.CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf(typeof(ushort))).Span);
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
@@ -176,7 +185,7 @@ namespace DuetControlServer.SPI
 
                     // Transfer OK
                     Interlocked.Increment(ref _numMeasuredTransfers);
-                    _txBufferIndex = (_txBufferIndex == 0) ? 1 : 0;
+                    _txBuffer = _txBuffer.Next ?? _txBuffers.First;
                     _rxPointer = _txPointer = 0;
                     _packetId = 0;
 
@@ -388,7 +397,8 @@ namespace DuetControlServer.SPI
         /// <param name="packet">Packet holding the resend request</param>
         public static void ResendPacket(Communication.PacketHeader packet)
         {
-            Span<byte> buffer = ((_txBufferIndex == 0) ? _txBuffers[1] : _txBuffers[0]).Span;
+            Span<byte> buffer = (_txBuffer.Next ?? _txBuffers.First).Value.Span;
+
             Communication.PacketHeader header;
             int headerSize = Marshal.SizeOf(typeof(Communication.PacketHeader));
             do
@@ -397,8 +407,9 @@ namespace DuetControlServer.SPI
                 header = MemoryMarshal.Cast<byte, Communication.PacketHeader>(buffer)[0];
                 if (header.Id == packet.ResendPacketId)
                 {
-                    Span<byte> destination = GetWriteBuffer(headerSize + header.Length);
-                    buffer.Slice(0, headerSize + header.Length).CopyTo(destination);
+                    // Resend it but use a new identifier
+                    WritePacket((Communication.LinuxRequests.Request)header.Request, header.Length);
+                    buffer.Slice(headerSize, header.Length).CopyTo(GetWriteBuffer(header.Length));
                     return;
                 }
 
@@ -645,7 +656,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.LockMovementAndWaitForStandstill);
+            WritePacket(Communication.LinuxRequests.Request.LockMovementAndWaitForStandstill, dataLength);
             Serialization.Writer.WriteLockUnlock(GetWriteBuffer(dataLength), channel);
             return true;
         }
@@ -663,7 +674,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.Unlock);
+            WritePacket(Communication.LinuxRequests.Request.Unlock, dataLength);
             Serialization.Writer.WriteLockUnlock(GetWriteBuffer(dataLength), channel);
             return true;
         }
@@ -846,7 +857,7 @@ namespace DuetControlServer.SPI
                 ResendPacketId = 0
             };
 
-            Span<byte> span = _txBuffers[_txBufferIndex].Slice(_txPointer).Span;
+            Span<byte> span = _txBuffer.Value.Slice(_txPointer).Span;
             MemoryMarshal.Write(span, ref header);
             _txPointer += Marshal.SizeOf(header);
         }
@@ -858,7 +869,7 @@ namespace DuetControlServer.SPI
         /// <returns>Data span</returns>
         private static Span<byte> GetWriteBuffer(int dataLength)
         {
-            Span<byte> result = _txBuffers[_txBufferIndex].Slice(_txPointer, dataLength).Span;
+            Span<byte> result = _txBuffer.Value.Slice(_txPointer, dataLength).Span;
             int padding = 4 - (dataLength % 4);
             _txPointer += dataLength + ((padding == 4) ? 0 : padding);
             return result;
@@ -1052,7 +1063,7 @@ namespace DuetControlServer.SPI
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
                 await WaitForTransfer();
-                _spiDevice.TransferFullDuplex(_txBuffers[_txBufferIndex].Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
+                _spiDevice.TransferFullDuplex(_txBuffer.Value.Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
 
                 // Check for possible response code
                 uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);

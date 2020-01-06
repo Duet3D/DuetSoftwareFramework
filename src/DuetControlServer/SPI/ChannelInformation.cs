@@ -135,7 +135,7 @@ namespace DuetControlServer.SPI
             }
             if (BytesBuffered != 0)
             {
-                channelDiagostics.AppendLine($"=> {BytesBuffered} bytes");
+                channelDiagostics.AppendLine($"==> {BytesBuffered} bytes");
             }
 
             foreach (Queue<QueuedCode> suspendedCodes in SuspendedCodes)
@@ -180,7 +180,32 @@ namespace DuetControlServer.SPI
         /// <returns>If anything more can be done on this channel</returns>
         public bool ProcessRequests()
         {
-            // 1. Priority codes
+            // 1. Lock/Unlock requests
+            if (PendingLockRequests.TryPeek(out QueuedLockRequest lockRequest))
+            {
+                if (lockRequest.IsLockRequest)
+                {
+                    if (!lockRequest.IsLockRequested)
+                    {
+                        lockRequest.IsLockRequested = DataTransfer.WriteLockMovementAndWaitForStandstill(Channel);
+                    }
+                }
+                else if (DataTransfer.WriteUnlock(Channel))
+                {
+                    lockRequest.Resolve(true);
+                    PendingLockRequests.Dequeue();
+                }
+                return false;
+            }
+
+            // 2. Suspended codes being resumed (may include priority and macro codes)
+            if (_resumingBuffer)
+            {
+                ResumeBuffer();
+                return _resumingBuffer;
+            }
+
+            // 3. Priority codes
             if (PriorityCodes.TryPeek(out QueuedCode queuedCode))
             {
                 if (queuedCode.IsFinished || (queuedCode.IsReadyToSend && BufferCode(queuedCode)))
@@ -190,24 +215,17 @@ namespace DuetControlServer.SPI
                 }
 
                 // Block this channel until every priority code is gone
-                IsBlocked = true;
+                return false;
             }
                 
-            // 2. Suspended codes being resumed (may include suspended codes from nested macros)
-            if (_resumingBuffer)
-            {
-                ResumeBuffer();
-                return _resumingBuffer;
-            }
-
-            // 3. Macro codes
+            // 4. Macro codes
             if (NestedMacroCodes.TryPeek(out queuedCode) && (queuedCode.IsFinished || (queuedCode.IsReadyToSend && BufferCode(queuedCode))))
             {
                 NestedMacroCodes.Dequeue();
                 return true;
             }
 
-            // 4. New codes from macro files
+            // 5. New codes from macro files
             if (NestedMacros.TryPeek(out MacroFile macroFile))
             {
                 // Try to read the next real code from the system macro being executed
@@ -231,11 +249,11 @@ namespace DuetControlServer.SPI
                     // deadlocks which would occur when SPI data is awaited (e.g. heightmap queries)
                     queuedCode = new QueuedCode(code);
                     NestedMacroCodes.Enqueue(queuedCode);
-                    _ = Task.Run(async () =>
+                    _ = code.Execute().ContinueWith(async task =>
                     {
                         try
                         {
-                            CodeResult result = await code.Execute();
+                            CodeResult result = await task;
                             if (!queuedCode.IsReadyToSend)
                             {
                                 // Macro codes need special treatment because they may complete before they are actually sent to RepRapFirmware
@@ -261,7 +279,6 @@ namespace DuetControlServer.SPI
                             await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{e.GetType().Name}] {e.Message}");
                         }
                     });
-
                     return true;
                 }
 
@@ -287,29 +304,11 @@ namespace DuetControlServer.SPI
                 }
             }
 
-            // 5. Regular codes - only applicable if no macro is being executed
+            // 6. Regular codes - only applicable if no macro is being executed
             else if (PendingCodes.TryPeek(out queuedCode) && BufferCode(queuedCode))
             {
                 PendingCodes.Dequeue();
                 return true;
-            }
-
-            // 6. Lock/Unlock requests
-            if (BufferedCodes.Count == 0 && PendingLockRequests.TryPeek(out QueuedLockRequest lockRequest))
-            {
-                if (lockRequest.IsLockRequest)
-                {
-                    if (!lockRequest.IsLockRequested)
-                    {
-                        lockRequest.IsLockRequested = DataTransfer.WriteLockMovementAndWaitForStandstill(Channel);
-                    }
-                }
-                else if (DataTransfer.WriteUnlock(Channel))
-                {
-                    lockRequest.Resolve(true);
-                    PendingLockRequests.Dequeue();
-                }
-                return false;
             }
 
             // 7. Flush requests
@@ -393,7 +392,7 @@ namespace DuetControlServer.SPI
                     {
                         NestedMacros.Pop().Dispose();
                         _logger.Info("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
-                        _logger.Debug("=> Starting code: {0}", macroFile.StartCode);
+                        _logger.Debug("==> Starting code: {0}", macroFile.StartCode);
                     }
                 }
                 else if (!flags.HasFlag(MessageTypeFlags.PushFlag))
