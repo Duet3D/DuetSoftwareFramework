@@ -14,6 +14,6 @@ namespace DuetAPIClient.Exceptions
         /// <param name="command">Name of the command that failed</param>
         /// <param name="type">Type of the thrown .NET error</param>
         /// <param name="message">Message of the thrown .NET error</param>
-        public InternalServerException(string command, string type, string message) : base($"Command {command} has reported an error:\n[{type}] {message}") { }
+        public InternalServerException(string command, string type, string message) : base(string.IsNullOrEmpty(message) ? $"{type} in {command}" : $"{type} in {command}: {message}") { }
     }
 }

@@ -325,6 +325,12 @@ namespace DuetAPI.Commands
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
+                            else if (letter == 'e' && value == "cho")
+                            {
+                                result.Keyword = KeywordType.Echo;
+                                result.KeywordArgument = string.Empty;
+                                inCondition = true;
+                            }
                             else if (result.Parameter(letter) == null)
                             {
                                 AddParameter(result, letter, value, false, false);

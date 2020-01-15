@@ -72,6 +72,26 @@ namespace DuetAPI.Machine
         private string _macros = "0:/macros";
 
         /// <summary>
+        /// Path to the Menu directory
+        /// </summary>
+        /// <remarks>
+        /// Intended for 12864 displays but currently unused in DSF. It is only needed for the Duet Maestro + DWC
+        /// </remarks>
+        public string Menu
+        {
+            get => _menu;
+            set
+            {
+                if (_menu != value)
+                {
+                    _menu = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private string _menu = "0:/menu";
+
+        /// <summary>
         /// Path to the system directory
         /// </summary>
         public string System

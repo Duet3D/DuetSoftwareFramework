@@ -199,8 +199,13 @@ namespace DuetControlServer.SPI
                 }
                 catch (OperationCanceledException e)
                 {
+                    if (Program.CancelSource.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+
                     _logger.Debug(e, "Lost connection to Duet");
-                    if (!Program.CancelSource.IsCancellationRequested && !_hadTimeout && _started && !Updating)
+                    if (!_hadTimeout && _started && !Updating)
                     {
                         _waitingForFirstTransfer = _hadTimeout = true;
                         using (await Model.Provider.AccessReadWriteAsync())
@@ -211,7 +216,7 @@ namespace DuetControlServer.SPI
                     }
                 }
             }
-            while (mustSucceed && !Program.CancelSource.IsCancellationRequested);
+            while (mustSucceed);
 
             return false;
         }

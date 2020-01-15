@@ -1753,6 +1753,14 @@
             Indicates if the suspended codes are being resumed
             </summary>
         </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.MacroCompleted(DuetControlServer.SPI.QueuedCode,System.Boolean)">
+            <summary>
+            Notify RepRapFirmware about a completed macro file
+            </summary>
+            <param name="startingCode">Code starting the macro</param>
+            <param name="error">True if there was any error processing the file</param>
+            <returns>Whether the notification could be sent</returns>
+        </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.InvalidateBuffer(System.Boolean)">
             <summary>
             Invalidate all the buffered G/M/T-codes

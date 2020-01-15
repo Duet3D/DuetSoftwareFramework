@@ -371,6 +371,11 @@
             Set operation
             </summary>
         </member>
+        <member name="F:DuetAPI.Commands.KeywordType.Echo">
+            <summary>
+            Echo operation
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.CodeFlags">
             <summary>
             Code bits to classify G/M/T-codes
@@ -1436,6 +1441,14 @@
             <summary>
             Path to the macros directory
             </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Directories.Menu">
+            <summary>
+            Path to the Menu directory
+            </summary>
+            <remarks>
+            Intended for 12864 displays but currently unused in DSF. It is only needed for the Duet Maestro + DWC
+            </remarks>
         </member>
         <member name="P:DuetAPI.Machine.Directories.System">
             <summary>
@@ -3217,6 +3230,11 @@
         <member name="P:DuetAPI.Machine.ProbeGrid.Radius">
             <summary>
             Probing radius for delta kinematics
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ProbeGrid.Spacing">
+            <summary>
+            Spacing between the probe points for delta kinematics
             </summary>
         </member>
         <member name="M:DuetAPI.Machine.ProbeGrid.Assign(System.Object)">

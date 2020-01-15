@@ -202,22 +202,20 @@ namespace DuetControlServer.SPI
             if (_resumingBuffer)
             {
                 ResumeBuffer();
-                return _resumingBuffer;
+                return false;
             }
 
             // 3. Priority codes
             if (PriorityCodes.TryPeek(out QueuedCode queuedCode))
             {
-                if (queuedCode.IsFinished || (queuedCode.IsReadyToSend && BufferCode(queuedCode)))
+                if (BufferCode(queuedCode))
                 {
                     PriorityCodes.Dequeue();
                     return true;
                 }
-
-                // Block this channel until every priority code is gone
                 return false;
             }
-                
+
             // 4. Macro codes
             if (NestedMacroCodes.TryPeek(out queuedCode) && (queuedCode.IsFinished || (queuedCode.IsReadyToSend && BufferCode(queuedCode))))
             {
@@ -228,9 +226,8 @@ namespace DuetControlServer.SPI
             // 5. New codes from macro files
             if (NestedMacros.TryPeek(out MacroFile macroFile))
             {
-                // Try to read the next real code from the system macro being executed
                 Commands.Code code = null;
-                if (!macroFile.IsFinished && NestedMacroCodes.Count < Settings.BufferedMacroCodes)
+                if (NestedMacroCodes.Count < Settings.BufferedMacroCodes)
                 {
                     try
                     {
@@ -242,11 +239,9 @@ namespace DuetControlServer.SPI
                     }
                 }
 
-                // If there is any, start executing it in the background. An interceptor may also generate extra codes
                 if (code != null)
                 {
-                    // Note that the following code is executed asynchronously to avoid potential
-                    // deadlocks which would occur when SPI data is awaited (e.g. heightmap queries)
+                    // Start the next code in the background. An interceptor may also generate extra (priority) codes
                     queuedCode = new QueuedCode(code);
                     NestedMacroCodes.Enqueue(queuedCode);
                     _ = code.Execute().ContinueWith(async task =>
@@ -256,10 +251,12 @@ namespace DuetControlServer.SPI
                             CodeResult result = await task;
                             if (!queuedCode.IsReadyToSend)
                             {
-                                // Macro codes need special treatment because they may complete before they are actually sent to RepRapFirmware
+                                // Macro codes need special treatment because they may complete before they are actually
+                                // sent to RepRapFirmware. Remove them from the NestedMacroCodes again in this case
                                 queuedCode.HandleReply(result);
                             }
-                            if (!macroFile.IsAborted)
+
+                            if (macroFile.StartCode == null)
                             {
                                 await Utility.Logger.LogOutput(result);
                             }
@@ -282,33 +279,39 @@ namespace DuetControlServer.SPI
                     return true;
                 }
 
-                // Macro file is complete if no more codes can be read from the file and the buffered codes are completely gone
-                if (macroFile.IsFinished && !NestedMacroCodes.TryPeek(out _) && BufferedCodes.Count == 0 &&
-                    ((macroFile.StartCode != null && macroFile.StartCode.DoingNestedMacro) || (macroFile.StartCode == null && !SystemMacroHasFinished)) &&
-                    MacroCompleted(macroFile.StartCode, macroFile.IsAborted))
+                if (macroFile.IsFinished && !NestedMacroCodes.TryPeek(out _) && BufferedCodes.Count == 0)
                 {
-                    if (macroFile.StartCode == null)
+                    // When the last code from the macro has been processed, notify RRF about the completed file
+                    if (((macroFile.StartCode != null && macroFile.StartCode.DoingNestedMacro) || (macroFile.StartCode == null && !SystemMacroHasFinished)) &&
+                        MacroCompleted(macroFile.StartCode, macroFile.IsAborted))
                     {
-                        SystemMacroHasFinished = true;
-                    }
+                        if (macroFile.StartCode == null)
+                        {
+                            SystemMacroHasFinished = true;
+                        }
 
-                    if (macroFile.IsAborted)
-                    {
-                        _logger.Info("Aborted macro file {0}", Path.GetFileName(macroFile.FileName));
-                    }
-                    else
-                    {
-                        _logger.Debug("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
+                        if (macroFile.IsAborted)
+                        {
+                            _logger.Info("Aborted macro file {0}", Path.GetFileName(macroFile.FileName));
+                        }
+                        else
+                        {
+                            _logger.Debug("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
+                        }
                     }
                     return false;
                 }
             }
 
             // 6. Regular codes - only applicable if no macro is being executed
-            else if (PendingCodes.TryPeek(out queuedCode) && BufferCode(queuedCode))
+            else if (PendingCodes.TryPeek(out queuedCode))
             {
-                PendingCodes.Dequeue();
-                return true;
+                if (BufferCode(queuedCode))
+                {
+                    PendingCodes.Dequeue();
+                    return true;
+                }
+                return false;
             }
 
             // 7. Flush requests
@@ -318,6 +321,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
+            // End
             return false;
         }
 
@@ -382,26 +386,33 @@ namespace DuetControlServer.SPI
                 return true;
             }
 
-            if (NestedMacros.TryPeek(out MacroFile macroFile) &&
-                ((macroFile.StartCode != null && !macroFile.StartCode.DoingNestedMacro) || (macroFile.StartCode == null && SystemMacroHasFinished)))
+            if (NestedMacros.TryPeek(out MacroFile macroFile))
             {
+                if ((macroFile.StartCode != null && !macroFile.StartCode.DoingNestedMacro) || (macroFile.StartCode == null && SystemMacroHasFinished))
+                {
+                    if (macroFile.StartCode != null)
+                    {
+                        macroFile.StartCode.HandleReply(flags, reply);
+                        if (macroFile.IsFinished)
+                        {
+                            NestedMacros.Pop().Dispose();
+                            _logger.Info("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
+                            _logger.Debug("==> Starting code: {0}", macroFile.StartCode);
+                        }
+                    }
+                    else if (!flags.HasFlag(MessageTypeFlags.PushFlag))
+                    {
+                        NestedMacros.Pop().Dispose();
+                        SystemMacroHasFinished = false;
+                        _logger.Info("Finished system macro file {0}", Path.GetFileName(macroFile.FileName));
+                    }
+                    return true;
+                }
+
                 if (macroFile.StartCode != null)
                 {
                     macroFile.StartCode.HandleReply(flags, reply);
-                    if (macroFile.IsFinished)
-                    {
-                        NestedMacros.Pop().Dispose();
-                        _logger.Info("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
-                        _logger.Debug("==> Starting code: {0}", macroFile.StartCode);
-                    }
                 }
-                else if (!flags.HasFlag(MessageTypeFlags.PushFlag))
-                {
-                    NestedMacros.Pop().Dispose();
-                    SystemMacroHasFinished = false;
-                    _logger.Info("Finished system macro file {0}", Path.GetFileName(macroFile.FileName));
-                }
-                return true;
             }
 
             if (BufferedCodes.Count > 0)
@@ -415,7 +426,11 @@ namespace DuetControlServer.SPI
                 return true;
             }
 
-            _logger.Warn("Out-of-order reply: '{0}'", reply);
+            // Replies from the code queue or a final empty response from the file are expected
+            if (Channel != CodeChannel.CodeQueue && Channel != CodeChannel.File)
+            {
+                _logger.Warn("Out-of-order reply: '{0}'", reply);
+            }
             return false;
         }
 
@@ -513,6 +528,17 @@ namespace DuetControlServer.SPI
             SuspendBuffer();
         }
 
+        /// <summary>
+        /// Indicates if the suspended codes are being resumed
+        /// </summary>
+        private bool _resumingBuffer;
+
+        /// <summary>
+        /// Notify RepRapFirmware about a completed macro file
+        /// </summary>
+        /// <param name="startingCode">Code starting the macro</param>
+        /// <param name="error">True if there was any error processing the file</param>
+        /// <returns>Whether the notification could be sent</returns>
         private bool MacroCompleted(QueuedCode startingCode, bool error)
         {
             if (DataTransfer.WriteMacroCompleted(Channel, error))
@@ -526,11 +552,6 @@ namespace DuetControlServer.SPI
             }
             return false;
         }
-
-        /// <summary>
-        /// Indicates if the suspended codes are being resumed
-        /// </summary>
-        private bool _resumingBuffer;
 
         /// <summary>
         /// Invalidate all the buffered G/M/T-codes

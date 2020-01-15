@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -178,18 +177,19 @@ namespace DuetControlServer.Commands
         public override Task<CodeResult> Execute()
         {
             // Wait until this code can be executed and then start it
-            Task<CodeResult> executingTask = WaitForExecution().ContinueWith(task =>
+            if (_codeType > 0)
             {
-                if (_codeType > 0)
-                {
-                    _logger.Debug("Waiting for execution of {0} (type {1})", this, _codeType);
-                }
-                else
-                {
-                    _logger.Debug("Waiting for execution of {0}", this);
-                }
-                _codeChannelLock = task.Result;
-                return ExecuteInternally();
+                _logger.Debug("Waiting for execution of {0} (type {1})", this, _codeType);
+            }
+            else
+            {
+                _logger.Debug("Waiting for execution of {0}", this);
+            }
+
+            Task<CodeResult> executingTask = WaitForExecution().ContinueWith(async task =>
+            {
+                _codeChannelLock = await task;
+                return await ExecuteInternally();
             }).Unwrap();
 
             // Return either the task itself or null and let it finish in the background
