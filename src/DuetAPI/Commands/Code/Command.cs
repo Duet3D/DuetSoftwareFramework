@@ -240,11 +240,15 @@ namespace DuetAPI.Commands
                 return "(comment)";
             }
 
-            if (MinorNumber.HasValue)
+            if (MajorNumber.HasValue)
             {
-                return $"{(char)Type}{MajorNumber}.{MinorNumber}";
+                if (MinorNumber.HasValue)
+                {
+                    return $"{(char)Type}{MajorNumber}.{MinorNumber}";
+                }
+                return $"{(char)Type}{MajorNumber}";
             }
-            return $"{(char)Type}{MajorNumber}";
+            return $"{(char)Type}";
         }
     }
 }

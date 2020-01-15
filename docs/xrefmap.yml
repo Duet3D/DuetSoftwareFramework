@@ -1270,6 +1270,12 @@ references:
   commentId: F:DuetAPI.Commands.KeywordType.Break
   fullName: DuetAPI.Commands.KeywordType.Break
   nameWithType: KeywordType.Break
+- uid: DuetAPI.Commands.KeywordType.Echo
+  name: Echo
+  href: api/DuetAPI.Commands.KeywordType.html#DuetAPI_Commands_KeywordType_Echo
+  commentId: F:DuetAPI.Commands.KeywordType.Echo
+  fullName: DuetAPI.Commands.KeywordType.Echo
+  nameWithType: KeywordType.Echo
 - uid: DuetAPI.Commands.KeywordType.Else
   name: Else
   href: api/DuetAPI.Commands.KeywordType.html#DuetAPI_Commands_KeywordType_Else
@@ -2869,6 +2875,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Directories.Macros
   nameWithType: Directories.Macros
+- uid: DuetAPI.Machine.Directories.Menu
+  name: Menu
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_Menu
+  commentId: P:DuetAPI.Machine.Directories.Menu
+  fullName: DuetAPI.Machine.Directories.Menu
+  nameWithType: Directories.Menu
+- uid: DuetAPI.Machine.Directories.Menu*
+  name: Menu
+  href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_Menu_
+  commentId: Overload:DuetAPI.Machine.Directories.Menu
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Directories.Menu
+  nameWithType: Directories.Menu
 - uid: DuetAPI.Machine.Directories.PropertyChanged
   name: PropertyChanged
   href: api/DuetAPI.Machine.Directories.html#DuetAPI_Machine_Directories_PropertyChanged
@@ -6780,6 +6799,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.ProbeGrid.Radius
   nameWithType: ProbeGrid.Radius
+- uid: DuetAPI.Machine.ProbeGrid.Spacing
+  name: Spacing
+  href: api/DuetAPI.Machine.ProbeGrid.html#DuetAPI_Machine_ProbeGrid_Spacing
+  commentId: P:DuetAPI.Machine.ProbeGrid.Spacing
+  fullName: DuetAPI.Machine.ProbeGrid.Spacing
+  nameWithType: ProbeGrid.Spacing
+- uid: DuetAPI.Machine.ProbeGrid.Spacing*
+  name: Spacing
+  href: api/DuetAPI.Machine.ProbeGrid.html#DuetAPI_Machine_ProbeGrid_Spacing_
+  commentId: Overload:DuetAPI.Machine.ProbeGrid.Spacing
+  isSpec: "True"
+  fullName: DuetAPI.Machine.ProbeGrid.Spacing
+  nameWithType: ProbeGrid.Spacing
 - uid: DuetAPI.Machine.ProbeGrid.XMax
   name: XMax
   href: api/DuetAPI.Machine.ProbeGrid.html#DuetAPI_Machine_ProbeGrid_XMax

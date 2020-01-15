@@ -96,7 +96,10 @@ namespace DuetControlServer.SPI
                     msg.Content = msg.Content.TrimEnd();
                 }
 
-                SetFinished();
+                if (!DoingNestedMacro)
+                {
+                    SetFinished();
+                }
             }
         }
 
@@ -106,11 +109,15 @@ namespace DuetControlServer.SPI
         /// <param name="result">Code reply</param>
         public void HandleReply(CodeResult result)
         {
-            if (result != null)
+            if (result != null && !_result.IsEmpty)
             {
                 _result.AddRange(result);
             }
-            SetFinished();
+
+            if (!DoingNestedMacro)
+            {
+                SetFinished();
+            }
         }
 
         /// <summary>

@@ -94,17 +94,17 @@ namespace DuetAPI.Machine
         /// </summary>
         public int OriginId
         {
-            get => _originPort;
+            get => _originId;
             set
             {
-                if (_originPort != value)
+                if (_originId != value)
                 {
-                    _originPort = value;
+                    _originId = value;
                     NotifyPropertyChanged();
                 }
             }
         }
-        private int _originPort = -1;
+        private int _originId = -1;
 
         /// <summary>
         /// Assigns every property from another instance

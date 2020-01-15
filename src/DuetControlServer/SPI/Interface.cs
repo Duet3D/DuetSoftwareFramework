@@ -574,8 +574,17 @@ namespace DuetControlServer.SPI
                 await DataTransfer.PerformFullTransfer();
                 _channels.ResetBlockedChannels();
 
-                // Wait a moment
-                await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
+                // Wait a moment unless instructions are being sent rapidly to RRF.
+                // This will become obsolete as soon as the LinuxTransfer module in RRF gets its own task
+                bool isSimulating;
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    isSimulating = Model.Provider.Get.State.Status == MachineStatus.Simulating;
+                }
+                if (!isSimulating)
+                {
+                    await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
+                }
             }
             while (true);
         }
@@ -676,7 +685,7 @@ namespace DuetControlServer.SPI
                         {
                             _moduleToQuery = 5;
                         }
-                        else if (Model.Provider.Get.State.Status == MachineStatus.Processing)
+                        else if (Model.Provider.Get.State.Status == MachineStatus.Processing || Model.Provider.Get.State.Status == MachineStatus.Simulating)
                         {
                             _moduleToQuery = 3;
                         }

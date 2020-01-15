@@ -207,7 +207,7 @@ namespace DuetControlServer.Codes
                     {
                         using (await Print.LockAsync())
                         {
-                            if (!Print.IsPrinting)
+                            if (!Print.IsFileSelected)
                             {
                                 return new CodeResult(MessageType.Error, "Not printing a file");
                             }
@@ -231,7 +231,7 @@ namespace DuetControlServer.Codes
                     {
                         using (await Print.LockAsync())
                         {
-                            if (Print.IsPrinting)
+                            if (Print.IsFileSelected)
                             {
                                 return new CodeResult(MessageType.Success, $"SD printing byte {Print.FilePosition}/{Print.FileLength}");
                             }
