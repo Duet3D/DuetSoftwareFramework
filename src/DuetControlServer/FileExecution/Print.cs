@@ -1,5 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
+using DuetControlServer.SPI.Communication;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -72,18 +73,27 @@ namespace DuetControlServer.FileExecution
         public static bool IsAborted { get; private set; }
 
         /// <summary>
+        /// Defines if the file position is supposed to be set by the Print task
+        /// </summary>
+        private static bool _pausePositionSet;
+
+        /// <summary>
+        /// Reason why the print has been paused
+        /// </summary>
+        private static PrintPausedReason _pauseReason;
+
+        /// <summary>
         /// Reports the current file position
         /// </summary>
         public static long FilePosition
         {
             get => _file.Position;
-            set => _file.Position = value;
+            set
+            {
+                _file.Position = value;
+                _pausePositionSet = true;
+            }
         }
-
-        /// <summary>
-        /// Holds the file position after the current code being executed
-        /// </summary>
-        public static long? NextFilePosition { get; private set; }
 
         /// <summary>
         /// Returns the length of the file being printed in bytes
@@ -103,7 +113,7 @@ namespace DuetControlServer.FileExecution
             BaseFile file = new BaseFile(fileName, CodeChannel.File);
 
             // A file being printed may start another file print
-            if (_file != null && IsPrinting)
+            if (IsFileSelected)
             {
                 Cancel();
                 await _finished.WaitAsync(Program.CancelSource.Token);
@@ -139,6 +149,7 @@ namespace DuetControlServer.FileExecution
                     await _resume.WaitAsync(Program.CancelSource.Token);
                     startingNewPrint = !_file.IsAborted;
                     IsPrinting = startingNewPrint;
+                    _pausePositionSet = false;
                 }
 
                 // Deal with the file print
@@ -152,24 +163,18 @@ namespace DuetControlServer.FileExecution
                     // Process the file
                     Queue<Code> codes = new Queue<Code>();
                     Queue<Task<CodeResult>> codeTasks = new Queue<Task<CodeResult>>();
+                    long nextFilePosition = 0;
                     do
                     {
+                        // Fill up the code buffer unless the print is paused
                         using (await _lock.LockAsync())
                         {
-                            // Check if the print has been paued
-                            if (IsPaused)
-                            {
-                                IsPrinting = false;
-                                await _resume.WaitAsync(Program.CancelSource.Token);
-                            }
-
-                            // Fill up the code buffer
-                            while (codeTasks.Count == 0 || codeTasks.Count < Settings.BufferedPrintCodes)
+                            while (!IsPaused && codeTasks.Count < Math.Max(2, Settings.BufferedPrintCodes))
                             {
                                 Code readCode = _file.ReadCode();
                                 if (readCode == null)
                                 {
-                                    // Print complete
+                                    // Cannot read any more codes
                                     break;
                                 }
 
@@ -181,28 +186,23 @@ namespace DuetControlServer.FileExecution
                         // Is there anything more to do?
                         if (codes.TryDequeue(out Code code))
                         {
+                            long lastFilePosition = nextFilePosition;
                             try
                             {
-                                if (codes.TryPeek(out Code nextCode) && nextCode.FilePosition != null)
-                                {
-                                    using (await _lock.LockAsync())
-                                    {
-                                        // Keep track of the next code's file position in case a macro is being executed
-                                        NextFilePosition = nextCode.FilePosition;
-                                    }
-                                }
-
+                                nextFilePosition = code.FilePosition.Value + code.Length.Value;
                                 CodeResult result = await codeTasks.Dequeue();
                                 await Utility.Logger.LogOutput(result);
                             }
                             catch (OperationCanceledException)
                             {
-                                // May happen when the file being printed is exchanged or
-                                // when a third-party application decides to cancel a code
+                                // May happen when the file being printed is exchanged, printed, or when a third-party plugin decided to cancel the code
+                                nextFilePosition = lastFilePosition;
                             }
                             catch (Exception e)
                             {
                                 await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
+                                _logger.Error(e);
+
                                 using (await _lock.LockAsync())
                                 {
                                     Abort();
@@ -212,8 +212,28 @@ namespace DuetControlServer.FileExecution
                         }
                         else
                         {
-                            // No more codes available - print must have finished
-                            break;
+                            using (await LockAsync())
+                            {
+                                if (IsPaused)
+                                {
+                                    // Check if the file position has to be adjusted
+                                    if (!_pausePositionSet)
+                                    {
+                                        FilePosition = nextFilePosition;
+                                        _logger.Info("Print has been paused at byte {0}*, reason {1}", nextFilePosition, _pauseReason);
+                                    }
+
+                                    // Wait for the print to be resumed
+                                    IsPrinting = false;
+                                    await _resume.WaitAsync(Program.CancelSource.Token);
+                                    _pausePositionSet = false;
+                                }
+                                else
+                                {
+                                    // No more codes available - print must have finished
+                                    break;
+                                }
+                            }
                         }
                     }
                     while (!Program.CancelSource.IsCancellationRequested);
@@ -226,18 +246,18 @@ namespace DuetControlServer.FileExecution
                             if (IsAborted)
                             {
                                 _logger.Info("Aborted print file");
-                                await SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.Abort);
+                                await SPI.Interface.SetPrintStopped(PrintStoppedReason.Abort);
                             }
                             else
                             {
                                 _logger.Info("Cancelled print file");
-                                await SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.UserCancelled);
+                                await SPI.Interface.SetPrintStopped(PrintStoppedReason.UserCancelled);
                             }
                         }
                         else
                         {
                             _logger.Info("Finished print file");
-                            await SPI.Interface.SetPrintStopped(SPI.Communication.PrintStoppedReason.NormalCompletion);
+                            await SPI.Interface.SetPrintStopped(PrintStoppedReason.NormalCompletion);
                         }
 
                         // Update the object model again
@@ -255,7 +275,6 @@ namespace DuetControlServer.FileExecution
                     // Dispose the file
                     _file.Dispose();
                     _file = null;
-                    NextFilePosition = null;
 
                     // End
                     IsPrinting = false;
@@ -268,15 +287,22 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Called when the print is being paused
         /// </summary>
-        public static void Pause(long? filePosition = null)
+        /// <param name="filePosition">File position where the print was paused</param>
+        /// <param name="pauseReason">Reason why the print has been paused</param>
+        public static void Pause(long? filePosition, PrintPausedReason pauseReason)
         {
             Code.CancelPending(CodeChannel.File);
             IsPaused = true;
 
-            if (filePosition != null)
+            if (filePosition == null)
             {
-                _file.Position = filePosition.Value;
-                _logger.Debug("Print has been paused at byte {0}", filePosition);
+                _pausePositionSet = false;
+                _pauseReason = pauseReason;
+            }
+            else
+            {
+                FilePosition = filePosition.Value;
+                _logger.Info("Print has been paused at byte {0}, reason {1}", filePosition, pauseReason);
             }
         }
 
@@ -298,7 +324,6 @@ namespace DuetControlServer.FileExecution
         public static void Cancel()
         {
             Code.CancelPending(CodeChannel.File);
-            NextFilePosition = null;
             _file?.Abort();
             Resume();
         }

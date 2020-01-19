@@ -7,9 +7,13 @@ namespace DuetAPI.Connection.InitMessages
     /// - <cref see="DuetAPI.Commands.Ignore">Ignore</cref> to pass through the code without modifications
     /// - <cref see="DuetAPI.Commands.Resolve">Resolve</cref> to resolve the current code and to return a message
     /// In addition the interceptor may issue custom commands once a code has been received
-    /// Do not attempt to perform commands before an intercepting code is received, else the order of
-    /// command execution cannot be guaranteed
     /// </summary>
+    /// <remarks>
+    /// Do not attempt to perform commands before an intercepting code is received, else the order of
+    /// command execution cannot be guaranteed. Furthermore, avoid the usage of <see cref="Commands.SimpleCode"/>
+    /// if new movement codes (G0/G1) are supposed to be inserted before another one. It is better to send a full
+    /// <see cref="Commands.Code"/> object with the <see cref="Commands.CodeFlags.Asynchronous"/> flag set
+    /// </remarks>
     public class InterceptInitMessage : ClientInitMessage
     {
         /// <summary>

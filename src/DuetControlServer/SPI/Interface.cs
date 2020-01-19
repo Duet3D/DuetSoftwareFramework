@@ -852,18 +852,10 @@ namespace DuetControlServer.SPI
         {
             DataTransfer.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
 
+            // Pause the print
             using (await Print.LockAsync())
             {
-                if (filePosition == Consts.NoFilePosition)
-                {
-                    // We get an invalid file position from RRF if the print is paused during a macro file.
-                    // In this case, RRF has no way to determine the file position so we have to care of that.
-                    filePosition = (uint)(Print.NextFilePosition ?? Print.FileLength);
-                }
-                _logger.Info("Print paused at file position {0}. Reason: {1}", filePosition, pauseReason);
-
-                // Make the print stop and rewind back to the given file position
-                Print.Pause(filePosition);
+                Print.Pause((filePosition != Consts.NoFilePosition) ? (long?)filePosition : null, pauseReason);
             }
 
             // Update the object model
@@ -877,7 +869,7 @@ namespace DuetControlServer.SPI
             {
                 while (_channels[CodeChannel.File].PendingCodes.TryDequeue(out QueuedCode code))
                 {
-                    code.SetFinished();
+                    code.SetCancelled();
                 }
                 _channels[CodeChannel.File].InvalidateBuffer(false);
             }

@@ -993,9 +993,7 @@ Whenever a code is received, the connection must respond with one of</p>
 <li><cref see="DuetAPI.Commands.Cancel">Cancel</cref> to cancel the code</li>
 <li><cref see="DuetAPI.Commands.Ignore">Ignore</cref> to pass through the code without modifications</li>
 <li><cref see="DuetAPI.Commands.Resolve">Resolve</cref> to resolve the current code and to return a message
-In addition the interceptor may issue custom commands once a code has been received
-Do not attempt to perform commands before an intercepting code is received, else the order of
-command execution cannot be guaranteed</li>
+In addition the interceptor may issue custom commands once a code has been received</li>
 </ul>
 </div>
   <div class="markdown level0 conceptual"></div>
@@ -1038,6 +1036,12 @@ command execution cannot be guaranteed</li>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public class InterceptInitMessage : ClientInitMessage</code></pre>
   </div>
+  <h5 id="DuetAPI_Connection_InitMessages_InterceptInitMessage_remarks"><strong>Remarks</strong></h5>
+  <div class="markdown level0 remarks"><p>Do not attempt to perform commands before an intercepting code is received, else the order of
+command execution cannot be guaranteed. Furthermore, avoid the usage of <a class="xref" href="DuetAPI.Commands.SimpleCode.html">SimpleCode</a>
+if new movement codes (G0/G1) are supposed to be inserted before another one. It is better to send a full
+<a class="xref" href="DuetAPI.Commands.Code.html">Code</a> object with the <a class="xref" href="DuetAPI.Commands.CodeFlags.html#DuetAPI_Commands_CodeFlags_Asynchronous">Asynchronous</a> flag set</p>
+</div>
   <h3 id="constructors">Constructors
   </h3>
   <a id="DuetAPI_Connection_InitMessages_InterceptInitMessage__ctor_" data-uid="DuetAPI.Connection.InitMessages.InterceptInitMessage.#ctor*"></a>

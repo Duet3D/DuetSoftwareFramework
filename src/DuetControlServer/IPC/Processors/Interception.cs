@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
@@ -36,7 +37,13 @@ namespace DuetControlServer.IPC.Processors
             /// <summary>
             /// Asynchronous lock for this interception type
             /// </summary>
-            public readonly AsyncLock Lock = new AsyncLock();
+            private readonly AsyncLock _lock = new AsyncLock();
+
+            /// <summary>
+            /// Lock this connection container
+            /// </summary>
+            /// <returns>Disposable lock</returns>
+            public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync();
 
             /// <summary>
             /// List of intercepting connections
@@ -92,7 +99,7 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Task that represents the lifecycle of the connection</returns>
         public override async Task Process()
         {
-            using (await _connections[_mode].Lock.LockAsync())
+            using (await _connections[_mode].LockAsync())
             {
                 _connections[_mode].Items.Add(this);
             }
@@ -122,7 +129,7 @@ namespace DuetControlServer.IPC.Processors
                         if (Command.SupportedCommands.Contains(command.GetType()))
                         {
                             // Interpret regular Command codes here
-                            object result = command.Invoke();
+                            object result = await command.Invoke();
                             await Connection.SendResponse(result);
                         }
                         else if (SupportedCommands.Contains(command.GetType()))
@@ -154,7 +161,7 @@ namespace DuetControlServer.IPC.Processors
             finally
             {
                 _commandQueue.CompleteAdding();
-                using (await _connections[_mode].Lock.LockAsync())
+                using (await _connections[_mode].LockAsync())
                 {
                     _connections[_mode].Items.Remove(this);
                 }
@@ -212,13 +219,20 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="code">Code to intercept</param>
         /// <param name="type">Type of the interception</param>
         /// <returns>True if the code has been resolved</returns>
+        /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         public static async Task<bool> Intercept(Code code, InterceptionMode type)
         {
-            using (await _connections[type].Lock.LockAsync())
+            List<Interception> processors = new List<Interception>();
+            using (await _connections[type].LockAsync())
             {
-                foreach (Interception processor in _connections[type].Items)
+                processors.AddRange(_connections[type].Items);
+            }
+
+            foreach (Interception processor in processors)
+            {
+                if (processor.Connection.IsConnected && code.SourceConnection != processor.Connection.Id)
                 {
-                    if (code.SourceConnection != processor.Connection.Id)
+                    using (await _connections[type].LockAsync())
                     {
                         _connections[type].InterceptingConnection = processor.Connection.Id;
                         try
@@ -245,8 +259,8 @@ namespace DuetControlServer.IPC.Processors
                         }
                     }
                 }
-                return false;
             }
+            return false;
         }
 
         /// <summary>

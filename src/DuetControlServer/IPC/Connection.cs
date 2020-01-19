@@ -71,6 +71,11 @@ namespace DuetControlServer.IPC
         }
 
         /// <summary>
+        /// Indicates if the connection is still available
+        /// </summary>
+        public bool IsConnected { get => !disposed && _unixSocket.Connected; }
+
+        /// <summary>
         /// Read a generic JSON object from the socket
         /// </summary>
         /// <returns>JsonDocument for deserialization</returns>

@@ -4,6 +4,12 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <Version>1.2.0</Version>
+    <RepositoryUrl>https://github.com/chrishamm/DuetSoftwareFramework.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Authors>Christian Hammacher</Authors>
+    <Company>Duet3D Ltd</Company>
+    <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/chrishamm/DuetSoftwareFramework</PackageProjectUrl>
   </PropertyGroup>
 
   <ItemGroup>

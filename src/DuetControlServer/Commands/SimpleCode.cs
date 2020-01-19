@@ -47,8 +47,10 @@ namespace DuetControlServer.Commands
             while (!reader.EndOfStream)
             {
                 Code code = new Code() { Channel = Channel, SourceConnection = SourceConnection };
-                DuetAPI.Commands.Code.Parse(reader, code, ref enforcingAbsolutePosition);
-                yield return code;
+                if (DuetAPI.Commands.Code.Parse(reader, code, ref enforcingAbsolutePosition))
+                {
+                    yield return code;
+                }
             }
         }
 
@@ -70,6 +72,10 @@ namespace DuetControlServer.Commands
                     {
                         code.Channel = CodeChannel.Daemon;
                         code.Flags |= CodeFlags.IsPrioritized;
+                        priorityCodes.Add(code);
+                    }
+                    else if (IPC.Processors.Interception.IsInterceptingConnection(SourceConnection))
+                    {
                         priorityCodes.Add(code);
                     }
                     else
@@ -98,14 +104,17 @@ namespace DuetControlServer.Commands
                 }
 
                 // Execute normal codes next. Use a lock here because multiple codes may be queued for the same channel
-                using (await _channelLocks[(int)Channel].LockAsync())
+                if (codes.Count > 0)
                 {
-                    foreach (Code code in codes)
+                    using (await _channelLocks[(int)Channel].LockAsync())
                     {
-                        CodeResult codeResult = await code.Execute();
-                        if (codeResult != null)
+                        foreach (Code code in codes)
                         {
-                            result.AddRange(codeResult);
+                            CodeResult codeResult = await code.Execute();
+                            if (codeResult != null)
+                            {
+                                result.AddRange(codeResult);
+                            }
                         }
                     }
                 }

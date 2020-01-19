@@ -179,28 +179,6 @@ namespace DuetControlServer.Codes
                     }
                     throw new OperationCanceledException();
 
-                // Pause print
-                case 25:
-                case 226:
-                    if (await SPI.Interface.Flush(code.Channel))
-                    {
-                        using (await Print.LockAsync())
-                        {
-                            if (Print.IsPrinting && !Print.IsPaused)
-                            {
-                                // Invalidate the code's file position because it must not be used for pausing
-                                code.FilePosition = null;
-
-                                // Stop reading any more codes from the file being printed. Everything else is handled by RRF
-                                Print.Pause();
-                            }
-                        }
-
-                        // Let RepRapFirmware pause the print
-                        break;
-                    }
-                    throw new OperationCanceledException();
-
                 // Set SD position
                 case 26:
                     if (await SPI.Interface.Flush(code.Channel))

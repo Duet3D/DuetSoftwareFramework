@@ -255,6 +255,7 @@ namespace DuetControlServer
                     Console.WriteLine("-h, --help: Display this text");
                     return false;
                 }
+                lastArg = arg;
             }
 
             // See if the file exists and attempt to load the settings from it, otherwise create it

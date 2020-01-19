@@ -124,12 +124,6 @@
             Logger instance
             </summary>
         </member>
-        <member name="F:DuetControlServer.Commands.Code.NumCodeTypes">
-            <summary>
-            Number of code types. This is roughly equivalent to a priority level but since
-            there is no real preference, it is not called that way
-            </summary>
-        </member>
         <member name="F:DuetControlServer.Commands.Code._codeStartLocks">
             <summary>
             Array of AsyncLocks to guarantee the ordered start of incoming G/M/T-codes
@@ -160,12 +154,37 @@
             </summary>
             <param name="channel">Channel to cancel codes from</param>
         </member>
+        <member name="T:DuetControlServer.Commands.Code.InternalCodeType">
+            <summary>
+            Internal type of a code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Regular">
+            <summary>
+            Regular G/M/T-code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Prioritized">
+            <summary>
+            Code with <see cref="F:DuetAPI.Commands.CodeFlags.IsPrioritized"/> set
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Macro">
+            <summary>
+            Code from a macro file
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Inserted">
+            <summary>
+            Inserted code from an intercepting connection
+            </summary>
+        </member>
         <member name="F:DuetControlServer.Commands.Code._codeType">
             <summary>
             Internal type assigned by the code scheduler
             </summary>
         </member>
-        <member name="F:DuetControlServer.Commands.Code._codeChannelLock">
+        <member name="F:DuetControlServer.Commands.Code._codeStartLock">
             <summary>
             Lock that is maintained as long as this code blocks the execution of the next code
             </summary>
@@ -182,6 +201,12 @@
             <summary>
             Start the next available G/M/T-code unless this code has already started one
             </summary>
+        </member>
+        <member name="M:DuetControlServer.Commands.Code.WaitForFinish">
+            <summary>
+            Start the next available G/M/T-code and wait until this code may finish
+            </summary>
+            <returns></returns>
         </member>
         <member name="F:DuetControlServer.Commands.Code.FileLocks">
             <summary>
@@ -630,14 +655,19 @@
             Indicates if the file print has been aborted
             </summary>
         </member>
+        <member name="F:DuetControlServer.FileExecution.Print._pausePositionSet">
+            <summary>
+            Defines if the file position is supposed to be set by the Print task
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.FileExecution.Print._pauseReason">
+            <summary>
+            Reason why the print has been paused
+            </summary>
+        </member>
         <member name="P:DuetControlServer.FileExecution.Print.FilePosition">
             <summary>
             Reports the current file position
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.FileExecution.Print.NextFilePosition">
-            <summary>
-            Holds the file position after the current code being executed
             </summary>
         </member>
         <member name="P:DuetControlServer.FileExecution.Print.FileLength">
@@ -658,10 +688,12 @@
             Perform actual print jobs
             </summary>
         </member>
-        <member name="M:DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64})">
+        <member name="M:DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64},DuetControlServer.SPI.Communication.PrintPausedReason)">
             <summary>
             Called when the print is being paused
             </summary>
+            <param name="filePosition">File position where the print was paused</param>
+            <param name="pauseReason">Reason why the print has been paused</param>
         </member>
         <member name="M:DuetControlServer.FileExecution.Print.Resume">
             <summary>
@@ -725,6 +757,11 @@
         <member name="M:DuetControlServer.IPC.Connection.Dispose">
             <summary>
             Dispose this connection
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.IPC.Connection.IsConnected">
+            <summary>
+            Indicates if the connection is still available
             </summary>
         </member>
         <member name="M:DuetControlServer.IPC.Connection.ReceiveJson">
@@ -878,10 +915,16 @@
             Class to hold intercepting connections and a corresponding lock
             </summary>
         </member>
-        <member name="F:DuetControlServer.IPC.Processors.Interception.ConnectionContainer.Lock">
+        <member name="F:DuetControlServer.IPC.Processors.Interception.ConnectionContainer._lock">
             <summary>
             Asynchronous lock for this interception type
             </summary>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Interception.ConnectionContainer.LockAsync">
+            <summary>
+            Lock this connection container
+            </summary>
+            <returns>Disposable lock</returns>
         </member>
         <member name="F:DuetControlServer.IPC.Processors.Interception.ConnectionContainer.Items">
             <summary>
@@ -943,6 +986,7 @@
             <param name="code">Code to intercept</param>
             <param name="type">Type of the interception</param>
             <returns>True if the code has been resolved</returns>
+            <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
         </member>
         <member name="M:DuetControlServer.IPC.Processors.Interception.IsInterceptingConnection(System.Int32)">
             <summary>
@@ -2207,7 +2251,7 @@
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader.FilePosition">
             <summary>
-            Position from which the code was read. This is used for pausing and resuming
+            File position after the read code. This is used for pausing and resuming
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter">

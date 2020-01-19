@@ -989,8 +989,10 @@
             </summary>
             <remarks>
             Internally the code passed is populated as a full <see cref="P:DuetAPI.Commands.SimpleCode.Code"/> instance and on completion
-            its CodeResult is transformed back into a basic string. This is useful for minimal extensions
-            that do not require granular control of the code details
+            its <see cref="T:DuetAPI.Commands.CodeResult"/> is transformed back into a basic string. This is useful for minimal
+            extensions that do not require granular control of the code details. Except for certain cases, it
+            is NOT recommended for usage in <see cref="T:DuetAPI.Connection.InterceptionMode"/> because it renders the
+            internal code buffer useless.
             </remarks>
         </member>
         <member name="P:DuetAPI.Commands.SimpleCode.Code">
@@ -1132,9 +1134,13 @@
             - <cref see="DuetAPI.Commands.Ignore">Ignore</cref> to pass through the code without modifications
             - <cref see="DuetAPI.Commands.Resolve">Resolve</cref> to resolve the current code and to return a message
             In addition the interceptor may issue custom commands once a code has been received
-            Do not attempt to perform commands before an intercepting code is received, else the order of
-            command execution cannot be guaranteed
             </summary>
+            <remarks>
+            Do not attempt to perform commands before an intercepting code is received, else the order of
+            command execution cannot be guaranteed. Furthermore, avoid the usage of <see cref="T:DuetAPI.Commands.SimpleCode"/>
+            if new movement codes (G0/G1) are supposed to be inserted before another one. It is better to send a full
+            <see cref="T:DuetAPI.Commands.Code"/> object with the <see cref="F:DuetAPI.Commands.CodeFlags.Asynchronous"/> flag set
+            </remarks>
         </member>
         <member name="M:DuetAPI.Connection.InitMessages.InterceptInitMessage.#ctor">
             <summary>
@@ -1208,7 +1214,7 @@
         </member>
         <member name="F:DuetAPI.Connection.InterceptionMode.Executed">
             <summary>
-            Receive a notification for executed codes. In this state the final result can still be changed
+            Receive a notification for executed codes. In this state the final result can be still changed
             </summary>
         </member>
         <member name="T:DuetAPI.Connection.SubscriptionMode">

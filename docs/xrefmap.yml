@@ -10727,28 +10727,15 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Print.LockAsync
   nameWithType: Print.LockAsync
-- uid: DuetControlServer.FileExecution.Print.NextFilePosition
-  name: NextFilePosition
-  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_NextFilePosition
-  commentId: P:DuetControlServer.FileExecution.Print.NextFilePosition
-  fullName: DuetControlServer.FileExecution.Print.NextFilePosition
-  nameWithType: Print.NextFilePosition
-- uid: DuetControlServer.FileExecution.Print.NextFilePosition*
-  name: NextFilePosition
-  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_NextFilePosition_
-  commentId: Overload:DuetControlServer.FileExecution.Print.NextFilePosition
-  isSpec: "True"
-  fullName: DuetControlServer.FileExecution.Print.NextFilePosition
-  nameWithType: Print.NextFilePosition
-- uid: DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64})
-  name: Pause(Nullable<Int64>)
-  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_Pause_System_Nullable_System_Int64__
-  commentId: M:DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64})
-  name.vb: Pause(Nullable(Of Int64))
-  fullName: DuetControlServer.FileExecution.Print.Pause(System.Nullable<System.Int64>)
-  fullName.vb: DuetControlServer.FileExecution.Print.Pause(System.Nullable(Of System.Int64))
-  nameWithType: Print.Pause(Nullable<Int64>)
-  nameWithType.vb: Print.Pause(Nullable(Of Int64))
+- uid: DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64},DuetControlServer.SPI.Communication.PrintPausedReason)
+  name: Pause(Nullable<Int64>, PrintPausedReason)
+  href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_Pause_System_Nullable_System_Int64__DuetControlServer_SPI_Communication_PrintPausedReason_
+  commentId: M:DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64},DuetControlServer.SPI.Communication.PrintPausedReason)
+  name.vb: Pause(Nullable(Of Int64), PrintPausedReason)
+  fullName: DuetControlServer.FileExecution.Print.Pause(System.Nullable<System.Int64>, DuetControlServer.SPI.Communication.PrintPausedReason)
+  fullName.vb: DuetControlServer.FileExecution.Print.Pause(System.Nullable(Of System.Int64), DuetControlServer.SPI.Communication.PrintPausedReason)
+  nameWithType: Print.Pause(Nullable<Int64>, PrintPausedReason)
+  nameWithType.vb: Print.Pause(Nullable(Of Int64), PrintPausedReason)
 - uid: DuetControlServer.FileExecution.Print.Pause*
   name: Pause
   href: api/DuetControlServer.FileExecution.Print.html#DuetControlServer_FileExecution_Print_Pause_
@@ -10933,6 +10920,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.IPC.Connection.Id
   nameWithType: Connection.Id
+- uid: DuetControlServer.IPC.Connection.IsConnected
+  name: IsConnected
+  href: api/DuetControlServer.IPC.Connection.html#DuetControlServer_IPC_Connection_IsConnected
+  commentId: P:DuetControlServer.IPC.Connection.IsConnected
+  fullName: DuetControlServer.IPC.Connection.IsConnected
+  nameWithType: Connection.IsConnected
+- uid: DuetControlServer.IPC.Connection.IsConnected*
+  name: IsConnected
+  href: api/DuetControlServer.IPC.Connection.html#DuetControlServer_IPC_Connection_IsConnected_
+  commentId: Overload:DuetControlServer.IPC.Connection.IsConnected
+  isSpec: "True"
+  fullName: DuetControlServer.IPC.Connection.IsConnected
+  nameWithType: Connection.IsConnected
 - uid: DuetControlServer.IPC.Connection.Logger
   name: Logger
   href: api/DuetControlServer.IPC.Connection.html#DuetControlServer_IPC_Connection_Logger

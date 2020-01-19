@@ -7,6 +7,12 @@
     <AssemblyVersion>1.2.1.0</AssemblyVersion>
     <FileVersion>1.2.1.0</FileVersion>
     <Version>1.2.1</Version>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/chrishamm/DuetSoftwareFramework.git</RepositoryUrl>
+    <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
+    <Authors>Christian Hammacher</Authors>
+    <Company>Duet3D Ltd</Company>
+    <PackageProjectUrl>https://github.com/chrishamm/DuetSoftwareFramework</PackageProjectUrl>
   </PropertyGroup>
 
   <ItemGroup>

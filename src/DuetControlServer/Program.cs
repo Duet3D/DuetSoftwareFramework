@@ -191,15 +191,6 @@ namespace DuetControlServer
             NLog.LogManager.Shutdown();
         }
 
-        private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
-        {
-            if (!CancelSource.IsCancellationRequested)
-            {
-                _logger.Warn("Received SIGTERM, shutting down...");
-                CancelSource.Cancel();
-            }
-        }
-
         /// <summary>
         /// Check if another instance is already running
         /// </summary>

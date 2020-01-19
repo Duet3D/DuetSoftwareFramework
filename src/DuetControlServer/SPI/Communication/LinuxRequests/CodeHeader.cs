@@ -41,7 +41,7 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         public int MinorCode;
 
         /// <summary>
-        /// Position from which the code was read. This is used for pausing and resuming
+        /// File position after the read code. This is used for pausing and resuming
         /// </summary>
         public uint FilePosition;
     }
