@@ -156,7 +156,7 @@
         </member>
         <member name="T:DuetControlServer.Commands.Code.InternalCodeType">
             <summary>
-            Internal type of a code
+            Internal type of a code. This reflects the priority as well
             </summary>
         </member>
         <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Regular">
@@ -164,9 +164,9 @@
             Regular G/M/T-code
             </summary>
         </member>
-        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Prioritized">
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Inserted">
             <summary>
-            Code with <see cref="F:DuetAPI.Commands.CodeFlags.IsPrioritized"/> set
+            Inserted code from an intercepting connection
             </summary>
         </member>
         <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Macro">
@@ -174,14 +174,24 @@
             Code from a macro file
             </summary>
         </member>
-        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Inserted">
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.InsertedFromMacro">
             <summary>
-            Inserted code from an intercepting connection
+            Inserted macro code from an intercepting connection
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Prioritized">
+            <summary>
+            Code with <see cref="F:DuetAPI.Commands.CodeFlags.IsPrioritized"/> set
             </summary>
         </member>
         <member name="F:DuetControlServer.Commands.Code._codeType">
             <summary>
             Internal type assigned by the code scheduler
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Commands.Code.IsInsertedFromMacro">
+            <summary>
+            Indicates if this code originates from an interceptor while in a macro file
             </summary>
         </member>
         <member name="F:DuetControlServer.Commands.Code._codeStartLock">
@@ -208,6 +218,12 @@
             </summary>
             <returns></returns>
         </member>
+        <member name="M:DuetControlServer.Commands.Code.WaitForInsertedCodes">
+            <summary>
+            Wait for inserted codes to be internally processed
+            </summary>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="F:DuetControlServer.Commands.Code.FileLocks">
             <summary>
             Lock around the files being written
@@ -233,6 +249,12 @@
             Check if Marlin is being emulated
             </summary>
             <returns>True if Marlin is being emulated</returns>
+        </member>
+        <member name="P:DuetControlServer.Commands.Code.CancellingPrint">
+            <summary>
+            This indicates if this code is cancelling a print.
+            FIXME Remove this again when the SBC interface has got its own task in RRF
+            </summary>
         </member>
         <member name="M:DuetControlServer.Commands.Code.Execute">
             <summary>
@@ -655,7 +677,7 @@
             Indicates if the file print has been aborted
             </summary>
         </member>
-        <member name="F:DuetControlServer.FileExecution.Print._pausePositionSet">
+        <member name="F:DuetControlServer.FileExecution.Print._pausePosition">
             <summary>
             Defines if the file position is supposed to be set by the Print task
             </summary>
@@ -1791,6 +1813,12 @@
             <param name="reportMissing">Report an error if the file could not be found</param>
             <param name="fromCode">Request comes from a real G/M/T-code</param>
             <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.InsertMacroCode(DuetControlServer.SPI.QueuedCode)">
+            <summary>
+            Insert a new code for execution before pending macro codes
+            </summary>
+            <param name="code">Queued code to insert</param>
         </member>
         <member name="F:DuetControlServer.SPI.ChannelInformation._resumingBuffer">
             <summary>

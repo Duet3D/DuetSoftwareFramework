@@ -17,8 +17,9 @@ namespace DuetAPI.Commands
         /// Code execution finishes as soon as it is enqueued in the code queue
         /// </summary>
         /// <remarks>
-        /// Potential G-code replies from RRF are only reported through the object model.
-        /// This behaviour will be enhanced in the future.
+        /// If codes are started asynchronously, code replies are normally reported via the object model.
+        /// In order to keep track of code replies, an <see cref="Connection.ConnectionMode.Intercept"/> connection
+        /// in <see cref="Connection.InterceptionMode.Executed"/> mode can be used
         /// </remarks>
         Asynchronous = 1,
 
@@ -60,6 +61,11 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Override every other code and send it to the firmware as quickly as possible
         /// </summary>
+        /// <remarks>
+        /// When this type of code is intercepted, the code can be ignored, cancelled, or resolved,
+        /// but it is not possible to insert asynchronous codes that complete before the given code.
+        /// In a future DSF version it may be no longer possible to intercept prioritized codes
+        /// </remarks>
         IsPrioritized = 256
     }
 }

@@ -468,6 +468,17 @@ namespace DuetControlServer.SPI
                 if (startingCode != null)
                 {
                     startingCode.DoingNestedMacro = true;
+
+                    // FIXME This work-around will not be needed any more when the SBC interface has got its own task in RRF
+                    if ((filename == "stop.g" || filename == "sleep.g") && startingCode.Code.CancellingPrint)
+                    {
+                        string cancelFile = await FilePath.ToPhysicalAsync("cancel.g", FileDirectory.System);
+                        if (File.Exists(cancelFile))
+                        {
+                            // Execute cancel.g instead of stop.g if it exists
+                            filename = "cancel.g";
+                        }
+                    }
                 }
             }
 
@@ -526,6 +537,36 @@ namespace DuetControlServer.SPI
 
             // Macro file is now running. At this point, the buffered codes have been thrown away by RRF
             SuspendBuffer();
+        }
+
+        /// <summary>
+        /// Insert a new code for execution before pending macro codes
+        /// </summary>
+        /// <param name="code">Queued code to insert</param>
+        public void InsertMacroCode(QueuedCode code)
+        {
+            Queue<QueuedCode> pendingMacroCodes = new Queue<QueuedCode>();
+
+            // Keep the order of already processed codes
+            while (NestedMacroCodes.TryPeek(out QueuedCode queuedCode) && queuedCode.IsReadyToSend)
+            {
+                pendingMacroCodes.Enqueue(NestedMacroCodes.Dequeue());
+            }
+
+            // Then add the new code
+            pendingMacroCodes.Enqueue(code);
+
+            // And finally all others
+            while (NestedMacroCodes.TryDequeue(out QueuedCode queuedCode))
+            {
+                pendingMacroCodes.Enqueue(queuedCode);
+            }
+
+            // Apply the new queue
+            while (pendingMacroCodes.TryDequeue(out QueuedCode queuedCode))
+            {
+                NestedMacroCodes.Enqueue(queuedCode);
+            }
         }
 
         /// <summary>

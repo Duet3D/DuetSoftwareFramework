@@ -9895,6 +9895,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.Code.Code
   nameWithType: Code.Code
+- uid: DuetControlServer.Commands.Code.CancellingPrint
+  name: CancellingPrint
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_CancellingPrint
+  commentId: P:DuetControlServer.Commands.Code.CancellingPrint
+  fullName: DuetControlServer.Commands.Code.CancellingPrint
+  nameWithType: Code.CancellingPrint
+- uid: DuetControlServer.Commands.Code.CancellingPrint*
+  name: CancellingPrint
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_CancellingPrint_
+  commentId: Overload:DuetControlServer.Commands.Code.CancellingPrint
+  isSpec: "True"
+  fullName: DuetControlServer.Commands.Code.CancellingPrint
+  nameWithType: Code.CancellingPrint
 - uid: DuetControlServer.Commands.Code.CancelPending(DuetAPI.CodeChannel)
   name: CancelPending(CodeChannel)
   href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_CancelPending_DuetAPI_CodeChannel_
@@ -9965,6 +9978,19 @@ references:
   commentId: F:DuetControlServer.Commands.Code.InternallyProcessed
   fullName: DuetControlServer.Commands.Code.InternallyProcessed
   nameWithType: Code.InternallyProcessed
+- uid: DuetControlServer.Commands.Code.IsInsertedFromMacro
+  name: IsInsertedFromMacro
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_IsInsertedFromMacro
+  commentId: P:DuetControlServer.Commands.Code.IsInsertedFromMacro
+  fullName: DuetControlServer.Commands.Code.IsInsertedFromMacro
+  nameWithType: Code.IsInsertedFromMacro
+- uid: DuetControlServer.Commands.Code.IsInsertedFromMacro*
+  name: IsInsertedFromMacro
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_IsInsertedFromMacro_
+  commentId: Overload:DuetControlServer.Commands.Code.IsInsertedFromMacro
+  isSpec: "True"
+  fullName: DuetControlServer.Commands.Code.IsInsertedFromMacro
+  nameWithType: Code.IsInsertedFromMacro
 - uid: DuetControlServer.Commands.Flush
   name: Flush
   href: api/DuetControlServer.Commands.Flush.html
@@ -13688,6 +13714,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.ChannelInformation.HandleReply
   nameWithType: ChannelInformation.HandleReply
+- uid: DuetControlServer.SPI.ChannelInformation.InsertMacroCode(DuetControlServer.SPI.QueuedCode)
+  name: InsertMacroCode(QueuedCode)
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_InsertMacroCode_DuetControlServer_SPI_QueuedCode_
+  commentId: M:DuetControlServer.SPI.ChannelInformation.InsertMacroCode(DuetControlServer.SPI.QueuedCode)
+  fullName: DuetControlServer.SPI.ChannelInformation.InsertMacroCode(DuetControlServer.SPI.QueuedCode)
+  nameWithType: ChannelInformation.InsertMacroCode(QueuedCode)
+- uid: DuetControlServer.SPI.ChannelInformation.InsertMacroCode*
+  name: InsertMacroCode
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_InsertMacroCode_
+  commentId: Overload:DuetControlServer.SPI.ChannelInformation.InsertMacroCode
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.ChannelInformation.InsertMacroCode
+  nameWithType: ChannelInformation.InsertMacroCode
 - uid: DuetControlServer.SPI.ChannelInformation.Invalidate
   name: Invalidate()
   href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_Invalidate

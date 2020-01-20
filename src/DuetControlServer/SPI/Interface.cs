@@ -140,11 +140,17 @@ namespace DuetControlServer.SPI
             QueuedCode item = null;
             using (_channels[code.Channel].Lock())
             {
-                if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || IPC.Processors.Interception.IsInterceptingConnection(code.SourceConnection))
+                if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
                 {
                     // This code is supposed to override every other queued code
                     item = new QueuedCode(code);
                     _channels[code.Channel].PriorityCodes.Enqueue(item);
+                }
+                else if (code.IsInsertedFromMacro)
+                {
+                    // This code is supposed to be executed before the next macro code
+                    item = new QueuedCode(code);
+                    _channels[code.Channel].InsertMacroCode(item);
                 }
                 else if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
                 {
@@ -855,7 +861,9 @@ namespace DuetControlServer.SPI
             // Pause the print
             using (await Print.LockAsync())
             {
-                Print.Pause((filePosition != Consts.NoFilePosition) ? (long?)filePosition : null, pauseReason);
+                // Do NOT supply a file position if this is a pause request initiated from G-code because that would lead to an endless loop
+                bool filePositionValid = filePosition != Consts.NoFilePosition && pauseReason != PrintPausedReason.GCode && pauseReason != PrintPausedReason.FilamentChange;
+                Print.Pause(filePositionValid ? (long?)filePosition : null, pauseReason);
             }
 
             // Update the object model

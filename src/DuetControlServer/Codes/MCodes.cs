@@ -41,13 +41,18 @@ namespace DuetControlServer.Codes
                     {
                         using (await Print.LockAsync())
                         {
-                            if (Print.IsFileSelected && code.Channel != CodeChannel.File && !Print.IsPaused)
+                            if (Print.IsFileSelected)
                             {
-                                return new CodeResult(MessageType.Error, "Pause the print before attempting to cancel it");
-                            }
+                                // M0/M1 may be used in a print file to terminate it
+                                if (code.Channel != CodeChannel.File && !Print.IsPaused)
+                                {
+                                    return new CodeResult(MessageType.Error, "Pause the print before attempting to cancel it");
+                                }
 
-                            // Invalidate the print file and make sure no more codes are read from it
-                            Print.Cancel();
+                                // Invalidate the print file and make sure no more codes are read from it
+                                code.CancellingPrint = true;
+                                Print.Cancel();
+                            }
                         }
                         break;
                     }

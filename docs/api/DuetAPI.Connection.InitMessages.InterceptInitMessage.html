@@ -1040,7 +1040,9 @@ In addition the interceptor may issue custom commands once a code has been recei
   <div class="markdown level0 remarks"><p>Do not attempt to perform commands before an intercepting code is received, else the order of
 command execution cannot be guaranteed. Furthermore, avoid the usage of <a class="xref" href="DuetAPI.Commands.SimpleCode.html">SimpleCode</a>
 if new movement codes (G0/G1) are supposed to be inserted before another one. It is better to send a full
-<a class="xref" href="DuetAPI.Commands.Code.html">Code</a> object with the <a class="xref" href="DuetAPI.Commands.CodeFlags.html#DuetAPI_Commands_CodeFlags_Asynchronous">Asynchronous</a> flag set</p>
+<a class="xref" href="DuetAPI.Commands.Code.html">Code</a> object with the <a class="xref" href="DuetAPI.Commands.CodeFlags.html#DuetAPI_Commands_CodeFlags_Asynchronous">Asynchronous</a> flag set.
+If a code from a macro file is intercepted, make sure to set the <a class="xref" href="DuetAPI.Commands.CodeFlags.html#DuetAPI_Commands_CodeFlags_IsFromMacro">IsFromMacro</a>
+flag when you insert a new coe, else the code will be started when the macro file(s) have finished.</p>
 </div>
   <h3 id="constructors">Constructors
   </h3>

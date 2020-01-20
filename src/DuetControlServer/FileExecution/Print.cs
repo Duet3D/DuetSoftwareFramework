@@ -75,7 +75,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Defines if the file position is supposed to be set by the Print task
         /// </summary>
-        private static bool _pausePositionSet;
+        private static long? _pausePosition;
 
         /// <summary>
         /// Reason why the print has been paused
@@ -88,11 +88,7 @@ namespace DuetControlServer.FileExecution
         public static long FilePosition
         {
             get => _file.Position;
-            set
-            {
-                _file.Position = value;
-                _pausePositionSet = true;
-            }
+            set => _file.Position = value;
         }
 
         /// <summary>
@@ -123,6 +119,7 @@ namespace DuetControlServer.FileExecution
             IsPaused = IsAborted = false;
             IsSimulating = simulating;
             _file = file;
+            _pausePosition = null;
 
             // Update the object model
             using (await Model.Provider.AccessReadWriteAsync())
@@ -149,7 +146,6 @@ namespace DuetControlServer.FileExecution
                     await _resume.WaitAsync(Program.CancelSource.Token);
                     startingNewPrint = !_file.IsAborted;
                     IsPrinting = startingNewPrint;
-                    _pausePositionSet = false;
                 }
 
                 // Deal with the file print
@@ -186,17 +182,15 @@ namespace DuetControlServer.FileExecution
                         // Is there anything more to do?
                         if (codes.TryDequeue(out Code code))
                         {
-                            long lastFilePosition = nextFilePosition;
                             try
                             {
-                                nextFilePosition = code.FilePosition.Value + code.Length.Value;
                                 CodeResult result = await codeTasks.Dequeue();
+                                nextFilePosition = code.FilePosition.Value + code.Length.Value;
                                 await Utility.Logger.LogOutput(result);
                             }
                             catch (OperationCanceledException)
                             {
                                 // May happen when the file being printed is exchanged, printed, or when a third-party plugin decided to cancel the code
-                                nextFilePosition = lastFilePosition;
                             }
                             catch (Exception e)
                             {
@@ -216,17 +210,13 @@ namespace DuetControlServer.FileExecution
                             {
                                 if (IsPaused)
                                 {
-                                    // Check if the file position has to be adjusted
-                                    if (!_pausePositionSet)
-                                    {
-                                        FilePosition = nextFilePosition;
-                                        _logger.Info("Print has been paused at byte {0}*, reason {1}", nextFilePosition, _pauseReason);
-                                    }
+                                    // Adjust the file position
+                                    FilePosition = (_pausePosition != null) ? _pausePosition.Value : nextFilePosition;
+                                    _logger.Info("Print has been paused at byte {0}, reason {1}", FilePosition, _pauseReason);
 
                                     // Wait for the print to be resumed
                                     IsPrinting = false;
                                     await _resume.WaitAsync(Program.CancelSource.Token);
-                                    _pausePositionSet = false;
                                 }
                                 else
                                 {
@@ -293,17 +283,8 @@ namespace DuetControlServer.FileExecution
         {
             Code.CancelPending(CodeChannel.File);
             IsPaused = true;
-
-            if (filePosition == null)
-            {
-                _pausePositionSet = false;
-                _pauseReason = pauseReason;
-            }
-            else
-            {
-                FilePosition = filePosition.Value;
-                _logger.Info("Print has been paused at byte {0}, reason {1}", filePosition, pauseReason);
-            }
+            _pausePosition = filePosition;
+            _pauseReason = pauseReason;
         }
 
         /// <summary>

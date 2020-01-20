@@ -95,11 +95,6 @@ namespace DuetControlServer.SPI.Serialization
             if (code.FilePosition.HasValue)
             {
                 header.Flags |= SpiCodeFlags.HasFilePosition;
-                if (code.Length.HasValue)
-                {
-                    // RRF always returns the position after this instruction for pausing
-                    header.FilePosition += (uint)code.Length;
-                }
             }
             if (code.Flags.HasFlag(DuetAPI.Commands.CodeFlags.EnforceAbsolutePosition))
             {

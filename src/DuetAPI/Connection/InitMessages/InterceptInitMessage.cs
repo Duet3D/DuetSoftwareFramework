@@ -12,7 +12,9 @@ namespace DuetAPI.Connection.InitMessages
     /// Do not attempt to perform commands before an intercepting code is received, else the order of
     /// command execution cannot be guaranteed. Furthermore, avoid the usage of <see cref="Commands.SimpleCode"/>
     /// if new movement codes (G0/G1) are supposed to be inserted before another one. It is better to send a full
-    /// <see cref="Commands.Code"/> object with the <see cref="Commands.CodeFlags.Asynchronous"/> flag set
+    /// <see cref="Commands.Code"/> object with the <see cref="Commands.CodeFlags.Asynchronous"/> flag set.
+    /// If a code from a macro file is intercepted, make sure to set the <see cref="Commands.CodeFlags.IsFromMacro"/>
+    /// flag when you insert a new coe, else the code will be started when the macro file(s) have finished.
     /// </remarks>
     public class InterceptInitMessage : ClientInitMessage
     {
