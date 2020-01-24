@@ -177,13 +177,8 @@ build_dwc() {
 	echo "Building DWC2..."
 
 	if [ ! -d $DEST_DIR/DuetWebControl ] ; then
-		if [ -d ~/duet/DuetWebControl2 ] ; then
-			echo "- Using local repository..."
-			cp -r ~/duet/DuetWebControl2 $DEST_DIR/DuetWebControl
-		else
-			echo "- Cloning repository..."
-			git clone -q --single-branch --branch master https://github.com/chrishamm/DuetWebControl.git $DEST_DIR/DuetWebControl
-		fi
+		echo "- Cloning repository..."
+		git clone -q --single-branch --branch master https://github.com/chrishamm/DuetWebControl.git $DEST_DIR/DuetWebControl
 	else
 		echo "- Using existing repository in $DEST_DIR/DuetWebControl"
 	fi
