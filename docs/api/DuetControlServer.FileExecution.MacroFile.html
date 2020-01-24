@@ -1145,6 +1145,55 @@
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_FileExecution_MacroFile_PendingCodes_" data-uid="DuetControlServer.FileExecution.MacroFile.PendingCodes*"></a>
+  <h4 id="DuetControlServer_FileExecution_MacroFile_PendingCodes" data-uid="DuetControlServer.FileExecution.MacroFile.PendingCodes">PendingCodes</h4>
+  <div class="markdown level1 summary"><p>Pending codes being started by a nested macro (and multiple codes may be started by an interceptor).
+This is required because it may take a moment until they are internally processed</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Queue&lt;QueuedCode&gt; PendingCodes { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Queue</span>&lt;<a class="xref" href="DuetControlServer.SPI.QueuedCode.html">QueuedCode</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_FileExecution_MacroFile_PendingFlushRequests_" data-uid="DuetControlServer.FileExecution.MacroFile.PendingFlushRequests*"></a>
+  <h4 id="DuetControlServer_FileExecution_MacroFile_PendingFlushRequests" data-uid="DuetControlServer.FileExecution.MacroFile.PendingFlushRequests">PendingFlushRequests</h4>
+  <div class="markdown level1 summary"><p>Queue of pending flush requests</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Queue&lt;TaskCompletionSource&lt;bool&gt;&gt; PendingFlushRequests { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Queue</span>&lt;<span class="xref">System.Threading.Tasks.TaskCompletionSource</span>&lt;<span class="xref">System.Boolean</span>&gt;&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_FileExecution_MacroFile_RunningConfig_" data-uid="DuetControlServer.FileExecution.MacroFile.RunningConfig*"></a>
   <h4 id="DuetControlServer_FileExecution_MacroFile_RunningConfig" data-uid="DuetControlServer.FileExecution.MacroFile.RunningConfig">RunningConfig</h4>
   <div class="markdown level1 summary"><p>Indicates if config.g is being processed</p>

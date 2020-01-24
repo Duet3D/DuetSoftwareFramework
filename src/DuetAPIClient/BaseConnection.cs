@@ -98,11 +98,11 @@ namespace DuetAPIClient
             _unixSocket.Connect(endPoint);
 
             // Verify server init message
-            ServerInitMessage expectedMessage = new ServerInitMessage();
+            ServerInitMessage ownMessage = new ServerInitMessage();
             ServerInitMessage serverMessage = await Receive<ServerInitMessage>(cancellationToken);
-            if (serverMessage.Version < expectedMessage.Version)
+            if (serverMessage.Version < ownMessage.Version)
             {
-                throw new IncompatibleVersionException($"Incompatible API version (expected {expectedMessage.Version}, got {serverMessage.Version}");
+                throw new IncompatibleVersionException($"Incompatible API version (need {ownMessage.Version}, got {serverMessage.Version}");
             }
             Id = serverMessage.Id;
 

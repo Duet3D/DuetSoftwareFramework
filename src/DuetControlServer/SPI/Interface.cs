@@ -131,6 +131,27 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Get a channel that is currently idle in order to process a priority code
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<CodeChannel> GetIdleChannel()
+        {
+            foreach (ChannelInformation channel in _channels)
+            {
+                using (await channel.LockAsync())
+                {
+                    if (channel.BufferedCodes.Count == 0)
+                    {
+                        return channel.Channel;
+                    }
+                }
+            }
+
+            _logger.Warn("Failed to find an idle channel, using fallback {0}", nameof(CodeChannel.Daemon));
+            return CodeChannel.Daemon;
+        }
+
+        /// <summary>
         /// Enqueue a G/M/T-code synchronously and obtain a task that completes when the code has finished
         /// </summary>
         /// <param name="code">Code to execute</param>
@@ -154,21 +175,42 @@ namespace DuetControlServer.SPI
                 }
                 else if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
                 {
-                    // Macro codes are already enqueued at the time this is called
-                    foreach (QueuedCode queuedCode in _channels[code.Channel].NestedMacroCodes)
+                    // Regular macro codes are already enqueued at the time this is called
+                    bool firstMacro = true;
+                    foreach (MacroFile macroFile in _channels[code.Channel].NestedMacros)
                     {
-                        if (queuedCode.Code == code)
+                        foreach (QueuedCode queuedCode in macroFile.PendingCodes)
                         {
-                            item = queuedCode;
+                            if (queuedCode.Code == code)
+                            {
+                                item = queuedCode;
+                                break;
+                            }
+                        }
+
+                        if (item != null)
+                        {
+                            if (!firstMacro)
+                            {
+                                _logger.Warn("Code {0} was internally processed but another macro is still pending", code);
+                            }
                             break;
                         }
+                        firstMacro = false;
                     }
 
                     // Users may want to enqueue custom codes as well when dealing with macro files
                     if (item == null)
                     {
-                        item = new QueuedCode(code);
-                        _channels[code.Channel].NestedMacroCodes.Enqueue(item);
+                        if (_channels[code.Channel].NestedMacros.TryPeek(out MacroFile macroFile))
+                        {
+                            item = new QueuedCode(code);
+                            macroFile.PendingCodes.Enqueue(item);
+                        }
+                        else
+                        {
+                            throw new ArgumentException("No macro file being executed");
+                        }
                     }
                 }
                 else
@@ -189,10 +231,40 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static Task<bool> Flush(CodeChannel channel)
         {
-            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<bool> tcs;
             using (_channels[channel].Lock())
             {
+                tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _channels[channel].PendingFlushRequests.Enqueue(tcs);
+            }
+            return tcs.Task;
+        }
+
+        /// <summary>
+        /// Wait for all pending (macro) codes to finish
+        /// </summary>
+        /// <param name="code">Code requesting the flush request</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public static Task<bool> Flush(Code code)
+        {
+            code.WaitingForFlush = true;
+
+            TaskCompletionSource<bool> tcs;
+            using (_channels[code.Channel].Lock())
+            {
+                if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
+                {
+                    if (_channels[code.Channel].NestedMacros.TryPeek(out MacroFile macroFile))
+                    {
+                        tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        macroFile.PendingFlushRequests.Enqueue(tcs);
+                        return tcs.Task;
+                    }
+                    return Task.FromResult(false);
+                }
+
+                tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _channels[code.Channel].PendingFlushRequests.Enqueue(tcs);
             }
             return tcs.Task;
         }

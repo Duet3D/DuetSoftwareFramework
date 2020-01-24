@@ -54,6 +54,11 @@ namespace DuetControlServer.SPI
         public Queue<QueuedCode> PendingCodes { get; } = new Queue<QueuedCode>();
 
         /// <summary>
+        /// Queue of pending flush requests
+        /// </summary>
+        public Queue<TaskCompletionSource<bool>> PendingFlushRequests { get; } = new Queue<TaskCompletionSource<bool>>();
+
+        /// <summary>
         /// Occupied space for buffered codes in bytes
         /// </summary>
         public int BytesBuffered { get; private set; }
@@ -84,20 +89,9 @@ namespace DuetControlServer.SPI
         public Stack<MacroFile> NestedMacros { get; } = new Stack<MacroFile>();
 
         /// <summary>
-        /// Pending codes being started by a nested macro (and multiple codes may be started by an interceptor).
-        /// This is required because it may take a moment until they are internally processed
-        /// </summary>
-        public Queue<QueuedCode> NestedMacroCodes { get; } = new Queue<QueuedCode>();
-
-        /// <summary>
         /// Queue of pending lock/unlock requests
         /// </summary>
         public Queue<QueuedLockRequest> PendingLockRequests { get; } = new Queue<QueuedLockRequest>();
-
-        /// <summary>
-        /// Queue of pending flush requests
-        /// </summary>
-        public Queue<TaskCompletionSource<bool>> PendingFlushRequests { get; } = new Queue<TaskCompletionSource<bool>>();
 
         /// <summary>
         /// Lock used when accessing this instance
@@ -150,11 +144,10 @@ namespace DuetControlServer.SPI
             foreach (MacroFile macroFile in NestedMacros)
             {
                 channelDiagostics.AppendLine($"Nested macro: {macroFile.FileName}, started by: {((macroFile.StartCode == null) ? "system" : macroFile.StartCode.ToString())}");
-            }
-
-            foreach (QueuedCode nestedMacroCode in NestedMacroCodes)
-            {
-                channelDiagostics.AppendLine($"Nested macro code: {nestedMacroCode.Code}");
+                foreach (QueuedCode nestedMacroCode in macroFile.PendingCodes)
+                {
+                    channelDiagostics.AppendLine($"==> Pending code: {nestedMacroCode.Code}");
+                }
             }
 
             if (PendingLockRequests.Count > 0)
@@ -216,18 +209,12 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            // 4. Macro codes
-            if (NestedMacroCodes.TryPeek(out queuedCode) && (queuedCode.IsFinished || (queuedCode.IsReadyToSend && BufferCode(queuedCode))))
-            {
-                NestedMacroCodes.Dequeue();
-                return true;
-            }
-
-            // 5. New codes from macro files
+            // 4. Macros
             if (NestedMacros.TryPeek(out MacroFile macroFile))
             {
+                // Fill up the macro code buffer
                 Commands.Code code = null;
-                if (NestedMacroCodes.Count < Settings.BufferedMacroCodes)
+                if (macroFile.PendingCodes.Count < Settings.BufferedMacroCodes)
                 {
                     try
                     {
@@ -241,9 +228,9 @@ namespace DuetControlServer.SPI
 
                 if (code != null)
                 {
-                    // Start the next code in the background. An interceptor may also generate extra (priority) codes
+                    // Start the next code in the background. An interceptor may also generate extra codes
                     queuedCode = new QueuedCode(code);
-                    NestedMacroCodes.Enqueue(queuedCode);
+                    macroFile.PendingCodes.Enqueue(queuedCode);
                     _ = code.Execute().ContinueWith(async task =>
                     {
                         try
@@ -271,16 +258,38 @@ namespace DuetControlServer.SPI
                             {
                                 e = ae.InnerException;
                             }
-
-                            // FIXME: Should this terminate the macro being executed?
                             await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{e.GetType().Name}] {e.Message}");
                         }
                     });
                     return true;
                 }
 
-                if (macroFile.IsFinished && !NestedMacroCodes.TryPeek(out _) && BufferedCodes.Count == 0)
+                if (macroFile.PendingCodes.TryPeek(out queuedCode))
                 {
+                    // Check if another code has finished
+                    if (queuedCode.IsFinished || (queuedCode.IsReadyToSend && BufferCode(queuedCode)))
+                    {
+                        macroFile.PendingCodes.Dequeue();
+                        return true;
+                    }
+
+                    // Take care of macro flush requests
+                    if (queuedCode.Code.WaitingForFlush && macroFile.PendingFlushRequests.TryDequeue(out TaskCompletionSource<bool> macroFlushRequest))
+                    {
+                        queuedCode.Code.WaitingForFlush = false;
+                        macroFlushRequest.TrySetResult(true);
+                        return false;
+                    }
+                }
+                else if (macroFile.IsFinished && BufferedCodes.Count == 0)
+                {
+                    // Take care of remaining macro flush requests
+                    if (macroFile.PendingFlushRequests.TryDequeue(out TaskCompletionSource<bool> macroFlushRequest))
+                    {
+                        macroFlushRequest.TrySetResult(true);
+                        return false;
+                    }
+
                     // When the last code from the macro has been processed, notify RRF about the completed file
                     if (((macroFile.StartCode != null && macroFile.StartCode.DoingNestedMacro) || (macroFile.StartCode == null && !SystemMacroHasFinished)) &&
                         MacroCompleted(macroFile.StartCode, macroFile.IsAborted))
@@ -299,12 +308,14 @@ namespace DuetControlServer.SPI
                             _logger.Debug("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
                         }
                     }
-                    return false;
                 }
+
+                // Don't execute regular requests until the last macro file has finished
+                return false;
             }
 
-            // 6. Regular codes - only applicable if no macro is being executed
-            else if (PendingCodes.TryPeek(out queuedCode))
+            // 5. Regular codes
+            if (PendingCodes.TryPeek(out queuedCode))
             {
                 if (BufferCode(queuedCode))
                 {
@@ -314,10 +325,10 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            // 7. Flush requests
-            if (BufferedCodes.Count == 0 && PendingFlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
+            // 6. Flush requests
+            if (BufferedCodes.Count == 0 && PendingFlushRequests.TryDequeue(out TaskCompletionSource<bool> flushRequest))
             {
-                source.SetResult(true);
+                flushRequest.SetResult(true);
                 return false;
             }
 
@@ -397,7 +408,10 @@ namespace DuetControlServer.SPI
                         {
                             NestedMacros.Pop().Dispose();
                             _logger.Info("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
-                            _logger.Debug("==> Starting code: {0}", macroFile.StartCode);
+                            if (macroFile.StartCode != null)
+                            {
+                                _logger.Debug("==> Starting code: {0}", macroFile.StartCode);
+                            }
                         }
                     }
                     else if (!flags.HasFlag(MessageTypeFlags.PushFlag))
@@ -543,30 +557,39 @@ namespace DuetControlServer.SPI
         /// Insert a new code for execution before pending macro codes
         /// </summary>
         /// <param name="code">Queued code to insert</param>
+        /// <exception cref="ArgumentException">No macro file is being executed</exception>
         public void InsertMacroCode(QueuedCode code)
         {
-            Queue<QueuedCode> pendingMacroCodes = new Queue<QueuedCode>();
-
-            // Keep the order of already processed codes
-            while (NestedMacroCodes.TryPeek(out QueuedCode queuedCode) && queuedCode.IsReadyToSend)
+            if (NestedMacros.TryPeek(out MacroFile macroFile))
             {
-                pendingMacroCodes.Enqueue(NestedMacroCodes.Dequeue());
+                Queue<QueuedCode> pendingMacroCodes = new Queue<QueuedCode>();
+
+                // Keep the order of already processed codes
+                while (macroFile.PendingCodes.TryPeek(out QueuedCode queuedCode) && queuedCode.IsReadyToSend)
+                {
+                    pendingMacroCodes.Enqueue(macroFile.PendingCodes.Dequeue());
+                }
+
+                // Then add the new code
+                pendingMacroCodes.Enqueue(code);
+
+                // And finally all others
+                while (macroFile.PendingCodes.TryDequeue(out QueuedCode queuedCode))
+                {
+                    pendingMacroCodes.Enqueue(queuedCode);
+                }
+
+                // Apply the new queue
+                while (pendingMacroCodes.TryDequeue(out QueuedCode queuedCode))
+                {
+                    macroFile.PendingCodes.Enqueue(queuedCode);
+                }
+            }
+            else
+            {
+                throw new ArgumentException("No macro file being executed");
             }
 
-            // Then add the new code
-            pendingMacroCodes.Enqueue(code);
-
-            // And finally all others
-            while (NestedMacroCodes.TryDequeue(out QueuedCode queuedCode))
-            {
-                pendingMacroCodes.Enqueue(queuedCode);
-            }
-
-            // Apply the new queue
-            while (pendingMacroCodes.TryDequeue(out QueuedCode queuedCode))
-            {
-                NestedMacroCodes.Enqueue(queuedCode);
-            }
         }
 
         /// <summary>
@@ -742,15 +765,6 @@ namespace DuetControlServer.SPI
             _resumingBuffer = false;
 
             SystemMacroHasFinished = SystemMacroHadError = false;
-
-            while (NestedMacroCodes.TryDequeue(out QueuedCode item))
-            {
-                if (!item.IsFinished)
-                {
-                    item.SetCancelled();
-                    resourceInvalidated = true;
-                }
-            }
 
             while (NestedMacros.TryPop(out MacroFile macroFile))
             {

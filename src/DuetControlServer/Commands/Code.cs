@@ -188,7 +188,10 @@ namespace DuetControlServer.Commands
         private AwaitableDisposable<IDisposable> WaitForFinish()
         {
             AwaitableDisposable<IDisposable> finishingTask = _codeFinishLocks[(int)Channel, (int)_codeType].LockAsync();
-            StartNextCode();
+            if (!Flags.HasFlag(CodeFlags.Unbuffered))
+            {
+                StartNextCode();
+            }
             return finishingTask;
         }
 
@@ -207,6 +210,11 @@ namespace DuetControlServer.Commands
                 }
             }
         }
+
+        /// <summary>
+        /// Indicates if this code is waiting for a flush request
+        /// </summary>
+        public bool WaitingForFlush;
         #endregion
 
         /// <summary>
@@ -272,6 +280,11 @@ namespace DuetControlServer.Commands
         /// Indicates whether the code has been internally processed
         /// </summary>
         public bool InternallyProcessed;
+
+        /// <summary>
+        /// Indicates if this code has been resolved by an interceptor
+        /// </summary>
+        public bool ResolvedByInterceptor;
 
         /// <summary>
         /// Execute the given code internally
@@ -410,7 +423,7 @@ namespace DuetControlServer.Commands
                 Flags |= CodeFlags.IsPreProcessed;
                 if (resolved)
                 {
-                    InternallyProcessed = true;
+                    ResolvedByInterceptor = InternallyProcessed = true;
                     return true;
                 }
             }
@@ -446,7 +459,7 @@ namespace DuetControlServer.Commands
                 Flags |= CodeFlags.IsPostProcessed;
                 if (resolved)
                 {
-                    InternallyProcessed = true;
+                    ResolvedByInterceptor = InternallyProcessed = true;
                     return true;
                 }
             }
@@ -463,61 +476,65 @@ namespace DuetControlServer.Commands
         {
             if (Result != null)
             {
-                // Process the code result
-                switch (Type)
+                if (!ResolvedByInterceptor)
                 {
-                    case CodeType.GCode:
-                        await GCodes.CodeExecuted(this);
-                        break;
-
-                    case CodeType.MCode:
-                        await MCodes.CodeExecuted(this);
-                        break;
-
-                    case CodeType.TCode:
-                        await TCodes.CodeExecuted(this);
-                        break;
-                }
-
-                // RepRapFirmware generally prefixes error messages with the code itself.
-                // Do this only for error messages that originate either from a print or from a macro file
-                if (Flags.HasFlag(CodeFlags.IsFromMacro) || Channel == CodeChannel.File)
-                {
-                    foreach (Message msg in Result)
+                    // Process the code result
+                    switch (Type)
                     {
-                        if (msg.Type == MessageType.Error)
+                        case CodeType.GCode:
+                            await GCodes.CodeExecuted(this);
+                            break;
+
+                        case CodeType.MCode:
+                            await MCodes.CodeExecuted(this);
+                            break;
+
+                        case CodeType.TCode:
+                            await TCodes.CodeExecuted(this);
+                            break;
+                    }
+
+                    // RepRapFirmware generally prefixes error messages with the code itself.
+                    // Do this only for error messages that originate either from a print or from a macro file
+                    if (Flags.HasFlag(CodeFlags.IsFromMacro) || Channel == CodeChannel.File)
+                    {
+                        foreach (Message msg in Result)
                         {
-                            msg.Content = ToShortString() + ": " + msg.Content;
+                            if (msg.Type == MessageType.Error)
+                            {
+                                msg.Content = ToShortString() + ": " + msg.Content;
+                            }
+                        }
+                    }
+
+                    // Deal with firmware emulation
+                    if (!Flags.HasFlag(CodeFlags.IsFromMacro) && await EmulatingMarlin())
+                    {
+                        if (Result.Count != 0 && Type == CodeType.MCode && MajorNumber == 105)
+                        {
+                            Result[0].Content = "ok " + Result[0].Content;
+                        }
+                        else if (Result.IsEmpty)
+                        {
+                            Result.Add(MessageType.Success, "ok\n");
+                        }
+                        else
+                        {
+                            Result[^1].Content += "\nok\n";
                         }
                     }
                 }
+            }
 
-                // Deal with firmware emulation
-                if (!Flags.HasFlag(CodeFlags.IsFromMacro) && await EmulatingMarlin())
+            // Log warning and error replies after the code has been processed internally
+            if (InternallyProcessed)
+            {
+                foreach (Message msg in Result)
                 {
-                    if (Result.Count != 0 && Type == CodeType.MCode && MajorNumber == 105)
+                    if (msg.Type != MessageType.Success && Channel != CodeChannel.File)
                     {
-                        Result[0].Content = "ok " + Result[0].Content;
-                    }
-                    else if (Result.IsEmpty)
-                    {
-                        Result.Add(MessageType.Success, "ok\n");
-                    }
-                    else
-                    {
-                        Result[^1].Content += "\nok\n";
-                    }
-                }
-
-                // Log warning and error replies after the code has been processed internally
-                if (InternallyProcessed)
-                {
-                    foreach (Message msg in Result)
-                    {
-                        if (msg.Type != MessageType.Success && Channel != CodeChannel.File)
-                        {
-                            await Utility.Logger.Log(msg);
-                        }
+                        // When a file is being printed, the message is output and logged
+                        await Utility.Logger.Log(msg);
                     }
                 }
             }

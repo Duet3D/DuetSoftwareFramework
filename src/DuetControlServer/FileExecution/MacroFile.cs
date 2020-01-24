@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -40,6 +41,17 @@ namespace DuetControlServer.FileExecution
         public QueuedCode StartCode { get; }
 
         /// <summary>
+        /// Pending codes being started by a nested macro (and multiple codes may be started by an interceptor).
+        /// This is required because it may take a moment until they are internally processed
+        /// </summary>
+        public Queue<QueuedCode> PendingCodes { get; } = new Queue<QueuedCode>();
+
+        /// <summary>
+        /// Queue of pending flush requests
+        /// </summary>
+        public Queue<TaskCompletionSource<bool>> PendingFlushRequests { get; } = new Queue<TaskCompletionSource<bool>>();
+
+        /// <summary>
         /// Create a new macro instance
         /// </summary>
         /// <param name="fileName">Filename of the macro</param>
@@ -62,7 +74,10 @@ namespace DuetControlServer.FileExecution
 
             _logger = NLog.LogManager.GetLogger(Path.GetFileName(fileName));
             _logger.Info("Executing {0} macro file {1} on channel {2}", (startCode == null) ? "system" : "nested", name, channel);
-            _logger.Debug("==> Starting code: {0}", startCode);
+            if (startCode != null)
+            {
+                _logger.Debug("==> Starting code: {0}", startCode);
+            }
         }
 
         /// <summary>
@@ -91,12 +106,26 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         public override void Abort()
         {
-            _logger.Info("Aborted macro file");
+            while (PendingCodes.TryDequeue(out QueuedCode item))
+            {
+                if (!item.IsFinished)
+                {
+                    item.SetCancelled();
+                }
+            }
+
+            while (PendingFlushRequests.TryDequeue(out TaskCompletionSource<bool> tcs))
+            {
+                tcs.TrySetResult(false);
+            }
+
             if (StartCode != null)
             {
                 StartCode.DoingNestedMacro = false;
             }
+
             base.Abort();
+            _logger.Info("Aborted macro file");
         }
 
         /// <summary>

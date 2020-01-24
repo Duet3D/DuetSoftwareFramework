@@ -66,6 +66,11 @@ namespace DuetAPI.Commands
         /// but it is not possible to insert asynchronous codes that complete before the given code.
         /// In a future DSF version it may be no longer possible to intercept prioritized codes
         /// </remarks>
-        IsPrioritized = 256
+        IsPrioritized = 256,
+
+        /// <summary>
+        /// Do NOT process another code on the same channel before this code has been fully executed
+        /// </summary>
+        Unbuffered = 512
     }
 }

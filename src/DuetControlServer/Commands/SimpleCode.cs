@@ -67,10 +67,10 @@ namespace DuetControlServer.Commands
             {
                 foreach (Code code in Parse())
                 {
-                    // M112, M122, and M999 always go to the Daemon channel so we (hopefully) get a low-latency response
-                    if (code.Type == CodeType.MCode && (code.MajorNumber == 112 || code.MajorNumber == 122 || code.MajorNumber == 999))
+                    // M108, M112, M122, and M999 always go to an idle channel so we (hopefully) get a low-latency response
+                    if (code.Type == CodeType.MCode && (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || code.MajorNumber == 999))
                     {
-                        code.Channel = CodeChannel.Daemon;
+                        code.Channel = await SPI.Interface.GetIdleChannel();
                         code.Flags |= CodeFlags.IsPrioritized;
                         priorityCodes.Add(code);
                     }

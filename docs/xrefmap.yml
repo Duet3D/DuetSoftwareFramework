@@ -487,6 +487,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Commands.Code.Parse
   nameWithType: Code.Parse
+- uid: DuetAPI.Commands.Code.Reset
+  name: Reset()
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Reset
+  commentId: M:DuetAPI.Commands.Code.Reset
+  fullName: DuetAPI.Commands.Code.Reset()
+  nameWithType: Code.Reset()
+- uid: DuetAPI.Commands.Code.Reset*
+  name: Reset
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Reset_
+  commentId: Overload:DuetAPI.Commands.Code.Reset
+  isSpec: "True"
+  fullName: DuetAPI.Commands.Code.Reset
+  nameWithType: Code.Reset
 - uid: DuetAPI.Commands.Code.Result
   name: Result
   href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Result
@@ -618,6 +631,12 @@ references:
   commentId: F:DuetAPI.Commands.CodeFlags.None
   fullName: DuetAPI.Commands.CodeFlags.None
   nameWithType: CodeFlags.None
+- uid: DuetAPI.Commands.CodeFlags.Unbuffered
+  name: Unbuffered
+  href: api/DuetAPI.Commands.CodeFlags.html#DuetAPI_Commands_CodeFlags_Unbuffered
+  commentId: F:DuetAPI.Commands.CodeFlags.Unbuffered
+  fullName: DuetAPI.Commands.CodeFlags.Unbuffered
+  nameWithType: CodeFlags.Unbuffered
 - uid: DuetAPI.Commands.CodeParameter
   name: CodeParameter
   href: api/DuetAPI.Commands.CodeParameter.html
@@ -9749,11 +9768,11 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Codes.GCodes.CodeExecuted
   nameWithType: GCodes.CodeExecuted
-- uid: DuetControlServer.Codes.GCodes.Process(DuetAPI.Commands.Code)
+- uid: DuetControlServer.Codes.GCodes.Process(DuetControlServer.Commands.Code)
   name: Process(Code)
-  href: api/DuetControlServer.Codes.GCodes.html#DuetControlServer_Codes_GCodes_Process_DuetAPI_Commands_Code_
-  commentId: M:DuetControlServer.Codes.GCodes.Process(DuetAPI.Commands.Code)
-  fullName: DuetControlServer.Codes.GCodes.Process(DuetAPI.Commands.Code)
+  href: api/DuetControlServer.Codes.GCodes.html#DuetControlServer_Codes_GCodes_Process_DuetControlServer_Commands_Code_
+  commentId: M:DuetControlServer.Codes.GCodes.Process(DuetControlServer.Commands.Code)
+  fullName: DuetControlServer.Codes.GCodes.Process(DuetControlServer.Commands.Code)
   nameWithType: GCodes.Process(Code)
 - uid: DuetControlServer.Codes.GCodes.Process*
   name: Process
@@ -9991,6 +10010,18 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.Code.IsInsertedFromMacro
   nameWithType: Code.IsInsertedFromMacro
+- uid: DuetControlServer.Commands.Code.ResolvedByInterceptor
+  name: ResolvedByInterceptor
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_ResolvedByInterceptor
+  commentId: F:DuetControlServer.Commands.Code.ResolvedByInterceptor
+  fullName: DuetControlServer.Commands.Code.ResolvedByInterceptor
+  nameWithType: Code.ResolvedByInterceptor
+- uid: DuetControlServer.Commands.Code.WaitingForFlush
+  name: WaitingForFlush
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_WaitingForFlush
+  commentId: F:DuetControlServer.Commands.Code.WaitingForFlush
+  fullName: DuetControlServer.Commands.Code.WaitingForFlush
+  nameWithType: Code.WaitingForFlush
 - uid: DuetControlServer.Commands.Flush
   name: Flush
   href: api/DuetControlServer.Commands.Flush.html
@@ -10010,6 +10041,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.Flush.Execute
   nameWithType: Flush.Execute
+- uid: DuetControlServer.Commands.Flush.SourceConnection
+  name: SourceConnection
+  href: api/DuetControlServer.Commands.Flush.html#DuetControlServer_Commands_Flush_SourceConnection
+  commentId: P:DuetControlServer.Commands.Flush.SourceConnection
+  fullName: DuetControlServer.Commands.Flush.SourceConnection
+  nameWithType: Flush.SourceConnection
+- uid: DuetControlServer.Commands.Flush.SourceConnection*
+  name: SourceConnection
+  href: api/DuetControlServer.Commands.Flush.html#DuetControlServer_Commands_Flush_SourceConnection_
+  commentId: Overload:DuetControlServer.Commands.Flush.SourceConnection
+  isSpec: "True"
+  fullName: DuetControlServer.Commands.Flush.SourceConnection
+  nameWithType: Flush.SourceConnection
 - uid: DuetControlServer.Commands.GetFileInfo
   name: GetFileInfo
   href: api/DuetControlServer.Commands.GetFileInfo.html
@@ -10565,6 +10609,32 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.MacroFile.IsConfigOverride
   nameWithType: MacroFile.IsConfigOverride
+- uid: DuetControlServer.FileExecution.MacroFile.PendingCodes
+  name: PendingCodes
+  href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_PendingCodes
+  commentId: P:DuetControlServer.FileExecution.MacroFile.PendingCodes
+  fullName: DuetControlServer.FileExecution.MacroFile.PendingCodes
+  nameWithType: MacroFile.PendingCodes
+- uid: DuetControlServer.FileExecution.MacroFile.PendingCodes*
+  name: PendingCodes
+  href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_PendingCodes_
+  commentId: Overload:DuetControlServer.FileExecution.MacroFile.PendingCodes
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.MacroFile.PendingCodes
+  nameWithType: MacroFile.PendingCodes
+- uid: DuetControlServer.FileExecution.MacroFile.PendingFlushRequests
+  name: PendingFlushRequests
+  href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_PendingFlushRequests
+  commentId: P:DuetControlServer.FileExecution.MacroFile.PendingFlushRequests
+  fullName: DuetControlServer.FileExecution.MacroFile.PendingFlushRequests
+  nameWithType: MacroFile.PendingFlushRequests
+- uid: DuetControlServer.FileExecution.MacroFile.PendingFlushRequests*
+  name: PendingFlushRequests
+  href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_PendingFlushRequests_
+  commentId: Overload:DuetControlServer.FileExecution.MacroFile.PendingFlushRequests
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.MacroFile.PendingFlushRequests
+  nameWithType: MacroFile.PendingFlushRequests
 - uid: DuetControlServer.FileExecution.MacroFile.ReadCode
   name: ReadCode()
   href: api/DuetControlServer.FileExecution.MacroFile.html#DuetControlServer_FileExecution_MacroFile_ReadCode
@@ -11183,11 +11253,24 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.IPC.Processors.Interception.Interception
   nameWithType: Interception.Interception
-- uid: DuetControlServer.IPC.Processors.Interception.Intercept(DuetAPI.Commands.Code,DuetAPI.Connection.InterceptionMode)
+- uid: DuetControlServer.IPC.Processors.Interception.GetInterceptingCode(System.Int32)
+  name: GetInterceptingCode(Int32)
+  href: api/DuetControlServer.IPC.Processors.Interception.html#DuetControlServer_IPC_Processors_Interception_GetInterceptingCode_System_Int32_
+  commentId: M:DuetControlServer.IPC.Processors.Interception.GetInterceptingCode(System.Int32)
+  fullName: DuetControlServer.IPC.Processors.Interception.GetInterceptingCode(System.Int32)
+  nameWithType: Interception.GetInterceptingCode(Int32)
+- uid: DuetControlServer.IPC.Processors.Interception.GetInterceptingCode*
+  name: GetInterceptingCode
+  href: api/DuetControlServer.IPC.Processors.Interception.html#DuetControlServer_IPC_Processors_Interception_GetInterceptingCode_
+  commentId: Overload:DuetControlServer.IPC.Processors.Interception.GetInterceptingCode
+  isSpec: "True"
+  fullName: DuetControlServer.IPC.Processors.Interception.GetInterceptingCode
+  nameWithType: Interception.GetInterceptingCode
+- uid: DuetControlServer.IPC.Processors.Interception.Intercept(DuetControlServer.Commands.Code,DuetAPI.Connection.InterceptionMode)
   name: Intercept(Code, InterceptionMode)
-  href: api/DuetControlServer.IPC.Processors.Interception.html#DuetControlServer_IPC_Processors_Interception_Intercept_DuetAPI_Commands_Code_DuetAPI_Connection_InterceptionMode_
-  commentId: M:DuetControlServer.IPC.Processors.Interception.Intercept(DuetAPI.Commands.Code,DuetAPI.Connection.InterceptionMode)
-  fullName: DuetControlServer.IPC.Processors.Interception.Intercept(DuetAPI.Commands.Code, DuetAPI.Connection.InterceptionMode)
+  href: api/DuetControlServer.IPC.Processors.Interception.html#DuetControlServer_IPC_Processors_Interception_Intercept_DuetControlServer_Commands_Code_DuetAPI_Connection_InterceptionMode_
+  commentId: M:DuetControlServer.IPC.Processors.Interception.Intercept(DuetControlServer.Commands.Code,DuetAPI.Connection.InterceptionMode)
+  fullName: DuetControlServer.IPC.Processors.Interception.Intercept(DuetControlServer.Commands.Code, DuetAPI.Connection.InterceptionMode)
   nameWithType: Interception.Intercept(Code, InterceptionMode)
 - uid: DuetControlServer.IPC.Processors.Interception.Intercept*
   name: Intercept
@@ -13257,6 +13340,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Settings.FilamentFilters
   nameWithType: Settings.FilamentFilters
+- uid: DuetControlServer.Settings.FileInfoReadBufferSize
+  name: FileInfoReadBufferSize
+  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_FileInfoReadBufferSize
+  commentId: P:DuetControlServer.Settings.FileInfoReadBufferSize
+  fullName: DuetControlServer.Settings.FileInfoReadBufferSize
+  nameWithType: Settings.FileInfoReadBufferSize
+- uid: DuetControlServer.Settings.FileInfoReadBufferSize*
+  name: FileInfoReadBufferSize
+  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_FileInfoReadBufferSize_
+  commentId: Overload:DuetControlServer.Settings.FileInfoReadBufferSize
+  isSpec: "True"
+  fullName: DuetControlServer.Settings.FileInfoReadBufferSize
+  nameWithType: Settings.FileInfoReadBufferSize
 - uid: DuetControlServer.Settings.FileInfoReadLimitFooter
   name: FileInfoReadLimitFooter
   href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_FileInfoReadLimitFooter
@@ -13792,19 +13888,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.ChannelInformation.LockAsync
   nameWithType: ChannelInformation.LockAsync
-- uid: DuetControlServer.SPI.ChannelInformation.NestedMacroCodes
-  name: NestedMacroCodes
-  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_NestedMacroCodes
-  commentId: P:DuetControlServer.SPI.ChannelInformation.NestedMacroCodes
-  fullName: DuetControlServer.SPI.ChannelInformation.NestedMacroCodes
-  nameWithType: ChannelInformation.NestedMacroCodes
-- uid: DuetControlServer.SPI.ChannelInformation.NestedMacroCodes*
-  name: NestedMacroCodes
-  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_NestedMacroCodes_
-  commentId: Overload:DuetControlServer.SPI.ChannelInformation.NestedMacroCodes
-  isSpec: "True"
-  fullName: DuetControlServer.SPI.ChannelInformation.NestedMacroCodes
-  nameWithType: ChannelInformation.NestedMacroCodes
 - uid: DuetControlServer.SPI.ChannelInformation.NestedMacros
   name: NestedMacros
   href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_NestedMacros
@@ -15897,6 +15980,12 @@ references:
   commentId: M:DuetControlServer.SPI.Interface.Flush(DuetAPI.CodeChannel)
   fullName: DuetControlServer.SPI.Interface.Flush(DuetAPI.CodeChannel)
   nameWithType: Interface.Flush(CodeChannel)
+- uid: DuetControlServer.SPI.Interface.Flush(DuetControlServer.Commands.Code)
+  name: Flush(Code)
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_Flush_DuetControlServer_Commands_Code_
+  commentId: M:DuetControlServer.SPI.Interface.Flush(DuetControlServer.Commands.Code)
+  fullName: DuetControlServer.SPI.Interface.Flush(DuetControlServer.Commands.Code)
+  nameWithType: Interface.Flush(Code)
 - uid: DuetControlServer.SPI.Interface.Flush*
   name: Flush
   href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_Flush_
@@ -15917,6 +16006,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Interface.GetHeightmap
   nameWithType: Interface.GetHeightmap
+- uid: DuetControlServer.SPI.Interface.GetIdleChannel
+  name: GetIdleChannel()
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_GetIdleChannel
+  commentId: M:DuetControlServer.SPI.Interface.GetIdleChannel
+  fullName: DuetControlServer.SPI.Interface.GetIdleChannel()
+  nameWithType: Interface.GetIdleChannel()
+- uid: DuetControlServer.SPI.Interface.GetIdleChannel*
+  name: GetIdleChannel
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_GetIdleChannel_
+  commentId: Overload:DuetControlServer.SPI.Interface.GetIdleChannel
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.Interface.GetIdleChannel
+  nameWithType: Interface.GetIdleChannel
 - uid: DuetControlServer.SPI.Interface.Init
   name: Init()
   href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_Init
@@ -16763,6 +16865,19 @@ references:
   commentId: T:DuetControlServer.Utility.FilamentManager
   fullName: DuetControlServer.Utility.FilamentManager
   nameWithType: FilamentManager
+- uid: DuetControlServer.Utility.FilamentManager.Init
+  name: Init()
+  href: api/DuetControlServer.Utility.FilamentManager.html#DuetControlServer_Utility_FilamentManager_Init
+  commentId: M:DuetControlServer.Utility.FilamentManager.Init
+  fullName: DuetControlServer.Utility.FilamentManager.Init()
+  nameWithType: FilamentManager.Init()
+- uid: DuetControlServer.Utility.FilamentManager.Init*
+  name: Init
+  href: api/DuetControlServer.Utility.FilamentManager.html#DuetControlServer_Utility_FilamentManager_Init_
+  commentId: Overload:DuetControlServer.Utility.FilamentManager.Init
+  isSpec: "True"
+  fullName: DuetControlServer.Utility.FilamentManager.Init
+  nameWithType: FilamentManager.Init
 - uid: DuetControlServer.Utility.FilamentManager.ToolAdded(DuetAPI.Machine.Tool)
   name: ToolAdded(Tool)
   href: api/DuetControlServer.Utility.FilamentManager.html#DuetControlServer_Utility_FilamentManager_ToolAdded_DuetAPI_Machine_Tool_

@@ -19,11 +19,6 @@ namespace DuetAPI.Commands
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
         public static bool Parse(TextReader reader, Code result, ref bool enforcingAbsolutePosition)
         {
-            if (enforcingAbsolutePosition)
-            {
-                result.Flags |= CodeFlags.EnforceAbsolutePosition;
-            }
-
             char letter = '\0', c;
             string value = string.Empty;
 
@@ -33,6 +28,10 @@ namespace DuetAPI.Commands
             bool wasQuoted = false, wasExpression = false;
 
             Encoding encoding = (reader is StreamReader sr) ? sr.CurrentEncoding : Encoding.UTF8;
+            if (enforcingAbsolutePosition)
+            {
+                result.Flags = CodeFlags.EnforceAbsolutePosition;
+            }
             result.Length = 0;
             do
             {

@@ -1152,31 +1152,6 @@
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_ChannelInformation_NestedMacroCodes_" data-uid="DuetControlServer.SPI.ChannelInformation.NestedMacroCodes*"></a>
-  <h4 id="DuetControlServer_SPI_ChannelInformation_NestedMacroCodes" data-uid="DuetControlServer.SPI.ChannelInformation.NestedMacroCodes">NestedMacroCodes</h4>
-  <div class="markdown level1 summary"><p>Pending codes being started by a nested macro (and multiple codes may be started by an interceptor).
-This is required because it may take a moment until they are internally processed</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Queue&lt;QueuedCode&gt; NestedMacroCodes { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Collections.Generic.Queue</span>&lt;<a class="xref" href="DuetControlServer.SPI.QueuedCode.html">QueuedCode</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_SPI_ChannelInformation_NestedMacros_" data-uid="DuetControlServer.SPI.ChannelInformation.NestedMacros*"></a>
   <h4 id="DuetControlServer_SPI_ChannelInformation_NestedMacros" data-uid="DuetControlServer.SPI.ChannelInformation.NestedMacros">NestedMacros</h4>
   <div class="markdown level1 summary"><p>Stack of nested macro files being executed</p>
@@ -1525,6 +1500,22 @@ This is required because it may take a moment until they are internally processe
         <td><a class="xref" href="DuetControlServer.SPI.QueuedCode.html">QueuedCode</a></td>
         <td><span class="parametername">code</span></td>
         <td><p>Queued code to insert</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.ArgumentException</span></td>
+        <td><p>No macro file is being executed</p>
 </td>
       </tr>
     </tbody>

@@ -14,7 +14,7 @@
             Logger instance
             </summary>
         </member>
-        <member name="M:DuetControlServer.Codes.GCodes.Process(DuetAPI.Commands.Code)">
+        <member name="M:DuetControlServer.Codes.GCodes.Process(DuetControlServer.Commands.Code)">
             <summary>
             Process a G-code that should be interpreted by the control server
             </summary>
@@ -83,6 +83,11 @@
         <member name="T:DuetControlServer.Commands.AddHttpEndpoint">
             <summary>
             Implementation of the <see cref="T:DuetAPI.Commands.AddHttpEndpoint"/> command
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.AddHttpEndpoint._logger">
+            <summary>
+            Logger instance
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.AddHttpEndpoint.Execute">
@@ -224,6 +229,11 @@
             </summary>
             <returns>Asynchronous task</returns>
         </member>
+        <member name="F:DuetControlServer.Commands.Code.WaitingForFlush">
+            <summary>
+            Indicates if this code is waiting for a flush request
+            </summary>
+        </member>
         <member name="F:DuetControlServer.Commands.Code.FileLocks">
             <summary>
             Lock around the files being written
@@ -268,6 +278,11 @@
             Indicates whether the code has been internally processed
             </summary>
         </member>
+        <member name="F:DuetControlServer.Commands.Code.ResolvedByInterceptor">
+            <summary>
+            Indicates if this code has been resolved by an interceptor
+            </summary>
+        </member>
         <member name="M:DuetControlServer.Commands.Code.ExecuteInternally">
             <summary>
             Execute the given code internally
@@ -295,6 +310,11 @@
         <member name="T:DuetControlServer.Commands.Flush">
             <summary>
             Implementation of the <see cref="T:DuetAPI.Commands.Flush"/> command
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Commands.Flush.SourceConnection">
+            <summary>
+            Source connection of this command
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.Flush.Execute">
@@ -344,6 +364,11 @@
         <member name="T:DuetControlServer.Commands.RemoveHttpEndpoint">
             <summary>
             Implementation of the <see cref="T:DuetAPI.Commands.RemoveHttpEndpoint"/> command
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.RemoveHttpEndpoint._logger">
+            <summary>
+            Logger instance
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.RemoveHttpEndpoint.Execute">
@@ -578,6 +603,17 @@
         <member name="P:DuetControlServer.FileExecution.MacroFile.StartCode">
             <summary>
             The queued code which originally started this macro file or null
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.MacroFile.PendingCodes">
+            <summary>
+            Pending codes being started by a nested macro (and multiple codes may be started by an interceptor).
+            This is required because it may take a moment until they are internally processed
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.FileExecution.MacroFile.PendingFlushRequests">
+            <summary>
+            Queue of pending flush requests
             </summary>
         </member>
         <member name="M:DuetControlServer.FileExecution.MacroFile.#ctor(System.String,DuetAPI.CodeChannel,DuetControlServer.SPI.QueuedCode)">
@@ -937,6 +973,11 @@
             Class to hold intercepting connections and a corresponding lock
             </summary>
         </member>
+        <member name="F:DuetControlServer.IPC.Processors.Interception.ConnectionContainer.InterceptingConnection">
+            <summary>
+            Connection intercepting a running code
+            </summary>
+        </member>
         <member name="F:DuetControlServer.IPC.Processors.Interception.ConnectionContainer._lock">
             <summary>
             Asynchronous lock for this interception type
@@ -953,9 +994,9 @@
             List of intercepting connections
             </summary>
         </member>
-        <member name="F:DuetControlServer.IPC.Processors.Interception.ConnectionContainer.InterceptingConnection">
+        <member name="F:DuetControlServer.IPC.Processors.Interception.ConnectionContainer.CodeBeingIntercepted">
             <summary>
-            Connection intercepting a running code
+            Current code being intercepted
             </summary>
         </member>
         <member name="F:DuetControlServer.IPC.Processors.Interception._connections">
@@ -1000,7 +1041,7 @@
             <returns>True if the code has been resolved</returns>
             <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
         </member>
-        <member name="M:DuetControlServer.IPC.Processors.Interception.Intercept(DuetAPI.Commands.Code,DuetAPI.Connection.InterceptionMode)">
+        <member name="M:DuetControlServer.IPC.Processors.Interception.Intercept(DuetControlServer.Commands.Code,DuetAPI.Connection.InterceptionMode)">
             <summary>
             Called by the <see cref="T:DuetAPI.Commands.Code"/> class to intercept a code.
             This method goes through each connected interception channel and notifies the clients.
@@ -1016,6 +1057,13 @@
             </summary>
             <param name="connection">Connection ID to check</param>
             <returns>True if the connection is intercepting a code</returns>
+        </member>
+        <member name="M:DuetControlServer.IPC.Processors.Interception.GetInterceptingCode(System.Int32)">
+            <summary>
+            Checks if the given connection is currently intercepting a code and returns the code being intercepted
+            </summary>
+            <param name="sourceConnection">Connection to check</param>
+            <returns>Code being intercepted</returns>
         </member>
         <member name="T:DuetControlServer.IPC.Processors.Subscription">
             <summary>
@@ -1610,6 +1658,11 @@
             Set this to -1 to disable the automatic deadlock detection
             </summary>
         </member>
+        <member name="P:DuetControlServer.Settings.FileInfoReadBufferSize">
+            <summary>
+            Size of the read buffer used for file parsing in bytes
+            </summary>
+        </member>
         <member name="P:DuetControlServer.Settings.FileInfoReadLimitHeader">
             <summary>
             How many bytes to parse max at the beginning of a file to retrieve G-code file information (12KiB)
@@ -1710,6 +1763,11 @@
             Queue of pending G/M/T-codes that have not been buffered yet
             </summary>
         </member>
+        <member name="P:DuetControlServer.SPI.ChannelInformation.PendingFlushRequests">
+            <summary>
+            Queue of pending flush requests
+            </summary>
+        </member>
         <member name="P:DuetControlServer.SPI.ChannelInformation.BytesBuffered">
             <summary>
             Occupied space for buffered codes in bytes
@@ -1740,20 +1798,9 @@
             Stack of nested macro files being executed
             </summary>
         </member>
-        <member name="P:DuetControlServer.SPI.ChannelInformation.NestedMacroCodes">
-            <summary>
-            Pending codes being started by a nested macro (and multiple codes may be started by an interceptor).
-            This is required because it may take a moment until they are internally processed
-            </summary>
-        </member>
         <member name="P:DuetControlServer.SPI.ChannelInformation.PendingLockRequests">
             <summary>
             Queue of pending lock/unlock requests
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.SPI.ChannelInformation.PendingFlushRequests">
-            <summary>
-            Queue of pending flush requests
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.ChannelInformation._lock">
@@ -1819,6 +1866,7 @@
             Insert a new code for execution before pending macro codes
             </summary>
             <param name="code">Queued code to insert</param>
+            <exception cref="T:System.ArgumentException">No macro file is being executed</exception>
         </member>
         <member name="F:DuetControlServer.SPI.ChannelInformation._resumingBuffer">
             <summary>
@@ -3325,6 +3373,12 @@
             <exception cref="T:System.OperationCanceledException">Operation could not finish</exception>
             <exception cref="T:System.InvalidOperationException">Heightmap is already being set</exception>
         </member>
+        <member name="M:DuetControlServer.SPI.Interface.GetIdleChannel">
+            <summary>
+            Get a channel that is currently idle in order to process a priority code
+            </summary>
+            <returns></returns>
+        </member>
         <member name="M:DuetControlServer.SPI.Interface.ProcessCode(DuetControlServer.Commands.Code)">
             <summary>
             Enqueue a G/M/T-code synchronously and obtain a task that completes when the code has finished
@@ -3337,6 +3391,13 @@
             Wait for all pending codes to finish
             </summary>
             <param name="channel">Code channel to wait for</param>
+            <returns>Whether the codes have been flushed successfully</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.Flush(DuetControlServer.Commands.Code)">
+            <summary>
+            Wait for all pending (macro) codes to finish
+            </summary>
+            <param name="code">Code requesting the flush request</param>
             <returns>Whether the codes have been flushed successfully</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.RequestEmergencyStop">
@@ -3874,6 +3935,31 @@
             Provides functions for filament management
             </summary>
         </member>
+        <member name="F:DuetControlServer.Utility.FilamentManager.FilamentsCsvFile">
+            <summary>
+            Name of the filament storage file
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Utility.FilamentManager.FilamentsCsvHeader">
+            <summary>
+            First line identifying the filament file
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Utility.FilamentManager._lock">
+            <summary>
+            Lock for this class
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Utility.FilamentManager._filamentMapping">
+            <summary>
+            Mapping of extruder vs filament
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Utility.FilamentManager.Init">
+            <summary>
+            Initialize this class
+            </summary>
+        </member>
         <member name="M:DuetControlServer.Utility.FilamentManager.ToolAdded(DuetAPI.Machine.Tool)">
             <summary>
             Called when a new tool is being added to the object model
@@ -3894,25 +3980,10 @@
             <param name="sender">Changed tool</param>
             <param name="e">Information about the changed property</param>
         </member>
-        <member name="M:DuetControlServer.Utility.FilamentManager.UpdateTool(DuetAPI.Machine.Tool)">
-            <summary>
-            Update the filament assigned to a tool
-            </summary>
-            <param name="tool">Tool to update</param>
-            <returns>Asynchronous task</returns>
-        </member>
-        <member name="M:DuetControlServer.Utility.FilamentManager.LoadMapping(System.String)">
-            <summary>
-            Load the filament mapping from a filaments CSV file
-            </summary>
-            <param name="filename">Path to the file</param>
-            <returns>Asynchronous task</returns>
-        </member>
-        <member name="M:DuetControlServer.Utility.FilamentManager.SaveMapping(System.String)">
+        <member name="M:DuetControlServer.Utility.FilamentManager.SaveMapping">
             <summary>
             Save the filament mapping to a file
             </summary>
-            <param name="filename">Path to the file</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.Utility.Logger">
@@ -4022,6 +4093,22 @@
             <param name="fileName">File to analyze</param>
             <returns>Information about the file</returns>
         </member>
+        <member name="M:DuetControlServer.FileInfoParser.ParseHeader(System.IO.StreamReader,DuetAPI.ParsedFileInfo)">
+            <summary>
+            Parse the header of a G-code file
+            </summary>
+            <param name="reader">Stream reader</param>
+            <param name="partialFileInfo">G-code file information</param>
+            <returns>Asynchronous task</returns>
+        </member>
+        <member name="M:DuetControlServer.FileInfoParser.ParseFooter(System.IO.StreamReader,DuetAPI.ParsedFileInfo)">
+            <summary>
+            Parse the footer of a G-code file
+            </summary>
+            <param name="reader">Stream reader</param>
+            <param name="partialFileInfo">G-code file information</param>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="T:DuetControlServer.FileInfoParser.ReadLineFromEndResult">
             <summary>
             Result for wrapping the buffer pointer because ref parameters are not supported for async functions
@@ -4045,6 +4132,53 @@
             <param name="buffer">Internal buffer</param>
             <param name="bufferPointer">Pointer to the next byte in the buffer</param>
             <returns>Read result</returns>
+        </member>
+        <member name="M:DuetControlServer.FileInfoParser.IsFileInfoComplete(DuetAPI.ParsedFileInfo)">
+            <summary>
+            Checks if the given file info is complete
+            </summary>
+            <param name="result">File information</param>
+            <returns>Whether the file info is complete</returns>
+        </member>
+        <member name="M:DuetControlServer.FileInfoParser.FindLayerHeight(System.String,DuetAPI.ParsedFileInfo@)">
+            <summary>
+            Try to find the layer height
+            </summary>
+            <param name="line">Line</param>
+            <param name="fileInfo">File information</param>
+            <returns>Whether layer height could be found</returns>
+        </member>
+        <member name="M:DuetControlServer.FileInfoParser.FindFilamentUsed(System.String,DuetAPI.ParsedFileInfo@)">
+            <summary>
+            Try to find the filament usage
+            </summary>
+            <param name="line">Line</param>
+            <param name="fileInfo">File information</param>
+            <returns>Whether filament consumption could be found</returns>
+        </member>
+        <member name="M:DuetControlServer.FileInfoParser.FindGeneratedBy(System.String,DuetAPI.ParsedFileInfo@)">
+            <summary>
+            Find the toolchain that generated the file
+            </summary>
+            <param name="line">Line</param>
+            <param name="fileInfo">File information</param>
+            <returns>Whether the slicer could be found</returns>
+        </member>
+        <member name="M:DuetControlServer.FileInfoParser.FindPrintTime(System.String,DuetAPI.ParsedFileInfo@)">
+            <summary>
+            Find the total print time
+            </summary>
+            <param name="line">Line</param>
+            <param name="fileInfo">File information</param>
+            <returns>Whether the print time could be found</returns>
+        </member>
+        <member name="M:DuetControlServer.FileInfoParser.FindSimulatedTime(System.String,DuetAPI.ParsedFileInfo@)">
+            <summary>
+            Find the simulated time
+            </summary>
+            <param name="line">Line</param>
+            <param name="fileInfo">File information</param>
+            <returns>Whether the simulated time could be found</returns>
         </member>
         <member name="T:DuetControlServer.FileDirectory">
             <summary>

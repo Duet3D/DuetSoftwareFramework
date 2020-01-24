@@ -179,6 +179,10 @@ namespace DuetControlServer.IPC
             {
                 simpleCode.SourceConnection = Id;
             }
+            else if (command is Commands.Flush flushCommand)
+            {
+                flushCommand.SourceConnection = Id;
+            }
             else if (command is Commands.LockMachineModel lockCommand)
             {
                 lockCommand.SourceConnection = Id;

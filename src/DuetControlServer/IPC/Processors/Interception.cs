@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
@@ -35,6 +34,11 @@ namespace DuetControlServer.IPC.Processors
         private class ConnectionContainer
         {
             /// <summary>
+            /// Connection intercepting a running code
+            /// </summary>
+            public volatile int InterceptingConnection = -1;
+
+            /// <summary>
             /// Asynchronous lock for this interception type
             /// </summary>
             private readonly AsyncLock _lock = new AsyncLock();
@@ -51,9 +55,9 @@ namespace DuetControlServer.IPC.Processors
             public readonly List<Interception> Items = new List<Interception>();
 
             /// <summary>
-            /// Connection intercepting a running code
+            /// Current code being intercepted
             /// </summary>
-            public volatile int InterceptingConnection = -1;
+            public Commands.Code CodeBeingIntercepted;
         }
 
         /// <summary>
@@ -91,7 +95,7 @@ namespace DuetControlServer.IPC.Processors
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
         }
-        
+
         /// <summary>
         /// Waits for commands to be received and enqueues them in a concurrent queue so that a <see cref="Code"/>
         /// can decide when to cancel/resume/resolve the execution.
@@ -220,7 +224,7 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="type">Type of the interception</param>
         /// <returns>True if the code has been resolved</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        public static async Task<bool> Intercept(Code code, InterceptionMode type)
+        public static async Task<bool> Intercept(Commands.Code code, InterceptionMode type)
         {
             List<Interception> processors = new List<Interception>();
             using (await _connections[type].LockAsync())
@@ -235,6 +239,7 @@ namespace DuetControlServer.IPC.Processors
                     using (await _connections[type].LockAsync())
                     {
                         _connections[type].InterceptingConnection = processor.Connection.Id;
+                        _connections[type].CodeBeingIntercepted = code;
                         try
                         {
                             try
@@ -256,6 +261,7 @@ namespace DuetControlServer.IPC.Processors
                         finally
                         {
                             _connections[type].InterceptingConnection = -1;
+                            _connections[type].CodeBeingIntercepted = null;
                         }
                     }
                 }
@@ -273,6 +279,26 @@ namespace DuetControlServer.IPC.Processors
             return (_connections[InterceptionMode.Pre].InterceptingConnection == connection) ||
                    (_connections[InterceptionMode.Post].InterceptingConnection == connection) ||
                    (_connections[InterceptionMode.Executed].InterceptingConnection == connection);
+        }
+
+        /// <summary>
+        /// Checks if the given connection is currently intercepting a code and returns the code being intercepted
+        /// </summary>
+        /// <param name="sourceConnection">Connection to check</param>
+        /// <returns>Code being intercepted</returns>
+        public static async Task<Commands.Code> GetInterceptingCode(int sourceConnection)
+        {
+            foreach (InterceptionMode mode in Enum.GetValues(typeof(InterceptionMode)))
+            {
+                using (await _connections[mode].LockAsync())
+                {
+                    if (_connections[mode].InterceptingConnection == sourceConnection)
+                    {
+                        return _connections[mode].CodeBeingIntercepted;
+                    }
+                }
+            }
+            return null;
         }
     }
 }

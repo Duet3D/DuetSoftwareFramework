@@ -72,6 +72,7 @@ namespace DuetControlServer
                 Commands.SimpleCode.Init();
                 Model.Provider.Init();
                 Model.Observer.Init();
+                Utility.FilamentManager.Init();
                 _logger.Info("Environment initialized");
             }
             catch (Exception e)
@@ -154,7 +155,7 @@ namespace DuetControlServer
             if (!CancelSource.IsCancellationRequested)
             {
                 _logger.Fatal("Abnormal program termination");
-                if (terminatedTask.IsCanceled)
+                if (terminatedTask.IsFaulted)
                 {
                     string taskName = mainTasks[terminatedTask];
                     _logger.Fatal(terminatedTask.Exception, "{0} task faulted", taskName);

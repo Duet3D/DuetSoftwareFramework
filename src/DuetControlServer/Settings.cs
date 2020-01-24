@@ -157,6 +157,11 @@ namespace DuetControlServer
         public static int MaxMachineModelLockTime { get; set; } = -1;
 
         /// <summary>
+        /// Size of the read buffer used for file parsing in bytes
+        /// </summary>
+        public static int FileInfoReadBufferSize { get; set; } = 8192;
+
+        /// <summary>
         /// How many bytes to parse max at the beginning of a file to retrieve G-code file information (12KiB)
         /// </summary>
         public static uint FileInfoReadLimitHeader { get; set; } = 12288;

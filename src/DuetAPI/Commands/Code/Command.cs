@@ -114,6 +114,25 @@ namespace DuetAPI.Commands
         public List<CodeParameter> Parameters { get; set; } = new List<CodeParameter>();
 
         /// <summary>
+        /// Reset this instance
+        /// </summary>
+        public void Reset()
+        {
+            Result = null;
+            Type = CodeType.Comment;
+            Channel = Defaults.Channel;
+            LineNumber = null;
+            Indent = 0;
+            Keyword = KeywordType.None;
+            KeywordArgument = null;
+            MajorNumber = MinorNumber = null;
+            Flags = CodeFlags.None;
+            Comment = null;
+            FilePosition = Length = null;
+            Parameters.Clear();
+        }
+
+        /// <summary>
         /// Retrieve the parameter whose letter equals c. Note that this look-up is case-insensitive
         /// </summary>
         /// <param name="c">Letter of the parameter to find</param>
