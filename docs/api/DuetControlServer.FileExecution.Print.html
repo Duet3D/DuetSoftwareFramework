@@ -1196,30 +1196,6 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_FileExecution_Print_NextFilePosition_" data-uid="DuetControlServer.FileExecution.Print.NextFilePosition*"></a>
-  <h4 id="DuetControlServer_FileExecution_Print_NextFilePosition" data-uid="DuetControlServer.FileExecution.Print.NextFilePosition">NextFilePosition</h4>
-  <div class="markdown level1 summary"><p>Holds the file position after the current code being executed</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static long? NextFilePosition { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Nullable</span>&lt;<span class="xref">System.Int64</span>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <h3 id="methods">Methods
   </h3>
   <a id="DuetControlServer_FileExecution_Print_Abort_" data-uid="DuetControlServer.FileExecution.Print.Abort*"></a>
@@ -1309,13 +1285,13 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
     </tbody>
   </table>
   <a id="DuetControlServer_FileExecution_Print_Pause_" data-uid="DuetControlServer.FileExecution.Print.Pause*"></a>
-  <h4 id="DuetControlServer_FileExecution_Print_Pause_System_Nullable_System_Int64__" data-uid="DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64})">Pause(Nullable&lt;Int64&gt;)</h4>
+  <h4 id="DuetControlServer_FileExecution_Print_Pause_System_Nullable_System_Int64__DuetControlServer_SPI_Communication_PrintPausedReason_" data-uid="DuetControlServer.FileExecution.Print.Pause(System.Nullable{System.Int64},DuetControlServer.SPI.Communication.PrintPausedReason)">Pause(Nullable&lt;Int64&gt;, PrintPausedReason)</h4>
   <div class="markdown level1 summary"><p>Called when the print is being paused</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void Pause(long? filePosition = default(long? ))</code></pre>
+    <pre><code class="lang-csharp hljs">public static void Pause(long? filePosition, PrintPausedReason pauseReason)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1330,7 +1306,14 @@ Lock this class whenver it is accessed (except for Diagnostics)</p>
       <tr>
         <td><span class="xref">System.Nullable</span>&lt;<span class="xref">System.Int64</span>&gt;</td>
         <td><span class="parametername">filePosition</span></td>
-        <td></td>
+        <td><p>File position where the print was paused</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetControlServer.SPI.Communication.PrintPausedReason.html">PrintPausedReason</a></td>
+        <td><span class="parametername">pauseReason</span></td>
+        <td><p>Reason why the print has been paused</p>
+</td>
       </tr>
     </tbody>
   </table>

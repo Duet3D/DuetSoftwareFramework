@@ -20,7 +20,7 @@ namespace DuetAPI.Connection
         Post,
 
         /// <summary>
-        /// Receive a notification for executed codes. In this state the final result can still be changed
+        /// Receive a notification for executed codes. In this state the final result can be still changed
         /// </summary>
         Executed
     }

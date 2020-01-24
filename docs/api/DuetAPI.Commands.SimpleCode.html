@@ -1039,8 +1039,10 @@
   </div>
   <h5 id="DuetAPI_Commands_SimpleCode_remarks"><strong>Remarks</strong></h5>
   <div class="markdown level0 remarks"><p>Internally the code passed is populated as a full <a class="xref" href="DuetAPI.Commands.SimpleCode.html#DuetAPI_Commands_SimpleCode_Code">Code</a> instance and on completion
-its CodeResult is transformed back into a basic string. This is useful for minimal extensions
-that do not require granular control of the code details</p>
+its <a class="xref" href="DuetAPI.Commands.CodeResult.html">CodeResult</a> is transformed back into a basic string. This is useful for minimal
+extensions that do not require granular control of the code details. Except for certain cases, it
+is NOT recommended for usage in <a class="xref" href="DuetAPI.Connection.InterceptionMode.html">InterceptionMode</a> because it renders the
+internal code buffer useless.</p>
 </div>
   <h3 id="properties">Properties
   </h3>

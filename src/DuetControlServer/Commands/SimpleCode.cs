@@ -47,8 +47,10 @@ namespace DuetControlServer.Commands
             while (!reader.EndOfStream)
             {
                 Code code = new Code() { Channel = Channel, SourceConnection = SourceConnection };
-                DuetAPI.Commands.Code.Parse(reader, code, ref enforcingAbsolutePosition);
-                yield return code;
+                if (DuetAPI.Commands.Code.Parse(reader, code, ref enforcingAbsolutePosition))
+                {
+                    yield return code;
+                }
             }
         }
 
@@ -65,11 +67,15 @@ namespace DuetControlServer.Commands
             {
                 foreach (Code code in Parse())
                 {
-                    // M112, M122, and M999 always go to the Daemon channel so we (hopefully) get a low-latency response
-                    if (code.Type == CodeType.MCode && (code.MajorNumber == 112 || code.MajorNumber == 122 || code.MajorNumber == 999))
+                    // M108, M112, M122, and M999 always go to an idle channel so we (hopefully) get a low-latency response
+                    if (code.Type == CodeType.MCode && (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || code.MajorNumber == 999))
                     {
-                        code.Channel = CodeChannel.Daemon;
+                        code.Channel = await SPI.Interface.GetIdleChannel();
                         code.Flags |= CodeFlags.IsPrioritized;
+                        priorityCodes.Add(code);
+                    }
+                    else if (IPC.Processors.Interception.IsInterceptingConnection(SourceConnection))
+                    {
                         priorityCodes.Add(code);
                     }
                     else
@@ -98,14 +104,17 @@ namespace DuetControlServer.Commands
                 }
 
                 // Execute normal codes next. Use a lock here because multiple codes may be queued for the same channel
-                using (await _channelLocks[(int)Channel].LockAsync())
+                if (codes.Count > 0)
                 {
-                    foreach (Code code in codes)
+                    using (await _channelLocks[(int)Channel].LockAsync())
                     {
-                        CodeResult codeResult = await code.Execute();
-                        if (codeResult != null)
+                        foreach (Code code in codes)
                         {
-                            result.AddRange(codeResult);
+                            CodeResult codeResult = await code.Execute();
+                            if (codeResult != null)
+                            {
+                                result.AddRange(codeResult);
+                            }
                         }
                     }
                 }

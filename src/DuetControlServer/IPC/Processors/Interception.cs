@@ -34,9 +34,20 @@ namespace DuetControlServer.IPC.Processors
         private class ConnectionContainer
         {
             /// <summary>
+            /// Connection intercepting a running code
+            /// </summary>
+            public volatile int InterceptingConnection = -1;
+
+            /// <summary>
             /// Asynchronous lock for this interception type
             /// </summary>
-            public readonly AsyncLock Lock = new AsyncLock();
+            private readonly AsyncLock _lock = new AsyncLock();
+
+            /// <summary>
+            /// Lock this connection container
+            /// </summary>
+            /// <returns>Disposable lock</returns>
+            public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync();
 
             /// <summary>
             /// List of intercepting connections
@@ -44,9 +55,9 @@ namespace DuetControlServer.IPC.Processors
             public readonly List<Interception> Items = new List<Interception>();
 
             /// <summary>
-            /// Connection intercepting a running code
+            /// Current code being intercepted
             /// </summary>
-            public volatile int InterceptingConnection = -1;
+            public Commands.Code CodeBeingIntercepted;
         }
 
         /// <summary>
@@ -84,7 +95,7 @@ namespace DuetControlServer.IPC.Processors
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
         }
-        
+
         /// <summary>
         /// Waits for commands to be received and enqueues them in a concurrent queue so that a <see cref="Code"/>
         /// can decide when to cancel/resume/resolve the execution.
@@ -92,7 +103,7 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Task that represents the lifecycle of the connection</returns>
         public override async Task Process()
         {
-            using (await _connections[_mode].Lock.LockAsync())
+            using (await _connections[_mode].LockAsync())
             {
                 _connections[_mode].Items.Add(this);
             }
@@ -122,7 +133,7 @@ namespace DuetControlServer.IPC.Processors
                         if (Command.SupportedCommands.Contains(command.GetType()))
                         {
                             // Interpret regular Command codes here
-                            object result = command.Invoke();
+                            object result = await command.Invoke();
                             await Connection.SendResponse(result);
                         }
                         else if (SupportedCommands.Contains(command.GetType()))
@@ -154,7 +165,7 @@ namespace DuetControlServer.IPC.Processors
             finally
             {
                 _commandQueue.CompleteAdding();
-                using (await _connections[_mode].Lock.LockAsync())
+                using (await _connections[_mode].LockAsync())
                 {
                     _connections[_mode].Items.Remove(this);
                 }
@@ -212,15 +223,23 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="code">Code to intercept</param>
         /// <param name="type">Type of the interception</param>
         /// <returns>True if the code has been resolved</returns>
-        public static async Task<bool> Intercept(Code code, InterceptionMode type)
+        /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
+        public static async Task<bool> Intercept(Commands.Code code, InterceptionMode type)
         {
-            using (await _connections[type].Lock.LockAsync())
+            List<Interception> processors = new List<Interception>();
+            using (await _connections[type].LockAsync())
             {
-                foreach (Interception processor in _connections[type].Items)
+                processors.AddRange(_connections[type].Items);
+            }
+
+            foreach (Interception processor in processors)
+            {
+                if (processor.Connection.IsConnected && code.SourceConnection != processor.Connection.Id)
                 {
-                    if (code.SourceConnection != processor.Connection.Id)
+                    using (await _connections[type].LockAsync())
                     {
                         _connections[type].InterceptingConnection = processor.Connection.Id;
+                        _connections[type].CodeBeingIntercepted = code;
                         try
                         {
                             try
@@ -242,11 +261,12 @@ namespace DuetControlServer.IPC.Processors
                         finally
                         {
                             _connections[type].InterceptingConnection = -1;
+                            _connections[type].CodeBeingIntercepted = null;
                         }
                     }
                 }
-                return false;
             }
+            return false;
         }
 
         /// <summary>
@@ -259,6 +279,26 @@ namespace DuetControlServer.IPC.Processors
             return (_connections[InterceptionMode.Pre].InterceptingConnection == connection) ||
                    (_connections[InterceptionMode.Post].InterceptingConnection == connection) ||
                    (_connections[InterceptionMode.Executed].InterceptingConnection == connection);
+        }
+
+        /// <summary>
+        /// Checks if the given connection is currently intercepting a code and returns the code being intercepted
+        /// </summary>
+        /// <param name="sourceConnection">Connection to check</param>
+        /// <returns>Code being intercepted</returns>
+        public static async Task<Commands.Code> GetInterceptingCode(int sourceConnection)
+        {
+            foreach (InterceptionMode mode in Enum.GetValues(typeof(InterceptionMode)))
+            {
+                using (await _connections[mode].LockAsync())
+                {
+                    if (_connections[mode].InterceptingConnection == sourceConnection)
+                    {
+                        return _connections[mode].CodeBeingIntercepted;
+                    }
+                }
+            }
+            return null;
         }
     }
 }

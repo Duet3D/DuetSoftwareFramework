@@ -12,6 +12,11 @@ namespace DuetControlServer.Commands
     public class AddHttpEndpoint : DuetAPI.Commands.AddHttpEndpoint
     {
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// Add a new HTTP endpoint
         /// </summary>
         /// <returns>Reserved file path to a UNIX socket</returns>
@@ -54,6 +59,8 @@ namespace DuetControlServer.Commands
                 endpoint.Path = Path;
                 endpoint.UnixSocket = socketPath;
             }
+
+            _logger.Debug("Registered new HTTP endpoint {0} machine/{1}/{2} via {3}", EndpointType, Namespace, Path, socketPath);
             return socketPath;
         }
 

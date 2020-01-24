@@ -8,7 +8,7 @@ namespace DuetAPI.Machine
     /// <summary>
     /// Information about the configured probe grid (see M557)
     /// </summary>
-    /// <seealso cref="Utility.Heightmap"/>
+    /// <seealso cref="Heightmap"/>
     public class ProbeGrid : IAssignable, ICloneable, INotifyPropertyChanged
     {
         /// <summary>
@@ -139,6 +139,23 @@ namespace DuetAPI.Machine
             }
         }
         private float _radius;
+
+        /// <summary>
+        /// Spacing between the probe points for delta kinematics
+        /// </summary>
+        public float Spacing
+        {
+            get => _spacing;
+            set
+            {
+                if (value != _spacing)
+                {
+                    _spacing = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        private float _spacing;
 
         /// <summary>
         /// Assigns every property from another instance

@@ -1094,8 +1094,51 @@
 </div>
   <h3 id="methods">Methods
   </h3>
+  <a id="DuetControlServer_IPC_Processors_Interception_GetInterceptingCode_" data-uid="DuetControlServer.IPC.Processors.Interception.GetInterceptingCode*"></a>
+  <h4 id="DuetControlServer_IPC_Processors_Interception_GetInterceptingCode_System_Int32_" data-uid="DuetControlServer.IPC.Processors.Interception.GetInterceptingCode(System.Int32)">GetInterceptingCode(Int32)</h4>
+  <div class="markdown level1 summary"><p>Checks if the given connection is currently intercepting a code and returns the code being intercepted</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task&lt;Code&gt; GetInterceptingCode(int sourceConnection)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><span class="parametername">sourceConnection</span></td>
+        <td><p>Connection to check</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<a class="xref" href="DuetControlServer.Commands.Code.html">Code</a>&gt;</td>
+        <td><p>Code being intercepted</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_IPC_Processors_Interception_Intercept_" data-uid="DuetControlServer.IPC.Processors.Interception.Intercept*"></a>
-  <h4 id="DuetControlServer_IPC_Processors_Interception_Intercept_DuetAPI_Commands_Code_DuetAPI_Connection_InterceptionMode_" data-uid="DuetControlServer.IPC.Processors.Interception.Intercept(DuetAPI.Commands.Code,DuetAPI.Connection.InterceptionMode)">Intercept(Code, InterceptionMode)</h4>
+  <h4 id="DuetControlServer_IPC_Processors_Interception_Intercept_DuetControlServer_Commands_Code_DuetAPI_Connection_InterceptionMode_" data-uid="DuetControlServer.IPC.Processors.Interception.Intercept(DuetControlServer.Commands.Code,DuetAPI.Connection.InterceptionMode)">Intercept(Code, InterceptionMode)</h4>
   <div class="markdown level1 summary"><p>Called by the <a class="xref" href="DuetAPI.Commands.Code.html">Code</a> class to intercept a code.
 This method goes through each connected interception channel and notifies the clients.</p>
 </div>
@@ -1115,7 +1158,7 @@ This method goes through each connected interception channel and notifies the cl
     </thead>
     <tbody>
       <tr>
-        <td><a class="xref" href="DuetAPI.Commands.Code.html">Code</a></td>
+        <td><a class="xref" href="DuetControlServer.Commands.Code.html">Code</a></td>
         <td><span class="parametername">code</span></td>
         <td><p>Code to intercept</p>
 </td>
@@ -1140,6 +1183,22 @@ This method goes through each connected interception channel and notifies the cl
       <tr>
         <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
         <td><p>True if the code has been resolved</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Code has been cancelled</p>
 </td>
       </tr>
     </tbody>

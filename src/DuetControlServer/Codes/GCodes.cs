@@ -20,7 +20,7 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Result of the code if the code completed, else null</returns>
-        public static async Task<CodeResult> Process(Code code)
+        public static async Task<CodeResult> Process(Commands.Code code)
         {
             switch (code.MajorNumber)
             {
@@ -29,7 +29,7 @@ namespace DuetControlServer.Codes
                     CodeParameter cp = code.Parameter('S', 0);
                     if (cp == 1 || cp == 3)
                     {
-                        if (await SPI.Interface.Flush(code.Channel))
+                        if (await SPI.Interface.Flush(code))
                         {
                             string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
                             string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.System);

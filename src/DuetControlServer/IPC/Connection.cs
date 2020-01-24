@@ -71,6 +71,11 @@ namespace DuetControlServer.IPC
         }
 
         /// <summary>
+        /// Indicates if the connection is still available
+        /// </summary>
+        public bool IsConnected { get => !disposed && _unixSocket.Connected; }
+
+        /// <summary>
         /// Read a generic JSON object from the socket
         /// </summary>
         /// <returns>JsonDocument for deserialization</returns>
@@ -173,6 +178,10 @@ namespace DuetControlServer.IPC
             else if (command is Commands.SimpleCode simpleCode)
             {
                 simpleCode.SourceConnection = Id;
+            }
+            else if (command is Commands.Flush flushCommand)
+            {
+                flushCommand.SourceConnection = Id;
             }
             else if (command is Commands.LockMachineModel lockCommand)
             {

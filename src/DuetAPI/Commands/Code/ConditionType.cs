@@ -53,6 +53,11 @@
         /// <summary>
         /// Set operation
         /// </summary>
-        Set
+        Set,
+
+        /// <summary>
+        /// Echo operation
+        /// </summary>
+        Echo
     }
 }

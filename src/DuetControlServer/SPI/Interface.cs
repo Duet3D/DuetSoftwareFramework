@@ -131,6 +131,27 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Get a channel that is currently idle in order to process a priority code
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<CodeChannel> GetIdleChannel()
+        {
+            foreach (ChannelInformation channel in _channels)
+            {
+                using (await channel.LockAsync())
+                {
+                    if (channel.BufferedCodes.Count == 0)
+                    {
+                        return channel.Channel;
+                    }
+                }
+            }
+
+            _logger.Warn("Failed to find an idle channel, using fallback {0}", nameof(CodeChannel.Daemon));
+            return CodeChannel.Daemon;
+        }
+
+        /// <summary>
         /// Enqueue a G/M/T-code synchronously and obtain a task that completes when the code has finished
         /// </summary>
         /// <param name="code">Code to execute</param>
@@ -140,29 +161,56 @@ namespace DuetControlServer.SPI
             QueuedCode item = null;
             using (_channels[code.Channel].Lock())
             {
-                if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || IPC.Processors.Interception.IsInterceptingConnection(code.SourceConnection))
+                if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
                 {
                     // This code is supposed to override every other queued code
                     item = new QueuedCode(code);
                     _channels[code.Channel].PriorityCodes.Enqueue(item);
                 }
+                else if (code.IsInsertedFromMacro)
+                {
+                    // This code is supposed to be executed before the next macro code
+                    item = new QueuedCode(code);
+                    _channels[code.Channel].InsertMacroCode(item);
+                }
                 else if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
                 {
-                    // Macro codes are already enqueued at the time this is called
-                    foreach (QueuedCode queuedCode in _channels[code.Channel].NestedMacroCodes)
+                    // Regular macro codes are already enqueued at the time this is called
+                    bool firstMacro = true;
+                    foreach (MacroFile macroFile in _channels[code.Channel].NestedMacros)
                     {
-                        if (queuedCode.Code == code)
+                        foreach (QueuedCode queuedCode in macroFile.PendingCodes)
                         {
-                            item = queuedCode;
+                            if (queuedCode.Code == code)
+                            {
+                                item = queuedCode;
+                                break;
+                            }
+                        }
+
+                        if (item != null)
+                        {
+                            if (!firstMacro)
+                            {
+                                _logger.Warn("Code {0} was internally processed but another macro is still pending", code);
+                            }
                             break;
                         }
+                        firstMacro = false;
                     }
 
                     // Users may want to enqueue custom codes as well when dealing with macro files
                     if (item == null)
                     {
-                        item = new QueuedCode(code);
-                        _channels[code.Channel].NestedMacroCodes.Enqueue(item);
+                        if (_channels[code.Channel].NestedMacros.TryPeek(out MacroFile macroFile))
+                        {
+                            item = new QueuedCode(code);
+                            macroFile.PendingCodes.Enqueue(item);
+                        }
+                        else
+                        {
+                            throw new ArgumentException("No macro file being executed");
+                        }
                     }
                 }
                 else
@@ -183,10 +231,40 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static Task<bool> Flush(CodeChannel channel)
         {
-            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<bool> tcs;
             using (_channels[channel].Lock())
             {
+                tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _channels[channel].PendingFlushRequests.Enqueue(tcs);
+            }
+            return tcs.Task;
+        }
+
+        /// <summary>
+        /// Wait for all pending (macro) codes to finish
+        /// </summary>
+        /// <param name="code">Code requesting the flush request</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public static Task<bool> Flush(Code code)
+        {
+            code.WaitingForFlush = true;
+
+            TaskCompletionSource<bool> tcs;
+            using (_channels[code.Channel].Lock())
+            {
+                if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
+                {
+                    if (_channels[code.Channel].NestedMacros.TryPeek(out MacroFile macroFile))
+                    {
+                        tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        macroFile.PendingFlushRequests.Enqueue(tcs);
+                        return tcs.Task;
+                    }
+                    return Task.FromResult(false);
+                }
+
+                tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _channels[code.Channel].PendingFlushRequests.Enqueue(tcs);
             }
             return tcs.Task;
         }
@@ -574,8 +652,17 @@ namespace DuetControlServer.SPI
                 await DataTransfer.PerformFullTransfer();
                 _channels.ResetBlockedChannels();
 
-                // Wait a moment
-                await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
+                // Wait a moment unless instructions are being sent rapidly to RRF.
+                // This will become obsolete as soon as the LinuxTransfer module in RRF gets its own task
+                bool isSimulating;
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    isSimulating = Model.Provider.Get.State.Status == MachineStatus.Simulating;
+                }
+                if (!isSimulating)
+                {
+                    await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
+                }
             }
             while (true);
         }
@@ -676,7 +763,7 @@ namespace DuetControlServer.SPI
                         {
                             _moduleToQuery = 5;
                         }
-                        else if (Model.Provider.Get.State.Status == MachineStatus.Processing)
+                        else if (Model.Provider.Get.State.Status == MachineStatus.Processing || Model.Provider.Get.State.Status == MachineStatus.Simulating)
                         {
                             _moduleToQuery = 3;
                         }
@@ -843,18 +930,12 @@ namespace DuetControlServer.SPI
         {
             DataTransfer.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
 
+            // Pause the print
             using (await Print.LockAsync())
             {
-                if (filePosition == Consts.NoFilePosition)
-                {
-                    // We get an invalid file position from RRF if the print is paused during a macro file.
-                    // In this case, RRF has no way to determine the file position so we have to care of that.
-                    filePosition = (uint)(Print.NextFilePosition ?? Print.FileLength);
-                }
-                _logger.Info("Print paused at file position {0}. Reason: {1}", filePosition, pauseReason);
-
-                // Make the print stop and rewind back to the given file position
-                Print.Pause(filePosition);
+                // Do NOT supply a file position if this is a pause request initiated from G-code because that would lead to an endless loop
+                bool filePositionValid = filePosition != Consts.NoFilePosition && pauseReason != PrintPausedReason.GCode && pauseReason != PrintPausedReason.FilamentChange;
+                Print.Pause(filePositionValid ? (long?)filePosition : null, pauseReason);
             }
 
             // Update the object model
@@ -868,7 +949,7 @@ namespace DuetControlServer.SPI
             {
                 while (_channels[CodeChannel.File].PendingCodes.TryDequeue(out QueuedCode code))
                 {
-                    code.SetFinished();
+                    code.SetCancelled();
                 }
                 _channels[CodeChannel.File].InvalidateBuffer(false);
             }

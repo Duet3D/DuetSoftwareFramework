@@ -10,6 +10,11 @@ namespace DuetControlServer.Commands
     public class RemoveHttpEndpoint : DuetAPI.Commands.RemoveHttpEndpoint
     {
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// Remove a third-party HTTP endpoint
         /// </summary>
         /// <returns>True if the endpint could be removed</returns>
@@ -22,6 +27,7 @@ namespace DuetControlServer.Commands
                     HttpEndpoint ep = Model.Provider.Get.HttpEndpoints[i];
                     if (ep.EndpointType == EndpointType && ep.Namespace == Namespace && ep.Path == Path)
                     {
+                        _logger.Debug("Removed HTTP endpoint {0} machine/{1}/{2}", EndpointType, Namespace, Path);
                         ListHelpers.RemoveItem(Model.Provider.Get.HttpEndpoints, i);
                         return true;
                     }

@@ -271,6 +271,11 @@
             </summary>
             <seealso cref="T:DuetAPI.Commands.CodeParameter"/>
         </member>
+        <member name="M:DuetAPI.Commands.Code.Reset">
+            <summary>
+            Reset this instance
+            </summary>
+        </member>
         <member name="M:DuetAPI.Commands.Code.Parameter(System.Char)">
             <summary>
             Retrieve the parameter whose letter equals c. Note that this look-up is case-insensitive
@@ -371,6 +376,11 @@
             Set operation
             </summary>
         </member>
+        <member name="F:DuetAPI.Commands.KeywordType.Echo">
+            <summary>
+            Echo operation
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.CodeFlags">
             <summary>
             Code bits to classify G/M/T-codes
@@ -386,8 +396,9 @@
             Code execution finishes as soon as it is enqueued in the code queue
             </summary>
             <remarks>
-            Potential G-code replies from RRF are only reported through the object model.
-            This behaviour will be enhanced in the future.
+            If codes are started asynchronously, code replies are normally reported via the object model.
+            In order to keep track of code replies, an <see cref="F:DuetAPI.Connection.ConnectionMode.Intercept"/> connection
+            in <see cref="F:DuetAPI.Connection.InterceptionMode.Executed"/> mode can be used
             </remarks>
         </member>
         <member name="F:DuetAPI.Commands.CodeFlags.IsPreProcessed">
@@ -428,6 +439,16 @@
         <member name="F:DuetAPI.Commands.CodeFlags.IsPrioritized">
             <summary>
             Override every other code and send it to the firmware as quickly as possible
+            </summary>
+            <remarks>
+            When this type of code is intercepted, the code can be ignored, cancelled, or resolved,
+            but it is not possible to insert asynchronous codes that complete before the given code.
+            In a future DSF version it may be no longer possible to intercept prioritized codes
+            </remarks>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.Unbuffered">
+            <summary>
+            Do NOT process another code on the same channel before this code has been fully executed
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.CodeParameter">
@@ -715,7 +736,7 @@
         </member>
         <member name="T:DuetAPI.Commands.Flush">
             <summary>
-            Wait for all pending codes of the given channel to finish.
+            Wait for all pending (macro) codes on the given channel to finish.
             This effectively guarantees that all buffered codes are processed by RRF before this command finishes.
             If the flush request is successful, true is returned
             </summary>
@@ -724,6 +745,9 @@
             <summary>
             Code channel to flush
             </summary>
+            <remarks>
+            This value is ignored if this request is processed while a code is being intercepted
+            </remarks>
         </member>
         <member name="T:DuetAPI.Commands.GetFileInfo">
             <summary>
@@ -984,8 +1008,10 @@
             </summary>
             <remarks>
             Internally the code passed is populated as a full <see cref="P:DuetAPI.Commands.SimpleCode.Code"/> instance and on completion
-            its CodeResult is transformed back into a basic string. This is useful for minimal extensions
-            that do not require granular control of the code details
+            its <see cref="T:DuetAPI.Commands.CodeResult"/> is transformed back into a basic string. This is useful for minimal
+            extensions that do not require granular control of the code details. Except for certain cases, it
+            is NOT recommended for usage in <see cref="T:DuetAPI.Connection.InterceptionMode"/> because it renders the
+            internal code buffer useless.
             </remarks>
         </member>
         <member name="P:DuetAPI.Commands.SimpleCode.Code">
@@ -1127,9 +1153,15 @@
             - <cref see="DuetAPI.Commands.Ignore">Ignore</cref> to pass through the code without modifications
             - <cref see="DuetAPI.Commands.Resolve">Resolve</cref> to resolve the current code and to return a message
             In addition the interceptor may issue custom commands once a code has been received
-            Do not attempt to perform commands before an intercepting code is received, else the order of
-            command execution cannot be guaranteed
             </summary>
+            <remarks>
+            Do not attempt to perform commands before an intercepting code is received, else the order of
+            command execution cannot be guaranteed. Furthermore, avoid the usage of <see cref="T:DuetAPI.Commands.SimpleCode"/>
+            if new movement codes (G0/G1) are supposed to be inserted before another one. It is better to send a full
+            <see cref="T:DuetAPI.Commands.Code"/> object with the <see cref="F:DuetAPI.Commands.CodeFlags.Asynchronous"/> flag set.
+            If a code from a macro file is intercepted, make sure to set the <see cref="F:DuetAPI.Commands.CodeFlags.IsFromMacro"/>
+            flag when you insert a new coe, else the code will be started when the macro file(s) have finished.
+            </remarks>
         </member>
         <member name="M:DuetAPI.Connection.InitMessages.InterceptInitMessage.#ctor">
             <summary>
@@ -1148,8 +1180,8 @@
         </member>
         <member name="P:DuetAPI.Connection.InitMessages.ServerInitMessage.Version">
             <summary>
-            Version of the server-side API. A client is supposed to check if its API level is greater than or equal
-            to the received API level once a connection has been etablished. This is recommended to ensure that all
+            Version of the server-side API. A client is supposed to check if the received API level is greater than
+            or equal to its own API level once a connection has been etablished. This is recommended to ensure that all
             of the required commands are actually supported by the control server
             </summary>
         </member>
@@ -1203,7 +1235,7 @@
         </member>
         <member name="F:DuetAPI.Connection.InterceptionMode.Executed">
             <summary>
-            Receive a notification for executed codes. In this state the final result can still be changed
+            Receive a notification for executed codes. In this state the final result can be still changed
             </summary>
         </member>
         <member name="T:DuetAPI.Connection.SubscriptionMode">
@@ -1436,6 +1468,14 @@
             <summary>
             Path to the macros directory
             </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Directories.Menu">
+            <summary>
+            Path to the Menu directory
+            </summary>
+            <remarks>
+            Intended for 12864 displays but currently unused in DSF. It is only needed for the Duet Maestro + DWC
+            </remarks>
         </member>
         <member name="P:DuetAPI.Machine.Directories.System">
             <summary>
@@ -3217,6 +3257,11 @@
         <member name="P:DuetAPI.Machine.ProbeGrid.Radius">
             <summary>
             Probing radius for delta kinematics
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ProbeGrid.Spacing">
+            <summary>
+            Spacing between the probe points for delta kinematics
             </summary>
         </member>
         <member name="M:DuetAPI.Machine.ProbeGrid.Assign(System.Object)">

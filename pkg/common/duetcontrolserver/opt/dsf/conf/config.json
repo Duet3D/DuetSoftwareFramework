@@ -20,6 +20,7 @@
   "MaxBufferSpacePerChannel": 1536,
   "ModelUpdateInterval": 125,
   "MaxMachineModelLockTime": -1,
+  "FileInfoReadBufferSize": 8192,
   "FileInfoReadLimitHeader": 12288,
   "FileInfoReadLimitFooter": 262144,
   "MaxLayerHeight": 0.9,
