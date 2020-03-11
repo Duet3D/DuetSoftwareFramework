@@ -11,6 +11,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DuetControlServer.Codes
 {
@@ -841,7 +842,8 @@ namespace DuetControlServer.Codes
                     if (code.Parameters.Count == 0)
                     {
                         await SPI.Interface.RequestReset();
-                        return new CodeResult();
+                        Environment.Exit(0);
+                        return new CodeResult();  // This should never execute, due to the exit. 
                     }
                     break;
             }
