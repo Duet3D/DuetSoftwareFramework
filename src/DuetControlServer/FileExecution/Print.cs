@@ -102,6 +102,9 @@ namespace DuetControlServer.FileExecution
         /// <param name="fileName">File to print</param>
         /// <param name="simulating">Whether the file is being simulated</param>
         /// <returns>Asynchronous task</returns>
+        /// <remarks>
+        /// This class has to be locked when this method is called
+        /// </remarks>
         public static async Task SelectFile(string fileName, bool simulating = false)
         {
             // Analyze and open the file
@@ -112,7 +115,7 @@ namespace DuetControlServer.FileExecution
             if (IsFileSelected)
             {
                 Cancel();
-                await _finished.WaitAsync(Program.CancelSource.Token);
+                await _finished.WaitAsync(Program.CancellationToken);
             }
 
             // Update the state
@@ -141,9 +144,9 @@ namespace DuetControlServer.FileExecution
             {
                 // Wait for the next print to start
                 bool startingNewPrint;
-                using (await _lock.LockAsync())
+                using (await _lock.LockAsync(Program.CancellationToken))
                 {
-                    await _resume.WaitAsync(Program.CancelSource.Token);
+                    await _resume.WaitAsync(Program.CancellationToken);
                     startingNewPrint = !_file.IsAborted;
                     IsPrinting = startingNewPrint;
                 }
@@ -163,7 +166,7 @@ namespace DuetControlServer.FileExecution
                     do
                     {
                         // Fill up the code buffer unless the print is paused
-                        using (await _lock.LockAsync())
+                        using (await _lock.LockAsync(Program.CancellationToken))
                         {
                             while (!IsPaused && codeTasks.Count < Math.Max(2, Settings.BufferedPrintCodes))
                             {
@@ -197,7 +200,7 @@ namespace DuetControlServer.FileExecution
                                 await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
                                 _logger.Error(e);
 
-                                using (await _lock.LockAsync())
+                                using (await _lock.LockAsync(Program.CancellationToken))
                                 {
                                     Abort();
                                     break;
@@ -216,7 +219,7 @@ namespace DuetControlServer.FileExecution
 
                                     // Wait for the print to be resumed
                                     IsPrinting = false;
-                                    await _resume.WaitAsync(Program.CancelSource.Token);
+                                    await _resume.WaitAsync(Program.CancellationToken);
                                 }
                                 else
                                 {
@@ -226,9 +229,9 @@ namespace DuetControlServer.FileExecution
                             }
                         }
                     }
-                    while (!Program.CancelSource.IsCancellationRequested);
+                    while (!Program.CancellationToken.IsCancellationRequested);
 
-                    using (await _lock.LockAsync())
+                    using (await _lock.LockAsync(Program.CancellationToken))
                     {
                         // Notify RepRapFirmware that the print file has been closed
                         if (_file.IsAborted)
@@ -260,7 +263,7 @@ namespace DuetControlServer.FileExecution
                     }
                 }
 
-                using (await _lock.LockAsync())
+                using (await _lock.LockAsync(Program.CancellationToken))
                 {
                     // Dispose the file
                     _file.Dispose();
@@ -271,7 +274,7 @@ namespace DuetControlServer.FileExecution
                     _finished.NotifyAll();
                 }
             }
-            while (!Program.CancelSource.IsCancellationRequested);
+            while (!Program.CancellationToken.IsCancellationRequested);
         }
 
         /// <summary>

@@ -296,6 +296,15 @@ namespace UnitTests.Commands
             Assert.AreEqual("{machine.axes[0].maximum - 10}", (string)code.Parameters[0]);
             Assert.AreEqual('Y', code.Parameters[1].Letter);
             Assert.AreEqual("{machine.axes[1].maximum - 10}", (string)code.Parameters[1]);
+
+            code = new DuetAPI.Commands.Code("M32 {my.test.value}");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(32, code.MajorNumber);
+            Assert.IsNull(code.MinorNumber);
+            Assert.AreEqual(1, code.Parameters.Count);
+            Assert.AreEqual('\0', code.Parameters[0].Letter);
+            Assert.AreEqual(true, code.Parameters[0].IsExpression);
+            Assert.AreEqual("{my.test.value}", (string)code.Parameters[0]);
         }
 
         [Test]

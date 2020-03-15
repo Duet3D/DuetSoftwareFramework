@@ -22,7 +22,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Creates a new connection in subscriber mode
         /// </summary>
-        public SubscribeConnection() : base(ConnectionMode.Command) { }
+        public SubscribeConnection() : base(ConnectionMode.Subscribe) { }
 
         /// <summary>
         /// Mode of the subscription

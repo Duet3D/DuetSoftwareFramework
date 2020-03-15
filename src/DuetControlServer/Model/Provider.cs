@@ -121,7 +121,7 @@ namespace DuetControlServer.Model
         /// <returns>Disposable lock object to be used with a using directive</returns>
         public static async Task<IDisposable> AccessReadOnlyAsync()
         {
-            return new LockWrapper(await _lock.ReaderLockAsync(Program.CancelSource.Token), false);
+            return new LockWrapper(await _lock.ReaderLockAsync(Program.CancellationToken), false);
         }
 
         /// <summary>
@@ -130,7 +130,7 @@ namespace DuetControlServer.Model
         /// <returns>Disposable lock object to be used with a using directive</returns>
         public static async Task<IDisposable> AccessReadWriteAsync()
         {
-            return new LockWrapper(await _lock.WriterLockAsync(Program.CancelSource.Token), true);
+            return new LockWrapper(await _lock.WriterLockAsync(Program.CancellationToken), true);
         }
 
         /// <summary>

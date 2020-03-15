@@ -129,11 +129,11 @@ namespace DuetControlServer.IPC.Processors
                     // Wait for an object model update to complete
                     using (CancellationTokenSource pollCts = new CancellationTokenSource(Settings.SocketPollInterval))
                     {
-                        using CancellationTokenSource combinedCts = CancellationTokenSource.CreateLinkedTokenSource(pollCts.Token, Program.CancelSource.Token);
+                        using CancellationTokenSource combinedCts = CancellationTokenSource.CreateLinkedTokenSource(pollCts.Token, Program.CancellationToken);
                         try
                         {
                             await _updateAvailableEvent.WaitAsync(combinedCts.Token);
-                            Program.CancelSource.Token.ThrowIfCancellationRequested();
+                            Program.CancellationToken.ThrowIfCancellationRequested();
                         }
                         catch (OperationCanceledException)
                         {
@@ -167,7 +167,7 @@ namespace DuetControlServer.IPC.Processors
                         }
                     }
                 }
-                while (!Program.CancelSource.IsCancellationRequested);
+                while (!Program.CancellationToken.IsCancellationRequested);
             }
             catch (Exception e)
             {

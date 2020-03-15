@@ -37,7 +37,7 @@
             Code channel for serial devices (e.g. PanelDue)
             </summary>
         </member>
-        <member name="F:DuetAPI.CodeChannel.Daemon">
+        <member name="F:DuetAPI.CodeChannel.Trigger">
             <summary>
             Code channel for running triggers or config.g
             </summary>
@@ -57,6 +57,11 @@
             Default code channel for requests over SPI
             </summary>
         </member>
+        <member name="F:DuetAPI.CodeChannel.Daemon">
+            <summary>
+            Code channel that executes the daemon process
+            </summary>
+        </member>
         <member name="F:DuetAPI.CodeChannel.AutoPause">
             <summary>
             Code channel that executes macros on power fail, heater faults and filament out
@@ -64,7 +69,7 @@
         </member>
         <member name="T:DuetAPI.Commands.AddHttpEndpoint">
             <summary>
-            Register a new HTTP endpoint via DuetWebServer. This wil create a new HTTP endpoint under /machine/{Namespace}/{EndpointPath}.
+            Register a new HTTP endpoint via DuetWebServer. This will create a new HTTP endpoint under /machine/{Namespace}/{EndpointPath}.
             Returns a path to the UNIX socket which DuetWebServer will connect to whenever a matching HTTP request is received.
             A plugin using this command has to open a new UNIX socket with the given path that DuetWebServer can connect to
             </summary>
@@ -271,10 +276,11 @@
             </summary>
             <seealso cref="T:DuetAPI.Commands.CodeParameter"/>
         </member>
-        <member name="M:DuetAPI.Commands.Code.Reset">
+        <member name="M:DuetAPI.Commands.Code.Reset(System.Boolean)">
             <summary>
             Reset this instance
             </summary>
+            <param name="keepLineNumber">Keep the line number</param>
         </member>
         <member name="M:DuetAPI.Commands.Code.Parameter(System.Char)">
             <summary>
@@ -660,6 +666,13 @@
             Creates a new CodeParserException
             </summary>
             <param name="message">Exception message</param>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParserException.#ctor(System.String,DuetAPI.Commands.Code)">
+            <summary>
+            Creates a new CodeParserException with details where the parser failed to read data
+            </summary>
+            <param name="message">Exception message</param>
+            <param name="code">Code being parsed</param>
         </member>
         <member name="M:DuetAPI.Commands.CodeParserException.#ctor(System.String,System.Exception)">
             <summary>
@@ -1324,9 +1337,9 @@
         </member>
         <member name="T:DuetAPI.Machine.Channels">
             <summary>
-            Information about the available G/M/T-code channels.
-            <seealso cref="T:DuetAPI.CodeChannel"/>
+            Information about the available G/M/T-code channels
             </summary>
+            <seealso cref="T:DuetAPI.CodeChannel"/>
         </member>
         <member name="F:DuetAPI.Machine.Channels.Total">
             <summary>
@@ -1358,9 +1371,9 @@
             G/M/T-code channel for AUX (UART/PanelDue)
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.Channels.Daemon">
+        <member name="P:DuetAPI.Machine.Channels.Trigger">
             <summary>
-            G/M/T-code channel for Daemon (deals with config.g and triggers)
+            G/M/T-code channel for running triggers or config.g
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Channels.CodeQueue">
@@ -1378,9 +1391,14 @@
             Default G/M/T-code channel for generic codes
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Channels.Daemon">
+            <summary>
+            Code channel that executes the daemon process
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Channels.AutoPause">
             <summary>
-            GM/T-code chanel for auto pause events
+            G/M/T-code chanel for auto pause events
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Channels.Item(DuetAPI.CodeChannel)">

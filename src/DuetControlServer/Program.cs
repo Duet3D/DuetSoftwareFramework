@@ -21,7 +21,12 @@ namespace DuetControlServer
         /// <summary>
         /// Global cancellation source that is triggered when the program is supposed to terminate
         /// </summary>
-        public static CancellationTokenSource CancelSource { get; } = new CancellationTokenSource();
+        public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
+
+        /// <summary>
+        /// Global cancellation token that is triggered when the program is supposed to terminate
+        /// </summary>
+        public static readonly CancellationToken CancellationToken = CancelSource.Token;
 
         /// <summary>
         /// Entry point of the program

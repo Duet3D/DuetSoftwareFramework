@@ -63,7 +63,7 @@ namespace DuetControlServer.Model
         {
             using (await _updateEvent.EnterAsync())
             {
-                await _updateEvent.WaitAsync(Program.CancelSource.Token);
+                await _updateEvent.WaitAsync(Program.CancellationToken);
                 Program.CancelSource.Token.ThrowIfCancellationRequested();
             }
         }
@@ -76,7 +76,7 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task ProcessResponse(byte module, Memory<byte> json)
         {
-            using (await _monitor.EnterAsync(Program.CancelSource.Token))
+            using (await _monitor.EnterAsync(Program.CancellationToken))
             {
                 _module = module;
                 json.CopyTo(_json);
@@ -92,15 +92,13 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
-            CancellationToken cancellationToken = Program.CancelSource.Token;
-
             do
             {
                 // Wait for the next status response
-                using (await _monitor.EnterAsync(cancellationToken))
+                using (await _monitor.EnterAsync(Program.CancellationToken))
                 {
-                    await _monitor.WaitAsync(cancellationToken);
-                    cancellationToken.ThrowIfCancellationRequested();
+                    await _monitor.WaitAsync(Program.CancellationToken);
+                    Program.CancellationToken.ThrowIfCancellationRequested();
 
                     // Process it
                     try

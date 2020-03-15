@@ -67,6 +67,12 @@ references:
   commentId: F:DuetAPI.CodeChannel.Telnet
   fullName: DuetAPI.CodeChannel.Telnet
   nameWithType: CodeChannel.Telnet
+- uid: DuetAPI.CodeChannel.Trigger
+  name: Trigger
+  href: api/DuetAPI.CodeChannel.html#DuetAPI_CodeChannel_Trigger
+  commentId: F:DuetAPI.CodeChannel.Trigger
+  fullName: DuetAPI.CodeChannel.Trigger
+  nameWithType: CodeChannel.Trigger
 - uid: DuetAPI.CodeChannel.USB
   name: USB
   href: api/DuetAPI.CodeChannel.html#DuetAPI_CodeChannel_USB
@@ -487,12 +493,12 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Commands.Code.Parse
   nameWithType: Code.Parse
-- uid: DuetAPI.Commands.Code.Reset
-  name: Reset()
-  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Reset
-  commentId: M:DuetAPI.Commands.Code.Reset
-  fullName: DuetAPI.Commands.Code.Reset()
-  nameWithType: Code.Reset()
+- uid: DuetAPI.Commands.Code.Reset(System.Boolean)
+  name: Reset(Boolean)
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Reset_System_Boolean_
+  commentId: M:DuetAPI.Commands.Code.Reset(System.Boolean)
+  fullName: DuetAPI.Commands.Code.Reset(System.Boolean)
+  nameWithType: Code.Reset(Boolean)
 - uid: DuetAPI.Commands.Code.Reset*
   name: Reset
   href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Reset_
@@ -945,6 +951,12 @@ references:
   commentId: M:DuetAPI.Commands.CodeParserException.#ctor(System.String)
   fullName: DuetAPI.Commands.CodeParserException.CodeParserException(System.String)
   nameWithType: CodeParserException.CodeParserException(String)
+- uid: DuetAPI.Commands.CodeParserException.#ctor(System.String,DuetAPI.Commands.Code)
+  name: CodeParserException(String, Code)
+  href: api/DuetAPI.Commands.CodeParserException.html#DuetAPI_Commands_CodeParserException__ctor_System_String_DuetAPI_Commands_Code_
+  commentId: M:DuetAPI.Commands.CodeParserException.#ctor(System.String,DuetAPI.Commands.Code)
+  fullName: DuetAPI.Commands.CodeParserException.CodeParserException(System.String, DuetAPI.Commands.Code)
+  nameWithType: CodeParserException.CodeParserException(String, Code)
 - uid: DuetAPI.Commands.CodeParserException.#ctor(System.String,System.Exception)
   name: CodeParserException(String, Exception)
   href: api/DuetAPI.Commands.CodeParserException.html#DuetAPI_Commands_CodeParserException__ctor_System_String_System_Exception_
@@ -2698,6 +2710,19 @@ references:
   commentId: F:DuetAPI.Machine.Channels.Total
   fullName: DuetAPI.Machine.Channels.Total
   nameWithType: Channels.Total
+- uid: DuetAPI.Machine.Channels.Trigger
+  name: Trigger
+  href: api/DuetAPI.Machine.Channels.html#DuetAPI_Machine_Channels_Trigger
+  commentId: P:DuetAPI.Machine.Channels.Trigger
+  fullName: DuetAPI.Machine.Channels.Trigger
+  nameWithType: Channels.Trigger
+- uid: DuetAPI.Machine.Channels.Trigger*
+  name: Trigger
+  href: api/DuetAPI.Machine.Channels.html#DuetAPI_Machine_Channels_Trigger_
+  commentId: Overload:DuetAPI.Machine.Channels.Trigger
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Channels.Trigger
+  nameWithType: Channels.Trigger
 - uid: DuetAPI.Machine.Channels.USB
   name: USB
   href: api/DuetAPI.Machine.Channels.html#DuetAPI_Machine_Channels_USB
@@ -9914,6 +9939,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.Code.Code
   nameWithType: Code.Code
+- uid: DuetControlServer.Commands.Code.CancellationToken
+  name: CancellationToken
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_CancellationToken
+  commentId: P:DuetControlServer.Commands.Code.CancellationToken
+  fullName: DuetControlServer.Commands.Code.CancellationToken
+  nameWithType: Code.CancellationToken
+- uid: DuetControlServer.Commands.Code.CancellationToken*
+  name: CancellationToken
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_CancellationToken_
+  commentId: Overload:DuetControlServer.Commands.Code.CancellationToken
+  isSpec: "True"
+  fullName: DuetControlServer.Commands.Code.CancellationToken
+  nameWithType: Code.CancellationToken
 - uid: DuetControlServer.Commands.Code.CancellingPrint
   name: CancellingPrint
   href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_CancellingPrint
@@ -10352,6 +10390,12 @@ references:
   commentId: F:DuetControlServer.FileDirectory.Macros
   fullName: DuetControlServer.FileDirectory.Macros
   nameWithType: FileDirectory.Macros
+- uid: DuetControlServer.FileDirectory.Menu
+  name: Menu
+  href: api/DuetControlServer.FileDirectory.html#DuetControlServer_FileDirectory_Menu
+  commentId: F:DuetControlServer.FileDirectory.Menu
+  fullName: DuetControlServer.FileDirectory.Menu
+  nameWithType: FileDirectory.Menu
 - uid: DuetControlServer.FileDirectory.System
   name: System
   href: api/DuetControlServer.FileDirectory.html#DuetControlServer_FileDirectory_System
@@ -10921,18 +10965,48 @@ references:
   commentId: F:DuetControlServer.FilePath.ConfigOverrideFile
   fullName: DuetControlServer.FilePath.ConfigOverrideFile
   nameWithType: FilePath.ConfigOverrideFile
+- uid: DuetControlServer.FilePath.DaemonFile
+  name: DaemonFile
+  href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_DaemonFile
+  commentId: F:DuetControlServer.FilePath.DaemonFile
+  fullName: DuetControlServer.FilePath.DaemonFile
+  nameWithType: FilePath.DaemonFile
 - uid: DuetControlServer.FilePath.DefaultHeightmapFile
   name: DefaultHeightmapFile
   href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_DefaultHeightmapFile
   commentId: F:DuetControlServer.FilePath.DefaultHeightmapFile
   fullName: DuetControlServer.FilePath.DefaultHeightmapFile
   nameWithType: FilePath.DefaultHeightmapFile
+- uid: DuetControlServer.FilePath.DeployProbeFallbackFile
+  name: DeployProbeFallbackFile
+  href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_DeployProbeFallbackFile
+  commentId: F:DuetControlServer.FilePath.DeployProbeFallbackFile
+  fullName: DuetControlServer.FilePath.DeployProbeFallbackFile
+  nameWithType: FilePath.DeployProbeFallbackFile
+- uid: DuetControlServer.FilePath.DeployProbePattern
+  name: DeployProbePattern
+  href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_DeployProbePattern
+  commentId: F:DuetControlServer.FilePath.DeployProbePattern
+  fullName: DuetControlServer.FilePath.DeployProbePattern
+  nameWithType: FilePath.DeployProbePattern
 - uid: DuetControlServer.FilePath.FilamentsFile
   name: FilamentsFile
   href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_FilamentsFile
   commentId: F:DuetControlServer.FilePath.FilamentsFile
   fullName: DuetControlServer.FilePath.FilamentsFile
   nameWithType: FilePath.FilamentsFile
+- uid: DuetControlServer.FilePath.RetractProbeFallbackFile
+  name: RetractProbeFallbackFile
+  href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_RetractProbeFallbackFile
+  commentId: F:DuetControlServer.FilePath.RetractProbeFallbackFile
+  fullName: DuetControlServer.FilePath.RetractProbeFallbackFile
+  nameWithType: FilePath.RetractProbeFallbackFile
+- uid: DuetControlServer.FilePath.RetractProbePattern
+  name: RetractProbePattern
+  href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_RetractProbePattern
+  commentId: F:DuetControlServer.FilePath.RetractProbePattern
+  fullName: DuetControlServer.FilePath.RetractProbePattern
+  nameWithType: FilePath.RetractProbePattern
 - uid: DuetControlServer.FilePath.ToPhysicalAsync(System.String,DuetControlServer.FileDirectory)
   name: ToPhysicalAsync(String, FileDirectory)
   href: api/DuetControlServer.FilePath.html#DuetControlServer_FilePath_ToPhysicalAsync_System_String_DuetControlServer_FileDirectory_
@@ -11074,6 +11148,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.IPC.Connection.ReceiveJson
   nameWithType: Connection.ReceiveJson
+- uid: DuetControlServer.IPC.Connection.ReceivePlainJson
+  name: ReceivePlainJson()
+  href: api/DuetControlServer.IPC.Connection.html#DuetControlServer_IPC_Connection_ReceivePlainJson
+  commentId: M:DuetControlServer.IPC.Connection.ReceivePlainJson
+  fullName: DuetControlServer.IPC.Connection.ReceivePlainJson()
+  nameWithType: Connection.ReceivePlainJson()
+- uid: DuetControlServer.IPC.Connection.ReceivePlainJson*
+  name: ReceivePlainJson
+  href: api/DuetControlServer.IPC.Connection.html#DuetControlServer_IPC_Connection_ReceivePlainJson_
+  commentId: Overload:DuetControlServer.IPC.Connection.ReceivePlainJson
+  isSpec: "True"
+  fullName: DuetControlServer.IPC.Connection.ReceivePlainJson
+  nameWithType: Connection.ReceivePlainJson
 - uid: DuetControlServer.IPC.Connection.Send(System.Object)
   name: Send(Object)
   href: api/DuetControlServer.IPC.Connection.html#DuetControlServer_IPC_Connection_Send_System_Object_
@@ -13230,17 +13317,16 @@ references:
   commentId: T:DuetControlServer.Program
   fullName: DuetControlServer.Program
   nameWithType: Program
+- uid: DuetControlServer.Program.CancellationToken
+  name: CancellationToken
+  href: api/DuetControlServer.Program.html#DuetControlServer_Program_CancellationToken
+  commentId: F:DuetControlServer.Program.CancellationToken
+  fullName: DuetControlServer.Program.CancellationToken
+  nameWithType: Program.CancellationToken
 - uid: DuetControlServer.Program.CancelSource
   name: CancelSource
   href: api/DuetControlServer.Program.html#DuetControlServer_Program_CancelSource
-  commentId: P:DuetControlServer.Program.CancelSource
-  fullName: DuetControlServer.Program.CancelSource
-  nameWithType: Program.CancelSource
-- uid: DuetControlServer.Program.CancelSource*
-  name: CancelSource
-  href: api/DuetControlServer.Program.html#DuetControlServer_Program_CancelSource_
-  commentId: Overload:DuetControlServer.Program.CancelSource
-  isSpec: "True"
+  commentId: F:DuetControlServer.Program.CancelSource
   fullName: DuetControlServer.Program.CancelSource
   nameWithType: Program.CancelSource
 - uid: DuetControlServer.Settings
@@ -15477,6 +15563,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.DataTransfer.PerformFullTransfer
   nameWithType: DataTransfer.PerformFullTransfer
+- uid: DuetControlServer.SPI.DataTransfer.ProtocolVersion
+  name: ProtocolVersion
+  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_ProtocolVersion
+  commentId: P:DuetControlServer.SPI.DataTransfer.ProtocolVersion
+  fullName: DuetControlServer.SPI.DataTransfer.ProtocolVersion
+  nameWithType: DataTransfer.ProtocolVersion
+- uid: DuetControlServer.SPI.DataTransfer.ProtocolVersion*
+  name: ProtocolVersion
+  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_ProtocolVersion_
+  commentId: Overload:DuetControlServer.SPI.DataTransfer.ProtocolVersion
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.DataTransfer.ProtocolVersion
+  nameWithType: DataTransfer.ProtocolVersion
 - uid: DuetControlServer.SPI.DataTransfer.ReadAbortFile(DuetAPI.CodeChannel@,System.Boolean@)
   name: ReadAbortFile(out CodeChannel, out Boolean)
   href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_ReadAbortFile_DuetAPI_CodeChannel__System_Boolean__

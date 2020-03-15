@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -51,14 +49,11 @@ namespace DuetControlServer
         /// <returns>Asynchronous task</returns>
         private static async Task ParseHeader(StreamReader reader, ParsedFileInfo partialFileInfo)
         {
-            // Every time CTS.Token is accessed a copy is generated. Hence we cache one until this method completes
-            CancellationToken token = Program.CancelSource.Token;
-
-            Code code = new Code();
+            Code code = new Code() { LineNumber = 0 };     // keep track of the line number in case parsing errors occur
             bool inRelativeMode = false, lastLineHadInfo = false, enforcingAbsolutePosition = false;
             do
             {
-                token.ThrowIfCancellationRequested();
+                Program.CancellationToken.ThrowIfCancellationRequested();
 
                 // Read another line
                 string line = await reader.ReadLineAsync();
@@ -110,7 +105,8 @@ namespace DuetControlServer
                             gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(line, ref partialFileInfo);
                             gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(line, ref partialFileInfo);
                         }
-                        code.Reset();
+
+                        code.Reset(true);
                     }
                 }
 
@@ -120,6 +116,7 @@ namespace DuetControlServer
                     break;
                 }
                 lastLineHadInfo = gotNewInfo;
+                // Code.Parse() increments the LineNumber, no need to do it here
             }
             while (reader.BaseStream.Position < Settings.FileInfoReadLimitHeader + Settings.FileInfoReadBufferSize);
         }
@@ -132,17 +129,15 @@ namespace DuetControlServer
         /// <returns>Asynchronous task</returns>
         private static async Task ParseFooter(StreamReader reader, ParsedFileInfo partialFileInfo)
         {
-            CancellationToken token = Program.CancelSource.Token;
             reader.BaseStream.Seek(0, SeekOrigin.End);
-
-            Code code = new Code();
-            bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = partialFileInfo.Filament.Count > 0, enforcingAbsolutePosition = false;
-
             char[] buffer = new char[Settings.FileInfoReadBufferSize];
             int bufferPointer = 0;
+
+            Code code = new Code() { LineNumber = -1 };     // keep track of the line number in case parsing errors occur
+            bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = partialFileInfo.Filament.Count > 0, enforcingAbsolutePosition = false;
             do
             {
-                token.ThrowIfCancellationRequested();
+                Program.CancellationToken.ThrowIfCancellationRequested();
 
                 // Read another line
                 ReadLineFromEndResult readResult = await ReadLineFromEndAsync(reader, buffer, bufferPointer);
@@ -191,7 +186,8 @@ namespace DuetControlServer
                             gotNewInfo |= partialFileInfo.PrintTime == 0 && FindPrintTime(readResult.Line, ref partialFileInfo);
                             gotNewInfo |= partialFileInfo.SimulatedTime == 0 && FindSimulatedTime(readResult.Line, ref partialFileInfo);
                         }
-                        code.Reset();
+
+                        code.Reset(true);
                     }
                 }
 
@@ -201,6 +197,7 @@ namespace DuetControlServer
                     break;
                 }
                 lastLineHadInfo = gotNewInfo;
+                code.LineNumber--;
             }
             while (reader.BaseStream.Length - reader.BaseStream.Position < Settings.FileInfoReadLimitFooter + buffer.Length);
         }

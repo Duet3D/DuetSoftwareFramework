@@ -36,7 +36,7 @@
         /// <summary>
         /// Code channel for running triggers or config.g
         /// </summary>
-        Daemon = 5,
+        Trigger = 5,
 
         /// <summary>
         /// Code channel for the code queue that executes a couple of codes in-sync with moves
@@ -54,8 +54,13 @@
         SPI = 8,
 
         /// <summary>
+        /// Code channel that executes the daemon process
+        /// </summary>
+        Daemon = 9,
+
+        /// <summary>
         /// Code channel that executes macros on power fail, heater faults and filament out
         /// </summary>
-        AutoPause = 9
+        AutoPause = 10
     }
 }

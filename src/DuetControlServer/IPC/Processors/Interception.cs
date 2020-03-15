@@ -47,7 +47,7 @@ namespace DuetControlServer.IPC.Processors
             /// Lock this connection container
             /// </summary>
             /// <returns>Disposable lock</returns>
-            public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync();
+            public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
 
             /// <summary>
             /// List of intercepting connections
@@ -114,9 +114,9 @@ namespace DuetControlServer.IPC.Processors
                 do
                 {
                     // Read another code from the interceptor
-                    if (await _codeQueue.OutputAvailableAsync(Program.CancelSource.Token))
+                    if (await _codeQueue.OutputAvailableAsync(Program.CancellationToken))
                     {
-                        Code code = await _codeQueue.TakeAsync(Program.CancelSource.Token);
+                        Code code = await _codeQueue.TakeAsync(Program.CancellationToken);
                         await Connection.Send(code);
                     }
                     else
@@ -148,7 +148,7 @@ namespace DuetControlServer.IPC.Processors
                             throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
                         }
                     }
-                    while (!Program.CancelSource.IsCancellationRequested);
+                    while (!Program.CancellationToken.IsCancellationRequested);
 
                     // Stop if the connection has been terminated
                     if (command == null)
@@ -156,7 +156,7 @@ namespace DuetControlServer.IPC.Processors
                         break;
                     }
                 }
-                while (!Program.CancelSource.IsCancellationRequested);
+                while (!Program.CancellationToken.IsCancellationRequested);
             }
             catch (SocketException)
             {
@@ -188,9 +188,9 @@ namespace DuetControlServer.IPC.Processors
             // This must be either a Cancel, Ignore, or Resolve instruction!
             try
             {
-                if (await _commandQueue.OutputAvailableAsync(Program.CancelSource.Token))
+                if (await _commandQueue.OutputAvailableAsync(Program.CancellationToken))
                 {
-                    BaseCommand command = await _commandQueue.TakeAsync(Program.CancelSource.Token);
+                    BaseCommand command = await _commandQueue.TakeAsync(Program.CancellationToken);
 
                     // Code is cancelled. This invokes an OperationCanceledException on the code's task.
                     if (command is Cancel)

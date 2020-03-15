@@ -56,7 +56,7 @@ namespace DuetControlServer.Utility
                 // Initialize access to the log file
                 _fileStream = new FileStream(filename, FileMode.Append, FileAccess.Write);
                 _writer = new StreamWriter(_fileStream) { AutoFlush = true };
-                _logCloseEvent = Program.CancelSource.Token.Register(Stop().Wait);
+                _logCloseEvent = Program.CancellationToken.Register(Stop().Wait);
 
                 // Write the first line
                 await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging started");

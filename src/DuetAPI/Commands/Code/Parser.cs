@@ -45,7 +45,7 @@ namespace DuetAPI.Commands
                     // Ignore CR
                     continue;
                 }
-                if (currentChar == '\n' && !hadLineNumber && result.LineNumber.HasValue)
+                if (currentChar == '\n' && !hadLineNumber && result.LineNumber != null)
                 {
                     // Keep track of the line number (if possible)
                     result.LineNumber++;
@@ -202,7 +202,7 @@ namespace DuetAPI.Commands
                     {
                         if (result.Indent == byte.MaxValue)
                         {
-                            throw new CodeParserException("Indentation too big");
+                            throw new CodeParserException("Indentation too big", result);
                         }
                         result.Indent++;
                     }
@@ -212,7 +212,7 @@ namespace DuetAPI.Commands
                     }
                 }
 
-                if (!inChunk && !readingAtStart)
+                if (!inCondition && !inChunk && !readingAtStart)
                 {
                     if (letter != '\0' || !string.IsNullOrEmpty(value) || wasQuoted)
                     {
@@ -250,7 +250,7 @@ namespace DuetAPI.Commands
                                 }
                                 else
                                 {
-                                    throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({args[0]})");
+                                    throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({args[0]})", result);
                                 }
                                 if (sbyte.TryParse(args[1], out sbyte minorNumber) && minorNumber >= 0)
                                 {
@@ -258,7 +258,7 @@ namespace DuetAPI.Commands
                                 }
                                 else
                                 {
-                                    throw new CodeParserException($"Failed to parse minor {char.ToUpperInvariant((char)result.Type)}-code number ({args[1]})");
+                                    throw new CodeParserException($"Failed to parse minor {char.ToUpperInvariant((char)result.Type)}-code number ({args[1]})", result);
                                 }
                             }
                             else if (int.TryParse(value, out int majorNumber))
@@ -268,7 +268,7 @@ namespace DuetAPI.Commands
                             }
                             else if (!string.IsNullOrWhiteSpace(value) || result.Type != CodeType.TCode)
                             {
-                                throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})");
+                                throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
                             }
                         }
                         else if (!result.MajorNumber.HasValue && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
@@ -332,11 +332,11 @@ namespace DuetAPI.Commands
                             }
                             else if (result.Parameter(letter) == null)
                             {
-                                AddParameter(result, letter, value, false, false);
+                                AddParameter(result, char.ToUpperInvariant(letter), value, false, false);
                             }
                             else
                             {
-                                throw new CodeParserException($"Duplicate {letter} parameter");
+                                throw new CodeParserException($"Duplicate {letter} parameter", result);
                             }
                         }
                         else if (letter == '\0' || result.Parameter(letter) == null)
@@ -349,7 +349,7 @@ namespace DuetAPI.Commands
                         }
                         else
                         {
-                            throw new CodeParserException($"Duplicate {letter} parameter");
+                            throw new CodeParserException($"Duplicate {(letter == '\0' ? "unprecedented" : letter.ToString())} parameter", result);
                         }
 
                         letter = '\0';
@@ -371,8 +371,20 @@ namespace DuetAPI.Commands
                     {
                         // Starting a new parameter
                         contentRead = inChunk = true;
-                        inQuotes = (c == '"');
-                        letter = inQuotes ? '\0' : c;
+                        if (c == '{')
+                        {
+                            value = "{";
+                            inExpression = true;
+                            inQuotes = false;
+                        }
+                        else if (c == '"')
+                        {
+                            inQuotes = true;
+                        }
+                        else
+                        {
+                            letter = c;
+                        }
                     }
                 }
 
@@ -394,54 +406,61 @@ namespace DuetAPI.Commands
             // Do not allow malformed codes
             if (inEncapsulatedComment)
             {
-                throw new CodeParserException("Unterminated encapsulated comment");
+                throw new CodeParserException("Unterminated encapsulated comment", result);
             }
             if (inQuotes)
             {
-                throw new CodeParserException("Unterminated string");
+                throw new CodeParserException("Unterminated string", result);
             }
             if (inExpression)
             {
-                throw new CodeParserException("Unterminated expression");
+                throw new CodeParserException("Unterminated expression", result);
             }
             if (result.KeywordArgument != null)
             {
                 result.KeywordArgument = result.KeywordArgument.Trim();
                 if (result.KeywordArgument.Length > 255)
                 {
-                    throw new CodeParserException("Keyword argument too long (> 255)");
+                    throw new CodeParserException("Keyword argument too long (> 255)", result);
                 }
             }
             if (result.Parameters.Count > 255)
             {
-                throw new CodeParserException("Too many parameters (> 255)");
+                throw new CodeParserException("Too many parameters (> 255)", result);
             }
 
             // M584, M569 and M915 use driver identifiers
             if (result.Type == CodeType.MCode)
             {
-                switch (result.MajorNumber)
+                try
                 {
-                    case 569:
-                    case 915:
-                        foreach (CodeParameter parameter in result.Parameters)
-                        {
-                            if (char.ToUpperInvariant(parameter.Letter) == 'P')
+                    switch (result.MajorNumber)
+                    {
+                        case 569:
+                        case 915:
+                            foreach (CodeParameter parameter in result.Parameters)
                             {
-                                parameter.ConvertDriverIds();
+                                if (char.ToUpperInvariant(parameter.Letter) == 'P')
+                                {
+                                    parameter.ConvertDriverIds();
+                                }
                             }
-                        }
-                        break;
+                            break;
 
-                    case 584:
-                        foreach (CodeParameter parameter in result.Parameters)
-                        {
-                            if ("XYZUVWABCE".Contains(char.ToUpperInvariant(parameter.Letter)))
+                        case 584:
+                            foreach (CodeParameter parameter in result.Parameters)
                             {
-                                parameter.ConvertDriverIds();
+                                if ("XYZUVWABCE".Contains(char.ToUpperInvariant(parameter.Letter)))
+                                {
+                                    parameter.ConvertDriverIds();
+                                }
                             }
-                        }
-                        break;
+                            break;
+                    }
+                }
+                catch (CodeParserException e)
+                {
+                    throw new CodeParserException(e.Message, result);
                 }
             }
 

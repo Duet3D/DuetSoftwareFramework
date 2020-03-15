@@ -5,9 +5,9 @@ using System.Text.Json.Serialization;
 namespace DuetAPI.Machine
 {
     /// <summary>
-    /// Information about the available G/M/T-code channels.
-    /// <seealso cref="CodeChannel"/>
+    /// Information about the available G/M/T-code channels
     /// </summary>
+    /// <seealso cref="CodeChannel"/>
     public sealed class Channels : IAssignable, ICloneable
     {
         /// <summary>
@@ -41,9 +41,9 @@ namespace DuetAPI.Machine
         public Channel AUX { get; private set; } = new Channel();
 
         /// <summary>
-        /// G/M/T-code channel for Daemon (deals with config.g and triggers)
+        /// G/M/T-code channel for running triggers or config.g
         /// </summary>
-        public Channel Daemon { get; private set; } = new Channel();
+        public Channel Trigger { get; private set; } = new Channel();
 
         /// <summary>
         /// G/M/T-code channel for the code queue
@@ -61,7 +61,12 @@ namespace DuetAPI.Machine
         public Channel SPI { get; private set; } = new Channel();
 
         /// <summary>
-        /// GM/T-code chanel for auto pause events
+        /// Code channel that executes the daemon process
+        /// </summary>
+        public Channel Daemon { get; private set; } = new Channel();
+
+        /// <summary>
+        /// G/M/T-code chanel for auto pause events
         /// </summary>
         public Channel AutoPause { get; private set; } = new Channel();
 
@@ -82,9 +87,10 @@ namespace DuetAPI.Machine
                     CodeChannel.File => File,
                     CodeChannel.USB => USB,
                     CodeChannel.AUX => AUX,
-                    CodeChannel.Daemon => Daemon,
+                    CodeChannel.Trigger => Trigger,
                     CodeChannel.CodeQueue => CodeQueue,
                     CodeChannel.LCD => LCD,
+                    CodeChannel.Daemon => Daemon,
                     CodeChannel.AutoPause => AutoPause,
                     _ => SPI,
                 };
@@ -113,10 +119,11 @@ namespace DuetAPI.Machine
             File.Assign(other.File);
             USB.Assign(other.USB);
             AUX.Assign(other.AUX);
-            Daemon.Assign(other.Daemon);
+            Trigger.Assign(other.Trigger);
             CodeQueue.Assign(other.CodeQueue);
             LCD.Assign(other.LCD);
             SPI.Assign(other.SPI);
+            Daemon.Assign(other.Daemon);
             AutoPause.Assign(other.AutoPause);
         }
 
@@ -133,10 +140,11 @@ namespace DuetAPI.Machine
                 File = (Channel)File.Clone(),
                 USB = (Channel)USB.Clone(),
                 AUX = (Channel)AUX.Clone(),
-                Daemon = (Channel)Daemon.Clone(),
+                Trigger = (Channel)Trigger.Clone(),
                 CodeQueue = (Channel)CodeQueue.Clone(),
                 LCD = (Channel)LCD.Clone(),
                 SPI = (Channel)SPI.Clone(),
+                Daemon = (Channel)Daemon.Clone(),
                 AutoPause = (Channel)AutoPause.Clone()
             };
         }

@@ -376,7 +376,7 @@ namespace DuetControlServer.Codes
 
                             byte[] hash;
                             using System.Security.Cryptography.SHA1 sha1 = System.Security.Cryptography.SHA1.Create();
-                            hash = await Task.Run(() => sha1.ComputeHash(stream), Program.CancelSource.Token);
+                            hash = await Task.Run(() => sha1.ComputeHash(stream), code.CancellationToken);
 
                             return new CodeResult(MessageType.Success, BitConverter.ToString(hash).Replace("-", string.Empty));
                         }

@@ -500,12 +500,14 @@ namespace DuetControlServer.SPI
             string physicalFile = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
             if (!File.Exists(physicalFile))
             {
+                bool found = false;
                 if (filename == FilePath.ConfigFile)
                 {
                     physicalFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFileFallback, FileDirectory.System);
                     if (File.Exists(physicalFile))
                     {
                         // Use config.b.bak if config.g cannot be found
+                        found = true;
                         _logger.Warn("Using fallback file {0} because {1} could not be found", FilePath.ConfigFileFallback, FilePath.ConfigFile);
                     }
                     else
@@ -522,15 +524,50 @@ namespace DuetControlServer.SPI
                         await Utility.Logger.LogOutput(MessageType.Error, $"Macro file {filename} not found");
                     }
                 }
-                else
+                else if (FilePath.DeployProbePattern.IsMatch(filename))
+                {
+                    physicalFile = await FilePath.ToPhysicalAsync(FilePath.DeployProbeFallbackFile, FileDirectory.System);
+                    if (File.Exists(physicalFile))
+                    {
+                        found = true;
+                        _logger.Info($"Using fallback file {FilePath.DeployProbeFallbackFile} because {filename} could not be found");
+                    }
+                    else
+                    {
+                        // No deployprobe file found
+                        _logger.Info($"Optional macro files {filename} and {FilePath.DeployProbeFallbackFile} not found");
+                    }
+                }
+                else if (FilePath.RetractProbePattern.IsMatch(filename))
+                {
+                    physicalFile = await FilePath.ToPhysicalAsync(FilePath.RetractProbeFallbackFile, FileDirectory.System);
+                    if (File.Exists(physicalFile))
+                    {
+                        found = true;
+                        _logger.Info($"Using fallback file {FilePath.RetractProbeFallbackFile} because {filename} could not be found");
+                    }
+                    else
+                    {
+                        // No retractprobe file found
+                        _logger.Info($"Optional macro files {filename} and {FilePath.RetractProbeFallbackFile} not found");
+                    }
+                }
+                else if (filename != FilePath.DaemonFile)
                 {
                     _logger.Info("Optional macro file {0} not found", filename);
                 }
+                else
+                {
+                    _logger.Trace("Optional macro file {0} not found", filename);
+                }
 
-                SystemMacroHadError = startingCode == null;
-                SuspendBuffer(startingCode);
-                MacroCompleted(startingCode, true);
-                return;
+                if (!found)
+                {
+                    SystemMacroHadError = startingCode == null;
+                    SuspendBuffer(startingCode);
+                    MacroCompleted(startingCode, true);
+                    return;
+                }
             }
 
             // Open the file

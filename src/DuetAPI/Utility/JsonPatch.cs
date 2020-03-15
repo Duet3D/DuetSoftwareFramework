@@ -280,6 +280,7 @@ namespace DuetAPI.Utility
                 }
             }
         }
+
         private static void PatchList(IList list, Type itemType, JsonElement diff)
         {
             int arrayLength = diff.GetArrayLength();

@@ -54,15 +54,15 @@ namespace DuetControlServer.IPC
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
-            // Don't listen for incoming connections if only the firmware is updated
+            // Don't listen for incoming connections if only the firmware is being updated
             if (Settings.UpdateOnly)
             {
-                await Task.Delay(-1, Program.CancelSource.Token);
+                await Task.Delay(-1, Program.CancellationToken);
                 return;
             }
 
             // Make sure to terminate the main socket when the application is being terminated
-            Program.CancelSource.Token.Register(_unixSocket.Close, false);
+            Program.CancellationToken.Register(_unixSocket.Close, false);
 
             // Start accepting incoming connections
             List<Task> connectionTasks = new List<Task>();
@@ -155,20 +155,20 @@ namespace DuetControlServer.IPC
         {
             try
             {
-                JsonDocument response = await conn.ReceiveJson();
-                ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                string response = await conn.ReceivePlainJson();
+                ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response, JsonHelper.DefaultJsonOptions);
                 switch (initMessage.Mode)
                 {
                     case ConnectionMode.Command:
-                        initMessage = JsonSerializer.Deserialize<CommandInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<CommandInitMessage>(response, JsonHelper.DefaultJsonOptions);
                         return new Command(conn);
 
                     case ConnectionMode.Intercept:
-                        initMessage = JsonSerializer.Deserialize<InterceptInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<InterceptInitMessage>(response, JsonHelper.DefaultJsonOptions);
                         return new Interception(conn, initMessage);
 
                     case ConnectionMode.Subscribe:
-                        initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response, JsonHelper.DefaultJsonOptions);
                         return new Subscription(conn, initMessage);
 
                     default:

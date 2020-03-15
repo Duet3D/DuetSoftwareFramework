@@ -116,12 +116,16 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Reset this instance
         /// </summary>
-        public void Reset()
+        /// <param name="keepLineNumber">Keep the line number</param>
+        public void Reset(bool keepLineNumber)
         {
             Result = null;
             Type = CodeType.Comment;
             Channel = Defaults.Channel;
-            LineNumber = null;
+            if (!keepLineNumber)
+            {
+                LineNumber = null;
+            }
             Indent = 0;
             Keyword = KeywordType.None;
             KeywordArgument = null;

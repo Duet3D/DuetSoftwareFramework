@@ -368,7 +368,7 @@ If you do not wish to publish everything to your board at the time of compiling,
 
 ### 3.2 Building on the SBC itself
 
-Of course you can compile the required components on the SBC itself. Once the .NET Core SDK has been installed, enter the directory of the DSF appliction you want to compile and run `dotnet build`. This will generate suitable binaries for you.
+Of course you can compile the required components on the SBC itself. Once the .NET Core SDK has been installed, enter the directory of the DSF application you want to compile and run `dotnet build`. This will generate suitable binaries for you.
 
 ## API
 

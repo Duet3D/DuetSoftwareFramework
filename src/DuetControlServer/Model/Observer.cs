@@ -97,6 +97,7 @@ namespace DuetControlServer.Model
             Provider.Get.Channels.LCD.PropertyChanged += PropertyChanged("channels", "lcd");
             Provider.Get.Channels.SPI.PropertyChanged += PropertyChanged("channels", "spi");
             Provider.Get.Channels.Telnet.PropertyChanged += PropertyChanged("channels", "telnet");
+            Provider.Get.Channels.Trigger.PropertyChanged += PropertyChanged("channels", "trigger");
             Provider.Get.Channels.USB.PropertyChanged += PropertyChanged("channels", "usb");
 
             Provider.Get.Directories.PropertyChanged += PropertyChanged("directories");

@@ -56,6 +56,11 @@ namespace DuetControlServer.SPI
         private static ReadOnlyMemory<byte> _packetData;
 
         /// <summary>
+        /// Currently-used protocol version
+        /// </summary>
+        public static int ProtocolVersion { get => _rxHeader.ProtocolVersion; }
+
+        /// <summary>
         /// Set up the SPI device and the controller for the transfer ready pin
         /// </summary>
         public static void Init()
@@ -73,7 +78,7 @@ namespace DuetControlServer.SPI
             // Initialize transfer ready pin
             _transferReadyPin = new InputGpioPin(Settings.GpioChipDevice, Settings.TransferReadyPin, $"dcs-trp-{Settings.TransferReadyPin}");
             _transferReadyPin.PinChanged += (sender, pinValue) => _transferReadyEvent.Set();
-            _ = _transferReadyPin.StartMonitoring(Program.CancelSource.Token);
+            _ = _transferReadyPin.StartMonitoring(Program.CancellationToken);
 
             // Initialize SPI device
             _spiDevice = new SpiDevice(Settings.SpiDevice, Settings.SpiFrequency);
@@ -165,13 +170,6 @@ namespace DuetControlServer.SPI
                     // Deal with timeouts
                     if (_hadTimeout)
                     {
-                        using (await Model.Provider.AccessReadWriteAsync())
-                        {
-                            if (Model.Provider.Get.State.Status == MachineStatus.Off)
-                            {
-                                Model.Provider.Get.State.Status = MachineStatus.Idle;
-                            }
-                        }
                         await Utility.Logger.LogOutput(MessageType.Success, "Connection to Duet established");
                         _hadTimeout = _resetting = false;
                     }
@@ -199,7 +197,7 @@ namespace DuetControlServer.SPI
                 }
                 catch (OperationCanceledException e)
                 {
-                    if (Program.CancelSource.IsCancellationRequested)
+                    if (Program.CancellationToken.IsCancellationRequested)
                     {
                         throw;
                     }
@@ -900,19 +898,20 @@ namespace DuetControlServer.SPI
                     }
                     else
                     {
-                        using CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SpiTransferTimeout);
-                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, Program.CancelSource.Token);
+                        // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
+                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+                        cts.CancelAfter(Settings.SpiTransferTimeout);
                         try
                         {
                             await _transferReadyEvent.WaitAsync(cts.Token);
                         }
                         catch (OperationCanceledException)
                         {
-                            if (timeoutCts.IsCancellationRequested)
+                            if (Program.CancellationToken.IsCancellationRequested)
                             {
-                                throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
+                                throw new OperationCanceledException("Program termination");
                             }
-                            throw new OperationCanceledException("Program termination");
+                            throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                         }
                     }
                 }
@@ -925,19 +924,20 @@ namespace DuetControlServer.SPI
             }
             else
             {
-                using CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SpiTransferTimeout);
-                using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token, timeoutCts.Token);
+                // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
+                using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+                cts.CancelAfter(Settings.SpiTransferTimeout);
                 try
                 {
                     await _transferReadyEvent.WaitAsync(cts.Token);
                 }
                 catch
                 {
-                    if (timeoutCts.IsCancellationRequested)
+                    if (Program.CancellationToken.IsCancellationRequested)
                     {
-                        throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
+                        throw new OperationCanceledException("Program termination");
                     }
-                    throw new OperationCanceledException("Program termination");
+                    throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                 }
             }
             _transferReadyEvent.Reset();
@@ -992,8 +992,15 @@ namespace DuetControlServer.SPI
                     await ExchangeResponse(Communication.TransferResponse.BadFormat);
                     throw new Exception($"Invalid format code {_rxHeader.FormatCode:x2}");
                 }
-                if (_rxHeader.ProtocolVersion != Communication.Consts.ProtocolVersion)
+                if (_rxHeader.ProtocolVersion != _txHeader.ProtocolVersion)
                 {
+                    // When updating via the command-line, downgrade the protocol version
+                    if (Settings.UpdateOnly && _txHeader.ProtocolVersion != 1)
+                    {
+                        _txHeader.ProtocolVersion = _rxHeader.ProtocolVersion;
+                        await ExchangeResponse(Communication.TransferResponse.BadProtocolVersion);
+                        return false;
+                    }
                     await ExchangeResponse(Communication.TransferResponse.BadProtocolVersion);
                     throw new Exception($"Invalid protocol version {_rxHeader.ProtocolVersion}");
                 }

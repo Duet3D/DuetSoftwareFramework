@@ -40,8 +40,7 @@ namespace DuetControlServer.SPI.Serialization
             module = header.Module;
             if (header.Length > 0)
             {
-                ReadOnlySpan<byte> unicodeJSON = from.Slice(bytesRead, header.Length);
-                json = unicodeJSON.ToArray();
+                json = from.Slice(bytesRead, header.Length).ToArray();
                 bytesRead += header.Length;
             }
             else

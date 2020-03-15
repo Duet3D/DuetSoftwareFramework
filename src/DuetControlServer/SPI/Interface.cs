@@ -28,7 +28,7 @@ namespace DuetControlServer.SPI
         private static readonly ChannelStore _channels = new ChannelStore();
         private static int _bytesReserved = 0, _bufferSpace = 0;
 
-        // Object model query
+        // Object model queries
         private static byte _moduleToQuery = 5;
         private static DateTime _lastConfigQuery = DateTime.Now;
         private static DateTime _lastQueryTime = DateTime.Now;
@@ -63,7 +63,7 @@ namespace DuetControlServer.SPI
         public static void Init()
         {
             DataTransfer.Init();
-            Program.CancelSource.Token.Register(() => _ = Invalidate(null));
+            Program.CancellationToken.Register(() => _ = Invalidate(null));
         }
 
         /// <summary>
@@ -147,8 +147,8 @@ namespace DuetControlServer.SPI
                 }
             }
 
-            _logger.Warn("Failed to find an idle channel, using fallback {0}", nameof(CodeChannel.Daemon));
-            return CodeChannel.Daemon;
+            _logger.Warn("Failed to find an idle channel, using fallback {0}", nameof(CodeChannel.Trigger));
+            return CodeChannel.Trigger;
         }
 
         /// <summary>
@@ -477,7 +477,7 @@ namespace DuetControlServer.SPI
         {
             if (Settings.NoSpiTask)
             {
-                await Task.Delay(-1, Program.CancelSource.Token);
+                await Task.Delay(-1, Program.CancellationToken);
                 return;
             }
 
@@ -634,8 +634,34 @@ namespace DuetControlServer.SPI
                 // Request object model updates
                 if (DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
                 {
+#if true
                     DataTransfer.WriteGetObjectModel(_moduleToQuery);
                     _lastQueryTime = DateTime.Now;
+#else
+                    if (DataTransfer.ProtocolVersion == 1)
+                    {
+                        // We no longer support regular status responses except to obtain the board name for updating the firmware
+                        if (_lastQueryTime == DateTime.MinValue)
+                        {
+                            DataTransfer.WriteGetObjectModel(Model.Updater.ConfigModule);
+                            _lastQueryTime = DateTime.Now;
+                        }
+                    }
+                    else
+                    {
+                        // Query the object model in round-robin order
+                        if (_lastQueryTime != DateTime.MinValue)
+                        {
+                            _moduleToQuery++;
+                            if (_moduleToQuery > Model.Updater.LastModule)
+                            {
+                                _moduleToQuery = Model.Updater.FirstModule;
+                            }
+                        }
+                        DataTransfer.WriteGetObjectModel(_moduleToQuery);
+                        _lastQueryTime = DateTime.Now;
+                    }
+#endif
                 }
 
                 // Update filament assignment per extruder drive
@@ -661,7 +687,7 @@ namespace DuetControlServer.SPI
                 }
                 if (!isSimulating)
                 {
-                    await Task.Delay(Settings.SpiPollDelay, Program.CancelSource.Token);
+                    await Task.Delay(Settings.SpiPollDelay, Program.CancellationToken);
                 }
             }
             while (true);

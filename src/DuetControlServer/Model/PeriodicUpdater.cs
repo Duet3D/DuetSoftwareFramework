@@ -46,7 +46,7 @@ namespace DuetControlServer.Model
                     Code code = new Code
                     {
                         InternallyProcessed = true,
-                        Channel = DuetAPI.CodeChannel.Daemon,
+                        Channel = DuetAPI.CodeChannel.Trigger,
                         Type = CodeType.MCode,
                         MajorNumber = 905
                     };
@@ -57,7 +57,7 @@ namespace DuetControlServer.Model
 
                 // Wait for next scheduled update check
                 lastUpdateTime = DateTime.Now;
-                await Task.Delay(Settings.HostUpdateInterval, Program.CancelSource.Token);
+                await Task.Delay(Settings.HostUpdateInterval, Program.CancellationToken);
             }
             while (!Program.CancelSource.IsCancellationRequested);
         }

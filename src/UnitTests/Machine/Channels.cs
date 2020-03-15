@@ -21,6 +21,7 @@ namespace UnitTests.Machine
             original.Channels.LCD.LineNumber = 45;
             original.Channels.AUX.VolumetricExtrusion = true;
             original.Channels.AutoPause.Compatibility = Compatibility.Marlin;
+            original.Channels.Trigger.Feedrate = 435F;
 
             MachineModel clone = (MachineModel)original.Clone();
 
@@ -34,6 +35,7 @@ namespace UnitTests.Machine
             Assert.AreEqual(original.Channels.LCD.LineNumber, clone.Channels.LCD.LineNumber);
             Assert.AreEqual(original.Channels.AUX.VolumetricExtrusion, clone.Channels.AUX.VolumetricExtrusion);
             Assert.AreEqual(original.Channels.AutoPause.Compatibility, clone.Channels.AutoPause.Compatibility);
+            Assert.AreEqual(original.Channels.Trigger.Feedrate, clone.Channels.Trigger.Feedrate);
         }
 
         [Test]
@@ -51,6 +53,7 @@ namespace UnitTests.Machine
             original.Channels.LCD.LineNumber = 45;
             original.Channels.AUX.VolumetricExtrusion = true;
             original.Channels.AutoPause.Compatibility = Compatibility.Marlin;
+            original.Channels.Trigger.Feedrate = 435F;
 
             MachineModel assigned = new MachineModel();
             assigned.Assign(original);
@@ -65,6 +68,7 @@ namespace UnitTests.Machine
             Assert.AreEqual(original.Channels.LCD.LineNumber, assigned.Channels.LCD.LineNumber);
             Assert.AreEqual(original.Channels.AUX.VolumetricExtrusion, assigned.Channels.AUX.VolumetricExtrusion);
             Assert.AreEqual(original.Channels.AutoPause.Compatibility, assigned.Channels.AutoPause.Compatibility);
+            Assert.AreEqual(original.Channels.Trigger.Feedrate, assigned.Channels.Trigger.Feedrate);
         }
     }
 }

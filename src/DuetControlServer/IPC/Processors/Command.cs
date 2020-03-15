@@ -78,7 +78,7 @@ namespace DuetControlServer.IPC.Processors
                     await Connection.SendResponse(e);
                 }
             }
-            while (!Program.CancelSource.IsCancellationRequested);
+            while (!Program.CancellationToken.IsCancellationRequested);
         }
     }
 }

@@ -55,7 +55,7 @@ namespace DuetControlServer.Commands
                     _codeStartLocks[i, (int)codeType] = new AsyncLock();
                     _codeFinishLocks[i, (int)codeType] = new AsyncLock();
                 }
-                _cancellationTokenSources[i] = CancellationTokenSource.CreateLinkedTokenSource(Program.CancelSource.Token);
+                _cancellationTokenSources[i] = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
                 FileLocks[i] = new AsyncLock();
             }
@@ -126,6 +126,11 @@ namespace DuetControlServer.Commands
         private IDisposable _codeStartLock;
 
         /// <summary>
+        /// Cancellation token that may be used to cancel this code
+        /// </summary>
+        public CancellationToken CancellationToken { get; private set; }
+
+        /// <summary>
         /// Create a task that waits until this code can be executed.
         /// It may be cancelled if this code is supposed to be cancelled before it is started
         /// </summary>
@@ -133,11 +138,10 @@ namespace DuetControlServer.Commands
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         private Task<IDisposable> WaitForExecution()
         {
-            // Enqueued codes may be cancelled as long as they're not being executed
-            CancellationToken cancellationToken;
+            // Get a cancellation token
             lock (_cancellationTokenSources)
             {
-                cancellationToken = _cancellationTokenSources[(int)Channel].Token;
+                CancellationToken = _cancellationTokenSources[(int)Channel].Token;
             }
 
             // Assign a priority to this code and create a task that completes when it can be started
@@ -169,7 +173,7 @@ namespace DuetControlServer.Commands
                 _codeType = InternalCodeType.Regular;
                 _logger.Debug("Waiting for execution of {0}", this);
             }
-            return _codeStartLocks[(int)Channel, (int)_codeType].LockAsync(cancellationToken);
+            return _codeStartLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken);
         }
 
         /// <summary>
@@ -524,17 +528,17 @@ namespace DuetControlServer.Commands
                         }
                     }
                 }
-            }
 
-            // Log warning and error replies after the code has been processed internally
-            if (InternallyProcessed)
-            {
-                foreach (Message msg in Result)
+                // Log warning and error replies after the code has been processed internally
+                if (InternallyProcessed)
                 {
-                    if (msg.Type != MessageType.Success && Channel != CodeChannel.File)
+                    foreach (Message msg in Result)
                     {
-                        // When a file is being printed, the message is output and logged
-                        await Utility.Logger.Log(msg);
+                        if (msg.Type != MessageType.Success && Channel != CodeChannel.File)
+                        {
+                            // When a file is being printed, the message is output and logged
+                            await Utility.Logger.Log(msg);
+                        }
                     }
                 }
             }

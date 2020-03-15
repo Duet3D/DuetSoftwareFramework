@@ -15,7 +15,6 @@ namespace DuetControlServer
     /// <summary>
     /// Settings provider
     /// </summary>
-    /// <remarks>This class cannot be static because JSON.NET requires an instance for deserialization</remarks>
     public static class Settings
     {
         private const string DefaultConfigFile = "/opt/dsf/conf/config.json";
