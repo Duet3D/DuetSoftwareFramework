@@ -70,6 +70,7 @@ namespace DuetAPI.Commands
                 {
                     // It is an expression
                     IsExpression = true;
+                    _parsedValue = value;
                 }
                 else if (value.Contains(':'))
                 {
