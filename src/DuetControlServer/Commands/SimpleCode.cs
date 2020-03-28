@@ -1,5 +1,5 @@
-﻿using DuetAPI;
-using DuetAPI.Commands;
+﻿using DuetAPI.Commands;
+using DuetAPI.Machine;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -17,14 +17,14 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Locks to avoid race conditions when executing multiple text-based codes via the same channel
         /// </summary>
-        private static readonly AsyncLock[] _channelLocks = new AsyncLock[DuetAPI.Machine.Channels.Total];
+        private static readonly AsyncLock[] _channelLocks = new AsyncLock[Inputs.Total];
 
         /// <summary>
         /// Initialize this class
         /// </summary>
         public static void Init()
         {
-            for (int i = 0; i < DuetAPI.Machine.Channels.Total; i++)
+            for (int i = 0; i < Inputs.Total; i++)
             {
                 _channelLocks[i] = new AsyncLock();
             }

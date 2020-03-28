@@ -1,7 +1,8 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
-using DuetControlServer.FileExecution;
-using DuetControlServer.SPI.Communication;
+using DuetAPI.Machine;
+using DuetControlServer.Files;
+using DuetControlServer.SPI.Communication.Shared;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -226,41 +227,10 @@ namespace DuetControlServer.SPI
                     }
                 }
 
+                // Start the next code in the background. An interceptor may also generate extra codes
                 if (code != null)
                 {
-                    // Start the next code in the background. An interceptor may also generate extra codes
-                    queuedCode = new QueuedCode(code);
-                    macroFile.PendingCodes.Enqueue(queuedCode);
-                    _ = code.Execute().ContinueWith(async task =>
-                    {
-                        try
-                        {
-                            CodeResult result = await task;
-                            if (!queuedCode.IsReadyToSend)
-                            {
-                                // Macro codes need special treatment because they may complete before they are actually
-                                // sent to RepRapFirmware. Remove them from the NestedMacroCodes again in this case
-                                queuedCode.HandleReply(result);
-                            }
-
-                            if (macroFile.StartCode == null)
-                            {
-                                await Utility.Logger.LogOutput(result);
-                            }
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            // Something has gone wrong and the SPI connector has invalidated everything - don't deal with this (yet?)
-                        }
-                        catch (Exception e)
-                        {
-                            if (e is AggregateException ae)
-                            {
-                                e = ae.InnerException;
-                            }
-                            await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{e.GetType().Name}] {e.Message}");
-                        }
-                    });
+                    DoBackgroundCode(code, macroFile);
                     return true;
                 }
 
@@ -337,6 +307,100 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Perform a code in the background
+        /// </summary>
+        /// <param name="code">Code to execute</param>
+        /// <param name="macroFile">Macro file that started this code</param>
+        private void DoBackgroundCode(Commands.Code code, MacroFile macroFile)
+        {
+            QueuedCode queuedCode = null;
+            if (macroFile != null)
+            {
+                queuedCode = new QueuedCode(code);
+                macroFile.PendingCodes.Enqueue(queuedCode);
+            }
+
+            _ = code.Execute().ContinueWith(async task =>
+            {
+                try
+                {
+                    CodeResult result = await task;
+                    if (queuedCode != null && !queuedCode.IsReadyToSend)
+                    {
+                        // Macro codes need special treatment because they are not processed in the main SPI interface
+                        queuedCode.HandleReply(result);
+                    }
+
+                    if (macroFile?.StartCode == null)
+                    {
+                        await Utility.Logger.LogOutput(result);
+                    }
+                    else
+                    {
+                        macroFile.StartCode.HandleReply(result);
+                    }
+                }
+                catch (OperationCanceledException oce)
+                {
+                    // Code has been cancelled. Make sure it is properly resolved
+                    if (queuedCode != null && !queuedCode.IsReadyToSend)
+                    {
+                        queuedCode.SetException(oce);
+                    }
+                }
+                catch (Exception e)
+                {
+                    if (e is AggregateException ae)
+                    {
+                        e = ae.InnerException;
+                    }
+                    await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{e.GetType().Name}] {e.Message}");
+                }
+            });
+        }
+
+        /// <summary>
+        /// Perform a regular code that was requested from the firmware
+        /// </summary>
+        /// <param name="code"></param>
+        public void DoFirmwareCode(string code)
+        {
+            try
+            {
+                Commands.Code codeObj = new Commands.Code(code);
+                _ = codeObj.Execute().ContinueWith(async task =>
+                {
+                    try
+                    {
+                        CodeResult result = await task;
+                        await Utility.Logger.LogOutput(result);
+
+                        MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel) | MessageTypeFlags.ErrorMessageFlag;
+                        Interface.SendMessage(flags, result.ToString());
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Code has been cancelled. Don't log this
+                    }
+                    catch (Exception e)
+                    {
+                        if (e is AggregateException ae)
+                        {
+                            e = ae.InnerException;
+                        }
+                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code}: [{e.GetType().Name}] {e.Message}");
+                    }
+                });
+                Task<CodeResult> task = codeObj.Execute();
+            }
+            catch (CodeParserException cpe)
+            {
+                MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel) | MessageTypeFlags.ErrorMessageFlag;
+                Interface.SendMessage(flags, "Failed to parse code: " + cpe.Message);
+            }
+        }
+
+        /// <summary>
         /// Store an enqueued code for transmission to RepRapFirmware
         /// </summary>
         /// <param name="queuedCode">Code to transfer</param>
@@ -345,7 +409,7 @@ namespace DuetControlServer.SPI
         {
             try
             {
-                if (Interface.BufferCode(queuedCode, out int codeLength))
+                if (Interface.SendCode(queuedCode, out int codeLength))
                 {
                     BytesBuffered += codeLength;
                     BufferedCodes.Add(queuedCode);
@@ -375,6 +439,7 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the reply could be processed</returns>
         public bool HandleReply(MessageTypeFlags flags, string reply)
         {
+            // Deal with log messages
             if (flags.HasFlag(MessageTypeFlags.LogMessage))
             {
                 _partialLogMessage += reply;
@@ -389,46 +454,44 @@ namespace DuetControlServer.SPI
                     }
                     _partialLogMessage = null;
                 }
+                return true;
             }
 
+            // Deal with replies following an attempt to open an invalid file
             if (SystemMacroHadError)
             {
                 SystemMacroHadError = false;
                 return true;
             }
 
-            if (NestedMacros.TryPeek(out MacroFile macroFile))
+            // Deal with macro files being finished
+            if (NestedMacros.TryPeek(out MacroFile macroFile) &&
+                ((macroFile.StartCode != null && !macroFile.StartCode.DoingNestedMacro) ||
+                 (macroFile.StartCode == null && SystemMacroHasFinished)))
             {
-                if ((macroFile.StartCode != null && !macroFile.StartCode.DoingNestedMacro) || (macroFile.StartCode == null && SystemMacroHasFinished))
-                {
-                    if (macroFile.StartCode != null)
-                    {
-                        macroFile.StartCode.HandleReply(flags, reply);
-                        if (macroFile.IsFinished)
-                        {
-                            NestedMacros.Pop().Dispose();
-                            _logger.Info("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
-                            if (macroFile.StartCode != null)
-                            {
-                                _logger.Debug("==> Starting code: {0}", macroFile.StartCode);
-                            }
-                        }
-                    }
-                    else if (!flags.HasFlag(MessageTypeFlags.PushFlag))
-                    {
-                        NestedMacros.Pop().Dispose();
-                        SystemMacroHasFinished = false;
-                        _logger.Info("Finished system macro file {0}", Path.GetFileName(macroFile.FileName));
-                    }
-                    return true;
-                }
-
                 if (macroFile.StartCode != null)
                 {
                     macroFile.StartCode.HandleReply(flags, reply);
+                    if (macroFile.IsFinished)
+                    {
+                        NestedMacros.Pop().Dispose();
+                        _logger.Info("Finished macro file {0}", Path.GetFileName(macroFile.FileName));
+                        if (macroFile.StartCode != null)
+                        {
+                            _logger.Debug("==> Starting code: {0}", macroFile.StartCode);
+                        }
+                    }
                 }
+                else if (!flags.HasFlag(MessageTypeFlags.PushFlag))
+                {
+                    NestedMacros.Pop().Dispose();
+                    SystemMacroHasFinished = false;
+                    _logger.Info("Finished system macro file {0}", Path.GetFileName(macroFile.FileName));
+                }
+                return true;
             }
 
+            // Deal with other codes
             if (BufferedCodes.Count > 0)
             {
                 BufferedCodes[0].HandleReply(flags, reply);
@@ -440,8 +503,21 @@ namespace DuetControlServer.SPI
                 return true;
             }
 
-            // Replies from the code queue or a final empty response from the file are expected
-            if (Channel != CodeChannel.CodeQueue && Channel != CodeChannel.File)
+            // Deal with the final response from a job file
+            if (Channel == CodeChannel.File && string.IsNullOrEmpty(reply))
+            {
+                using (FileExecution.Job.Lock())
+                {
+                    if (FileExecution.Job.IsDoingFinalCodes)
+                    {
+                        FileExecution.Job.FileHasFinished();
+                        return true;
+                    }
+                }
+            }
+
+            // Unless this message comes from the code queue it is out-of-order...
+            if (Channel != CodeChannel.Queue)
             {
                 _logger.Warn("Out-of-order reply: '{0}'", reply);
             }

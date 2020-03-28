@@ -1,4 +1,6 @@
 ﻿using DuetAPI.Commands;
+using DuetAPI.Machine;
+using DuetControlServer.SPI.Communication.Shared;
 using System;
 using System.Threading.Tasks;
 
@@ -63,37 +65,37 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="messageType">Message type flags</param>
         /// <param name="reply">Raw code reply</param>
-        public void HandleReply(Communication.MessageTypeFlags messageType, string reply)
+        public void HandleReply(MessageTypeFlags messageType, string reply)
         {
             if (string.IsNullOrEmpty(reply))
             {
                 if (_result.Count == 0)
                 {
-                    _result.Add(DuetAPI.MessageType.Success, string.Empty);
+                    _result.Add(MessageType.Success, string.Empty);
                 }
             }
             else
             {
                 if (_lastMessageIncomplete)
                 {
-                    DuetAPI.Message message = _result[_result.Count - 1];
+                    Message message = _result[^1];
                     message.Content += reply;
                 }
                 else
                 {
-                    DuetAPI.MessageType type = messageType.HasFlag(Communication.MessageTypeFlags.ErrorMessageFlag) ? DuetAPI.MessageType.Error
-                                : messageType.HasFlag(Communication.MessageTypeFlags.WarningMessageFlag) ? DuetAPI.MessageType.Warning
-                                : DuetAPI.MessageType.Success;
+                    MessageType type = messageType.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                                : messageType.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                                : MessageType.Success;
                     _result.Add(type, reply);
                 }
             }
 
-            _lastMessageIncomplete = messageType.HasFlag(Communication.MessageTypeFlags.PushFlag);
+            _lastMessageIncomplete = messageType.HasFlag(MessageTypeFlags.PushFlag);
             if (!_lastMessageIncomplete)
             {
-                foreach (DuetAPI.Message msg in _result)
+                foreach (Message message in _result)
                 {
-                    msg.Content = msg.Content.TrimEnd();
+                    message.Content = message.Content.TrimEnd();
                 }
 
                 if (!DoingNestedMacro)

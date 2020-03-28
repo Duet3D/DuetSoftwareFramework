@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.Commands
+﻿using DuetAPI.Machine;
+
+namespace DuetAPI.Commands
 {
     /// <summary>
     /// Analyse a G-code file and return an instance of <see cref="ParsedFileInfo"/> when ready

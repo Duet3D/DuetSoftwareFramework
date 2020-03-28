@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using DuetAPI.Machine;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace DuetAPI.Commands

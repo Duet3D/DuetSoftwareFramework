@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DuetAPI.Utility;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -44,9 +45,10 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="letter">Letter of the code parameter</param>
         /// <param name="value">String representation of the value</param>
-        /// <param name="isString">Whether this is a string. This is set to true if the parameter was inside quotation marks.</param>
+        /// <param name="isString">Whether this is a string. This is set to true if the parameter was inside quotation marks</param>
+        /// <param name="isDriverId">Whether this is a driver ID</param>
         /// <remarks>This constructor does not parsed long (aka int64) values because RRF cannot handle them</remarks>
-        public CodeParameter(char letter, string value, bool isString)
+        public CodeParameter(char letter, string value, bool isString, bool isDriverId)
         {
             Letter = letter;
             _stringValue = value;
@@ -55,6 +57,26 @@ namespace DuetAPI.Commands
             {
                 // Value is definitely a string because it is encapsulated in quotation marks
                 _parsedValue = value;
+            }
+            else if (isDriverId)
+            {
+                // Value is a (list of) driver identifier(s)
+                List<DriverId> driverIds = new List<DriverId>();
+
+                foreach (string item in value.Split(':'))
+                {
+                    DriverId driverId = new DriverId(item);
+                    driverIds.Add(driverId);
+                }
+
+                if (driverIds.Count == 1)
+                {
+                    _parsedValue = driverIds[0];
+                }
+                else
+                {
+                    _parsedValue = driverIds.ToArray();
+                }
             }
             else
             {
@@ -141,52 +163,25 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Convert this parameter to driver id(s)
         /// </summary>
-        /// <remarks>The data remains a uint (array) after the conversion. The top 16 bits reflect the board number and the bottom 16 bits the port</remarks>
-        public void ConvertDriverIds()
+        /// <param name="code">Code that owns this parameter</param>
+        /// <exception cref="CodeParserException">Driver ID could not be parsed</exception>
+        public void ConvertDriverIds(Code code)
         {
             if (!IsExpression)
             {
-                List<uint> drivers = new List<uint>();
+                List<DriverId> drivers = new List<DriverId>();
 
                 string[] parameters = _stringValue.Split(':');
                 foreach (string value in parameters)
                 {
-                    string[] segments = value.Split('.');
-                    if (segments.Length == 1)
+                    try
                     {
-                        if (ushort.TryParse(segments[0], out ushort port))
-                        {
-                            drivers.Add(port);
-                        }
-                        else
-                        {
-                            throw new CodeParserException($"Failed to parse driver number from {Letter} parameter");
-                        }
+                        DriverId id = new DriverId(value);
+                        drivers.Add(id);
                     }
-                    else if (segments.Length == 2)
+                    catch (ArgumentException e)
                     {
-                        uint driver;
-                        if (ushort.TryParse(segments[0], out ushort board))
-                        {
-                            driver = (uint)board << 16;
-                        }
-                        else
-                        {
-                            throw new CodeParserException($"Failed to parse board number from {Letter} parameter");
-                        }
-                        if (ushort.TryParse(segments[1], out ushort port))
-                        {
-                            driver |= port;
-                        }
-                        else
-                        {
-                            throw new CodeParserException($"Failed to parse driver number from {Letter} parameter");
-                        }
-                        drivers.Add(driver);
-                    }
-                    else
-                    {
-                        throw new CodeParserException($"Driver value from {Letter} parameter is invalid");
+                        throw new CodeParserException(e.Message + $" from {Letter} parameter", code);
                     }
                 }
 
@@ -235,7 +230,7 @@ namespace DuetAPI.Commands
             // long won't fit
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to float (value {codeParameter._stringValue})");
         }
-        
+
         /// <summary>
         /// Implicit conversion operator to int
         /// </summary>
@@ -286,6 +281,33 @@ namespace DuetAPI.Commands
             }
             // long won't fit
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to unsigned integer (value {codeParameter._stringValue})");
+        }
+
+        /// <summary>
+        /// Implicit conversion operator to a driver ID
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
+        public static implicit operator DriverId(CodeParameter codeParameter)
+        {
+            if (codeParameter is null)
+            {
+                throw new ArgumentNullException(nameof(codeParameter));
+            }
+            if (codeParameter.IsDriverId)
+            {
+                return (DriverId)codeParameter._parsedValue;
+            }
+            if (codeParameter._parsedValue is DriverId driverId)
+            {
+                return driverId;
+            }
+            if (codeParameter._parsedValue is uint uintValue)
+            {
+                return new DriverId(uintValue);
+            }
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to driver ID (value {codeParameter._stringValue})");
         }
 
         /// <summary>
@@ -447,6 +469,30 @@ namespace DuetAPI.Commands
         }
 
         /// <summary>
+        /// Implicit conversion operator to a driver ID array
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
+        public static implicit operator DriverId[](CodeParameter codeParameter)
+        {
+            if (codeParameter is null)
+            {
+                throw new ArgumentNullException(nameof(codeParameter));
+            }
+
+            if (codeParameter._parsedValue is DriverId[] driverIdArray)
+            {
+                return driverIdArray;
+            }
+            if (codeParameter._parsedValue is DriverId driverId)
+            {
+                return new DriverId[] { driverId };
+            }
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to driver ID array (value {codeParameter._stringValue})");
+        }
+
+        /// <summary>
         /// Implicit conversion operator to long array
         /// </summary>
         /// <param name="codeParameter">Target object</param>
@@ -561,7 +607,7 @@ namespace DuetAPI.Commands
             {
                 char letter = '\0';
                 string propertyName = string.Empty, value = string.Empty;
-                bool isString = false;
+                bool isString = false, isDriverId = false;
 
                 while (reader.Read())
                 {
@@ -589,10 +635,26 @@ namespace DuetAPI.Commands
                             {
                                 isString = Convert.ToBoolean(reader.GetInt32());
                             }
+                            else if (propertyName.Equals("isDriverId", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                isDriverId = Convert.ToBoolean(reader.GetInt32());
+                            }
+                            break;
+
+                        case JsonTokenType.True:
+                        case JsonTokenType.False:
+                            if (propertyName.Equals("isString", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                isString = (reader.TokenType == JsonTokenType.True);
+                            }
+                            else if (propertyName.Equals("isDriverId", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                isDriverId = (reader.TokenType == JsonTokenType.True);
+                            }
                             break;
 
                         case JsonTokenType.EndObject:
-                            return new CodeParameter(letter, value, isString);
+                            return new CodeParameter(letter, value, isString, isDriverId);
                     }
                 }
             }
@@ -610,7 +672,11 @@ namespace DuetAPI.Commands
             writer.WriteStartObject();
             writer.WriteString("letter", value.Letter.ToString());
             writer.WriteString("value", value);
-            writer.WriteNumber("isString", Convert.ToInt32(value.Type == typeof(string)));
+            if (value.Type == typeof(DriverId) || value.Type == typeof(DriverId[]))
+            {
+                writer.WriteBoolean("isDriverId", true);
+            }
+            writer.WriteBoolean("isString", value.Type == typeof(string));
             writer.WriteEndObject();
         }
     }

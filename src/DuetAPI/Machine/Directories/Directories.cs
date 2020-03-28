@@ -1,41 +1,29 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
-    /// Information about the machine state
+    /// Information about the configured directories
     /// </summary>
-    public sealed class Directories : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class Directories : ModelObject
     {
         /// <summary>
-        /// Event to trigger when a property has changed
-        /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        /// <summary>
-        /// Path to the Filaments directory
+        /// Path to the filaments directory
         /// </summary>
         public string Filaments
         {
             get => _filaments;
-            set
-            {
-                if (_filaments != value)
-                {
-                    _filaments = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _filaments, value);
         }
         private string _filaments = "0:/filaments";
+
+        /// <summary>
+        /// Path to the firmware directory
+        /// </summary>
+        public string Firmware
+        {
+            get => _firmware;
+			set => SetPropertyValue(ref _firmware, value);
+        }
+        private string _firmware = "0:/sys";
 
         /// <summary>
         /// Path to the G-Codes directory
@@ -43,14 +31,7 @@ namespace DuetAPI.Machine
         public string GCodes
         {
             get => _gcodes;
-            set
-            {
-                if (_gcodes != value)
-                {
-                    _gcodes = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _gcodes, value);
         }
         private string _gcodes = "0:/gcodes";
 
@@ -60,19 +41,12 @@ namespace DuetAPI.Machine
         public string Macros
         {
             get => _macros;
-            set
-            {
-                if (_macros != value)
-                {
-                    _macros = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _macros, value);
         }
         private string _macros = "0:/macros";
 
         /// <summary>
-        /// Path to the Menu directory
+        /// Path to the menu directory
         /// </summary>
         /// <remarks>
         /// Intended for 12864 displays but currently unused in DSF. It is only needed for the Duet Maestro + DWC
@@ -80,16 +54,19 @@ namespace DuetAPI.Machine
         public string Menu
         {
             get => _menu;
-            set
-            {
-                if (_menu != value)
-                {
-                    _menu = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _menu, value);
         }
         private string _menu = "0:/menu";
+
+        /// <summary>
+        /// Path to the scans directory
+        /// </summary>
+        public string Scans
+        {
+            get => _scans;
+			set => SetPropertyValue(ref _scans, value);
+        }
+        private string _scans = "0:/scans";
 
         /// <summary>
         /// Path to the system directory
@@ -97,72 +74,18 @@ namespace DuetAPI.Machine
         public string System
         {
             get => _system;
-            set
-            {
-                if (_system != value)
-                {
-                    _system = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _system, value);
         }
         private string _system = "0:/sys";
 
         /// <summary>
         /// Path to the web directory
         /// </summary>
-        public string WWW
+        public string Web
         {
-            get => _www;
-            set
-            {
-                if (_www != value)
-                {
-                    _www = value;
-                    NotifyPropertyChanged();
-                }
-            }
+            get => _web;
+			set => SetPropertyValue(ref _web, value);
         }
-        private string _www = "0:/www";
-
-        /// <summary>
-        /// Assigns every property of another instance of this one
-        /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
-        {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is Directories other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            Filaments = other.Filaments;
-            GCodes = other.GCodes;
-            Macros = other.Macros;
-            System = other.System;
-            WWW = other.WWW;
-        }
-
-        /// <summary>
-        /// Creates a clone of this instance
-        /// </summary>
-        /// <returns>A clone of this instance</returns>
-        public object Clone()
-        {
-            return new Directories
-            {
-                Filaments = Filaments,
-                GCodes = GCodes,
-                Macros = Macros,
-                System = System,
-                WWW = WWW
-            };
-        }
+        private string _web = "0:/www";
     }
 }

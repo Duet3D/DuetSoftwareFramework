@@ -1,8 +1,9 @@
 ﻿using DuetAPI.Commands;
-using Newtonsoft.Json;
+using DuetAPI.Utility;
 using NUnit.Framework;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 
 namespace UnitTests.Commands
 {
@@ -147,7 +148,7 @@ namespace UnitTests.Commands
             Assert.AreEqual('S', code.Parameters[3].Letter);
             Assert.AreEqual(0.5, code.Parameters[3], 0.0001);
 
-            TestContext.Out.Write(JsonConvert.SerializeObject(code, Formatting.Indented));
+            TestContext.Out.Write(JsonSerializer.Serialize(code, typeof(DuetAPI.Commands.Code), new JsonSerializerOptions { WriteIndented = true }));
         }
 
         [Test]
@@ -177,8 +178,7 @@ namespace UnitTests.Commands
             Assert.AreEqual(CodeFlags.None, code.Flags);
             Assert.AreEqual(3, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
-            uint driverId = (uint)((1 << 16) | 2);
-            Assert.AreEqual(driverId, (uint)code.Parameters[0]);
+            Assert.AreEqual(new DriverId(1, 2), (DriverId)code.Parameters[0]);
             Assert.AreEqual('S', code.Parameters[1].Letter);
             Assert.AreEqual(1, (int)code.Parameters[1]);
             Assert.AreEqual('T', code.Parameters[2].Letter);
@@ -213,8 +213,8 @@ namespace UnitTests.Commands
             Assert.AreEqual(CodeFlags.None, code.Flags);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
-            uint[] driverIds = new uint[] { 2, 3, (1 << 16) | 4 };
-            Assert.AreEqual(driverIds, (uint[])code.Parameters[0]);
+            DriverId[] driverIds = new DriverId[] { new DriverId(2), new DriverId(3), new DriverId(1, 4) };
+            Assert.AreEqual(driverIds, (DriverId[])code.Parameters[0]);
             Assert.AreEqual('S', code.Parameters[1].Letter);
             Assert.AreEqual(22, (int)code.Parameters[1]);
         }

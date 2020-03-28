@@ -43,7 +43,8 @@ namespace DuetControlServer
             }
             else
             {
-                Console.WriteLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
+                string version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
+                Console.WriteLine($"Duet Control Server v{version}");
                 Console.WriteLine("Written by Christian Hammacher for Duet3D");
                 Console.WriteLine("Licensed under the terms of the GNU Public License Version 3");
                 Console.WriteLine();
@@ -131,7 +132,7 @@ namespace DuetControlServer
                 { Task.Factory.StartNew(Model.Updater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Update" },
                 { Task.Factory.StartNew(SPI.Interface.Run, TaskCreationOptions.LongRunning).Unwrap(), "SPI" },
                 { Task.Factory.StartNew(IPC.Server.Run, TaskCreationOptions.LongRunning).Unwrap(), "IPC" },
-                { Task.Factory.StartNew(FileExecution.Print.Run, TaskCreationOptions.LongRunning).Unwrap(), "Print" },
+                { Task.Factory.StartNew(FileExecution.Job.Run, TaskCreationOptions.LongRunning).Unwrap(), "Job" },
                 { Task.Factory.StartNew(Model.PeriodicUpdater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Periodic updater" }
             };
 

@@ -4,9 +4,12 @@ using DuetAPI;
 namespace DuetControlServer.SPI.Communication.LinuxRequests
 {
     /// <summary>
-    /// Header of G/M/T-codes. This is followed by NumParameters <see cref="CodeParameter"/> instances,
-    /// which is then followed by concatenated zero-terminated UTF8-strings for each parameter where applicable.
+    /// Header for G/M/T-codes
     /// </summary>
+    /// <remarks>
+    /// This is followed by NumParameters <see cref="CodeParameter"/> instances,
+    /// which is then followed by concatenated zero-terminated UTF8-strings for each parameter where applicable
+    /// </remarks>
     [StructLayout(LayoutKind.Sequential, Size = 16)]
     public struct CodeHeader
     {
@@ -18,7 +21,7 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Flags of this code
         /// </summary>
-        public SpiCodeFlags Flags;
+        public CodeFlags Flags;
 
         /// <summary>
         /// Number of parameters following the 

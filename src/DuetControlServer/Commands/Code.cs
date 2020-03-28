@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -31,24 +32,24 @@ namespace DuetControlServer.Commands
         /// AsyncLock implements an internal waiter queue, so it is safe to rely on it for
         /// maintaining the right order of codes being executed per code channel
         /// </remarks>
-        private static readonly AsyncLock[,] _codeStartLocks = new AsyncLock[Channels.Total, Enum.GetValues(typeof(InternalCodeType)).Length];
+        private static readonly AsyncLock[,] _codeStartLocks = new AsyncLock[Inputs.Total, Enum.GetValues(typeof(InternalCodeType)).Length];
 
         /// <summary>
         /// Array of AsyncLocks to guarantee the ordered finishing of G/M/T-codes
         /// </summary>
-        private static readonly AsyncLock[,] _codeFinishLocks = new AsyncLock[Channels.Total, Enum.GetValues(typeof(InternalCodeType)).Length];
+        private static readonly AsyncLock[,] _codeFinishLocks = new AsyncLock[Inputs.Total, Enum.GetValues(typeof(InternalCodeType)).Length];
 
         /// <summary>
         /// List of cancellation tokens to cancel pending codes while they are waiting for their execution
         /// </summary>
-        private static readonly CancellationTokenSource[] _cancellationTokenSources = new CancellationTokenSource[Channels.Total];
+        private static readonly CancellationTokenSource[] _cancellationTokenSources = new CancellationTokenSource[Inputs.Total];
 
         /// <summary>
         /// Initialize the code scheduler
         /// </summary>
         public static void Init()
         {
-            for (int i = 0; i < Channels.Total; i++)
+            for (int i = 0; i < Inputs.Total; i++)
             {
                 foreach (InternalCodeType codeType in Enum.GetValues(typeof(InternalCodeType)))
                 {
@@ -224,12 +225,12 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Lock around the files being written
         /// </summary>
-        public static AsyncLock[] FileLocks = new AsyncLock[Channels.Total];
+        public static AsyncLock[] FileLocks = new AsyncLock[Inputs.Total];
 
         /// <summary>
         /// Current stream writer of the files being written to (M28/M29)
         /// </summary>
-        public static StreamWriter[] FilesBeingWritten = new StreamWriter[Channels.Total];
+        public static StreamWriter[] FilesBeingWritten = new StreamWriter[Inputs.Total];
 
         /// <summary>
         /// Constructor of a new code
@@ -249,7 +250,7 @@ namespace DuetControlServer.Commands
         {
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                Compatibility compatibility = Model.Provider.Get.Channels[Channel].Compatibility;
+                Compatibility compatibility = Model.Provider.Get.Inputs[Channel].Compatibility;
                 return compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP;
             }
         }
@@ -379,9 +380,9 @@ namespace DuetControlServer.Commands
             Task<CodeResult> rrfTask;
             if (Channel == CodeChannel.File)
             {
-                using (await FileExecution.Print.LockAsync())
+                using (await FileExecution.Job.LockAsync())
                 {
-                    if (FileExecution.Print.IsPaused)
+                    if (FileExecution.Job.IsPaused)
                     {
                         throw new OperationCanceledException();
                     }
@@ -430,6 +431,45 @@ namespace DuetControlServer.Commands
                     ResolvedByInterceptor = InternallyProcessed = true;
                     return true;
                 }
+            }
+
+            // Evaluate echo commands
+            if (Keyword == KeywordType.Echo)
+            {
+                await Interface.Flush(this);
+
+                StringBuilder builder = new StringBuilder();
+                foreach (string expression in KeywordArgument.Split(','))
+                {
+                    string trimmedExpression = expression.Trim();
+                    try
+                    {
+                        // FIXME This should only replace Linux expressions and perform the final evaluation after Post
+                        bool expressionFound;
+                        object expressionResult;
+                        using (await Model.Provider.AccessReadOnlyAsync())
+                        {
+                            expressionFound = Model.Filter.GetSpecific(trimmedExpression, true, out expressionResult);
+                        }
+                        if (!expressionFound)
+                        {
+                            await Interface.EvaluateExpression(trimmedExpression);
+                        }
+
+                        if (builder.Length != 0)
+                        {
+                            builder.Append(' ');
+                        }
+                        builder.Append(expressionResult);
+                    }
+                    catch (CodeParserException e)
+                    {
+                        Result = new CodeResult(MessageType.Error, $"Failed to evaluate \"{trimmedExpression}\": {e.Message}");
+                        return true;
+                    }
+                }
+                Result = new CodeResult(MessageType.Success, builder.ToString());
+                return true;
             }
 
             // Attempt to process the code internally

@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Machine;
+using DuetControlServer.Files;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -76,7 +77,7 @@ namespace DuetControlServer.Utility
                 if (extruderDrive >= 0 && _filamentMapping.TryGetValue(extruderDrive, out string filamentName) && tool.Filament != filamentName)
                 {
                     // Tell RepRapFirmware about the loaded filament
-                    await SPI.Interface.AssignFilament(extruderDrive, filamentName);
+                    SPI.Interface.AssignFilament(extruderDrive, filamentName);
                 }
                 tool.PropertyChanged += ToolPropertyChanged;
             }

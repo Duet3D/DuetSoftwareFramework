@@ -1,4 +1,5 @@
-﻿using DuetAPI;
+﻿using DuetAPI.Commands;
+using DuetAPI.Machine;
 using Nito.AsyncEx;
 using System;
 using System.IO;
@@ -147,7 +148,7 @@ namespace DuetControlServer.Utility
         /// Write messages including timestamp to the log file
         /// </summary>
         /// <param name="result">Message list</param>
-        public static async Task Log(DuetAPI.Commands.CodeResult result)
+        public static async Task Log(CodeResult result)
         {
             if (result != null)
             {
@@ -174,7 +175,7 @@ namespace DuetControlServer.Utility
         /// </summary>
         /// <param name="result">Code result</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task LogOutput(DuetAPI.Commands.CodeResult result)
+        public static async Task LogOutput(CodeResult result)
         {
             if (result != null)
             {

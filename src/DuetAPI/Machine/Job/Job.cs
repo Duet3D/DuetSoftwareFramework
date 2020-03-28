@@ -1,30 +1,34 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
-    /// Information about the current file job (if any)
+    /// Information about the current job
     /// </summary>
-    public sealed class Job : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class Job : ModelObject
     {
         /// <summary>
-        /// Event to trigger when a property has changed
+        /// Information about the current build or null if not available
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        public Build Build
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            get => _build;
+            set => SetPropertyValue(ref _build, value);
         }
+        private Build _build;
+
+        /// <summary>
+        /// Total duration of the current job (in s or null)
+        /// </summary>
+        public float? Duration
+        {
+            get => _duration;
+			set => SetPropertyValue(ref _duration, value);
+        }
+        private float? _duration;
 
         /// <summary>
         /// Information about the file being processed
         /// </summary>
-        public ParsedFileInfo File { get; private set; } = new ParsedFileInfo();
+        public ParsedFileInfo File { get; } = new ParsedFileInfo();
         
         /// <summary>
         /// Current position in the file being processed (in bytes or null)
@@ -32,31 +36,27 @@ namespace DuetAPI.Machine
         public long? FilePosition
         {
             get => _filePosition;
-            set
-            {
-                if (_filePosition != value)
-                {
-                    _filePosition = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _filePosition, value);
         }
         private long? _filePosition;
-        
+
+        /// <summary>
+        /// Duration of the first layer (in s or null)
+        /// </summary>
+        public float? FirstLayerDuration
+        {
+            get => _firstLayerDuration;
+			set => SetPropertyValue(ref _firstLayerDuration, value);
+        }
+        private float? _firstLayerDuration;
+
         /// <summary>
         /// Name of the last file processed or null if none
         /// </summary>
         public string LastFileName
         {
             get => _lastFileName;
-            set
-            {
-                if (_lastFileName != value)
-                {
-                    _lastFileName = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _lastFileName, value);
         }
         private string _lastFileName;
 
@@ -66,14 +66,7 @@ namespace DuetAPI.Machine
         public bool LastFileAborted
         {
             get => _lastFileAborted;
-            set
-            {
-                if (_lastFileAborted != value)
-                {
-                    _lastFileAborted = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _lastFileAborted, value);
         }
         private bool _lastFileAborted;
         
@@ -83,14 +76,7 @@ namespace DuetAPI.Machine
         public bool LastFileCancelled
         {
             get => _lastFileCancelled;
-            set
-            {
-                if (_lastFileCancelled != value)
-                {
-                    _lastFileCancelled = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _lastFileCancelled, value);
         }
         private bool _lastFileCancelled;
 
@@ -101,70 +87,27 @@ namespace DuetAPI.Machine
         public bool LastFileSimulated
         {
             get => _lastFileSimulated;
-            set
-            {
-                if (_lastFileSimulated != value)
-                {
-                    _lastFileSimulated = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _lastFileSimulated, value);
         }
         private bool _lastFileSimulated;
 
         /// <summary>
-        /// Virtual amounts of extruded filament according to the G-code file (in mm)
-        /// </summary>
-        public ObservableCollection<float> ExtrudedRaw { get; } = new ObservableCollection<float>();
-        
-        /// <summary>
-        /// Total duration of the current job (in s)
-        /// </summary>
-        public float? Duration
-        {
-            get => _duration;
-            set
-            {
-                if (_duration != value)
-                {
-                    _duration = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private float? _duration;
-        
-        /// <summary>
-        /// Number of the current layer or 0 if none has been started yet
+        /// Number of the current layer or null not available
         /// </summary>
         public int? Layer
         {
             get => _layer;
-            set
-            {
-                if (_layer != value)
-                {
-                    _layer = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _layer, value);
         }
         private int? _layer;
         
         /// <summary>
-        /// Time elapsed since the beginning of the current layer (in s)
+        /// Time elapsed since the beginning of the current layer (in s or null)
         /// </summary>
         public float? LayerTime
         {
             get => _layerTime;
-            set
-            {
-                if (_layerTime != value)
-                {
-                    _layerTime = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _layerTime, value);
         }
         private float? _layerTime;
         
@@ -172,88 +115,21 @@ namespace DuetAPI.Machine
         /// Information about the past layers
         /// </summary>
         /// <seealso cref="Layer"/>
-        [JsonGrowingList]
-        public ObservableCollection<Layer> Layers { get; } = new ObservableCollection<Layer>();
-        
-        /// <summary>
-        /// Time needed to heat up the heaters (in s)
-        /// </summary>
-        public float? WarmUpDuration
-        {
-            get => _warmUpDuration;
-            set
-            {
-                if (_warmUpDuration != value)
-                {
-                    _warmUpDuration = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private float? _warmUpDuration;
+        public ModelGrowingCollection<Layer> Layers { get; } = new ModelGrowingCollection<Layer>();
         
         /// <summary>
         /// Estimated times left
         /// </summary>
-        public TimesLeft TimesLeft { get; private set; } = new TimesLeft();
+        public TimesLeft TimesLeft { get; } = new TimesLeft();
 
         /// <summary>
-        /// Assigns every property from another instance
+        /// Time needed to heat up the heaters (in s or null)
         /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
+        public float? WarmUpDuration
         {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is Job other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            File.Assign(other.File);
-            FilePosition = other.FilePosition;
-            LastFileName = other.LastFileName;
-            LastFileAborted = other.LastFileAborted;
-            LastFileCancelled = other.LastFileCancelled;
-            LastFileSimulated = other.LastFileSimulated;
-            ListHelpers.SetList(ExtrudedRaw, other.ExtrudedRaw);
-            Duration = other.Duration;
-            Layer = other.Layer;
-            LayerTime = other.LayerTime;
-            ListHelpers.AssignList(Layers, other.Layers);
-            WarmUpDuration = other.WarmUpDuration;
-            TimesLeft.Assign(other.TimesLeft);
+            get => _warmUpDuration;
+			set => SetPropertyValue(ref _warmUpDuration, value);
         }
-
-        /// <summary>
-        /// Creates a clone of this instance
-        /// </summary>
-        /// <returns>A clone of this instance</returns>
-        public object Clone()
-        {
-            Job clone = new Job
-            {
-                File = (ParsedFileInfo)File.Clone(),
-                FilePosition = FilePosition,
-                LastFileName = LastFileName,
-                LastFileAborted = LastFileAborted,
-                LastFileCancelled = LastFileCancelled,
-                LastFileSimulated = LastFileSimulated,
-                Duration = Duration,
-                Layer = Layer,
-                LayerTime = LayerTime,
-                WarmUpDuration = WarmUpDuration,
-                TimesLeft = (TimesLeft)TimesLeft.Clone()
-            };
-
-            ListHelpers.AddItems(clone.ExtrudedRaw, ExtrudedRaw);
-            ListHelpers.CloneItems(clone.Layers, Layers);
-
-            return clone;
-        }
+        private float? _warmUpDuration;
     }
 }

@@ -96,7 +96,6 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
         /// <seealso cref="GetMachineModel"/>
-        /// <seealso cref="JsonPatch.Patch(object, JsonDocument)"/>
         public async Task<JsonDocument> GetMachineModelPatch(CancellationToken cancellationToken = default)
         {
             JsonDocument patch = await ReceiveJson(cancellationToken);

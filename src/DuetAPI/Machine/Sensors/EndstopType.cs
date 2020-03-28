@@ -1,33 +1,37 @@
-﻿namespace DuetAPI.Machine
+﻿using DuetAPI.Utility;
+using System.Text.Json.Serialization;
+
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Type of a configured endstop
     /// </summary>
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
     public enum EndstopType
     {
         /// <summary>
-        /// The signal of the endstop is pulled from HIGH to LOW when hit
+        /// Generic input pin
         /// </summary>
-        ActiveLow = 0,
+        InputPin,
 
         /// <summary>
-        /// The signal of the endstop is pulled from LOW to HIGH when hit
+        /// Z-probe acts as an endstop
         /// </summary>
-        ActiveHigh,
+        ZProbeAsEndstop,
 
         /// <summary>
-        /// A probe is used for this endstop
-        /// </summary>
-        Probe,
-
-        /// <summary>
-        /// Motor load detection is used for this endstop (stop all when one motor stalls)
+        /// Motor stall detection stops all the drives when triggered
         /// </summary>
         MotorStallAny,
 
         /// <summary>
-        /// Motor load detection is used for this endstop (run each motor until it stalls)
+        /// Motor stall detection stops individual drives when triggered
         /// </summary>
-        MotorStallIndividual
+        MotorStallIndividual,
+
+        /// <summary>
+        /// Unknown type
+        /// </summary>
+        Unknown
     }
 }

@@ -1,3 +1,4 @@
+using DuetControlServer.SPI.Communication.Shared;
 using System.Runtime.InteropServices;
 
 namespace DuetControlServer.SPI.Communication.LinuxRequests
@@ -11,26 +12,31 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Letter prefix of this parameter
         /// </summary>
-        [FieldOffset(0)] public byte Letter;
+        [FieldOffset(0)]
+        public byte Letter;
 
         /// <summary>
         /// Type of the parameter
         /// </summary>
-        [FieldOffset(1)] public DataType Type;
+        [FieldOffset(1)]
+        public DataType Type;
             
         /// <summary>
         /// Value as integer
         /// </summary>
-        [FieldOffset(4)] public int IntValue;
+        [FieldOffset(4)]
+        public int IntValue;
         
         /// <summary>
         /// Value as unsigned integer
         /// </summary>
-        [FieldOffset(4)] public uint UIntValue;
+        [FieldOffset(4)]
+        public uint UIntValue;
         
         /// <summary>
         /// Value as float
         /// </summary>
-        [FieldOffset(4)] public float FloatValue;
+        [FieldOffset(4)]
+        public float FloatValue;
     }
 }

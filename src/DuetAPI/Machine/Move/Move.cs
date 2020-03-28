@@ -1,209 +1,95 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about the move subsystem
     /// </summary>
-    public sealed class Move : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class Move : ModelObject
     {
-        /// <summary>
-        /// Event to trigger when a property has changed
-        /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
         /// <summary>
         /// List of the configured axes
         /// </summary>
         /// <seealso cref="Axis"/>
-        public ObservableCollection<Axis> Axes { get; } = new ObservableCollection<Axis>();
-        
+        public ModelCollection<Axis> Axes { get; } = new ModelCollection<Axis>();
+
         /// <summary>
-        /// Current babystep amount in Z direction (in mm)
+        /// Information about the automatic calibration
         /// </summary>
-        public float BabystepZ
-        {
-            get => _babystepZ;
-            set
-            {
-                if (_babystepZ != value)
-                {
-                    _babystepZ = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private float _babystepZ;
+        public MoveCalibration Calibration { get; } = new MoveCalibration();
+
+        /// <summary>
+        /// Information about the currently configured compensation options
+        /// </summary>
+        public MoveCompensation Compensation { get; } = new MoveCompensation();
         
         /// <summary>
         /// Information about the current move
         /// </summary>
-        public CurrentMove CurrentMove { get; private set; } = new CurrentMove();
+        public CurrentMove CurrentMove { get; } = new CurrentMove();
 
         /// <summary>
-        /// Name of the currently used bed compensation (one of "Mesh", "[n] Point", "None")
+        /// Information about the configured dynamic acceleration adjustment
         /// </summary>
-        public string Compensation
-        {
-            get => _compensation;
-            set
-            {
-                if (_compensation != value)
-                {
-                    _compensation = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private string _compensation = "None";
+        public DAA DAA { get; } = new DAA();
 
-        /// <summary>
-        /// Path to the current heightmap file if Compensation is "Mesh"
-        /// </summary>
-        public string HeightmapFile
-        {
-            get => _heightmapFile;
-            set
-            {
-                if (_heightmapFile != value)
-                {
-                    _heightmapFile = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private string _heightmapFile;
-        
-        /// <summary>
-        /// List of configured drives
-        /// </summary>
-        /// <seealso cref="Drive"/>
-        public ObservableCollection<Drive> Drives { get; } = new ObservableCollection<Drive>();
-        
         /// <summary>
         /// List of configured extruders
         /// </summary>
         /// <seealso cref="Extruder"/>
-        public ObservableCollection<Extruder> Extruders { get; } = new ObservableCollection<Extruder>();
-        
-        /// <summary>
-        /// Information about the currently configured geometry
-        /// </summary>
-        public Geometry Geometry { get; private set; } = new Geometry();
+        public ModelCollection<Extruder> Extruders { get; } = new ModelCollection<Extruder>();
         
         /// <summary>
         /// Idle current reduction parameters
         /// </summary>
-        public MotorsIdleControl Idle { get; private set; } = new MotorsIdleControl();
+        public MotorsIdleControl Idle { get; } = new MotorsIdleControl();
 
         /// <summary>
-        /// Information about the configured mesh compensation (see M557)
+        /// Configured kinematics options
         /// </summary>
-        public ProbeGrid ProbeGrid { get; private set; } = new ProbeGrid();
-        
+        public Kinematics Kinematics
+        {
+            get => _kinematics;
+			set => SetPropertyValue(ref _kinematics, value);
+        }
+        private Kinematics _kinematics = new Kinematics();
+
         /// <summary>
-        /// Speed factor applied to every regular move (1.0 equals 100%)
+        /// Maximum acceleration allowed while printing (in mm/s^2)
+        /// </summary>
+        public float PrintingAcceleration
+        {
+            get => _printingAcceleration;
+			set => SetPropertyValue(ref _printingAcceleration, value);
+        }
+        private float _printingAcceleration = 10000F;
+
+        /// <summary>
+        /// Speed factor applied to every regular move (0.01..1 or greater)
         /// </summary>
         public float SpeedFactor
         {
             get => _speedFactor;
-            set
-            {
-                if (_speedFactor != value)
-                {
-                    _speedFactor = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _speedFactor, value);
         }
-        private float _speedFactor = 1.0F;
+        private float _speedFactor = 1F;
+
+        /// <summary>
+        /// Maximum acceleration allowed while travelling (in mm/s^2)
+        /// </summary>
+        public float TravelAcceleration
+        {
+            get => _travelAcceleration;
+			set => SetPropertyValue(ref _travelAcceleration, value);
+        }
+        private float _travelAcceleration = 10000F;
 
         /// <summary>
         /// Index of the currently selected workspace
         /// </summary>
-        public int CurrentWorkplace
+        public int WorkspaceNumber
         {
-            get => _currentWorkplace;
-            set
-            {
-                if (_currentWorkplace != value)
-                {
-                    _currentWorkplace = value;
-                    NotifyPropertyChanged();
-                }
-            }
+            get => _workspaceNumber;
+			set => SetPropertyValue(ref _workspaceNumber, value);
         }
-        private int _currentWorkplace;
-
-        /// <summary>
-        /// Axis offsets of each available workspace (in mm)
-        /// </summary>
-        /// <remarks>When modifying items, make sure to (re-)set an entire item to ensure the change events are called</remarks>
-        public ObservableCollection<float[]> WorkplaceCoordinates { get; } = new ObservableCollection<float[]>();
-
-        /// <summary>
-        /// Assigns every property of another instance of this one
-        /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
-        {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is Move other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            ListHelpers.AssignList(Axes, other.Axes);
-            BabystepZ = other.BabystepZ;
-            CurrentMove.Assign(other.CurrentMove);
-            Compensation = other.Compensation;
-            ListHelpers.AssignList(Drives, other.Drives);
-            ListHelpers.AssignList(Extruders, other.Extruders);
-            Geometry.Assign(other.Geometry);
-            Idle.Assign(other.Idle);
-            ProbeGrid.Assign(other.ProbeGrid);
-            SpeedFactor = other.SpeedFactor;
-            CurrentWorkplace = other.CurrentWorkplace;
-            ListHelpers.SetList(WorkplaceCoordinates, other.WorkplaceCoordinates);
-        }
-
-        /// <summary>
-        /// Creates a clone of this instance
-        /// </summary>
-        /// <returns>A clone of this instance</returns>
-        public object Clone()
-        {
-            Move clone = new Move
-            {
-                BabystepZ = BabystepZ,
-                CurrentMove = (CurrentMove)CurrentMove.Clone(),
-                Compensation = Compensation,
-                Geometry = (Geometry)Geometry.Clone(),
-                Idle = (MotorsIdleControl)Idle.Clone(),
-                ProbeGrid = (ProbeGrid)ProbeGrid.Clone(),
-                SpeedFactor = SpeedFactor
-            };
-
-            ListHelpers.CloneItems(clone.Axes, Axes);
-            ListHelpers.CloneItems(clone.Drives, Drives);
-            ListHelpers.CloneItems(clone.Extruders, Extruders);
-            ListHelpers.AddItems(clone.WorkplaceCoordinates, WorkplaceCoordinates);
-
-            return clone;
-        }
+        private int _workspaceNumber;
     }
 }

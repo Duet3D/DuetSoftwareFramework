@@ -1,7 +1,4 @@
 ﻿using DuetAPI.Utility;
-using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 
 namespace DuetAPI.Machine
 {
@@ -9,32 +6,15 @@ namespace DuetAPI.Machine
     /// Information about the configured probe grid (see M557)
     /// </summary>
     /// <seealso cref="Heightmap"/>
-    public class ProbeGrid : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class ProbeGrid : ModelObject
     {
-        /// <summary>
-        /// Event to trigger when a property has changed
-        /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
         /// <summary>
         /// X start coordinate of the heightmap
         /// </summary>
         public float XMin
         {
             get => _xMin;
-            set
-            {
-                if (value != _xMin)
-                {
-                    _xMin = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _xMin, value);
         }
         private float _xMin;
 
@@ -44,14 +24,7 @@ namespace DuetAPI.Machine
         public float XMax
         {
             get => _xMax;
-            set
-            {
-                if (value != _xMax)
-                {
-                    _xMax = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _xMax, value);
         }
         private float _xMax;
 
@@ -61,14 +34,7 @@ namespace DuetAPI.Machine
         public float XSpacing
         {
             get => _xSpacing;
-            set
-            {
-                if (value != _xSpacing)
-                {
-                    _xSpacing = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _xSpacing, value);
         }
         private float _xSpacing;
 
@@ -78,14 +44,7 @@ namespace DuetAPI.Machine
         public float YMin
         {
             get => _yMin;
-            set
-            {
-                if (value != _yMin)
-                {
-                    _yMin = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _yMin, value);
         }
         private float _yMin;
 
@@ -95,15 +54,8 @@ namespace DuetAPI.Machine
         public float YMax
         {
             get => _yMax;
-            set
-            {
-                if (value != _yMax)
-                {
-                    _yMax = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
+			set => SetPropertyValue(ref _yMax, value);
+         }
         private float _yMax;
 
         /// <summary>
@@ -112,14 +64,7 @@ namespace DuetAPI.Machine
         public float YSpacing
         {
             get => _ySpacing;
-            set
-            {
-                if (value != _ySpacing)
-                {
-                    _ySpacing = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _ySpacing, value);
         }
         private float _ySpacing;
 
@@ -129,77 +74,8 @@ namespace DuetAPI.Machine
         public float Radius
         {
             get => _radius;
-            set
-            {
-                if (value != _radius)
-                {
-                    _radius = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _radius, value);
         }
         private float _radius;
-
-        /// <summary>
-        /// Spacing between the probe points for delta kinematics
-        /// </summary>
-        public float Spacing
-        {
-            get => _spacing;
-            set
-            {
-                if (value != _spacing)
-                {
-                    _spacing = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private float _spacing;
-
-        /// <summary>
-        /// Assigns every property from another instance
-        /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
-        {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is ProbeGrid other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            XMin = other.XMin;
-            XMax = other.XMax;
-            XSpacing = other.XSpacing;
-            YMin = other.YMin;
-            YMax = other.YMax;
-            YSpacing = other.YSpacing;
-            Radius = other.Radius;
-        }
-
-        /// <summary>
-        /// Creates a clone of this instance
-        /// </summary>
-        /// <returns>A clone of this instance</returns>
-        public object Clone()
-        {
-            ProbeGrid clone = new ProbeGrid
-            {
-                XMin = XMin,
-                XMax = XMax,
-                XSpacing = XSpacing,
-                YMin = YMin,
-                YMax = YMax,
-                YSpacing = YSpacing,
-                Radius = Radius
-            };
-            return clone;
-        }
     }
 }

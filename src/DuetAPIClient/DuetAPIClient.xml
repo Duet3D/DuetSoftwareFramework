@@ -614,7 +614,7 @@
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="T:DuetAPI.Commands.Ignore"/>
         </member>
-        <member name="M:DuetAPIClient.InterceptConnection.ResolveCode(DuetAPI.MessageType,System.String,System.Threading.CancellationToken)">
+        <member name="M:DuetAPIClient.InterceptConnection.ResolveCode(DuetAPI.Machine.MessageType,System.String,System.Threading.CancellationToken)">
             <summary>
             Instruct the control server to resolve the last received code with the given message details (in intercepting mode)
             </summary>
@@ -624,7 +624,7 @@
             <returns>Asynchronous task</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
-            <seealso cref="T:DuetAPI.Message"/>
+            <seealso cref="T:DuetAPI.Machine.Message"/>
             <seealso cref="T:DuetAPI.Commands.Resolve"/>
         </member>
         <member name="T:DuetAPIClient.SubscribeConnection">
@@ -694,7 +694,6 @@
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Receipt could not be acknowledged</exception>
             <seealso cref="M:DuetAPIClient.SubscribeConnection.GetMachineModel(System.Threading.CancellationToken)"/>
-            <seealso cref="M:DuetAPI.Utility.JsonPatch.Patch(System.Object,System.Text.Json.JsonDocument)"/>
         </member>
     </members>
 </doc>

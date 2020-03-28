@@ -3,10 +3,10 @@ using System.Runtime.InteropServices;
 namespace DuetControlServer.SPI.Communication.LinuxRequests
 {
     /// <summary>
-    /// Response to a <see cref="FirmwareRequests.FileChunkRequest"/>.
+    /// Response to a <see cref="FirmwareRequests.FileChunkHeader"/>.
     /// This is followed by the payload if Length is greater than 0
     /// </summary>
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, Size = 8)]
     public struct FileChunk
     {
         /// <summary>

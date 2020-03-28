@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
+using DuetAPI.Machine;
 using DuetAPI.Utility;
+using DuetControlServer.Files;
 
 namespace DuetControlServer.Codes
 {
@@ -58,9 +60,9 @@ namespace DuetControlServer.Codes
                                         string virtualFile = await FilePath.ToVirtualAsync(physicalFile);
                                         using (await Model.Provider.AccessReadWriteAsync())
                                         {
-                                            Model.Provider.Get.Move.HeightmapFile = virtualFile;
+                                            Model.Provider.Get.Move.Compensation.File = virtualFile;
                                         }
-                                        return new CodeResult(DuetAPI.MessageType.Success, $"Height map loaded from file {file}");
+                                        return new CodeResult(MessageType.Success, $"Height map loaded from file {file}");
                                     }
                                     else
                                     {
@@ -73,9 +75,9 @@ namespace DuetControlServer.Codes
                                             string virtualFile = await FilePath.ToVirtualAsync(physicalFile);
                                             using (await Model.Provider.AccessReadWriteAsync())
                                             {
-                                                Model.Provider.Get.Move.HeightmapFile = virtualFile;
+                                                Model.Provider.Get.Move.Compensation.File = virtualFile;
                                             }
-                                            return new CodeResult(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
+                                            return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
                                         }
                                         return new CodeResult();
                                     }
@@ -88,7 +90,7 @@ namespace DuetControlServer.Codes
                                 {
                                     e = ae.InnerException;
                                 }
-                                return new CodeResult(DuetAPI.MessageType.Error, $"Failed to {(cp == 1 ? "load" : "save")} height map {(cp == 1 ? "from" : "to")} file {file}: {e.Message}");
+                                return new CodeResult(MessageType.Error, $"Failed to {(cp == 1 ? "load" : "save")} height map {(cp == 1 ? "from" : "to")} file {file}: {e.Message}");
                             }
                         }
                         throw new OperationCanceledException();
@@ -121,13 +123,13 @@ namespace DuetControlServer.Codes
                     {
                         using (await Model.Provider.AccessReadWriteAsync())
                         {
-                            if (Model.Provider.Get.Channels[code.Channel].UsingInches)
+                            if (Model.Provider.Get.Inputs[code.Channel].DistanceUnit == DistanceUnit.Inch)
                             {
-                                Model.Provider.Get.Channels[code.Channel].Feedrate = feedrate / 25.4F;
+                                Model.Provider.Get.Inputs[code.Channel].FeedRate = feedrate / (25.4F * 60F);
                             }
                             else
                             {
-                                Model.Provider.Get.Channels[code.Channel].Feedrate = feedrate;
+                                Model.Provider.Get.Inputs[code.Channel].FeedRate = feedrate / 60F;
                             }
                         }
                     }
@@ -137,7 +139,7 @@ namespace DuetControlServer.Codes
                 case 20:
                     using (await Model.Provider.AccessReadWriteAsync())
                     {
-                        Model.Provider.Get.Channels[code.Channel].UsingInches = true;
+                        Model.Provider.Get.Inputs[code.Channel].DistanceUnit = DistanceUnit.Inch;
                     }
                     break;
 
@@ -145,7 +147,7 @@ namespace DuetControlServer.Codes
                 case 21:
                     using (await Model.Provider.AccessReadWriteAsync())
                     {
-                        Model.Provider.Get.Channels[code.Channel].UsingInches = false;
+                        Model.Provider.Get.Inputs[code.Channel].DistanceUnit = DistanceUnit.MM;
                     }
                     break;
 
@@ -177,9 +179,9 @@ namespace DuetControlServer.Codes
                                     string virtualFile = await FilePath.ToVirtualAsync(physicalFile);
                                     using (await Model.Provider.AccessReadWriteAsync())
                                     {
-                                        Model.Provider.Get.Move.HeightmapFile = virtualFile;
+                                        Model.Provider.Get.Move.Compensation.File = virtualFile;
                                     }
-                                    code.Result.Add(DuetAPI.MessageType.Success, $"Height map saved to file {file}");
+                                    code.Result.Add(MessageType.Success, $"Height map saved to file {file}");
                                 }
                             }
                         }
@@ -190,7 +192,7 @@ namespace DuetControlServer.Codes
                             {
                                 e = ae.InnerException;
                             }
-                            code.Result.Add(DuetAPI.MessageType.Error, $"Failed to save height map to file {file}: {e.Message}");
+                            code.Result.Add(MessageType.Error, $"Failed to save height map to file {file}: {e.Message}");
                         }
                     }
                     break;
@@ -199,7 +201,7 @@ namespace DuetControlServer.Codes
                 case 90:
                     using (await Model.Provider.AccessReadWriteAsync())
                     {
-                        Model.Provider.Get.Channels[code.Channel].RelativePositioning = false;
+                        Model.Provider.Get.Inputs[code.Channel].AxesRelative = false;
                     }
                     break;
 
@@ -207,7 +209,7 @@ namespace DuetControlServer.Codes
                 case 91:
                     using (await Model.Provider.AccessReadWriteAsync())
                     {
-                        Model.Provider.Get.Channels[code.Channel].RelativePositioning = true;
+                        Model.Provider.Get.Inputs[code.Channel].AxesRelative = true;
                     }
                     break;
             }

@@ -1,9 +1,9 @@
 ﻿namespace DuetAPI.Machine
 {
     /// <summary>
-    /// State of a heater (also see RepRapFirmware)
+    /// State of a heater
     /// </summary>
-    public enum HeaterState
+    public enum HeaterState : int
     {
         /// <summary>
         /// Heater is turned off

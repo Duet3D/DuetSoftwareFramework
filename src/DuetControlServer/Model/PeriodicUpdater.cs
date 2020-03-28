@@ -1,4 +1,5 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.Machine;
 using System;
 using System.IO;
@@ -46,7 +47,7 @@ namespace DuetControlServer.Model
                     Code code = new Code
                     {
                         InternallyProcessed = true,
-                        Channel = DuetAPI.CodeChannel.Trigger,
+                        Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
                         MajorNumber = 905
                     };
@@ -89,7 +90,7 @@ namespace DuetControlServer.Model
                     }
                     index++;
 
-                    networkInterface.MacAddress = iface.GetPhysicalAddress().ToString();
+                    networkInterface.Mac = BitConverter.ToString(iface.GetPhysicalAddress().GetAddressBytes()).Replace('-', ':');
                     networkInterface.ActualIP = ipInfo.Address.ToString();
                     networkInterface.ConfiguredIP = ipInfo.Address.ToString();
                     networkInterface.Subnet = ipInfo.IPv4Mask.ToString();
@@ -132,22 +133,22 @@ namespace DuetControlServer.Model
 
                 if (drive.DriveType != DriveType.Ram && totalSize > 0)
                 {
-                    Storage storage;
-                    if (index >= Provider.Get.Storages.Count)
+                    Volume volume;
+                    if (index >= Provider.Get.Volumes.Count)
                     {
-                        storage = new Storage();
-                        Provider.Get.Storages.Add(storage);
+                        volume = new Volume();
+                        Provider.Get.Volumes.Add(volume);
                     }
                     else
                     {
-                        storage = Provider.Get.Storages[index];
+                        volume = Provider.Get.Volumes[index];
                     }
                     index++;
 
-                    storage.Capacity = (drive.DriveType == DriveType.Network) ? null : (long?)totalSize;
-                    storage.Free = (drive.DriveType == DriveType.Network) ? null : (long?)drive.AvailableFreeSpace;
-                    storage.Mounted = drive.IsReady;
-                    storage.Path = drive.VolumeLabel;
+                    volume.Capacity = (drive.DriveType == DriveType.Network) ? null : (long?)totalSize;
+                    volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : (long?)drive.AvailableFreeSpace;
+                    volume.Mounted = drive.IsReady;
+                    volume.Path = drive.VolumeLabel;
                 }
             }
 
@@ -166,7 +167,6 @@ namespace DuetControlServer.Model
             {
                 if (Provider.Get.Messages[i].Time - DateTime.Now > TimeSpan.FromSeconds(Settings.MaxMessageAge))
                 {
-                    // A call to ListHelpers.RemoveItem is not needed here because this collection is cleared after the first query anyway
                     Provider.Get.Messages.RemoveAt(i);
                 }
             }

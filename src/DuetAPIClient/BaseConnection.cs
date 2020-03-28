@@ -199,17 +199,16 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Connection has been closed</exception>
         protected async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
-            using JsonDocument jsonDoc = await ReceiveJson(cancellationToken);
+            using JsonDocument jsonDocument = await ReceiveJson(cancellationToken);
             if (typeof(T) == typeof(DuetAPI.Machine.MachineModel))
             {
-                // FIXME: JsonSerializer does not populate readonly properties like ObservableCollections (yet)
-                T obj = (T)Activator.CreateInstance(typeof(T));
-                JsonPatch.Patch(obj, jsonDoc);
-                return obj;
+                DuetAPI.Machine.MachineModel newModel = new DuetAPI.Machine.MachineModel();
+                newModel.UpdateFromJson(jsonDocument.RootElement);
+                return (T)(object)newModel;
             }
             else
             {
-                return JsonSerializer.Deserialize<T>(jsonDoc.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                return JsonSerializer.Deserialize<T>(jsonDocument.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
             }
         }
 

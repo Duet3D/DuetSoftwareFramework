@@ -19,7 +19,7 @@ namespace DuetControlServer.SPI.Communication
         /// <summary>
         /// Used protocol version. This is incremented whenever the protocol details change
         /// </summary>
-        public const ushort ProtocolVersion = 1;
+        public const ushort ProtocolVersion = 2;
 
         /// <summary>
         /// Size of a packet transfer buffer

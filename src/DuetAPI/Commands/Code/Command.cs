@@ -51,7 +51,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Code channel to send this code to
         /// </summary>
-        public CodeChannel Channel { get; set; } = Defaults.Channel;
+        public CodeChannel Channel { get; set; } = Defaults.InputChannel;
 
         /// <summary>
         /// Line number of this code
@@ -121,7 +121,7 @@ namespace DuetAPI.Commands
         {
             Result = null;
             Type = CodeType.Comment;
-            Channel = Defaults.Channel;
+            Channel = Defaults.InputChannel;
             if (!keepLineNumber)
             {
                 LineNumber = null;

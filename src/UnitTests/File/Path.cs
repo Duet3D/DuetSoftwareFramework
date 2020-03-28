@@ -1,4 +1,4 @@
-﻿using DuetControlServer;
+﻿using DuetControlServer.Files;
 using NUnit.Framework;
 using System.Threading.Tasks;
 
@@ -32,7 +32,7 @@ namespace UnitTests.File
             string sysFile = await FilePath.ToPhysicalAsync("test.g", FileDirectory.System);
             Assert.AreEqual("/opt/dsf/sd/sys/test.g", sysFile);
 
-            string wwwFile = await FilePath.ToPhysicalAsync("index.html", FileDirectory.WWW);
+            string wwwFile = await FilePath.ToPhysicalAsync("index.html", FileDirectory.Web);
             Assert.AreEqual("/opt/dsf/sd/www/index.html", wwwFile);
         }
 

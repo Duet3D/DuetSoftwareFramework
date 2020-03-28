@@ -1,24 +1,19 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about a heater
     /// </summary>
-    public sealed class Heater : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class Heater : ModelObject
     {
         /// <summary>
-        /// Event to trigger when a property has changed
+        /// Active temperature of the heater (in C)
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        public float Active
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            get => _active;
+			set => SetPropertyValue(ref _active, value);
         }
+        private float _active;
 
         /// <summary>
         /// Current temperature of the heater (in C)
@@ -26,133 +21,84 @@ namespace DuetAPI.Machine
         public float Current
         {
             get => _current;
-            set
-            {
-                if (_current != value)
-                {
-                    _current = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _current, value);
         }
         private float _current = -273.15F;
-        
-        /// <summary>
-        /// Name of the heater or null if unset
-        /// </summary>
-        public string Name
-        {
-            get => _name;
-            set
-            {
-                if (_name != value)
-                {
-                    _name = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private string _name;
-        
-        /// <summary>
-        /// State of the heater
-        /// </summary>
-        public HeaterState? State
-        {
-            get => _state;
-            set
-            {
-                if (_state != value)
-                {
-                    _state = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private HeaterState? _state;
-        
-        /// <summary>
-        /// Information about the heater model
-        /// </summary>
-        public HeaterModel Model { get; private set; } = new HeaterModel();
-        
+
         /// <summary>
         /// Maximum allowed temperature for this heater (in C)
         /// </summary>
         /// <remarks>
         /// This is only temporary and should be replaced by a representation of the heater protection as in RRF
         /// </remarks>
-        public float? Max
+        public float Max
         {
             get => _max;
-            set
-            {
-                if (_max != value)
-                {
-                    _max = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _max, value);
         }
-        private float? _max;
-        
+        private float _max = 285F;
+
         /// <summary>
-        /// Sensor number (thermistor index) of this heater or null if unknown
+        /// Maximum allowed temperature for this heater (in C)
         /// </summary>
-        public int? Sensor
+        /// <remarks>
+        /// This is only temporary and should be replaced by a representation of the heater protection as in RRF
+        /// </remarks>
+        public float Min
+        {
+            get => _min;
+			set => SetPropertyValue(ref _min, value);
+        }
+        private float _min = -10F;
+
+        /// <summary>
+        /// Information about the heater model
+        /// </summary>
+        public HeaterModel Model { get; } = new HeaterModel();
+
+        /// <summary>
+        /// Monitors of this heater
+        /// </summary>
+        public ModelCollection<HeaterMonitor> Monitors { get; } = new ModelCollection<HeaterMonitor>();
+
+        /// <summary>
+        /// Name of the heater or null if unset
+        /// </summary>
+        public string Name
+        {
+            get => _name;
+			set => SetPropertyValue(ref _name, value);
+        }
+        private string _name;
+
+        /// <summary>
+        /// Sensor number of this heater or -1 if not configured
+        /// </summary>
+        public int Sensor
         {
             get => _sensor;
-            set
-            {
-                if (_sensor != value)
-                {
-                    _sensor = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _sensor, value);
         }
-        private int? _sensor;
+        private int _sensor;
 
         /// <summary>
-        /// Assigns every property from another instance
+        /// Standby temperature of the heater (in C)
         /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
+        public float Standby
         {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is Heater other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            Current = other.Current;
-            Name = other.Name;
-            State = other.State;
-            Model.Assign(other.Model);
-            Max = other.Max;
-            Sensor = other.Sensor;
+            get => _standby;
+			set => SetPropertyValue(ref _standby, value);
         }
+        private float _standby;
 
         /// <summary>
-        /// Creates a clone of this instance
+        /// State of the heater
         /// </summary>
-        /// <returns>A clone of this instance</returns>
-        public object Clone()
+        public HeaterState? State
         {
-            return new Heater
-            {
-                Current = Current,
-                Name = Name,
-                State = State,
-                Model = (HeaterModel)Model.Clone(),
-                Max = Max,
-                Sensor = Sensor
-            };
+            get => _state;
+			set => SetPropertyValue(ref _state, value);
         }
+        private HeaterState? _state;
     }
 }

@@ -23,6 +23,6 @@
         /// <summary>
         /// Default code channel to use
         /// </summary>
-        public const CodeChannel Channel = CodeChannel.SPI;
+        public const CodeChannel InputChannel = CodeChannel.SBC;
     }
 }

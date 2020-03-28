@@ -14,51 +14,72 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// <summary>
         /// Response to an object model request
         /// </summary>
+        /// <seealso cref="Shared.StringHeader"/>
         ObjectModel = 1,
 
         /// <summary>
         /// Update about the available code buffer size
         /// </summary>
+        /// <seealso cref="CodeBufferUpdateHeader"/>
         CodeBufferUpdate = 2,
         
         /// <summary>
-        /// Response to a G/M/T-code
+        /// Message from the firmware
         /// </summary>
-        CodeReply = 3,
+        /// <seealso cref="Shared.MessageHeader"/>
+        Message = 3,
 
         /// <summary>
         /// Request execution of a macro file
         /// </summary>
+        /// <seealso cref="ExecuteMacroHeader"/>
         ExecuteMacro = 4,
 
         /// <summary>
         /// Request all files of the code channel to be closed
         /// </summary>
+        /// <seealso cref="AbortFileHeader"/>
         AbortFile = 5,
         
         /// <summary>
-        /// Stack has been changed
+        /// Stack has been changed. This is no longer used
         /// </summary>
-        StackEvent = 6,
-        
+        StackEvent_Obsolete = 6,
+
         /// <summary>
         /// Print has been paused
         /// </summary>
+        /// <seealso cref="PrintPausedHeader"/>
         PrintPaused = 7,
         
         /// <summary>
         /// Response to a heightmap request
         /// </summary>
+        /// <seealso cref="Shared.HeightMapHeader"/>
         HeightMap = 8,
 
         /// <summary>
         /// Ressource locked
         /// </summary>
+        /// <seealso cref="Shared.LockUnlockHeader"/>
         Locked = 9,
 
         /// <summary>
         /// Request another chunk of a file
         /// </summary>
-        RequestFileChunk = 10
+        /// <seealso cref="FileChunkHeader"/>
+        FileChunk = 10,
+
+        /// <summary>
+        /// Response to an expression evaluation request
+        /// </summary>
+        /// <seealso cref="EvaluationResultHeader"/>
+        EvaluationResult = 11,
+
+        /// <summary>
+        /// Perform a G/M/T-code from a RepRapFirmware code input
+        /// </summary>
+        /// <seealso cref="DoCodeHeader"/>
+        DoCode = 12
     }
 }

@@ -147,14 +147,14 @@ namespace DuetWebServer.Services
                         // Keep track of the web directory
                         _commandConnection = commandConnection;
                         model.Directories.PropertyChanged += Directories_PropertyChanged;
-                        string wwwDirectory = await commandConnection.ResolvePath(model.Directories.WWW);
+                        string wwwDirectory = await commandConnection.ResolvePath(model.Directories.Web);
                         OnWebDirectoryChanged?.Invoke(wwwDirectory);
 
                         do
                         {
                             // Wait for more updates
                             using JsonDocument jsonPatch = await subscribeConnection.GetMachineModelPatch(_stopRequest.Token);
-                            DuetAPI.Utility.JsonPatch.Patch(model, jsonPatch);
+                            model.UpdateFromJson(jsonPatch.RootElement);
 
                             // Check if the HTTP sessions have changed and rebuild them on demand
                             if (jsonPatch.RootElement.TryGetProperty("httpEndpoints", out _))
@@ -187,7 +187,7 @@ namespace DuetWebServer.Services
                                 }
                             }
                         }
-                        while (!!_stopRequest.IsCancellationRequested);
+                        while (!_stopRequest.IsCancellationRequested);
                     }
                     catch (Exception e) when (!(e is OperationCanceledException))
                     {
@@ -213,10 +213,10 @@ namespace DuetWebServer.Services
         /// <param name="e">Information about the changed property</param>
         private async void Directories_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(Directories.WWW))
+            if (e.PropertyName == nameof(Directories.Web))
             {
                 Directories directories = (Directories)sender;
-                string path = await _commandConnection.ResolvePath(directories.WWW);
+                string path = await _commandConnection.ResolvePath(directories.Web);
                 OnWebDirectoryChanged?.Invoke(path);
             }
         }

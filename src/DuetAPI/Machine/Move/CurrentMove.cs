@@ -1,39 +1,37 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about the current move
     /// </summary>
-    public sealed class CurrentMove : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class CurrentMove : ModelObject
     {
         /// <summary>
-        /// Event to trigger when a property has changed
+        /// Acceleration of the current move (in mm/s^2)
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        public float Acceleration
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            get => _acceleration;
+			set => SetPropertyValue(ref _acceleration, value);
         }
-
+        private float _acceleration;
+        
+        /// <summary>
+        /// Deceleration of the current move (in mm/s^2)
+        /// </summary>
+        public float Deceleration
+        {
+            get => _deceleration;
+			set => SetPropertyValue(ref _deceleration, value);
+        }
+        private float _deceleration;
+        
         /// <summary>
         /// Requested speed of the current move (in mm/s)
         /// </summary>
         public float RequestedSpeed
         {
             get => _requestedSpeed;
-            set
-            {
-                if (_requestedSpeed != value)
-                {
-                    _requestedSpeed = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _requestedSpeed, value);
         }
         private float _requestedSpeed;
         
@@ -43,49 +41,8 @@ namespace DuetAPI.Machine
         public float TopSpeed
         {
             get => _topSpeed;
-            set
-            {
-                if (_topSpeed != value)
-                {
-                    _topSpeed = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _topSpeed, value);
         }
         private float _topSpeed;
-
-        /// <summary>
-        /// Assigns every property of another instance of this one
-        /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
-        {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is CurrentMove other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            RequestedSpeed = other.RequestedSpeed;
-            TopSpeed = other.TopSpeed;
-        }
-
-        /// <summary>
-        /// Creates a clone of this instance
-        /// </summary>
-        /// <returns>A clone of this instance</returns>
-        public object Clone()
-        {
-            return new CurrentMove
-            {
-                RequestedSpeed = RequestedSpeed,
-                TopSpeed = TopSpeed
-            };
-        }
     }
 }

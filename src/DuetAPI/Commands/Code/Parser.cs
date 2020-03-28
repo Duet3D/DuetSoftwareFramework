@@ -7,7 +7,7 @@ namespace DuetAPI.Commands
     public partial class Code
     {
         // Numeric parameters may hold only characters of this string 
-        private const string NumericParameterChars = "01234567890+-.e:";
+        private const string NumericParameterChars = "01234567890+-.e";
 
         /// <summary>
         /// Parse the next available G/M/T-code from the given stream
@@ -134,7 +134,7 @@ namespace DuetAPI.Commands
                         else
                         {
                             // Starting numeric or string parameter
-                            isNumericParameter = (c != 'e') && (NumericParameterChars.Contains(c)) && !unprecedentedParameter;
+                            isNumericParameter = (c != 'e') && (c == ':' || NumericParameterChars.Contains(c)) && !unprecedentedParameter;
                             value += c;
                         }
                     }
@@ -177,7 +177,7 @@ namespace DuetAPI.Commands
                     else if (endingChunk ||
                         (unprecedentedParameter && c == '\n') ||
                         (!unprecedentedParameter && char.IsWhiteSpace(c)) ||
-                        (isNumericParameter && !NumericParameterChars.Contains(c)))
+                        (isNumericParameter && c != ':' && !NumericParameterChars.Contains(c)))
                     {
                         // Parameter has ended
                         inChunk = endingChunk = false;
@@ -429,7 +429,7 @@ namespace DuetAPI.Commands
                 throw new CodeParserException("Too many parameters (> 255)", result);
             }
 
-            // M584, M569 and M915 use driver identifiers
+            // M569, M584, and M915 use driver identifiers
             if (result.Type == CodeType.MCode)
             {
                 try
@@ -440,9 +440,9 @@ namespace DuetAPI.Commands
                         case 915:
                             foreach (CodeParameter parameter in result.Parameters)
                             {
-                                if (char.ToUpperInvariant(parameter.Letter) == 'P')
+                                if (!parameter.IsExpression && char.ToUpperInvariant(parameter.Letter) == 'P')
                                 {
-                                    parameter.ConvertDriverIds();
+                                    parameter.ConvertDriverIds(result);
                                 }
                             }
                             break;
@@ -450,9 +450,9 @@ namespace DuetAPI.Commands
                         case 584:
                             foreach (CodeParameter parameter in result.Parameters)
                             {
-                                if ("XYZUVWABCE".Contains(char.ToUpperInvariant(parameter.Letter)))
+                                if (!parameter.IsExpression && Machine.Axis.Letters.Contains(char.ToUpperInvariant(parameter.Letter)))
                                 {
-                                    parameter.ConvertDriverIds();
+                                    parameter.ConvertDriverIds(result);
                                 }
                             }
                             break;
@@ -468,18 +468,26 @@ namespace DuetAPI.Commands
             return contentRead;
         }
 
+        /// <summary>
+        /// Add a new parameter to a given <see cref="Code"/> instance
+        /// </summary>
+        /// <param name="code">Code to add the parameter to</param>
+        /// <param name="letter">Letter of the parameter to 0 if unprecedented</param>
+        /// <param name="value">Value of the parameter</param>
+        /// <param name="isQuoted">Whether the parameter is a quoted string</param>
+        /// <param name="isSingleParameter">Whether the parameter is definitely a single parameter</param>
         private static void AddParameter(Code code, char letter, string value, bool isQuoted, bool isSingleParameter)
         {
             if (isQuoted || isSingleParameter)
             {
-                code.Parameters.Add(new CodeParameter(letter, value, isQuoted));
+                code.Parameters.Add(new CodeParameter(letter, value, isQuoted, false));
             }
             else
             {
-                code.Parameters.Add(new CodeParameter(letter, string.Empty, false));
+                code.Parameters.Add(new CodeParameter(letter, string.Empty, false, false));
                 foreach (char c in value)
                 {
-                    code.Parameters.Add(new CodeParameter(c, string.Empty, false));
+                    code.Parameters.Add(new CodeParameter(c, string.Empty, false, false));
                 }
             }
         }

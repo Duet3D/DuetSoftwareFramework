@@ -1,11 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI;
+using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.LinuxRequests;
+using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.SPI.Serialization;
 using NUnit.Framework;
 using Code = DuetControlServer.Commands.Code;
@@ -72,7 +73,7 @@ namespace UnitTests.SPI
 
             // Header
             Assert.AreEqual((byte)CodeChannel.HTTP, span[0]);
-            Assert.AreEqual((byte)(SpiCodeFlags.HasMajorCommandNumber | SpiCodeFlags.EnforceAbsolutePosition), span[1]);
+            Assert.AreEqual((byte)(CodeFlags.HasMajorCommandNumber | CodeFlags.EnforceAbsolutePosition), span[1]);
             Assert.AreEqual(0, span[2]);                    // Number of parameters
             byte codeLetter = (byte)'G';
             Assert.AreEqual(codeLetter, span[3]);
@@ -102,7 +103,7 @@ namespace UnitTests.SPI
             
             // Header
             Assert.AreEqual((byte)CodeChannel.File, span[0]);
-            Assert.AreEqual((byte)SpiCodeFlags.HasMajorCommandNumber, span[1]);
+            Assert.AreEqual((byte)CodeFlags.HasMajorCommandNumber, span[1]);
             Assert.AreEqual(5, span[2]);                    // Number of parameters
             Assert.AreEqual((byte)'G', span[3]);            // Code letter
             int majorCode = MemoryMarshal.Read<int>(span.Slice(4, 4));
@@ -162,16 +163,26 @@ namespace UnitTests.SPI
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
-            
-            int bytesWritten = Writer.WriteObjectModelRequest(span, 5);
-            Assert.AreEqual(4, bytesWritten);
+
+            int bytesWritten = Writer.WriteGetObjectModel(span, "move", "d99vn");
+            Assert.AreEqual(16, bytesWritten);
 
             // Header
-            Assert.AreEqual(0, MemoryMarshal.Read<ushort>(span));   // Length
-            Assert.AreEqual(5, span[2]);                            // Module
+            Assert.AreEqual(4, MemoryMarshal.Read<ushort>(span));               // Key length
+            Assert.AreEqual(5, MemoryMarshal.Read<ushort>(span.Slice(2, 2)));   // Flags length
+
+            // Key
+            string key = Encoding.UTF8.GetString(span.Slice(4, 4));
+            Assert.AreEqual("move", key);
+
+            // Flags
+            string flags = Encoding.UTF8.GetString(span.Slice(8, 5));
+            Assert.AreEqual("d99vn", flags);
 
             // Padding
-            Assert.AreEqual(0, span[3]);
+            Assert.AreEqual(0, span[13]);
+            Assert.AreEqual(0, span[14]);
+            Assert.AreEqual(0, span[15]);
         }
         
         [Test]
@@ -180,7 +191,7 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
             
-            int bytesWritten = Writer.WriteObjectModel(span, "foobar", "myval");
+            int bytesWritten = Writer.WriteSetObjectModel(span, "foobar", "myval");
             Assert.AreEqual(24, bytesWritten);
             
             // Header
@@ -198,6 +209,8 @@ namespace UnitTests.SPI
             // Field value
             string value = Encoding.UTF8.GetString(span.Slice(16, 5));
             Assert.AreEqual("myval", value);
+
+            // Padding
             Assert.AreEqual(0, span[21]);
             Assert.AreEqual(0, span[22]);
             Assert.AreEqual(0, span[23]);
@@ -216,13 +229,13 @@ namespace UnitTests.SPI
                 FirstLayerHeight = 0.3F,
                 GeneratedBy = "Slic3r",
                 Height = 53.4F,
-                LastModified = new DateTime(2014, 11, 23),
                 NumLayers = 343,
-                Filament = new List<float> { 123.45F, 678.9F },
                 LayerHeight = 0.2F,
                 PrintTime = 12355,
                 SimulatedTime = 10323
             };
+            info.Filament.Add(123.45F);
+            info.Filament.Add(678.9F);
             
             int bytesWritten = Writer.WritePrintStarted(span, info);
             Assert.AreEqual(72, bytesWritten);
@@ -234,9 +247,6 @@ namespace UnitTests.SPI
             Assert.AreEqual(6, generatedByLength);
             uint numFilaments = MemoryMarshal.Read<uint>(span.Slice(4, 4));
             Assert.AreEqual(2, numFilaments);
-            ulong expectedModifiedDate = (ulong)(info.LastModified.Value - new DateTime (1970, 1, 1)).TotalSeconds;
-            ulong modifiedDate = MemoryMarshal.Read<ulong>(span.Slice(8, 8));
-            Assert.AreEqual(expectedModifiedDate, modifiedDate);
             uint fileSize = MemoryMarshal.Read<uint>(span.Slice(16, 4));
             Assert.AreEqual(452432, fileSize);
             float firstLayerHeight = MemoryMarshal.Read<float>(span.Slice(20, 4));
@@ -278,8 +288,6 @@ namespace UnitTests.SPI
                 FirstLayerHeight = 0.5F,
                 GeneratedBy = string.Empty,
                 Height = 0,
-                LastModified = new DateTime(2019, 4, 23),
-                NumLayers = null,
                 LayerHeight = 0,
                 PrintTime = 0,
                 SimulatedTime = 0,
@@ -295,9 +303,6 @@ namespace UnitTests.SPI
             Assert.AreEqual(info.GeneratedBy.Length, generatedByLength);
             uint numFilaments = MemoryMarshal.Read<uint>(span.Slice(4, 4));
             Assert.AreEqual(0, numFilaments);
-            ulong expectedModifiedDate = (ulong)(info.LastModified.Value - new DateTime(1970, 1, 1)).TotalSeconds;
-            ulong modifiedDate = MemoryMarshal.Read<ulong>(span.Slice(8, 8));
-            Assert.AreEqual(expectedModifiedDate, modifiedDate);
             uint fileSize = MemoryMarshal.Read<uint>(span.Slice(16, 4));
             Assert.AreEqual(4180, fileSize);
             float firstLayerHeight = MemoryMarshal.Read<float>(span.Slice(20, 4));

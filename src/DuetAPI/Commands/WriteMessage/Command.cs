@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.Commands
+﻿using DuetAPI.Machine;
+
+namespace DuetAPI.Commands
 {
     /// <summary>
     /// Write an arbitrary message
