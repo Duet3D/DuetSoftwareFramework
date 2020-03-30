@@ -12,7 +12,6 @@ using DuetAPI.Connection.InitMessages;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.Model;
-using Nito.AsyncEx;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -223,12 +222,13 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Get the object from a path node
         /// </summary>
+        /// <param name="root">Root dictionary</param>
         /// <param name="path">Path node</param>
         /// <returns>Item at the given path</returns>
-        private object GetPathNode(object[] path)
+        public static object GetPathNode(Dictionary<string, object> root, object[] path)
         {
-            Dictionary<string, object> currentDictionary = _patch;
-            IList currentList = null;
+            Dictionary<string, object> currentDictionary = root;
+            List<object> currentList = null;
 
             for (int i = 0; i < path.Length - 1; i++)
             {
@@ -239,17 +239,18 @@ namespace DuetControlServer.IPC.Processors
                     {
                         if (child is Dictionary<string, object> childDictionary)
                         {
-                            currentDictionary = childDictionary;
                             currentList = null;
+                            currentDictionary = childDictionary;
                         }
-                        else if (child is IList childList)
+                        else if (child is List<object> childList)
                         {
                             currentList = childList;
                             currentDictionary = null;
                         }
                         else
                         {
-                            throw new InvalidOperationException($"Invalid child type {child.GetType().Name} for path {string.Join('/', path)}");
+                            // Stop here if the node type is unsupported
+                            return child;
                         }
                     }
                     else
@@ -261,9 +262,17 @@ namespace DuetControlServer.IPC.Processors
                 }
                 else if (pathItem is ItemPathNode pathNode)
                 {
-                    if (currentDictionary.TryGetValue(pathNode.Name, out object nodeList))
+                    if (currentDictionary.TryGetValue(pathNode.Name, out object nodeObject))
                     {
-                        currentList = (IList)nodeList;
+                        if (nodeObject is List<object> nodeList)
+                        {
+                            currentList = nodeList;
+                        }
+                        else
+                        {
+                            // Stop here if the node type is unsupported
+                            return nodeObject;
+                        }
 
                         for (int k = currentList.Count; k > pathNode.Count; k--)
                         {
@@ -283,7 +292,22 @@ namespace DuetControlServer.IPC.Processors
                         currentList.Add(newItem);
                     }
 
-                    return currentList[pathNode.Index];
+                    object currentItem = currentList[pathNode.Index];
+                    if (currentItem is Dictionary<string, object> dictionaryItem)
+                    {
+                        currentList = null;
+                        currentDictionary = dictionaryItem;
+                    }
+                    else if (currentItem is List<object> listItem)
+                    {
+                        currentList = listItem;
+                        currentDictionary = null;
+                    }
+                    else
+                    {
+                        // Stop here if the item type is unsupported
+                        return null;
+                    }
                 }
             }
 
@@ -311,10 +335,10 @@ namespace DuetControlServer.IPC.Processors
             {
                 try
                 {
-                    object node = GetPathNode(path);
-                    if (!(node is Dictionary<string, object>) && !(node is IList))
+                    object node = GetPathNode(_patch, path);
+                    if (node == null)
                     {
-                        // No need to perform an update because the underlying object is about to be fully transferred anyway
+                        // Skip this update if the underlying object is about to be fully transferred anyway
                         return;
                     }
 

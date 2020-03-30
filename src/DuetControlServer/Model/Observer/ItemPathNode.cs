@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 
 namespace DuetControlServer.Model
 {
@@ -11,32 +12,37 @@ namespace DuetControlServer.Model
     public class ItemPathNode
     {
         /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        /// <param name="name">List name</param>
-        /// <param name="index">Index of the changed item</param>
-        /// <param name="count">Number of items in the collection</param>
-        public ItemPathNode(string name, int index, int count)
-        {
-            Name = name;
-            Index = index;
-            Count = count;
-        }
-
-        /// <summary>
         /// Name of the list
         /// </summary>
-        public string Name;
+        public readonly string Name;
 
         /// <summary>
         /// Index of the item
         /// </summary>
-        public int Index;
+        public readonly int Index;
 
         /// <summary>
-        /// Count of the list owning this item
+        /// Internal list reference
         /// </summary>
-        public int Count;
+        private readonly IList _list;
+
+        /// <summary>
+        /// Count of the items in the list or 0 if unknown
+        /// </summary>
+        public int Count { get => (_list != null) ? _list.Count : 0; }
+
+        /// <summary>
+        /// Constructor of this class
+        /// </summary>
+        /// <param name="name">List name</param>
+        /// <param name="index">Index of the changed item</param>
+        /// <param name="list">Reference to the list</param>
+        public ItemPathNode(string name, int index, IList list)
+        {
+            Name = name;
+            Index = index;
+            _list = list;
+        }
 
         /// <summary>
         /// Check if this instance equals another

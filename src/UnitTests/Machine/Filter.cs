@@ -31,7 +31,7 @@ namespace UnitTests.Machine
         [Test]
         public void CheckFilters()
         {
-            object[] pathA = new object[] { "sensors", new ItemPathNode("analog", 0, 3) };
+            object[] pathA = new object[] { "sensors", new ItemPathNode("analog", 0, new object[3]) };
             object[] filterA = new object[] { "sensors", "analog", -1, "lastReading" };
             Assert.IsTrue(DuetControlServer.Model.Filter.PathMatches(pathA, filterA));
 
@@ -46,6 +46,18 @@ namespace UnitTests.Machine
             object[] pathD = new object[] { "state", "status" };
             object[] filterD = new object[] { "state" };
             Assert.IsFalse(DuetControlServer.Model.Filter.PathMatches(pathD, filterD));
+        }
+
+        [Test]
+        public void CheckMultipleFilters()
+        {
+            object[][] filters = DuetControlServer.Model.Filter.ConvertFilters("directories/www|httpEndpoints/**|userSessions/**");
+            object[] otherPath = new object[] { new ItemPathNode("boards", 0, new object[1]), "mcuTemp", "current" };
+            foreach (object[] filter in filters)
+            {
+                bool pathMatches = DuetControlServer.Model.Filter.PathMatches(otherPath, filter);
+                Assert.IsFalse(pathMatches);
+            }
         }
 
         [Test]
@@ -98,7 +110,7 @@ namespace UnitTests.Machine
 
             // Query filter A
             Dictionary<string, object> partialModelA = DuetControlServer.Model.Filter.GetFiltered(parsedFilterA);
-            IList toolsKeyA = (IList)partialModelA["tools"];
+            List<object> toolsKeyA = (List<object>)partialModelA["tools"];
             Dictionary<string, object> toolOneA = (Dictionary<string, object>)toolsKeyA[0];
             Assert.AreEqual(1, toolOneA.Count);
             Assert.AreEqual(new List<object> { 123F }, toolOneA["active"]);
@@ -108,7 +120,7 @@ namespace UnitTests.Machine
 
             // Query filter B
             Dictionary<string, object> partialModelB = DuetControlServer.Model.Filter.GetFiltered(parsedFilterB);
-            IList toolsKeyB = (IList)partialModelB["tools"];
+            List<object> toolsKeyB = (List<object>)partialModelB["tools"];
             Dictionary<string, object> toolOneB = (Dictionary<string, object>)toolsKeyB[0];
             Assert.AreEqual(1, toolOneB.Count);
             Assert.AreEqual(new List<object> { 456F }, toolOneB["standby"]);

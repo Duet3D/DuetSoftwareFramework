@@ -9,7 +9,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.CodeChannel.html",
-          "hash": "nV2tOy2inhuu0PdzZ3UHhw=="
+          "hash": "ZIby/K/1coyqiFF/x7Ye/w=="
         }
       },
       "is_incremental": false,
@@ -21,7 +21,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.Acknowledge.html",
-          "hash": "CZvWIogaPtCom/q2DCykzg=="
+          "hash": "/86TKoAmmsAWL8c+DS1ZZg=="
         }
       },
       "is_incremental": false,
@@ -33,7 +33,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.AddHttpEndpoint.html",
-          "hash": "EuJIjxq1nArLdZsXMnfzOQ=="
+          "hash": "0AjebBD0zP7cOceutZQIZQ=="
         }
       },
       "is_incremental": false,
@@ -45,7 +45,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.AddUserSession.html",
-          "hash": "ESiKC6NvZ/+jm6Z8XKf2GA=="
+          "hash": "mzJUEsvm89kqQYOwZU3BtA=="
         }
       },
       "is_incremental": false,
@@ -57,7 +57,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.BaseCommand.html",
-          "hash": "JVCEkd438T0XblcvMyLcfQ=="
+          "hash": "yw+kt1SA5WUbiPpBMvAPAg=="
         }
       },
       "is_incremental": false,
@@ -69,7 +69,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.BaseResponse.html",
-          "hash": "5yeMqdf/xW4nqd7oBNt8Jw=="
+          "hash": "LP+Xo7exf8hZGA6T3iRmcQ=="
         }
       },
       "is_incremental": false,
@@ -81,7 +81,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.Cancel.html",
-          "hash": "ZkPuScFuHLNUH/R3hE0TcQ=="
+          "hash": "wUqiJ6nv/lwcEOEBjS4s3g=="
         }
       },
       "is_incremental": false,
@@ -93,7 +93,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.Code.html",
-          "hash": "J2B9PJatJxkdnH0aKm2lbg=="
+          "hash": "A/tL60KdvJjNziMs4TORiw=="
         }
       },
       "is_incremental": false,
@@ -105,7 +105,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.CodeFlags.html",
-          "hash": "87UBSjhZ/s5kET4nisXAhA=="
+          "hash": "JyzhaYzhcHVHzJedTPx2Nw=="
         }
       },
       "is_incremental": false,
@@ -117,7 +117,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.CodeParameter.html",
-          "hash": "UVzhMskn3jT13e8Wq3rMAQ=="
+          "hash": "sXdiNcs3/zugYKRCacgBmA=="
         }
       },
       "is_incremental": false,
@@ -129,7 +129,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.CodeParameterConverter.html",
-          "hash": "1oc7XkNtu63QKstwAUh2AA=="
+          "hash": "VOAm3V/SbfgxGqGbh9H/1A=="
         }
       },
       "is_incremental": false,
@@ -141,7 +141,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.CodeParserException.html",
-          "hash": "CLgNOtc8Ww1x9cRgYLwCEg=="
+          "hash": "xFX8NE3Bn1W65ibDwg21Ew=="
         }
       },
       "is_incremental": false,
@@ -153,7 +153,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.CodeResult.html",
-          "hash": "2Vz/WreFxU1Mu0zuLWlf0g=="
+          "hash": "KE3W8AynF9cMV7U1qQhTvA=="
         }
       },
       "is_incremental": false,
@@ -165,7 +165,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.CodeType.html",
-          "hash": "AJ5xckMy2SdKMg81JlY6kg=="
+          "hash": "T7cNYBF2f1HmRQ12SqPsSA=="
         }
       },
       "is_incremental": false,
@@ -177,7 +177,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.Command-1.html",
-          "hash": "Iaa+uN1UzZnlupa7bWzsIQ=="
+          "hash": "3hMOgbWSn8ctfzdmmxAzxg=="
         }
       },
       "is_incremental": false,
@@ -189,7 +189,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.Command.html",
-          "hash": "a7qOU4fPBg+3eXkpoRVS4w=="
+          "hash": "wmzMOKbUdMrdytA8G8T+sw=="
         }
       },
       "is_incremental": false,
@@ -201,7 +201,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.ErrorResponse.html",
-          "hash": "dyQmuZeTM/fw0lbdBZqaaQ=="
+          "hash": "Ov3uV3bUfTw2gkhOhRBzPQ=="
         }
       },
       "is_incremental": false,
@@ -213,7 +213,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.EvaluateExpression.html",
-          "hash": "p/rWOmC51nsu4WiPR16uLQ=="
+          "hash": "qKCFfVrbESzG69GIMWZm/g=="
         }
       },
       "is_incremental": false,
@@ -225,7 +225,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.Flush.html",
-          "hash": "LTKD2L5g3kSvLceCpHtfWA=="
+          "hash": "QAiahEMxaLO51ZE7iqiOvA=="
         }
       },
       "is_incremental": false,
@@ -237,7 +237,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.GetFileInfo.html",
-          "hash": "/0vqDMmv5mtwe9DbnDaFbA=="
+          "hash": "S0tf/nt4qow6sgxLw58atQ=="
         }
       },
       "is_incremental": false,
@@ -249,7 +249,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.GetMachineModel.html",
-          "hash": "lcO6UQZRwyNHEgRqjwlR/w=="
+          "hash": "6/9WorlQfGEpQmxI1iiJVA=="
         }
       },
       "is_incremental": false,
@@ -261,7 +261,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.HttpResponseType.html",
-          "hash": "o0uKgnltWtzNUM86GDEWWQ=="
+          "hash": "x0CAWiHzrS6r4fUHV4lapg=="
         }
       },
       "is_incremental": false,
@@ -273,7 +273,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.Ignore.html",
-          "hash": "fi61m0TGMlTFFTxT9zsZsQ=="
+          "hash": "eFw4dhFB0qnmcBwP6Ge3Qg=="
         }
       },
       "is_incremental": false,
@@ -285,7 +285,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.KeywordType.html",
-          "hash": "pLqWQdcRCYqduBv5ujOWUg=="
+          "hash": "xKUBA+YgfWbFkw8e+t8LeA=="
         }
       },
       "is_incremental": false,
@@ -297,7 +297,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.LockMachineModel.html",
-          "hash": "JbKGmeGrEQ2T3xqF/lYXaQ=="
+          "hash": "Itne6vtyZ7rhBnIytJ9S9Q=="
         }
       },
       "is_incremental": false,
@@ -309,7 +309,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.ReceivedHttpRequest.html",
-          "hash": "HQNbHk3FEZU97UGtI15evg=="
+          "hash": "bdYqWcbUEJPyhWVVqcUyyA=="
         }
       },
       "is_incremental": false,
@@ -321,7 +321,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.RemoveHttpEndpoint.html",
-          "hash": "14c/jKGS7MVz9RHj4O5X7Q=="
+          "hash": "rbY6XfW8KTasuEpedYYcHQ=="
         }
       },
       "is_incremental": false,
@@ -333,7 +333,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.RemoveUserSession.html",
-          "hash": "baMMjcwcNw3IqGi60AUTIg=="
+          "hash": "+2VkuXc08XBX3bkvcIQd/Q=="
         }
       },
       "is_incremental": false,
@@ -345,7 +345,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.Resolve.html",
-          "hash": "FrZAGTdy3R54zM1pGzU/Hg=="
+          "hash": "tGtE6S7PdF9MZ0gzUniOJA=="
         }
       },
       "is_incremental": false,
@@ -357,7 +357,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.ResolvePath.html",
-          "hash": "McmwP9NQ6d7GSQ3sCPue1A=="
+          "hash": "FM3MwVVlsnMa8JNaKygDEA=="
         }
       },
       "is_incremental": false,
@@ -369,7 +369,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.Response-1.html",
-          "hash": "AD6iuJs0y1JGFF/sKgtwNA=="
+          "hash": "YSHKo9TNRXnCt2gAXRzvYg=="
         }
       },
       "is_incremental": false,
@@ -381,7 +381,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.SendHttpResponse.html",
-          "hash": "i5qA1W2x0EKoB/dj+6c6sg=="
+          "hash": "P94OPwZQR8eRMH+n5xib6A=="
         }
       },
       "is_incremental": false,
@@ -393,7 +393,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.SetMachineModel.html",
-          "hash": "i2VuKH9HIfxJZDt9hxEweA=="
+          "hash": "wB6clAmUrFzKMy2tlyambw=="
         }
       },
       "is_incremental": false,
@@ -405,7 +405,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.SimpleCode.html",
-          "hash": "fE3vz+Ci1l7cSJ0PjcCepA=="
+          "hash": "8i0FLy8KReER7yxhFw5hbw=="
         }
       },
       "is_incremental": false,
@@ -417,7 +417,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.SyncMachineModel.html",
-          "hash": "KB488BggFLcy+xsyl8iyzA=="
+          "hash": "16oR5EM+3fwx+1F6GuUiJA=="
         }
       },
       "is_incremental": false,
@@ -429,7 +429,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.UnlockMachineModel.html",
-          "hash": "zs71r8VzyTsUNWCAKz4obA=="
+          "hash": "C18GVenYUfKSuvoU4wgFng=="
         }
       },
       "is_incremental": false,
@@ -441,7 +441,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.WriteMessage.html",
-          "hash": "hMPFjrWgezRMwOgBP60wkQ=="
+          "hash": "JXpg+zyYutKtVA/yC+oOYA=="
         }
       },
       "is_incremental": false,
@@ -453,7 +453,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.html",
-          "hash": "/wGT6t81ThPYsa8nVGMobA=="
+          "hash": "nF7EOi/MAJcXZgF50BOLFQ=="
         }
       },
       "is_incremental": false,
@@ -465,7 +465,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.ConnectionMode.html",
-          "hash": "DFvxAJWea0uBoGm6RqpE1w=="
+          "hash": "EqVsufburjFV+uqDkyLO7Q=="
         }
       },
       "is_incremental": false,
@@ -477,7 +477,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.Defaults.html",
-          "hash": "+t8IJR9IXQRqSuOQtWs3rQ=="
+          "hash": "Pd8hj8W4XGPunz++SiB7nA=="
         }
       },
       "is_incremental": false,
@@ -489,7 +489,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.InitMessages.ClientInitMessage.html",
-          "hash": "qC7ZQz1WiSLzX9k1OxupPw=="
+          "hash": "G13nmYs6lXw432YREOeaXA=="
         }
       },
       "is_incremental": false,
@@ -501,7 +501,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.InitMessages.CommandInitMessage.html",
-          "hash": "+TjFEitMhf+OJBbss3Zb4w=="
+          "hash": "7QpImJw8v4E1UyOTGAkQUw=="
         }
       },
       "is_incremental": false,
@@ -513,7 +513,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.InitMessages.InterceptInitMessage.html",
-          "hash": "+9xKDZVBvdeKad5wvO/EQg=="
+          "hash": "wxb3kKjD7riDQjXKHGMA0w=="
         }
       },
       "is_incremental": false,
@@ -525,7 +525,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.InitMessages.ServerInitMessage.html",
-          "hash": "xp8CP4Ig06vOqkqfoZ3lAQ=="
+          "hash": "lCF8piJ3V1FgLf016U7EQQ=="
         }
       },
       "is_incremental": false,
@@ -537,7 +537,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.InitMessages.SubscribeInitMessage.html",
-          "hash": "Q3fwQXnKjl9Htk3hkEWxrQ=="
+          "hash": "qy+t/P0ZTxomUcPz2xAV+A=="
         }
       },
       "is_incremental": false,
@@ -549,7 +549,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.InitMessages.html",
-          "hash": "V/nre7PdF2PDWwjKhZfLNw=="
+          "hash": "T408a+zBKX1lVCKlpWWV/Q=="
         }
       },
       "is_incremental": false,
@@ -561,7 +561,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.InterceptionMode.html",
-          "hash": "pJVwGn6ErEsPxQVUJovByA=="
+          "hash": "jQDNY950rSoJgE2JL93uYA=="
         }
       },
       "is_incremental": false,
@@ -573,7 +573,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.SubscriptionMode.html",
-          "hash": "dl7RuSAGUxg1QkBCcoU8iQ=="
+          "hash": "UID1ntNRpxaIFTk5TYD2Lg=="
         }
       },
       "is_incremental": false,
@@ -585,7 +585,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.html",
-          "hash": "YeHYVpgz78wwtmt98VzPUg=="
+          "hash": "BO3iou9JnWF/BuR4vycxhA=="
         }
       },
       "is_incremental": false,
@@ -597,7 +597,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.AccessLevel.html",
-          "hash": "5Dd4pVzoiuNjE/yIgoR7pA=="
+          "hash": "MCBJQ33bTgFNl5vjhquILQ=="
         }
       },
       "is_incremental": false,
@@ -609,7 +609,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.AnalogSensor.html",
-          "hash": "/uYhwNg2J5OT72tWxGaCVA=="
+          "hash": "maDN6vMxhzqttBU0Hr8zIw=="
         }
       },
       "is_incremental": false,
@@ -621,7 +621,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.AnalogSensorType.html",
-          "hash": "dbwr41B9ADr0dbY2J8P75Q=="
+          "hash": "72ifPZ4iEL8iDKyQE7oFhg=="
         }
       },
       "is_incremental": false,
@@ -633,7 +633,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.AnalogSensorTypeConverter.html",
-          "hash": "fjtPuKXgYtmNen4zzEkaFQ=="
+          "hash": "SCEVaUvR/UUe7KWMGirjdg=="
         }
       },
       "is_incremental": false,
@@ -645,7 +645,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Axis.html",
-          "hash": "wQWoHPpGZoHGgZ4xPhTa7A=="
+          "hash": "oot+uMzQQcV1mX14ZhxiQQ=="
         }
       },
       "is_incremental": false,
@@ -657,7 +657,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.BeepRequest.html",
-          "hash": "9r+9+bKxyDfaMiCHcMltGw=="
+          "hash": "0O9KWcAbp69stu1fugmu5g=="
         }
       },
       "is_incremental": false,
@@ -669,7 +669,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Board.html",
-          "hash": "QiGgjeSWYmuOHOLv0Fj7IA=="
+          "hash": "fK/bjQ8mB+LNuKljX6zFSw=="
         }
       },
       "is_incremental": false,
@@ -681,7 +681,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Build.html",
-          "hash": "DBjEe3j29GCMXit9XhFRxA=="
+          "hash": "E/5NsmwR56pReA6gBZ/DFA=="
         }
       },
       "is_incremental": false,
@@ -693,7 +693,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.BuildObject.html",
-          "hash": "ujMe6kNPFfPxv9cSqq+Rhg=="
+          "hash": "8rZiwB/WfFZRI5iPSl54Kw=="
         }
       },
       "is_incremental": false,
@@ -705,7 +705,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Compatibility.html",
-          "hash": "zAahOd6A7jRVrrGLlwPPog=="
+          "hash": "KGThR9tnL13ACaXx9UMIAw=="
         }
       },
       "is_incremental": false,
@@ -717,7 +717,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.CoreKinematics.html",
-          "hash": "f3c2NyvLjNtVQHVDbyOo6w=="
+          "hash": "tf9+DuepQEIYTaI32ObyOA=="
         }
       },
       "is_incremental": false,
@@ -729,7 +729,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.CurrentMove.html",
-          "hash": "wrRBLY+2FgxCFCO9pingSg=="
+          "hash": "4L4ZFlpIV0zzBoDRRjmgpg=="
         }
       },
       "is_incremental": false,
@@ -741,7 +741,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.DAA.html",
-          "hash": "Q11Mp/GDmltaQ1yRjD+n+w=="
+          "hash": "wOyDOuZ8y/aEbEtwW6lEQQ=="
         }
       },
       "is_incremental": false,
@@ -753,7 +753,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.DeltaKinematics.html",
-          "hash": "6Xc38truZmn0YCSEfvDHLQ=="
+          "hash": "a2KkoPUpgfrV6FhfG6tg5g=="
         }
       },
       "is_incremental": false,
@@ -765,7 +765,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.DeltaTower.html",
-          "hash": "VQ+ZBFLqs9VeCCsCq+F2jg=="
+          "hash": "tgBFLmonHXgvJ32uD8+pog=="
         }
       },
       "is_incremental": false,
@@ -777,7 +777,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Directories.html",
-          "hash": "+uGYpJiAsMqNXMKgmd5rbg=="
+          "hash": "sFKhtJnBmcAjZiH613jTEg=="
         }
       },
       "is_incremental": false,
@@ -789,7 +789,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.DistanceUnit.html",
-          "hash": "DhL/QhRJxWLWvNxH9IUMZg=="
+          "hash": "v6UY4hi3+1the6DQk6r3/A=="
         }
       },
       "is_incremental": false,
@@ -801,7 +801,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Endstop.html",
-          "hash": "DGIzIdmGvtGSfvKi75UkHw=="
+          "hash": "qVGZ3RxVkDbkcCpgn3SDiA=="
         }
       },
       "is_incremental": false,
@@ -813,7 +813,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.EndstopType.html",
-          "hash": "rab2eqo59FmdtJ4xwiYHNg=="
+          "hash": "e+1VgCLVOgqPPgxVx0A5ZQ=="
         }
       },
       "is_incremental": false,
@@ -825,7 +825,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Extruder.html",
-          "hash": "h7vj/7+pEg0aY3UTNjZYqA=="
+          "hash": "IPd4mYRZuuuK0Mgyxjhreg=="
         }
       },
       "is_incremental": false,
@@ -837,7 +837,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.ExtruderNonlinear.html",
-          "hash": "nZ5fT2tLlQkodeFzJem+cQ=="
+          "hash": "cXy8AVrE4LahBEVXK7+q1A=="
         }
       },
       "is_incremental": false,
@@ -849,7 +849,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Fan.html",
-          "hash": "bld4z0yrI1FRUh0O/EbRtw=="
+          "hash": "zBeSuQr5DWzh3ecDAnCrZA=="
         }
       },
       "is_incremental": false,
@@ -861,7 +861,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.FanThermostaticControl.html",
-          "hash": "V6cBvbjIjLNkjMHNOvDFvA=="
+          "hash": "gFHuyWvxLdU/nzkP4qppFQ=="
         }
       },
       "is_incremental": false,
@@ -873,7 +873,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.FilamentMonitor.html",
-          "hash": "kaejaP9zKhNReKReZXklIA=="
+          "hash": "YzKFnmSZW3ISMc+ZAb39fg=="
         }
       },
       "is_incremental": false,
@@ -885,7 +885,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.FilamentMonitorType.html",
-          "hash": "QxBw4k5ed0f8OEZXnM+c1w=="
+          "hash": "SUYx7AQYTZP7k+ID/OJnqA=="
         }
       },
       "is_incremental": false,
@@ -897,7 +897,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.GpInputPort.html",
-          "hash": "vTA6roiz2v2MfEeLuZDwSw=="
+          "hash": "M0kSlBjXtqFxqpf0zXaF6A=="
         }
       },
       "is_incremental": false,
@@ -909,7 +909,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.HangprinterKinematics.html",
-          "hash": "GIWe0A1Hm2wjpPEuayKKNg=="
+          "hash": "33jMCNEYwTsjd68BMoBiEg=="
         }
       },
       "is_incremental": false,
@@ -921,7 +921,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Heat.html",
-          "hash": "P/W51KpHWwO932c31Iksvg=="
+          "hash": "5jPU2+hPeeT19YwmDIgHuA=="
         }
       },
       "is_incremental": false,
@@ -933,7 +933,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Heater.html",
-          "hash": "l32aUnsNdjo3IW1IfsKxCw=="
+          "hash": "LMRA7iGda0/cdx+kPWl14Q=="
         }
       },
       "is_incremental": false,
@@ -945,7 +945,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.HeaterModel.html",
-          "hash": "uSfpGPDU3WIp3XdVOGDdjA=="
+          "hash": "ncJUybWKxcvGVbP9IjdDEg=="
         }
       },
       "is_incremental": false,
@@ -957,7 +957,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.HeaterModelPID.html",
-          "hash": "K1GSWbtYjP51gOFqY7f3jw=="
+          "hash": "1tE4RiPbRPyBj9W0lyHPlQ=="
         }
       },
       "is_incremental": false,
@@ -969,7 +969,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.HeaterMonitor.html",
-          "hash": "LwuGaO9o2Sici8WFFJtcww=="
+          "hash": "CCeNy2Y9fJmh51GBCadunQ=="
         }
       },
       "is_incremental": false,
@@ -981,7 +981,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.HeaterMonitorAction.html",
-          "hash": "bICQ1ab5ayi/oVfMHuL1ew=="
+          "hash": "NG15EL9QKRHOr1Ti6rZdwg=="
         }
       },
       "is_incremental": false,
@@ -993,7 +993,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.HeaterMonitorCondition.html",
-          "hash": "dYw68Fmy3S6FyBXG1teGRw=="
+          "hash": "ewqUZb++XoHIIXGoW/sawA=="
         }
       },
       "is_incremental": false,
@@ -1005,7 +1005,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.HeaterState.html",
-          "hash": "2JbH/ib12nL7A2RVNn3Fgg=="
+          "hash": "brMJoKZ6NPkcCCD749orIw=="
         }
       },
       "is_incremental": false,
@@ -1017,7 +1017,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.HttpEndpoint.html",
-          "hash": "kyXgrt6uGxK0qO6g+WSu8Q=="
+          "hash": "xBSVGw9SRuNgUlGLdRAVIQ=="
         }
       },
       "is_incremental": false,
@@ -1029,7 +1029,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.HttpEndpointType.html",
-          "hash": "LQ0qsmGuC05HAwIkrS4eLg=="
+          "hash": "QK9pfUj+0bVxqmDZIllXFg=="
         }
       },
       "is_incremental": false,
@@ -1041,7 +1041,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.InputChannel.html",
-          "hash": "shGDQvopn25CcuAhhiDTuQ=="
+          "hash": "Dy0Ak+CC3WEdzOPuFIqlTw=="
         }
       },
       "is_incremental": false,
@@ -1053,7 +1053,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.InputChannelState.html",
-          "hash": "eAxjFENtqhaI9743buHCpQ=="
+          "hash": "CU4HgUbhdRajTb0v0wjwNw=="
         }
       },
       "is_incremental": false,
@@ -1065,7 +1065,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Inputs.html",
-          "hash": "vV0v+zoRg3i4PJQVUNxYnA=="
+          "hash": "ZqTjl2+aWfvwSY3NXGU54A=="
         }
       },
       "is_incremental": false,
@@ -1077,7 +1077,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.InterfaceType.html",
-          "hash": "HK6EUGncE2nBr5Cf/zQ3rA=="
+          "hash": "qzXVAccEPh+7OV32ABewkw=="
         }
       },
       "is_incremental": false,
@@ -1089,7 +1089,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Job.html",
-          "hash": "3xK56h/V/nm9dzM/Lqo1jQ=="
+          "hash": "6QB6gI9d4DQL2/TGTNxn9w=="
         }
       },
       "is_incremental": false,
@@ -1101,7 +1101,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Kinematics.html",
-          "hash": "/eQoMlIWA+t9zkQM1KQUVQ=="
+          "hash": "vkUaHjXbIVXKjYYWOcYsnA=="
         }
       },
       "is_incremental": false,
@@ -1113,7 +1113,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.KinematicsName.html",
-          "hash": "URq1LiXkG6nC8M+6KEjVPw=="
+          "hash": "I5oXgeyGp4cRTGprmqGuBg=="
         }
       },
       "is_incremental": false,
@@ -1125,7 +1125,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.KinematicsNameConverter.html",
-          "hash": "RUF4Jw+JB0ocGTDFJdwPnQ=="
+          "hash": "pEd9pqpDmPJxOFoCBa/P/g=="
         }
       },
       "is_incremental": false,
@@ -1137,7 +1137,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.LaserFilamentMonitor.html",
-          "hash": "xtsKiKAvkmj6/xKf4yCJDQ=="
+          "hash": "wd3ldwU3Qw31QkM96n4Wbg=="
         }
       },
       "is_incremental": false,
@@ -1149,7 +1149,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.LaserFilamentMonitorCalibrated.html",
-          "hash": "/NSZBJ+Y4l6E2DdvxAM99A=="
+          "hash": "n9W309v+nXtDkXpRe6ob6g=="
         }
       },
       "is_incremental": false,
@@ -1161,7 +1161,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.LaserFilamentMonitorConfigured.html",
-          "hash": "Kk3tHOQ1kVofdO8xnlTkMg=="
+          "hash": "WM5LNwgvCwfR7ROrxmcWHA=="
         }
       },
       "is_incremental": false,
@@ -1173,7 +1173,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Layer.html",
-          "hash": "TXqd5p7pT+L4GUZX9loIcQ=="
+          "hash": "X+GegIB/dq8C3wZa0t60Ww=="
         }
       },
       "is_incremental": false,
@@ -1185,7 +1185,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Limits.html",
-          "hash": "E2SZPW18fMGMXtIfYJh4Xg=="
+          "hash": "uSOe1GbZlgwUBLge0N2rrQ=="
         }
       },
       "is_incremental": false,
@@ -1197,7 +1197,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.LinuxPropertyAttribute.html",
-          "hash": "T2o+YZKJA1T3EeNIifCP/Q=="
+          "hash": "HKbAjtuqxvuCYkOCpkgHQQ=="
         }
       },
       "is_incremental": false,
@@ -1209,7 +1209,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MachineMode.html",
-          "hash": "RwARWrlamySsxCucRDySFg=="
+          "hash": "A5GiztDJ7+B3zMZ6eDbqZg=="
         }
       },
       "is_incremental": false,
@@ -1221,7 +1221,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MachineModel.html",
-          "hash": "/JUxSzMmLcN1uJKhuZ/qHQ=="
+          "hash": "7emyjfh3q/qQe0uG6r1FZA=="
         }
       },
       "is_incremental": false,
@@ -1233,7 +1233,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MachineStatus.html",
-          "hash": "r8RkQQh7j4roPbGUTTk4Ww=="
+          "hash": "wL3yercT3oRsf2bvtONzXA=="
         }
       },
       "is_incremental": false,
@@ -1245,7 +1245,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Message.html",
-          "hash": "CDch6h6B9cj3eu2GhqmD+w=="
+          "hash": "vFiNIGljAIvCwdPOt8Ndng=="
         }
       },
       "is_incremental": false,
@@ -1257,7 +1257,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MessageBox.html",
-          "hash": "9Zdw+MPLgQJ/OtKH8qr/FA=="
+          "hash": "svQhVuxtRT3S0oQhNDeWPg=="
         }
       },
       "is_incremental": false,
@@ -1269,7 +1269,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MessageBoxMode.html",
-          "hash": "CzOPqPzZgFSC94BzEXifVA=="
+          "hash": "sXOnYCKpMAN88NkHOHH+2Q=="
         }
       },
       "is_incremental": false,
@@ -1281,7 +1281,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MessageType.html",
-          "hash": "jK7D+s9RFbukQRpF0k9amg=="
+          "hash": "fYns6lhYcLC3ViMyJQLTTw=="
         }
       },
       "is_incremental": false,
@@ -1293,7 +1293,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MinMaxCurrent-1.html",
-          "hash": "1+brmkPknu0Zswo5NrUxHQ=="
+          "hash": "+XZjztEugf/FikQRGdxQwA=="
         }
       },
       "is_incremental": false,
@@ -1305,7 +1305,19 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.ModelCollection-1.html",
-          "hash": "SWfRVXTCR7bNSTHTtX015g=="
+          "hash": "bSJei2TeOxZRUZk0GaneJg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Machine.ModelCollection.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Machine.ModelCollection.html",
+          "hash": "J9UIyXIFEsbHr8dmPvqr+w=="
         }
       },
       "is_incremental": false,
@@ -1317,7 +1329,19 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.ModelGrowingCollection-1.html",
-          "hash": "VrL4sSEP3IpZF5nRgZ7nqQ=="
+          "hash": "7leqq8Rkv0usW3Lauv88gw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Machine.ModelGrowingCollection.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Machine.ModelGrowingCollection.html",
+          "hash": "2sTtKIWaSMluGkCHZ0is3A=="
         }
       },
       "is_incremental": false,
@@ -1329,7 +1353,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.ModelObject.html",
-          "hash": "YFz/8QGlSeteUz3/XCOfQw=="
+          "hash": "RljPsrDonSRHjqt5aQPQIg=="
         }
       },
       "is_incremental": false,
@@ -1341,7 +1365,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MotorsIdleControl.html",
-          "hash": "y20i/xHsBSxgMgjq5a2KSw=="
+          "hash": "MbDjSAAljgCfXk+ye0rj7w=="
         }
       },
       "is_incremental": false,
@@ -1353,7 +1377,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Move.html",
-          "hash": "NWWPjLrLwwO7PhiNNDIftg=="
+          "hash": "o3h4FXOoMg/Fo8yR2skRcw=="
         }
       },
       "is_incremental": false,
@@ -1365,7 +1389,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MoveCalibration.html",
-          "hash": "ElTPCnrVjQtoc/WnoGotbQ=="
+          "hash": "yQhyJN3Q19i5heJmkzbrtA=="
         }
       },
       "is_incremental": false,
@@ -1377,7 +1401,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MoveCalibrationResults.html",
-          "hash": "szgj2GqwkKhWDJfmCKZM/g=="
+          "hash": "jsOe8pQpe9oBl65Iv9QCqA=="
         }
       },
       "is_incremental": false,
@@ -1389,7 +1413,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MoveCompensation.html",
-          "hash": "5ycZnvWjSnSdBZZNcvWTSA=="
+          "hash": "W2yY7gggnZ1n+DNE6BovgA=="
         }
       },
       "is_incremental": false,
@@ -1401,7 +1425,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.MoveCompensationType.html",
-          "hash": "QlTpaTBXppKI+mxfdPSBdg=="
+          "hash": "31fxl4wz35HhNhvYNsenuQ=="
         }
       },
       "is_incremental": false,
@@ -1413,7 +1437,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Network.html",
-          "hash": "yurHZi5TRCNA77Qi4zm+MA=="
+          "hash": "0853EJmkSwKqUSv98BE1/A=="
         }
       },
       "is_incremental": false,
@@ -1425,7 +1449,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.NetworkInterface.html",
-          "hash": "tKlP5OpzcbAN2COLNoaxlQ=="
+          "hash": "2Apz+1i2J3J4JVRKqpdozQ=="
         }
       },
       "is_incremental": false,
@@ -1437,7 +1461,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.NetworkProtocol.html",
-          "hash": "c8ImsGre5NIvhU5aphyhjg=="
+          "hash": "2+k1j5ClU+0++DMf6d9law=="
         }
       },
       "is_incremental": false,
@@ -1449,7 +1473,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.ParsedFileInfo.html",
-          "hash": "mg2AECSs3KY7asaLIiu8hQ=="
+          "hash": "lzWYGz0XVtx/ZCHsuGqnWw=="
         }
       },
       "is_incremental": false,
@@ -1461,7 +1485,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Probe.html",
-          "hash": "DCPU//11QPEDgHDHMTZoSw=="
+          "hash": "KPLchZnDHnwAAc9tArP5Mw=="
         }
       },
       "is_incremental": false,
@@ -1473,7 +1497,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.ProbeGrid.html",
-          "hash": "rTl6QQlHeAOzIn3qBiyQKw=="
+          "hash": "3i0G+agKkceFVU9HmUo1Ng=="
         }
       },
       "is_incremental": false,
@@ -1485,7 +1509,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.ProbeType.html",
-          "hash": "IFzet0r8B5p89kHETEJBAg=="
+          "hash": "K2dVDKNWZTLxPAMOtwRoBw=="
         }
       },
       "is_incremental": false,
@@ -1497,7 +1521,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.PulsedFilamentMonitor.html",
-          "hash": "7NWtD0rYtpAbIJLuXjwnGg=="
+          "hash": "lYZlq119cQWbjdhccUavCw=="
         }
       },
       "is_incremental": false,
@@ -1509,7 +1533,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.PulsedFilamentMonitorCalibrated.html",
-          "hash": "ug9WBAfDz8UFSJd3sy0R7w=="
+          "hash": "yWGVs5InLTiDdbtp85APGA=="
         }
       },
       "is_incremental": false,
@@ -1521,7 +1545,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.PulsedFilamentMonitorConfigured.html",
-          "hash": "zHaexTR3NB05Eto+xwosog=="
+          "hash": "MFoRIr8WTiWUubBGT0u8sQ=="
         }
       },
       "is_incremental": false,
@@ -1533,7 +1557,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.RotatingMagnetFilamentMonitor.html",
-          "hash": "Vhf9IU4SRhKtIiHCbDphnQ=="
+          "hash": "c2gvCR8b64FdCLspZCIqFw=="
         }
       },
       "is_incremental": false,
@@ -1545,7 +1569,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.RotatingMagnetFilamentMonitorCalibrated.html",
-          "hash": "pDzz4FnwYTp7iFwPq67ZKg=="
+          "hash": "26oIhxtvTjdTqWMG79FdLg=="
         }
       },
       "is_incremental": false,
@@ -1557,7 +1581,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.RotatingMagnetFilamentMonitorConfigured.html",
-          "hash": "BC3yYgu8X/Vry15GPqMJpw=="
+          "hash": "mCqLO/JTe8UKxuxoF0uzWA=="
         }
       },
       "is_incremental": false,
@@ -1569,7 +1593,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Scanner.html",
-          "hash": "w9KXfEU6tNze4vGU+6J9LA=="
+          "hash": "HYy4v/4X6AhTyheYxMuz6g=="
         }
       },
       "is_incremental": false,
@@ -1581,7 +1605,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.ScannerStatus.html",
-          "hash": "0EqdFwYpFyztIkzMUJj11A=="
+          "hash": "UzDB8LRtg4pNPrP9CJEiJQ=="
         }
       },
       "is_incremental": false,
@@ -1593,7 +1617,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Sensors.html",
-          "hash": "0szWA5V7zhNwyqm2Ccniwg=="
+          "hash": "yTyMi0SNWJ4c3e4a/WtY7w=="
         }
       },
       "is_incremental": false,
@@ -1605,7 +1629,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.SessionType.html",
-          "hash": "MqMXueKt2CvcCqDJAEmjnA=="
+          "hash": "0CFulo6dfpR8zGOQYy4c7Q=="
         }
       },
       "is_incremental": false,
@@ -1617,7 +1641,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Spindle.html",
-          "hash": "zOQtHorNSH27FuePbp653w=="
+          "hash": "VEl7KY/VnCStr7kaORTDlg=="
         }
       },
       "is_incremental": false,
@@ -1629,7 +1653,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.State.html",
-          "hash": "EeJ/owzORp6wvFsLQI5sVg=="
+          "hash": "3QJse2+dqMhI/N88miWgFw=="
         }
       },
       "is_incremental": false,
@@ -1641,7 +1665,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.TimesLeft.html",
-          "hash": "B8WtRzbWaHD5lNq1ELNmXw=="
+          "hash": "iI8PJVCY9rjnL+JmNXvk/w=="
         }
       },
       "is_incremental": false,
@@ -1653,7 +1677,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Tool.html",
-          "hash": "/2EaVuOE2Jh41uqo0V3x9w=="
+          "hash": "Hy9boDE8mENvBaz50BKQkQ=="
         }
       },
       "is_incremental": false,
@@ -1665,7 +1689,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.ToolRetraction.html",
-          "hash": "zJFTY4lV93bZsLc7hxHpuw=="
+          "hash": "wNfZtZQJgmN9520XsmNfVA=="
         }
       },
       "is_incremental": false,
@@ -1677,7 +1701,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.ToolState.html",
-          "hash": "XkLPnsaunEvB/QPy0kAclQ=="
+          "hash": "QSJ2fWGSb2kOpaZtaY3/Vw=="
         }
       },
       "is_incremental": false,
@@ -1689,7 +1713,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.UserSession.html",
-          "hash": "TEi3lxc0NQoauz1l/gaylg=="
+          "hash": "Qo0GWx7pAnzKI8p1Ol7vEQ=="
         }
       },
       "is_incremental": false,
@@ -1701,7 +1725,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.UserVariable.html",
-          "hash": "0YMzDzE3XfO4u+ZHgzGzlQ=="
+          "hash": "MptW0PJUKr51wChnPDZYUQ=="
         }
       },
       "is_incremental": false,
@@ -1713,7 +1737,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.Volume.html",
-          "hash": "sHkIKDIJYgNAqIl4vivViA=="
+          "hash": "2mto+1Djv3pOw/PTn82E4Q=="
         }
       },
       "is_incremental": false,
@@ -1725,7 +1749,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Machine.html",
-          "hash": "k3AfvDzcsreTVIR/Ku5hhQ=="
+          "hash": "/ZIFtAmotmsjdbue6zF4Wg=="
         }
       },
       "is_incremental": false,
@@ -1737,7 +1761,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Utility.DriverId.html",
-          "hash": "AXxbfNT4TDsanK6Ll6oV2A=="
+          "hash": "EFCPHHv6IUf5jC/dqPmZmQ=="
         }
       },
       "is_incremental": false,
@@ -1749,7 +1773,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Utility.FileLists.html",
-          "hash": "SkZHTtaVJMel0rGKjywuBg=="
+          "hash": "0oSSR0ZQvkU5PTgWtE/9qA=="
         }
       },
       "is_incremental": false,
@@ -1761,7 +1785,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Utility.Heightmap.html",
-          "hash": "Rrt+pgvQz0L53syuF3bl9Q=="
+          "hash": "9FbJytR3X6loPE+37hflmg=="
         }
       },
       "is_incremental": false,
@@ -1773,7 +1797,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Utility.JsonCamelCaseStringEnumConverter.html",
-          "hash": "jyDBle7r3CzgZCUi1fSMJw=="
+          "hash": "MQ2okDU9ulpNwffYfSGC3g=="
         }
       },
       "is_incremental": false,
@@ -1785,7 +1809,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Utility.JsonCharEnumConverter.html",
-          "hash": "i5fbFeFrC84BS6yDWINaEg=="
+          "hash": "qm1Xs7sIsGf3edTcg4asnA=="
         }
       },
       "is_incremental": false,
@@ -1797,7 +1821,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Utility.JsonHelper.html",
-          "hash": "T01zHavtHwLcSbAp5Q23vA=="
+          "hash": "zdZfTn8B1loLBcdGCJoXRQ=="
         }
       },
       "is_incremental": false,
@@ -1809,7 +1833,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html",
-          "hash": "fRb7xC/JR4EvnQqvoJRajg=="
+          "hash": "DpFfrAMpzG4oEQOo53Pjkg=="
         }
       },
       "is_incremental": false,
@@ -1821,7 +1845,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Utility.JsonRegexListConverter.html",
-          "hash": "y2/ifqTmFPQr4+udvV/XPA=="
+          "hash": "2T+6+x3XEbVT19Yza7v6MQ=="
         }
       },
       "is_incremental": false,
@@ -1833,7 +1857,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Utility.html",
-          "hash": "yZGZzTNncfsU5y6mxZ3jbA=="
+          "hash": "/npG+qHNzgH6C3AyYvu7gg=="
         }
       },
       "is_incremental": false,
@@ -1845,7 +1869,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.html",
-          "hash": "Tm4mQoT72rI6vlQVu/FhZA=="
+          "hash": "C0WLmZFqarhGRVQ+qMIEqQ=="
         }
       },
       "is_incremental": false,
@@ -1857,7 +1881,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.BaseCommandConnection.html",
-          "hash": "pj+MNoRnUsTYCkOOmN3PGA=="
+          "hash": "cmWxVOXd2U72IkqU/AcfJA=="
         }
       },
       "is_incremental": false,
@@ -1869,7 +1893,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.BaseConnection.html",
-          "hash": "nCdOtxeYeL0u5wAU7LhepA=="
+          "hash": "Qmlcixdci6oU9CzfDLBN7A=="
         }
       },
       "is_incremental": false,
@@ -1881,7 +1905,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.CommandConnection.html",
-          "hash": "6/i+JjSu/H+XUVor+o27Cg=="
+          "hash": "xVp/g9GlQJsBUFMQCfhh7Q=="
         }
       },
       "is_incremental": false,
@@ -1893,7 +1917,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.Exceptions.IncompatibleVersionException.html",
-          "hash": "403Mr6HBNTWqrxKXBfBB1g=="
+          "hash": "93Mk4XVCzlhKpixEKQNC0A=="
         }
       },
       "is_incremental": false,
@@ -1905,7 +1929,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.Exceptions.InternalServerException.html",
-          "hash": "SorX2dF540H3rrq+NisL4A=="
+          "hash": "UzlIbrZPjU47ARTvSAQcIg=="
         }
       },
       "is_incremental": false,
@@ -1917,7 +1941,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.Exceptions.html",
-          "hash": "gUhfW9pYv7BhsTaOcuXetg=="
+          "hash": "0Gerhl3wxJYiW/dnobdcAg=="
         }
       },
       "is_incremental": false,
@@ -1929,7 +1953,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.HttpEndpointConnection.html",
-          "hash": "YzlkFWjnKtINphxki1/C/w=="
+          "hash": "88u1oZCG23ZU3iqlB4a/ZA=="
         }
       },
       "is_incremental": false,
@@ -1941,7 +1965,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.HttpEndpointUnixSocket.EndpointRequestReceived.html",
-          "hash": "0CrVvuK5U2o8nkMnVccA3Q=="
+          "hash": "NLYBo8ZmpG1/g3yL3jY78g=="
         }
       },
       "is_incremental": false,
@@ -1953,7 +1977,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.HttpEndpointUnixSocket.html",
-          "hash": "Notn/gpyOrsN6YLuz0ApcQ=="
+          "hash": "E/05zc/syiqDg/ipYbpzAA=="
         }
       },
       "is_incremental": false,
@@ -1965,7 +1989,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.InterceptConnection.html",
-          "hash": "3B+8yQIE6sFwoZ9KBC/Qdg=="
+          "hash": "0VuTse5lF5drC6/3gmzDug=="
         }
       },
       "is_incremental": false,
@@ -1977,7 +2001,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.SubscribeConnection.html",
-          "hash": "YZjyuIV39WlJZAD0AaNvQA=="
+          "hash": "pPjBXJuDHCZtAQsccDXmlA=="
         }
       },
       "is_incremental": false,
@@ -1989,7 +2013,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPIClient.html",
-          "hash": "In+4N0ekY+QfoQtB/rTk9g=="
+          "hash": "NOuRMJf68+QXul38xyKi3g=="
         }
       },
       "is_incremental": false,
@@ -2001,7 +2025,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Codes.GCodes.html",
-          "hash": "IgbY7agwrhc8brt7ZGpOXQ=="
+          "hash": "ngRqbYdFHGrFZzjvouL10w=="
         }
       },
       "is_incremental": false,
@@ -2013,7 +2037,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Codes.MCodes.html",
-          "hash": "0zRkmTJP86yF90K+1FT+PQ=="
+          "hash": "5pXP0QduSdsk2U4SJv+ITA=="
         }
       },
       "is_incremental": false,
@@ -2025,7 +2049,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Codes.TCodes.html",
-          "hash": "vtQFbwbsi7xFtBb+nx5GnQ=="
+          "hash": "LAh3/NfQjWTcC++63yHIZw=="
         }
       },
       "is_incremental": false,
@@ -2037,7 +2061,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Codes.html",
-          "hash": "g51ROyr91OjGNDF4dNg3FQ=="
+          "hash": "tqu6ZoW+TndiSShMywImsA=="
         }
       },
       "is_incremental": false,
@@ -2049,7 +2073,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.AddHttpEndpoint.html",
-          "hash": "dCKHcCAHte4OMeM3Mm8hNg=="
+          "hash": "XfGs0hfNh3i1V2zutZdjOw=="
         }
       },
       "is_incremental": false,
@@ -2061,7 +2085,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.AddUserSession.html",
-          "hash": "6/fe3/oDyqvvsBSfhU+gFw=="
+          "hash": "FvL6dhzHyU5zkZBux/pzOA=="
         }
       },
       "is_incremental": false,
@@ -2073,7 +2097,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.Code.html",
-          "hash": "b/JRfCo9s0vr9qJTL3vo4A=="
+          "hash": "/ecov5Z4RbjfTx7wZbBpTg=="
         }
       },
       "is_incremental": false,
@@ -2085,7 +2109,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.EvaluateExpression.html",
-          "hash": "lkyGPG+1kd9tvOrRLkmcRw=="
+          "hash": "j3Uy7FxFgNBkMku6U4FIhQ=="
         }
       },
       "is_incremental": false,
@@ -2097,7 +2121,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.Flush.html",
-          "hash": "JVrLrsf1JCH+ZC6/lmfFHA=="
+          "hash": "HJgleSJ8wEMG+lAsRS/eNw=="
         }
       },
       "is_incremental": false,
@@ -2109,7 +2133,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.GetFileInfo.html",
-          "hash": "V6AvfDGgP53RXuFRlbYX5w=="
+          "hash": "fd5Szwh8U4l6RxhIHWbWzQ=="
         }
       },
       "is_incremental": false,
@@ -2121,7 +2145,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.GetMachineModel.html",
-          "hash": "rYDIBqyKDpDUtEuMWS7E+Q=="
+          "hash": "RecT0cCvXwNxkNpiPpY/RQ=="
         }
       },
       "is_incremental": false,
@@ -2133,7 +2157,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.LockMachineModel.html",
-          "hash": "BYj1A3oT4MsRzqhr4gOGqg=="
+          "hash": "FLz1aTuiV4jQO9i8E/ri6g=="
         }
       },
       "is_incremental": false,
@@ -2145,7 +2169,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.RemoveHttpEndpoint.html",
-          "hash": "6yvgXXyctHZVMZeCWVubRA=="
+          "hash": "r7Z4Tua94IWvQeGpiu+jeQ=="
         }
       },
       "is_incremental": false,
@@ -2157,7 +2181,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.RemoveUserSession.html",
-          "hash": "D2BwWXWpeIe0loSdOZc7AQ=="
+          "hash": "CsKvP6IQ433FT/6m7csoTg=="
         }
       },
       "is_incremental": false,
@@ -2169,7 +2193,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.ResolvePath.html",
-          "hash": "AwFc4KAiS6dT36FKfRD1Nw=="
+          "hash": "7wU9EVd9wEd3yC0DVe5L+A=="
         }
       },
       "is_incremental": false,
@@ -2181,7 +2205,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.SetMachineModel.html",
-          "hash": "gcvuUkcvWGCzgMcBQruTZA=="
+          "hash": "YYEoSlxKCrSZLCLBXfAmqg=="
         }
       },
       "is_incremental": false,
@@ -2193,7 +2217,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.SimpleCode.html",
-          "hash": "n0yr/PRCcFQoCskzMlcn/w=="
+          "hash": "Pw7Z0PfJMyuWACaU+DSMpQ=="
         }
       },
       "is_incremental": false,
@@ -2205,7 +2229,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.SyncMachineModel.html",
-          "hash": "pJSm2xNeUPgO8auh+5ol5g=="
+          "hash": "xE/LFyJlTtte1UlPI2Z06Q=="
         }
       },
       "is_incremental": false,
@@ -2217,7 +2241,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.UnlockMachineModel.html",
-          "hash": "15T48I3ivTgftT1RQ4WdfQ=="
+          "hash": "RPKnGFOnUtwJucMDFQiTpQ=="
         }
       },
       "is_incremental": false,
@@ -2229,7 +2253,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.WriteMessage.html",
-          "hash": "8YcZzOG7Y9Re3Da17MZs4A=="
+          "hash": "7043bukfRI6V94qv45UobQ=="
         }
       },
       "is_incremental": false,
@@ -2241,7 +2265,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.html",
-          "hash": "HbKoKrLcOUSFJFBlYyRg2A=="
+          "hash": "+y0Fx1GhFStekq9OAlgaxw=="
         }
       },
       "is_incremental": false,
@@ -2253,7 +2277,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.FileExecution.Job.html",
-          "hash": "OEL80qx5uo5h0bqPXpfijg=="
+          "hash": "15gA5QkvpBEcRTjOqJhaKg=="
         }
       },
       "is_incremental": false,
@@ -2265,7 +2289,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.FileExecution.html",
-          "hash": "jAvpwSDpgx4C1ahIdmhorg=="
+          "hash": "vgXDxjTC1iBppRlGgSFYkA=="
         }
       },
       "is_incremental": false,
@@ -2277,7 +2301,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Files.BaseFile.html",
-          "hash": "x1d5CUpaobddZiqWS62NXg=="
+          "hash": "lk9wX8Kg8wa7OrDtkorbgg=="
         }
       },
       "is_incremental": false,
@@ -2289,7 +2313,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Files.ConfigOverride.html",
-          "hash": "siDC0GiMcoCumqyf3biFBQ=="
+          "hash": "NUHbd9i4m1MAS3p7XZMjqA=="
         }
       },
       "is_incremental": false,
@@ -2301,7 +2325,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Files.FileDirectory.html",
-          "hash": "n4GAkKxzw6ejfYt0xghq3w=="
+          "hash": "YUhUrcK6XZg4nSnVA1by0w=="
         }
       },
       "is_incremental": false,
@@ -2313,7 +2337,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Files.FilePath.html",
-          "hash": "Aj36xK6vFhhyvo+NXz+Z1Q=="
+          "hash": "F98TMmorW/K390QCAeccGA=="
         }
       },
       "is_incremental": false,
@@ -2325,7 +2349,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Files.InfoParser.html",
-          "hash": "+kFoKi4PjZKjGj2e9kOv7g=="
+          "hash": "r8rzfjStdNQYjUpAVf+LEg=="
         }
       },
       "is_incremental": false,
@@ -2337,7 +2361,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Files.MacroFile.html",
-          "hash": "Qew1F7WY4KDm91npE8Kvlg=="
+          "hash": "KkH5GQ+GkOWA51vh8avPlw=="
         }
       },
       "is_incremental": false,
@@ -2349,7 +2373,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Files.html",
-          "hash": "+XupuTkz4WTZmALgiZbOOQ=="
+          "hash": "qvEZX1QBM7HilWbNKUXcZA=="
         }
       },
       "is_incremental": false,
@@ -2361,7 +2385,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.IPC.Connection.html",
-          "hash": "Hr3gDjQcaIhT2TGYDrZI4A=="
+          "hash": "3iF6Mhcduj8yFd5CkslnPQ=="
         }
       },
       "is_incremental": false,
@@ -2373,7 +2397,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.IPC.LockManager.html",
-          "hash": "zS82E0pSl0vJ5Iizu/YW6Q=="
+          "hash": "ECtmGmvDIb11dBLFkT8R3g=="
         }
       },
       "is_incremental": false,
@@ -2385,7 +2409,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.IPC.Processors.Base.html",
-          "hash": "j/tck4fd6OhpjY2LAn4giw=="
+          "hash": "P0xiY+hZYCNYXdNuUnK9cw=="
         }
       },
       "is_incremental": false,
@@ -2397,7 +2421,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.IPC.Processors.Command.html",
-          "hash": "5QStSvyvxFhhCnM1LmaNOA=="
+          "hash": "Y/eFVuDIRaBEp9/9JrOgcg=="
         }
       },
       "is_incremental": false,
@@ -2409,7 +2433,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.IPC.Processors.Interception.html",
-          "hash": "tOwtVJUYvzVP1oBnXKyamw=="
+          "hash": "QGpvX+1LCZ6LA/CmdpVXaA=="
         }
       },
       "is_incremental": false,
@@ -2421,7 +2445,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.IPC.Processors.Subscription.html",
-          "hash": "4Id/B7TuM29sQPuMWNz6bw=="
+          "hash": "VVx2ysPNnEMno9TijOaIfg=="
         }
       },
       "is_incremental": false,
@@ -2433,7 +2457,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.IPC.Processors.html",
-          "hash": "XGryUIOYpFsb8mP05SrPLg=="
+          "hash": "z8olcX4Iepf13lRNkITZqQ=="
         }
       },
       "is_incremental": false,
@@ -2445,7 +2469,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.IPC.Server.html",
-          "hash": "qjCRmoWVSi9KSszfEODNlQ=="
+          "hash": "w36kphYp0WpfvKeC+xupgA=="
         }
       },
       "is_incremental": false,
@@ -2457,7 +2481,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.IPC.html",
-          "hash": "A5VtGqjrqk0+m72vthmFeg=="
+          "hash": "CBNHfcfjTrHaE/xEknJf9w=="
         }
       },
       "is_incremental": false,
@@ -2469,7 +2493,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Model.Filter.html",
-          "hash": "NR5y2rgbqaCMuDa2wJxGHQ=="
+          "hash": "pZW5X1q92Ap3Z4xW5JgfzA=="
         }
       },
       "is_incremental": false,
@@ -2481,7 +2505,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Model.ItemPathNode.html",
-          "hash": "m8vjV2tuh48UAOksTsHbag=="
+          "hash": "GCeyn1BkmNDzW1XqTcVtmQ=="
         }
       },
       "is_incremental": false,
@@ -2493,7 +2517,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Model.Observer.PropertyPathChanged.html",
-          "hash": "yV9YUj/UAKCbndL+D8hvWg=="
+          "hash": "CY1+Kt/mgz2qAuXugerBJA=="
         }
       },
       "is_incremental": false,
@@ -2505,7 +2529,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Model.Observer.html",
-          "hash": "5ZCoAN1JZFIkXui+Q7TrgQ=="
+          "hash": "p36ao5BMbCMuARvh39v/og=="
         }
       },
       "is_incremental": false,
@@ -2517,7 +2541,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Model.PeriodicUpdater.html",
-          "hash": "0xMuJRkY1cR8HiP5YA2hlA=="
+          "hash": "yZv+cYhQVeqiIZ8OQwE3Fg=="
         }
       },
       "is_incremental": false,
@@ -2529,7 +2553,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Model.PropertyChangeType.html",
-          "hash": "WffrLIV/lL/A0x/2GV8G/w=="
+          "hash": "2WNYTIG+X1gG7ytVc36crg=="
         }
       },
       "is_incremental": false,
@@ -2541,7 +2565,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Model.Provider.html",
-          "hash": "w48cZprH+0CgTz/FWTyTtQ=="
+          "hash": "cJgLnCdmXVxS/hS497cK0g=="
         }
       },
       "is_incremental": false,
@@ -2553,7 +2577,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Model.Updater.html",
-          "hash": "Crkp3oVZx6eq3s2pxagjxA=="
+          "hash": "yUge3OOY5qdej3p/T3QQdA=="
         }
       },
       "is_incremental": false,
@@ -2565,7 +2589,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Model.html",
-          "hash": "1voHitqfQ/kVNINGXoF2Jg=="
+          "hash": "w3vVejKJDV/FOSvyI11JIA=="
         }
       },
       "is_incremental": false,
@@ -2577,7 +2601,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Program.html",
-          "hash": "tQ1PpsgG24kz36sDkXqZdA=="
+          "hash": "dWWWdfdw+AurQWbfyzNH+w=="
         }
       },
       "is_incremental": false,
@@ -2589,7 +2613,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.ChannelInformation.html",
-          "hash": "mMvVkiB19uV1nOM3/pESiA=="
+          "hash": "PbzSaPWAwJmBvLEtOxBCOg=="
         }
       },
       "is_incremental": false,
@@ -2601,7 +2625,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.ChannelStore.html",
-          "hash": "l6LFvTKcGoxijvGjTlYBQQ=="
+          "hash": "inRoj36kFmapQxt/H4p7xg=="
         }
       },
       "is_incremental": false,
@@ -2613,7 +2637,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Consts.html",
-          "hash": "/zujhDmY160y6m/avMTyBA=="
+          "hash": "H/WyH+1pz98PmVYUTtD47w=="
         }
       },
       "is_incremental": false,
@@ -2625,7 +2649,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileHeader.html",
-          "hash": "AszpIz2TV9mSNKTq3cMsHg=="
+          "hash": "Hk25+19qSfnfGsYKruRWpQ=="
         }
       },
       "is_incremental": false,
@@ -2637,7 +2661,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdateHeader.html",
-          "hash": "7G4WeW0J2EmV8KWDrdR2sA=="
+          "hash": "9aFHVd047JVB2TdKcMHjLA=="
         }
       },
       "is_incremental": false,
@@ -2649,7 +2673,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.DoCodeHeader.html",
-          "hash": "tQl9caODkKKYaysgqpjrqQ=="
+          "hash": "817eXvlP7q/T42uAM3U4sg=="
         }
       },
       "is_incremental": false,
@@ -2661,7 +2685,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.EvaluationResultHeader.html",
-          "hash": "CxwS1/ZwMWgelis9BwGHbA=="
+          "hash": "eoDu0PmzxHBpeLIoxaOKiA=="
         }
       },
       "is_incremental": false,
@@ -2673,7 +2697,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.html",
-          "hash": "1n7rTN/61tk2SiXPCozhZw=="
+          "hash": "LfqWJkGw6dye3IPIVA8Oxg=="
         }
       },
       "is_incremental": false,
@@ -2685,7 +2709,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkHeader.html",
-          "hash": "VB7J8Qh9fmHQS5PSzdE8ng=="
+          "hash": "qHHhr4nfXFr53Agj50/ZSg=="
         }
       },
       "is_incremental": false,
@@ -2697,7 +2721,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.PrintPausedHeader.html",
-          "hash": "vEVX0uQJI7PMP+Y9dukSnA=="
+          "hash": "VoNd/HOBaMLQ/p6jBJFCeA=="
         }
       },
       "is_incremental": false,
@@ -2709,7 +2733,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.PrintPausedReason.html",
-          "hash": "JIYcA8wM6GZxkOmSj+InBA=="
+          "hash": "ny+SmbmyILMpP4ct3Mfgng=="
         }
       },
       "is_incremental": false,
@@ -2721,7 +2745,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.Request.html",
-          "hash": "xPqXvCz5TOgUH1BetOVivw=="
+          "hash": "9+/V9cLzPmWa8wcuf+kxxA=="
         }
       },
       "is_incremental": false,
@@ -2733,7 +2757,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.html",
-          "hash": "FrLd8Q+qnpdt9431rOwMxg=="
+          "hash": "7BU6koKiJOIcz7RWHzLTiQ=="
         }
       },
       "is_incremental": false,
@@ -2745,7 +2769,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.AssignFilamentHeader.html",
-          "hash": "faGXqki4Ld30BLezTpW2Ag=="
+          "hash": "h8MjD0jkCzM3N9/vR+SnPw=="
         }
       },
       "is_incremental": false,
@@ -2757,7 +2781,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.html",
-          "hash": "aHdN6ef7P76ro6jUVLkoGQ=="
+          "hash": "hQg3/tVqSSiiNv9IQ5tNDg=="
         }
       },
       "is_incremental": false,
@@ -2769,7 +2793,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader.html",
-          "hash": "mmCWtWc7DXjwNPbPrHDSlw=="
+          "hash": "J00Gy6ygI3ee59iBTyraQw=="
         }
       },
       "is_incremental": false,
@@ -2781,19 +2805,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html",
-          "hash": "YkgIQM1miDWBnlNYcAwv/g=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html",
-          "hash": "//AvB4182mO+kHOCh0gOCg=="
+          "hash": "G4CeYvIG4ma97ZVBVW8C9Q=="
         }
       },
       "is_incremental": false,
@@ -2805,7 +2817,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html",
-          "hash": "EQGVd6pMU0cNl4+I7o4R/g=="
+          "hash": "jbKABu8EVaza1M1QnPydGQ=="
         }
       },
       "is_incremental": false,
@@ -2817,7 +2829,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModelHeader.html",
-          "hash": "uo5nSb0ZG2jFPTrLDxKJHw=="
+          "hash": "cPpFRQ7ie15XvQ20WTQY8Q=="
         }
       },
       "is_incremental": false,
@@ -2829,7 +2841,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.MacroCompleteHeader.html",
-          "hash": "g7ySzEZt0oV2evY14JzkSw=="
+          "hash": "U+ZQSRueroMPxz7KzPQcPA=="
         }
       },
       "is_incremental": false,
@@ -2841,7 +2853,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.PrintStartedHeader.html",
-          "hash": "FG4u+y9hQpROxf4Ksl/R3A=="
+          "hash": "uilmM6Oonka63pUN6YrKIA=="
         }
       },
       "is_incremental": false,
@@ -2853,7 +2865,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.PrintStoppedHeader.html",
-          "hash": "VfVGEEO1i1vok/o3dFsonw=="
+          "hash": "KNVvF7N2CrkLNOWJKLehnQ=="
         }
       },
       "is_incremental": false,
@@ -2865,7 +2877,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.Request.html",
-          "hash": "TX3LBK+8GuclRUofIi9WBg=="
+          "hash": "WDgLbu/0RyX8j40PoIbBGw=="
         }
       },
       "is_incremental": false,
@@ -2877,7 +2889,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModelHeader.html",
-          "hash": "4e3cIUlLtMEj+XZY2h0UCQ=="
+          "hash": "rCJp5Y1s4PjgA2g84g5Cbg=="
         }
       },
       "is_incremental": false,
@@ -2889,7 +2901,19 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.LinuxRequests.html",
-          "hash": "2gPJYYucH5W94CxoN2+C8A=="
+          "hash": "8xJUppmeUedzxRtD/OjlhQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html",
+          "hash": "S4tVJfkmWMwcBW3cMNt/pA=="
         }
       },
       "is_incremental": false,
@@ -2901,7 +2925,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Shared.DataType.html",
-          "hash": "/3HL0mW7hjlZjelnlTeBeg=="
+          "hash": "2Wt0UMPZblmJzuiJ4QcqKA=="
         }
       },
       "is_incremental": false,
@@ -2913,19 +2937,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html",
-          "hash": "9nwQEWgf6mj0SO1HRWEGYw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html",
-          "hash": "CpvTzGJMvzO2PEiPVyVg3w=="
+          "hash": "bvYsLtxIgey7MKs4TQuvXg=="
         }
       },
       "is_incremental": false,
@@ -2937,7 +2949,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Shared.MessageHeader.html",
-          "hash": "VxjiKsYwaAV8k4DSkkwhLw=="
+          "hash": "YrB+CqG84J3OdcsOv1QSog=="
         }
       },
       "is_incremental": false,
@@ -2949,7 +2961,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.html",
-          "hash": "px9bKMfG8sbQ1ZhJ4AtJyw=="
+          "hash": "3BPbc1AngBnOREd4ymwrfA=="
         }
       },
       "is_incremental": false,
@@ -2961,7 +2973,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Shared.PacketHeader.html",
-          "hash": "QcLldVMxMNY5SMxHpnHHqQ=="
+          "hash": "V9Y1w8ghCVoFjg/iDFxQ2w=="
         }
       },
       "is_incremental": false,
@@ -2973,7 +2985,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Shared.PrintStoppedReason.html",
-          "hash": "FYXxHqV9bwqLCgV7s8fJkA=="
+          "hash": "JYChGgFvD5Y4mFp/k9NfUg=="
         }
       },
       "is_incremental": false,
@@ -2985,7 +2997,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Shared.StringHeader.html",
-          "hash": "tmXlifRoayMZCbJsR7bXgw=="
+          "hash": "LdEyJ1FGjcOkNTYMCtxiBw=="
         }
       },
       "is_incremental": false,
@@ -2997,7 +3009,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Shared.TransferHeader.html",
-          "hash": "wQMmyo55NCkP/J1+0MW19g=="
+          "hash": "frgKNmEG/hrJL0xh7vzXBA=="
         }
       },
       "is_incremental": false,
@@ -3009,7 +3021,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Shared.TransferResponse.html",
-          "hash": "d8Q54PTivKFZBeYxCj2F9Q=="
+          "hash": "O9wOMO2gV6bPXJWZ3/jShA=="
         }
       },
       "is_incremental": false,
@@ -3021,7 +3033,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.Shared.html",
-          "hash": "l6DxxTZNuTkwFT0/sGCEXw=="
+          "hash": "7qZsxshaNXk3AJLJKyH95A=="
         }
       },
       "is_incremental": false,
@@ -3033,7 +3045,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Communication.html",
-          "hash": "iwwkO/tFNPb3BTxKfwcP3Q=="
+          "hash": "keMvSf9mISsYohV+onVKgg=="
         }
       },
       "is_incremental": false,
@@ -3045,7 +3057,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.DataTransfer.html",
-          "hash": "ONT8pfKSOK8cD4M5KBNDzg=="
+          "hash": "Jh+IDcehcb+XKYMcdk8NTw=="
         }
       },
       "is_incremental": false,
@@ -3057,7 +3069,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.EvaluateExpressionRequest.html",
-          "hash": "bD+AqdETXJQdkiLaH9rQ/w=="
+          "hash": "pBYygdB4GbUsJgd9cLYCJw=="
         }
       },
       "is_incremental": false,
@@ -3069,7 +3081,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Interface.html",
-          "hash": "pM7YjDkwML29Gg6h4D2o+w=="
+          "hash": "XCHOPJy9BQB3rf8dho1JrA=="
         }
       },
       "is_incremental": false,
@@ -3081,7 +3093,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.QueuedCode.html",
-          "hash": "Tzshmej40pTyMxvJtoek0g=="
+          "hash": "QO+ZpgtdFLcfk8IA9ybuLw=="
         }
       },
       "is_incremental": false,
@@ -3093,7 +3105,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.QueuedLockRequest.html",
-          "hash": "gfJRA7FSD834guqLjZfJVg=="
+          "hash": "GbGaBkiSsJrSFA7kCcisLg=="
         }
       },
       "is_incremental": false,
@@ -3105,7 +3117,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Serialization.Reader.html",
-          "hash": "UFCFsCsqkOT+LmchCZjEIw=="
+          "hash": "UJnK9EkcMHyGSVYbp8Uk6A=="
         }
       },
       "is_incremental": false,
@@ -3117,7 +3129,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Serialization.Writer.html",
-          "hash": "szgKO7zO1S5C+5dLmRNYoQ=="
+          "hash": "9zjTeOHuylsTrklJxwzJPw=="
         }
       },
       "is_incremental": false,
@@ -3129,7 +3141,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.Serialization.html",
-          "hash": "+q202holyIodG5x5aS2ewQ=="
+          "hash": "56zLDH0pL8H/3xv8/fmlEQ=="
         }
       },
       "is_incremental": false,
@@ -3141,7 +3153,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.SPI.html",
-          "hash": "jr2fuGa39MLmcs7acxy+4Q=="
+          "hash": "/vjmKHW8Rk7xrpMQ1xg2TQ=="
         }
       },
       "is_incremental": false,
@@ -3153,7 +3165,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Settings.html",
-          "hash": "N2MyYFdJaEDwykDd8njZLg=="
+          "hash": "kO94Th9AWb89h+DgT21SvQ=="
         }
       },
       "is_incremental": false,
@@ -3165,7 +3177,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Utility.CRC16.html",
-          "hash": "7iV/QMnj2oq2uHqR2+XS4A=="
+          "hash": "llOH03FbuCw7HzkVehxk0g=="
         }
       },
       "is_incremental": false,
@@ -3177,7 +3189,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Utility.FilamentManager.html",
-          "hash": "eDaem5rME0QvoQR7GTHebw=="
+          "hash": "llL9+PTrvgzgsAMWQ12gNQ=="
         }
       },
       "is_incremental": false,
@@ -3189,7 +3201,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Utility.Logger.html",
-          "hash": "FNLPx+lmJlyILHyrq9unXw=="
+          "hash": "bH54PD22o9WcKnZUI18KFw=="
         }
       },
       "is_incremental": false,
@@ -3201,7 +3213,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Utility.html",
-          "hash": "PwFVoRrJjFeNNK7seYhsyg=="
+          "hash": "VRASEXpGFuTUYdWO+OdWlQ=="
         }
       },
       "is_incremental": false,
@@ -3213,7 +3225,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.html",
-          "hash": "OLBOxukn8cVqhEHqv2ZHxA=="
+          "hash": "hhABgohaxnDZlbDkH+tYag=="
         }
       },
       "is_incremental": false,
@@ -3225,7 +3237,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Controllers.MachineController.html",
-          "hash": "VdW2WhJxIsLht7BqvBWPkQ=="
+          "hash": "i+GajgGe7d6IdYHbaq6Zjw=="
         }
       },
       "is_incremental": false,
@@ -3237,7 +3249,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Controllers.WebSocketController.html",
-          "hash": "s6N0po/n6rgCOVp7p9OLMw=="
+          "hash": "fFnOK+msv+9ZGNsXGyaCqw=="
         }
       },
       "is_incremental": false,
@@ -3249,7 +3261,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Controllers.html",
-          "hash": "W1JgtBVz6LaEKT2tYGDlIA=="
+          "hash": "oDgEE5wTNiTQfl/6E+8c6A=="
         }
       },
       "is_incremental": false,
@@ -3261,7 +3273,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.FileProviders.DuetFileProvider.html",
-          "hash": "S5Uyc8Z6b06orq4Vj4yj4w=="
+          "hash": "8NIknx3rfRkRpJEh3k9Cmg=="
         }
       },
       "is_incremental": false,
@@ -3273,7 +3285,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.FileProviders.html",
-          "hash": "maFJhWjTYHVpyGfb9alX0Q=="
+          "hash": "4JjueZnjH73rwWsykbkEBA=="
         }
       },
       "is_incremental": false,
@@ -3285,7 +3297,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Middleware.CustomEndpointMiddleware.html",
-          "hash": "WukvIQ4uiVIRDFvTNmgR6A=="
+          "hash": "zXFdopsWnUQBOJCAg45OTQ=="
         }
       },
       "is_incremental": false,
@@ -3297,7 +3309,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Middleware.FallbackMiddleware.html",
-          "hash": "1ti3oOo6pjMPfC3VWUIYRw=="
+          "hash": "YPzYsnHkf0lhpz/G/dmg/w=="
         }
       },
       "is_incremental": false,
@@ -3309,7 +3321,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Middleware.HttpEndpointConnection.html",
-          "hash": "U5lrFzkASB/9QRIH/JTYUQ=="
+          "hash": "BLoMEAXXBSSkBSTI/wQlzg=="
         }
       },
       "is_incremental": false,
@@ -3321,7 +3333,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Middleware.html",
-          "hash": "9ExKCE8uuP4LQ5t2EAAGQg=="
+          "hash": "28czjWFc/babtNGLqrJCeA=="
         }
       },
       "is_incremental": false,
@@ -3333,7 +3345,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Program.html",
-          "hash": "Hsga5wAZQ1kFzqFh6zno5w=="
+          "hash": "R5DVVFDxWTfFlnbLinkS6A=="
         }
       },
       "is_incremental": false,
@@ -3345,7 +3357,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Services.ModelObserver.WebDirectoryChanged.html",
-          "hash": "0HeV5EYFQT5gaQUWEIv0Sw=="
+          "hash": "opFY1IhHzLBgwBwY2kbMlA=="
         }
       },
       "is_incremental": false,
@@ -3357,7 +3369,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Services.ModelObserver.html",
-          "hash": "yTzA8LojYL0HmGslaCFNzg=="
+          "hash": "2aboWLsEKsz7yqOKNBOkRA=="
         }
       },
       "is_incremental": false,
@@ -3369,7 +3381,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Services.html",
-          "hash": "yWxSWuVJqgn0lv05edzNdg=="
+          "hash": "DiPdtfjqo6E5dF07N7lYDw=="
         }
       },
       "is_incremental": false,
@@ -3381,7 +3393,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.Startup.html",
-          "hash": "htXuDQkIVACvdUjo30q2sQ=="
+          "hash": "yNLQE5gG/sFpO8MJg0h0JQ=="
         }
       },
       "is_incremental": false,
@@ -3393,7 +3405,7 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetWebServer.html",
-          "hash": "jwoes3TvywwgF7EO/ZK/sg=="
+          "hash": "i0bM35js5CiRB9/MbZoKKw=="
         }
       },
       "is_incremental": false,
@@ -3405,7 +3417,7 @@
       "output": {
         ".html": {
           "relative_path": "api/index.html",
-          "hash": "2JNOX9NNs5AI9WOXxHthLA=="
+          "hash": "BNHwACFyxI3xSveinJQaug=="
         }
       },
       "is_incremental": false,
@@ -3420,7 +3432,7 @@
           "hash": "Xa9bg69k3U3fjfbH7mNrtw=="
         }
       },
-      "is_incremental": false,
+      "is_incremental": true,
       "version": ""
     },
     {
@@ -3432,32 +3444,30 @@
           "hash": "aiR3pFkAFKP1mhbjNS/98g=="
         }
       },
-      "is_incremental": false,
+      "is_incremental": true,
       "version": ""
     }
   ],
   "incremental_info": [
     {
       "status": {
-        "can_incremental": false,
-        "details": "Cannot build incrementally because docfx version changed from 2.50.0.0 to 2.51.0.0.",
+        "can_incremental": true,
         "incrementalPhase": "build",
         "total_file_count": 0,
-        "skipped_file_count": 0,
-        "full_build_reason_code": "DocfxVersionChanged"
+        "skipped_file_count": 0
       },
       "processors": {
         "ConceptualDocumentProcessor": {
-          "can_incremental": false,
+          "can_incremental": true,
           "incrementalPhase": "build",
           "total_file_count": 3,
-          "skipped_file_count": 0
+          "skipped_file_count": 3
         },
         "ManagedReferenceDocumentProcessor": {
-          "can_incremental": false,
+          "can_incremental": true,
           "incrementalPhase": "build",
-          "total_file_count": 283,
-          "skipped_file_count": 0
+          "total_file_count": 284,
+          "skipped_file_count": 270
         },
         "TocDocumentProcessor": {
           "can_incremental": false,

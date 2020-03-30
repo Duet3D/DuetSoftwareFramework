@@ -96,8 +96,9 @@ namespace DuetControlServer
             {
                 try
                 {
+                    SPI.DataTransfer.Init();
                     SPI.Interface.Init();
-                    if (await SPI.Interface.Connect())
+                    if (SPI.Interface.Connect())
                     {
                         _logger.Info("Connection to Duet established");
                     }

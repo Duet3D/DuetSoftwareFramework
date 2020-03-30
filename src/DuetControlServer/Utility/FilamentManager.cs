@@ -3,9 +3,9 @@ using DuetControlServer.Files;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
-using System.Threading.Tasks;
 
 namespace DuetControlServer.Utility
 {
@@ -62,49 +62,66 @@ namespace DuetControlServer.Utility
                     }
                 }
             }
+
+            Model.Provider.Get.Move.Extruders.CollectionChanged += Extruders_CollectionChanged;
         }
 
         /// <summary>
-        /// Called when a new tool is being added to the object model
+        /// Called when the extruders have changed
         /// </summary>
-        /// <param name="tool">New tool</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task ToolAdded(Tool tool)
+        /// <param name="sender">Extruder list</param>
+        /// <param name="e">Event arguments</param>
+        private static void Extruders_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            using (await _lock.LockAsync())
+            using (_lock.Lock())
             {
-                int extruderDrive = tool.FilamentExtruder;
-                if (extruderDrive >= 0 && _filamentMapping.TryGetValue(extruderDrive, out string filamentName) && tool.Filament != filamentName)
+                if (e.OldItems != null)
                 {
-                    // Tell RepRapFirmware about the loaded filament
-                    SPI.Interface.AssignFilament(extruderDrive, filamentName);
+                    foreach (object extruderObject in e.OldItems)
+                    {
+                        if (extruderObject is Extruder extruder)
+                        {
+                            extruder.PropertyChanged -= ExtruderPropertyChanged;
+                        }
+                    }
                 }
-                tool.PropertyChanged += ToolPropertyChanged;
+
+                if (e.NewItems != null)
+                {
+                    foreach (object extruderObject in e.NewItems)
+                    {
+                        if (extruderObject is Extruder extruder)
+                        {
+                            int extruderDrive = Model.Provider.Get.Move.Extruders.IndexOf(extruder);
+                            if (_filamentMapping.TryGetValue(extruderDrive, out string filamentName) && extruder.Filament != filamentName)
+                            {
+                                // Tell RepRapFirmware about the loaded filament
+                                SPI.Interface.AssignFilament(extruderDrive, filamentName);
+                            }
+                            extruder.PropertyChanged += ExtruderPropertyChanged;
+                        }
+                    }
+                }
             }
         }
-
-        /// <summary>
-        /// Called when a tool is being removed from the object model
-        /// </summary>
-        /// <param name="tool">Tool being removed</param>
-        public static void ToolRemoved(Tool tool) => tool.PropertyChanged -= ToolPropertyChanged;
 
         /// <summary>
         /// Called when a tool property has changed
         /// </summary>
         /// <param name="sender">Changed tool</param>
         /// <param name="e">Information about the changed property</param>
-        private static async void ToolPropertyChanged(object sender, PropertyChangedEventArgs e)
+        private static void ExtruderPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(Tool.Filament))
+            if (e.PropertyName == nameof(Extruder.Filament))
             {
-                Tool tool = (Tool)sender;
-                using (await _lock.LockAsync())
+                Extruder extruder = (Extruder)sender;
+                using (_lock.Lock())
                 {
-                    if (!_filamentMapping.TryGetValue(tool.FilamentExtruder, out string filament) || filament != tool.Filament)
+                    int extruderIndex = Model.Provider.Get.Move.Extruders.IndexOf(extruder);
+                    if (!_filamentMapping.TryGetValue(extruderIndex, out string filament) || filament != extruder.Filament)
                     {
-                        _filamentMapping[tool.FilamentExtruder] = tool.Filament;
-                        await SaveMapping();
+                        _filamentMapping[extruderIndex] = extruder.Filament;
+                        SaveMapping();
                     }
                 }
             }
@@ -113,18 +130,20 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Save the filament mapping to a file
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static async Task SaveMapping()
+        private static async void SaveMapping()
         {
-            string filename = await FilePath.ToPhysicalAsync(FilamentsCsvFile, FileDirectory.System);
-            using FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.Write);
-            using StreamWriter writer = new StreamWriter(fs);
-
-            writer.WriteLine($"{FilamentsCsvHeader} generated at {DateTime.Now:yyyy-MM-dd HH:mm}");
-            writer.WriteLine("extruder,filament");
-            foreach (var pair in _filamentMapping)
+            using (await _lock.LockAsync())
             {
-                await writer.WriteLineAsync($"{pair.Key},{pair.Value}");
+                string filename = await FilePath.ToPhysicalAsync(FilamentsCsvFile, FileDirectory.System);
+                using FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.Write);
+                using StreamWriter writer = new StreamWriter(fs);
+
+                writer.WriteLine($"{FilamentsCsvHeader} generated at {DateTime.Now:yyyy-MM-dd HH:mm}");
+                writer.WriteLine("extruder,filament");
+                foreach (var pair in _filamentMapping)
+                {
+                    await writer.WriteLineAsync($"{pair.Key},{pair.Value}");
+                }
             }
         }
     }

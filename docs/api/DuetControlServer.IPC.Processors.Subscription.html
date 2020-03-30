@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1158,6 +1161,55 @@ There is no point in deserializing the object model here so only the JSON repres
       <tr>
         <td><span class="xref">System.Boolean</span></td>
         <td><p>True if subscribers are connected</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_IPC_Processors_Subscription_GetPathNode_" data-uid="DuetControlServer.IPC.Processors.Subscription.GetPathNode*"></a>
+  <h4 id="DuetControlServer_IPC_Processors_Subscription_GetPathNode_System_Collections_Generic_Dictionary_System_String_System_Object__System_Object___" data-uid="DuetControlServer.IPC.Processors.Subscription.GetPathNode(System.Collections.Generic.Dictionary{System.String,System.Object},System.Object[])">GetPathNode(Dictionary&lt;String, Object&gt;, Object[])</h4>
+  <div class="markdown level1 summary"><p>Get the object from a path node</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static object GetPathNode(Dictionary&lt;string, object&gt; root, object[] path)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Dictionary</span>&lt;<span class="xref">System.String</span>, <span class="xref">System.Object</span>&gt;</td>
+        <td><span class="parametername">root</span></td>
+        <td><p>Root dictionary</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span>[]</td>
+        <td><span class="parametername">path</span></td>
+        <td><p>Path node</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Object</span></td>
+        <td><p>Item at the given path</p>
 </td>
       </tr>
     </tbody>

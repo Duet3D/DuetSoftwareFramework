@@ -5,10 +5,10 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Enum TransferResponse
+    <title>Class TransferResponse
    </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Enum TransferResponse
+    <meta name="title" content="Class TransferResponse
    ">
     <meta name="generator" content="docfx 2.51.0.0">
     
@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1030,74 +1033,258 @@
             <article class="content wrap" id="_content" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse">
   
   
-  <h1 id="DuetControlServer_SPI_Communication_Shared_TransferResponse" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse" class="text-break">Enum TransferResponse
+  <h1 id="DuetControlServer_SPI_Communication_Shared_TransferResponse" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse" class="text-break">Class TransferResponse
   </h1>
   <div class="markdown level0 summary"><p>Result code for header and data transfers</p>
 </div>
   <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><span class="xref">TransferResponse</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetHashCode()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetType()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.MemberwiseClone()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ToString()</span>
+    </div>
+  </div>
   <h6><strong>Namespace</strong>: <a class="xref" href="DuetControlServer.SPI.Communication.Shared.html">DuetControlServer.SPI.Communication.Shared</a></h6>
   <h6><strong>Assembly</strong>: DuetControlServer.dll</h6>
   <h5 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public enum TransferResponse : uint</code></pre>
+    <pre><code class="lang-csharp hljs">public static class TransferResponse</code></pre>
   </div>
+  <h5 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_remarks"><strong>Remarks</strong></h5>
+  <div class="markdown level0 remarks"><p>This must remain a static class in order to allow for unknown enum values</p>
+</div>
   <h3 id="fields">Fields
   </h3>
+  <h4 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadDataChecksum" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse.BadDataChecksum">BadDataChecksum</h4>
+  <div class="markdown level1 summary"><p>Bad header checksum</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint BadDataChecksum = 6U</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
-        <th>Name</th>
+        <th>Type</th>
         <th>Description</th>
       </tr>
-    <thead>
+    </thead>
     <tbody>
       <tr>
-        <td id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadDataChecksum">BadDataChecksum</td>
-        <td><p>Bad header checksum</p>
-</td>
-      </tr>
-      <tr>
-        <td id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadDataLength">BadDataLength</td>
-        <td><p>Bad data length</p>
-</td>
-      </tr>
-      <tr>
-        <td id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadFormat">BadFormat</td>
-        <td><p>Bad transfer format</p>
-</td>
-      </tr>
-      <tr>
-        <td id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadHeaderChecksum">BadHeaderChecksum</td>
-        <td><p>Bad header checksum</p>
-</td>
-      </tr>
-      <tr>
-        <td id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadProtocolVersion">BadProtocolVersion</td>
-        <td><p>Bad protocol version</p>
-</td>
-      </tr>
-      <tr>
-        <td id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadResponse">BadResponse</td>
-        <td><p>Bad response. This one is special because it can follow a response exchange</p>
-</td>
-      </tr>
-      <tr>
-        <td id="DuetControlServer_SPI_Communication_Shared_TransferResponse_HighPin">HighPin</td>
-        <td><p>Error response because the pin is always high</p>
-</td>
-      </tr>
-      <tr>
-        <td id="DuetControlServer_SPI_Communication_Shared_TransferResponse_LowPin">LowPin</td>
-        <td><p>Error response because the pin is always low</p>
-</td>
-      </tr>
-      <tr>
-        <td id="DuetControlServer_SPI_Communication_Shared_TransferResponse_Success">Success</td>
-        <td><p>Transfer is OK</p>
-</td>
+        <td><span class="xref">System.UInt32</span></td>
+        <td></td>
       </tr>
     </tbody>
-  </thead></thead></table>
+  </table>
+  <h4 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadDataLength" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse.BadDataLength">BadDataLength</h4>
+  <div class="markdown level1 summary"><p>Bad data length</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint BadDataLength = 4U</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadFormat" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse.BadFormat">BadFormat</h4>
+  <div class="markdown level1 summary"><p>Bad transfer format</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint BadFormat = 2U</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadHeaderChecksum" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse.BadHeaderChecksum">BadHeaderChecksum</h4>
+  <div class="markdown level1 summary"><p>Bad header checksum</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint BadHeaderChecksum = 5U</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadProtocolVersion" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse.BadProtocolVersion">BadProtocolVersion</h4>
+  <div class="markdown level1 summary"><p>Bad protocol version</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint BadProtocolVersion = 3U</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_BadResponse" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse.BadResponse">BadResponse</h4>
+  <div class="markdown level1 summary"><p>Bad response. This one is special because it can follow a response exchange</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint BadResponse = 4278124286U</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_HighPin" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse.HighPin">HighPin</h4>
+  <div class="markdown level1 summary"><p>Error response because the pin is always high</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint HighPin = 4294967295U</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_LowPin" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse.LowPin">LowPin</h4>
+  <div class="markdown level1 summary"><p>Error response because the pin is always low</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint LowPin = 0U</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 id="DuetControlServer_SPI_Communication_Shared_TransferResponse_Success" data-uid="DuetControlServer.SPI.Communication.Shared.TransferResponse.Success">Success</h4>
+  <div class="markdown level1 summary"><p>Transfer is OK</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint Success = 1U</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
 </article>
           </div>
           

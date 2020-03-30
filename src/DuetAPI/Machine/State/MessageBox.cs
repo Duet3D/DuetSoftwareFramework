@@ -16,26 +16,6 @@
         private long _axisControls;
 
         /// <summary>
-        /// Mode of the message box to display or null if none is shown
-        /// </summary>
-        public MessageBoxMode Mode
-        {
-            get => _mode;
-			set => SetPropertyValue(ref _mode, value);
-        }
-        private MessageBoxMode _mode = MessageBoxMode.OkOnly;
-        
-        /// <summary>
-        /// Title of the message box
-        /// </summary>
-        public string Title
-        {
-            get => _title;
-			set => SetPropertyValue(ref _title, value);
-        }
-        private string _title = string.Empty;
-        
-        /// <summary>
         /// Content of the message box
         /// </summary>
         public string Message
@@ -44,6 +24,16 @@
 			set => SetPropertyValue(ref _message, value);
         }
         private string _message = string.Empty;
+
+        /// <summary>
+        /// Mode of the message box to display or null if none is shown
+        /// </summary>
+        public MessageBoxMode Mode
+        {
+            get => _mode;
+			set => SetPropertyValue(ref _mode, value);
+        }
+        private MessageBoxMode _mode = MessageBoxMode.OkOnly;
 
         /// <summary>
         /// Sequence number of the message box
@@ -59,13 +49,23 @@
         private int _seq = -1;
 
         /// <summary>
-        /// Counter that is incremented whenever a new message box is shown
+        /// Total timeout for this message box (in ms)
         /// </summary>
-        public float Timeout
+        public int Timeout
         {
             get => _timeout;
 			set => SetPropertyValue(ref _timeout, value);
         }
-        private float _timeout;
+        private int _timeout;
+
+        /// <summary>
+        /// Title of the message box
+        /// </summary>
+        public string Title
+        {
+            get => _title;
+			set => SetPropertyValue(ref _title, value);
+        }
+        private string _title = string.Empty;
     }
 }

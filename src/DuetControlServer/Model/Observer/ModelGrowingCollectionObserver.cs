@@ -34,6 +34,7 @@ namespace DuetControlServer.Model
         /// Subscribe to changes of the given growing model collection
         /// </summary>
         /// <param name="growingModelCollection">Growing model collection to subscribe to</param>
+        /// <param name="collectionName">Name of the collection</param>
         /// <param name="path">Path to the growing collection</param>
         private static void SubscribeToGrowingModelCollection(object growingModelCollection, string collectionName, params object[] path)
         {

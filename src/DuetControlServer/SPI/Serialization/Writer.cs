@@ -10,7 +10,6 @@ using DuetControlServer.SPI.Communication.LinuxRequests;
 using DuetControlServer.SPI.Communication.Shared;
 using Code = DuetControlServer.Commands.Code;
 using CodeParameter = DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter;
-using MessageHeader = DuetControlServer.SPI.Communication.Shared.MessageHeader;
 
 namespace DuetControlServer.SPI.Serialization
 {
@@ -109,9 +108,9 @@ namespace DuetControlServer.SPI.Serialization
             // Write line number
             if (DataTransfer.ProtocolVersion >= 2)
             {
-                uint lineNumber = (uint)(code.LineNumber ?? 0);
+                int lineNumber = (int)(code.LineNumber ?? 0);
                 MemoryMarshal.Write(to.Slice(bytesWritten), ref lineNumber);
-                bytesWritten += Marshal.SizeOf<uint>();
+                bytesWritten += Marshal.SizeOf<int>();
             }
             
             // Write parameters
@@ -427,7 +426,7 @@ namespace DuetControlServer.SPI.Serialization
                 GeneratedByLength = (byte)unicodeGeneratedBy.Length,
                 NumFilaments = (ushort)info.Filament.Count,
                 FileSize = (uint)info.Size,
-                LastModifiedTime = (ulong)(System.IO.File.GetLastWriteTime(info.FileName) - new DateTime (1970, 1, 1)).TotalSeconds,
+                LastModifiedTime = info.LastModified.HasValue ? (ulong)(info.LastModified.Value - new DateTime(1970, 1, 1)).TotalSeconds : 0,
                 FirstLayerHeight = info.FirstLayerHeight,
                 LayerHeight = info.LayerHeight,
                 ObjectHeight = info.Height,
@@ -521,14 +520,14 @@ namespace DuetControlServer.SPI.Serialization
         }
 
         /// <summary>
-        /// Request a resource to be locked or unlocked
+        /// Write a G-code channel
         /// </summary>
         /// <param name="to">Destination</param>
         /// <param name="channel">Channel for the lock request</param>
         /// <returns>Number of bytes written</returns>
-        public static int WriteLockUnlock(Span<byte> to, CodeChannel channel)
+        public static int WriteCodeChannel(Span<byte> to, CodeChannel channel)
         {
-            LockUnlockHeader header = new LockUnlockHeader
+            CodeChannelHeader header = new CodeChannelHeader
             {
                 Channel = channel
             };
@@ -590,6 +589,31 @@ namespace DuetControlServer.SPI.Serialization
                 data.CopyTo(to.Slice(bytesWritten));
                 bytesWritten += data.Length;
             }
+            return AddPadding(to, bytesWritten);
+        }
+
+        /// <summary>
+        /// Write a request to evaluate an expression
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="channel">Where to evaluate the expression</param>
+        /// <param name="expression">Expression to evaluate</param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteEvaluateExpression(Span<byte> to, CodeChannel channel, string expression)
+        {
+            Span<byte> unicodeExpression = Encoding.UTF8.GetBytes(expression);
+
+            // Write header
+            CodeChannelHeader header = new CodeChannelHeader
+            {
+                Channel = channel
+            };
+            MemoryMarshal.Write(to, ref header);
+            int bytesWritten = Marshal.SizeOf(header);
+
+            // Write expression
+            unicodeExpression.CopyTo(to.Slice(bytesWritten));
+            bytesWritten += unicodeExpression.Length;
             return AddPadding(to, bytesWritten);
         }
 

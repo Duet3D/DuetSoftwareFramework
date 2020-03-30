@@ -1,16 +1,61 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Text.Json;
 
 namespace DuetAPI.Machine
 {
     /// <summary>
+    /// Helper class to keep track of individual model collection subtypes
+    /// </summary>
+    public static class ModelGrowingCollection
+    {
+        /// <summary>
+        /// List of types that are derived from this class
+        /// </summary>
+        private static readonly List<Type> _derivedTypes = new List<Type>();
+
+        /// <summary>
+        /// Check if the given type is derived from a <see cref="ModelCollection{T}"/>
+        /// </summary>
+        /// <param name="type">Type to check</param>
+        /// <returns>Whether the type is derived</returns>
+        public static bool TypeMatches(Type type)
+        {
+            lock (_derivedTypes)
+            {
+                return _derivedTypes.Contains(type);
+            }
+        }
+
+        /// <summary>
+        /// Register another growing model collection type
+        /// </summary>
+        /// <param name="type">Specific collection type</param>
+        internal static void RegisterType(Type type)
+        {
+            lock (_derivedTypes)
+            {
+                if (!_derivedTypes.Contains(type))
+                {
+                    _derivedTypes.Add(type);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Generic list container to which items can be added or which can be cleared only
     /// </summary>
     /// <typeparam name="T">Item type</typeparam>
     public class ModelGrowingCollection<T> : ModelCollection<T>
     {
+        /// <summary>
+        /// Constructor of this class
+        /// </summary>
+        public ModelGrowingCollection() : base() => ModelGrowingCollection.RegisterType(GetType());
+
         /// <summary>
         /// Called after the collection has been changed but before the corresponding event has been raised
         /// </summary>

@@ -16,7 +16,13 @@ namespace UnitTests.Machine
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
             MachineModel model = new MachineModel();
+
             model.UpdateFromJson(parsedJson.RootElement);
+
+            Assert.IsNotNull(model.State.MessageBox);
+            Assert.AreEqual(MessageBoxMode.OkOnly, model.State.MessageBox.Mode);
+            Assert.AreEqual("message", model.State.MessageBox.Message);
+            Assert.AreEqual("title", model.State.MessageBox.Title);
 
             string serializedModel = model.ToString();
             Assert.AreEqual(jsonText, serializedModel);

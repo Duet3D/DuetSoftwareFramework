@@ -68,13 +68,13 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Lock movement and wait for standstill
         /// </summary>
-        /// <seealso cref="Shared.LockUnlockHeader"/>
+        /// <seealso cref="Shared.CodeChannelHeader"/>
         LockMovementAndWaitForStandstill = 10,
 
         /// <summary>
         /// Unlock everything again
         /// </summary>
-        /// <seealso cref="Shared.LockUnlockHeader"/>
+        /// <seealso cref="Shared.CodeChannelHeader"/>
         Unlock = 11,
 
         /// <summary>
@@ -106,13 +106,13 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Evaluate an arbitrary expression
         /// </summary>
-        /// <seealso cref="EvaluateExpressionHeader"/>
+        /// <seealso cref="Shared.CodeChannelHeader"/>
         EvaluateExpression = 16,
 
         /// <summary>
         /// Send an arbitrary RepRapFirmware message
         /// </summary>
-        /// <seealso cref="LinuxRequests.SendMessage"/>
+        /// <seealso cref="Shared.MessageHeader"/>
         Message = 17
     }
 }

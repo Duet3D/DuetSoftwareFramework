@@ -129,7 +129,7 @@ namespace UnitTests.SPI
             Assert.AreEqual(16, bytesRead);
             
             // Header
-            Assert.AreEqual(CodeChannel.USB, channel);
+            Assert.AreEqual(DuetAPI.CodeChannel.USB, channel);
             Assert.IsFalse(reportMissing);
             Assert.IsTrue(fromCode);
             
@@ -146,7 +146,7 @@ namespace UnitTests.SPI
             Assert.AreEqual(4, bytesRead);
 
             // Header
-            Assert.AreEqual(CodeChannel.File, channel);
+            Assert.AreEqual(DuetAPI.CodeChannel.File, channel);
             Assert.IsFalse(abortAll);
         }
 
@@ -191,17 +191,19 @@ namespace UnitTests.SPI
         }
 
         [Test]
-        public void ResourceLocked()
+        public void CodeChannel()
         {
-            Span<byte> blob = GetBlob("resourceLocked.bin");
+            Span<byte> blob = GetBlob("codeChannel.bin");
 
-            int bytesRead = Reader.ReadResourceLocked(blob, out CodeChannel channel);
+            int bytesRead = Reader.ReadCodeChannel(blob, out CodeChannel channel);
             Assert.AreEqual(bytesRead, 4);
 
             // Header
-            Assert.AreEqual(CodeChannel.SBC, channel);
+            Assert.AreEqual(DuetAPI.CodeChannel.SBC, channel);
         }
-          
+
+#warning FIXME Add missing packets
+
         private Span<byte> GetBlob(string filename)
         {
             FileStream stream = new FileStream(Path.Combine(Directory.GetCurrentDirectory(), "../../../SPI/Blobs", filename), FileMode.Open, FileAccess.Read);

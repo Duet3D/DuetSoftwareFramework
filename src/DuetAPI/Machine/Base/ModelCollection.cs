@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -8,11 +9,42 @@ using System.Text.Json;
 namespace DuetAPI.Machine
 {
     /// <summary>
+    /// Helper class to keep track of individual model collection subtypes
+    /// </summary>
+    public static class ModelCollection
+    {
+        /// <summary>
+        /// List of types that are derived from this class
+        /// </summary>
+        private static readonly ConcurrentDictionary<Type, Type> _derivedTypes = new ConcurrentDictionary<Type, Type>();
+
+        /// <summary>
+        /// Check if the given type is derived from a <see cref="ModelCollection{T}"/> and return the corresponding item type
+        /// </summary>
+        /// <param name="type">Type to check</param>
+        /// <param name="itemType">Item type</param>
+        /// <returns>Whether the item type could be found</returns>
+        public static bool GetItemType(Type type, out Type itemType) => _derivedTypes.TryGetValue(type, out itemType);
+
+        /// <summary>
+        /// Register another model collection type
+        /// </summary>
+        /// <param name="type">Specific collection type</param>
+        /// <param name="itemType">Item type</param>
+        internal static void RegisterType(Type type, Type itemType) => _derivedTypes.TryAdd(type, itemType);
+    }
+
+    /// <summary>
     /// Generic container for object model arrays
     /// </summary>
     /// <typeparam name="T">Item type</typeparam>
     public class ModelCollection<T> : ObservableCollection<T>, ICloneable
     {
+        /// <summary>
+        /// Constructor of this class
+        /// </summary>
+        public ModelCollection() => ModelCollection.RegisterType(GetType(), typeof(T));
+
         /// <summary>
         /// Removes all items from the collection
         /// </summary>
@@ -284,11 +316,8 @@ namespace DuetAPI.Machine
                     }
                 }
             }
-            else if (itemType.IsGenericType &&
-                     (itemType.GetGenericTypeDefinition() == typeof(ModelCollection<>) ||
-                      itemType.GetGenericTypeDefinition() == typeof(ModelGrowingCollection<>)))
+            else if (ModelCollection.GetItemType(itemType, out Type subItemType))
             {
-                Type subItemType = itemType.GetGenericArguments()[0];
                 for (int i = 0; i < newList.Count; i++)
                 {
                     if (i < oldList.Count)

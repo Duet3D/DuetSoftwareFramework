@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1113,7 +1116,7 @@ This is only called once on initialization</p>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; Connect()</code></pre>
+    <pre><code class="lang-csharp hljs">public static bool Connect()</code></pre>
   </div>
   <h5 class="returns">Returns</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1125,7 +1128,7 @@ This is only called once on initialization</p>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
+        <td><span class="xref">System.Boolean</span></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
@@ -1175,13 +1178,13 @@ This is only called once on initialization</p>
     </tbody>
   </table>
   <a id="DuetControlServer_SPI_Interface_EvaluateExpression_" data-uid="DuetControlServer.SPI.Interface.EvaluateExpression*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_EvaluateExpression_System_String_" data-uid="DuetControlServer.SPI.Interface.EvaluateExpression(System.String)">EvaluateExpression(String)</h4>
+  <h4 id="DuetControlServer_SPI_Interface_EvaluateExpression_DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.SPI.Interface.EvaluateExpression(DuetAPI.CodeChannel,System.String)">EvaluateExpression(CodeChannel, String)</h4>
   <div class="markdown level1 summary"><p>Evaluate an arbitrary expression</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task&lt;object&gt; EvaluateExpression(string expression)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;object&gt; EvaluateExpression(CodeChannel channel, string expression)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1193,6 +1196,12 @@ This is only called once on initialization</p>
       </tr>
     </thead>
     <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Where to evaluate the expression</p>
+</td>
+      </tr>
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">expression</span></td>
@@ -1398,6 +1407,49 @@ This is only called once on initialization</p>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static void Init()</code></pre>
   </div>
+  <a id="DuetControlServer_SPI_Interface_IsWaitingForAcknowledgement_" data-uid="DuetControlServer.SPI.Interface.IsWaitingForAcknowledgement*"></a>
+  <h4 id="DuetControlServer_SPI_Interface_IsWaitingForAcknowledgement_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Interface.IsWaitingForAcknowledgement(DuetAPI.CodeChannel)">IsWaitingForAcknowledgement(CodeChannel)</h4>
+  <div class="markdown level1 summary"><p>Checks if the given channel is waiting for acknowledgement</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool IsWaitingForAcknowledgement(CodeChannel channel)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Channel to check</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><p>Whether the channel is waiting for acknowledgement</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_Interface_LockMovementAndWaitForStandstill_" data-uid="DuetControlServer.SPI.Interface.LockMovementAndWaitForStandstill*"></a>
   <h4 id="DuetControlServer_SPI_Interface_LockMovementAndWaitForStandstill_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Interface.LockMovementAndWaitForStandstill(DuetAPI.CodeChannel)">LockMovementAndWaitForStandstill(CodeChannel)</h4>
   <div class="markdown level1 summary"><p>Lock the move module and wait for standstill</p>
@@ -1437,6 +1489,49 @@ This is only called once on initialization</p>
       <tr>
         <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
         <td><p>Whether the resource could be locked</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_SPI_Interface_MessageAcknowledged_" data-uid="DuetControlServer.SPI.Interface.MessageAcknowledged*"></a>
+  <h4 id="DuetControlServer_SPI_Interface_MessageAcknowledged_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Interface.MessageAcknowledged(DuetAPI.CodeChannel)">MessageAcknowledged(CodeChannel)</h4>
+  <div class="markdown level1 summary"><p>Called when a message has been acknowledged</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task MessageAcknowledged(CodeChannel channel)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Code channel</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
 </td>
       </tr>
     </tbody>

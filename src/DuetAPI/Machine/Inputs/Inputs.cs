@@ -21,7 +21,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Constructor of this class
         /// </summary>
-        public Inputs()
+        public Inputs() : base()
         {
             foreach (CodeChannel name in Enum.GetValues(typeof(CodeChannel)))
             {

@@ -26,6 +26,42 @@ namespace DuetControlServer.Commands
 
         #region Code Scheduling
         /// <summary>
+        /// Internal type of a code. This reflects the priority as well
+        /// </summary>
+        private enum InternalCodeType : int
+        {
+            /// <summary>
+            /// Regular G/M/T-code
+            /// </summary>
+            Regular = 0,
+
+            /// <summary>
+            /// Inserted code from an intercepting connection
+            /// </summary>
+            Inserted = 1,
+
+            /// <summary>
+            /// Code from a macro file
+            /// </summary>
+            Macro = 2,
+
+            /// <summary>
+            /// Inserted macro code from an intercepting connection
+            /// </summary>
+            InsertedFromMacro = 3,
+
+            /// <summary>
+            /// Code being executed while an acknowledgemenet is awaited
+            /// </summary>
+            BlockingRegular = 4,
+
+            /// <summary>
+            /// Code with <see cref="CodeFlags.IsPrioritized"/> set
+            /// </summary>
+            Prioritized = 5
+        }
+
+        /// <summary>
         /// Array of AsyncLocks to guarantee the ordered start of incoming G/M/T-codes
         /// </summary>
         /// <remarks>
@@ -78,37 +114,6 @@ namespace DuetControlServer.Commands
                 // Create a new one
                 _cancellationTokenSources[(int)channel] = new CancellationTokenSource();
             }
-        }
-
-        /// <summary>
-        /// Internal type of a code. This reflects the priority as well
-        /// </summary>
-        private enum InternalCodeType : int
-        {
-            /// <summary>
-            /// Regular G/M/T-code
-            /// </summary>
-            Regular = 0,
-
-            /// <summary>
-            /// Inserted code from an intercepting connection
-            /// </summary>
-            Inserted = 1,
-
-            /// <summary>
-            /// Code from a macro file
-            /// </summary>
-            Macro = 2,
-
-            /// <summary>
-            /// Inserted macro code from an intercepting connection
-            /// </summary>
-            InsertedFromMacro = 3,
-
-            /// <summary>
-            /// Code with <see cref="CodeFlags.IsPrioritized"/> set
-            /// </summary>
-            Prioritized = 4
         }
 
         /// <summary>
@@ -168,6 +173,11 @@ namespace DuetControlServer.Commands
             {
                 _codeType = InternalCodeType.Macro;
                 _logger.Debug("Waiting for execution of {0} (macro code)", this);
+            }
+            else if (SPI.Interface.IsWaitingForAcknowledgement(Channel))
+            {
+                _codeType = InternalCodeType.BlockingRegular;
+                _logger.Debug("Waiting for execution of {0} (acknowledgement)", this);
             }
             else
             {
@@ -444,7 +454,7 @@ namespace DuetControlServer.Commands
                     string trimmedExpression = expression.Trim();
                     try
                     {
-                        // FIXME This should only replace Linux expressions and perform the final evaluation after Post
+                        // FIXME This should only replace Linux expressions after Pre and perform the final evaluation after Post
                         bool expressionFound;
                         object expressionResult;
                         using (await Model.Provider.AccessReadOnlyAsync())
@@ -453,7 +463,7 @@ namespace DuetControlServer.Commands
                         }
                         if (!expressionFound)
                         {
-                            await Interface.EvaluateExpression(trimmedExpression);
+                            expressionResult = await Interface.EvaluateExpression(Channel, trimmedExpression);
                         }
 
                         if (builder.Length != 0)
@@ -470,6 +480,10 @@ namespace DuetControlServer.Commands
                 }
                 Result = new CodeResult(MessageType.Success, builder.ToString());
                 return true;
+            }
+            else if (Keyword != KeywordType.None)
+            {
+                throw new NotSupportedException();
             }
 
             // Attempt to process the code internally

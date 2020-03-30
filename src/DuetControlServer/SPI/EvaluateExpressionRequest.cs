@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DuetAPI;
+using System;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.SPI
@@ -11,16 +12,23 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Constructor of this class
         /// </summary>
+        /// <param name="channel">Where to evaluate the expression</param>
         /// <param name="expression">Expression to evaluate</param>
-        public EvaluateExpressionRequest(string expression)
+        public EvaluateExpressionRequest(CodeChannel channel, string expression)
         {
+            Channel = channel;
             Expression = expression;
         }
 
         /// <summary>
+        /// Where the expression is evaluated
+        /// </summary>
+        public CodeChannel Channel { get; }
+
+        /// <summary>
         /// Expression to evaluate
         /// </summary>
-        public string Expression { get; set; }
+        public string Expression { get; }
 
         /// <summary>
         /// Whether the request has been sent to the firmware

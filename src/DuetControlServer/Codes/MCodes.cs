@@ -453,14 +453,6 @@ namespace DuetControlServer.Codes
                     }
                     break;
 
-                // Display message and optionally wait for response
-                case 291:
-                    if (code.Parameter('S') == 2 || code.Parameter('S') == 3)
-                    {
-                        throw new NotSupportedException();
-                    }
-                    break;
-
                 // Save heightmap
                 case 374:
                     if (await SPI.Interface.Flush(code))
@@ -892,6 +884,11 @@ namespace DuetControlServer.Codes
                     {
                         await Diagnostics(code.Result);
                     }
+                    break;
+
+                // Acknowledge message
+                case 292:
+                    await SPI.Interface.MessageAcknowledged(code.Channel);
                     break;
 
                 // Set compatibility

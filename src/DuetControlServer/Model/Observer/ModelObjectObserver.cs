@@ -19,7 +19,7 @@ namespace DuetControlServer.Model
         /// <param name="e">Event arguments</param>
         private static void VariableModelObjectChanging(object sender, PropertyChangingEventArgs e)
         {
-            if (((ModelObject)sender).GetPropertyValue(e.PropertyName) is ModelObject modelMember)
+            if (sender.GetType().GetProperty(e.PropertyName).GetValue(sender) is ModelObject modelMember)
             {
                 // Prevent memory leaks in case variable model objects are replaced
                 UnsubscribeFromModelObject(modelMember);
@@ -42,10 +42,10 @@ namespace DuetControlServer.Model
             return (sender, e) =>
             {
                 string propertyName = JsonNamingPolicy.CamelCase.ConvertName(e.PropertyName);
-                object value = ((ModelObject)sender).GetPropertyValue(e.PropertyName);
+                object value = sender.GetType().GetProperty(e.PropertyName).GetValue(sender);
                 OnPropertyPathChanged?.Invoke(AddToPath(path, propertyName), PropertyChangeType.Property, value);
 
-                if (hasVariableModelObjects && ((ModelObject)sender).GetPropertyValue(e.PropertyName) is ModelObject modelMember)
+                if (hasVariableModelObjects && value is ModelObject modelMember)
                 {
                     // Subscribe to variable ModelObject events again
                     SubscribeToModelObject(modelMember, AddToPath(path, propertyName));
@@ -56,7 +56,8 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Subscribe to changes of the given model object
         /// </summary>
-        /// <param name="machineModel">Object to subscribe to</param>
+        /// <param name="model">Object to subscribe to</param>
+        /// <param name="path">Collection path</param>
         private static void SubscribeToModelObject(ModelObject model, object[] path)
         {
             if (model == null)
@@ -65,7 +66,7 @@ namespace DuetControlServer.Model
             }
 
             bool hasVariableModelObjects = false;
-            foreach (PropertyInfo property in model.GetProperties())
+            foreach (PropertyInfo property in model.GetType().GetProperties())
             {
                 string propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
                 object value = property.GetValue(model);
@@ -77,22 +78,16 @@ namespace DuetControlServer.Model
                     }
                     hasVariableModelObjects |= (property.SetMethod != null);
                 }
-                else if (property.PropertyType.IsGenericType &&
-                         property.PropertyType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
+                else if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
                 {
-                    Type itemType = property.PropertyType.GetGenericArguments()[0];
-                    SubscribeToModelCollection(value, itemType, propertyName, path);
-                }
-                else if (property.PropertyType.IsGenericType &&
-                         property.PropertyType.GetGenericTypeDefinition() == typeof(ModelGrowingCollection<>))
-                {
-                    SubscribeToGrowingModelCollection(value, propertyName, path);
-                }
-                else if (property.PropertyType.BaseType.IsGenericType &&
-                         property.PropertyType.BaseType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
-                {
-                    Type itemType = property.PropertyType.BaseType.GetGenericArguments()[0];
-                    SubscribeToModelCollection(value, itemType, propertyName, path);
+                    if (ModelGrowingCollection.TypeMatches(property.PropertyType))
+                    {
+                        SubscribeToGrowingModelCollection(value, propertyName, path);
+                    }
+                    else
+                    {
+                        SubscribeToModelCollection(value, itemType, propertyName, path);
+                    }
                 }
             }
 
@@ -124,7 +119,7 @@ namespace DuetControlServer.Model
             _propertyChangedHandlers.Remove(model);
 
             bool unregisterPropertyChanging = false;
-            foreach (PropertyInfo property in model.GetProperties())
+            foreach (PropertyInfo property in model.GetType().GetProperties())
             {
                 object value = property.GetValue(model);
                 if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
@@ -135,20 +130,16 @@ namespace DuetControlServer.Model
                     }
                     unregisterPropertyChanging |= (property.SetMethod != null);
                 }
-                else if (property.PropertyType.IsGenericType &&
-                         property.PropertyType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
+                else if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
                 {
-                    UnsubscribeFromModelCollection(value, property.PropertyType.GetGenericArguments()[0]);
-                }
-                else if (property.PropertyType.IsGenericType &&
-                         property.PropertyType.GetGenericTypeDefinition() == typeof(ModelGrowingCollection<>))
-                {
-                    UnsubscribeFromGrowingModelCollection(value);
-                }
-                else if (property.PropertyType.BaseType.IsGenericType &&
-                         property.PropertyType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
-                {
-                    UnsubscribeFromModelCollection(value, property.PropertyType.GetGenericArguments()[0]);
+                    if (ModelGrowingCollection.TypeMatches(property.PropertyType))
+                    {
+                        UnsubscribeFromGrowingModelCollection(value);
+                    }
+                    else
+                    {
+                        UnsubscribeFromModelCollection(value, property.PropertyType.GetGenericArguments()[0]);
+                    }
                 }
             }
 

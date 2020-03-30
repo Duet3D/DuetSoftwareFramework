@@ -61,7 +61,7 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// <summary>
         /// Ressource locked
         /// </summary>
-        /// <seealso cref="Shared.LockUnlockHeader"/>
+        /// <seealso cref="Shared.CodeChannelHeader"/>
         Locked = 9,
 
         /// <summary>
@@ -80,6 +80,12 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// Perform a G/M/T-code from a RepRapFirmware code input
         /// </summary>
         /// <seealso cref="DoCodeHeader"/>
-        DoCode = 12
+        DoCode = 12,
+
+        /// <summary>
+        /// Firmware is waiting for a blocking message to be acknowledged
+        /// </summary>
+        /// <seealso cref="Shared.CodeChannelHeader"/>
+        WaitForAcknowledgement = 13
     }
 }

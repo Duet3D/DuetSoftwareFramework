@@ -360,7 +360,7 @@ sudo passwd
 After that, open a new console in one of the DSF application directories (where a .csproj file lies) and run 
 
 ```
-dotnet publish-ssh -r linux-arm --ssh-host duet3 --ssh-user root --ssh-password raspberry --ssh-path /opt/dsf/bin
+dotnet publish-ssh -r linux-arm --ssh-host duet3 --ssh-user root --ssh-password raspberry --ssh-path /opt/dsf/bin /p:DefineConstants=VERIFY_OBJECT_MODEL
 ```
 
 This will replace the stock DSF component with your own compiled variant. Make sure to shut down all the DSF components before you do this, else you may get errors.
@@ -623,9 +623,8 @@ To ensure flawless operation of the most critical components, Duet Software Fram
 
 - `killall` may not be used to terminate DuetControlServer. Since it sends SIGTERM to all processes including worker threads of the .NET task scheduler, an abnormal program termination is the consequence. It is better to send SIGTERM only to the main PID
 - G-Code checksums and M998 are currently not supported
-- M291 S2/S3 are not working yet
-- Object model is only partially populated
 - Some G-codes behave differently when executed directly by RepRapFirmware instead of DCS
+- Conditional G-codes (aka meta commands) except for `echo` are not supported yet
 
 ## Reporting issues
 

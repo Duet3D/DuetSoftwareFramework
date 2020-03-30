@@ -78,7 +78,6 @@ namespace DuetControlServer.SPI.Serialization
             {
                 reply = string.Empty;
             }
-
             return AddPadding(bytesRead);
         }
 
@@ -175,14 +174,14 @@ namespace DuetControlServer.SPI.Serialization
         }
 
         /// <summary>
-        /// Read a lock confirmation
+        /// Read a G-code channel
         /// </summary>
         /// <param name="from">Origin</param>
         /// <param name="channel">Channel that has acquired the lock</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadResourceLocked(ReadOnlySpan<byte> from, out CodeChannel channel)
+        public static int ReadCodeChannel(ReadOnlySpan<byte> from, out CodeChannel channel)
         {
-            LockUnlockHeader header = MemoryMarshal.Cast<byte, LockUnlockHeader>(from)[0];
+            CodeChannelHeader header = MemoryMarshal.Cast<byte, CodeChannelHeader>(from)[0];
             channel = header.Channel;
             return Marshal.SizeOf(header);
         }
@@ -216,13 +215,18 @@ namespace DuetControlServer.SPI.Serialization
         /// Read a <see cref="Request.EvaluationResult"/> request
         /// </summary>
         /// <param name="from">Origin</param>
-        /// <param name="channel">Code channel</param>
-        /// <param name="code">Code to execute</param>
+        /// <param name="expression">Expression</param>
+        /// <param name="result">Evaluation result</param>
         /// <returns>Number of bytes read</returns>
         public static int ReadEvaluationResult(ReadOnlySpan<byte> from, out string expression, out object result)
         {
             EvaluationResultHeader header = MemoryMarshal.Cast<byte, EvaluationResultHeader>(from)[0];
             int bytesRead = Marshal.SizeOf(header);
+
+            // Read expression
+            ReadOnlySpan<byte> unicodeExpression = from.Slice(bytesRead, header.ExpressionLength);
+            expression = Encoding.UTF8.GetString(unicodeExpression);
+            bytesRead += header.ExpressionLength;
 
             // Read value
             switch (header.Type)
@@ -291,15 +295,14 @@ namespace DuetControlServer.SPI.Serialization
                     }
                     result = boolArray;
                     break;
+                case DataType.Expression:
+                    string errorMessage = Encoding.UTF8.GetString(from.Slice(bytesRead, header.IntValue));
+                    result = new CodeParserException(errorMessage);
+                    break;
                 default:
-                    result = new CodeParserException("Failed to evaluate expression");
+                    result = null;
                     break;
             }
-
-            // Read expression
-            ReadOnlySpan<byte> unicodeExpression = from.Slice(bytesRead, header.ExpressionLength);
-            expression = Encoding.UTF8.GetString(unicodeExpression);
-            bytesRead += header.ExpressionLength;
 
             return AddPadding(bytesRead);
         }

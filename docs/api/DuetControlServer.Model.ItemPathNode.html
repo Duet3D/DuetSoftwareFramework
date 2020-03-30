@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1067,13 +1070,13 @@
   <h3 id="constructors">Constructors
   </h3>
   <a id="DuetControlServer_Model_ItemPathNode__ctor_" data-uid="DuetControlServer.Model.ItemPathNode.#ctor*"></a>
-  <h4 id="DuetControlServer_Model_ItemPathNode__ctor_System_String_System_Int32_System_Int32_" data-uid="DuetControlServer.Model.ItemPathNode.#ctor(System.String,System.Int32,System.Int32)">ItemPathNode(String, Int32, Int32)</h4>
+  <h4 id="DuetControlServer_Model_ItemPathNode__ctor_System_String_System_Int32_System_Collections_IList_" data-uid="DuetControlServer.Model.ItemPathNode.#ctor(System.String,System.Int32,System.Collections.IList)">ItemPathNode(String, Int32, IList)</h4>
   <div class="markdown level1 summary"><p>Constructor of this class</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public ItemPathNode(string name, int index, int count)</code></pre>
+    <pre><code class="lang-csharp hljs">public ItemPathNode(string name, int index, IList list)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1098,45 +1101,22 @@
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><span class="parametername">count</span></td>
-        <td><p>Number of items in the collection</p>
+        <td><span class="xref">System.Collections.IList</span></td>
+        <td><span class="parametername">list</span></td>
+        <td><p>Reference to the list</p>
 </td>
       </tr>
     </tbody>
   </table>
   <h3 id="fields">Fields
   </h3>
-  <h4 id="DuetControlServer_Model_ItemPathNode_Count" data-uid="DuetControlServer.Model.ItemPathNode.Count">Count</h4>
-  <div class="markdown level1 summary"><p>Count of the list owning this item</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public int Count</code></pre>
-  </div>
-  <h5 class="fieldValue">Field Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <h4 id="DuetControlServer_Model_ItemPathNode_Index" data-uid="DuetControlServer.Model.ItemPathNode.Index">Index</h4>
   <div class="markdown level1 summary"><p>Index of the item</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public int Index</code></pre>
+    <pre><code class="lang-csharp hljs">public readonly int Index</code></pre>
   </div>
   <h5 class="fieldValue">Field Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1159,7 +1139,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public string Name</code></pre>
+    <pre><code class="lang-csharp hljs">public readonly string Name</code></pre>
   </div>
   <h5 class="fieldValue">Field Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1172,6 +1152,32 @@
     <tbody>
       <tr>
         <td><span class="xref">System.String</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+  </h3>
+  <a id="DuetControlServer_Model_ItemPathNode_Count_" data-uid="DuetControlServer.Model.ItemPathNode.Count*"></a>
+  <h4 id="DuetControlServer_Model_ItemPathNode_Count" data-uid="DuetControlServer.Model.ItemPathNode.Count">Count</h4>
+  <div class="markdown level1 summary"><p>Count of the items in the list or 0 if unknown</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int Count { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
         <td></td>
       </tr>
     </tbody>

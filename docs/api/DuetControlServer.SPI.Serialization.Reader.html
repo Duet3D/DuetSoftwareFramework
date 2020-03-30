@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1178,6 +1181,55 @@ Make sure to keep the data returned by these functions only as long as the under
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_SPI_Serialization_Reader_ReadCodeChannel_" data-uid="DuetControlServer.SPI.Serialization.Reader.ReadCodeChannel*"></a>
+  <h4 id="DuetControlServer_SPI_Serialization_Reader_ReadCodeChannel_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__" data-uid="DuetControlServer.SPI.Serialization.Reader.ReadCodeChannel(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)">ReadCodeChannel(ReadOnlySpan&lt;Byte&gt;, out CodeChannel)</h4>
+  <div class="markdown level1 summary"><p>Read a G-code channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadCodeChannel(ReadOnlySpan&lt;byte&gt; from, out CodeChannel channel)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.ReadOnlySpan</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
+        <td><span class="parametername">from</span></td>
+        <td><p>Origin</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Channel that has acquired the lock</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><p>Number of bytes read</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_Serialization_Reader_ReadDoCode_" data-uid="DuetControlServer.SPI.Serialization.Reader.ReadDoCode*"></a>
   <h4 id="DuetControlServer_SPI_Serialization_Reader_ReadDoCode_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__System_String__" data-uid="DuetControlServer.SPI.Serialization.Reader.ReadDoCode(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.String@)">ReadDoCode(ReadOnlySpan&lt;Byte&gt;, out CodeChannel, out String)</h4>
   <div class="markdown level1 summary"><p>Read a <a class="xref" href="DuetControlServer.SPI.Communication.FirmwareRequests.Request.html#DuetControlServer_SPI_Communication_FirmwareRequests_Request_DoCode">DoCode</a> request</p>
@@ -1261,12 +1313,14 @@ Make sure to keep the data returned by these functions only as long as the under
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">expression</span></td>
-        <td></td>
+        <td><p>Expression</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.Object</span></td>
         <td><span class="parametername">result</span></td>
-        <td></td>
+        <td><p>Evaluation result</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1645,55 +1699,6 @@ Make sure to keep the data returned by these functions only as long as the under
         <td><a class="xref" href="DuetControlServer.SPI.Communication.FirmwareRequests.PrintPausedReason.html">PrintPausedReason</a></td>
         <td><span class="parametername">reason</span></td>
         <td><p>Reason why the print has been paused</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes read</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Reader_ReadResourceLocked_" data-uid="DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Reader_ReadResourceLocked_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__" data-uid="DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)">ReadResourceLocked(ReadOnlySpan&lt;Byte&gt;, out CodeChannel)</h4>
-  <div class="markdown level1 summary"><p>Read a lock confirmation</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int ReadResourceLocked(ReadOnlySpan&lt;byte&gt; from, out CodeChannel channel)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.ReadOnlySpan</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">from</span></td>
-        <td><p>Origin</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
-        <td><span class="parametername">channel</span></td>
-        <td><p>Channel that has acquired the lock</p>
 </td>
       </tr>
     </tbody>

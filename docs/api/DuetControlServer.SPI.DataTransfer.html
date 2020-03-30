@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1189,7 +1192,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; FlashFirmwareSegment(Stream stream)</code></pre>
+    <pre><code class="lang-csharp hljs">public static bool FlashFirmwareSegment(Stream stream)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1219,7 +1222,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
+        <td><span class="xref">System.Boolean</span></td>
         <td><p>Whether another segment could be sent</p>
 </td>
       </tr>
@@ -1302,6 +1305,15 @@
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static void Init()</code></pre>
   </div>
+  <a id="DuetControlServer_SPI_DataTransfer_MonitorTransferReadyPin_" data-uid="DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin*"></a>
+  <h4 id="DuetControlServer_SPI_DataTransfer_MonitorTransferReadyPin" data-uid="DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin">MonitorTransferReadyPin()</h4>
+  <div class="markdown level1 summary"><p>Internal function to monitor the transfer ready pin</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void MonitorTransferReadyPin()</code></pre>
+  </div>
   <a id="DuetControlServer_SPI_DataTransfer_PerformFullTransfer_" data-uid="DuetControlServer.SPI.DataTransfer.PerformFullTransfer*"></a>
   <h4 id="DuetControlServer_SPI_DataTransfer_PerformFullTransfer_System_Boolean_" data-uid="DuetControlServer.SPI.DataTransfer.PerformFullTransfer(System.Boolean)">PerformFullTransfer(Boolean)</h4>
   <div class="markdown level1 summary"><p>Perform a full data transfer synchronously</p>
@@ -1309,7 +1321,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; PerformFullTransfer(bool mustSucceed = true)</code></pre>
+    <pre><code class="lang-csharp hljs">public static bool PerformFullTransfer(bool mustSucceed = true)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1339,7 +1351,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
+        <td><span class="xref">System.Boolean</span></td>
         <td><p>Whether new data could be transferred</p>
 </td>
       </tr>
@@ -1401,6 +1413,33 @@
         <td><span class="xref">System.UInt16</span></td>
         <td><span class="parametername">bufferSpace</span></td>
         <td><p>Buffer space</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_SPI_DataTransfer_ReadCodeChannel_" data-uid="DuetControlServer.SPI.DataTransfer.ReadCodeChannel*"></a>
+  <h4 id="DuetControlServer_SPI_DataTransfer_ReadCodeChannel_DuetAPI_CodeChannel__" data-uid="DuetControlServer.SPI.DataTransfer.ReadCodeChannel(DuetAPI.CodeChannel@)">ReadCodeChannel(out CodeChannel)</h4>
+  <div class="markdown level1 summary"><p>Read a code channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void ReadCodeChannel(out CodeChannel channel)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Code channel that has acquired the lock</p>
 </td>
       </tr>
     </tbody>
@@ -1727,33 +1766,6 @@
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_DataTransfer_ReadResourceLocked_" data-uid="DuetControlServer.SPI.DataTransfer.ReadResourceLocked*"></a>
-  <h4 id="DuetControlServer_SPI_DataTransfer_ReadResourceLocked_DuetAPI_CodeChannel__" data-uid="DuetControlServer.SPI.DataTransfer.ReadResourceLocked(DuetAPI.CodeChannel@)">ReadResourceLocked(out CodeChannel)</h4>
-  <div class="markdown level1 summary"><p>Read the content of a <a class="xref" href="DuetControlServer.SPI.Communication.FirmwareRequests.Request.html#DuetControlServer_SPI_Communication_FirmwareRequests_Request_Locked">Locked</a> packet</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void ReadResourceLocked(out CodeChannel channel)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
-        <td><span class="parametername">channel</span></td>
-        <td><p>Code channel that has acquired the lock</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_SPI_DataTransfer_ResendPacket_" data-uid="DuetControlServer.SPI.DataTransfer.ResendPacket*"></a>
   <h4 id="DuetControlServer_SPI_DataTransfer_ResendPacket_DuetControlServer_SPI_Communication_Shared_PacketHeader_" data-uid="DuetControlServer.SPI.DataTransfer.ResendPacket(DuetControlServer.SPI.Communication.Shared.PacketHeader)">ResendPacket(PacketHeader)</h4>
   <div class="markdown level1 summary"><p>Resend a packet back to the firmware</p>
@@ -1788,24 +1800,8 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task StartIap()</code></pre>
+    <pre><code class="lang-csharp hljs">public static void StartIap()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
-        <td><p>Asynchronous task</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_SPI_DataTransfer_VerifyFirmwareChecksum_" data-uid="DuetControlServer.SPI.DataTransfer.VerifyFirmwareChecksum*"></a>
   <h4 id="DuetControlServer_SPI_DataTransfer_VerifyFirmwareChecksum_System_Int64_System_UInt16_" data-uid="DuetControlServer.SPI.DataTransfer.VerifyFirmwareChecksum(System.Int64,System.UInt16)">VerifyFirmwareChecksum(Int64, UInt16)</h4>
   <div class="markdown level1 summary"><p>Send the CRC16 checksum of the firmware binary to the IAP program and verify the written data</p>
@@ -1813,7 +1809,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; VerifyFirmwareChecksum(long firmwareLength, ushort crc16)</code></pre>
+    <pre><code class="lang-csharp hljs">public static bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1849,7 +1845,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
+        <td><span class="xref">System.Boolean</span></td>
         <td><p>Whether the firmware has been written successfully</p>
 </td>
       </tr>
@@ -1982,13 +1978,13 @@
     </tbody>
   </table>
   <a id="DuetControlServer_SPI_DataTransfer_WriteEvaluateExpression_" data-uid="DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression*"></a>
-  <h4 id="DuetControlServer_SPI_DataTransfer_WriteEvaluateExpression_System_String_" data-uid="DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression(System.String)">WriteEvaluateExpression(String)</h4>
+  <h4 id="DuetControlServer_SPI_DataTransfer_WriteEvaluateExpression_DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression(DuetAPI.CodeChannel,System.String)">WriteEvaluateExpression(CodeChannel, String)</h4>
   <div class="markdown level1 summary"><p>Write a request for an expression evaluation</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static bool WriteEvaluateExpression(string expression)</code></pre>
+    <pre><code class="lang-csharp hljs">public static bool WriteEvaluateExpression(CodeChannel channel, string expression)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -2000,6 +1996,12 @@
       </tr>
     </thead>
     <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Where to evaluate the expression</p>
+</td>
+      </tr>
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">expression</span></td>
@@ -2151,7 +2153,8 @@
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">flags</span></td>
-        <td></td>
+        <td><p>Objecvt model flags to query</p>
+</td>
       </tr>
     </tbody>
   </table>

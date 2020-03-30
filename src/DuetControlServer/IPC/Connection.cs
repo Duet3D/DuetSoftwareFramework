@@ -104,7 +104,6 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Read a plain JSON object as a string from the socket
         /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>JsonDocument for deserialization</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>

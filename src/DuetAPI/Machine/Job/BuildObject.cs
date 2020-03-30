@@ -6,6 +6,16 @@
     public sealed class BuildObject : ModelObject
     {
         /// <summary>
+        /// Indicates if this build object is cancelled
+        /// </summary>
+        public bool Cancelled
+        {
+            get => _cancelled;
+            set => SetPropertyValue(ref _cancelled, value);
+        }
+        private bool _cancelled;
+
+        /// <summary>
         /// Name of the build object (if any)
         /// </summary>
         public string Name

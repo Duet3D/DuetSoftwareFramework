@@ -32,6 +32,11 @@ namespace DuetControlServer.SPI.Communication
         public const int MaxCodeBufferSize = 256;
 
         /// <summary>
+        /// Maximum supported length of messages to be sent to RepRapFirmware
+        /// </summary>
+        public const int MaxMessageLength = 256;
+
+        /// <summary>
         /// Size of the header prefixing a buffered code
         /// </summary>
         public const int BufferedCodeHeaderSize = 4;

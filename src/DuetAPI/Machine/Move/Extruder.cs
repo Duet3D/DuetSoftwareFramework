@@ -36,6 +36,16 @@
         private string _driver;
 
         /// <summary>
+        /// Name of the currently loaded filament
+        /// </summary>
+        public string Filament
+        {
+            get => _filament;
+			set => SetPropertyValue(ref _filament, value);
+        }
+        private string _filament = string.Empty;
+
+        /// <summary>
         /// Extrusion factor to use (0..1 or greater)
         /// </summary>
         public float Factor

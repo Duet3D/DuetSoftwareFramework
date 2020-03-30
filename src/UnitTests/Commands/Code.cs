@@ -16,7 +16,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G28 X Y");
             Assert.AreEqual(CodeType.GCode, code.Type);
             Assert.AreEqual(28, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('X', code.Parameters[0].Letter);
             Assert.AreEqual('Y', code.Parameters[1].Letter);
@@ -28,7 +28,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G29 S1 ; load heightmap");
             Assert.AreEqual(CodeType.GCode, code.Type);
             Assert.AreEqual(29, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(1, code.Parameters.Count);
             Assert.AreEqual('S', code.Parameters[0].Letter);
             Assert.AreEqual(1, (int)code.Parameter('S', 0));
@@ -85,7 +85,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G92 XYZ");
             Assert.AreEqual(CodeType.GCode, code.Type);
             Assert.AreEqual(92, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
 
             Assert.AreEqual(3, code.Parameters.Count);
 
@@ -137,7 +137,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M106 P1 C\"Fancy \"\" Fan\" H-1 S0.5");
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(106, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(4, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
             Assert.AreEqual(1, (int)code.Parameters[0]);
@@ -152,12 +152,24 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseEmptyM117()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M117 \"\"");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(117, code.MajorNumber);
+            Assert.IsNull(code.MinorNumber);
+            Assert.AreEqual(1, code.Parameters.Count);
+            Assert.AreEqual('\0', code.Parameters[0].Letter);
+            Assert.AreEqual(string.Empty, (string)code.Parameters[0]);
+        }
+
+        [Test]
         public void ParseM563()
         {
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M563 P0 D0:1 H1:2                             ; Define tool 0");
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(563, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(3, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
             Assert.AreEqual(0, (int)code.Parameters[0]);
@@ -174,7 +186,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M569 P1.2 S1 T0.5");
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(569, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(CodeFlags.None, code.Flags);
             Assert.AreEqual(3, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
@@ -191,7 +203,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M574 Y2 S1 P\"io1.in\";comment");
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(574, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(CodeFlags.None, code.Flags);
             Assert.AreEqual(3, code.Parameters.Count);
             Assert.AreEqual('Y', code.Parameters[0].Letter);
@@ -209,7 +221,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M915 P2:0.3:1.4 S22");
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(915, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(CodeFlags.None, code.Flags);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
@@ -225,7 +237,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("T3 P4 S\"foo\"");
             Assert.AreEqual(CodeType.TCode, code.Type);
             Assert.AreEqual(3, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(CodeFlags.None, code.Flags);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
@@ -241,7 +253,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G53 G1 X3 Y1.25");
             Assert.AreEqual(CodeFlags.EnforceAbsolutePosition, code.Flags);
             Assert.AreEqual(1, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('X', code.Parameters[0].Letter);
             Assert.AreEqual(3, (int)code.Parameters[0]);
@@ -275,7 +287,7 @@ namespace UnitTests.Commands
             Assert.AreEqual(3, code.Indent);
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(586, code.MajorNumber);
-            Assert.AreEqual(null, code.MinorNumber);
+            Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
             Assert.AreEqual(2, (int)code.Parameters[0]);

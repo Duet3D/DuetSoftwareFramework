@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1073,13 +1076,13 @@
   <h3 id="constructors">Constructors
   </h3>
   <a id="DuetControlServer_SPI_EvaluateExpressionRequest__ctor_" data-uid="DuetControlServer.SPI.EvaluateExpressionRequest.#ctor*"></a>
-  <h4 id="DuetControlServer_SPI_EvaluateExpressionRequest__ctor_System_String_" data-uid="DuetControlServer.SPI.EvaluateExpressionRequest.#ctor(System.String)">EvaluateExpressionRequest(String)</h4>
+  <h4 id="DuetControlServer_SPI_EvaluateExpressionRequest__ctor_DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.SPI.EvaluateExpressionRequest.#ctor(DuetAPI.CodeChannel,System.String)">EvaluateExpressionRequest(CodeChannel, String)</h4>
   <div class="markdown level1 summary"><p>Constructor of this class</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public EvaluateExpressionRequest(string expression)</code></pre>
+    <pre><code class="lang-csharp hljs">public EvaluateExpressionRequest(CodeChannel channel, string expression)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1092,6 +1095,12 @@
     </thead>
     <tbody>
       <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Where to evaluate the expression</p>
+</td>
+      </tr>
+      <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">expression</span></td>
         <td><p>Expression to evaluate</p>
@@ -1101,6 +1110,30 @@
   </table>
   <h3 id="properties">Properties
   </h3>
+  <a id="DuetControlServer_SPI_EvaluateExpressionRequest_Channel_" data-uid="DuetControlServer.SPI.EvaluateExpressionRequest.Channel*"></a>
+  <h4 id="DuetControlServer_SPI_EvaluateExpressionRequest_Channel" data-uid="DuetControlServer.SPI.EvaluateExpressionRequest.Channel">Channel</h4>
+  <div class="markdown level1 summary"><p>Where the expression is evaluated</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public CodeChannel Channel { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_EvaluateExpressionRequest_Expression_" data-uid="DuetControlServer.SPI.EvaluateExpressionRequest.Expression*"></a>
   <h4 id="DuetControlServer_SPI_EvaluateExpressionRequest_Expression" data-uid="DuetControlServer.SPI.EvaluateExpressionRequest.Expression">Expression</h4>
   <div class="markdown level1 summary"><p>Expression to evaluate</p>
@@ -1108,7 +1141,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public string Expression { get; set; }</code></pre>
+    <pre><code class="lang-csharp hljs">public string Expression { get; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">

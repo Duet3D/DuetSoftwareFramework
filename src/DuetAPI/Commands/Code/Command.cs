@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -198,6 +199,24 @@ namespace DuetAPI.Commands
         /// <returns>Reconstructed code string</returns>
         public override string ToString()
         {
+            if (Keyword != KeywordType.None)
+            {
+                return Keyword switch
+                {
+                    KeywordType.Abort => "abort " + KeywordArgument,
+                    KeywordType.Break => "break",
+                    KeywordType.Echo => "echo " + KeywordArgument,
+                    KeywordType.Else => "else",
+                    KeywordType.ElseIf => "elif " + KeywordArgument,
+                    KeywordType.If => "if " + KeywordArgument,
+                    KeywordType.Return => "return " + KeywordArgument,
+                    KeywordType.Set => "set " + KeywordArgument,
+                    KeywordType.Var => "var " + KeywordArgument,
+                    KeywordType.While => "while " + KeywordArgument,
+                    _ => throw new NotImplementedException()
+                };
+            }
+
             if (Type == CodeType.Comment)
             {
                 return ";" + Comment;

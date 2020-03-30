@@ -1,7 +1,9 @@
 ﻿using DuetAPI.Machine;
 using DuetControlServer.Model;
 using NUnit.Framework;
+using System;
 using System.Collections;
+using System.Text.Json;
 
 namespace UnitTests.Machine
 {
@@ -32,12 +34,95 @@ namespace UnitTests.Machine
             }
             DuetControlServer.Model.Observer.OnPropertyPathChanged += onPropertyChanged;
 
+            // Simple property
+            TestContext.Out.WriteLine("Simple property");
             Provider.Get.State.Status = MachineStatus.Halted;
 
             Assert.AreEqual(1, numEvents);
             Assert.AreEqual(new object[] { "state", "status" }, recordedPath);
             Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
             Assert.AreEqual(MachineStatus.Halted, recordedValue);
+
+            // Nested item property
+            TestContext.Out.WriteLine("Adding new item");
+            Board mainBoard = new Board();
+            Provider.Get.Boards.Add(mainBoard);
+
+            // Reset
+            numEvents = 0;
+            recordedChangeType = PropertyChangeType.Property;
+            recordedValue = null;
+            TestContext.Out.WriteLine();
+
+            // Nested item propery
+            TestContext.Out.WriteLine("Nested item property");
+            mainBoard.V12.Current = 123F;
+
+            Assert.AreEqual(1, numEvents);
+            Assert.AreEqual(new object[] { new ItemPathNode("boards", 0, new object[1]), "v12", "current" }, recordedPath);
+            Assert.AreEqual(123F, recordedValue);
+
+            // Reset
+            numEvents = 0;
+            recordedChangeType = PropertyChangeType.Property;
+            recordedValue = null;
+            TestContext.Out.WriteLine();
+
+            // Nested item propery 2
+            TestContext.Out.WriteLine("Nested item property 2");
+            Provider.Get.Inputs.HTTP.State = InputChannelState.AwaitingAcknowledgement;
+
+            Assert.AreEqual(1, numEvents);
+            Assert.AreEqual(new object[] { new ItemPathNode("inputs", (int)DuetAPI.CodeChannel.HTTP, new object[Inputs.Total]), "state" }, recordedPath);
+            Assert.AreEqual(InputChannelState.AwaitingAcknowledgement, recordedValue);
+
+            // Reset
+            numEvents = 0;
+            recordedChangeType = PropertyChangeType.Property;
+            recordedValue = null;
+            TestContext.Out.WriteLine();
+
+            // Replaceable model object
+            TestContext.Out.WriteLine("Assign MessageBox");
+            MessageBox messageBox = new MessageBox
+            {
+                Message = "Test",
+                Mode = MessageBoxMode.OkCancel,
+                Title = "Test title"
+            };
+            Provider.Get.State.MessageBox = messageBox;
+
+            Assert.AreEqual(1, numEvents);
+            Assert.AreEqual(new object[] { "state", "messageBox" }, recordedPath);
+            Assert.AreSame(messageBox, recordedValue);
+
+            // Reset
+            numEvents = 0;
+            recordedChangeType = PropertyChangeType.Property;
+            recordedValue = null;
+            TestContext.Out.WriteLine();
+
+            // Replaceable model object property
+            TestContext.Out.WriteLine("MessageBox property");
+            Provider.Get.State.MessageBox.Message = "asdf";
+
+            Assert.AreEqual(1, numEvents);
+            Assert.AreEqual(new object[] { "state", "messageBox", "message" }, recordedPath);
+            Assert.AreEqual("asdf", recordedValue);
+
+            // Reset
+            numEvents = 0;
+            recordedChangeType = PropertyChangeType.Property;
+            recordedValue = null;
+            TestContext.Out.WriteLine();
+
+            // Replaceable model object 2
+            TestContext.Out.WriteLine("Remove MessageBox");
+            Provider.Get.State.MessageBox = null;
+
+            Assert.AreEqual(1, numEvents);
+            Assert.AreEqual(new object[] { "state", "messageBox" }, recordedPath);
+            Assert.AreEqual(null, recordedValue);
 
             // End
             DuetControlServer.Model.Observer.OnPropertyPathChanged -= onPropertyChanged;
@@ -61,6 +146,7 @@ namespace UnitTests.Machine
             }
             DuetControlServer.Model.Observer.OnPropertyPathChanged += onPropertyChanged;
 
+            // job.build[]
             Build newBuild = new Build();
             Provider.Get.Job.Build = newBuild;
 
@@ -98,7 +184,7 @@ namespace UnitTests.Machine
 
             Assert.AreEqual(1, numEvents);
             Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
-            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 0, 1) }, recordedPath);
+            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 0, new object[1]) }, recordedPath);
             Assert.AreSame(newHeater, recordedValue);
 
             // Reset
@@ -114,8 +200,23 @@ namespace UnitTests.Machine
 
             Assert.AreEqual(1, numEvents);
             Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
-            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 1, 2) }, recordedPath);
+            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 1, new object[2]) }, recordedPath);
             Assert.AreSame(newHeater, recordedValue);
+
+            // Reset
+            numEvents = 0;
+            recordedPath = null;
+            recordedValue = null;
+            TestContext.Out.WriteLine();
+
+            // Modify first item
+            TestContext.Out.WriteLine("Modify first item");
+            Provider.Get.Heat.Heaters[0].Active = 123F;
+
+            Assert.AreEqual(1, numEvents);
+            Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
+            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 0, new object[2]), "active" }, recordedPath);
+            Assert.AreEqual(123F, recordedValue);
 
             // Reset
             numEvents = 0;
@@ -129,7 +230,7 @@ namespace UnitTests.Machine
 
             Assert.AreEqual(2, numEvents);
             Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
-            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 1, 2) }, recordedPath);
+            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 1, new object[2]) }, recordedPath);
             Assert.AreSame(Provider.Get.Heat.Heaters[1], recordedValue);
 
             // Reset
@@ -145,7 +246,7 @@ namespace UnitTests.Machine
 
             Assert.AreEqual(1, numEvents);
             Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
-            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 0, 2) }, recordedPath);
+            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 0, new object[2]) }, recordedPath);
             Assert.AreSame(newHeater, recordedValue);
 
             // Reset
@@ -161,7 +262,7 @@ namespace UnitTests.Machine
 
             Assert.AreEqual(3, numEvents);
             Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
-            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 2, 3) }, recordedPath);
+            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 2, new object[3]) }, recordedPath);
             Assert.AreEqual(Provider.Get.Heat.Heaters[2], recordedValue);
 
             // Reset
@@ -176,7 +277,7 @@ namespace UnitTests.Machine
 
             Assert.AreEqual(2, numEvents);
             Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
-            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 1, 2) }, recordedPath);
+            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 1, new object[2]) }, recordedPath);
             Assert.AreEqual(Provider.Get.Heat.Heaters[1], recordedValue);
 
             // Reset
@@ -191,7 +292,7 @@ namespace UnitTests.Machine
 
             Assert.AreEqual(1, numEvents);
             Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
-            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 0, 0) }, recordedPath);
+            Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 0, Array.Empty<object>()) }, recordedPath);
             Assert.AreEqual(null, recordedValue);
 
             // End

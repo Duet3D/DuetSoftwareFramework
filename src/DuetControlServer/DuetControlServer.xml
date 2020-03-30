@@ -129,6 +129,41 @@
             Logger instance
             </summary>
         </member>
+        <member name="T:DuetControlServer.Commands.Code.InternalCodeType">
+            <summary>
+            Internal type of a code. This reflects the priority as well
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Regular">
+            <summary>
+            Regular G/M/T-code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Inserted">
+            <summary>
+            Inserted code from an intercepting connection
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Macro">
+            <summary>
+            Code from a macro file
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.InsertedFromMacro">
+            <summary>
+            Inserted macro code from an intercepting connection
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.BlockingRegular">
+            <summary>
+            Code being executed while an acknowledgemenet is awaited
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Prioritized">
+            <summary>
+            Code with <see cref="F:DuetAPI.Commands.CodeFlags.IsPrioritized"/> set
+            </summary>
+        </member>
         <member name="F:DuetControlServer.Commands.Code._codeStartLocks">
             <summary>
             Array of AsyncLocks to guarantee the ordered start of incoming G/M/T-codes
@@ -158,36 +193,6 @@
             Cancel pending codes of the given channel
             </summary>
             <param name="channel">Channel to cancel codes from</param>
-        </member>
-        <member name="T:DuetControlServer.Commands.Code.InternalCodeType">
-            <summary>
-            Internal type of a code. This reflects the priority as well
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Regular">
-            <summary>
-            Regular G/M/T-code
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Inserted">
-            <summary>
-            Inserted code from an intercepting connection
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Macro">
-            <summary>
-            Code from a macro file
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.InsertedFromMacro">
-            <summary>
-            Inserted macro code from an intercepting connection
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Commands.Code.InternalCodeType.Prioritized">
-            <summary>
-            Code with <see cref="F:DuetAPI.Commands.CodeFlags.IsPrioritized"/> set
-            </summary>
         </member>
         <member name="F:DuetControlServer.Commands.Code._codeType">
             <summary>
@@ -1108,7 +1113,6 @@
             <summary>
             Read a plain JSON object as a string from the socket
             </summary>
-            <param name="cancellationToken">Cancellation token</param>
             <returns>JsonDocument for deserialization</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
@@ -1405,10 +1409,11 @@
             <param name="path">Change path</param>
             <returns>True if a filter applies</returns>
         </member>
-        <member name="M:DuetControlServer.IPC.Processors.Subscription.GetPathNode(System.Object[])">
+        <member name="M:DuetControlServer.IPC.Processors.Subscription.GetPathNode(System.Collections.Generic.Dictionary{System.String,System.Object},System.Object[])">
             <summary>
             Get the object from a path node
             </summary>
+            <param name="root">Root dictionary</param>
             <param name="path">Path node</param>
             <returns>Item at the given path</returns>
         </member>
@@ -1477,6 +1482,7 @@
             Convert a filter string into an object array that can be used to traverse the object model
             </summary>
             <param name="filter">Filter expression</param>
+            <param name="codeExpression">Whether the filter is from a G-code expression</param>
             <returns>Object array</returns>
         </member>
         <member name="M:DuetControlServer.Model.Filter.ConvertFilter(System.String[])">
@@ -1491,7 +1497,7 @@
             Checks if a change path matches a given filter 
             </summary>
             <param name="path">Patch path</param>
-            <param name="filters">Subscription filters</param>
+            <param name="filter">Path filter</param>
             <returns>True if a filter applies</returns>
         </member>
         <member name="M:DuetControlServer.Model.Filter.GetFiltered(System.Object[])">
@@ -1530,7 +1536,7 @@
             Find a specific object in the object model (wildcards are not supported)
             </summary>
             <param name="filter">Filter for finding a property or a list item</param>
-            <param name="findLinuxProperty">Whether the object must be a Linux property</param>
+            <param name="findLinuxProperty">Whether the object may be a Linux property</param>
             <param name="result">Partial object model or null</param>
             <returns>Whether the object could be found</returns>
         </member>
@@ -1540,6 +1546,8 @@
             </summary>
             <param name="partialModel">Partial object model</param>
             <param name="partialFilter">Array consisting of item indices or case-insensitive property names</param>
+            <param name="findLinuxProperty">Whether the object may be a Linux property</param>
+            <param name="hadLinuxProperty">Whether a Linux property is part of the current node path</param>
             <param name="result">Partial object model or null</param>
             <returns>Whether the object could be found</returns>
         </member>
@@ -1572,6 +1580,7 @@
             <summary>
             Function to generate a value collection change handler
             </summary>
+            <param name="collectionName">Name of the collection</param>
             <param name="path">Collection path</param>
             <returns>Property change handler</returns>
         </member>
@@ -1579,6 +1588,7 @@
             <summary>
             Function to generate an object collection change handler
             </summary>
+            <param name="collectionName">Name of the collection</param>
             <param name="path">Collection path</param>
             <returns>Property change handler</returns>
         </member>
@@ -1587,6 +1597,8 @@
             Subscribe to changes of the given model collection
             </summary>
             <param name="modelCollection">Collection to subscribe to</param>
+            <param name="itemType">Type of the items</param>
+            <param name="collectionName">Name of the collection</param>
             <param name="path">Path of the subscription</param>
         </member>
         <member name="M:DuetControlServer.Model.Observer.UnsubscribeFromModelCollection(System.Object,System.Type)">
@@ -1645,7 +1657,8 @@
             <summary>
             Subscribe to changes of the given model object
             </summary>
-            <param name="machineModel">Object to subscribe to</param>
+            <param name="model">Object to subscribe to</param>
+            <param name="path">Collection path</param>
         </member>
         <member name="M:DuetControlServer.Model.Observer.UnsubscribeFromModelObject(DuetAPI.Machine.ModelObject)">
             <summary>
@@ -1687,14 +1700,6 @@
             This is necessary for the case of model items changing in a collection
             </remarks>
         </member>
-        <member name="M:DuetControlServer.Model.ItemPathNode.#ctor(System.String,System.Int32,System.Int32)">
-            <summary>
-            Constructor of this class
-            </summary>
-            <param name="name">List name</param>
-            <param name="index">Index of the changed item</param>
-            <param name="count">Number of items in the collection</param>
-        </member>
         <member name="F:DuetControlServer.Model.ItemPathNode.Name">
             <summary>
             Name of the list
@@ -1705,10 +1710,23 @@
             Index of the item
             </summary>
         </member>
-        <member name="F:DuetControlServer.Model.ItemPathNode.Count">
+        <member name="F:DuetControlServer.Model.ItemPathNode._list">
             <summary>
-            Count of the list owning this item
+            Internal list reference
             </summary>
+        </member>
+        <member name="P:DuetControlServer.Model.ItemPathNode.Count">
+            <summary>
+            Count of the items in the list or 0 if unknown
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Model.ItemPathNode.#ctor(System.String,System.Int32,System.Collections.IList)">
+            <summary>
+            Constructor of this class
+            </summary>
+            <param name="name">List name</param>
+            <param name="index">Index of the changed item</param>
+            <param name="list">Reference to the list</param>
         </member>
         <member name="M:DuetControlServer.Model.ItemPathNode.Equals(System.Object)">
             <summary>
@@ -1868,6 +1886,18 @@
             Initialize the object model provider with values that are not expected to change
             </summary>
         </member>
+        <member name="M:DuetControlServer.Model.Provider.AccessReadOnly">
+            <summary>
+            Access the machine model for read operations only
+            </summary>
+            <returns>Disposable lock object to be used with a using directive</returns>
+        </member>
+        <member name="M:DuetControlServer.Model.Provider.AccessReadWrite">
+            <summary>
+            Access the machine model for read/write operations
+            </summary>
+            <returns>Disposable lock object to be used with a using directive</returns>
+        </member>
         <member name="M:DuetControlServer.Model.Provider.AccessReadOnlyAsync">
             <summary>
             Access the machine model asynchronously for read operations only
@@ -1969,7 +1999,6 @@
             Called when the connection to the Duet has been lost
             </summary>
             <param name="errorMessage">Message of the error that led to this event</param>
-            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.Program">
             <summary>
@@ -2066,11 +2095,6 @@
             the host controller (e.g. network information and mass storages) are updated (in ms)
             </summary>
         </member>
-        <member name="P:DuetControlServer.Settings.ConfigUpdateInterval">
-            <summary>
-            How frequently the config response is polled (in ms; temporary; will be removed once the new object model has been finished)
-            </summary>
-        </member>
         <member name="P:DuetControlServer.Settings.MaxMessageAge">
             <summary>
             Maximum time to keep messages in the object model unless client(s) pick them up (in s).
@@ -2129,9 +2153,8 @@
         </member>
         <member name="P:DuetControlServer.Settings.ModelUpdateInterval">
             <summary>
-            Interval of regular status updates (in ms)
+            Interval of object model updates (in ms)
             </summary>
-            <remarks>This is preliminary and will be removed from future versions</remarks>
         </member>
         <member name="P:DuetControlServer.Settings.MaxMachineModelLockTime">
             <summary>
@@ -2234,6 +2257,11 @@
             Indicates if this channel is blocked until the next full transfer
             </summary>
         </member>
+        <member name="P:DuetControlServer.SPI.ChannelInformation.WaitingForAcknowledgement">
+            <summary>
+            Indicates if this channel is blocked because it is waiting for a confirmation
+            </summary>
+        </member>
         <member name="P:DuetControlServer.SPI.ChannelInformation.PriorityCodes">
             <summary>
             Prioritised codes that override every other code
@@ -2307,6 +2335,12 @@
             </summary>
             <param name="builder">Target to write to</param>
         </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.ProcessCode(DuetControlServer.Commands.Code)">
+            <summary>
+            Process another code
+            </summary>
+            <param name="code">Code to process</param>
+        </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.ProcessRequests">
             <summary>
             Process pending requests on this channel
@@ -2345,6 +2379,16 @@
             <param name="flags">Message flags</param>
             <param name="reply">Code reply</param>
             <returns>Whether the reply could be processed</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.WaitForAcknowledgement">
+            <summary>
+            Wait for a message to be acknowledged
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.ChannelInformation.MessageAcknowledged">
+            <summary>
+            Called when a message has been acknowledged
+            </summary>
         </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.HandleMacroRequest(System.String,System.Boolean,System.Boolean)">
             <summary>
@@ -2467,6 +2511,11 @@
         <member name="F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize">
             <summary>
             Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.MaxMessageLength">
+            <summary>
+            Maximum supported length of messages to be sent to RepRapFirmware
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Consts.BufferedCodeHeaderSize">
@@ -2707,7 +2756,7 @@
             <summary>
             Message from the firmware
             </summary>
-            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.MessageHeader"/>
+            <seealso cref="!:Shared.DeprecatedMessageHeader"/>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.ExecuteMacro">
             <summary>
@@ -2742,7 +2791,7 @@
             <summary>
             Ressource locked
             </summary>
-            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.LockUnlockHeader"/>
+            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.CodeChannelHeader"/>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.FileChunk">
             <summary>
@@ -2761,6 +2810,12 @@
             Perform a G/M/T-code from a RepRapFirmware code input
             </summary>
             <seealso cref="T:DuetControlServer.SPI.Communication.FirmwareRequests.DoCodeHeader"/>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.WaitForAcknowledgement">
+            <summary>
+            Firmware is waiting for a blocking message to be acknowledged
+            </summary>
+            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.CodeChannelHeader"/>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.AssignFilamentHeader">
             <summary>
@@ -2874,22 +2929,6 @@
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.FloatValue">
             <summary>
             Value as float
-            </summary>
-        </member>
-        <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader">
-            <summary>
-            Request to evaluate an expression
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.Channel">
-            <summary>
-            Message type describing the message
-            </summary>
-            <seealso cref="!:MessageType"/>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.ExpressionLength">
-            <summary>
-            Length of the expression to evaluate in bytes
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.FileChunk">
@@ -3089,13 +3128,13 @@
             <summary>
             Lock movement and wait for standstill
             </summary>
-            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.LockUnlockHeader"/>
+            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.CodeChannelHeader"/>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.Unlock">
             <summary>
             Unlock everything again
             </summary>
-            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.LockUnlockHeader"/>
+            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.CodeChannelHeader"/>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.WriteIap">
             <summary>
@@ -3127,7 +3166,7 @@
             <summary>
             Evaluate an arbitrary expression
             </summary>
-            <seealso cref="T:DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader"/>
+            <seealso cref="!:EvaluateExpressionHeader"/>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.Message">
             <summary>
@@ -3168,6 +3207,16 @@
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModelHeader.FloatValue">
             <summary>
             Value as float
+            </summary>
+        </member>
+        <member name="T:DuetControlServer.SPI.Communication.Shared.CodeChannelHeader">
+            <summary>
+            Header holding a G-code channel
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.Channel">
+            <summary>
+            Channel which has locked or unlocked the resource
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.Shared.DataType">
@@ -3287,19 +3336,9 @@
             Number of probe points in Y direction
             </summary>
         </member>
-        <member name="T:DuetControlServer.SPI.Communication.Shared.LockUnlockHeader">
-            <summary>
-            Header describing a response to a lock resource request
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.Channel">
-            <summary>
-            Channel which has locked or unlocked the resource
-            </summary>
-        </member>
         <member name="T:DuetControlServer.SPI.Communication.Shared.MessageHeader">
             <summary>
-            Response to a <see cref="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.Code"/> request
+            Header for arbitrary messages
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Shared.MessageHeader.MessageType">
@@ -3527,6 +3566,9 @@
             <summary>
             Result code for header and data transfers
             </summary>
+            <remarks>
+            This must remain a static class in order to allow for unknown enum values
+            </remarks>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Shared.TransferResponse.Success">
             <summary>
@@ -3688,9 +3730,9 @@
             </summary>
             <param name="map">Received heightmap</param>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.ReadResourceLocked(DuetAPI.CodeChannel@)">
+        <member name="M:DuetControlServer.SPI.DataTransfer.ReadCodeChannel(DuetAPI.CodeChannel@)">
             <summary>
-            Read the content of a <see cref="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.Locked"/> packet
+            Read a code channel
             </summary>
             <param name="channel">Code channel that has acquired the lock</param>
             <returns>Asynchronous task</returns>
@@ -3779,6 +3821,7 @@
             Request the key of a object module of a specific module
             </summary>
             <param name="key">Object model key to query</param>
+            <param name="flags">Objecvt model flags to query</param>
             <returns>True if the packet could be written</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.WriteSetObjectModel(System.String,System.Object)">
@@ -3850,7 +3893,6 @@
             <summary>
             Instruct the firmware to start the IAP binary
             </summary>
-            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.FlashFirmwareSegment(System.IO.Stream)">
             <summary>
@@ -3888,10 +3930,11 @@
             <param name="fileLength">Total length of the file in bytes</param>
             <returns>Whether the firmware has been written successfully</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression(System.String)">
+        <member name="M:DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression(DuetAPI.CodeChannel,System.String)">
             <summary>
             Write a request for an expression evaluation
             </summary>
+            <param name="channel">Where to evaluate the expression</param>
             <param name="expression">Expression to evaluate</param>
             <returns>Whether the evaluation request has been written successfully</returns>
         </member>
@@ -3910,11 +3953,15 @@
             <param name="dataLength">Payload data length</param>
             <returns>True if there is enough space</returns>
         </member>
+        <member name="M:DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin">
+            <summary>
+            Internal function to monitor the transfer ready pin
+            </summary>
+        </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.WaitForTransfer">
             <summary>
             Wait for the Duet to flag when it is ready to transfer data
             </summary>
-            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.ExchangeHeader">
             <summary>
@@ -3922,7 +3969,7 @@
             </summary>
             <returns>True on success</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.ExchangeResponse(DuetControlServer.SPI.Communication.Shared.TransferResponse)">
+        <member name="M:DuetControlServer.SPI.DataTransfer.ExchangeResponse(System.UInt32)">
             <summary>
             Exchange a response code
             </summary>
@@ -3940,11 +3987,17 @@
             Internal storage class for expression evaluation requests
             </summary>
         </member>
-        <member name="M:DuetControlServer.SPI.EvaluateExpressionRequest.#ctor(System.String)">
+        <member name="M:DuetControlServer.SPI.EvaluateExpressionRequest.#ctor(DuetAPI.CodeChannel,System.String)">
             <summary>
             Constructor of this class
             </summary>
+            <param name="channel">Where to evaluate the expression</param>
             <param name="expression">Expression to evaluate</param>
+        </member>
+        <member name="P:DuetControlServer.SPI.EvaluateExpressionRequest.Channel">
+            <summary>
+            Where the expression is evaluated
+            </summary>
         </member>
         <member name="P:DuetControlServer.SPI.EvaluateExpressionRequest.Expression">
             <summary>
@@ -4012,10 +4065,11 @@
             <param name="key">Key to request</param>
             <param name="flags">Object model flags</param>
         </member>
-        <member name="M:DuetControlServer.SPI.Interface.EvaluateExpression(System.String)">
+        <member name="M:DuetControlServer.SPI.Interface.EvaluateExpression(DuetAPI.CodeChannel,System.String)">
             <summary>
             Evaluate an arbitrary expression
             </summary>
+            <param name="channel">Where to evaluate the expression</param>
             <param name="expression">Expression to evaluate</param>
             <returns>Result of the evaluated expression</returns>
             <exception cref="T:DuetAPI.Commands.CodeParserException">Failed to evaluate expression</exception>
@@ -4042,6 +4096,20 @@
             Get a channel that is currently idle in order to process a priority code
             </summary>
             <returns></returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.IsWaitingForAcknowledgement(DuetAPI.CodeChannel)">
+            <summary>
+            Checks if the given channel is waiting for acknowledgement
+            </summary>
+            <param name="channel">Channel to check</param>
+            <returns>Whether the channel is waiting for acknowledgement</returns>
+        </member>
+        <member name="M:DuetControlServer.SPI.Interface.MessageAcknowledged(DuetAPI.CodeChannel)">
+            <summary>
+            Called when a message has been acknowledged
+            </summary>
+            <param name="channel">Code channel</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.ProcessCode(DuetControlServer.Commands.Code)">
             <summary>
@@ -4429,9 +4497,9 @@
             <param name="map">Deserialized heightmap</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadCodeChannel(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)">
             <summary>
-            Read a lock confirmation
+            Read a G-code channel
             </summary>
             <param name="from">Origin</param>
             <param name="channel">Channel that has acquired the lock</param>
@@ -4452,8 +4520,8 @@
             Read a <see cref="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.EvaluationResult"/> request
             </summary>
             <param name="from">Origin</param>
-            <param name="channel">Code channel</param>
-            <param name="code">Code to execute</param>
+            <param name="expression">Expression</param>
+            <param name="result">Evaluation result</param>
             <returns>Number of bytes read</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadDoCode(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.String@)">
@@ -4574,9 +4642,9 @@
             <param name="map">Heightmap to write</param>
             <returns>Number of bytes written</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock(System.Span{System.Byte},DuetAPI.CodeChannel)">
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel(System.Span{System.Byte},DuetAPI.CodeChannel)">
             <summary>
-            Request a resource to be locked or unlocked
+            Write a G-code channel
             </summary>
             <param name="to">Destination</param>
             <param name="channel">Channel for the lock request</param>
@@ -4600,6 +4668,15 @@
             <param name="fileLength">Total length of the file in bytes</param>
             <returns>Number of bytes written</returns>
         </member>
+        <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression(System.Span{System.Byte},DuetAPI.CodeChannel,System.String)">
+            <summary>
+            Write a request to evaluate an expression
+            </summary>
+            <param name="to">Destination</param>
+            <param name="channel">Where to evaluate the expression</param>
+            <param name="expression">Expression to evaluate</param>
+            <returns>Number of bytes written</returns>
+        </member>
         <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteStringRequest(System.Span{System.Byte},System.String)">
             <summary>
             Write a <see cref="T:DuetControlServer.SPI.Communication.Shared.StringHeader"/> to a memory span
@@ -4610,7 +4687,7 @@
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteMessage(System.Span{System.Byte},DuetControlServer.SPI.Communication.Shared.MessageTypeFlags,System.String)">
             <summary>
-            Write a <see cref="T:DuetControlServer.SPI.Communication.Shared.MessageHeader"/> to a memory span
+            Write a <see cref="!:DeprecatedMessageHeader"/> to a memory span
             </summary>
             <param name="to">Destination</param>
             <param name="type">Message flags</param>
@@ -4670,20 +4747,14 @@
             Initialize this class
             </summary>
         </member>
-        <member name="M:DuetControlServer.Utility.FilamentManager.ToolAdded(DuetAPI.Machine.Tool)">
+        <member name="M:DuetControlServer.Utility.FilamentManager.Extruders_CollectionChanged(System.Object,System.Collections.Specialized.NotifyCollectionChangedEventArgs)">
             <summary>
-            Called when a new tool is being added to the object model
+            Called when the extruders have changed
             </summary>
-            <param name="tool">New tool</param>
-            <returns>Asynchronous task</returns>
+            <param name="sender">Extruder list</param>
+            <param name="e">Event arguments</param>
         </member>
-        <member name="M:DuetControlServer.Utility.FilamentManager.ToolRemoved(DuetAPI.Machine.Tool)">
-            <summary>
-            Called when a tool is being removed from the object model
-            </summary>
-            <param name="tool">Tool being removed</param>
-        </member>
-        <member name="M:DuetControlServer.Utility.FilamentManager.ToolPropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)">
+        <member name="M:DuetControlServer.Utility.FilamentManager.ExtruderPropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)">
             <summary>
             Called when a tool property has changed
             </summary>
@@ -4694,7 +4765,6 @@
             <summary>
             Save the filament mapping to a file
             </summary>
-            <returns>Asynchronous task</returns>
         </member>
         <member name="T:DuetControlServer.Utility.Logger">
             <summary>

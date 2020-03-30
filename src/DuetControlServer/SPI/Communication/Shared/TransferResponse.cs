@@ -3,51 +3,54 @@
     /// <summary>
     /// Result code for header and data transfers
     /// </summary>
-    public enum TransferResponse : uint
+    /// <remarks>
+    /// This must remain a static class in order to allow for unknown enum values
+    /// </remarks>
+    public static class TransferResponse
     {
         /// <summary>
         /// Transfer is OK
         /// </summary>
-        Success = 1,
+        public const uint Success = 1;
 
         /// <summary>
         /// Bad transfer format
         /// </summary>
-        BadFormat = 2,
+        public const uint BadFormat = 2;
 
         /// <summary>
         /// Bad protocol version
         /// </summary>
-        BadProtocolVersion = 3,
+        public const uint BadProtocolVersion = 3;
 
         /// <summary>
         /// Bad data length
         /// </summary>
-        BadDataLength = 4,
+        public const uint BadDataLength = 4;
 
         /// <summary>
         /// Bad header checksum
         /// </summary>
-        BadHeaderChecksum = 5,
+        public const uint BadHeaderChecksum = 5;
 
         /// <summary>
         /// Bad header checksum
         /// </summary>
-        BadDataChecksum = 6,
+        public const uint BadDataChecksum = 6;
 
         /// <summary>
         /// Bad response. This one is special because it can follow a response exchange
         /// </summary>
-        BadResponse = 0xFEFEFEFE,
+        public const uint BadResponse = 0xFEFEFEFE;
 
         /// <summary>
         /// Error response because the pin is always low
         /// </summary>
-        LowPin = 0,
+        public const uint LowPin = 0;
 
         /// <summary>
         /// Error response because the pin is always high
         /// </summary>
-        HighPin = 0xFFFFFFFF
+        public const uint HighPin = 0xFFFFFFFF;
     }
 }

@@ -607,6 +607,12 @@ references:
   commentId: F:DuetAPI.Commands.CodeFlags.IsFromConfigOverride
   fullName: DuetAPI.Commands.CodeFlags.IsFromConfigOverride
   nameWithType: CodeFlags.IsFromConfigOverride
+- uid: DuetAPI.Commands.CodeFlags.IsFromFirmware
+  name: IsFromFirmware
+  href: api/DuetAPI.Commands.CodeFlags.html#DuetAPI_Commands_CodeFlags_IsFromFirmware
+  commentId: F:DuetAPI.Commands.CodeFlags.IsFromFirmware
+  fullName: DuetAPI.Commands.CodeFlags.IsFromFirmware
+  nameWithType: CodeFlags.IsFromFirmware
 - uid: DuetAPI.Commands.CodeFlags.IsFromMacro
   name: IsFromMacro
   href: api/DuetAPI.Commands.CodeFlags.html#DuetAPI_Commands_CodeFlags_IsFromMacro
@@ -1233,6 +1239,19 @@ references:
   commentId: T:DuetAPI.Commands.EvaluateExpression
   fullName: DuetAPI.Commands.EvaluateExpression
   nameWithType: EvaluateExpression
+- uid: DuetAPI.Commands.EvaluateExpression.Channel
+  name: Channel
+  href: api/DuetAPI.Commands.EvaluateExpression.html#DuetAPI_Commands_EvaluateExpression_Channel
+  commentId: P:DuetAPI.Commands.EvaluateExpression.Channel
+  fullName: DuetAPI.Commands.EvaluateExpression.Channel
+  nameWithType: EvaluateExpression.Channel
+- uid: DuetAPI.Commands.EvaluateExpression.Channel*
+  name: Channel
+  href: api/DuetAPI.Commands.EvaluateExpression.html#DuetAPI_Commands_EvaluateExpression_Channel_
+  commentId: Overload:DuetAPI.Commands.EvaluateExpression.Channel
+  isSpec: "True"
+  fullName: DuetAPI.Commands.EvaluateExpression.Channel
+  nameWithType: EvaluateExpression.Channel
 - uid: DuetAPI.Commands.EvaluateExpression.Expression
   name: Expression
   href: api/DuetAPI.Commands.EvaluateExpression.html#DuetAPI_Commands_EvaluateExpression_Expression
@@ -2659,7 +2678,14 @@ references:
 - uid: DuetAPI.Machine.Board.McuTemp
   name: McuTemp
   href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_McuTemp
-  commentId: F:DuetAPI.Machine.Board.McuTemp
+  commentId: P:DuetAPI.Machine.Board.McuTemp
+  fullName: DuetAPI.Machine.Board.McuTemp
+  nameWithType: Board.McuTemp
+- uid: DuetAPI.Machine.Board.McuTemp*
+  name: McuTemp
+  href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_McuTemp_
+  commentId: Overload:DuetAPI.Machine.Board.McuTemp
+  isSpec: "True"
   fullName: DuetAPI.Machine.Board.McuTemp
   nameWithType: Board.McuTemp
 - uid: DuetAPI.Machine.Board.Name
@@ -2791,6 +2817,19 @@ references:
   commentId: T:DuetAPI.Machine.BuildObject
   fullName: DuetAPI.Machine.BuildObject
   nameWithType: BuildObject
+- uid: DuetAPI.Machine.BuildObject.Cancelled
+  name: Cancelled
+  href: api/DuetAPI.Machine.BuildObject.html#DuetAPI_Machine_BuildObject_Cancelled
+  commentId: P:DuetAPI.Machine.BuildObject.Cancelled
+  fullName: DuetAPI.Machine.BuildObject.Cancelled
+  nameWithType: BuildObject.Cancelled
+- uid: DuetAPI.Machine.BuildObject.Cancelled*
+  name: Cancelled
+  href: api/DuetAPI.Machine.BuildObject.html#DuetAPI_Machine_BuildObject_Cancelled_
+  commentId: Overload:DuetAPI.Machine.BuildObject.Cancelled
+  isSpec: "True"
+  fullName: DuetAPI.Machine.BuildObject.Cancelled
+  nameWithType: BuildObject.Cancelled
 - uid: DuetAPI.Machine.BuildObject.Name
   name: Name
   href: api/DuetAPI.Machine.BuildObject.html#DuetAPI_Machine_BuildObject_Name
@@ -3448,6 +3487,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Extruder.Factor
   nameWithType: Extruder.Factor
+- uid: DuetAPI.Machine.Extruder.Filament
+  name: Filament
+  href: api/DuetAPI.Machine.Extruder.html#DuetAPI_Machine_Extruder_Filament
+  commentId: P:DuetAPI.Machine.Extruder.Filament
+  fullName: DuetAPI.Machine.Extruder.Filament
+  nameWithType: Extruder.Filament
+- uid: DuetAPI.Machine.Extruder.Filament*
+  name: Filament
+  href: api/DuetAPI.Machine.Extruder.html#DuetAPI_Machine_Extruder_Filament_
+  commentId: Overload:DuetAPI.Machine.Extruder.Filament
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Extruder.Filament
+  nameWithType: Extruder.Filament
 - uid: DuetAPI.Machine.Extruder.Jerk
   name: Jerk
   href: api/DuetAPI.Machine.Extruder.html#DuetAPI_Machine_Extruder_Jerk
@@ -4739,18 +4791,30 @@ references:
   commentId: T:DuetAPI.Machine.InputChannelState
   fullName: DuetAPI.Machine.InputChannelState
   nameWithType: InputChannelState
+- uid: DuetAPI.Machine.InputChannelState.AwaitingAcknowledgement
+  name: AwaitingAcknowledgement
+  href: api/DuetAPI.Machine.InputChannelState.html#DuetAPI_Machine_InputChannelState_AwaitingAcknowledgement
+  commentId: F:DuetAPI.Machine.InputChannelState.AwaitingAcknowledgement
+  fullName: DuetAPI.Machine.InputChannelState.AwaitingAcknowledgement
+  nameWithType: InputChannelState.AwaitingAcknowledgement
+- uid: DuetAPI.Machine.InputChannelState.Executing
+  name: Executing
+  href: api/DuetAPI.Machine.InputChannelState.html#DuetAPI_Machine_InputChannelState_Executing
+  commentId: F:DuetAPI.Machine.InputChannelState.Executing
+  fullName: DuetAPI.Machine.InputChannelState.Executing
+  nameWithType: InputChannelState.Executing
 - uid: DuetAPI.Machine.InputChannelState.Idle
   name: Idle
   href: api/DuetAPI.Machine.InputChannelState.html#DuetAPI_Machine_InputChannelState_Idle
   commentId: F:DuetAPI.Machine.InputChannelState.Idle
   fullName: DuetAPI.Machine.InputChannelState.Idle
   nameWithType: InputChannelState.Idle
-- uid: DuetAPI.Machine.InputChannelState.Ready
-  name: Ready
-  href: api/DuetAPI.Machine.InputChannelState.html#DuetAPI_Machine_InputChannelState_Ready
-  commentId: F:DuetAPI.Machine.InputChannelState.Ready
-  fullName: DuetAPI.Machine.InputChannelState.Ready
-  nameWithType: InputChannelState.Ready
+- uid: DuetAPI.Machine.InputChannelState.Reading
+  name: Reading
+  href: api/DuetAPI.Machine.InputChannelState.html#DuetAPI_Machine_InputChannelState_Reading
+  commentId: F:DuetAPI.Machine.InputChannelState.Reading
+  fullName: DuetAPI.Machine.InputChannelState.Reading
+  nameWithType: InputChannelState.Reading
 - uid: DuetAPI.Machine.InputChannelState.Waiting
   name: Waiting
   href: api/DuetAPI.Machine.InputChannelState.html#DuetAPI_Machine_InputChannelState_Waiting
@@ -6465,6 +6529,28 @@ references:
   fullName.vb: DuetAPI.Machine.MinMaxCurrent(Of T).Min
   nameWithType: MinMaxCurrent<T>.Min
   nameWithType.vb: MinMaxCurrent(Of T).Min
+- uid: DuetAPI.Machine.ModelCollection
+  name: ModelCollection
+  href: api/DuetAPI.Machine.ModelCollection.html
+  commentId: T:DuetAPI.Machine.ModelCollection
+  fullName: DuetAPI.Machine.ModelCollection
+  nameWithType: ModelCollection
+- uid: DuetAPI.Machine.ModelCollection.GetItemType(System.Type,System.Type@)
+  name: GetItemType(Type, out Type)
+  href: api/DuetAPI.Machine.ModelCollection.html#DuetAPI_Machine_ModelCollection_GetItemType_System_Type_System_Type__
+  commentId: M:DuetAPI.Machine.ModelCollection.GetItemType(System.Type,System.Type@)
+  name.vb: GetItemType(Type, ByRef Type)
+  fullName: DuetAPI.Machine.ModelCollection.GetItemType(System.Type, out System.Type)
+  fullName.vb: DuetAPI.Machine.ModelCollection.GetItemType(System.Type, ByRef System.Type)
+  nameWithType: ModelCollection.GetItemType(Type, out Type)
+  nameWithType.vb: ModelCollection.GetItemType(Type, ByRef Type)
+- uid: DuetAPI.Machine.ModelCollection.GetItemType*
+  name: GetItemType
+  href: api/DuetAPI.Machine.ModelCollection.html#DuetAPI_Machine_ModelCollection_GetItemType_
+  commentId: Overload:DuetAPI.Machine.ModelCollection.GetItemType
+  isSpec: "True"
+  fullName: DuetAPI.Machine.ModelCollection.GetItemType
+  nameWithType: ModelCollection.GetItemType
 - uid: DuetAPI.Machine.ModelCollection`1
   name: ModelCollection<T>
   href: api/DuetAPI.Machine.ModelCollection-1.html
@@ -6474,6 +6560,23 @@ references:
   fullName.vb: DuetAPI.Machine.ModelCollection(Of T)
   nameWithType: ModelCollection<T>
   nameWithType.vb: ModelCollection(Of T)
+- uid: DuetAPI.Machine.ModelCollection`1.#ctor
+  name: ModelCollection()
+  href: api/DuetAPI.Machine.ModelCollection-1.html#DuetAPI_Machine_ModelCollection_1__ctor
+  commentId: M:DuetAPI.Machine.ModelCollection`1.#ctor
+  fullName: DuetAPI.Machine.ModelCollection<T>.ModelCollection()
+  fullName.vb: DuetAPI.Machine.ModelCollection(Of T).ModelCollection()
+  nameWithType: ModelCollection<T>.ModelCollection()
+  nameWithType.vb: ModelCollection(Of T).ModelCollection()
+- uid: DuetAPI.Machine.ModelCollection`1.#ctor*
+  name: ModelCollection
+  href: api/DuetAPI.Machine.ModelCollection-1.html#DuetAPI_Machine_ModelCollection_1__ctor_
+  commentId: Overload:DuetAPI.Machine.ModelCollection`1.#ctor
+  isSpec: "True"
+  fullName: DuetAPI.Machine.ModelCollection<T>.ModelCollection
+  fullName.vb: DuetAPI.Machine.ModelCollection(Of T).ModelCollection
+  nameWithType: ModelCollection<T>.ModelCollection
+  nameWithType.vb: ModelCollection(Of T).ModelCollection
 - uid: DuetAPI.Machine.ModelCollection`1.Assign(DuetAPI.Machine.ModelCollection{`0})
   name: Assign(ModelCollection<T>)
   href: api/DuetAPI.Machine.ModelCollection-1.html#DuetAPI_Machine_ModelCollection_1_Assign_DuetAPI_Machine_ModelCollection__0__
@@ -6560,6 +6663,25 @@ references:
   fullName.vb: DuetAPI.Machine.ModelCollection(Of T).UpdateFromJson
   nameWithType: ModelCollection<T>.UpdateFromJson
   nameWithType.vb: ModelCollection(Of T).UpdateFromJson
+- uid: DuetAPI.Machine.ModelGrowingCollection
+  name: ModelGrowingCollection
+  href: api/DuetAPI.Machine.ModelGrowingCollection.html
+  commentId: T:DuetAPI.Machine.ModelGrowingCollection
+  fullName: DuetAPI.Machine.ModelGrowingCollection
+  nameWithType: ModelGrowingCollection
+- uid: DuetAPI.Machine.ModelGrowingCollection.TypeMatches(System.Type)
+  name: TypeMatches(Type)
+  href: api/DuetAPI.Machine.ModelGrowingCollection.html#DuetAPI_Machine_ModelGrowingCollection_TypeMatches_System_Type_
+  commentId: M:DuetAPI.Machine.ModelGrowingCollection.TypeMatches(System.Type)
+  fullName: DuetAPI.Machine.ModelGrowingCollection.TypeMatches(System.Type)
+  nameWithType: ModelGrowingCollection.TypeMatches(Type)
+- uid: DuetAPI.Machine.ModelGrowingCollection.TypeMatches*
+  name: TypeMatches
+  href: api/DuetAPI.Machine.ModelGrowingCollection.html#DuetAPI_Machine_ModelGrowingCollection_TypeMatches_
+  commentId: Overload:DuetAPI.Machine.ModelGrowingCollection.TypeMatches
+  isSpec: "True"
+  fullName: DuetAPI.Machine.ModelGrowingCollection.TypeMatches
+  nameWithType: ModelGrowingCollection.TypeMatches
 - uid: DuetAPI.Machine.ModelGrowingCollection`1
   name: ModelGrowingCollection<T>
   href: api/DuetAPI.Machine.ModelGrowingCollection-1.html
@@ -6569,6 +6691,23 @@ references:
   fullName.vb: DuetAPI.Machine.ModelGrowingCollection(Of T)
   nameWithType: ModelGrowingCollection<T>
   nameWithType.vb: ModelGrowingCollection(Of T)
+- uid: DuetAPI.Machine.ModelGrowingCollection`1.#ctor
+  name: ModelGrowingCollection()
+  href: api/DuetAPI.Machine.ModelGrowingCollection-1.html#DuetAPI_Machine_ModelGrowingCollection_1__ctor
+  commentId: M:DuetAPI.Machine.ModelGrowingCollection`1.#ctor
+  fullName: DuetAPI.Machine.ModelGrowingCollection<T>.ModelGrowingCollection()
+  fullName.vb: DuetAPI.Machine.ModelGrowingCollection(Of T).ModelGrowingCollection()
+  nameWithType: ModelGrowingCollection<T>.ModelGrowingCollection()
+  nameWithType.vb: ModelGrowingCollection(Of T).ModelGrowingCollection()
+- uid: DuetAPI.Machine.ModelGrowingCollection`1.#ctor*
+  name: ModelGrowingCollection
+  href: api/DuetAPI.Machine.ModelGrowingCollection-1.html#DuetAPI_Machine_ModelGrowingCollection_1__ctor_
+  commentId: Overload:DuetAPI.Machine.ModelGrowingCollection`1.#ctor
+  isSpec: "True"
+  fullName: DuetAPI.Machine.ModelGrowingCollection<T>.ModelGrowingCollection
+  fullName.vb: DuetAPI.Machine.ModelGrowingCollection(Of T).ModelGrowingCollection
+  nameWithType: ModelGrowingCollection<T>.ModelGrowingCollection
+  nameWithType.vb: ModelGrowingCollection(Of T).ModelGrowingCollection
 - uid: DuetAPI.Machine.ModelGrowingCollection`1.OnCollectionChanged(System.Collections.Specialized.NotifyCollectionChangedEventArgs)
   name: OnCollectionChanged(NotifyCollectionChangedEventArgs)
   href: api/DuetAPI.Machine.ModelGrowingCollection-1.html#DuetAPI_Machine_ModelGrowingCollection_1_OnCollectionChanged_System_Collections_Specialized_NotifyCollectionChangedEventArgs_
@@ -6648,32 +6787,12 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.ModelObject.Clone
   nameWithType: ModelObject.Clone
-- uid: DuetAPI.Machine.ModelObject.GetProperties
-  name: GetProperties()
-  href: api/DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_GetProperties
-  commentId: M:DuetAPI.Machine.ModelObject.GetProperties
-  fullName: DuetAPI.Machine.ModelObject.GetProperties()
-  nameWithType: ModelObject.GetProperties()
-- uid: DuetAPI.Machine.ModelObject.GetProperties*
-  name: GetProperties
-  href: api/DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_GetProperties_
-  commentId: Overload:DuetAPI.Machine.ModelObject.GetProperties
-  isSpec: "True"
-  fullName: DuetAPI.Machine.ModelObject.GetProperties
-  nameWithType: ModelObject.GetProperties
-- uid: DuetAPI.Machine.ModelObject.GetPropertyValue(System.String)
-  name: GetPropertyValue(String)
-  href: api/DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_GetPropertyValue_System_String_
-  commentId: M:DuetAPI.Machine.ModelObject.GetPropertyValue(System.String)
-  fullName: DuetAPI.Machine.ModelObject.GetPropertyValue(System.String)
-  nameWithType: ModelObject.GetPropertyValue(String)
-- uid: DuetAPI.Machine.ModelObject.GetPropertyValue*
-  name: GetPropertyValue
-  href: api/DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_GetPropertyValue_
-  commentId: Overload:DuetAPI.Machine.ModelObject.GetPropertyValue
-  isSpec: "True"
-  fullName: DuetAPI.Machine.ModelObject.GetPropertyValue
-  nameWithType: ModelObject.GetPropertyValue
+- uid: DuetAPI.Machine.ModelObject.JsonProperties
+  name: JsonProperties
+  href: api/DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_JsonProperties
+  commentId: F:DuetAPI.Machine.ModelObject.JsonProperties
+  fullName: DuetAPI.Machine.ModelObject.JsonProperties
+  nameWithType: ModelObject.JsonProperties
 - uid: DuetAPI.Machine.ModelObject.MakeStringPatch(DuetAPI.Machine.ModelObject)
   name: MakeStringPatch(ModelObject)
   href: api/DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_MakeStringPatch_DuetAPI_Machine_ModelObject_
@@ -7408,6 +7527,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.ParsedFileInfo.Height
   nameWithType: ParsedFileInfo.Height
+- uid: DuetAPI.Machine.ParsedFileInfo.LastModified
+  name: LastModified
+  href: api/DuetAPI.Machine.ParsedFileInfo.html#DuetAPI_Machine_ParsedFileInfo_LastModified
+  commentId: P:DuetAPI.Machine.ParsedFileInfo.LastModified
+  fullName: DuetAPI.Machine.ParsedFileInfo.LastModified
+  nameWithType: ParsedFileInfo.LastModified
+- uid: DuetAPI.Machine.ParsedFileInfo.LastModified*
+  name: LastModified
+  href: api/DuetAPI.Machine.ParsedFileInfo.html#DuetAPI_Machine_ParsedFileInfo_LastModified_
+  commentId: Overload:DuetAPI.Machine.ParsedFileInfo.LastModified
+  isSpec: "True"
+  fullName: DuetAPI.Machine.ParsedFileInfo.LastModified
+  nameWithType: ParsedFileInfo.LastModified
 - uid: DuetAPI.Machine.ParsedFileInfo.LayerHeight
   name: LayerHeight
   href: api/DuetAPI.Machine.ParsedFileInfo.html#DuetAPI_Machine_ParsedFileInfo_LayerHeight
@@ -8696,19 +8828,6 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Tool.Fans
   nameWithType: Tool.Fans
-- uid: DuetAPI.Machine.Tool.Filament
-  name: Filament
-  href: api/DuetAPI.Machine.Tool.html#DuetAPI_Machine_Tool_Filament
-  commentId: P:DuetAPI.Machine.Tool.Filament
-  fullName: DuetAPI.Machine.Tool.Filament
-  nameWithType: Tool.Filament
-- uid: DuetAPI.Machine.Tool.Filament*
-  name: Filament
-  href: api/DuetAPI.Machine.Tool.html#DuetAPI_Machine_Tool_Filament_
-  commentId: Overload:DuetAPI.Machine.Tool.Filament
-  isSpec: "True"
-  fullName: DuetAPI.Machine.Tool.Filament
-  nameWithType: Tool.Filament
 - uid: DuetAPI.Machine.Tool.FilamentExtruder
   name: FilamentExtruder
   href: api/DuetAPI.Machine.Tool.html#DuetAPI_Machine_Tool_FilamentExtruder
@@ -12308,6 +12427,22 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.IPC.Processors.Subscription.AreClientsConnected
   nameWithType: Subscription.AreClientsConnected
+- uid: DuetControlServer.IPC.Processors.Subscription.GetPathNode(System.Collections.Generic.Dictionary{System.String,System.Object},System.Object[])
+  name: GetPathNode(Dictionary<String, Object>, Object[])
+  href: api/DuetControlServer.IPC.Processors.Subscription.html#DuetControlServer_IPC_Processors_Subscription_GetPathNode_System_Collections_Generic_Dictionary_System_String_System_Object__System_Object___
+  commentId: M:DuetControlServer.IPC.Processors.Subscription.GetPathNode(System.Collections.Generic.Dictionary{System.String,System.Object},System.Object[])
+  name.vb: GetPathNode(Dictionary(Of String, Object), Object())
+  fullName: DuetControlServer.IPC.Processors.Subscription.GetPathNode(System.Collections.Generic.Dictionary<System.String, System.Object>, System.Object[])
+  fullName.vb: DuetControlServer.IPC.Processors.Subscription.GetPathNode(System.Collections.Generic.Dictionary(Of System.String, System.Object), System.Object())
+  nameWithType: Subscription.GetPathNode(Dictionary<String, Object>, Object[])
+  nameWithType.vb: Subscription.GetPathNode(Dictionary(Of String, Object), Object())
+- uid: DuetControlServer.IPC.Processors.Subscription.GetPathNode*
+  name: GetPathNode
+  href: api/DuetControlServer.IPC.Processors.Subscription.html#DuetControlServer_IPC_Processors_Subscription_GetPathNode_
+  commentId: Overload:DuetControlServer.IPC.Processors.Subscription.GetPathNode
+  isSpec: "True"
+  fullName: DuetControlServer.IPC.Processors.Subscription.GetPathNode
+  nameWithType: Subscription.GetPathNode
 - uid: DuetControlServer.IPC.Processors.Subscription.Process
   name: Process()
   href: api/DuetControlServer.IPC.Processors.Subscription.html#DuetControlServer_IPC_Processors_Subscription_Process
@@ -12476,12 +12611,12 @@ references:
   commentId: T:DuetControlServer.Model.ItemPathNode
   fullName: DuetControlServer.Model.ItemPathNode
   nameWithType: ItemPathNode
-- uid: DuetControlServer.Model.ItemPathNode.#ctor(System.String,System.Int32,System.Int32)
-  name: ItemPathNode(String, Int32, Int32)
-  href: api/DuetControlServer.Model.ItemPathNode.html#DuetControlServer_Model_ItemPathNode__ctor_System_String_System_Int32_System_Int32_
-  commentId: M:DuetControlServer.Model.ItemPathNode.#ctor(System.String,System.Int32,System.Int32)
-  fullName: DuetControlServer.Model.ItemPathNode.ItemPathNode(System.String, System.Int32, System.Int32)
-  nameWithType: ItemPathNode.ItemPathNode(String, Int32, Int32)
+- uid: DuetControlServer.Model.ItemPathNode.#ctor(System.String,System.Int32,System.Collections.IList)
+  name: ItemPathNode(String, Int32, IList)
+  href: api/DuetControlServer.Model.ItemPathNode.html#DuetControlServer_Model_ItemPathNode__ctor_System_String_System_Int32_System_Collections_IList_
+  commentId: M:DuetControlServer.Model.ItemPathNode.#ctor(System.String,System.Int32,System.Collections.IList)
+  fullName: DuetControlServer.Model.ItemPathNode.ItemPathNode(System.String, System.Int32, System.Collections.IList)
+  nameWithType: ItemPathNode.ItemPathNode(String, Int32, IList)
 - uid: DuetControlServer.Model.ItemPathNode.#ctor*
   name: ItemPathNode
   href: api/DuetControlServer.Model.ItemPathNode.html#DuetControlServer_Model_ItemPathNode__ctor_
@@ -12492,7 +12627,14 @@ references:
 - uid: DuetControlServer.Model.ItemPathNode.Count
   name: Count
   href: api/DuetControlServer.Model.ItemPathNode.html#DuetControlServer_Model_ItemPathNode_Count
-  commentId: F:DuetControlServer.Model.ItemPathNode.Count
+  commentId: P:DuetControlServer.Model.ItemPathNode.Count
+  fullName: DuetControlServer.Model.ItemPathNode.Count
+  nameWithType: ItemPathNode.Count
+- uid: DuetControlServer.Model.ItemPathNode.Count*
+  name: Count
+  href: api/DuetControlServer.Model.ItemPathNode.html#DuetControlServer_Model_ItemPathNode_Count_
+  commentId: Overload:DuetControlServer.Model.ItemPathNode.Count
+  isSpec: "True"
   fullName: DuetControlServer.Model.ItemPathNode.Count
   nameWithType: ItemPathNode.Count
 - uid: DuetControlServer.Model.ItemPathNode.Equals(System.Object)
@@ -12626,6 +12768,19 @@ references:
   commentId: T:DuetControlServer.Model.Provider
   fullName: DuetControlServer.Model.Provider
   nameWithType: Provider
+- uid: DuetControlServer.Model.Provider.AccessReadOnly
+  name: AccessReadOnly()
+  href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadOnly
+  commentId: M:DuetControlServer.Model.Provider.AccessReadOnly
+  fullName: DuetControlServer.Model.Provider.AccessReadOnly()
+  nameWithType: Provider.AccessReadOnly()
+- uid: DuetControlServer.Model.Provider.AccessReadOnly*
+  name: AccessReadOnly
+  href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadOnly_
+  commentId: Overload:DuetControlServer.Model.Provider.AccessReadOnly
+  isSpec: "True"
+  fullName: DuetControlServer.Model.Provider.AccessReadOnly
+  nameWithType: Provider.AccessReadOnly
 - uid: DuetControlServer.Model.Provider.AccessReadOnlyAsync
   name: AccessReadOnlyAsync()
   href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadOnlyAsync
@@ -12639,6 +12794,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Model.Provider.AccessReadOnlyAsync
   nameWithType: Provider.AccessReadOnlyAsync
+- uid: DuetControlServer.Model.Provider.AccessReadWrite
+  name: AccessReadWrite()
+  href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadWrite
+  commentId: M:DuetControlServer.Model.Provider.AccessReadWrite
+  fullName: DuetControlServer.Model.Provider.AccessReadWrite()
+  nameWithType: Provider.AccessReadWrite()
+- uid: DuetControlServer.Model.Provider.AccessReadWrite*
+  name: AccessReadWrite
+  href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadWrite_
+  commentId: Overload:DuetControlServer.Model.Provider.AccessReadWrite
+  isSpec: "True"
+  fullName: DuetControlServer.Model.Provider.AccessReadWrite
+  nameWithType: Provider.AccessReadWrite
 - uid: DuetControlServer.Model.Provider.AccessReadWriteAsync
   name: AccessReadWriteAsync()
   href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_AccessReadWriteAsync
@@ -12866,19 +13034,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Settings.ConfigFilename
   nameWithType: Settings.ConfigFilename
-- uid: DuetControlServer.Settings.ConfigUpdateInterval
-  name: ConfigUpdateInterval
-  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_ConfigUpdateInterval
-  commentId: P:DuetControlServer.Settings.ConfigUpdateInterval
-  fullName: DuetControlServer.Settings.ConfigUpdateInterval
-  nameWithType: Settings.ConfigUpdateInterval
-- uid: DuetControlServer.Settings.ConfigUpdateInterval*
-  name: ConfigUpdateInterval
-  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_ConfigUpdateInterval_
-  commentId: Overload:DuetControlServer.Settings.ConfigUpdateInterval
-  isSpec: "True"
-  fullName: DuetControlServer.Settings.ConfigUpdateInterval
-  nameWithType: Settings.ConfigUpdateInterval
 - uid: DuetControlServer.Settings.FilamentFilters
   name: FilamentFilters
   href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_FilamentFilters
@@ -13453,6 +13608,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.ChannelInformation.LockAsync
   nameWithType: ChannelInformation.LockAsync
+- uid: DuetControlServer.SPI.ChannelInformation.MessageAcknowledged
+  name: MessageAcknowledged()
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_MessageAcknowledged
+  commentId: M:DuetControlServer.SPI.ChannelInformation.MessageAcknowledged
+  fullName: DuetControlServer.SPI.ChannelInformation.MessageAcknowledged()
+  nameWithType: ChannelInformation.MessageAcknowledged()
+- uid: DuetControlServer.SPI.ChannelInformation.MessageAcknowledged*
+  name: MessageAcknowledged
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_MessageAcknowledged_
+  commentId: Overload:DuetControlServer.SPI.ChannelInformation.MessageAcknowledged
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.ChannelInformation.MessageAcknowledged
+  nameWithType: ChannelInformation.MessageAcknowledged
 - uid: DuetControlServer.SPI.ChannelInformation.NestedMacros
   name: NestedMacros
   href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_NestedMacros
@@ -13518,6 +13686,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.ChannelInformation.PriorityCodes
   nameWithType: ChannelInformation.PriorityCodes
+- uid: DuetControlServer.SPI.ChannelInformation.ProcessCode(DuetControlServer.Commands.Code)
+  name: ProcessCode(Code)
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_ProcessCode_DuetControlServer_Commands_Code_
+  commentId: M:DuetControlServer.SPI.ChannelInformation.ProcessCode(DuetControlServer.Commands.Code)
+  fullName: DuetControlServer.SPI.ChannelInformation.ProcessCode(DuetControlServer.Commands.Code)
+  nameWithType: ChannelInformation.ProcessCode(Code)
+- uid: DuetControlServer.SPI.ChannelInformation.ProcessCode*
+  name: ProcessCode
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_ProcessCode_
+  commentId: Overload:DuetControlServer.SPI.ChannelInformation.ProcessCode
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.ChannelInformation.ProcessCode
+  nameWithType: ChannelInformation.ProcessCode
 - uid: DuetControlServer.SPI.ChannelInformation.ProcessRequests
   name: ProcessRequests()
   href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_ProcessRequests
@@ -13596,6 +13777,32 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.ChannelInformation.SystemMacroHasFinished
   nameWithType: ChannelInformation.SystemMacroHasFinished
+- uid: DuetControlServer.SPI.ChannelInformation.WaitForAcknowledgement
+  name: WaitForAcknowledgement()
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_WaitForAcknowledgement
+  commentId: M:DuetControlServer.SPI.ChannelInformation.WaitForAcknowledgement
+  fullName: DuetControlServer.SPI.ChannelInformation.WaitForAcknowledgement()
+  nameWithType: ChannelInformation.WaitForAcknowledgement()
+- uid: DuetControlServer.SPI.ChannelInformation.WaitForAcknowledgement*
+  name: WaitForAcknowledgement
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_WaitForAcknowledgement_
+  commentId: Overload:DuetControlServer.SPI.ChannelInformation.WaitForAcknowledgement
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.ChannelInformation.WaitForAcknowledgement
+  nameWithType: ChannelInformation.WaitForAcknowledgement
+- uid: DuetControlServer.SPI.ChannelInformation.WaitingForAcknowledgement
+  name: WaitingForAcknowledgement
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_WaitingForAcknowledgement
+  commentId: P:DuetControlServer.SPI.ChannelInformation.WaitingForAcknowledgement
+  fullName: DuetControlServer.SPI.ChannelInformation.WaitingForAcknowledgement
+  nameWithType: ChannelInformation.WaitingForAcknowledgement
+- uid: DuetControlServer.SPI.ChannelInformation.WaitingForAcknowledgement*
+  name: WaitingForAcknowledgement
+  href: api/DuetControlServer.SPI.ChannelInformation.html#DuetControlServer_SPI_ChannelInformation_WaitingForAcknowledgement_
+  commentId: Overload:DuetControlServer.SPI.ChannelInformation.WaitingForAcknowledgement
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.ChannelInformation.WaitingForAcknowledgement
+  nameWithType: ChannelInformation.WaitingForAcknowledgement
 - uid: DuetControlServer.SPI.ChannelStore
   name: ChannelStore
   href: api/DuetControlServer.SPI.ChannelStore.html
@@ -13750,6 +13957,12 @@ references:
   commentId: F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize
   fullName: DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize
   nameWithType: Consts.MaxCodeBufferSize
+- uid: DuetControlServer.SPI.Communication.Consts.MaxMessageLength
+  name: MaxMessageLength
+  href: api/DuetControlServer.SPI.Communication.Consts.html#DuetControlServer_SPI_Communication_Consts_MaxMessageLength
+  commentId: F:DuetControlServer.SPI.Communication.Consts.MaxMessageLength
+  fullName: DuetControlServer.SPI.Communication.Consts.MaxMessageLength
+  nameWithType: Consts.MaxMessageLength
 - uid: DuetControlServer.SPI.Communication.Consts.NoFilePosition
   name: NoFilePosition
   href: api/DuetControlServer.SPI.Communication.Consts.html#DuetControlServer_SPI_Communication_Consts_NoFilePosition
@@ -14062,6 +14275,12 @@ references:
   commentId: F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.StackEvent_Obsolete
   fullName: DuetControlServer.SPI.Communication.FirmwareRequests.Request.StackEvent_Obsolete
   nameWithType: Request.StackEvent_Obsolete
+- uid: DuetControlServer.SPI.Communication.FirmwareRequests.Request.WaitForAcknowledgement
+  name: WaitForAcknowledgement
+  href: api/DuetControlServer.SPI.Communication.FirmwareRequests.Request.html#DuetControlServer_SPI_Communication_FirmwareRequests_Request_WaitForAcknowledgement
+  commentId: F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.WaitForAcknowledgement
+  fullName: DuetControlServer.SPI.Communication.FirmwareRequests.Request.WaitForAcknowledgement
+  nameWithType: Request.WaitForAcknowledgement
 - uid: DuetControlServer.SPI.Communication.LinuxRequests
   name: DuetControlServer.SPI.Communication.LinuxRequests
   href: api/DuetControlServer.SPI.Communication.LinuxRequests.html
@@ -14200,24 +14419,6 @@ references:
   commentId: F:DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.UIntValue
   fullName: DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.UIntValue
   nameWithType: CodeParameter.UIntValue
-- uid: DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader
-  name: EvaluateExpressionHeader
-  href: api/DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html
-  commentId: T:DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader
-  fullName: DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader
-  nameWithType: EvaluateExpressionHeader
-- uid: DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.Channel
-  name: Channel
-  href: api/DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html#DuetControlServer_SPI_Communication_LinuxRequests_EvaluateExpressionHeader_Channel
-  commentId: F:DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.Channel
-  fullName: DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.Channel
-  nameWithType: EvaluateExpressionHeader.Channel
-- uid: DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.ExpressionLength
-  name: ExpressionLength
-  href: api/DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html#DuetControlServer_SPI_Communication_LinuxRequests_EvaluateExpressionHeader_ExpressionLength
-  commentId: F:DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.ExpressionLength
-  fullName: DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.ExpressionLength
-  nameWithType: EvaluateExpressionHeader.ExpressionLength
 - uid: DuetControlServer.SPI.Communication.LinuxRequests.FileChunk
   name: FileChunk
   href: api/DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html
@@ -14506,6 +14707,18 @@ references:
   commentId: N:DuetControlServer.SPI.Communication.Shared
   fullName: DuetControlServer.SPI.Communication.Shared
   nameWithType: DuetControlServer.SPI.Communication.Shared
+- uid: DuetControlServer.SPI.Communication.Shared.CodeChannelHeader
+  name: CodeChannelHeader
+  href: api/DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html
+  commentId: T:DuetControlServer.SPI.Communication.Shared.CodeChannelHeader
+  fullName: DuetControlServer.SPI.Communication.Shared.CodeChannelHeader
+  nameWithType: CodeChannelHeader
+- uid: DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.Channel
+  name: Channel
+  href: api/DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html#DuetControlServer_SPI_Communication_Shared_CodeChannelHeader_Channel
+  commentId: F:DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.Channel
+  fullName: DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.Channel
+  nameWithType: CodeChannelHeader.Channel
 - uid: DuetControlServer.SPI.Communication.Shared.DataType
   name: DataType
   href: api/DuetControlServer.SPI.Communication.Shared.DataType.html
@@ -14644,18 +14857,6 @@ references:
   commentId: F:DuetControlServer.SPI.Communication.Shared.HeightMapHeader.YSpacing
   fullName: DuetControlServer.SPI.Communication.Shared.HeightMapHeader.YSpacing
   nameWithType: HeightMapHeader.YSpacing
-- uid: DuetControlServer.SPI.Communication.Shared.LockUnlockHeader
-  name: LockUnlockHeader
-  href: api/DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html
-  commentId: T:DuetControlServer.SPI.Communication.Shared.LockUnlockHeader
-  fullName: DuetControlServer.SPI.Communication.Shared.LockUnlockHeader
-  nameWithType: LockUnlockHeader
-- uid: DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.Channel
-  name: Channel
-  href: api/DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html#DuetControlServer_SPI_Communication_Shared_LockUnlockHeader_Channel
-  commentId: F:DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.Channel
-  fullName: DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.Channel
-  nameWithType: LockUnlockHeader.Channel
 - uid: DuetControlServer.SPI.Communication.Shared.MessageHeader
   name: MessageHeader
   href: api/DuetControlServer.SPI.Communication.Shared.MessageHeader.html
@@ -15064,6 +15265,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.DataTransfer.Init
   nameWithType: DataTransfer.Init
+- uid: DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin
+  name: MonitorTransferReadyPin()
+  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_MonitorTransferReadyPin
+  commentId: M:DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin
+  fullName: DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin()
+  nameWithType: DataTransfer.MonitorTransferReadyPin()
+- uid: DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin*
+  name: MonitorTransferReadyPin
+  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_MonitorTransferReadyPin_
+  commentId: Overload:DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin
+  nameWithType: DataTransfer.MonitorTransferReadyPin
 - uid: DuetControlServer.SPI.DataTransfer.PacketsToRead
   name: PacketsToRead
   href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_PacketsToRead
@@ -15135,6 +15349,22 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.DataTransfer.ReadCodeBufferUpdate
   nameWithType: DataTransfer.ReadCodeBufferUpdate
+- uid: DuetControlServer.SPI.DataTransfer.ReadCodeChannel(DuetAPI.CodeChannel@)
+  name: ReadCodeChannel(out CodeChannel)
+  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_ReadCodeChannel_DuetAPI_CodeChannel__
+  commentId: M:DuetControlServer.SPI.DataTransfer.ReadCodeChannel(DuetAPI.CodeChannel@)
+  name.vb: ReadCodeChannel(ByRef CodeChannel)
+  fullName: DuetControlServer.SPI.DataTransfer.ReadCodeChannel(out DuetAPI.CodeChannel)
+  fullName.vb: DuetControlServer.SPI.DataTransfer.ReadCodeChannel(ByRef DuetAPI.CodeChannel)
+  nameWithType: DataTransfer.ReadCodeChannel(out CodeChannel)
+  nameWithType.vb: DataTransfer.ReadCodeChannel(ByRef CodeChannel)
+- uid: DuetControlServer.SPI.DataTransfer.ReadCodeChannel*
+  name: ReadCodeChannel
+  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_ReadCodeChannel_
+  commentId: Overload:DuetControlServer.SPI.DataTransfer.ReadCodeChannel
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.DataTransfer.ReadCodeChannel
+  nameWithType: DataTransfer.ReadCodeChannel
 - uid: DuetControlServer.SPI.DataTransfer.ReadDoCode(DuetAPI.CodeChannel@,System.String@)
   name: ReadDoCode(out CodeChannel, out String)
   href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_ReadDoCode_DuetAPI_CodeChannel__System_String__
@@ -15292,22 +15522,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.DataTransfer.ReadPrintPaused
   nameWithType: DataTransfer.ReadPrintPaused
-- uid: DuetControlServer.SPI.DataTransfer.ReadResourceLocked(DuetAPI.CodeChannel@)
-  name: ReadResourceLocked(out CodeChannel)
-  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_ReadResourceLocked_DuetAPI_CodeChannel__
-  commentId: M:DuetControlServer.SPI.DataTransfer.ReadResourceLocked(DuetAPI.CodeChannel@)
-  name.vb: ReadResourceLocked(ByRef CodeChannel)
-  fullName: DuetControlServer.SPI.DataTransfer.ReadResourceLocked(out DuetAPI.CodeChannel)
-  fullName.vb: DuetControlServer.SPI.DataTransfer.ReadResourceLocked(ByRef DuetAPI.CodeChannel)
-  nameWithType: DataTransfer.ReadResourceLocked(out CodeChannel)
-  nameWithType.vb: DataTransfer.ReadResourceLocked(ByRef CodeChannel)
-- uid: DuetControlServer.SPI.DataTransfer.ReadResourceLocked*
-  name: ReadResourceLocked
-  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_ReadResourceLocked_
-  commentId: Overload:DuetControlServer.SPI.DataTransfer.ReadResourceLocked
-  isSpec: "True"
-  fullName: DuetControlServer.SPI.DataTransfer.ReadResourceLocked
-  nameWithType: DataTransfer.ReadResourceLocked
 - uid: DuetControlServer.SPI.DataTransfer.ResendPacket(DuetControlServer.SPI.Communication.Shared.PacketHeader)
   name: ResendPacket(PacketHeader)
   href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_ResendPacket_DuetControlServer_SPI_Communication_Shared_PacketHeader_
@@ -15412,12 +15626,12 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.DataTransfer.WriteEmergencyStop
   nameWithType: DataTransfer.WriteEmergencyStop
-- uid: DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression(System.String)
-  name: WriteEvaluateExpression(String)
-  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_WriteEvaluateExpression_System_String_
-  commentId: M:DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression(System.String)
-  fullName: DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression(System.String)
-  nameWithType: DataTransfer.WriteEvaluateExpression(String)
+- uid: DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression(DuetAPI.CodeChannel,System.String)
+  name: WriteEvaluateExpression(CodeChannel, String)
+  href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_WriteEvaluateExpression_DuetAPI_CodeChannel_System_String_
+  commentId: M:DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression(DuetAPI.CodeChannel,System.String)
+  fullName: DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression(DuetAPI.CodeChannel, System.String)
+  nameWithType: DataTransfer.WriteEvaluateExpression(CodeChannel, String)
 - uid: DuetControlServer.SPI.DataTransfer.WriteEvaluateExpression*
   name: WriteEvaluateExpression
   href: api/DuetControlServer.SPI.DataTransfer.html#DuetControlServer_SPI_DataTransfer_WriteEvaluateExpression_
@@ -15616,12 +15830,12 @@ references:
   commentId: T:DuetControlServer.SPI.EvaluateExpressionRequest
   fullName: DuetControlServer.SPI.EvaluateExpressionRequest
   nameWithType: EvaluateExpressionRequest
-- uid: DuetControlServer.SPI.EvaluateExpressionRequest.#ctor(System.String)
-  name: EvaluateExpressionRequest(String)
-  href: api/DuetControlServer.SPI.EvaluateExpressionRequest.html#DuetControlServer_SPI_EvaluateExpressionRequest__ctor_System_String_
-  commentId: M:DuetControlServer.SPI.EvaluateExpressionRequest.#ctor(System.String)
-  fullName: DuetControlServer.SPI.EvaluateExpressionRequest.EvaluateExpressionRequest(System.String)
-  nameWithType: EvaluateExpressionRequest.EvaluateExpressionRequest(String)
+- uid: DuetControlServer.SPI.EvaluateExpressionRequest.#ctor(DuetAPI.CodeChannel,System.String)
+  name: EvaluateExpressionRequest(CodeChannel, String)
+  href: api/DuetControlServer.SPI.EvaluateExpressionRequest.html#DuetControlServer_SPI_EvaluateExpressionRequest__ctor_DuetAPI_CodeChannel_System_String_
+  commentId: M:DuetControlServer.SPI.EvaluateExpressionRequest.#ctor(DuetAPI.CodeChannel,System.String)
+  fullName: DuetControlServer.SPI.EvaluateExpressionRequest.EvaluateExpressionRequest(DuetAPI.CodeChannel, System.String)
+  nameWithType: EvaluateExpressionRequest.EvaluateExpressionRequest(CodeChannel, String)
 - uid: DuetControlServer.SPI.EvaluateExpressionRequest.#ctor*
   name: EvaluateExpressionRequest
   href: api/DuetControlServer.SPI.EvaluateExpressionRequest.html#DuetControlServer_SPI_EvaluateExpressionRequest__ctor_
@@ -15629,6 +15843,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.EvaluateExpressionRequest.EvaluateExpressionRequest
   nameWithType: EvaluateExpressionRequest.EvaluateExpressionRequest
+- uid: DuetControlServer.SPI.EvaluateExpressionRequest.Channel
+  name: Channel
+  href: api/DuetControlServer.SPI.EvaluateExpressionRequest.html#DuetControlServer_SPI_EvaluateExpressionRequest_Channel
+  commentId: P:DuetControlServer.SPI.EvaluateExpressionRequest.Channel
+  fullName: DuetControlServer.SPI.EvaluateExpressionRequest.Channel
+  nameWithType: EvaluateExpressionRequest.Channel
+- uid: DuetControlServer.SPI.EvaluateExpressionRequest.Channel*
+  name: Channel
+  href: api/DuetControlServer.SPI.EvaluateExpressionRequest.html#DuetControlServer_SPI_EvaluateExpressionRequest_Channel_
+  commentId: Overload:DuetControlServer.SPI.EvaluateExpressionRequest.Channel
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.EvaluateExpressionRequest.Channel
+  nameWithType: EvaluateExpressionRequest.Channel
 - uid: DuetControlServer.SPI.EvaluateExpressionRequest.Expression
   name: Expression
   href: api/DuetControlServer.SPI.EvaluateExpressionRequest.html#DuetControlServer_SPI_EvaluateExpressionRequest_Expression
@@ -15752,12 +15979,12 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Interface.Diagnostics
   nameWithType: Interface.Diagnostics
-- uid: DuetControlServer.SPI.Interface.EvaluateExpression(System.String)
-  name: EvaluateExpression(String)
-  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_EvaluateExpression_System_String_
-  commentId: M:DuetControlServer.SPI.Interface.EvaluateExpression(System.String)
-  fullName: DuetControlServer.SPI.Interface.EvaluateExpression(System.String)
-  nameWithType: Interface.EvaluateExpression(String)
+- uid: DuetControlServer.SPI.Interface.EvaluateExpression(DuetAPI.CodeChannel,System.String)
+  name: EvaluateExpression(CodeChannel, String)
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_EvaluateExpression_DuetAPI_CodeChannel_System_String_
+  commentId: M:DuetControlServer.SPI.Interface.EvaluateExpression(DuetAPI.CodeChannel,System.String)
+  fullName: DuetControlServer.SPI.Interface.EvaluateExpression(DuetAPI.CodeChannel, System.String)
+  nameWithType: Interface.EvaluateExpression(CodeChannel, String)
 - uid: DuetControlServer.SPI.Interface.EvaluateExpression*
   name: EvaluateExpression
   href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_EvaluateExpression_
@@ -15823,6 +16050,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Interface.Init
   nameWithType: Interface.Init
+- uid: DuetControlServer.SPI.Interface.IsWaitingForAcknowledgement(DuetAPI.CodeChannel)
+  name: IsWaitingForAcknowledgement(CodeChannel)
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_IsWaitingForAcknowledgement_DuetAPI_CodeChannel_
+  commentId: M:DuetControlServer.SPI.Interface.IsWaitingForAcknowledgement(DuetAPI.CodeChannel)
+  fullName: DuetControlServer.SPI.Interface.IsWaitingForAcknowledgement(DuetAPI.CodeChannel)
+  nameWithType: Interface.IsWaitingForAcknowledgement(CodeChannel)
+- uid: DuetControlServer.SPI.Interface.IsWaitingForAcknowledgement*
+  name: IsWaitingForAcknowledgement
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_IsWaitingForAcknowledgement_
+  commentId: Overload:DuetControlServer.SPI.Interface.IsWaitingForAcknowledgement
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.Interface.IsWaitingForAcknowledgement
+  nameWithType: Interface.IsWaitingForAcknowledgement
 - uid: DuetControlServer.SPI.Interface.LockMovementAndWaitForStandstill(DuetAPI.CodeChannel)
   name: LockMovementAndWaitForStandstill(CodeChannel)
   href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_LockMovementAndWaitForStandstill_DuetAPI_CodeChannel_
@@ -15836,6 +16076,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Interface.LockMovementAndWaitForStandstill
   nameWithType: Interface.LockMovementAndWaitForStandstill
+- uid: DuetControlServer.SPI.Interface.MessageAcknowledged(DuetAPI.CodeChannel)
+  name: MessageAcknowledged(CodeChannel)
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_MessageAcknowledged_DuetAPI_CodeChannel_
+  commentId: M:DuetControlServer.SPI.Interface.MessageAcknowledged(DuetAPI.CodeChannel)
+  fullName: DuetControlServer.SPI.Interface.MessageAcknowledged(DuetAPI.CodeChannel)
+  nameWithType: Interface.MessageAcknowledged(CodeChannel)
+- uid: DuetControlServer.SPI.Interface.MessageAcknowledged*
+  name: MessageAcknowledged
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_MessageAcknowledged_
+  commentId: Overload:DuetControlServer.SPI.Interface.MessageAcknowledged
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.Interface.MessageAcknowledged
+  nameWithType: Interface.MessageAcknowledged
 - uid: DuetControlServer.SPI.Interface.ProcessCode(DuetControlServer.Commands.Code)
   name: ProcessCode(Code)
   href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_ProcessCode_DuetControlServer_Commands_Code_
@@ -16291,6 +16544,22 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Serialization.Reader.ReadCodeBufferUpdate
   nameWithType: Reader.ReadCodeBufferUpdate
+- uid: DuetControlServer.SPI.Serialization.Reader.ReadCodeChannel(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)
+  name: ReadCodeChannel(ReadOnlySpan<Byte>, out CodeChannel)
+  href: api/DuetControlServer.SPI.Serialization.Reader.html#DuetControlServer_SPI_Serialization_Reader_ReadCodeChannel_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__
+  commentId: M:DuetControlServer.SPI.Serialization.Reader.ReadCodeChannel(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)
+  name.vb: ReadCodeChannel(ReadOnlySpan(Of Byte), ByRef CodeChannel)
+  fullName: DuetControlServer.SPI.Serialization.Reader.ReadCodeChannel(System.ReadOnlySpan<System.Byte>, out DuetAPI.CodeChannel)
+  fullName.vb: DuetControlServer.SPI.Serialization.Reader.ReadCodeChannel(System.ReadOnlySpan(Of System.Byte), ByRef DuetAPI.CodeChannel)
+  nameWithType: Reader.ReadCodeChannel(ReadOnlySpan<Byte>, out CodeChannel)
+  nameWithType.vb: Reader.ReadCodeChannel(ReadOnlySpan(Of Byte), ByRef CodeChannel)
+- uid: DuetControlServer.SPI.Serialization.Reader.ReadCodeChannel*
+  name: ReadCodeChannel
+  href: api/DuetControlServer.SPI.Serialization.Reader.html#DuetControlServer_SPI_Serialization_Reader_ReadCodeChannel_
+  commentId: Overload:DuetControlServer.SPI.Serialization.Reader.ReadCodeChannel
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.Serialization.Reader.ReadCodeChannel
+  nameWithType: Reader.ReadCodeChannel
 - uid: DuetControlServer.SPI.Serialization.Reader.ReadDoCode(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.String@)
   name: ReadDoCode(ReadOnlySpan<Byte>, out CodeChannel, out String)
   href: api/DuetControlServer.SPI.Serialization.Reader.html#DuetControlServer_SPI_Serialization_Reader_ReadDoCode_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__System_String__
@@ -16435,22 +16704,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Serialization.Reader.ReadPrintPaused
   nameWithType: Reader.ReadPrintPaused
-- uid: DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)
-  name: ReadResourceLocked(ReadOnlySpan<Byte>, out CodeChannel)
-  href: api/DuetControlServer.SPI.Serialization.Reader.html#DuetControlServer_SPI_Serialization_Reader_ReadResourceLocked_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__
-  commentId: M:DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)
-  name.vb: ReadResourceLocked(ReadOnlySpan(Of Byte), ByRef CodeChannel)
-  fullName: DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked(System.ReadOnlySpan<System.Byte>, out DuetAPI.CodeChannel)
-  fullName.vb: DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked(System.ReadOnlySpan(Of System.Byte), ByRef DuetAPI.CodeChannel)
-  nameWithType: Reader.ReadResourceLocked(ReadOnlySpan<Byte>, out CodeChannel)
-  nameWithType.vb: Reader.ReadResourceLocked(ReadOnlySpan(Of Byte), ByRef CodeChannel)
-- uid: DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked*
-  name: ReadResourceLocked
-  href: api/DuetControlServer.SPI.Serialization.Reader.html#DuetControlServer_SPI_Serialization_Reader_ReadResourceLocked_
-  commentId: Overload:DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked
-  isSpec: "True"
-  fullName: DuetControlServer.SPI.Serialization.Reader.ReadResourceLocked
-  nameWithType: Reader.ReadResourceLocked
 - uid: DuetControlServer.SPI.Serialization.Reader.ReadStringRequest(System.ReadOnlySpan{System.Byte},System.ReadOnlySpan{System.Byte}@)
   name: ReadStringRequest(ReadOnlySpan<Byte>, out ReadOnlySpan<Byte>)
   href: api/DuetControlServer.SPI.Serialization.Reader.html#DuetControlServer_SPI_Serialization_Reader_ReadStringRequest_System_ReadOnlySpan_System_Byte__System_ReadOnlySpan_System_Byte___
@@ -16533,6 +16786,38 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Serialization.Writer.WriteCode
   nameWithType: Writer.WriteCode
+- uid: DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel(System.Span{System.Byte},DuetAPI.CodeChannel)
+  name: WriteCodeChannel(Span<Byte>, CodeChannel)
+  href: api/DuetControlServer.SPI.Serialization.Writer.html#DuetControlServer_SPI_Serialization_Writer_WriteCodeChannel_System_Span_System_Byte__DuetAPI_CodeChannel_
+  commentId: M:DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel(System.Span{System.Byte},DuetAPI.CodeChannel)
+  name.vb: WriteCodeChannel(Span(Of Byte), CodeChannel)
+  fullName: DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel(System.Span<System.Byte>, DuetAPI.CodeChannel)
+  fullName.vb: DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel(System.Span(Of System.Byte), DuetAPI.CodeChannel)
+  nameWithType: Writer.WriteCodeChannel(Span<Byte>, CodeChannel)
+  nameWithType.vb: Writer.WriteCodeChannel(Span(Of Byte), CodeChannel)
+- uid: DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel*
+  name: WriteCodeChannel
+  href: api/DuetControlServer.SPI.Serialization.Writer.html#DuetControlServer_SPI_Serialization_Writer_WriteCodeChannel_
+  commentId: Overload:DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel
+  nameWithType: Writer.WriteCodeChannel
+- uid: DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression(System.Span{System.Byte},DuetAPI.CodeChannel,System.String)
+  name: WriteEvaluateExpression(Span<Byte>, CodeChannel, String)
+  href: api/DuetControlServer.SPI.Serialization.Writer.html#DuetControlServer_SPI_Serialization_Writer_WriteEvaluateExpression_System_Span_System_Byte__DuetAPI_CodeChannel_System_String_
+  commentId: M:DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression(System.Span{System.Byte},DuetAPI.CodeChannel,System.String)
+  name.vb: WriteEvaluateExpression(Span(Of Byte), CodeChannel, String)
+  fullName: DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression(System.Span<System.Byte>, DuetAPI.CodeChannel, System.String)
+  fullName.vb: DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression(System.Span(Of System.Byte), DuetAPI.CodeChannel, System.String)
+  nameWithType: Writer.WriteEvaluateExpression(Span<Byte>, CodeChannel, String)
+  nameWithType.vb: Writer.WriteEvaluateExpression(Span(Of Byte), CodeChannel, String)
+- uid: DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression*
+  name: WriteEvaluateExpression
+  href: api/DuetControlServer.SPI.Serialization.Writer.html#DuetControlServer_SPI_Serialization_Writer_WriteEvaluateExpression_
+  commentId: Overload:DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression
+  nameWithType: Writer.WriteEvaluateExpression
 - uid: DuetControlServer.SPI.Serialization.Writer.WriteFileChunk(System.Span{System.Byte},System.Span{System.Byte},System.Int64)
   name: WriteFileChunk(Span<Byte>, Span<Byte>, Int64)
   href: api/DuetControlServer.SPI.Serialization.Writer.html#DuetControlServer_SPI_Serialization_Writer_WriteFileChunk_System_Span_System_Byte__System_Span_System_Byte__System_Int64_
@@ -16581,22 +16866,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Serialization.Writer.WriteHeightMap
   nameWithType: Writer.WriteHeightMap
-- uid: DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock(System.Span{System.Byte},DuetAPI.CodeChannel)
-  name: WriteLockUnlock(Span<Byte>, CodeChannel)
-  href: api/DuetControlServer.SPI.Serialization.Writer.html#DuetControlServer_SPI_Serialization_Writer_WriteLockUnlock_System_Span_System_Byte__DuetAPI_CodeChannel_
-  commentId: M:DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock(System.Span{System.Byte},DuetAPI.CodeChannel)
-  name.vb: WriteLockUnlock(Span(Of Byte), CodeChannel)
-  fullName: DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock(System.Span<System.Byte>, DuetAPI.CodeChannel)
-  fullName.vb: DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock(System.Span(Of System.Byte), DuetAPI.CodeChannel)
-  nameWithType: Writer.WriteLockUnlock(Span<Byte>, CodeChannel)
-  nameWithType.vb: Writer.WriteLockUnlock(Span(Of Byte), CodeChannel)
-- uid: DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock*
-  name: WriteLockUnlock
-  href: api/DuetControlServer.SPI.Serialization.Writer.html#DuetControlServer_SPI_Serialization_Writer_WriteLockUnlock_
-  commentId: Overload:DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock
-  isSpec: "True"
-  fullName: DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock
-  nameWithType: Writer.WriteLockUnlock
 - uid: DuetControlServer.SPI.Serialization.Writer.WriteMacroCompleted(System.Span{System.Byte},DuetAPI.CodeChannel,System.Boolean)
   name: WriteMacroCompleted(Span<Byte>, CodeChannel, Boolean)
   href: api/DuetControlServer.SPI.Serialization.Writer.html#DuetControlServer_SPI_Serialization_Writer_WriteMacroCompleted_System_Span_System_Byte__DuetAPI_CodeChannel_System_Boolean_
@@ -16756,32 +17025,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Utility.FilamentManager.Init
   nameWithType: FilamentManager.Init
-- uid: DuetControlServer.Utility.FilamentManager.ToolAdded(DuetAPI.Machine.Tool)
-  name: ToolAdded(Tool)
-  href: api/DuetControlServer.Utility.FilamentManager.html#DuetControlServer_Utility_FilamentManager_ToolAdded_DuetAPI_Machine_Tool_
-  commentId: M:DuetControlServer.Utility.FilamentManager.ToolAdded(DuetAPI.Machine.Tool)
-  fullName: DuetControlServer.Utility.FilamentManager.ToolAdded(DuetAPI.Machine.Tool)
-  nameWithType: FilamentManager.ToolAdded(Tool)
-- uid: DuetControlServer.Utility.FilamentManager.ToolAdded*
-  name: ToolAdded
-  href: api/DuetControlServer.Utility.FilamentManager.html#DuetControlServer_Utility_FilamentManager_ToolAdded_
-  commentId: Overload:DuetControlServer.Utility.FilamentManager.ToolAdded
-  isSpec: "True"
-  fullName: DuetControlServer.Utility.FilamentManager.ToolAdded
-  nameWithType: FilamentManager.ToolAdded
-- uid: DuetControlServer.Utility.FilamentManager.ToolRemoved(DuetAPI.Machine.Tool)
-  name: ToolRemoved(Tool)
-  href: api/DuetControlServer.Utility.FilamentManager.html#DuetControlServer_Utility_FilamentManager_ToolRemoved_DuetAPI_Machine_Tool_
-  commentId: M:DuetControlServer.Utility.FilamentManager.ToolRemoved(DuetAPI.Machine.Tool)
-  fullName: DuetControlServer.Utility.FilamentManager.ToolRemoved(DuetAPI.Machine.Tool)
-  nameWithType: FilamentManager.ToolRemoved(Tool)
-- uid: DuetControlServer.Utility.FilamentManager.ToolRemoved*
-  name: ToolRemoved
-  href: api/DuetControlServer.Utility.FilamentManager.html#DuetControlServer_Utility_FilamentManager_ToolRemoved_
-  commentId: Overload:DuetControlServer.Utility.FilamentManager.ToolRemoved
-  isSpec: "True"
-  fullName: DuetControlServer.Utility.FilamentManager.ToolRemoved
-  nameWithType: FilamentManager.ToolRemoved
 - uid: DuetControlServer.Utility.Logger
   name: Logger
   href: api/DuetControlServer.Utility.Logger.html

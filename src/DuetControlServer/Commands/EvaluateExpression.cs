@@ -11,6 +11,6 @@ namespace DuetControlServer.Commands
         /// Evaluate an arbitrary expression in RepRapFirmware
         /// </summary>
         /// <returns>Evaluation result</returns>
-        public override Task<object> Execute() => SPI.Interface.EvaluateExpression(Expression);
+        public override Task<object> Execute() => SPI.Interface.EvaluateExpression(Channel, Expression);
     }
 }

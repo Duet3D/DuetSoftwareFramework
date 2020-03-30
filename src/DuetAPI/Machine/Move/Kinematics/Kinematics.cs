@@ -58,7 +58,7 @@ namespace DuetAPI.Machine
 
             if (jsonElement.TryGetProperty("name", out JsonElement nameProperty))
             {
-                KinematicsName kinematicsName = (KinematicsName)JsonSerializer.Deserialize(nameProperty.GetRawText(), typeof(KinematicsName));
+                KinematicsName kinematicsName = (KinematicsName)Enum.Parse(typeof(KinematicsName), nameProperty.GetString(), true);
                 Type requiredType = GetKinematicsType(kinematicsName);
                 if (GetType() != requiredType)
                 {

@@ -6,13 +6,23 @@ namespace DuetAPI.Machine
 	/// <summary>
 	/// State of a channel
 	/// </summary>
-	[JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+	[JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
 	public enum InputChannelState
 	{
+		/// <summary>
+		/// Awaiting message acknowledgement
+		/// </summary>
+		AwaitingAcknowledgement,
+
 		/// <summary>
 		/// Channel is idle
 		/// </summary>
 		Idle,
+
+		/// <summary>
+		/// Channel is executing a G/M/T-code
+		/// </summary>
+		Executing,
 
 		/// <summary>
 		/// Channel is waiting for more data
@@ -20,8 +30,8 @@ namespace DuetAPI.Machine
 		Waiting,
 
 		/// <summary>
-		/// Channel is ready to perform an action
+		/// Channel is reading a G/M/T-code
 		/// </summary>
-		Ready
+		Reading
 	}
 }

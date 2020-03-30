@@ -83,11 +83,6 @@ namespace DuetControlServer
         public static int HostUpdateInterval { get; set; } = 4000;
 
         /// <summary>
-        /// How frequently the config response is polled (in ms; temporary; will be removed once the new object model has been finished)
-        /// </summary>
-        public static int ConfigUpdateInterval { get; set; } = 5000;
-
-        /// <summary>
         /// Maximum time to keep messages in the object model unless client(s) pick them up (in s).
         /// Note that messages are only cleared when the host update task runs.
         /// </summary>
@@ -101,7 +96,7 @@ namespace DuetControlServer
         /// <summary>
         /// Frequency to use for SPI transfers
         /// </summary>
-        public static int SpiFrequency { get; set; } = 2_000_000;
+        public static int SpiFrequency { get; set; } = 8_000_000;
 
         /// <summary>
         /// Maximum allowed delay between data exchanges during a full transfer (in ms)
@@ -144,10 +139,9 @@ namespace DuetControlServer
         public static int MaxBufferSpacePerChannel { get; set; } = 1536;
 
         /// <summary>
-        /// Interval of regular status updates (in ms)
+        /// Interval of object model updates (in ms)
         /// </summary>
-        /// <remarks>This is preliminary and will be removed from future versions</remarks>
-        public static double ModelUpdateInterval { get; set; } = 125.0;
+        public static int ModelUpdateInterval { get; set; } = 250;
 
         /// <summary>
         /// Maximum lock time of the object model. If this time is exceeded, a deadlock is reported and the application is terminated.

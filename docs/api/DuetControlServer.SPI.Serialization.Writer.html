@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1268,6 +1271,110 @@ This class makes sure each data block is on a 4-byte boundary to guarantee effic
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_SPI_Serialization_Writer_WriteCodeChannel_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel*"></a>
+  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteCodeChannel_System_Span_System_Byte__DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel(System.Span{System.Byte},DuetAPI.CodeChannel)">WriteCodeChannel(Span&lt;Byte&gt;, CodeChannel)</h4>
+  <div class="markdown level1 summary"><p>Write a G-code channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteCodeChannel(Span&lt;byte&gt; to, CodeChannel channel)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
+        <td><span class="parametername">to</span></td>
+        <td><p>Destination</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Channel for the lock request</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><p>Number of bytes written</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_SPI_Serialization_Writer_WriteEvaluateExpression_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression*"></a>
+  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteEvaluateExpression_System_Span_System_Byte__DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression(System.Span{System.Byte},DuetAPI.CodeChannel,System.String)">WriteEvaluateExpression(Span&lt;Byte&gt;, CodeChannel, String)</h4>
+  <div class="markdown level1 summary"><p>Write a request to evaluate an expression</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteEvaluateExpression(Span&lt;byte&gt; to, CodeChannel channel, string expression)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
+        <td><span class="parametername">to</span></td>
+        <td><p>Destination</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Where to evaluate the expression</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">expression</span></td>
+        <td><p>Expression to evaluate</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><p>Number of bytes written</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_Serialization_Writer_WriteFileChunk_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteFileChunk*"></a>
   <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteFileChunk_System_Span_System_Byte__System_Span_System_Byte__System_Int64_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteFileChunk(System.Span{System.Byte},System.Span{System.Byte},System.Int64)">WriteFileChunk(Span&lt;Byte&gt;, Span&lt;Byte&gt;, Int64)</h4>
   <div class="markdown level1 summary"><p>Write a file chunk</p>
@@ -1427,55 +1534,6 @@ This class makes sure each data block is on a 4-byte boundary to guarantee effic
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteLockUnlock_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteLockUnlock_System_Span_System_Byte__DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteLockUnlock(System.Span{System.Byte},DuetAPI.CodeChannel)">WriteLockUnlock(Span&lt;Byte&gt;, CodeChannel)</h4>
-  <div class="markdown level1 summary"><p>Request a resource to be locked or unlocked</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteLockUnlock(Span&lt;byte&gt; to, CodeChannel channel)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
-        <td><span class="parametername">channel</span></td>
-        <td><p>Channel for the lock request</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_SPI_Serialization_Writer_WriteMacroCompleted_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteMacroCompleted*"></a>
   <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteMacroCompleted_System_Span_System_Byte__DuetAPI_CodeChannel_System_Boolean_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteMacroCompleted(System.Span{System.Byte},DuetAPI.CodeChannel,System.Boolean)">WriteMacroCompleted(Span&lt;Byte&gt;, CodeChannel, Boolean)</h4>
   <div class="markdown level1 summary"><p>Write notification about a completed macro file</p>
@@ -1533,7 +1591,7 @@ This class makes sure each data block is on a 4-byte boundary to guarantee effic
   </table>
   <a id="DuetControlServer_SPI_Serialization_Writer_WriteMessage_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteMessage*"></a>
   <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteMessage_System_Span_System_Byte__DuetControlServer_SPI_Communication_Shared_MessageTypeFlags_System_String_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteMessage(System.Span{System.Byte},DuetControlServer.SPI.Communication.Shared.MessageTypeFlags,System.String)">WriteMessage(Span&lt;Byte&gt;, MessageTypeFlags, String)</h4>
-  <div class="markdown level1 summary"><p>Write a <a class="xref" href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html">MessageHeader</a> to a memory span</p>
+  <div class="markdown level1 summary"><p>Write a <see cref="!:DeprecatedMessageHeader"></see> to a memory span</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>

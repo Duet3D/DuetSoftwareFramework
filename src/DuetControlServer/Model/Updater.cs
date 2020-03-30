@@ -59,9 +59,8 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
-        /// Merge a received status response into the object model
+        /// Merge a received object model response
         /// </summary>
-        /// <param name="module">Module that is supposed to be merged</param>
         /// <param name="json">JSON data</param>
         public static void ProcessResponse(ReadOnlySpan<byte> json)
         {
@@ -199,16 +198,15 @@ namespace DuetControlServer.Model
         /// Called when the connection to the Duet has been lost
         /// </summary>
         /// <param name="errorMessage">Message of the error that led to this event</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task ConnectionLost(string errorMessage)
+        public static void ConnectionLost(string errorMessage)
         {
-            using (await Provider.AccessReadWriteAsync())
+            using (Provider.AccessReadWrite())
             {
                 Provider.Get.Boards.Clear();
                 Provider.Get.State.Status = MachineStatus.Off;
             }
 
-            await Utility.Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({errorMessage})");
+            _ = Utility.Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({errorMessage})");
         }
     }
 }

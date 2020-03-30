@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1108,6 +1111,31 @@ so that pending updates can be performed as quickly as possible.</p>
   </div>
   <h3 id="methods">Methods
   </h3>
+  <a id="DuetControlServer_Model_Provider_AccessReadOnly_" data-uid="DuetControlServer.Model.Provider.AccessReadOnly*"></a>
+  <h4 id="DuetControlServer_Model_Provider_AccessReadOnly" data-uid="DuetControlServer.Model.Provider.AccessReadOnly">AccessReadOnly()</h4>
+  <div class="markdown level1 summary"><p>Access the machine model for read operations only</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static IDisposable AccessReadOnly()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.IDisposable</span></td>
+        <td><p>Disposable lock object to be used with a using directive</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_Model_Provider_AccessReadOnlyAsync_" data-uid="DuetControlServer.Model.Provider.AccessReadOnlyAsync*"></a>
   <h4 id="DuetControlServer_Model_Provider_AccessReadOnlyAsync" data-uid="DuetControlServer.Model.Provider.AccessReadOnlyAsync">AccessReadOnlyAsync()</h4>
   <div class="markdown level1 summary"><p>Access the machine model asynchronously for read operations only</p>
@@ -1128,6 +1156,31 @@ so that pending updates can be performed as quickly as possible.</p>
     <tbody>
       <tr>
         <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.IDisposable</span>&gt;</td>
+        <td><p>Disposable lock object to be used with a using directive</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_Model_Provider_AccessReadWrite_" data-uid="DuetControlServer.Model.Provider.AccessReadWrite*"></a>
+  <h4 id="DuetControlServer_Model_Provider_AccessReadWrite" data-uid="DuetControlServer.Model.Provider.AccessReadWrite">AccessReadWrite()</h4>
+  <div class="markdown level1 summary"><p>Access the machine model for read/write operations</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static IDisposable AccessReadWrite()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.IDisposable</span></td>
         <td><p>Disposable lock object to be used with a using directive</p>
 </td>
       </tr>

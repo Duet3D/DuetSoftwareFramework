@@ -144,6 +144,24 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
+        /// Access the machine model for read operations only
+        /// </summary>
+        /// <returns>Disposable lock object to be used with a using directive</returns>
+        public static IDisposable AccessReadOnly()
+        {
+            return new LockWrapper(_readWriteLock.ReaderLock(Program.CancellationToken), false);
+        }
+
+        /// <summary>
+        /// Access the machine model for read/write operations
+        /// </summary>
+        /// <returns>Disposable lock object to be used with a using directive</returns>
+        public static IDisposable AccessReadWrite()
+        {
+            return new LockWrapper(_readWriteLock.WriterLock(Program.CancellationToken), true);
+        }
+
+        /// <summary>
         /// Access the machine model asynchronously for read operations only
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>

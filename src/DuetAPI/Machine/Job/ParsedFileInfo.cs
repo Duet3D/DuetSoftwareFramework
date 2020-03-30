@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.Machine
+﻿using System;
+
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Holds information about a parsed G-code file
@@ -49,6 +51,16 @@
 			set => SetPropertyValue(ref _height, value);
         }
         private float _height;
+
+        /// <summary>
+        /// Value indicating when the file was last modified or null if unknown
+        /// </summary>
+        public DateTime? LastModified
+        {
+            get => _lastModified;
+            set => SetPropertyValue(ref _lastModified, value);
+        }
+        private DateTime? _lastModified;
 
         /// <summary>
         /// Height of each other layer or 0 if not found (in mm)

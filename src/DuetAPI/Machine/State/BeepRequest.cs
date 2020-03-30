@@ -6,16 +6,6 @@
     public sealed class BeepRequest : ModelObject
     {
         /// <summary>
-        /// Frequency of the requested beep (in Hz)
-        /// </summary>
-        public int Frequency
-        {
-            get => _frequency;
-			set => SetPropertyValue(ref _frequency, value);
-        }
-        private int _frequency;
-
-        /// <summary>
         /// Duration of the requested beep (in ms)
         /// </summary>
         public int Duration
@@ -24,5 +14,15 @@
 			set => SetPropertyValue(ref _duration, value);
         }
         private int _duration;
+
+        /// <summary>
+        /// Frequency of the requested beep (in Hz)
+        /// </summary>
+        public int Frequency
+        {
+            get => _frequency;
+			set => SetPropertyValue(ref _frequency, value);
+        }
+        private int _frequency;
     }
 }

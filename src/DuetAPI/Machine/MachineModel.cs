@@ -106,7 +106,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// List of user sessions
         /// </summary>
-        public ModelCollection<UserSession> UserSessions { get; set; } = new ModelCollection<UserSession>();
+        public ModelCollection<UserSession> UserSessions { get; } = new ModelCollection<UserSession>();
 
         /// <summary>
         /// List of user-defined variables
@@ -135,51 +135,41 @@ namespace DuetAPI.Machine
                 return true;
             }
 
-            foreach (PropertyInfo property in GetProperties())
+            if (JsonProperties.TryGetValue(key, out PropertyInfo property))
             {
-                if (property.Name.Equals(key, StringComparison.InvariantCultureIgnoreCase))
+                if (Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
                 {
-                    if (Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
-                    {
-                        // Skip this field if it cannot be updated
-                        return true;
-                    }
+                    // Skip this field if it must not be updated from RRF
+                    return true;
+                }
 
-                    if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
-                    {
-                        ModelObject value = (ModelObject)property.GetValue(this);
-                        value.UpdateFromJson(jsonElement, true);
-                        return true;
-                    }
+                if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
+                {
+                    ModelObject value = (ModelObject)property.GetValue(this);
+                    value.UpdateFromJson(jsonElement, true);
+                    return true;
+                }
 
-                    if (property.PropertyType.IsGenericType &&
-                        property.PropertyType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
+                if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
+                {
+                    IList modelCollection = (IList)property.GetValue(this);
+                    if (ModelGrowingCollection.TypeMatches(property.PropertyType))
                     {
-                        IList modelCollection = (IList)property.GetValue(this);
-                        Type itemType = property.PropertyType.GetGenericArguments()[0];
+                        ModelGrowingCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonElement, true);
+                    }
+                    else
+                    {
                         ModelCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonElement, true);
-                        return true;
                     }
-
-                    if (property.PropertyType.IsGenericType &&
-                        property.PropertyType.GetGenericTypeDefinition() == typeof(ModelGrowingCollection<>))
-                    {
-                        IList growingModelCollection = (IList)property.GetValue(this);
-                        Type itemType = property.PropertyType.GetGenericArguments()[0];
-                        ModelGrowingCollectionHelper.UpdateFromJson(growingModelCollection, itemType, jsonElement, true);
-                        return true;
-                    }
-
-                    if (property.PropertyType.BaseType.IsGenericType &&
-                        property.PropertyType.BaseType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
-                    {
-                        IList modelCollection = (IList)property.GetValue(this);
-                        Type itemType = property.PropertyType.BaseType.GetGenericArguments()[0];
-                        ModelCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonElement, true);
-                        return true;
-                    }
+                    return true;
                 }
             }
+#if VERIFY_OBJECT_MODEL
+            else
+            {
+                Console.WriteLine("[warn] Missing property: {0} = {1}", key, jsonElement.GetRawText());
+            }
+#endif
 
             // Failed to find a property
             return false;

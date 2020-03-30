@@ -1,9 +1,10 @@
+using DuetControlServer.SPI.Communication.Shared;
 using System.Runtime.InteropServices;
 
 namespace DuetControlServer.SPI.Communication.Shared
 {
     /// <summary>
-    /// Response to a <see cref="LinuxRequests.Request.Code"/> request
+    /// Header for arbitrary messages
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Size = 8)]
     public struct MessageHeader

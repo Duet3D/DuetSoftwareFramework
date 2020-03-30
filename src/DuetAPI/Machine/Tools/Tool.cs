@@ -34,16 +34,6 @@
         public ModelCollection<int> Fans { get; } = new ModelCollection<int>();
         
         /// <summary>
-        /// Name of the currently loaded filament
-        /// </summary>
-        public string Filament
-        {
-            get => _filament;
-			set => SetPropertyValue(ref _filament, value);
-        }
-        private string _filament = string.Empty;
-
-        /// <summary>
         /// Extruder drive index for resolving the tool filament (index or -1)
         /// </summary>
         public int FilamentExtruder

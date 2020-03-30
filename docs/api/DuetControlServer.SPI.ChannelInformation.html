@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1389,6 +1392,30 @@
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_SPI_ChannelInformation_WaitingForAcknowledgement_" data-uid="DuetControlServer.SPI.ChannelInformation.WaitingForAcknowledgement*"></a>
+  <h4 id="DuetControlServer_SPI_ChannelInformation_WaitingForAcknowledgement" data-uid="DuetControlServer.SPI.ChannelInformation.WaitingForAcknowledgement">WaitingForAcknowledgement</h4>
+  <div class="markdown level1 summary"><p>Indicates if this channel is blocked because it is waiting for a confirmation</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WaitingForAcknowledgement { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="methods">Methods
   </h3>
   <a id="DuetControlServer_SPI_ChannelInformation_Diagnostics_" data-uid="DuetControlServer.SPI.ChannelInformation.Diagnostics*"></a>
@@ -1692,6 +1719,57 @@
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_SPI_ChannelInformation_MessageAcknowledged_" data-uid="DuetControlServer.SPI.ChannelInformation.MessageAcknowledged*"></a>
+  <h4 id="DuetControlServer_SPI_ChannelInformation_MessageAcknowledged" data-uid="DuetControlServer.SPI.ChannelInformation.MessageAcknowledged">MessageAcknowledged()</h4>
+  <div class="markdown level1 summary"><p>Called when a message has been acknowledged</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void MessageAcknowledged()</code></pre>
+  </div>
+  <a id="DuetControlServer_SPI_ChannelInformation_ProcessCode_" data-uid="DuetControlServer.SPI.ChannelInformation.ProcessCode*"></a>
+  <h4 id="DuetControlServer_SPI_ChannelInformation_ProcessCode_DuetControlServer_Commands_Code_" data-uid="DuetControlServer.SPI.ChannelInformation.ProcessCode(DuetControlServer.Commands.Code)">ProcessCode(Code)</h4>
+  <div class="markdown level1 summary"><p>Process another code</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;CodeResult&gt; ProcessCode(Code code)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetControlServer.Commands.Code.html">Code</a></td>
+        <td><span class="parametername">code</span></td>
+        <td><p>Code to process</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<a class="xref" href="DuetAPI.Commands.CodeResult.html">CodeResult</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_ChannelInformation_ProcessRequests_" data-uid="DuetControlServer.SPI.ChannelInformation.ProcessRequests*"></a>
   <h4 id="DuetControlServer_SPI_ChannelInformation_ProcessRequests" data-uid="DuetControlServer.SPI.ChannelInformation.ProcessRequests">ProcessRequests()</h4>
   <div class="markdown level1 summary"><p>Process pending requests on this channel</p>
@@ -1753,6 +1831,15 @@
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_SPI_ChannelInformation_WaitForAcknowledgement_" data-uid="DuetControlServer.SPI.ChannelInformation.WaitForAcknowledgement*"></a>
+  <h4 id="DuetControlServer_SPI_ChannelInformation_WaitForAcknowledgement" data-uid="DuetControlServer.SPI.ChannelInformation.WaitForAcknowledgement">WaitForAcknowledgement()</h4>
+  <div class="markdown level1 summary"><p>Wait for a message to be acknowledged</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void WaitForAcknowledgement()</code></pre>
+  </div>
 </article>
           </div>
           

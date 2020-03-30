@@ -473,6 +473,11 @@
             Do NOT process another code on the same channel before this code has been fully executed
             </summary>
         </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.IsFromFirmware">
+            <summary>
+            Indicates if this code was requested from the firmware
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.CodeParameter">
             <summary>
             Represents a parsed parameter of a G/M/T-code
@@ -783,11 +788,16 @@
         </member>
         <member name="T:DuetAPI.Commands.EvaluateExpression">
             <summary>
-            Evaluate an arbitrary expression in RepRapFirmware
+            Evaluate an arbitrary expression on the given channel in RepRapFirmware
             </summary>
             <remarks>
             Do not use this call to evaluate file-based and network-related fields because the DSF and RRF models diverge in this regard
             </remarks>
+        </member>
+        <member name="P:DuetAPI.Commands.EvaluateExpression.Channel">
+            <summary>
+            Code channel where the expression is evaluated
+            </summary>
         </member>
         <member name="P:DuetAPI.Commands.EvaluateExpression.Expression">
             <summary>
@@ -1323,11 +1333,41 @@
             Attribute used to mark properties that are overridden by the control server
             </summary>
         </member>
+        <member name="T:DuetAPI.Machine.ModelCollection">
+            <summary>
+            Helper class to keep track of individual model collection subtypes
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.ModelCollection._derivedTypes">
+            <summary>
+            List of types that are derived from this class
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.ModelCollection.GetItemType(System.Type,System.Type@)">
+            <summary>
+            Check if the given type is derived from a <see cref="T:DuetAPI.Machine.ModelCollection`1"/> and return the corresponding item type
+            </summary>
+            <param name="type">Type to check</param>
+            <param name="itemType">Item type</param>
+            <returns>Whether the item type could be found</returns>
+        </member>
+        <member name="M:DuetAPI.Machine.ModelCollection.RegisterType(System.Type,System.Type)">
+            <summary>
+            Register another model collection type
+            </summary>
+            <param name="type">Specific collection type</param>
+            <param name="itemType">Item type</param>
+        </member>
         <member name="T:DuetAPI.Machine.ModelCollection`1">
             <summary>
             Generic container for object model arrays
             </summary>
             <typeparam name="T">Item type</typeparam>
+        </member>
+        <member name="M:DuetAPI.Machine.ModelCollection`1.#ctor">
+            <summary>
+            Constructor of this class
+            </summary>
         </member>
         <member name="M:DuetAPI.Machine.ModelCollection`1.ClearItems">
             <summary>
@@ -1389,11 +1429,39 @@
             <param name="itemType">Item type</param>
             <returns>Differences of the lists or null if they are equal</returns>
         </member>
+        <member name="T:DuetAPI.Machine.ModelGrowingCollection">
+            <summary>
+            Helper class to keep track of individual model collection subtypes
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.ModelGrowingCollection._derivedTypes">
+            <summary>
+            List of types that are derived from this class
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.ModelGrowingCollection.TypeMatches(System.Type)">
+            <summary>
+            Check if the given type is derived from a <see cref="T:DuetAPI.Machine.ModelCollection`1"/>
+            </summary>
+            <param name="type">Type to check</param>
+            <returns>Whether the type is derived</returns>
+        </member>
+        <member name="M:DuetAPI.Machine.ModelGrowingCollection.RegisterType(System.Type)">
+            <summary>
+            Register another growing model collection type
+            </summary>
+            <param name="type">Specific collection type</param>
+        </member>
         <member name="T:DuetAPI.Machine.ModelGrowingCollection`1">
             <summary>
             Generic list container to which items can be added or which can be cleared only
             </summary>
             <typeparam name="T">Item type</typeparam>
+        </member>
+        <member name="M:DuetAPI.Machine.ModelGrowingCollection`1.#ctor">
+            <summary>
+            Constructor of this class
+            </summary>
         </member>
         <member name="M:DuetAPI.Machine.ModelGrowingCollection`1.OnCollectionChanged(System.Collections.Specialized.NotifyCollectionChangedEventArgs)">
             <summary>
@@ -1435,26 +1503,19 @@
         </member>
         <member name="F:DuetAPI.Machine.ModelObject._propertyInfos">
             <summary>
-            Cached dictionary of derived types vs properties
+            Cached dictionary of derived types vs JSON property names vs property descriptors
             </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.ModelObject.JsonProperties">
+            <summary>
+            Get the cached JSON properties of this type
+            </summary>
+            <returns>Properties of this type</returns>
         </member>
         <member name="M:DuetAPI.Machine.ModelObject.#ctor">
             <summary>
             Default constructor to be called from derived classes
             </summary>
-        </member>
-        <member name="M:DuetAPI.Machine.ModelObject.GetProperties">
-            <summary>
-            Get the cached properties of this type
-            </summary>
-            <returns>Properties of this type</returns>
-        </member>
-        <member name="M:DuetAPI.Machine.ModelObject.GetPropertyValue(System.String)">
-            <summary>
-            Get the value of a given property (case-sensitive!)
-            </summary>
-            <param name="propertyName">Name of the property to query</param>
-            <returns>Property value or null if it does not exist</returns>
         </member>
         <member name="E:DuetAPI.Machine.ModelObject.PropertyChanging">
             <summary>
@@ -1517,7 +1578,7 @@
         </member>
         <member name="M:DuetAPI.Machine.ModelObject.MakePatch(DuetAPI.Machine.ModelObject)">
             <summary>
-            Create a patch to bring an old instance to this state
+            Create a patch to update an old instance to this state
             </summary>
             <param name="old">Old object state</param>
             <returns>Differences between this and other or null if they are equal</returns>
@@ -1572,7 +1633,7 @@
             Maximum number of motors this board can drive
             </summary>
         </member>
-        <member name="F:DuetAPI.Machine.Board.McuTemp">
+        <member name="P:DuetAPI.Machine.Board.McuTemp">
             <summary>
             Minimum, maximum, and current temperatures of the MCU
             </summary>
@@ -2208,9 +2269,19 @@
             State of a channel
             </summary>
         </member>
+        <member name="F:DuetAPI.Machine.InputChannelState.AwaitingAcknowledgement">
+            <summary>
+            Awaiting message acknowledgement
+            </summary>
+        </member>
         <member name="F:DuetAPI.Machine.InputChannelState.Idle">
             <summary>
             Channel is idle
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.InputChannelState.Executing">
+            <summary>
+            Channel is executing a G/M/T-code
             </summary>
         </member>
         <member name="F:DuetAPI.Machine.InputChannelState.Waiting">
@@ -2218,9 +2289,9 @@
             Channel is waiting for more data
             </summary>
         </member>
-        <member name="F:DuetAPI.Machine.InputChannelState.Ready">
+        <member name="F:DuetAPI.Machine.InputChannelState.Reading">
             <summary>
-            Channel is ready to perform an action
+            Channel is reading a G/M/T-code
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.Inputs">
@@ -2332,6 +2403,11 @@
         <member name="T:DuetAPI.Machine.BuildObject">
             <summary>
             Information about a detected build object
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.BuildObject.Cancelled">
+            <summary>
+            Indicates if this build object is cancelled
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.BuildObject.Name">
@@ -2479,6 +2555,11 @@
         <member name="P:DuetAPI.Machine.ParsedFileInfo.Height">
             <summary>
             Build height of the G-code job or 0 if not found (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ParsedFileInfo.LastModified">
+            <summary>
+            Value indicating when the file was last modified or null if unknown
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.ParsedFileInfo.LayerHeight">
@@ -2990,6 +3071,11 @@
         <member name="P:DuetAPI.Machine.Extruder.Driver">
             <summary>
             Assigned driver
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Extruder.Filament">
+            <summary>
+            Name of the currently loaded filament
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Extruder.Factor">
@@ -4337,14 +4423,14 @@
             Details about a requested beep
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.BeepRequest.Frequency">
-            <summary>
-            Frequency of the requested beep (in Hz)
-            </summary>
-        </member>
         <member name="P:DuetAPI.Machine.BeepRequest.Duration">
             <summary>
             Duration of the requested beep (in ms)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.BeepRequest.Frequency">
+            <summary>
+            Frequency of the requested beep (in Hz)
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.MachineMode">
@@ -4437,19 +4523,14 @@
             Bitmap of the axis movement controls to show (indices)
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.MessageBox.Mode">
-            <summary>
-            Mode of the message box to display or null if none is shown
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Machine.MessageBox.Title">
-            <summary>
-            Title of the message box
-            </summary>
-        </member>
         <member name="P:DuetAPI.Machine.MessageBox.Message">
             <summary>
             Content of the message box
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MessageBox.Mode">
+            <summary>
+            Mode of the message box to display or null if none is shown
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.MessageBox.Seq">
@@ -4462,7 +4543,12 @@
         </member>
         <member name="P:DuetAPI.Machine.MessageBox.Timeout">
             <summary>
-            Counter that is incremented whenever a new message box is shown
+            Total timeout for this message box (in ms)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MessageBox.Title">
+            <summary>
+            Title of the message box
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.MessageBoxMode">
@@ -4596,11 +4682,6 @@
         <member name="P:DuetAPI.Machine.Tool.Fans">
             <summary>
             List of associated fans (indices)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Machine.Tool.Filament">
-            <summary>
-            Name of the currently loaded filament
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Tool.FilamentExtruder">

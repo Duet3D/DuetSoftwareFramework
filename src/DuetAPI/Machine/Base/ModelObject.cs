@@ -15,9 +15,15 @@ namespace DuetAPI.Machine
     public class ModelObject : ICloneable, INotifyPropertyChanging, INotifyPropertyChanged
     {
         /// <summary>
-        /// Cached dictionary of derived types vs properties
+        /// Cached dictionary of derived types vs JSON property names vs property descriptors
         /// </summary>
-        private static readonly Dictionary<Type, PropertyInfo[]> _propertyInfos = new Dictionary<Type, PropertyInfo[]>();
+        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
+
+        /// <summary>
+        /// Get the cached JSON properties of this type
+        /// </summary>
+        /// <returns>Properties of this type</returns>
+        public readonly Dictionary<string, PropertyInfo> JsonProperties;
 
         /// <summary>
         /// Default constructor to be called from derived classes
@@ -26,36 +32,29 @@ namespace DuetAPI.Machine
         {
             lock (_propertyInfos)
             {
-                Type myType = GetType();
-                if (!_propertyInfos.ContainsKey(myType))
+                Type type = GetType();
+                if (!_propertyInfos.TryGetValue(type, out JsonProperties))
                 {
-                    PropertyInfo[] myProperties = myType.GetProperties();
-                    _propertyInfos.Add(myType, myProperties);
+                    JsonProperties = new Dictionary<string, PropertyInfo>();
+                    foreach (PropertyInfo property in type.GetProperties())
+                    {
+                        if (!Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
+                        {
+                            if (Attribute.IsDefined(property, typeof(JsonPropertyNameAttribute)))
+                            {
+                                JsonPropertyNameAttribute attribute = (JsonPropertyNameAttribute)Attribute.GetCustomAttribute(property, typeof(JsonPropertyNameAttribute));
+                                JsonProperties.Add(attribute.Name, property);
+                            }
+                            else
+                            {
+                                string jsonName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
+                                JsonProperties.Add(jsonName, property);
+                            }
+                        }
+                    }
+                    _propertyInfos.Add(type, JsonProperties);
                 }
             }
-        }
-
-        /// <summary>
-        /// Get the cached properties of this type
-        /// </summary>
-        /// <returns>Properties of this type</returns>
-        public PropertyInfo[] GetProperties() => _propertyInfos[GetType()];
-
-        /// <summary>
-        /// Get the value of a given property (case-sensitive!)
-        /// </summary>
-        /// <param name="propertyName">Name of the property to query</param>
-        /// <returns>Property value or null if it does not exist</returns>
-        public object GetPropertyValue(string propertyName)
-        {
-            foreach (PropertyInfo property in _propertyInfos[GetType()])
-            {
-                if (property.Name == propertyName)
-                {
-                    return property.GetValue(this);
-                }
-            }
-            return null;
         }
 
         /// <summary>
@@ -104,7 +103,7 @@ namespace DuetAPI.Machine
             }
 
             // Assign property values
-            foreach (PropertyInfo property in _propertyInfos[myType])
+            foreach (PropertyInfo property in GetType().GetProperties())
             {
                 if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
                 {
@@ -123,28 +122,18 @@ namespace DuetAPI.Machine
                         oldValue.Assign(newValue);
                     }
                 }
-                else if (property.PropertyType.IsGenericType &&
-                         property.PropertyType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
+                else if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
                 {
                     IList oldModelCollection = (IList)property.GetValue(this);
                     IList newModelCollection = (IList)property.GetValue(from);
-                    Type itemType = property.PropertyType.GetGenericArguments()[0];
-                    ModelCollectionHelper.Assign(oldModelCollection, itemType, newModelCollection);
-                }
-                else if (property.PropertyType.IsGenericType &&
-                         property.PropertyType.GetGenericTypeDefinition() == typeof(ModelGrowingCollection<>))
-                {
-                    IList oldGrowingModelCollection = (IList)property.GetValue(this);
-                    IList newGrowingModelCollection = (IList)property.GetValue(from);
-                    ModelGrowingCollectionHelper.Assign(oldGrowingModelCollection, newGrowingModelCollection);
-                }
-                else if (property.PropertyType.BaseType.IsGenericType &&
-                         property.PropertyType.BaseType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
-                {
-                    IList oldModelCollection = (IList)property.GetValue(this);
-                    IList newModelCollection = (IList)property.GetValue(from);
-                    Type itemType = property.PropertyType.BaseType.GetGenericArguments()[0];
-                    ModelCollectionHelper.Assign(oldModelCollection, itemType, newModelCollection);
+                    if (ModelGrowingCollection.TypeMatches(property.PropertyType))
+                    {
+                        ModelGrowingCollectionHelper.Assign(oldModelCollection, newModelCollection);
+                    }
+                    else
+                    {
+                        ModelCollectionHelper.Assign(oldModelCollection, itemType, newModelCollection);
+                    }
                 }
                 else
                 {
@@ -165,7 +154,7 @@ namespace DuetAPI.Machine
             ModelObject clone = (ModelObject)Activator.CreateInstance(myType);
 
             // Assign cloned property values
-            foreach (PropertyInfo property in _propertyInfos[myType])
+            foreach (PropertyInfo property in GetType().GetProperties())
             {
                 if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
                 {
@@ -184,28 +173,18 @@ namespace DuetAPI.Machine
                         cloneValue.Assign(value);
                     }
                 }
-                else if (property.PropertyType.IsGenericType &&
-                         property.PropertyType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
+                else if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
                 {
                     IList collection = (IList)property.GetValue(this);
                     IList clonedCollection = (IList)property.GetValue(clone);
-                    Type itemType = property.PropertyType.GetGenericArguments()[0];
-                    ModelCollectionHelper.Assign(clonedCollection, itemType, collection);
-                }
-                else if (property.PropertyType.IsGenericType &&
-                         property.PropertyType.GetGenericTypeDefinition() == typeof(ModelGrowingCollection<>))
-                {
-                    IList growingCollection = (IList)property.GetValue(this);
-                    IList clonedGrowingCollection = (IList)property.GetValue(clone);
-                    ModelGrowingCollectionHelper.Assign(growingCollection, clonedGrowingCollection);
-                }
-                else if (property.PropertyType.BaseType.IsGenericType &&
-                         property.PropertyType.BaseType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
-                {
-                    IList collection = (IList)property.GetValue(this);
-                    IList clonedCollection = (IList)property.GetValue(clone);
-                    Type itemType = property.PropertyType.BaseType.GetGenericArguments()[0];
-                    ModelCollectionHelper.Assign(clonedCollection, itemType, collection);
+                    if (ModelGrowingCollection.TypeMatches(property.PropertyType))
+                    {
+                        ModelGrowingCollectionHelper.Assign(clonedCollection, collection);
+                    }
+                    else
+                    {
+                        ModelCollectionHelper.Assign(clonedCollection, itemType, collection);
+                    }
                 }
                 else if (property.PropertyType.IsAssignableFrom(typeof(ICloneable)))
                 {
@@ -237,72 +216,65 @@ namespace DuetAPI.Machine
         /// <returns>Updated instance</returns>
         internal virtual ModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
-            PropertyInfo[] properties = _propertyInfos[GetType()];
             foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
             {
-                foreach (PropertyInfo property in properties)
+                if (JsonProperties.TryGetValue(jsonProperty.Name, out PropertyInfo property))
                 {
-                    if (property.Name.Equals(jsonProperty.Name, StringComparison.InvariantCultureIgnoreCase))
+                    if (ignoreSbcProperties && Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
                     {
-                        if (ignoreSbcProperties && Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
-                        {
-                            break;
-                        }
+                        // Skip this field if it must not be updated
+                        break;
+                    }
 
-                        if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
+                    if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
+                    {
+                        ModelObject modelObject = (ModelObject)property.GetValue(this);
+                        if (jsonProperty.Value.ValueKind == JsonValueKind.Null)
                         {
-                            ModelObject modelObject = (ModelObject)property.GetValue(this);
-                            if (jsonProperty.Value.ValueKind == JsonValueKind.Null)
+                            if (modelObject != null)
                             {
-                                if (modelObject != null)
-                                {
-                                    property.SetValue(this, null);
-                                }
-                            }
-                            else if (modelObject == null || property.PropertyType != modelObject.GetType())
-                            {
-                                modelObject = (ModelObject)Activator.CreateInstance(property.PropertyType);
-                                modelObject = modelObject.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
-                                property.SetValue(this, modelObject);
-                            }
-                            else
-                            {
-                                ModelObject updatedInstance = modelObject.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
-                                if (updatedInstance != modelObject)
-                                {
-                                    property.SetValue(this, updatedInstance);
-                                }
+                                property.SetValue(this, null);
                             }
                         }
-                        else if (property.PropertyType.IsGenericType &&
-                                 property.PropertyType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
+                        else if (modelObject == null || property.PropertyType != modelObject.GetType())
                         {
-                            IList modelCollection = (IList)property.GetValue(this);
-                            Type itemType = property.PropertyType.GetGenericArguments()[0];
-                            ModelCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonProperty.Value, ignoreSbcProperties);
-                        }
-                        else if (property.PropertyType.IsGenericType &&
-                                 property.PropertyType.GetGenericTypeDefinition() == typeof(ModelGrowingCollection<>))
-                        {
-                            IList modelCollection = (IList)property.GetValue(this);
-                            Type itemType = property.PropertyType.GetGenericArguments()[0];
-                            ModelGrowingCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonProperty.Value, ignoreSbcProperties);
-                        }
-                        else if (property.PropertyType.BaseType.IsGenericType &&
-                                 property.PropertyType.BaseType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
-                        {
-                            IList modelCollection = (IList)property.GetValue(this);
-                            Type itemType = property.PropertyType.BaseType.GetGenericArguments()[0];
-                            ModelCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonProperty.Value, ignoreSbcProperties);
+                            modelObject = (ModelObject)Activator.CreateInstance(property.PropertyType);
+                            modelObject = modelObject.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                            property.SetValue(this, modelObject);
                         }
                         else
                         {
-                            object newValue = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), property.PropertyType);
-                            property.SetValue(this, newValue);
+                            ModelObject updatedInstance = modelObject.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                            if (updatedInstance != modelObject)
+                            {
+                                property.SetValue(this, updatedInstance);
+                            }
                         }
-                        break;
+                    }
+                    else if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
+                    {
+                        IList modelCollection = (IList)property.GetValue(this);
+                        if (ModelGrowingCollection.TypeMatches(property.PropertyType))
+                        {
+                            ModelGrowingCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonProperty.Value, ignoreSbcProperties);
+                        }
+                        else
+                        {
+                            ModelCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonProperty.Value, ignoreSbcProperties);
+                        }
+                    }
+                    else
+                    {
+                        object newValue = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), property.PropertyType);
+                        property.SetValue(this, newValue);
                     }
                 }
+#if VERIFY_OBJECT_MODEL
+                else if (jsonProperty.Name != "seqs")
+                {
+                    Console.WriteLine("[warn] Missing property: {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
+                }
+#endif
             }
             return this;
         }
@@ -330,7 +302,7 @@ namespace DuetAPI.Machine
         }
 
         /// <summary>
-        /// Create a patch to bring an old instance to this state
+        /// Create a patch to update an old instance to this state
         /// </summary>
         /// <param name="old">Old object state</param>
         /// <returns>Differences between this and other or null if they are equal</returns>
@@ -352,14 +324,9 @@ namespace DuetAPI.Machine
 
             // Look for differences
             Dictionary<string, object> diffs = null;
-            foreach (PropertyInfo property in _propertyInfos[otherType])
+            foreach (KeyValuePair<string, PropertyInfo> jsonProperty in JsonProperties)
             {
-                if (Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
-                {
-                    continue;
-                }
-
-                object oldValue = property.GetValue(old), newValue = property.GetValue(this);
+                object oldValue = jsonProperty.Value.GetValue(old), newValue = jsonProperty.Value.GetValue(this);
                 if (oldValue == null || newValue == null || oldValue.GetType() != newValue.GetType())
                 {
                     if (oldValue != newValue)
@@ -368,12 +335,10 @@ namespace DuetAPI.Machine
                         {
                             diffs = new Dictionary<string, object>();
                         }
-
-                        string propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                        diffs[propertyName] = newValue;
+                        diffs.Add(jsonProperty.Key, newValue);
                     }
                 }
-                else if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
+                else if (jsonProperty.Value.PropertyType.IsSubclassOf(typeof(ModelObject)))
                 {
                     object diff = ((ModelObject)newValue).MakePatch((ModelObject)oldValue);
                     if (diff != null)
@@ -382,16 +347,11 @@ namespace DuetAPI.Machine
                         {
                             diffs = new Dictionary<string, object>();
                         }
-
-                        string propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                        diffs[propertyName] = diff;
+                        diffs.Add(jsonProperty.Key, diff);
                     }
                 }
-                else if (property.PropertyType.IsGenericType &&
-                         (property.PropertyType.GetGenericTypeDefinition() == typeof(ModelCollection<>) ||
-                          property.PropertyType.GetGenericTypeDefinition() == typeof(ModelGrowingCollection<>)))
+                else if (ModelCollection.GetItemType(jsonProperty.Value.PropertyType, out Type itemType))
                 {
-                    Type itemType = property.PropertyType.GetGenericArguments()[0];
                     object listDiff = ModelCollectionHelper.FindDiffs((IList)oldValue, (IList)newValue, itemType);
                     if (listDiff != null)
                     {
@@ -399,25 +359,7 @@ namespace DuetAPI.Machine
                         {
                             diffs = new Dictionary<string, object>();
                         }
-
-                        string propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                        diffs[propertyName] = listDiff;
-                    }
-                }
-                else if (property.PropertyType.BaseType.IsGenericType &&
-                         property.PropertyType.BaseType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
-                {
-                    Type itemType = property.PropertyType.BaseType.GetGenericArguments()[0];
-                    object listDiff = ModelCollectionHelper.FindDiffs((IList)oldValue, (IList)newValue, itemType);
-                    if (listDiff != null)
-                    {
-                        if (diffs == null)
-                        {
-                            diffs = new Dictionary<string, object>();
-                        }
-
-                        string propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                        diffs[propertyName] = listDiff;
+                        diffs.Add(jsonProperty.Key, listDiff);
                     }
                 }
                 else if (!newValue.Equals(oldValue))
@@ -426,9 +368,7 @@ namespace DuetAPI.Machine
                     {
                         diffs = new Dictionary<string, object>();
                     }
-
-                    string propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                    diffs[propertyName] = newValue;
+                    diffs.Add(jsonProperty.Key, newValue);
                 }
             }
             return diffs;

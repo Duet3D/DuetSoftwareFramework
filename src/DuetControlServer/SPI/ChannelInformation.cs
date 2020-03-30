@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.SPI
 {
@@ -35,14 +36,31 @@ namespace DuetControlServer.SPI
         public ChannelInformation(CodeChannel channel)
         {
             Channel = channel;
-
             _logger = NLog.LogManager.GetLogger(channel.ToString());
+
+            Model.Provider.Get.Inputs[Channel].PropertyChanged += (sender, e) =>
+            {
+                if (e.PropertyName.Equals(nameof(InputChannel.State)) &&
+                    (InputChannelState)sender.GetType().GetProperty(e.PropertyName).GetValue(sender) != InputChannelState.AwaitingAcknowledgement)
+                {
+                    using (_lock.Lock())
+                    {
+                        // Make sure the G-code flow is resumed even if the message box is closed from RRF
+                        MessageAcknowledged();
+                    }
+                }
+            };
         }
 
         /// <summary>
         /// Indicates if this channel is blocked until the next full transfer
         /// </summary>
         public bool IsBlocked { get; set; }
+
+        /// <summary>
+        /// Indicates if this channel is blocked because it is waiting for a confirmation
+        /// </summary>
+        public bool WaitingForAcknowledgement { get; private set; }
 
         /// <summary>
         /// Prioritised codes that override every other code
@@ -169,6 +187,75 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Process another code
+        /// </summary>
+        /// <param name="code">Code to process</param>
+        public Task<CodeResult> ProcessCode(Code code)
+        {
+            QueuedCode item = null;
+            if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
+            {
+                // This code is supposed to override every other queued code
+                item = new QueuedCode(code);
+                PriorityCodes.Enqueue(item);
+            }
+            else if (code.IsInsertedFromMacro)
+            {
+                // This code is supposed to be executed before the next macro code
+                item = new QueuedCode(code);
+                InsertMacroCode(item);
+            }
+            else if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
+            {
+                // Regular macro codes are already enqueued at the time this is called
+                bool firstMacro = true;
+                foreach (MacroFile macroFile in NestedMacros)
+                {
+                    foreach (QueuedCode queuedCode in macroFile.PendingCodes)
+                    {
+                        if (queuedCode.Code == code)
+                        {
+                            item = queuedCode;
+                            break;
+                        }
+                    }
+
+                    if (item != null)
+                    {
+                        if (!firstMacro)
+                        {
+                            _logger.Warn("Code {0} was internally processed but another macro is still pending", code);
+                        }
+                        break;
+                    }
+                    firstMacro = false;
+                }
+
+                // Users may want to enqueue custom codes as well when dealing with macro files
+                if (item == null)
+                {
+                    if (NestedMacros.TryPeek(out MacroFile macroFile))
+                    {
+                        item = new QueuedCode(code);
+                        macroFile.PendingCodes.Enqueue(item);
+                    }
+                    else
+                    {
+                        throw new ArgumentException("No macro file being executed");
+                    }
+                }
+            }
+            else
+            {
+                // Enqueue this code for regular execution
+                item = new QueuedCode(code);
+                PendingCodes.Enqueue(item);
+            }
+            item.IsReadyToSend = true;
+            return item.Task;
+        }
+
+        /// <summary>
         /// Process pending requests on this channel
         /// </summary>
         /// <returns>If anything more can be done on this channel</returns>
@@ -211,10 +298,10 @@ namespace DuetControlServer.SPI
             }
 
             // 4. Macros
-            if (NestedMacros.TryPeek(out MacroFile macroFile))
+            if (!WaitingForAcknowledgement && NestedMacros.TryPeek(out MacroFile macroFile))
             {
                 // Fill up the macro code buffer
-                Commands.Code code = null;
+                Code code = null;
                 if (macroFile.PendingCodes.Count < Settings.BufferedMacroCodes)
                 {
                     try
@@ -284,8 +371,8 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            // 5. Regular codes
-            if (PendingCodes.TryPeek(out queuedCode))
+            // 5. Pending codes
+            if ((!WaitingForAcknowledgement || Channel != CodeChannel.File) && PendingCodes.TryPeek(out queuedCode))
             {
                 if (BufferCode(queuedCode))
                 {
@@ -311,7 +398,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="code">Code to execute</param>
         /// <param name="macroFile">Macro file that started this code</param>
-        private void DoBackgroundCode(Commands.Code code, MacroFile macroFile)
+        private void DoBackgroundCode(Code code, MacroFile macroFile)
         {
             QueuedCode queuedCode = null;
             if (macroFile != null)
@@ -367,16 +454,37 @@ namespace DuetControlServer.SPI
         {
             try
             {
-                Commands.Code codeObj = new Commands.Code(code);
+                Code codeObj = new Code(code) { Flags = CodeFlags.IsFromFirmware };
                 _ = codeObj.Execute().ContinueWith(async task =>
                 {
                     try
                     {
                         CodeResult result = await task;
-                        await Utility.Logger.LogOutput(result);
+                        foreach (Message message in result)
+                        {
+                            // Check what kind of message this is
+                            MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel);
+                            if (message.Type != MessageType.Success)
+                            {
+                                flags |= (message.Type == MessageType.Error) ? MessageTypeFlags.ErrorMessageFlag : MessageTypeFlags.WarningMessageFlag;
+                            }
 
-                        MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel) | MessageTypeFlags.ErrorMessageFlag;
-                        Interface.SendMessage(flags, result.ToString());
+                            // Split the message into multiple chunks so RRF can output it
+                            Memory<byte> encodedMessage = Encoding.UTF8.GetBytes(result.ToString());
+                            for (int i = 0; i < encodedMessage.Length; i += Communication.Consts.MaxMessageLength)
+                            {
+                                if (i + Communication.Consts.MaxMessageLength >= encodedMessage.Length)
+                                {
+                                    Memory<byte> partialMessage = encodedMessage.Slice(i);
+                                    Interface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
+                                }
+                                else
+                                {
+                                    Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, Communication.Consts.MaxMessageLength));
+                                    Interface.SendMessage(flags | MessageTypeFlags.PushFlag, Encoding.UTF8.GetString(partialMessage.ToArray()));
+                                }
+                            }
+                        }
                     }
                     catch (OperationCanceledException)
                     {
@@ -465,7 +573,7 @@ namespace DuetControlServer.SPI
             }
 
             // Deal with macro files being finished
-            if (NestedMacros.TryPeek(out MacroFile macroFile) &&
+            if (!WaitingForAcknowledgement && NestedMacros.TryPeek(out MacroFile macroFile) &&
                 ((macroFile.StartCode != null && !macroFile.StartCode.DoingNestedMacro) ||
                  (macroFile.StartCode == null && SystemMacroHasFinished)))
             {
@@ -517,11 +625,35 @@ namespace DuetControlServer.SPI
             }
 
             // Unless this message comes from the code queue it is out-of-order...
-            if (Channel != CodeChannel.Queue)
+            if (Channel != CodeChannel.Queue && !string.IsNullOrEmpty(reply))
             {
                 _logger.Warn("Out-of-order reply: '{0}'", reply);
             }
             return false;
+        }
+
+        /// <summary>
+        /// Wait for a message to be acknowledged
+        /// </summary>
+        public void WaitForAcknowledgement()
+        {
+            if (!WaitingForAcknowledgement)
+            {
+                SuspendBuffer();
+                WaitingForAcknowledgement = true;
+            }
+        }
+
+        /// <summary>
+        /// Called when a message has been acknowledged
+        /// </summary>
+        public void MessageAcknowledged()
+        {
+            if (WaitingForAcknowledgement)
+            {
+                WaitingForAcknowledgement = false;
+                _resumingBuffer = true;
+            }
         }
 
         /// <summary>
@@ -865,8 +997,9 @@ namespace DuetControlServer.SPI
         {
             bool resourceInvalidated = false;
 
-            Commands.Code.CancelPending(Channel);
+            Code.CancelPending(Channel);
 
+            WaitingForAcknowledgement = false;
             while (SuspendedCodes.TryPop(out Queue<QueuedCode> suspendedCodes))
             {
                 while (suspendedCodes.TryDequeue(out QueuedCode queuedCode))

@@ -4,10 +4,10 @@ using System.Runtime.InteropServices;
 namespace DuetControlServer.SPI.Communication.Shared
 {
     /// <summary>
-    /// Header describing a response to a lock resource request
+    /// Header holding a G-code channel
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Size = 4)]
-    public struct LockUnlockHeader
+    public struct CodeChannelHeader
     {
         /// <summary>
         /// Channel which has locked or unlocked the resource

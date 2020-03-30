@@ -98,7 +98,7 @@
 		/// <summary>
 		/// Minimum, maximum, and current temperatures of the MCU
 		/// </summary>
-		public MinMaxCurrent<float> McuTemp = new MinMaxCurrent<float>();
+		public MinMaxCurrent<float> McuTemp { get; } = new MinMaxCurrent<float>();
 
 		/// <summary>
 		/// Full name of the board

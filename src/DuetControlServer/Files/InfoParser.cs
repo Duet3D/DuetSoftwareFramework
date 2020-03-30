@@ -25,6 +25,7 @@ namespace DuetControlServer.Files
             ParsedFileInfo result = new ParsedFileInfo
             {
                 FileName = await FilePath.ToVirtualAsync(fileName),
+                LastModified = File.GetLastWriteTime(fileName),
                 Size = fileStream.Length
             };
 
@@ -255,7 +256,7 @@ namespace DuetControlServer.Files
                 }
 
                 char c = buffer[--bufferPointer];
-                if (c == '\n')
+                if (c == '\n' || line.Length > buffer.Length)
                 {
                     return new ReadLineFromEndResult
                     {
@@ -263,7 +264,7 @@ namespace DuetControlServer.Files
                         BufferPointer = bufferPointer
                     };
                 }
-                if (c != '\r')
+                if (c != '\0' && c != '\r')
                 {
                     line = c + line;
                 }

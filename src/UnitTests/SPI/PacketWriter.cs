@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
-using DuetAPI;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
@@ -65,14 +64,14 @@ namespace UnitTests.SPI
 
             Code code = new Code("G53 G10")
             {
-                Channel = CodeChannel.HTTP
+                Channel = DuetAPI.CodeChannel.HTTP
             };
 
             int bytesWritten = Writer.WriteCode(span, code);
             Assert.AreEqual(16, bytesWritten);
 
             // Header
-            Assert.AreEqual((byte)CodeChannel.HTTP, span[0]);
+            Assert.AreEqual((byte)DuetAPI.CodeChannel.HTTP, span[0]);
             Assert.AreEqual((byte)(CodeFlags.HasMajorCommandNumber | CodeFlags.EnforceAbsolutePosition), span[1]);
             Assert.AreEqual(0, span[2]);                    // Number of parameters
             byte codeLetter = (byte)'G';
@@ -95,14 +94,14 @@ namespace UnitTests.SPI
             
             Code code = new Code("G1 X4 Y23.5 Z12.2 J\"testok\" E12:3.45:5.67")
             {
-                Channel = CodeChannel.File
+                Channel = DuetAPI.CodeChannel.File
             };
 
             int bytesWritten = Writer.WriteCode(span, code);
             Assert.AreEqual(76, bytesWritten);
             
             // Header
-            Assert.AreEqual((byte)CodeChannel.File, span[0]);
+            Assert.AreEqual((byte)DuetAPI.CodeChannel.File, span[0]);
             Assert.AreEqual((byte)CodeFlags.HasMajorCommandNumber, span[1]);
             Assert.AreEqual(5, span[2]);                    // Number of parameters
             Assert.AreEqual((byte)'G', span[3]);            // Code letter
@@ -349,11 +348,11 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
             
-            int bytesWritten = Writer.WriteMacroCompleted(span, CodeChannel.File, false);
+            int bytesWritten = Writer.WriteMacroCompleted(span, DuetAPI.CodeChannel.File, false);
             Assert.AreEqual(4, bytesWritten);
             
             // Header
-            Assert.AreEqual((byte)CodeChannel.File, span[0]);
+            Assert.AreEqual((byte)DuetAPI.CodeChannel.File, span[0]);
             Assert.AreEqual(0, span[1]);
             
             // Padding
@@ -419,16 +418,16 @@ namespace UnitTests.SPI
         }
 
         [Test]
-        public void LockUnlock()
+        public void CodeChannel()
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            int bytesWritten = Writer.WriteLockUnlock(span, CodeChannel.LCD);
+            int bytesWritten = Writer.WriteCodeChannel(span, DuetAPI.CodeChannel.LCD);
             Assert.AreEqual(4, bytesWritten);
 
             // Header
-            Assert.AreEqual(span[0], (byte)CodeChannel.LCD);
+            Assert.AreEqual(span[0], (byte)DuetAPI.CodeChannel.LCD);
 
             // Padding
             Assert.AreEqual(0, span[1]);
@@ -455,5 +454,7 @@ namespace UnitTests.SPI
             string filamentName = Encoding.UTF8.GetString(span.Slice(8, 7));
             Assert.AreEqual("foo bar", filamentName);
         }
+
+#warning FIXME Add missing packets
     }
 }

@@ -11,22 +11,27 @@
         public bool? AtxPower
         {
             get => _atxPower;
-			set => SetPropertyValue(ref _atxPower, value);
+            set => SetPropertyValue(ref _atxPower, value);
         }
         private bool? _atxPower;
 
         /// <summary>
         /// Information about a requested beep or null if none is requested
         /// </summary>
-        public BeepRequest Beep { get; set; }
-        
+        public BeepRequest Beep
+        {
+            get => _beep;
+            set => SetPropertyValue(ref _beep, value);
+        }
+        private BeepRequest _beep;
+
         /// <summary>
         /// Number of the currently selected tool or -1 if none is selected
         /// </summary>
         public int CurrentTool
         {
             get => _currentTool;
-			set => SetPropertyValue(ref _currentTool, value);
+            set => SetPropertyValue(ref _currentTool, value);
         }
         private int _currentTool = -1;
 
@@ -36,7 +41,7 @@
         public string DisplayMessage
         {
             get => _displayMessage;
-			set => SetPropertyValue(ref _displayMessage, value);
+            set => SetPropertyValue(ref _displayMessage, value);
         }
         private string _displayMessage = string.Empty;
 
@@ -46,7 +51,7 @@
         public string DsfVersion
         {
             get => _dsfVersion;
-			set => SetPropertyValue(ref _dsfVersion, value);
+            set => SetPropertyValue(ref _dsfVersion, value);
         }
         private string _dsfVersion;
 
@@ -56,7 +61,7 @@
         public float? LaserPwm
         {
             get => _laserPwm;
-			set => SetPropertyValue(ref _laserPwm, value);
+            set => SetPropertyValue(ref _laserPwm, value);
         }
         private float? _laserPwm = null;
 
@@ -66,14 +71,19 @@
         public string LogFile
         {
             get => _logFile;
-			set => SetPropertyValue(ref _logFile, value);
+            set => SetPropertyValue(ref _logFile, value);
         }
         private string _logFile;
 
         /// <summary>
         /// Details about a requested message box or null if none is requested
         /// </summary>
-        public MessageBox MessageBox { get; set; }
+        public MessageBox MessageBox
+        {
+            get => _messageBox;
+            set => SetPropertyValue(ref _messageBox, value);
+        }
+        private MessageBox _messageBox;
 
         /// <summary>
         /// Current mode of operation

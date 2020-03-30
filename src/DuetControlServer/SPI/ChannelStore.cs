@@ -30,7 +30,7 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Index operator for easy access via an <see cref="InputChannel"/> value
+        /// Index operator for easy access via a <see cref="CodeChannel"/> value
         /// </summary>
         /// <param name="channel">Channel to retrieve information about</param>
         /// <returns>Information about the code channel</returns>

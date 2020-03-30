@@ -106,15 +106,21 @@ namespace DuetControlServer.Commands
                 // Execute normal codes next. Use a lock here because multiple codes may be queued for the same channel
                 if (codes.Count > 0)
                 {
-                    using (await _channelLocks[(int)Channel].LockAsync())
+                    Task<CodeResult>[] codeTasks = new Task<CodeResult>[codes.Count];
+                    using (await _channelLocks[(int)Channel].LockAsync(Program.CancellationToken))
                     {
-                        foreach (Code code in codes)
+                        for (int i = 0; i < codes.Count; i++)
                         {
-                            CodeResult codeResult = await code.Execute();
-                            if (codeResult != null)
-                            {
-                                result.AddRange(codeResult);
-                            }
+                            codeTasks[i] = codes[i].Execute();
+                        }
+                    }
+
+                    foreach (Task<CodeResult> codeTask in codeTasks)
+                    {
+                        CodeResult codeResult = await codeTask;
+                        if (codeResult != null)
+                        {
+                            result.AddRange(codeResult);
                         }
                     }
                 }

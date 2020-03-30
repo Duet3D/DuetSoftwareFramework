@@ -4,7 +4,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace DuetControlServer.Model
@@ -43,6 +42,7 @@ namespace DuetControlServer.Model
         /// Convert a filter string into an object array that can be used to traverse the object model
         /// </summary>
         /// <param name="filter">Filter expression</param>
+        /// <param name="codeExpression">Whether the filter is from a G-code expression</param>
         /// <returns>Object array</returns>
         public static object[] ConvertFilter(string filter, bool codeExpression)
         {
@@ -86,7 +86,7 @@ namespace DuetControlServer.Model
         /// Checks if a change path matches a given filter 
         /// </summary>
         /// <param name="path">Patch path</param>
-        /// <param name="filters">Subscription filters</param>
+        /// <param name="filter">Path filter</param>
         /// <returns>True if a filter applies</returns>
         public static bool PathMatches(object[] path, object[] filter)
         {
@@ -109,7 +109,7 @@ namespace DuetControlServer.Model
 
                     if (path[i] is string pathString)
                     {
-                        if (!filterString.Equals(pathString, StringComparison.InvariantCultureIgnoreCase))
+                        if (filterString != "*" && !filterString.Equals(pathString, StringComparison.InvariantCultureIgnoreCase))
                         {
                             // Not the property we're looking for
                             return false;
@@ -125,7 +125,7 @@ namespace DuetControlServer.Model
                             filterIndex++;
                         }
 
-                        if (!pathNode.Name.Equals(filterString) && (itemIndex != -1 && itemIndex != pathNode.Index))
+                        if ((filterString != "*" && !pathNode.Name.Equals(filterString)) || (itemIndex != -1 && itemIndex != pathNode.Index))
                         {
                             // Not the item we're looking for
                             return false;
@@ -165,36 +165,36 @@ namespace DuetControlServer.Model
             {
                 return null;
             }
+            object currentFilter = partialFilter[0];
+            partialFilter = partialFilter.Skip(1).ToArray();
 
             // Check what kind of item to expect
-            if (partialFilter[0] is string propertyName)
+            if (currentFilter is string propertyName)
             {
-                partialFilter = partialFilter.Skip(1).ToArray();
                 if (partialModel is ModelObject model)
                 {
                     Dictionary<string, object> result = new Dictionary<string, object>();
-                    foreach (PropertyInfo property in model.GetProperties())
+                    foreach (KeyValuePair<string, PropertyInfo> property in model.JsonProperties)
                     {
-                        if (propertyName == "*" || property.Name.Equals(propertyName, StringComparison.InvariantCultureIgnoreCase))
+                        if (propertyName == "*" || property.Key == propertyName)
                         {
                             if (partialFilter.Length == 0 ||
                                 (partialFilter.Length == 1 && partialFilter[0] is string partialStringFilter && partialStringFilter == "**"))
                             {
                                 // This is a property we've been looking for
-                                string convertedPropertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                                result.Add(convertedPropertyName, property.GetValue(model));
+                                result.Add(property.Key, property.Value.GetValue(model));
                                 continue;
                             }
 
-                            if (property.PropertyType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(property.PropertyType))
+                            if (property.Value.PropertyType.IsSubclassOf(typeof(ModelObject)) ||
+                                typeof(IList).IsAssignableFrom(property.Value.PropertyType))
                             {
                                 // Property is somewhere deeper
-                                object propertyValue = property.GetValue(model);
+                                object propertyValue = property.Value.GetValue(model);
                                 object subResult = InternalGetFiltered(propertyValue, partialFilter);
                                 if (subResult != null)
                                 {
-                                    string convertedPropertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                                    result.Add(convertedPropertyName, subResult);
+                                    result.Add(property.Key, subResult);
                                 }
                             }
                         }
@@ -202,23 +202,13 @@ namespace DuetControlServer.Model
                     return (result.Count != 0) ? result : null;
                 }
             }
-            else if (partialFilter[0] is int itemIndex)
+            else if (currentFilter is int itemIndex)
             {
-                partialFilter = partialFilter.Skip(1).ToArray();
                 if (partialModel is IList list && itemIndex >= -1 && itemIndex < list.Count)
                 {
                     bool isModelObjectList = false, isListList = false;
-                    if (partialModel.GetType().IsGenericType &&
-                        partialModel.GetType().GetGenericTypeDefinition() == typeof(ModelCollection<>))
+                    if (ModelCollection.GetItemType(partialModel.GetType(), out Type itemType))
                     {
-                        Type itemType = partialModel.GetType().GetGenericArguments()[0];
-                        isModelObjectList = itemType.IsSubclassOf(typeof(ModelObject));
-                        isListList = typeof(IList).IsAssignableFrom(itemType);
-                    }
-                    else if (partialModel.GetType().BaseType.IsGenericType &&
-                             partialModel.GetType().BaseType.GetGenericTypeDefinition() == typeof(ModelCollection<>))
-                    {
-                        Type itemType = partialModel.GetType().BaseType.GetGenericArguments()[0];
                         isModelObjectList = itemType.IsSubclassOf(typeof(ModelObject));
                         isListList = typeof(IList).IsAssignableFrom(itemType);
                     }
@@ -362,7 +352,7 @@ namespace DuetControlServer.Model
         /// Find a specific object in the object model (wildcards are not supported)
         /// </summary>
         /// <param name="filter">Filter for finding a property or a list item</param>
-        /// <param name="findLinuxProperty">Whether the object must be a Linux property</param>
+        /// <param name="findLinuxProperty">Whether the object may be a Linux property</param>
         /// <param name="result">Partial object model or null</param>
         /// <returns>Whether the object could be found</returns>
         public static bool GetSpecific(string filter, bool findLinuxProperty, out object result)
@@ -375,6 +365,8 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="partialModel">Partial object model</param>
         /// <param name="partialFilter">Array consisting of item indices or case-insensitive property names</param>
+        /// <param name="findLinuxProperty">Whether the object may be a Linux property</param>
+        /// <param name="hadLinuxProperty">Whether a Linux property is part of the current node path</param>
         /// <param name="result">Partial object model or null</param>
         /// <returns>Whether the object could be found</returns>
         private static bool InternalGetSpecific(object partialModel, object[] partialFilter, bool findLinuxProperty, bool hadLinuxProperty, out object result)
@@ -392,32 +384,27 @@ namespace DuetControlServer.Model
                 partialFilter = partialFilter.Skip(1).ToArray();
                 if (partialModel is ModelObject model)
                 {
-                    foreach (PropertyInfo property in model.GetProperties())
+                    if (model.JsonProperties.TryGetValue(propertyName, out PropertyInfo property))
                     {
-                        if (property.Name.Equals(propertyName, StringComparison.InvariantCultureIgnoreCase))
+                        if (findLinuxProperty && Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
                         {
-                            if (findLinuxProperty && Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
-                            {
-                                hadLinuxProperty = true;
-                            }
+                            hadLinuxProperty = true;
+                        }
 
-                            if (partialFilter.Length == 0)
+                        if (partialFilter.Length == 0)
+                        {
+                            if (!findLinuxProperty || hadLinuxProperty)
                             {
-                                if (!findLinuxProperty || hadLinuxProperty)
-                                {
-                                    // This is exactly the property we've been looking for
-                                    result = property.GetValue(model);
-                                    return true;
-                                }
-                                break;
+                                // This is exactly the property we've been looking for
+                                result = property.GetValue(model);
+                                return true;
                             }
-
-                            if (property.PropertyType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(property.PropertyType))
-                            {
-                                // Property is somewhere deeper
-                                object propertyValue = property.GetValue(model);
-                                return InternalGetSpecific(propertyValue, partialFilter, findLinuxProperty, hadLinuxProperty, out result);
-                            }
+                        }
+                        else if (property.PropertyType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(property.PropertyType))
+                        {
+                            // Property is somewhere deeper
+                            object propertyValue = property.GetValue(model);
+                            return InternalGetSpecific(propertyValue, partialFilter, findLinuxProperty, hadLinuxProperty, out result);
                         }
                     }
                 }

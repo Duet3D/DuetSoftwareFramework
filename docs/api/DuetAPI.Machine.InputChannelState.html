@@ -432,7 +432,13 @@
                             <a href="DuetAPI.Machine.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -873,9 +879,6 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.EvaluateExpressionHeader.html" title="EvaluateExpressionHeader" class="">EvaluateExpressionHeader</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
                           </li>
                           <li class="">
@@ -903,13 +906,13 @@
                         
                         <ul class="nav level2">
                           <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.SPI.Communication.Shared.LockUnlockHeader.html" title="LockUnlockHeader" class="">LockUnlockHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
@@ -1039,7 +1042,7 @@
   <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
   <h5 id="DuetAPI_Machine_InputChannelState_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">[JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+    <pre><code class="lang-csharp hljs">[JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
 public enum InputChannelState</code></pre>
   </div>
   <h3 id="fields">Fields
@@ -1053,13 +1056,23 @@ public enum InputChannelState</code></pre>
     <thead>
     <tbody>
       <tr>
+        <td id="DuetAPI_Machine_InputChannelState_AwaitingAcknowledgement">AwaitingAcknowledgement</td>
+        <td><p>Awaiting message acknowledgement</p>
+</td>
+      </tr>
+      <tr>
+        <td id="DuetAPI_Machine_InputChannelState_Executing">Executing</td>
+        <td><p>Channel is executing a G/M/T-code</p>
+</td>
+      </tr>
+      <tr>
         <td id="DuetAPI_Machine_InputChannelState_Idle">Idle</td>
         <td><p>Channel is idle</p>
 </td>
       </tr>
       <tr>
-        <td id="DuetAPI_Machine_InputChannelState_Ready">Ready</td>
-        <td><p>Channel is ready to perform an action</p>
+        <td id="DuetAPI_Machine_InputChannelState_Reading">Reading</td>
+        <td><p>Channel is reading a G/M/T-code</p>
 </td>
       </tr>
       <tr>

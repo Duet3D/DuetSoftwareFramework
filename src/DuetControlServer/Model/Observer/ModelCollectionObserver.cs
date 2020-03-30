@@ -19,6 +19,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Function to generate a value collection change handler
         /// </summary>
+        /// <param name="collectionName">Name of the collection</param>
         /// <param name="path">Collection path</param>
         /// <returns>Property change handler</returns>
         private static NotifyCollectionChangedEventHandler ValueCollectionChanged(string collectionName, params object[] path)
@@ -34,6 +35,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Function to generate an object collection change handler
         /// </summary>
+        /// <param name="collectionName">Name of the collection</param>
         /// <param name="path">Collection path</param>
         /// <returns>Property change handler</returns>
         private static NotifyCollectionChangedEventHandler ObjectCollectionChanged(string collectionName, params object[] path)
@@ -62,7 +64,7 @@ namespace DuetControlServer.Model
                                 itemNeedsPatch[i] = true;
                             }
                         }
-                        nodePath = AddToPath(path, new ItemPathNode(collectionName, e.NewStartingIndex, senderList.Count));
+                        nodePath = AddToPath(path, new ItemPathNode(collectionName, e.NewStartingIndex, senderList));
                         SubscribeToModelObject((ModelObject)e.NewItems[0], nodePath);
                         break;
                     case NotifyCollectionChangedAction.Move:
@@ -74,7 +76,7 @@ namespace DuetControlServer.Model
                     case NotifyCollectionChangedAction.Replace:
                         itemNeedsPatch[e.NewStartingIndex] = true;
                         UnsubscribeFromModelObject((ModelObject)e.OldItems[0]);
-                        nodePath = AddToPath(path, new ItemPathNode(collectionName, e.NewStartingIndex, senderList.Count));
+                        nodePath = AddToPath(path, new ItemPathNode(collectionName, e.NewStartingIndex, senderList));
                         SubscribeToModelObject((ModelObject)e.NewItems[0], nodePath);
                         break;
                     case NotifyCollectionChangedAction.Remove:
@@ -88,7 +90,7 @@ namespace DuetControlServer.Model
                         }
                         if (senderList.Count == 0)
                         {
-                            nodePath = AddToPath(path, new ItemPathNode(collectionName, 0, 0));
+                            nodePath = AddToPath(path, new ItemPathNode(collectionName, 0, null));
                             OnPropertyPathChanged?.Invoke(nodePath, PropertyChangeType.ObjectCollection, null);
                         }
                         break;
@@ -102,7 +104,7 @@ namespace DuetControlServer.Model
                 {
                     if (itemNeedsPatch[i])
                     {
-                        nodePath = AddToPath(path, new ItemPathNode(collectionName, i, senderList.Count));
+                        nodePath = AddToPath(path, new ItemPathNode(collectionName, i, senderList));
                         OnPropertyPathChanged?.Invoke(nodePath, PropertyChangeType.ObjectCollection, senderList[i]);
                     }
                 }
@@ -113,6 +115,8 @@ namespace DuetControlServer.Model
         /// Subscribe to changes of the given model collection
         /// </summary>
         /// <param name="modelCollection">Collection to subscribe to</param>
+        /// <param name="itemType">Type of the items</param>
+        /// <param name="collectionName">Name of the collection</param>
         /// <param name="path">Path of the subscription</param>
         private static void SubscribeToModelCollection(object modelCollection, Type itemType, string collectionName, object[] path)
         {
@@ -123,11 +127,12 @@ namespace DuetControlServer.Model
                 ncc.CollectionChanged += changeHandler;
                 _collectionChangeHandlers[modelCollection] = changeHandler;
 
-                foreach (object item in (IList)modelCollection)
+                IList list = (IList)modelCollection;
+                for (int i = 0; i < list.Count; i++)
                 {
-                    if (item != null)
+                    if (list[i] is ModelObject item)
                     {
-                        SubscribeToModelObject((ModelObject)item, path);
+                        SubscribeToModelObject(item, AddToPath(path, new ItemPathNode(collectionName, i, list)));
                     }
                 }
             }

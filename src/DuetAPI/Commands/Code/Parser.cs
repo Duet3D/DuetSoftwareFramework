@@ -111,34 +111,7 @@ namespace DuetAPI.Commands
 
                 if (inChunk)
                 {
-                    if (!endingChunk && string.IsNullOrEmpty(value))
-                    {
-                        if (char.IsWhiteSpace(c))
-                        {
-                            // Parameter is empty
-                            endingChunk = true;
-                        }
-                        else if (c == '"')
-                        {
-                            // Parameter is a quoted string
-                            inQuotes = true;
-                            isNumericParameter = false;
-                        }
-                        else if (c == '{')
-                        {
-                            // Parameter is an expression
-                            value = "{";
-                            inExpression = true;
-                            isNumericParameter = false;
-                        }
-                        else
-                        {
-                            // Starting numeric or string parameter
-                            isNumericParameter = (c != 'e') && (c == ':' || NumericParameterChars.Contains(c)) && !unprecedentedParameter;
-                            value += c;
-                        }
-                    }
-                    else if (inQuotes)
+                    if (inQuotes)
                     {
                         if (c == '"')
                         {
@@ -173,6 +146,33 @@ namespace DuetAPI.Commands
                             endingChunk = true;
                         }
                         value += c;
+                    }
+                    else if (!endingChunk && string.IsNullOrEmpty(value))
+                    {
+                        if (char.IsWhiteSpace(c))
+                        {
+                            // Parameter is empty
+                            endingChunk = true;
+                        }
+                        else if (c == '"')
+                        {
+                            // Parameter is a quoted string
+                            inQuotes = true;
+                            isNumericParameter = false;
+                        }
+                        else if (c == '{')
+                        {
+                            // Parameter is an expression
+                            value = "{";
+                            inExpression = true;
+                            isNumericParameter = false;
+                        }
+                        else
+                        {
+                            // Starting numeric or string parameter
+                            isNumericParameter = (c != 'e') && (c == ':' || NumericParameterChars.Contains(c)) && !unprecedentedParameter;
+                            value += c;
+                        }
                     }
                     else if (endingChunk ||
                         (unprecedentedParameter && c == '\n') ||
