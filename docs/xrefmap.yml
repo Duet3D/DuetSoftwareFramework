@@ -2558,6 +2558,19 @@ references:
   commentId: T:DuetAPI.Machine.Board
   fullName: DuetAPI.Machine.Board
   nameWithType: Board
+- uid: DuetAPI.Machine.Board.BootloaderFileName
+  name: BootloaderFileName
+  href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_BootloaderFileName
+  commentId: P:DuetAPI.Machine.Board.BootloaderFileName
+  fullName: DuetAPI.Machine.Board.BootloaderFileName
+  nameWithType: Board.BootloaderFileName
+- uid: DuetAPI.Machine.Board.BootloaderFileName*
+  name: BootloaderFileName
+  href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_BootloaderFileName_
+  commentId: Overload:DuetAPI.Machine.Board.BootloaderFileName
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Board.BootloaderFileName
+  nameWithType: Board.BootloaderFileName
 - uid: DuetAPI.Machine.Board.CanAddress
   name: CanAddress
   href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_CanAddress
@@ -9701,54 +9714,67 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Utility.JsonHelper.ReceiveUtf8Json
   nameWithType: JsonHelper.ReceiveUtf8Json
-- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter
-  name: JsonLowerCaseStringEnumConverter
-  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html
-  commentId: T:DuetAPI.Utility.JsonLowerCaseStringEnumConverter
-  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter
-  nameWithType: JsonLowerCaseStringEnumConverter
-- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.CanConvert(System.Type)
+- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1
+  name: JsonLowerCaseStringEnumConverter<T>
+  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter-1.html
+  commentId: T:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1
+  name.vb: JsonLowerCaseStringEnumConverter(Of T)
+  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter<T>
+  fullName.vb: DuetAPI.Utility.JsonLowerCaseStringEnumConverter(Of T)
+  nameWithType: JsonLowerCaseStringEnumConverter<T>
+  nameWithType.vb: JsonLowerCaseStringEnumConverter(Of T)
+- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.CanConvert(System.Type)
   name: CanConvert(Type)
-  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_CanConvert_System_Type_
-  commentId: M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.CanConvert(System.Type)
-  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.CanConvert(System.Type)
-  nameWithType: JsonLowerCaseStringEnumConverter.CanConvert(Type)
-- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.CanConvert*
+  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter-1.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_CanConvert_System_Type_
+  commentId: M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.CanConvert(System.Type)
+  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter<T>.CanConvert(System.Type)
+  fullName.vb: DuetAPI.Utility.JsonLowerCaseStringEnumConverter(Of T).CanConvert(System.Type)
+  nameWithType: JsonLowerCaseStringEnumConverter<T>.CanConvert(Type)
+  nameWithType.vb: JsonLowerCaseStringEnumConverter(Of T).CanConvert(Type)
+- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.CanConvert*
   name: CanConvert
-  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_CanConvert_
-  commentId: Overload:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.CanConvert
+  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter-1.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_CanConvert_
+  commentId: Overload:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.CanConvert
   isSpec: "True"
-  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.CanConvert
-  nameWithType: JsonLowerCaseStringEnumConverter.CanConvert
-- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)
+  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter<T>.CanConvert
+  fullName.vb: DuetAPI.Utility.JsonLowerCaseStringEnumConverter(Of T).CanConvert
+  nameWithType: JsonLowerCaseStringEnumConverter<T>.CanConvert
+  nameWithType.vb: JsonLowerCaseStringEnumConverter(Of T).CanConvert
+- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)
   name: Read(ref Utf8JsonReader, Type, JsonSerializerOptions)
-  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_Read_System_Text_Json_Utf8JsonReader__System_Type_System_Text_Json_JsonSerializerOptions_
-  commentId: M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)
+  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter-1.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_Read_System_Text_Json_Utf8JsonReader__System_Type_System_Text_Json_JsonSerializerOptions_
+  commentId: M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)
   name.vb: Read(ByRef Utf8JsonReader, Type, JsonSerializerOptions)
-  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Read(ref System.Text.Json.Utf8JsonReader, System.Type, System.Text.Json.JsonSerializerOptions)
-  fullName.vb: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Read(ByRef System.Text.Json.Utf8JsonReader, System.Type, System.Text.Json.JsonSerializerOptions)
-  nameWithType: JsonLowerCaseStringEnumConverter.Read(ref Utf8JsonReader, Type, JsonSerializerOptions)
-  nameWithType.vb: JsonLowerCaseStringEnumConverter.Read(ByRef Utf8JsonReader, Type, JsonSerializerOptions)
-- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Read*
+  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter<T>.Read(ref System.Text.Json.Utf8JsonReader, System.Type, System.Text.Json.JsonSerializerOptions)
+  fullName.vb: DuetAPI.Utility.JsonLowerCaseStringEnumConverter(Of T).Read(ByRef System.Text.Json.Utf8JsonReader, System.Type, System.Text.Json.JsonSerializerOptions)
+  nameWithType: JsonLowerCaseStringEnumConverter<T>.Read(ref Utf8JsonReader, Type, JsonSerializerOptions)
+  nameWithType.vb: JsonLowerCaseStringEnumConverter(Of T).Read(ByRef Utf8JsonReader, Type, JsonSerializerOptions)
+- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Read*
   name: Read
-  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_Read_
-  commentId: Overload:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Read
+  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter-1.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_Read_
+  commentId: Overload:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Read
   isSpec: "True"
-  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Read
-  nameWithType: JsonLowerCaseStringEnumConverter.Read
-- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Write(System.Text.Json.Utf8JsonWriter,System.Object,System.Text.Json.JsonSerializerOptions)
-  name: Write(Utf8JsonWriter, Object, JsonSerializerOptions)
-  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_Write_System_Text_Json_Utf8JsonWriter_System_Object_System_Text_Json_JsonSerializerOptions_
-  commentId: M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Write(System.Text.Json.Utf8JsonWriter,System.Object,System.Text.Json.JsonSerializerOptions)
-  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Write(System.Text.Json.Utf8JsonWriter, System.Object, System.Text.Json.JsonSerializerOptions)
-  nameWithType: JsonLowerCaseStringEnumConverter.Write(Utf8JsonWriter, Object, JsonSerializerOptions)
-- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Write*
+  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter<T>.Read
+  fullName.vb: DuetAPI.Utility.JsonLowerCaseStringEnumConverter(Of T).Read
+  nameWithType: JsonLowerCaseStringEnumConverter<T>.Read
+  nameWithType.vb: JsonLowerCaseStringEnumConverter(Of T).Read
+- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Write(System.Text.Json.Utf8JsonWriter,`0,System.Text.Json.JsonSerializerOptions)
+  name: Write(Utf8JsonWriter, T, JsonSerializerOptions)
+  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter-1.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_Write_System_Text_Json_Utf8JsonWriter__0_System_Text_Json_JsonSerializerOptions_
+  commentId: M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Write(System.Text.Json.Utf8JsonWriter,`0,System.Text.Json.JsonSerializerOptions)
+  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter<T>.Write(System.Text.Json.Utf8JsonWriter, T, System.Text.Json.JsonSerializerOptions)
+  fullName.vb: DuetAPI.Utility.JsonLowerCaseStringEnumConverter(Of T).Write(System.Text.Json.Utf8JsonWriter, T, System.Text.Json.JsonSerializerOptions)
+  nameWithType: JsonLowerCaseStringEnumConverter<T>.Write(Utf8JsonWriter, T, JsonSerializerOptions)
+  nameWithType.vb: JsonLowerCaseStringEnumConverter(Of T).Write(Utf8JsonWriter, T, JsonSerializerOptions)
+- uid: DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Write*
   name: Write
-  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_Write_
-  commentId: Overload:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Write
+  href: api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter-1.html#DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_Write_
+  commentId: Overload:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Write
   isSpec: "True"
-  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Write
-  nameWithType: JsonLowerCaseStringEnumConverter.Write
+  fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter<T>.Write
+  fullName.vb: DuetAPI.Utility.JsonLowerCaseStringEnumConverter(Of T).Write
+  nameWithType: JsonLowerCaseStringEnumConverter<T>.Write
+  nameWithType.vb: JsonLowerCaseStringEnumConverter(Of T).Write
 - uid: DuetAPI.Utility.JsonRegexListConverter
   name: JsonRegexListConverter
   href: api/DuetAPI.Utility.JsonRegexListConverter.html

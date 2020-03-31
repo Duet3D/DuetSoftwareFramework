@@ -5,10 +5,10 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Struct ExecuteMacroHeader
+    <title>Class JsonLowerCaseStringEnumConverter&lt;T&gt;
    </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Struct ExecuteMacroHeader
+    <meta name="title" content="Class JsonLowerCaseStringEnumConverter&lt;T&gt;
    ">
     <meta name="generator" content="docfx 2.51.0.0">
     
@@ -566,8 +566,8 @@
                           <li class="">
                             <a href="DuetAPI.Utility.JsonHelper.html" title="JsonHelper" class="">JsonHelper</a>
                           </li>
-                          <li class="">
-                            <a href="DuetAPI.Utility.JsonLowerCaseStringEnumConverter-1.html" title="JsonLowerCaseStringEnumConverter&lt;T&gt;" class="">JsonLowerCaseStringEnumConverter&lt;T&gt;</a>
+                          <li class="active">
+                            <a href="DuetAPI.Utility.JsonLowerCaseStringEnumConverter-1.html" title="JsonLowerCaseStringEnumConverter&lt;T&gt;" class="active">JsonLowerCaseStringEnumConverter&lt;T&gt;</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Utility.JsonRegexListConverter.html" title="JsonRegexListConverter" class="">JsonRegexListConverter</a>
@@ -845,8 +845,8 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.FirmwareRequests.EvaluationResultHeader.html" title="EvaluationResultHeader" class="">EvaluationResultHeader</a>
                           </li>
-                          <li class="active">
-                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.html" title="ExecuteMacroHeader" class="active">ExecuteMacroHeader</a>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.html" title="ExecuteMacroHeader" class="">ExecuteMacroHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkHeader.html" title="FileChunkHeader" class="">FileChunkHeader</a>
@@ -1030,52 +1030,96 @@
         </div>
         <div class="article row grid-right">
           <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader">
+            <article class="content wrap" id="_content" data-uid="DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1">
   
   
-  <h1 id="DuetControlServer_SPI_Communication_FirmwareRequests_ExecuteMacroHeader" data-uid="DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader" class="text-break">Struct ExecuteMacroHeader
+  <h1 id="DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1" data-uid="DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1" class="text-break">Class JsonLowerCaseStringEnumConverter&lt;T&gt;
   </h1>
-  <div class="markdown level0 summary"><p>Request execution of a macro file</p>
+  <div class="markdown level0 summary"><p>Class to convert enums to and from lowercase JSON strings</p>
 </div>
   <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><span class="xref">System.Text.Json.Serialization.JsonConverter</span></div>
+    <div class="level2"><span class="xref">System.Text.Json.Serialization.JsonConverter</span>&lt;T&gt;</div>
+    <div class="level3"><span class="xref">JsonLowerCaseStringEnumConverter&lt;T&gt;</span></div>
+  </div>
   <div class="inheritedMembers">
     <h5>Inherited Members</h5>
     <div>
-      <span class="xref">System.ValueType.Equals(System.Object)</span>
-    </div>
-    <div>
-      <span class="xref">System.ValueType.GetHashCode()</span>
-    </div>
-    <div>
-      <span class="xref">System.ValueType.ToString()</span>
+      <span class="xref">System.Object.Equals(System.Object)</span>
     </div>
     <div>
       <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
     </div>
     <div>
+      <span class="xref">System.Object.GetHashCode()</span>
+    </div>
+    <div>
       <span class="xref">System.Object.GetType()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.MemberwiseClone()</span>
     </div>
     <div>
       <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
     </div>
+    <div>
+      <span class="xref">System.Object.ToString()</span>
+    </div>
   </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="DuetControlServer.SPI.Communication.FirmwareRequests.html">DuetControlServer.SPI.Communication.FirmwareRequests</a></h6>
-  <h6><strong>Assembly</strong>: DuetControlServer.dll</h6>
-  <h5 id="DuetControlServer_SPI_Communication_FirmwareRequests_ExecuteMacroHeader_syntax">Syntax</h5>
+  <h6><strong>Namespace</strong>: <a class="xref" href="DuetAPI.Utility.html">DuetAPI.Utility</a></h6>
+  <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
+  <h5 id="DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public struct ExecuteMacroHeader</code></pre>
+    <pre><code class="lang-csharp hljs">public class JsonLowerCaseStringEnumConverter&lt;T&gt; : JsonConverter&lt;T&gt; where T : Enum</code></pre>
   </div>
-  <h3 id="fields">Fields
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
   </h3>
-  <h4 id="DuetControlServer_SPI_Communication_FirmwareRequests_ExecuteMacroHeader_Channel" data-uid="DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.Channel">Channel</h4>
-  <div class="markdown level1 summary"><p>Channel to pipe the macro content into</p>
+  <a id="DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_CanConvert_" data-uid="DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.CanConvert*"></a>
+  <h4 id="DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_CanConvert_System_Type_" data-uid="DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.CanConvert(System.Type)">CanConvert(Type)</h4>
+  <div class="markdown level1 summary"><p>Checks if the type can be converted</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public CodeChannel Channel</code></pre>
+    <pre><code class="lang-csharp hljs">public override bool CanConvert(Type typeToConvert)</code></pre>
   </div>
-  <h5 class="fieldValue">Field Value</h5>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Type</span></td>
+        <td><span class="parametername">typeToConvert</span></td>
+        <td><p>Type to convert</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
@@ -1085,20 +1129,54 @@
     </thead>
     <tbody>
       <tr>
-        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
-        <td></td>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><p>True if the type can be converted</p>
+</td>
       </tr>
     </tbody>
   </table>
-  <h4 id="DuetControlServer_SPI_Communication_FirmwareRequests_ExecuteMacroHeader_FromCode" data-uid="DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.FromCode">FromCode</h4>
-  <div class="markdown level1 summary"><p>Whether the code was requested from a G/M/T-code</p>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">System.Text.Json.Serialization.JsonConverter&lt;T&gt;.CanConvert(System.Type)</span></div>
+  <a id="DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_Read_" data-uid="DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Read*"></a>
+  <h4 id="DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_Read_System_Text_Json_Utf8JsonReader__System_Type_System_Text_Json_JsonSerializerOptions_" data-uid="DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">Read(ref Utf8JsonReader, Type, JsonSerializerOptions)</h4>
+  <div class="markdown level1 summary"><p>Read an enum value from JSON</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public byte FromCode</code></pre>
+    <pre><code class="lang-csharp hljs">public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)</code></pre>
   </div>
-  <h5 class="fieldValue">Field Value</h5>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Text.Json.Utf8JsonReader</span></td>
+        <td><span class="parametername">reader</span></td>
+        <td><p>JSON reader</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Type</span></td>
+        <td><span class="parametername">typeToConvert</span></td>
+        <td><p>Type to convert</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Text.Json.JsonSerializerOptions</span></td>
+        <td><span class="parametername">options</span></td>
+        <td><p>Read options</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
@@ -1108,57 +1186,55 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Byte</span></td>
-        <td></td>
+        <td><span class="xref">T</span></td>
+        <td><p>Deserialized enum value</p>
+</td>
       </tr>
     </tbody>
   </table>
-  <h4 id="DuetControlServer_SPI_Communication_FirmwareRequests_ExecuteMacroHeader_Length" data-uid="DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.Length">Length</h4>
-  <div class="markdown level1 summary"><p>Length of the filename</p>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">System.Text.Json.Serialization.JsonConverter&lt;T&gt;.Read(System.Text.Json.Utf8JsonReader, System.Type, System.Text.Json.JsonSerializerOptions)</span></div>
+  <a id="DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_Write_" data-uid="DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Write*"></a>
+  <h4 id="DuetAPI_Utility_JsonLowerCaseStringEnumConverter_1_Write_System_Text_Json_Utf8JsonWriter__0_System_Text_Json_JsonSerializerOptions_" data-uid="DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Write(System.Text.Json.Utf8JsonWriter,`0,System.Text.Json.JsonSerializerOptions)">Write(Utf8JsonWriter, T, JsonSerializerOptions)</h4>
+  <div class="markdown level1 summary"><p>Write an enum value to lowercase JSON</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public byte Length</code></pre>
+    <pre><code class="lang-csharp hljs">public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)</code></pre>
   </div>
-  <h5 class="fieldValue">Field Value</h5>
+  <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
         <th>Type</th>
+        <th>Name</th>
         <th>Description</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Byte</span></td>
-        <td></td>
+        <td><span class="xref">System.Text.Json.Utf8JsonWriter</span></td>
+        <td><span class="parametername">writer</span></td>
+        <td><p>JSON writer</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">value</span></td>
+        <td><p>Value to write</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Text.Json.JsonSerializerOptions</span></td>
+        <td><span class="parametername">options</span></td>
+        <td><p>Write options</p>
+</td>
       </tr>
     </tbody>
   </table>
-  <h4 id="DuetControlServer_SPI_Communication_FirmwareRequests_ExecuteMacroHeader_ReportMissing" data-uid="DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.ReportMissing">ReportMissing</h4>
-  <div class="markdown level1 summary"><p>Output a warning message if the file could not be found</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public byte ReportMissing</code></pre>
-  </div>
-  <h5 class="fieldValue">Field Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Byte</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">System.Text.Json.Serialization.JsonConverter&lt;T&gt;.Write(System.Text.Json.Utf8JsonWriter, T, System.Text.Json.JsonSerializerOptions)</span></div>
 </article>
           </div>
           

@@ -625,6 +625,7 @@ To ensure flawless operation of the most critical components, Duet Software Fram
 - G-Code checksums and M998 are currently not supported
 - Some G-codes behave differently when executed directly by RepRapFirmware instead of DCS
 - Conditional G-codes (aka meta commands) except for `echo` are not supported yet
+- Print/Simulation times are not written to G-code files yet
 
 ## Reporting issues
 

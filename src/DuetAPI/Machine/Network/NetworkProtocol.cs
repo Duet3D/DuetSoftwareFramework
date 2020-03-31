@@ -6,7 +6,7 @@ namespace DuetAPI.Machine
     /// <summary>
     /// Supported network protocols
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter<NetworkProtocol>))]
     public enum NetworkProtocol
     {
         /// <summary>

@@ -262,7 +262,7 @@ namespace DuetAPIClient
                                 subProperty.Value.ValueKind != JsonValueKind.Null)
                             {
                                 ModelObject result = (ModelObject)Activator.CreateInstance(typeof(T));
-                                result.UpdateFromJson(subProperty.Value);
+                                result = result.UpdateFromJson(subProperty.Value);
 
                                 Response<T> response = (Response<T>)Activator.CreateInstance(typeof(Response<T>));
                                 response.Success = true;

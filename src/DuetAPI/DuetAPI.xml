@@ -5186,19 +5186,19 @@
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
         </member>
-        <member name="T:DuetAPI.Utility.JsonLowerCaseStringEnumConverter">
+        <member name="T:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1">
             <summary>
             Class to convert enums to and from lowercase JSON strings
             </summary>
         </member>
-        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.CanConvert(System.Type)">
+        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.CanConvert(System.Type)">
             <summary>
             Checks if the type can be converted
             </summary>
             <param name="typeToConvert">Type to convert</param>
             <returns>True if the type can be converted</returns>
         </member>
-        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
             <summary>
             Read an enum value from JSON
             </summary>
@@ -5207,7 +5207,7 @@
             <param name="options">Read options</param>
             <returns>Deserialized enum value</returns>
         </member>
-        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter.Write(System.Text.Json.Utf8JsonWriter,System.Object,System.Text.Json.JsonSerializerOptions)">
+        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.Write(System.Text.Json.Utf8JsonWriter,`0,System.Text.Json.JsonSerializerOptions)">
             <summary>
             Write an enum value to lowercase JSON
             </summary>

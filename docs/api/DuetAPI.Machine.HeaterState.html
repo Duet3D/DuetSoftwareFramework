@@ -567,7 +567,7 @@
                             <a href="DuetAPI.Utility.JsonHelper.html" title="JsonHelper" class="">JsonHelper</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html" title="JsonLowerCaseStringEnumConverter" class="">JsonLowerCaseStringEnumConverter</a>
+                            <a href="DuetAPI.Utility.JsonLowerCaseStringEnumConverter-1.html" title="JsonLowerCaseStringEnumConverter&lt;T&gt;" class="">JsonLowerCaseStringEnumConverter&lt;T&gt;</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Utility.JsonRegexListConverter.html" title="JsonRegexListConverter" class="">JsonRegexListConverter</a>
@@ -1042,7 +1042,8 @@
   <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
   <h5 id="DuetAPI_Machine_HeaterState_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public enum HeaterState</code></pre>
+    <pre><code class="lang-csharp hljs">[JsonConverter(typeof(JsonLowerCaseStringEnumConverter&lt;HeaterState&gt;))]
+public enum HeaterState</code></pre>
   </div>
   <h3 id="fields">Fields
   </h3>

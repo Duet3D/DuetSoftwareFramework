@@ -265,8 +265,15 @@ namespace DuetAPI.Machine
                     }
                     else
                     {
-                        object newValue = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), property.PropertyType);
-                        property.SetValue(this, newValue);
+                        try
+                        {
+                            object newValue = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), property.PropertyType);
+                            property.SetValue(this, newValue);
+                        }
+                        catch (JsonException e)
+                        {
+                            throw new AggregateException($"Failed to serialize property {property.Name} (type {property.PropertyType.Name}) from JSON {jsonProperty.Value.GetRawText()}", e);
+                        }
                     }
                 }
 #if VERIFY_OBJECT_MODEL

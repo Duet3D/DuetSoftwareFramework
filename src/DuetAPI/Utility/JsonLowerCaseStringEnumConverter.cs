@@ -7,7 +7,7 @@ namespace DuetAPI.Utility
     /// <summary>
     /// Class to convert enums to and from lowercase JSON strings
     /// </summary>
-    public class JsonLowerCaseStringEnumConverter : JsonConverter<object>
+    public class JsonLowerCaseStringEnumConverter<T> : JsonConverter<T> where T : Enum
     {
         /// <summary>
         /// Checks if the type can be converted
@@ -16,7 +16,7 @@ namespace DuetAPI.Utility
         /// <returns>True if the type can be converted</returns>
         public override bool CanConvert(Type typeToConvert)
         {
-            return typeToConvert.IsEnum;
+            return typeToConvert == typeof(T);
         }
 
         /// <summary>
@@ -26,15 +26,15 @@ namespace DuetAPI.Utility
         /// <param name="typeToConvert">Type to convert</param>
         /// <param name="options">Read options</param>
         /// <returns>Deserialized enum value</returns>
-        public override object Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType == JsonTokenType.Number)
             {
-                return reader.GetInt32();
+                return (T)(object)reader.GetInt32();
             }
             if (reader.TokenType == JsonTokenType.String)
             {
-                return Enum.Parse(typeToConvert, reader.GetString(), true);
+                return (T)(object)Enum.Parse(typeToConvert, reader.GetString(), true);
             }
             throw new JsonException($"Invalid {typeToConvert.Name}");
         }
@@ -45,7 +45,7 @@ namespace DuetAPI.Utility
         /// <param name="writer">JSON writer</param>
         /// <param name="value">Value to write</param>
         /// <param name="options">Write options</param>
-        public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
         {
             writer.WriteStringValue(Enum.GetName(value.GetType(), value).ToLowerInvariant());
         }

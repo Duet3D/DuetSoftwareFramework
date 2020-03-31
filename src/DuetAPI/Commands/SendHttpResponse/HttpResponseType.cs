@@ -6,7 +6,7 @@ namespace DuetAPI.Commands
     /// <summary>
     /// Enumeration of supported HTTP responses
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter<HttpResponseType>))]
     public enum HttpResponseType
     {
         /// <summary>
