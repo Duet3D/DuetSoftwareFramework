@@ -1588,6 +1588,11 @@
             Information about a connected board
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Board.BootloaderFileName">
+            <summary>
+            Filename of the firmware binary
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Board.CanAddress">
             <summary>
             CAN address of this board or null if not applicable

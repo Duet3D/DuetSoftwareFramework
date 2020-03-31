@@ -1625,6 +1625,7 @@
             Subscribe to changes of the given growing model collection
             </summary>
             <param name="growingModelCollection">Growing model collection to subscribe to</param>
+            <param name="collectionName">Name of the collection</param>
             <param name="path">Path to the growing collection</param>
         </member>
         <member name="M:DuetControlServer.Model.Observer.UnsubscribeFromGrowingModelCollection(System.Object)">
@@ -1983,9 +1984,8 @@
         </member>
         <member name="M:DuetControlServer.Model.Updater.ProcessResponse(System.ReadOnlySpan{System.Byte})">
             <summary>
-            Merge a received status response into the object model
+            Merge a received object model response
             </summary>
-            <param name="module">Module that is supposed to be merged</param>
             <param name="json">JSON data</param>
         </member>
         <member name="M:DuetControlServer.Model.Updater.Run">
@@ -2460,7 +2460,7 @@
         </member>
         <member name="P:DuetControlServer.SPI.ChannelStore.Item(DuetAPI.CodeChannel)">
             <summary>
-            Index operator for easy access via an <see cref="!:InputChannel"/> value
+            Index operator for easy access via a <see cref="T:DuetAPI.CodeChannel"/> value
             </summary>
             <param name="channel">Channel to retrieve information about</param>
             <returns>Information about the code channel</returns>
@@ -2756,7 +2756,7 @@
             <summary>
             Message from the firmware
             </summary>
-            <seealso cref="!:Shared.DeprecatedMessageHeader"/>
+            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.MessageHeader"/>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.Request.ExecuteMacro">
             <summary>
@@ -3166,13 +3166,13 @@
             <summary>
             Evaluate an arbitrary expression
             </summary>
-            <seealso cref="!:EvaluateExpressionHeader"/>
+            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.CodeChannelHeader"/>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.LinuxRequests.Request.Message">
             <summary>
             Send an arbitrary RepRapFirmware message
             </summary>
-            <seealso cref="!:LinuxRequests.SendMessage"/>
+            <seealso cref="T:DuetControlServer.SPI.Communication.Shared.MessageHeader"/>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModelHeader">
             <summary>
@@ -4687,7 +4687,7 @@
         </member>
         <member name="M:DuetControlServer.SPI.Serialization.Writer.WriteMessage(System.Span{System.Byte},DuetControlServer.SPI.Communication.Shared.MessageTypeFlags,System.String)">
             <summary>
-            Write a <see cref="!:DeprecatedMessageHeader"/> to a memory span
+            Write a <see cref="T:DuetControlServer.SPI.Communication.Shared.MessageHeader"/> to a memory span
             </summary>
             <param name="to">Destination</param>
             <param name="type">Message flags</param>

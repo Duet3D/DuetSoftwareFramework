@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -302,7 +303,8 @@ namespace DuetControlServer.Files
                 {
                     foreach (Group grp in match.Groups)
                     {
-                        if (grp.Name == "mm" && float.TryParse(grp.Value, out float layerHeight) && float.IsFinite(layerHeight))
+                        if (grp.Name == "mm" && float.TryParse(grp.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float layerHeight) &&
+                            float.IsFinite(layerHeight) && layerHeight < Settings.MaxLayerHeight)
                         {
                             fileInfo.LayerHeight = layerHeight;
                             return true;
@@ -333,7 +335,8 @@ namespace DuetControlServer.Files
                         {
                             foreach (Capture c in grp.Captures)
                             {
-                                if (float.TryParse(c.Value, out float filamentUsage) && float.IsFinite(filamentUsage))
+                                if (float.TryParse(c.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float filamentUsage) &&
+                                    float.IsFinite(filamentUsage))
                                 {
                                     fileInfo.Filament.Add(filamentUsage);
                                 }
@@ -344,7 +347,8 @@ namespace DuetControlServer.Files
                         {
                             foreach (Capture c in grp.Captures)
                             {
-                                if (float.TryParse(c.Value, out float filamentUsage) && float.IsFinite(filamentUsage))
+                                if (float.TryParse(c.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float filamentUsage) &&
+                                    float.IsFinite(filamentUsage))
                                 {
                                     fileInfo.Filament.Add(filamentUsage * 1000F);
                                 }

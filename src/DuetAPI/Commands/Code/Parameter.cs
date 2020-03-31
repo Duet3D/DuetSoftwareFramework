@@ -295,10 +295,6 @@ namespace DuetAPI.Commands
             {
                 throw new ArgumentNullException(nameof(codeParameter));
             }
-            if (codeParameter.IsDriverId)
-            {
-                return (DriverId)codeParameter._parsedValue;
-            }
             if (codeParameter._parsedValue is DriverId driverId)
             {
                 return driverId;
@@ -480,7 +476,6 @@ namespace DuetAPI.Commands
             {
                 throw new ArgumentNullException(nameof(codeParameter));
             }
-
             if (codeParameter._parsedValue is DriverId[] driverIdArray)
             {
                 return driverIdArray;

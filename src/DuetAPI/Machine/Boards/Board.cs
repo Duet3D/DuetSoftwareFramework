@@ -6,6 +6,16 @@
     public sealed class Board : ModelObject
     {
 		/// <summary>
+		/// Filename of the firmware binary
+		/// </summary>
+		public string BootloaderFileName
+		{
+			get => _bootloaderFileName;
+			set => SetPropertyValue(ref _bootloaderFileName, value);
+		}
+		private string _bootloaderFileName;
+
+		/// <summary>
 		/// CAN address of this board or null if not applicable
 		/// </summary>
 		public int? CanAddress
@@ -33,7 +43,7 @@
 			get => _firmwareFileName;
 			set => SetPropertyValue(ref _firmwareFileName, value);
 		}
-		private string _firmwareFileName = string.Empty;
+		private string _firmwareFileName;
 
 		/// <summary>
 		/// Name of the firmware build

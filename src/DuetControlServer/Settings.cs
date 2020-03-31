@@ -174,7 +174,7 @@ namespace DuetControlServer
         /// </summary>
         public static List<Regex> LayerHeightFilters { get; set; } = new List<Regex>
         {
-            new Regex(@"layer_height\D+(?<mm>(\d+\.?\d*))", RegexFlags),                // Slic3r
+            new Regex(@"\slayer_height\D+(?<mm>(\d+\.?\d*))", RegexFlags),              // Slic3r / Prusa Slicer
             new Regex(@"Layer height\D+(?<mm>(\d+\.?\d*))", RegexFlags),                // Cura
             new Regex(@"layerHeight\D+(?<mm>(\d+\.?\d*))", RegexFlags),                 // Simplify3D
             new Regex(@"layer_thickness_mm\D+(?<mm>(\d+\.?\d*))", RegexFlags),          // KISSlicer and Canvas
@@ -188,8 +188,9 @@ namespace DuetControlServer
         {
             new Regex(@"filament used\D+(((?<mm>\d+\.?\d*)mm)(\D+)?)+", RegexFlags),        // Slic3r (mm)
             new Regex(@"filament used\D+(((?<m>\d+\.?\d*)m([^m]|$))(\D+)?)+", RegexFlags),  // Cura (m)
-            new Regex(@"material\#\d+\D+(?<mm>\d+\.?\d*)", RegexFlags),                     // IdeaMaker (mm)
             new Regex(@"filament length\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+", RegexFlags),   // Simplify3D (mm)
+            new Regex(@"filament used \[mm\]\D+(?<mm>\d+\.?\d*)", RegexFlags),              // Prusa Slicer (mm)
+            new Regex(@"material\#\d+\D+(?<mm>\d+\.?\d*)", RegexFlags),                     // IdeaMaker (mm)
             new Regex(@"Filament used per extruder:\r\n;\s*(?<name>.+)\s+=\s*(?<mm>[0-9.]+)", RegexFlags)   // Canvas
         };
 

@@ -11,11 +11,12 @@ namespace UnitTests.File
     {
         [Test]
         [TestCase("Cura.gcode")]
+        [TestCase("PrusaSlicer.gcode")]
         [TestCase("Simplify3D.gcode")]
         [TestCase("Slic3r.gcode")]
         public async Task Test(string fileName)
         {
-            string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "File/GCodes", fileName);
+            string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes", fileName);
             ParsedFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath);
 
             TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(ParsedFileInfo), new JsonSerializerOptions { WriteIndented = true }));
@@ -34,7 +35,7 @@ namespace UnitTests.File
         [Test]
         public async Task TestEmpty()
         {
-            string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "File/GCodes/Circle.gcode");
+            string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes/Circle.gcode");
             ParsedFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath);
 
             TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(ParsedFileInfo), new JsonSerializerOptions { WriteIndented = true }));
