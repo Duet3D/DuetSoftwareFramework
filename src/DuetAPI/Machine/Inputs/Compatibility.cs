@@ -1,18 +1,17 @@
-﻿using DuetAPI.Utility;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace DuetAPI.Machine
 {
     /// <summary>
     /// Compatibility level for emulation
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum Compatibility
     {
         /// <summary>
         /// No emulation (same as RepRapFirmware)
         /// </summary>
-        Me,
+        Default,
 
         /// <summary>
         /// Emulating RepRapFirmware

@@ -271,7 +271,7 @@ namespace DuetAPI.Commands
                                 throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
                             }
                         }
-                        else if (!result.MajorNumber.HasValue && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
+                        else if (result.MajorNumber == null && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
                         {
                             // Check for conditional G-code
                             if (letter == 'i' && value == "f")
@@ -393,7 +393,7 @@ namespace DuetAPI.Commands
                     // Stop if another G/M/T code is coming up and this one is complete
                     int next = reader.Peek();
                     char nextChar = (next == -1) ? '\n' : char.ToUpperInvariant((char)next);
-                    if (result.MajorNumber.HasValue && result.MajorNumber != 53 && (nextChar == 'G' || nextChar == 'M' || nextChar == 'T') &&
+                    if (result.MajorNumber != null && result.MajorNumber != 53 && (nextChar == 'G' || nextChar == 'M' || nextChar == 'T') &&
                         (nextChar == 'M' || result.Type != CodeType.MCode || result.Parameters.Any(item => item.Letter == nextChar)))
                     {
                         // Note that M-codes may have G or T parameters but only one

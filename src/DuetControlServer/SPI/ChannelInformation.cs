@@ -317,7 +317,7 @@ namespace DuetControlServer.SPI
                 // Start the next code in the background. An interceptor may also generate extra codes
                 if (code != null)
                 {
-                    DoBackgroundCode(code, macroFile);
+                    DoMacroCode(code, macroFile);
                     return true;
                 }
 
@@ -398,27 +398,23 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="code">Code to execute</param>
         /// <param name="macroFile">Macro file that started this code</param>
-        private void DoBackgroundCode(Code code, MacroFile macroFile)
+        private void DoMacroCode(Code code, MacroFile macroFile)
         {
-            QueuedCode queuedCode = null;
-            if (macroFile != null)
-            {
-                queuedCode = new QueuedCode(code);
-                macroFile.PendingCodes.Enqueue(queuedCode);
-            }
+            QueuedCode queuedCode = new QueuedCode(code);
+            macroFile.PendingCodes.Enqueue(queuedCode);
 
             _ = code.Execute().ContinueWith(async task =>
             {
                 try
                 {
                     CodeResult result = await task;
-                    if (queuedCode != null && !queuedCode.IsReadyToSend)
+                    if (!queuedCode.IsReadyToSend)
                     {
                         // Macro codes need special treatment because they are not processed in the main SPI interface
                         queuedCode.HandleReply(result);
                     }
 
-                    if (macroFile?.StartCode == null)
+                    if (macroFile.StartCode == null)
                     {
                         await Utility.Logger.LogOutput(result);
                     }
@@ -427,38 +423,45 @@ namespace DuetControlServer.SPI
                         macroFile.StartCode.HandleReply(result);
                     }
                 }
-                catch (OperationCanceledException oce)
+                catch (OperationCanceledException)
                 {
-                    // Code has been cancelled. Make sure it is properly resolved
-                    if (queuedCode != null && !queuedCode.IsReadyToSend)
+                    if (!queuedCode.IsReadyToSend)
                     {
-                        queuedCode.SetException(oce);
+                        // Code has been cancelled. Don't log this
+                        queuedCode.SetCancelled();
                     }
                 }
                 catch (AggregateException ae)
                 {
-                    macroFile?.Abort();
-                    queuedCode.SetException(ae.InnerException);
                     await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                    macroFile.Abort();
+                    if (!queuedCode.IsReadyToSend)
+                    {
+                        queuedCode.SetException(ae.InnerException);
+                    }
                 }
                 catch (Exception e)
                 {
-                    macroFile?.Abort();
-                    queuedCode.SetException(e);
                     await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{e.GetType().Name}] {e.Message}");
+                    macroFile.Abort();
+                    if (!queuedCode.IsReadyToSend)
+                    {
+                        queuedCode.SetException(e);
+                    }
                 }
-            });
+            }, TaskContinuationOptions.RunContinuationsAsynchronously);
         }
 
         /// <summary>
         /// Perform a regular code that was requested from the firmware
         /// </summary>
-        /// <param name="code"></param>
+        /// <param name="code">Code to perform</param>
         public void DoFirmwareCode(string code)
         {
             try
             {
-                Code codeObj = new Code(code) { Flags = CodeFlags.IsFromFirmware };
+                _logger.Info("Running code from firmware '{0}' on channel {1}", code, Channel);
+                Code codeObj = new Code(code) { Channel = Channel, Flags = CodeFlags.IsFromFirmware };
                 _ = codeObj.Execute().ContinueWith(async task =>
                 {
                     try
@@ -494,21 +497,20 @@ namespace DuetControlServer.SPI
                     {
                         // Code has been cancelled. Don't log this
                     }
+                    catch (AggregateException ae)
+                    {
+                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code} from firmware: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                    }
                     catch (Exception e)
                     {
-                        if (e is AggregateException ae)
-                        {
-                            e = ae.InnerException;
-                        }
-                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code}: [{e.GetType().Name}] {e.Message}");
+                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code} from firmware: [{e.GetType().Name}] {e.Message}");
                     }
-                });
-                Task<CodeResult> task = codeObj.Execute();
+                }, TaskContinuationOptions.RunContinuationsAsynchronously);
             }
             catch (CodeParserException cpe)
             {
                 MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel) | MessageTypeFlags.ErrorMessageFlag;
-                Interface.SendMessage(flags, "Failed to parse code: " + cpe.Message);
+                Interface.SendMessage(flags, "Failed to parse firmware code: " + cpe.Message);
             }
         }
 
@@ -566,7 +568,6 @@ namespace DuetControlServer.SPI
                     }
                     _partialLogMessage = null;
                 }
-                return true;
             }
 
             // Deal with replies following an attempt to open an invalid file
@@ -615,21 +616,8 @@ namespace DuetControlServer.SPI
                 return true;
             }
 
-            // Deal with the final response from a job file
-            if (Channel == CodeChannel.File && string.IsNullOrEmpty(reply))
-            {
-                using (FileExecution.Job.Lock())
-                {
-                    if (FileExecution.Job.IsDoingFinalCodes)
-                    {
-                        FileExecution.Job.FileHasFinished();
-                        return true;
-                    }
-                }
-            }
-
-            // Unless this message comes from the code queue it is out-of-order...
-            if (Channel != CodeChannel.Queue && !string.IsNullOrEmpty(reply))
+            // Unless this message comes from the file or code queue it is out-of-order...
+            if (Channel != CodeChannel.File && Channel != CodeChannel.Queue && !string.IsNullOrEmpty(reply))
             {
                 _logger.Warn("Out-of-order reply: '{0}'", reply);
             }

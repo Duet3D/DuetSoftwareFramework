@@ -234,7 +234,6 @@ namespace DuetAPI.Machine
                 // Update items
                 for (int i = 0; i < Math.Min(list.Count, arrayLength); i++)
                 {
-                    object item = list[i];
                     JsonElement jsonItem = jsonElement[i];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {

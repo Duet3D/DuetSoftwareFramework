@@ -57,11 +57,7 @@ namespace ModelObserver
                 Console.WriteLine("Connected!");
             }
 
-            // In Patch mode the whole object model is sent over after connecting.
-            // Dump it (or call connection.GetMachineModel() to deserialize it)
-            _ = await connection.GetSerializedMachineModel();
-
-            // Then keep listening for (filtered) patches
+            // Write incoming fragments indented to the console
             do
             {
                 try
@@ -81,16 +77,21 @@ namespace ModelObserver
             while (true);
         }
 
+        /// <summary>
+        /// Print a JSON document as indented JSON text
+        /// </summary>
+        /// <param name="jsonDocument"></param>
+        /// <returns>Indented text</returns>
         public static string GetIndentedJson(JsonDocument jsonDocument)
         {
-            using var stream = new MemoryStream();
+            using MemoryStream stream = new MemoryStream();
             using (Utf8JsonWriter writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
             {
                 jsonDocument.WriteTo(writer);
             }
             stream.Seek(0, SeekOrigin.Begin);
 
-            using var reader = new StreamReader(stream);
+            using StreamReader reader = new StreamReader(stream);
             return reader.ReadToEnd();
         }
     }

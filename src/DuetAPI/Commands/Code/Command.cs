@@ -257,6 +257,10 @@ namespace DuetAPI.Commands
             // Then the comment is appended (if applicable)
             if (!string.IsNullOrEmpty(Comment))
             {
+                if (builder.Length > 0)
+                {
+                    builder.Append(' ');
+                }
                 builder.Append(';');
                 builder.Append(Comment);
             }
@@ -282,9 +286,9 @@ namespace DuetAPI.Commands
                 return "(comment)";
             }
 
-            if (MajorNumber.HasValue)
+            if (MajorNumber != null)
             {
-                if (MinorNumber.HasValue)
+                if (MinorNumber != null)
                 {
                     return $"{(char)Type}{MajorNumber}.{MinorNumber}";
                 }

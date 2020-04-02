@@ -6,10 +6,9 @@
   "SocketPollInterval": 2000,
   "BaseDirectory": "/opt/dsf/sd",
   "HostUpdateInterval": 4000,
-  "ConfigUpdateInterval": 5000,
   "MaxMessageAge": 60,
   "SpiDevice": "/dev/spidev0.0",
-  "SpiFrequency": 2000000,
+  "SpiFrequency": 8000000,
   "SpiTransferTimeout": 500,
   "MaxSpiRetries": 3,
   "SpiPollDelay": 25,
@@ -18,7 +17,7 @@
   "BufferedPrintCodes": 32,
   "BufferedMacroCodes": 16,
   "MaxBufferSpacePerChannel": 1536,
-  "ModelUpdateInterval": 125,
+  "ModelUpdateInterval": 250,
   "MaxMachineModelLockTime": -1,
   "FileInfoReadBufferSize": 8192,
   "FileInfoReadLimitHeader": 12288,
@@ -26,7 +25,7 @@
   "MaxLayerHeight": 0.9,
   "LayerHeightFilters": [
     {
-      "Pattern": "layer_height\\D\u002B(?\u003Cmm\u003E(\\d\u002B\\.?\\d*))",
+      "Pattern": "\\slayer_height\\D\u002B(?\u003Cmm\u003E(\\d\u002B\\.?\\d*))",
       "Options": 17
     },
     {
@@ -56,11 +55,15 @@
       "Options": 17
     },
     {
-      "Pattern": "material\\#\\d\u002B\\D\u002B(?\u003Cmm\u003E\\d\u002B\\.?\\d*)",
+      "Pattern": "filament length\\D\u002B(((?\u003Cmm\u003E\\d\u002B\\.?\\d*)\\s*mm)(\\D\u002B)?)\u002B",
       "Options": 17
     },
     {
-      "Pattern": "filament length\\D\u002B(((?\u003Cmm\u003E\\d\u002B\\.?\\d*)\\s*mm)(\\D\u002B)?)\u002B",
+      "Pattern": "filament used \\[mm\\]\\D\u002B(?\u003Cmm\u003E\\d\u002B\\.?\\d*)",
+      "Options": 17
+    },
+    {
+      "Pattern": "material\\#\\d\u002B\\D\u002B(?\u003Cmm\u003E\\d\u002B\\.?\\d*)",
       "Options": 17
     },
     {

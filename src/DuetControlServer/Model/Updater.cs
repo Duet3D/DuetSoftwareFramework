@@ -35,6 +35,11 @@ namespace DuetControlServer.Model
         private static readonly AsyncConditionVariable _fullyUpdated = new AsyncConditionVariable(_lock);
 
         /// <summary>
+        /// Dictionary of main keys vs last sequence numbers
+        /// </summary>
+        private static readonly Dictionary<string, int> _lastSeqs = new Dictionary<string, int>();
+
+        /// <summary>
         /// UTF-8 representation of the received object model data
         /// </summary>
         private static readonly byte[] _json = new byte[SPI.Communication.Consts.BufferSize];
@@ -78,7 +83,6 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
-            Dictionary<string, int> lastSeqs = new Dictionary<string, int>();
             do
             {
                 using (await _lock.LockAsync(Program.CancellationToken))
@@ -143,10 +147,10 @@ namespace DuetControlServer.Model
                                     if (seqProperty.Name != "reply")
                                     {
                                         int newSeq = seqProperty.Value.GetInt32();
-                                        if (!lastSeqs.TryGetValue(seqProperty.Name, out int lastSeq) || lastSeq != newSeq)
+                                        if (!_lastSeqs.TryGetValue(seqProperty.Name, out int lastSeq) || lastSeq != newSeq)
                                         {
                                             _logger.Debug("Requesting update of key {0}, seq {1} -> {2}", seqProperty.Name, lastSeq, newSeq);
-                                            lastSeqs[seqProperty.Name] = newSeq;
+                                            _lastSeqs[seqProperty.Name] = newSeq;
                                             SPI.Interface.RequestObjectModel(seqProperty.Name, "d99vn");
                                             objectModelSynchronized = false;
                                         }
@@ -204,6 +208,11 @@ namespace DuetControlServer.Model
             {
                 Provider.Get.Boards.Clear();
                 Provider.Get.State.Status = MachineStatus.Off;
+            }
+
+            using (_lock.Lock())
+            {
+                _lastSeqs.Clear();
             }
 
             _ = Utility.Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({errorMessage})");

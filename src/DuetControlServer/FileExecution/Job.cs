@@ -74,11 +74,6 @@ namespace DuetControlServer.FileExecution
         public static bool IsSimulating { get; private set; }
 
         /// <summary>
-        /// Indicates if the last few codes are being processed
-        /// </summary>
-        public static bool IsDoingFinalCodes { get; private set; }
-
-        /// <summary>
         /// Indicates if the file print has been paused
         /// </summary>
         public static bool IsPaused { get; private set; }
@@ -135,7 +130,7 @@ namespace DuetControlServer.FileExecution
             }
 
             // Update the state
-            IsDoingFinalCodes = IsPaused = IsAborted = false;
+            IsAborted = false;
             IsSimulating = simulating;
             _file = file;
             _pausePosition = null;
@@ -189,7 +184,6 @@ namespace DuetControlServer.FileExecution
                                 Code readCode = _file.ReadCode();
                                 if (readCode == null)
                                 {
-                                    IsDoingFinalCodes = true;
                                     break;
                                 }
 
@@ -274,6 +268,7 @@ namespace DuetControlServer.FileExecution
                         {
                             Model.Provider.Get.Job.LastFileAborted = _file.IsAborted && IsAborted;
                             Model.Provider.Get.Job.LastFileCancelled = _file.IsAborted && !IsAborted;
+                            Model.Provider.Get.Job.LastFileSimulated = IsSimulating;
                             Model.Provider.Get.Job.LastFileName = Model.Provider.Get.Job.File.FileName;
                         }
                     }
@@ -281,27 +276,18 @@ namespace DuetControlServer.FileExecution
 
                 using (await _lock.LockAsync(Program.CancellationToken))
                 {
-                    // Wait for RepRapFirmware to finish the file
-                    await _finished.WaitAsync(Program.CancellationToken);
+                    // We are no longer printing a file...
+                    _finished.NotifyAll();
 
                     // Dispose the file
                     _file.Dispose();
                     _file = null;
 
                     // End
-                    IsProcessing = false;
+                    IsProcessing = IsSimulating = IsPaused = false;
                 }
             }
             while (!Program.CancellationToken.IsCancellationRequested);
-        }
-
-        /// <summary>
-        /// Called when RepRapFirmware has finished the file
-        /// </summary>
-        public static void FileHasFinished()
-        {
-            IsDoingFinalCodes = false;
-            _finished.NotifyAll();
         }
 
         /// <summary>

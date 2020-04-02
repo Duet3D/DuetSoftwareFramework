@@ -8,12 +8,12 @@
         /// <summary>
         /// Final calibration results (for Delta calibration)
         /// </summary>
-        public MoveCalibrationResults Final { get; } = new MoveCalibrationResults();
+        public MoveDeviations Final { get; } = new MoveDeviations();
 
         /// <summary>
         /// Initial calibration results (for Delta calibration)
         /// </summary>
-        public MoveCalibrationResults Initial { get; } = new MoveCalibrationResults();
+        public MoveDeviations Initial { get; } = new MoveDeviations();
 
         /// <summary>
         /// Number of factors used (for Delta calibration)

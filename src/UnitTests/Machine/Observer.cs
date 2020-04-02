@@ -3,7 +3,6 @@ using DuetControlServer.Model;
 using NUnit.Framework;
 using System;
 using System.Collections;
-using System.Text.Json;
 
 namespace UnitTests.Machine
 {

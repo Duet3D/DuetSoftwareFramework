@@ -163,13 +163,14 @@ namespace DuetAPI.Machine
                     }
                     return true;
                 }
-            }
+
 #if VERIFY_OBJECT_MODEL
+                Console.WriteLine("[warn] Missing key type handler for {0}", key);
             else
             {
                 Console.WriteLine("[warn] Missing property: {0} = {1}", key, jsonElement.GetRawText());
-            }
 #endif
+            }
 
             // Failed to find a property
             return false;

@@ -2888,18 +2888,18 @@ references:
   commentId: T:DuetAPI.Machine.Compatibility
   fullName: DuetAPI.Machine.Compatibility
   nameWithType: Compatibility
+- uid: DuetAPI.Machine.Compatibility.Default
+  name: Default
+  href: api/DuetAPI.Machine.Compatibility.html#DuetAPI_Machine_Compatibility_Default
+  commentId: F:DuetAPI.Machine.Compatibility.Default
+  fullName: DuetAPI.Machine.Compatibility.Default
+  nameWithType: Compatibility.Default
 - uid: DuetAPI.Machine.Compatibility.Marlin
   name: Marlin
   href: api/DuetAPI.Machine.Compatibility.html#DuetAPI_Machine_Compatibility_Marlin
   commentId: F:DuetAPI.Machine.Compatibility.Marlin
   fullName: DuetAPI.Machine.Compatibility.Marlin
   nameWithType: Compatibility.Marlin
-- uid: DuetAPI.Machine.Compatibility.Me
-  name: Me
-  href: api/DuetAPI.Machine.Compatibility.html#DuetAPI_Machine_Compatibility_Me
-  commentId: F:DuetAPI.Machine.Compatibility.Me
-  fullName: DuetAPI.Machine.Compatibility.Me
-  nameWithType: Compatibility.Me
 - uid: DuetAPI.Machine.Compatibility.NanoDLP
   name: NanoDLP
   href: api/DuetAPI.Machine.Compatibility.html#DuetAPI_Machine_Compatibility_NanoDLP
@@ -3765,19 +3765,6 @@ references:
   commentId: T:DuetAPI.Machine.FanThermostaticControl
   fullName: DuetAPI.Machine.FanThermostaticControl
   nameWithType: FanThermostaticControl
-- uid: DuetAPI.Machine.FanThermostaticControl.Control
-  name: Control
-  href: api/DuetAPI.Machine.FanThermostaticControl.html#DuetAPI_Machine_FanThermostaticControl_Control
-  commentId: P:DuetAPI.Machine.FanThermostaticControl.Control
-  fullName: DuetAPI.Machine.FanThermostaticControl.Control
-  nameWithType: FanThermostaticControl.Control
-- uid: DuetAPI.Machine.FanThermostaticControl.Control*
-  name: Control
-  href: api/DuetAPI.Machine.FanThermostaticControl.html#DuetAPI_Machine_FanThermostaticControl_Control_
-  commentId: Overload:DuetAPI.Machine.FanThermostaticControl.Control
-  isSpec: "True"
-  fullName: DuetAPI.Machine.FanThermostaticControl.Control
-  nameWithType: FanThermostaticControl.Control
 - uid: DuetAPI.Machine.FanThermostaticControl.Heaters
   name: Heaters
   href: api/DuetAPI.Machine.FanThermostaticControl.html#DuetAPI_Machine_FanThermostaticControl_Heaters
@@ -4489,18 +4476,24 @@ references:
   commentId: F:DuetAPI.Machine.HeaterMonitorCondition.Disabled
   fullName: DuetAPI.Machine.HeaterMonitorCondition.Disabled
   nameWithType: HeaterMonitorCondition.Disabled
-- uid: DuetAPI.Machine.HeaterMonitorCondition.TemperatureExceeded
-  name: TemperatureExceeded
-  href: api/DuetAPI.Machine.HeaterMonitorCondition.html#DuetAPI_Machine_HeaterMonitorCondition_TemperatureExceeded
-  commentId: F:DuetAPI.Machine.HeaterMonitorCondition.TemperatureExceeded
-  fullName: DuetAPI.Machine.HeaterMonitorCondition.TemperatureExceeded
-  nameWithType: HeaterMonitorCondition.TemperatureExceeded
-- uid: DuetAPI.Machine.HeaterMonitorCondition.TemperatureTooLow
-  name: TemperatureTooLow
-  href: api/DuetAPI.Machine.HeaterMonitorCondition.html#DuetAPI_Machine_HeaterMonitorCondition_TemperatureTooLow
-  commentId: F:DuetAPI.Machine.HeaterMonitorCondition.TemperatureTooLow
-  fullName: DuetAPI.Machine.HeaterMonitorCondition.TemperatureTooLow
-  nameWithType: HeaterMonitorCondition.TemperatureTooLow
+- uid: DuetAPI.Machine.HeaterMonitorCondition.TooHigh
+  name: TooHigh
+  href: api/DuetAPI.Machine.HeaterMonitorCondition.html#DuetAPI_Machine_HeaterMonitorCondition_TooHigh
+  commentId: F:DuetAPI.Machine.HeaterMonitorCondition.TooHigh
+  fullName: DuetAPI.Machine.HeaterMonitorCondition.TooHigh
+  nameWithType: HeaterMonitorCondition.TooHigh
+- uid: DuetAPI.Machine.HeaterMonitorCondition.TooLow
+  name: TooLow
+  href: api/DuetAPI.Machine.HeaterMonitorCondition.html#DuetAPI_Machine_HeaterMonitorCondition_TooLow
+  commentId: F:DuetAPI.Machine.HeaterMonitorCondition.TooLow
+  fullName: DuetAPI.Machine.HeaterMonitorCondition.TooLow
+  nameWithType: HeaterMonitorCondition.TooLow
+- uid: DuetAPI.Machine.HeaterMonitorCondition.Undefined
+  name: Undefined
+  href: api/DuetAPI.Machine.HeaterMonitorCondition.html#DuetAPI_Machine_HeaterMonitorCondition_Undefined
+  commentId: F:DuetAPI.Machine.HeaterMonitorCondition.Undefined
+  fullName: DuetAPI.Machine.HeaterMonitorCondition.Undefined
+  nameWithType: HeaterMonitorCondition.Undefined
 - uid: DuetAPI.Machine.HeaterState
   name: HeaterState
   href: api/DuetAPI.Machine.HeaterState.html
@@ -7112,38 +7105,6 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.MoveCalibration.NumFactors
   nameWithType: MoveCalibration.NumFactors
-- uid: DuetAPI.Machine.MoveCalibrationResults
-  name: MoveCalibrationResults
-  href: api/DuetAPI.Machine.MoveCalibrationResults.html
-  commentId: T:DuetAPI.Machine.MoveCalibrationResults
-  fullName: DuetAPI.Machine.MoveCalibrationResults
-  nameWithType: MoveCalibrationResults
-- uid: DuetAPI.Machine.MoveCalibrationResults.Deviation
-  name: Deviation
-  href: api/DuetAPI.Machine.MoveCalibrationResults.html#DuetAPI_Machine_MoveCalibrationResults_Deviation
-  commentId: P:DuetAPI.Machine.MoveCalibrationResults.Deviation
-  fullName: DuetAPI.Machine.MoveCalibrationResults.Deviation
-  nameWithType: MoveCalibrationResults.Deviation
-- uid: DuetAPI.Machine.MoveCalibrationResults.Deviation*
-  name: Deviation
-  href: api/DuetAPI.Machine.MoveCalibrationResults.html#DuetAPI_Machine_MoveCalibrationResults_Deviation_
-  commentId: Overload:DuetAPI.Machine.MoveCalibrationResults.Deviation
-  isSpec: "True"
-  fullName: DuetAPI.Machine.MoveCalibrationResults.Deviation
-  nameWithType: MoveCalibrationResults.Deviation
-- uid: DuetAPI.Machine.MoveCalibrationResults.Mean
-  name: Mean
-  href: api/DuetAPI.Machine.MoveCalibrationResults.html#DuetAPI_Machine_MoveCalibrationResults_Mean
-  commentId: P:DuetAPI.Machine.MoveCalibrationResults.Mean
-  fullName: DuetAPI.Machine.MoveCalibrationResults.Mean
-  nameWithType: MoveCalibrationResults.Mean
-- uid: DuetAPI.Machine.MoveCalibrationResults.Mean*
-  name: Mean
-  href: api/DuetAPI.Machine.MoveCalibrationResults.html#DuetAPI_Machine_MoveCalibrationResults_Mean_
-  commentId: Overload:DuetAPI.Machine.MoveCalibrationResults.Mean
-  isSpec: "True"
-  fullName: DuetAPI.Machine.MoveCalibrationResults.Mean
-  nameWithType: MoveCalibrationResults.Mean
 - uid: DuetAPI.Machine.MoveCompensation
   name: MoveCompensation
   href: api/DuetAPI.Machine.MoveCompensation.html
@@ -7233,6 +7194,38 @@ references:
   commentId: F:DuetAPI.Machine.MoveCompensationType.None
   fullName: DuetAPI.Machine.MoveCompensationType.None
   nameWithType: MoveCompensationType.None
+- uid: DuetAPI.Machine.MoveDeviations
+  name: MoveDeviations
+  href: api/DuetAPI.Machine.MoveDeviations.html
+  commentId: T:DuetAPI.Machine.MoveDeviations
+  fullName: DuetAPI.Machine.MoveDeviations
+  nameWithType: MoveDeviations
+- uid: DuetAPI.Machine.MoveDeviations.Deviation
+  name: Deviation
+  href: api/DuetAPI.Machine.MoveDeviations.html#DuetAPI_Machine_MoveDeviations_Deviation
+  commentId: P:DuetAPI.Machine.MoveDeviations.Deviation
+  fullName: DuetAPI.Machine.MoveDeviations.Deviation
+  nameWithType: MoveDeviations.Deviation
+- uid: DuetAPI.Machine.MoveDeviations.Deviation*
+  name: Deviation
+  href: api/DuetAPI.Machine.MoveDeviations.html#DuetAPI_Machine_MoveDeviations_Deviation_
+  commentId: Overload:DuetAPI.Machine.MoveDeviations.Deviation
+  isSpec: "True"
+  fullName: DuetAPI.Machine.MoveDeviations.Deviation
+  nameWithType: MoveDeviations.Deviation
+- uid: DuetAPI.Machine.MoveDeviations.Mean
+  name: Mean
+  href: api/DuetAPI.Machine.MoveDeviations.html#DuetAPI_Machine_MoveDeviations_Mean
+  commentId: P:DuetAPI.Machine.MoveDeviations.Mean
+  fullName: DuetAPI.Machine.MoveDeviations.Mean
+  nameWithType: MoveDeviations.Mean
+- uid: DuetAPI.Machine.MoveDeviations.Mean*
+  name: Mean
+  href: api/DuetAPI.Machine.MoveDeviations.html#DuetAPI_Machine_MoveDeviations_Mean_
+  commentId: Overload:DuetAPI.Machine.MoveDeviations.Mean
+  isSpec: "True"
+  fullName: DuetAPI.Machine.MoveDeviations.Mean
+  nameWithType: MoveDeviations.Mean
 - uid: DuetAPI.Machine.Network
   name: Network
   href: api/DuetAPI.Machine.Network.html
@@ -11319,19 +11312,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Job.Diagnostics
   nameWithType: Job.Diagnostics
-- uid: DuetControlServer.FileExecution.Job.FileHasFinished
-  name: FileHasFinished()
-  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_FileHasFinished
-  commentId: M:DuetControlServer.FileExecution.Job.FileHasFinished
-  fullName: DuetControlServer.FileExecution.Job.FileHasFinished()
-  nameWithType: Job.FileHasFinished()
-- uid: DuetControlServer.FileExecution.Job.FileHasFinished*
-  name: FileHasFinished
-  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_FileHasFinished_
-  commentId: Overload:DuetControlServer.FileExecution.Job.FileHasFinished
-  isSpec: "True"
-  fullName: DuetControlServer.FileExecution.Job.FileHasFinished
-  nameWithType: Job.FileHasFinished
 - uid: DuetControlServer.FileExecution.Job.FileLength
   name: FileLength
   href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_FileLength
@@ -11371,19 +11351,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Job.IsAborted
   nameWithType: Job.IsAborted
-- uid: DuetControlServer.FileExecution.Job.IsDoingFinalCodes
-  name: IsDoingFinalCodes
-  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_IsDoingFinalCodes
-  commentId: P:DuetControlServer.FileExecution.Job.IsDoingFinalCodes
-  fullName: DuetControlServer.FileExecution.Job.IsDoingFinalCodes
-  nameWithType: Job.IsDoingFinalCodes
-- uid: DuetControlServer.FileExecution.Job.IsDoingFinalCodes*
-  name: IsDoingFinalCodes
-  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_IsDoingFinalCodes_
-  commentId: Overload:DuetControlServer.FileExecution.Job.IsDoingFinalCodes
-  isSpec: "True"
-  fullName: DuetControlServer.FileExecution.Job.IsDoingFinalCodes
-  nameWithType: Job.IsDoingFinalCodes
 - uid: DuetControlServer.FileExecution.Job.IsFileSelected
   name: IsFileSelected
   href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_IsFileSelected

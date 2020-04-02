@@ -1,9 +1,9 @@
 ﻿namespace DuetAPI.Machine
 {
     /// <summary>
-    /// Calibration results (for Delta calibration)
+    /// Calibration or mesh grid results
     /// </summary>
-    public sealed class MoveCalibrationResults : ModelObject
+    public sealed class MoveDeviations : ModelObject
     {
         /// <summary>
         /// RMS deviation (in mm)

@@ -85,15 +85,15 @@ namespace DuetControlServer.SPI.Serialization
                 NumParameters = (byte)code.Parameters.Count
             };
 
-            if (code.MajorNumber.HasValue)
+            if (code.MajorNumber != null)
             {
                 header.Flags |= CodeFlags.HasMajorCommandNumber;
             }
-            if (code.MinorNumber.HasValue)
+            if (code.MinorNumber != null)
             {
                 header.Flags |= CodeFlags.HasMinorCommandNumber;
             }
-            if (code.FilePosition.HasValue)
+            if (code.FilePosition != null)
             {
                 header.Flags |= CodeFlags.HasFilePosition;
             }
@@ -426,12 +426,12 @@ namespace DuetControlServer.SPI.Serialization
                 GeneratedByLength = (byte)unicodeGeneratedBy.Length,
                 NumFilaments = (ushort)info.Filament.Count,
                 FileSize = (uint)info.Size,
-                LastModifiedTime = info.LastModified.HasValue ? (ulong)(info.LastModified.Value - new DateTime(1970, 1, 1)).TotalSeconds : 0,
+                LastModifiedTime = (info.LastModified != null) ? (ulong)(info.LastModified.Value - new DateTime(1970, 1, 1)).TotalSeconds : 0,
                 FirstLayerHeight = info.FirstLayerHeight,
                 LayerHeight = info.LayerHeight,
                 ObjectHeight = info.Height,
-                PrintTime = (uint)info.PrintTime,
-                SimulatedTime = (uint)info.SimulatedTime
+                PrintTime = (uint)(info.PrintTime ?? 0),
+                SimulatedTime = (uint)(info.SimulatedTime ?? 0)
             };
             MemoryMarshal.Write(to, ref header);
             int bytesWritten = Marshal.SizeOf(header);

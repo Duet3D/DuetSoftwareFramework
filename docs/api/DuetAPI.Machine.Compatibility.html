@@ -456,13 +456,13 @@
                             <a href="DuetAPI.Machine.MoveCalibration.html" title="MoveCalibration" class="">MoveCalibration</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.Machine.MoveCalibrationResults.html" title="MoveCalibrationResults" class="">MoveCalibrationResults</a>
-                          </li>
-                          <li class="">
                             <a href="DuetAPI.Machine.MoveCompensation.html" title="MoveCompensation" class="">MoveCompensation</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.MoveCompensationType.html" title="MoveCompensationType" class="">MoveCompensationType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.MoveDeviations.html" title="MoveDeviations" class="">MoveDeviations</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.Network.html" title="Network" class="">Network</a>
@@ -1042,7 +1042,7 @@
   <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
   <h5 id="DuetAPI_Machine_Compatibility_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">[JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
+    <pre><code class="lang-csharp hljs">[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum Compatibility</code></pre>
   </div>
   <h3 id="fields">Fields
@@ -1056,13 +1056,13 @@ public enum Compatibility</code></pre>
     <thead>
     <tbody>
       <tr>
-        <td id="DuetAPI_Machine_Compatibility_Marlin">Marlin</td>
-        <td><p>Emulating Marlin</p>
+        <td id="DuetAPI_Machine_Compatibility_Default">Default</td>
+        <td><p>No emulation (same as RepRapFirmware)</p>
 </td>
       </tr>
       <tr>
-        <td id="DuetAPI_Machine_Compatibility_Me">Me</td>
-        <td><p>No emulation (same as RepRapFirmware)</p>
+        <td id="DuetAPI_Machine_Compatibility_Marlin">Marlin</td>
+        <td><p>Emulating Marlin</p>
 </td>
       </tr>
       <tr>

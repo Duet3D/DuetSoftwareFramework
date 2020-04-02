@@ -113,6 +113,7 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Code channel that executes the daemon process
         /// </summary>
+        [JsonIgnore]
         public InputChannel Daemon
         {
             get => this[CodeChannel.Daemon];

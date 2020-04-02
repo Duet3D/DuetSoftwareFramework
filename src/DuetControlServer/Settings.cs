@@ -134,7 +134,7 @@ namespace DuetControlServer
         public static int BufferedMacroCodes { get; set; } = 16;
 
         /// <summary>
-        /// Maximum space of buffered codes per channel (in bytes). Must be greater than <see cref="SPI.Communication.Consts.MaxCodeBufferSize"/>
+        /// Maximum space of buffered codes per channel (in bytes)
         /// </summary>
         public static int MaxBufferSpacePerChannel { get; set; } = 1536;
 
@@ -262,11 +262,6 @@ namespace DuetControlServer
             {
                 LoadFromFile(ConfigFilename);
                 ParseParameters(args);
-
-                if (MaxBufferSpacePerChannel < SPI.Communication.Consts.MaxCodeBufferSize)
-                {
-                    throw new ArgumentException($"{nameof(MaxBufferSpacePerChannel)} is too low");
-                }
             }
             else
             {

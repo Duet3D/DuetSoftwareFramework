@@ -23,7 +23,7 @@ namespace DuetControlServer.Codes
         /// <returns>Result to output</returns>
         public static async Task CodeExecuted(Code code)
         {
-            if (!code.MajorNumber.HasValue || !code.Result.IsSuccessful)
+            if (code.MajorNumber == null || !code.Result.IsSuccessful)
             {
                 return;
             }

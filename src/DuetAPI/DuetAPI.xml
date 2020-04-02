@@ -1793,11 +1793,6 @@
             Thermostatic parameters of a fan
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.FanThermostaticControl.Control">
-            <summary>
-            Defines whether thermostatic control is enabled
-            </summary>
-        </member>
         <member name="P:DuetAPI.Machine.FanThermostaticControl.Heaters">
             <summary>
             List of the heaters to monitor (indices)
@@ -2165,7 +2160,7 @@
             Compatibility level for emulation
             </summary>
         </member>
-        <member name="F:DuetAPI.Machine.Compatibility.Me">
+        <member name="F:DuetAPI.Machine.Compatibility.Default">
             <summary>
             No emulation (same as RepRapFirmware)
             </summary>
@@ -3477,21 +3472,6 @@
             Number of factors used (for Delta calibration)
             </summary>
         </member>
-        <member name="T:DuetAPI.Machine.MoveCalibrationResults">
-            <summary>
-            Calibration results (for Delta calibration)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Machine.MoveCalibrationResults.Deviation">
-            <summary>
-            RMS deviation (in mm)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.Machine.MoveCalibrationResults.Mean">
-            <summary>
-            Mean deviation (in mm)
-            </summary>
-        </member>
         <member name="T:DuetAPI.Machine.MoveCompensation">
             <summary>
             Information about the configured compensation options
@@ -3509,7 +3489,7 @@
         </member>
         <member name="P:DuetAPI.Machine.MoveCompensation.MeshDeviation">
             <summary>
-            RMS of the mesh deviation (in mm or null)
+            Deviations of the mesh grid or null if not applicable
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.MoveCompensation.ProbeGrid">
@@ -3535,6 +3515,21 @@
         <member name="F:DuetAPI.Machine.MoveCompensationType.Mesh">
             <summary>
             Mesh compensation
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.MoveDeviations">
+            <summary>
+            Calibration or mesh grid results
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MoveDeviations.Deviation">
+            <summary>
+            RMS deviation (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.MoveDeviations.Mean">
+            <summary>
+            Mean deviation (in mm)
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.ProbeGrid">

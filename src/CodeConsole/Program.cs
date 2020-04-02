@@ -63,7 +63,7 @@ namespace CodeConsole
                     try
                     {
                         string output = await connection.PerformSimpleCode(input);
-                        if (output.EndsWith('\n'))
+                        if (output.EndsWith(Environment.NewLine))
                         {
                             Console.Write(output);
                         }

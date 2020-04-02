@@ -567,11 +567,6 @@
             Indicates if a file is being simulated
             </summary>
         </member>
-        <member name="P:DuetControlServer.FileExecution.Job.IsDoingFinalCodes">
-            <summary>
-            Indicates if the last few codes are being processed
-            </summary>
-        </member>
         <member name="P:DuetControlServer.FileExecution.Job.IsPaused">
             <summary>
             Indicates if the file print has been paused
@@ -616,11 +611,6 @@
         <member name="M:DuetControlServer.FileExecution.Job.Run">
             <summary>
             Perform actual print jobs
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.FileExecution.Job.FileHasFinished">
-            <summary>
-            Called when RepRapFirmware has finished the file
             </summary>
         </member>
         <member name="M:DuetControlServer.FileExecution.Job.Pause(System.Nullable{System.Int64},DuetControlServer.SPI.Communication.FirmwareRequests.PrintPausedReason)">
@@ -1965,6 +1955,11 @@
             Condition variable to trigger when the machine model has been fully updated
             </summary>
         </member>
+        <member name="F:DuetControlServer.Model.Updater._lastSeqs">
+            <summary>
+            Dictionary of main keys vs last sequence numbers
+            </summary>
+        </member>
         <member name="F:DuetControlServer.Model.Updater._json">
             <summary>
             UTF-8 representation of the received object model data
@@ -2148,7 +2143,7 @@
         </member>
         <member name="P:DuetControlServer.Settings.MaxBufferSpacePerChannel">
             <summary>
-            Maximum space of buffered codes per channel (in bytes). Must be greater than <see cref="F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize"/>
+            Maximum space of buffered codes per channel (in bytes)
             </summary>
         </member>
         <member name="P:DuetControlServer.Settings.ModelUpdateInterval">
@@ -2347,7 +2342,7 @@
             </summary>
             <returns>If anything more can be done on this channel</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.ChannelInformation.DoBackgroundCode(DuetControlServer.Commands.Code,DuetControlServer.Files.MacroFile)">
+        <member name="M:DuetControlServer.SPI.ChannelInformation.DoMacroCode(DuetControlServer.Commands.Code,DuetControlServer.Files.MacroFile)">
             <summary>
             Perform a code in the background
             </summary>
@@ -2358,7 +2353,7 @@
             <summary>
             Perform a regular code that was requested from the firmware
             </summary>
-            <param name="code"></param>
+            <param name="code">Code to perform</param>
         </member>
         <member name="M:DuetControlServer.SPI.ChannelInformation.BufferCode(DuetControlServer.SPI.QueuedCode)">
             <summary>

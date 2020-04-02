@@ -1,4 +1,3 @@
-using DuetControlServer.SPI.Communication.Shared;
 using System.Runtime.InteropServices;
 
 namespace DuetControlServer.SPI.Communication.Shared

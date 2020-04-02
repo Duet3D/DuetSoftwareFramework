@@ -26,14 +26,14 @@
 		private string _file;
 
 		/// <summary>
-		/// RMS of the mesh deviation (in mm or null)
+		/// Deviations of the mesh grid or null if not applicable
 		/// </summary>
-		public float? MeshDeviation
+		public MoveDeviations MeshDeviation
 		{
 			get => _meshDeviation;
 			set => SetPropertyValue(ref _meshDeviation, value);
 		}
-		private float? _meshDeviation;
+		private MoveDeviations _meshDeviation;
 
 		/// <summary>
 		/// Settings of the current probe grid

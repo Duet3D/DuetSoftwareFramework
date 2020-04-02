@@ -87,7 +87,7 @@ namespace DuetControlServer.Codes
                         }
 
                         StringBuilder result = new StringBuilder();
-                        if (compatibility == Compatibility.Me || compatibility == Compatibility.RepRapFirmware)
+                        if (compatibility == Compatibility.Default || compatibility == Compatibility.RepRapFirmware)
                         {
                             result.AppendLine("GCode files:");
                         }

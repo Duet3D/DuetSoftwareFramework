@@ -13,7 +13,6 @@ using LinuxDevices;
 using System.Collections.Generic;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.Shared;
-using System.Threading.Tasks;
 
 namespace DuetControlServer.SPI
 {
@@ -786,7 +785,7 @@ namespace DuetControlServer.SPI
         {
             // Tell the firmware to boot the IAP program
             WritePacket(Communication.LinuxRequests.Request.StartIap);
-            PerformFullTransfer(false);
+            PerformFullTransfer();
 
             // Wait for the first transfer.
             // The IAP firmware will pull the transfer ready pin to high when it is ready to receive data

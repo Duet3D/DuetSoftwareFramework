@@ -174,7 +174,7 @@ namespace DuetControlServer.Commands
                 _codeType = InternalCodeType.Macro;
                 _logger.Debug("Waiting for execution of {0} (macro code)", this);
             }
-            else if (SPI.Interface.IsWaitingForAcknowledgement(Channel))
+            else if (!Flags.HasFlag(CodeFlags.IsFromFirmware) && SPI.Interface.IsWaitingForAcknowledgement(Channel))
             {
                 _codeType = InternalCodeType.BlockingRegular;
                 _logger.Debug("Waiting for execution of {0} (acknowledgement)", this);
@@ -552,9 +552,8 @@ namespace DuetControlServer.Commands
                             break;
                     }
 
-                    // RepRapFirmware generally prefixes error messages with the code itself.
-                    // Do this only for error messages that originate either from a print or from a macro file
-                    if (Flags.HasFlag(CodeFlags.IsFromMacro) || Channel == CodeChannel.File)
+                    // RepRapFirmware generally prefixes error messages with the code itself
+                    if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
                     {
                         foreach (Message msg in Result)
                         {
@@ -566,31 +565,42 @@ namespace DuetControlServer.Commands
                     }
 
                     // Deal with firmware emulation
-                    if (!Flags.HasFlag(CodeFlags.IsFromMacro) && await EmulatingMarlin())
+                    if (!Flags.HasFlag(CodeFlags.IsFromMacro))
                     {
-                        if (Result.Count != 0 && Type == CodeType.MCode && MajorNumber == 105)
+                        if (await EmulatingMarlin())
                         {
-                            Result[0].Content = "ok " + Result[0].Content;
+                            if (Result.Count != 0 && Type == CodeType.MCode && MajorNumber == 105)
+                            {
+                                Result[0].Content = "ok " + Result[0].Content;
+                            }
+                            else if (Result.IsEmpty)
+                            {
+                                Result.Add(MessageType.Success, "ok\n");
+                            }
+                            else
+                            {
+                                Result[^1].Content += "\nok\n";
+                            }
                         }
-                        else if (Result.IsEmpty)
+                        else if (!Result.IsEmpty)
                         {
-                            Result.Add(MessageType.Success, "ok\n");
+                            Result[^1].Content += "\n";
                         }
                         else
                         {
-                            Result[^1].Content += "\nok\n";
+                            Result.Add(MessageType.Success, "\n");
                         }
                     }
                 }
 
-                // Log warning and error replies after the code has been processed internally
-                if (InternallyProcessed)
+                // Log our own warnings and errors
+                if (!Flags.HasFlag(CodeFlags.IsPostProcessed) && Channel != CodeChannel.File)
                 {
                     foreach (Message msg in Result)
                     {
-                        if (msg.Type != MessageType.Success && Channel != CodeChannel.File)
+                        if (msg.Type != MessageType.Success)
                         {
-                            // When a file is being printed, the message is output and logged
+                            // When a file is being printed, every message is automatically output and logged
                             await Utility.Logger.Log(msg);
                         }
                     }

@@ -5,10 +5,10 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Class Writer
+    <title>Class MeshDeviation
    </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Class Writer
+    <meta name="title" content="Class MeshDeviation
    ">
     <meta name="generator" content="docfx 2.51.0.0">
     
@@ -416,6 +416,9 @@
                           <li class="">
                             <a href="DuetAPI.Machine.MachineStatus.html" title="MachineStatus" class="">MachineStatus</a>
                           </li>
+                          <li class="active">
+                            <a href="DuetAPI.Machine.MeshDeviation.html" title="MeshDeviation" class="active">MeshDeviation</a>
+                          </li>
                           <li class="">
                             <a href="DuetAPI.Machine.Message.html" title="Message" class="">Message</a>
                           </li>
@@ -456,13 +459,13 @@
                             <a href="DuetAPI.Machine.MoveCalibration.html" title="MoveCalibration" class="">MoveCalibration</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.MoveCalibrationResults.html" title="MoveCalibrationResults" class="">MoveCalibrationResults</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.MoveCompensation.html" title="MoveCompensation" class="">MoveCompensation</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.MoveCompensationType.html" title="MoveCompensationType" class="">MoveCompensationType</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetAPI.Machine.MoveDeviations.html" title="MoveDeviations" class="">MoveDeviations</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.Network.html" title="Network" class="">Network</a>
@@ -944,8 +947,8 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Serialization.Reader.html" title="Reader" class="">Reader</a>
                           </li>
-                          <li class="active">
-                            <a href="DuetControlServer.SPI.Serialization.Writer.html" title="Writer" class="active">Writer</a>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Serialization.Writer.html" title="Writer" class="">Writer</a>
                           </li>
                         </ul>  </li>
                     <li class="">
@@ -1030,22 +1033,55 @@
         </div>
         <div class="article row grid-right">
           <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="DuetControlServer.SPI.Serialization.Writer">
+            <article class="content wrap" id="_content" data-uid="DuetAPI.Machine.MeshDeviation">
   
   
-  <h1 id="DuetControlServer_SPI_Serialization_Writer" data-uid="DuetControlServer.SPI.Serialization.Writer" class="text-break">Class Writer
+  <h1 id="DuetAPI_Machine_MeshDeviation" data-uid="DuetAPI.Machine.MeshDeviation" class="text-break">Class MeshDeviation
   </h1>
-  <div class="markdown level0 summary"><p>Static class for writing data for SPI transmissions.
-This class makes sure each data block is on a 4-byte boundary to guarantee efficient DMA transfers on the remote side.</p>
+  <div class="markdown level0 summary"><p>Deviations of the mesh grid</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
     <h5>Inheritance</h5>
     <div class="level0"><span class="xref">System.Object</span></div>
-    <div class="level1"><span class="xref">Writer</span></div>
+    <div class="level1"><a class="xref" href="DuetAPI.Machine.ModelObject.html">ModelObject</a></div>
+    <div class="level2"><span class="xref">MeshDeviation</span></div>
+  </div>
+  <div classs="implements">
+    <h5>Implements</h5>
+    <div><span class="xref">System.ICloneable</span></div>
+    <div><span class="xref">System.ComponentModel.INotifyPropertyChanging</span></div>
+    <div><span class="xref">System.ComponentModel.INotifyPropertyChanged</span></div>
   </div>
   <div class="inheritedMembers">
     <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_JsonProperties">ModelObject.JsonProperties</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_PropertyChanging">ModelObject.PropertyChanging</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_PropertyChanged">ModelObject.PropertyChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_SetPropertyValue__1___0____0_System_String_">ModelObject.SetPropertyValue&lt;T&gt;(T, T, String)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_Assign_DuetAPI_Machine_ModelObject_">ModelObject.Assign(ModelObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_Clone">ModelObject.Clone()</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_UpdateFromJson_System_Text_Json_JsonElement_">ModelObject.UpdateFromJson(JsonElement)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_MakeUtf8Patch_DuetAPI_Machine_ModelObject_">ModelObject.MakeUtf8Patch(ModelObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_MakeStringPatch_DuetAPI_Machine_ModelObject_">ModelObject.MakeStringPatch(ModelObject)</a>
+    </div>
     <div>
       <span class="xref">System.Object.Equals(System.Object)</span>
     </div>
@@ -1068,23 +1104,24 @@ This class makes sure each data block is on a 4-byte boundary to guarantee effic
       <span class="xref">System.Object.ToString()</span>
     </div>
   </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="DuetControlServer.SPI.Serialization.html">DuetControlServer.SPI.Serialization</a></h6>
-  <h6><strong>Assembly</strong>: DuetControlServer.dll</h6>
-  <h5 id="DuetControlServer_SPI_Serialization_Writer_syntax">Syntax</h5>
+  <h6><strong>Namespace</strong>: <a class="xref" href="DuetAPI.Machine.html">DuetAPI.Machine</a></h6>
+  <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
+  <h5 id="DuetAPI_Machine_MeshDeviation_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static class Writer</code></pre>
+    <pre><code class="lang-csharp hljs">public class MeshDeviation : ModelObject, ICloneable, INotifyPropertyChanging, INotifyPropertyChanged</code></pre>
   </div>
-  <h3 id="fields">Fields
+  <h3 id="properties">Properties
   </h3>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_PacketHeaderSize" data-uid="DuetControlServer.SPI.Serialization.Writer.PacketHeaderSize">PacketHeaderSize</h4>
-  <div class="markdown level1 summary"><p>Size of a packet header</p>
+  <a id="DuetAPI_Machine_MeshDeviation_Deviation_" data-uid="DuetAPI.Machine.MeshDeviation.Deviation*"></a>
+  <h4 id="DuetAPI_Machine_MeshDeviation_Deviation" data-uid="DuetAPI.Machine.MeshDeviation.Deviation">Deviation</h4>
+  <div class="markdown level1 summary"><p>RMS deviation (in mm)</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static readonly int PacketHeaderSize</code></pre>
+    <pre><code class="lang-csharp hljs">public float Deviation { get; set; }</code></pre>
   </div>
-  <h5 class="fieldValue">Field Value</h5>
+  <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
@@ -1094,20 +1131,21 @@ This class makes sure each data block is on a 4-byte boundary to guarantee effic
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Int32</span></td>
+        <td><span class="xref">System.Single</span></td>
         <td></td>
       </tr>
     </tbody>
   </table>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_TransmissionHeaderSize" data-uid="DuetControlServer.SPI.Serialization.Writer.TransmissionHeaderSize">TransmissionHeaderSize</h4>
-  <div class="markdown level1 summary"><p>Size of a transmission header</p>
+  <a id="DuetAPI_Machine_MeshDeviation_Mean_" data-uid="DuetAPI.Machine.MeshDeviation.Mean*"></a>
+  <h4 id="DuetAPI_Machine_MeshDeviation_Mean" data-uid="DuetAPI.Machine.MeshDeviation.Mean">Mean</h4>
+  <div class="markdown level1 summary"><p>RMS deviation (in mm)</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static readonly int TransmissionHeaderSize</code></pre>
+    <pre><code class="lang-csharp hljs">public float Mean { get; set; }</code></pre>
   </div>
-  <h5 class="fieldValue">Field Value</h5>
+  <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
@@ -1117,815 +1155,21 @@ This class makes sure each data block is on a 4-byte boundary to guarantee effic
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Int32</span></td>
+        <td><span class="xref">System.Single</span></td>
         <td></td>
       </tr>
     </tbody>
   </table>
-  <h3 id="methods">Methods
-  </h3>
-  <a id="DuetControlServer_SPI_Serialization_Writer_InitTransferHeader_" data-uid="DuetControlServer.SPI.Serialization.Writer.InitTransferHeader*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_InitTransferHeader_DuetControlServer_SPI_Communication_Shared_TransferHeader__" data-uid="DuetControlServer.SPI.Serialization.Writer.InitTransferHeader(DuetControlServer.SPI.Communication.Shared.TransferHeader@)">InitTransferHeader(ref TransferHeader)</h4>
-  <div class="markdown level1 summary"><p>Initialize a transfer header</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void InitTransferHeader(ref TransferHeader header)</code></pre>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <span class="xref">System.ICloneable</span>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="DuetControlServer.SPI.Communication.Shared.TransferHeader.html">TransferHeader</a></td>
-        <td><span class="parametername">header</span></td>
-        <td><p>Header reference to initialize</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteAssignFilament_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteAssignFilament*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteAssignFilament_System_Span_System_Byte__System_Int32_System_String_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteAssignFilament(System.Span{System.Byte},System.Int32,System.String)">WriteAssignFilament(Span&lt;Byte&gt;, Int32, String)</h4>
-  <div class="markdown level1 summary"><p>Assign a filament name to the given extruder drive</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteAssignFilament(Span&lt;byte&gt; to, int extruder, string filamentName)</code></pre>
+  <div>
+      <span class="xref">System.ComponentModel.INotifyPropertyChanging</span>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><span class="parametername">extruder</span></td>
-        <td><p>Extruder drive</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">filamentName</span></td>
-        <td><p>Filament name</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteCode_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteCode*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteCode_System_Span_System_Byte__DuetControlServer_Commands_Code_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteCode(System.Span{System.Byte},DuetControlServer.Commands.Code)">WriteCode(Span&lt;Byte&gt;, Code)</h4>
-  <div class="markdown level1 summary"><p>Write a parsed G/M/T code in binary format to a memory span</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteCode(Span&lt;byte&gt; to, Code code)</code></pre>
+  <div>
+      <span class="xref">System.ComponentModel.INotifyPropertyChanged</span>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetControlServer.Commands.Code.html">Code</a></td>
-        <td><span class="parametername">code</span></td>
-        <td><p>Code to write</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.ArgumentException</span></td>
-        <td><p>Unsupported data type</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteCodeChannel_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteCodeChannel_System_Span_System_Byte__DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteCodeChannel(System.Span{System.Byte},DuetAPI.CodeChannel)">WriteCodeChannel(Span&lt;Byte&gt;, CodeChannel)</h4>
-  <div class="markdown level1 summary"><p>Write a G-code channel</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteCodeChannel(Span&lt;byte&gt; to, CodeChannel channel)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
-        <td><span class="parametername">channel</span></td>
-        <td><p>Channel for the lock request</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteEvaluateExpression_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteEvaluateExpression_System_Span_System_Byte__DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteEvaluateExpression(System.Span{System.Byte},DuetAPI.CodeChannel,System.String)">WriteEvaluateExpression(Span&lt;Byte&gt;, CodeChannel, String)</h4>
-  <div class="markdown level1 summary"><p>Write a request to evaluate an expression</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteEvaluateExpression(Span&lt;byte&gt; to, CodeChannel channel, string expression)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
-        <td><span class="parametername">channel</span></td>
-        <td><p>Where to evaluate the expression</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">expression</span></td>
-        <td><p>Expression to evaluate</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteFileChunk_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteFileChunk*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteFileChunk_System_Span_System_Byte__System_Span_System_Byte__System_Int64_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteFileChunk(System.Span{System.Byte},System.Span{System.Byte},System.Int64)">WriteFileChunk(Span&lt;Byte&gt;, Span&lt;Byte&gt;, Int64)</h4>
-  <div class="markdown level1 summary"><p>Write a file chunk</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteFileChunk(Span&lt;byte&gt; to, Span&lt;byte&gt; data, long fileLength)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">data</span></td>
-        <td><p>File chunk data</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Int64</span></td>
-        <td><span class="parametername">fileLength</span></td>
-        <td><p>Total length of the file in bytes</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteGetObjectModel_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteGetObjectModel*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteGetObjectModel_System_Span_System_Byte__System_String_System_String_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteGetObjectModel(System.Span{System.Byte},System.String,System.String)">WriteGetObjectModel(Span&lt;Byte&gt;, String, String)</h4>
-  <div class="markdown level1 summary"><p>Request a part of the object model</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteGetObjectModel(Span&lt;byte&gt; to, string key, string flags)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">key</span></td>
-        <td><p>Key to the object model part</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">flags</span></td>
-        <td><p>Object model flags</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteHeightMap_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteHeightMap*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteHeightMap_System_Span_System_Byte__DuetAPI_Utility_Heightmap_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteHeightMap(System.Span{System.Byte},DuetAPI.Utility.Heightmap)">WriteHeightMap(Span&lt;Byte&gt;, Heightmap)</h4>
-  <div class="markdown level1 summary"><p>Write a heightmap as read by G29 S1</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteHeightMap(Span&lt;byte&gt; to, Heightmap map)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetAPI.Utility.Heightmap.html">Heightmap</a></td>
-        <td><span class="parametername">map</span></td>
-        <td><p>Heightmap to write</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteMacroCompleted_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteMacroCompleted*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteMacroCompleted_System_Span_System_Byte__DuetAPI_CodeChannel_System_Boolean_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteMacroCompleted(System.Span{System.Byte},DuetAPI.CodeChannel,System.Boolean)">WriteMacroCompleted(Span&lt;Byte&gt;, CodeChannel, Boolean)</h4>
-  <div class="markdown level1 summary"><p>Write notification about a completed macro file</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteMacroCompleted(Span&lt;byte&gt; to, CodeChannel channel, bool error)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
-        <td><span class="parametername">channel</span></td>
-        <td><p>Channel where the macro file has finished</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Boolean</span></td>
-        <td><span class="parametername">error</span></td>
-        <td><p>Whether an error occurred when trying to open/process the macro file</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteMessage_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteMessage*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteMessage_System_Span_System_Byte__DuetControlServer_SPI_Communication_Shared_MessageTypeFlags_System_String_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteMessage(System.Span{System.Byte},DuetControlServer.SPI.Communication.Shared.MessageTypeFlags,System.String)">WriteMessage(Span&lt;Byte&gt;, MessageTypeFlags, String)</h4>
-  <div class="markdown level1 summary"><p>Write a <a class="xref" href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html">MessageHeader</a> to a memory span</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteMessage(Span&lt;byte&gt; to, MessageTypeFlags type, string message)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.html">MessageTypeFlags</a></td>
-        <td><span class="parametername">type</span></td>
-        <td><p>Message flags</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">message</span></td>
-        <td><p>Message content</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WritePacketHeader_" data-uid="DuetControlServer.SPI.Serialization.Writer.WritePacketHeader*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WritePacketHeader_System_Span_System_Byte__DuetControlServer_SPI_Communication_LinuxRequests_Request_System_UInt16_System_Int32_" data-uid="DuetControlServer.SPI.Serialization.Writer.WritePacketHeader(System.Span{System.Byte},DuetControlServer.SPI.Communication.LinuxRequests.Request,System.UInt16,System.Int32)">WritePacketHeader(Span&lt;Byte&gt;, Request, UInt16, Int32)</h4>
-  <div class="markdown level1 summary"><p>Write an arbitrary packet header to a memory span</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void WritePacketHeader(Span&lt;byte&gt; to, Request request, ushort id, int length)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetControlServer.SPI.Communication.LinuxRequests.Request.html">Request</a></td>
-        <td><span class="parametername">request</span></td>
-        <td><p>Packet type</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.UInt16</span></td>
-        <td><span class="parametername">id</span></td>
-        <td><p>Packet ID</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>Length of the packet</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WritePrintStarted_" data-uid="DuetControlServer.SPI.Serialization.Writer.WritePrintStarted*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WritePrintStarted_System_Span_System_Byte__DuetAPI_Machine_ParsedFileInfo_" data-uid="DuetControlServer.SPI.Serialization.Writer.WritePrintStarted(System.Span{System.Byte},DuetAPI.Machine.ParsedFileInfo)">WritePrintStarted(Span&lt;Byte&gt;, ParsedFileInfo)</h4>
-  <div class="markdown level1 summary"><p>Notify the firmware that a print has started</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WritePrintStarted(Span&lt;byte&gt; to, ParsedFileInfo info)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetAPI.Machine.ParsedFileInfo.html">ParsedFileInfo</a></td>
-        <td><span class="parametername">info</span></td>
-        <td><p>Information about the file being printed</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.ArgumentException</span></td>
-        <td><p>One of the supplied values is too big</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WritePrintStopped_" data-uid="DuetControlServer.SPI.Serialization.Writer.WritePrintStopped*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WritePrintStopped_System_Span_System_Byte__DuetControlServer_SPI_Communication_Shared_PrintStoppedReason_" data-uid="DuetControlServer.SPI.Serialization.Writer.WritePrintStopped(System.Span{System.Byte},DuetControlServer.SPI.Communication.Shared.PrintStoppedReason)">WritePrintStopped(Span&lt;Byte&gt;, PrintStoppedReason)</h4>
-  <div class="markdown level1 summary"><p>Notify the firmware that a print has been stopped</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WritePrintStopped(Span&lt;byte&gt; to, PrintStoppedReason reason)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="DuetControlServer.SPI.Communication.Shared.PrintStoppedReason.html">PrintStoppedReason</a></td>
-        <td><span class="parametername">reason</span></td>
-        <td><p>Reason why the print has been stopped</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteSetObjectModel_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteSetObjectModel*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteSetObjectModel_System_Span_System_Byte__System_String_System_Object_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteSetObjectModel(System.Span{System.Byte},System.String,System.Object)">WriteSetObjectModel(Span&lt;Byte&gt;, String, Object)</h4>
-  <div class="markdown level1 summary"><p>Request the update of an object model field to an arbitrary value via a <a class="xref" href="DuetControlServer.SPI.Communication.LinuxRequests.Request.html#DuetControlServer_SPI_Communication_LinuxRequests_Request_SetObjectModel">SetObjectModel</a> request</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteSetObjectModel(Span&lt;byte&gt; to, string field, object value)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">field</span></td>
-        <td><p>Path to the object model field</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Object</span></td>
-        <td><span class="parametername">value</span></td>
-        <td><p>New value</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="DuetControlServer_SPI_Serialization_Writer_WriteSetObjectModel_System_Span_System_Byte__System_String_System_Object__remarks">Remarks</h5>
-  <div class="markdown level1 remarks"><p>value must be of type <a class="xref" href="DuetControlServer.SPI.Communication.Shared.DataType.html">DataType</a></p>
-</div>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.ArgumentException</span></td>
-        <td><p>Unsupported data type</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_Serialization_Writer_WriteStringRequest_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteStringRequest*"></a>
-  <h4 id="DuetControlServer_SPI_Serialization_Writer_WriteStringRequest_System_Span_System_Byte__System_String_" data-uid="DuetControlServer.SPI.Serialization.Writer.WriteStringRequest(System.Span{System.Byte},System.String)">WriteStringRequest(Span&lt;Byte&gt;, String)</h4>
-  <div class="markdown level1 summary"><p>Write a <a class="xref" href="DuetControlServer.SPI.Communication.Shared.StringHeader.html">StringHeader</a> to a memory span</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int WriteStringRequest(Span&lt;byte&gt; to, string data)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Span</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>Destination</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">data</span></td>
-        <td><p>String data</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><p>Number of bytes written</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
 </article>
           </div>
           

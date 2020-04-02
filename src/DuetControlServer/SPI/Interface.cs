@@ -592,7 +592,7 @@ namespace DuetControlServer.SPI
                 {
                     using (await _printStopppedReasonLock.LockAsync())
                     {
-                        if (_printStoppedReason.HasValue && DataTransfer.WritePrintStopped(_printStoppedReason.Value))
+                        if (_printStoppedReason != null && DataTransfer.WritePrintStopped(_printStoppedReason.Value))
                         {
                             _printStoppedReason = null;
                         }
@@ -624,7 +624,7 @@ namespace DuetControlServer.SPI
                     try
                     {
                         packet = DataTransfer.ReadPacket();
-                        if (!packet.HasValue)
+                        if (packet == null)
                         {
                             _logger.Error("Read invalid packet");
                             break;
@@ -740,7 +740,7 @@ namespace DuetControlServer.SPI
                     }
                 }
 
-                // Do another full SPI transfer
+                // Do another full SPI transfe
                 DataTransfer.PerformFullTransfer();
                 _channels.ResetBlockedChannels();
 
@@ -769,8 +769,9 @@ namespace DuetControlServer.SPI
         public static bool SendCode(QueuedCode queuedCode, out int codeLength)
         {
             codeLength = Consts.BufferedCodeHeaderSize + DataTransfer.GetCodeSize(queuedCode.Code);
+            int bytesBuffered = _channels[queuedCode.Code.Channel].BytesBuffered;
             if (_bufferSpace > codeLength &&
-                _channels[queuedCode.Code.Channel].BytesBuffered + codeLength <= Settings.MaxBufferSpacePerChannel &&
+                (bytesBuffered == 0 || bytesBuffered + codeLength <= Settings.MaxBufferSpacePerChannel) &&
                 DataTransfer.WriteCode(queuedCode.Code))
             {
                 _bytesReserved += codeLength;
