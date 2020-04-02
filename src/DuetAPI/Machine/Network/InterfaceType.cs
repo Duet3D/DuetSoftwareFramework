@@ -6,7 +6,7 @@ namespace DuetAPI.Machine
     /// <summary>
     /// Supported types of network interfaces
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter<InterfaceType>))]
+    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
     public enum InterfaceType
     {
         /// <summary>

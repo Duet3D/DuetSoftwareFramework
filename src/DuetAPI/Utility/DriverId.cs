@@ -5,7 +5,7 @@ namespace DuetAPI.Utility
     /// <summary>
     /// Class representing a driver identifier
     /// </summary>
-    public class DriverId
+    public sealed class DriverId
     {
         /// <summary>
         /// Default constructor of this class

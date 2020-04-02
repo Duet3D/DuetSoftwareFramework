@@ -1,23 +1,32 @@
-﻿namespace DuetAPI.Machine
+﻿using DuetAPI.Utility;
+using System.Text.Json.Serialization;
+
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Trigger condition for a heater monitor
     /// </summary>
-    public enum HeaterMonitorCondition : int
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
+    public enum HeaterMonitorCondition
     {
         /// <summary>
         /// Heater monitor is disabled
         /// </summary>
-        Disabled = -1,
+        Disabled,
 
         /// <summary>
         /// Limit temperature has been exceeded
         /// </summary>
-        TemperatureExceeded = 0,
+        TooHigh,
 
         /// <summary>
         /// Limit temperature is too low
         /// </summary>
-        TemperatureTooLow = 1
+        TooLow,
+
+        /// <summary>
+        /// Unknown condition
+        /// </summary>
+        Undefined
     }
 }

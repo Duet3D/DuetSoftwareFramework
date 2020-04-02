@@ -106,6 +106,11 @@ namespace DuetControlServer.Files
         /// </summary>
         public override void Abort()
         {
+            if (IsAborted)
+            {
+                return;
+            }
+
             while (PendingCodes.TryDequeue(out QueuedCode item))
             {
                 if (!item.IsFinished)

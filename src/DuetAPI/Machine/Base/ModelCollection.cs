@@ -196,10 +196,7 @@ namespace DuetAPI.Machine
                     JsonElement jsonItem = jsonElement[i];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
-                        if (item != null)
-                        {
-                            list[i] = null;
-                        }
+                        list[i] = null;
                     }
                     else if (item == null)
                     {
@@ -241,17 +238,28 @@ namespace DuetAPI.Machine
                     JsonElement jsonItem = jsonElement[i];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
-                        if (item != null)
+                        list[i] = null;
+                    }
+                    else if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
+                    {
+                        try
                         {
-                            list[i] = null;
+                            list[i] = Convert.ToBoolean(jsonItem.GetInt32());
+                        }
+                        catch (FormatException e)
+                        {
+                            throw new JsonException($"Failed to deserialize item type bool from JSON {jsonItem.GetRawText()}", e);
                         }
                     }
                     else
                     {
-                        object newItem = JsonSerializer.Deserialize(jsonItem.GetRawText(), itemType);
-                        if (item != newItem)
+                        try
                         {
-                            list[i] = newItem;
+                            list[i] = JsonSerializer.Deserialize(jsonItem.GetRawText(), itemType);
+                        }
+                        catch (JsonException e)
+                        {
+                            throw new JsonException($"Failed to deserialize item type {itemType.Name} from JSON {jsonItem.GetRawText()}", e);
                         }
                     }
                 }
@@ -259,8 +267,30 @@ namespace DuetAPI.Machine
                 // Add missing items
                 for (int i = list.Count; i < arrayLength; i++)
                 {
-                    object newItem = JsonSerializer.Deserialize(jsonElement[i].GetRawText(), itemType);
-                    list.Add(newItem);
+                    JsonElement jsonItem = jsonElement[i];
+                    if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
+                    {
+                        try
+                        {
+                            list.Add(Convert.ToBoolean(jsonItem.GetInt32()));
+                        }
+                        catch (FormatException e)
+                        {
+                            throw new JsonException($"Failed to deserialize item type bool from JSON {jsonItem.GetRawText()}", e);
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            object newItem = JsonSerializer.Deserialize(jsonItem.GetRawText(), itemType);
+                            list.Add(newItem);
+                        }
+                        catch (JsonException e)
+                        {
+                            throw new JsonException($"Failed to deserialize item type {itemType.Name} from JSON {jsonItem.GetRawText()}", e);
+                        }
+                    }
                 }
             }
         }

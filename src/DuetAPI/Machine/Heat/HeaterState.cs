@@ -6,7 +6,7 @@ namespace DuetAPI.Machine
     /// <summary>
     /// State of a heater
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter<HeaterState>))]
+    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
     public enum HeaterState : int
     {
         /// <summary>

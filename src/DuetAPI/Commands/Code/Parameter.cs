@@ -271,6 +271,10 @@ namespace DuetAPI.Commands
             {
                 return uintValue;
             }
+            if (codeParameter._parsedValue is DriverId driverIdValue)
+            {
+                return driverIdValue;
+            }
             if (codeParameter._parsedValue is int intValue)
             {
                 return Convert.ToUInt32(intValue);
@@ -444,6 +448,14 @@ namespace DuetAPI.Commands
             {
                 return new uint[] { uintValue };
             }
+            if (codeParameter._parsedValue is DriverId[] driverIdArray)
+            {
+                return driverIdArray.Select(value => (uint)value).ToArray();
+            }
+            if (codeParameter._parsedValue is DriverId driverIdValue)
+            {
+                return new uint[] { driverIdValue };
+            }
             if (codeParameter._parsedValue is int intValue && intValue >= 0)
             {
                 return new uint[] { Convert.ToUInt32(intValue) };
@@ -483,6 +495,14 @@ namespace DuetAPI.Commands
             if (codeParameter._parsedValue is DriverId driverId)
             {
                 return new DriverId[] { driverId };
+            }
+            if (codeParameter._parsedValue is uint[] uintArray)
+            {
+                return uintArray.Select(value => new DriverId(value)).ToArray();
+            }
+            if (codeParameter._parsedValue is uint uintValue)
+            {
+                return new DriverId[] { new DriverId(uintValue) };
             }
             throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to driver ID array (value {codeParameter._stringValue})");
         }

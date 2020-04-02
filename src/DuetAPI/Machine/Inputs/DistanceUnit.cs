@@ -6,7 +6,7 @@ namespace DuetAPI.Machine
     /// <summary>
     /// Distance unit used for positioning
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter<DistanceUnit>))]
+    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
     public enum DistanceUnit
     {
         /// <summary>

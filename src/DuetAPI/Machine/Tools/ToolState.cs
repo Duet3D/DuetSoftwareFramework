@@ -6,7 +6,7 @@ namespace DuetAPI.Machine
     /// <summary>
     /// States of a tool
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter<ToolState>))]
+    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
     public enum ToolState
     {
         /// <summary>

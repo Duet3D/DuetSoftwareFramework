@@ -109,6 +109,11 @@ namespace DuetControlServer.Model
         /// <param name="model">Model object to unsubscribe from</param>
         private static void UnsubscribeFromModelObject(ModelObject model)
         {
+            if (model == null)
+            {
+                return;
+            }
+
             PropertyChangedEventHandler changeHandler = _propertyChangedHandlers[model];
             if (changeHandler == null)
             {

@@ -435,12 +435,16 @@ namespace DuetControlServer.SPI
                         queuedCode.SetException(oce);
                     }
                 }
+                catch (AggregateException ae)
+                {
+                    macroFile?.Abort();
+                    queuedCode.SetException(ae.InnerException);
+                    await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                }
                 catch (Exception e)
                 {
-                    if (e is AggregateException ae)
-                    {
-                        e = ae.InnerException;
-                    }
+                    macroFile?.Abort();
+                    queuedCode.SetException(e);
                     await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{e.GetType().Name}] {e.Message}");
                 }
             });

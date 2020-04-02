@@ -214,6 +214,7 @@ namespace DuetAPI.Machine
         /// <param name="jsonElement">Element to update this intance from</param>
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
+        /// <exception cref="JsonException">Failed to deserialize data</exception>
         internal virtual ModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
@@ -263,6 +264,17 @@ namespace DuetAPI.Machine
                             ModelCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonProperty.Value, ignoreSbcProperties);
                         }
                     }
+                    else if (property.PropertyType == typeof(bool) && jsonProperty.Value.ValueKind == JsonValueKind.Number)
+                    {
+                        try
+                        {
+                            property.SetValue(this, Convert.ToBoolean(jsonProperty.Value.GetInt32()));
+                        }
+                        catch (FormatException e)
+                        {
+                            throw new JsonException($"Failed to deserialize property [{GetType().Name}].{property.Name} (type bool) from JSON {jsonProperty.Value.GetRawText()}", e);
+                        }
+                    }
                     else
                     {
                         try
@@ -272,7 +284,7 @@ namespace DuetAPI.Machine
                         }
                         catch (JsonException e)
                         {
-                            throw new AggregateException($"Failed to serialize property {property.Name} (type {property.PropertyType.Name}) from JSON {jsonProperty.Value.GetRawText()}", e);
+                            throw new JsonException($"Failed to deserialize property [{GetType().Name}].{property.Name} (type {property.PropertyType.Name}) from JSON {jsonProperty.Value.GetRawText()}", e);
                         }
                     }
                 }

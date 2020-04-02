@@ -519,9 +519,9 @@ namespace DuetControlServer.SPI
             {
                 return Serialization.Writer.WriteCode(span, code);
             }
-            catch (ArgumentException)
+            catch (ArgumentException e)
             {
-                throw new ArgumentException("Code is too long");
+                throw new ArgumentException("Failed to serialize code", e);
             }
         }
 
@@ -539,9 +539,9 @@ namespace DuetControlServer.SPI
             {
                 codeLength = Serialization.Writer.WriteCode(span, code);
             }
-            catch (ArgumentException)
+            catch (ArgumentException e)
             {
-                throw new ArgumentException("Value is too big", nameof(code));
+                throw new ArgumentException("Failed to serialize code", e);
             }
 
             // See if the code fits into the buffer

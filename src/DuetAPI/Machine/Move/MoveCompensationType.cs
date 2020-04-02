@@ -6,7 +6,7 @@ namespace DuetAPI.Machine
     /// <summary>
     /// Supported compensation types
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter<MoveCompensationType>))]
+    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
 	public enum MoveCompensationType
 	{
 		/// <summary>
