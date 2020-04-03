@@ -1066,16 +1066,13 @@ namespace DuetControlServer.SPI
         private static void HandleEvaluationResult()
         {
             DataTransfer.ReadEvaluationResult(out string expression, out object result);
-            Console.WriteLine("!!! Got expression result for {0} = {1}", expression, result);
 
             lock (_evaluateExpressionRequests)
             {
                 foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
                 {
-                    Console.WriteLine("!!! Checking request {0}", request.Expression);
                     if (request.Expression == expression)
                     {
-                        Console.WriteLine("!!! Resolving it...");
                         if (result is Exception exception)
                         {
                             request.SetException(exception);

@@ -141,6 +141,8 @@ namespace DuetControlServer.Model
         public static void Init()
         {
             Get.State.DsfVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            Get.Network.Hostname = Environment.MachineName;
+            Get.Network.Name = Environment.MachineName;
         }
 
         /// <summary>

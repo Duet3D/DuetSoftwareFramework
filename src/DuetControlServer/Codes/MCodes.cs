@@ -659,38 +659,41 @@ namespace DuetControlServer.Codes
                     {
                         // Verify the P parameter
                         string pParam = code.Parameter('P');
-                        if (pParam.Length > 40)
+                        if (!string.IsNullOrEmpty(pParam))
                         {
-                            return new CodeResult(MessageType.Error, "Machine name is too long");
-                        }
-
-                        // Strip letters and digits from the machine name
-                        string machineName = string.Empty;
-                        foreach (char c in Environment.MachineName)
-                        {
-                            if (char.IsLetterOrDigit(c))
+                            if (pParam.Length > 40)
                             {
-                                machineName += c;
+                                return new CodeResult(MessageType.Error, "Machine name is too long");
                             }
-                        }
 
-                        // Strip letters and digits from the desired name
-                        string desiredName = string.Empty;
-                        foreach (char c in pParam)
-                        {
-                            if (char.IsLetterOrDigit(c))
+                            // Strip letters and digits from the machine name
+                            string machineName = string.Empty;
+                            foreach (char c in Environment.MachineName)
                             {
-                                desiredName += c;
+                                if (char.IsLetterOrDigit(c))
+                                {
+                                    machineName += c;
+                                }
                             }
-                        }
 
-                        // Make sure the subset of letters and digits is equal
-                        if (!machineName.Equals(desiredName, StringComparison.CurrentCultureIgnoreCase))
-                        {
-                            return new CodeResult(MessageType.Error, "Machine name must consist of the same letters and digits as configured by the Linux hostname");
-                        }
+                            // Strip letters and digits from the desired name
+                            string desiredName = string.Empty;
+                            foreach (char c in pParam)
+                            {
+                                if (char.IsLetterOrDigit(c))
+                                {
+                                    desiredName += c;
+                                }
+                            }
 
-                        // Hostname is legit - pretend we didn't see this code so RRF can interpret it
+                            // Make sure the subset of letters and digits is equal
+                            if (!machineName.Equals(desiredName, StringComparison.CurrentCultureIgnoreCase))
+                            {
+                                return new CodeResult(MessageType.Error, "Machine name must consist of the same letters and digits as configured by the Linux hostname");
+                            }
+
+                            // Hostname is legit - pretend we didn't see this code so RRF can interpret it
+                        }
                         break;
                     }
                     throw new OperationCanceledException();

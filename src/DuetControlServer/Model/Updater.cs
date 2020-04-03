@@ -172,6 +172,10 @@ namespace DuetControlServer.Model
                                     if (Provider.Get.UpdateFromFirmwareModel(key.GetString(), result))
                                     {
                                         _logger.Debug("Updated key {0}", keyName);
+                                        if (_logger.IsTraceEnabled)
+                                        {
+                                            _logger.Trace("Key JSON: {0}", Encoding.UTF8.GetString(_json, 0, _jsonLength));
+                                        }
                                     }
                                     else
                                     {

@@ -224,7 +224,7 @@ namespace DuetAPI.Machine
                     if (ignoreSbcProperties && Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
                     {
                         // Skip this field if it must not be updated
-                        break;
+                        continue;
                     }
 
                     if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))

@@ -450,7 +450,8 @@ namespace DuetAPI.Commands
                         case 584:
                             foreach (CodeParameter parameter in result.Parameters)
                             {
-                                if (!parameter.IsExpression && Machine.Axis.Letters.Contains(char.ToUpperInvariant(parameter.Letter)))
+                                char upper = char.ToUpperInvariant(parameter.Letter);
+                                if (!parameter.IsExpression && (Machine.Axis.Letters.Contains(upper) || upper == 'E'))
                                 {
                                     parameter.ConvertDriverIds(result);
                                 }

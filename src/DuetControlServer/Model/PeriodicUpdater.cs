@@ -29,6 +29,7 @@ namespace DuetControlServer.Model
         public static async Task Run()
         {
             DateTime lastUpdateTime = DateTime.Now;
+            string lastHostname = Environment.MachineName;
             do
             {
                 // Run another update cycle
@@ -56,6 +57,22 @@ namespace DuetControlServer.Model
                     await code.Execute();
                 }
 
+                // Check if the hostname has to be updated
+                if (lastHostname != Environment.MachineName)
+                {
+                    _logger.Info("Hostname has been changed");
+                    lastHostname = Environment.MachineName;
+                    Code code = new Code
+                    {
+                        InternallyProcessed = true,
+                        Channel = CodeChannel.Trigger,
+                        Type = CodeType.MCode,
+                        MajorNumber = 550
+                    };
+                    code.Parameters.Add(new CodeParameter('P', lastHostname));
+                    await code.Execute();
+                }
+
                 // Wait for next scheduled update check
                 lastUpdateTime = DateTime.Now;
                 await Task.Delay(Settings.HostUpdateInterval, Program.CancellationToken);
@@ -68,8 +85,6 @@ namespace DuetControlServer.Model
         /// </summary>
         private static void UpdateNetwork()
         {
-            Provider.Get.Network.Hostname = Environment.MachineName;
-
             int index = 0;
             foreach (var iface in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
             {
