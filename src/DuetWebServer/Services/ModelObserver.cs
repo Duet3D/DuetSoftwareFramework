@@ -197,12 +197,9 @@ namespace DuetWebServer.Services
                 }
                 while (!_stopRequest.IsCancellationRequested);
             }
-            catch (Exception e)
+            catch (OperationCanceledException)
             {
-                if (!(e is OperationCanceledException))
-                {
-                    _logger.LogError(e, "Failed to synchronize object model");
-                }
+                // unhandled
             }
         }
 

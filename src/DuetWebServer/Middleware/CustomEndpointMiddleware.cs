@@ -163,7 +163,7 @@ namespace DuetWebServer.Middleware
                 if (response.StatusCode >= 1000)
                 {
                     _logger.LogDebug("Closing WebSocket with status code {0} ({1})", response.StatusCode, response.Response);
-                    await webSocket.CloseAsync((WebSocketCloseStatus)response.StatusCode, response.Response, cancellationToken);
+                    await CloseConnection(webSocket, (WebSocketCloseStatus)response.StatusCode, response.Response);
                     break;
                 }
                 else

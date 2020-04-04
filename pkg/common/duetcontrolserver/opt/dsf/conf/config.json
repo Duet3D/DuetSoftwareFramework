@@ -12,6 +12,7 @@
   "SpiTransferTimeout": 500,
   "MaxSpiRetries": 3,
   "SpiPollDelay": 25,
+  "SpiPollDelaySimulating": 5,
   "GpioChipDevice": "/dev/gpiochip0",
   "TransferReadyPin": 25,
   "BufferedPrintCodes": 32,

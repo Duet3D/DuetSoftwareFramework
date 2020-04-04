@@ -21,12 +21,12 @@ namespace DuetAPI.Machine
         /// <summary>
         /// Indicates if a filament is present
         /// </summary>
-        public bool FilamentPresent
+        public bool? FilamentPresent
         {
             get => _filamentPresent;
 			set => SetPropertyValue(ref _filamentPresent, value);
         }
-        private bool _filamentPresent;
+        private bool? _filamentPresent;
 
         /// <summary>
         /// Type of this filament monitor

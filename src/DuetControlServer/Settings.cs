@@ -94,7 +94,7 @@ namespace DuetControlServer
         public static string SpiDevice { get; set; } = "/dev/spidev0.0";
 
         /// <summary>
-        /// Frequency to use for SPI transfers
+        /// Frequency to use for SPI transfers (in Hz)
         /// </summary>
         public static int SpiFrequency { get; set; } = 8_000_000;
 
@@ -112,6 +112,11 @@ namespace DuetControlServer
         /// Time to wait after every full transfer (in ms)
         /// </summary>
         public static int SpiPollDelay { get; set; } = 25;
+
+        /// <summary>
+        /// Time to wait after every full transfer when simulating a file (in ms)
+        /// </summary>
+        public static int SpiPollDelaySimulating { get; set; } = 5;
 
         /// <summary>
         /// Path to the GPIO chip device node

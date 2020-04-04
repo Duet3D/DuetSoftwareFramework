@@ -13323,6 +13323,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Settings.SpiPollDelay
   nameWithType: Settings.SpiPollDelay
+- uid: DuetControlServer.Settings.SpiPollDelaySimulating
+  name: SpiPollDelaySimulating
+  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SpiPollDelaySimulating
+  commentId: P:DuetControlServer.Settings.SpiPollDelaySimulating
+  fullName: DuetControlServer.Settings.SpiPollDelaySimulating
+  nameWithType: Settings.SpiPollDelaySimulating
+- uid: DuetControlServer.Settings.SpiPollDelaySimulating*
+  name: SpiPollDelaySimulating
+  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SpiPollDelaySimulating_
+  commentId: Overload:DuetControlServer.Settings.SpiPollDelaySimulating
+  isSpec: "True"
+  fullName: DuetControlServer.Settings.SpiPollDelaySimulating
+  nameWithType: Settings.SpiPollDelaySimulating
 - uid: DuetControlServer.Settings.SpiTransferTimeout
   name: SpiTransferTimeout
   href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SpiTransferTimeout
@@ -17147,19 +17160,19 @@ references:
   isSpec: "True"
   fullName: DuetWebServer.Controllers.MachineController.DownloadFile
   nameWithType: MachineController.DownloadFile
-- uid: DuetWebServer.Controllers.MachineController.GetFileinfo(System.String)
-  name: GetFileinfo(String)
-  href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_GetFileinfo_System_String_
-  commentId: M:DuetWebServer.Controllers.MachineController.GetFileinfo(System.String)
-  fullName: DuetWebServer.Controllers.MachineController.GetFileinfo(System.String)
-  nameWithType: MachineController.GetFileinfo(String)
-- uid: DuetWebServer.Controllers.MachineController.GetFileinfo*
-  name: GetFileinfo
-  href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_GetFileinfo_
-  commentId: Overload:DuetWebServer.Controllers.MachineController.GetFileinfo
+- uid: DuetWebServer.Controllers.MachineController.GetFileInfo(System.String)
+  name: GetFileInfo(String)
+  href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_GetFileInfo_System_String_
+  commentId: M:DuetWebServer.Controllers.MachineController.GetFileInfo(System.String)
+  fullName: DuetWebServer.Controllers.MachineController.GetFileInfo(System.String)
+  nameWithType: MachineController.GetFileInfo(String)
+- uid: DuetWebServer.Controllers.MachineController.GetFileInfo*
+  name: GetFileInfo
+  href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_GetFileInfo_
+  commentId: Overload:DuetWebServer.Controllers.MachineController.GetFileInfo
   isSpec: "True"
-  fullName: DuetWebServer.Controllers.MachineController.GetFileinfo
-  nameWithType: MachineController.GetFileinfo
+  fullName: DuetWebServer.Controllers.MachineController.GetFileInfo
+  nameWithType: MachineController.GetFileInfo
 - uid: DuetWebServer.Controllers.MachineController.GetFileList(System.String)
   name: GetFileList(String)
   href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_GetFileList_System_String_

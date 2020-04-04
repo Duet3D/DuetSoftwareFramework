@@ -111,7 +111,7 @@ namespace DuetControlServer.SPI
         /// <param name="result">Code reply</param>
         public void HandleReply(CodeResult result)
         {
-            if (result != null && !_result.IsEmpty)
+            if (result != null && !result.IsEmpty)
             {
                 _result.AddRange(result);
             }
