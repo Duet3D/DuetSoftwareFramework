@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -108,6 +110,7 @@ namespace DuetAPI.Utility
         public static readonly JsonSerializerOptions DefaultJsonOptions = new JsonSerializerOptions
         {
             DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true
         };

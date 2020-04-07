@@ -18,12 +18,12 @@
         /// <summary>
         /// Total duration of the current job (in s or null)
         /// </summary>
-        public float? Duration
+        public int? Duration
         {
             get => _duration;
 			set => SetPropertyValue(ref _duration, value);
         }
-        private float? _duration;
+        private int? _duration;
 
         /// <summary>
         /// Information about the file being processed
@@ -43,12 +43,22 @@
         /// <summary>
         /// Duration of the first layer (in s or null)
         /// </summary>
-        public float? FirstLayerDuration
+        public int? FirstLayerDuration
         {
             get => _firstLayerDuration;
 			set => SetPropertyValue(ref _firstLayerDuration, value);
         }
-        private float? _firstLayerDuration;
+        private int? _firstLayerDuration;
+
+        /// <summary>
+        /// Total duration of the last job (in s or null)
+        /// </summary>
+        public int? LastDuration
+        {
+            get => _lastDuration;
+			set => SetPropertyValue(ref _lastDuration, value);
+        }
+        private int? _lastDuration;
 
         /// <summary>
         /// Name of the last file processed or null if none
@@ -104,12 +114,12 @@
         /// <summary>
         /// Time elapsed since the beginning of the current layer (in s or null)
         /// </summary>
-        public float? LayerTime
+        public int? LayerTime
         {
             get => _layerTime;
 			set => SetPropertyValue(ref _layerTime, value);
         }
-        private float? _layerTime;
+        private int? _layerTime;
         
         /// <summary>
         /// Information about the past layers

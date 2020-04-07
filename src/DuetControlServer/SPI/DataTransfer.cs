@@ -13,6 +13,7 @@ using LinuxDevices;
 using System.Collections.Generic;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.Shared;
+using DuetControlServer.Model;
 
 namespace DuetControlServer.SPI
 {
@@ -194,6 +195,7 @@ namespace DuetControlServer.SPI
                     // Deal with reset requests
                     if (_resetting)
                     {
+                        Updater.ConnectionLost();
                         _waitingForFirstTransfer = _hadTimeout = true;
                         return PerformFullTransfer(mustSucceed);
                     }
@@ -211,7 +213,7 @@ namespace DuetControlServer.SPI
                     if (!_hadTimeout && _started && !Updating)
                     {
                         _waitingForFirstTransfer = _hadTimeout = true;
-                        Model.Updater.ConnectionLost(e.Message);
+                        Updater.ConnectionLost(e.Message);
                     }
                 }
             }
@@ -394,13 +396,13 @@ namespace DuetControlServer.SPI
 
             string dump = "Received malformed packet:\n";
             dump += $"=== Packet #{_lastPacket.Id} from offset {_rxPointer} request {_lastPacket.Request} (length {_lastPacket.Length}) ===\n";
-            foreach(byte c in _packetData.Span)
+            foreach (byte c in _packetData.Span)
             {
                 dump += ((int)c).ToString("x2");
             }
             dump += "\n";
             string str = Encoding.UTF8.GetString(_packetData.Span);
-            foreach(char c in str)
+            foreach (char c in str)
             {
                 dump += char.IsLetterOrDigit(c) ? c : '.';
             }
@@ -428,7 +430,7 @@ namespace DuetControlServer.SPI
 
             Span<byte> span = _txBuffer.Value.Slice(_txPointer).Span;
             MemoryMarshal.Write(span, ref header);
-            _txPointer += Marshal.SizeOf(header);
+            _txPointer += Marshal.SizeOf<PacketHeader>();
         }
 
         /// <summary>
@@ -786,6 +788,9 @@ namespace DuetControlServer.SPI
             // Tell the firmware to boot the IAP program
             WritePacket(Communication.LinuxRequests.Request.StartIap);
             PerformFullTransfer();
+
+            // No longer connected...
+            Updater.ConnectionLost();
 
             // Wait for the first transfer.
             // The IAP firmware will pull the transfer ready pin to high when it is ready to receive data

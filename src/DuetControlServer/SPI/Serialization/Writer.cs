@@ -269,6 +269,7 @@ namespace DuetControlServer.SPI.Serialization
             // Write flags
             unicodeFlags.CopyTo(to.Slice(bytesWritten));
             bytesWritten += unicodeFlags.Length;
+
             return AddPadding(to, bytesWritten);
         }
         

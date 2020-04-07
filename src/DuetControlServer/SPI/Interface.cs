@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -53,7 +54,7 @@ namespace DuetControlServer.SPI
         private static readonly Queue<Tuple<int, string>> _extruderFilamentUpdates = new Queue<Tuple<int, string>>();
         private static readonly AsyncLock _printStopppedReasonLock = new AsyncLock();
         private static PrintStoppedReason? _printStoppedReason;
-        private static volatile bool _emergencyStopRequested, _resetRequested, _printStarted;
+        private static volatile bool _emergencyStopRequested, _resetRequested, _printStarted, _assignFilaments;
         private static readonly Queue<Tuple<MessageTypeFlags, string>> _messagesToSend = new Queue<Tuple<MessageTypeFlags, string>>();
 
         // Partial incoming message (if any)
@@ -230,6 +231,13 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         public static Task<CodeResult> ProcessCode(Code code)
         {
+            if (code.Type == CodeType.MCode && code.MajorNumber == 703)
+            {
+                // It is safe to assume that the tools and extruders have been configured at this point.
+                // Assign the filaments next so that M703 works as intended
+                _assignFilaments = true;
+            }
+
             using (_channels[code.Channel].Lock())
             {
                 return _channels[code.Channel].ProcessCode(code);
@@ -730,14 +738,24 @@ namespace DuetControlServer.SPI
                     }
                 }
 
-                // Update filament assignment per extruder drive
-                lock (_extruderFilamentUpdates)
+                // Update filament assignment per extruder drive. This must happen when config.g has finished or M701 is requested
+                if (!MacroFile.RunningConfig || _assignFilaments)
                 {
-                    if (_extruderFilamentUpdates.TryPeek(out Tuple<int, string> filamentMapping) &&
-                        DataTransfer.WriteAssignFilament(filamentMapping.Item1, filamentMapping.Item2))
+                    lock (_extruderFilamentUpdates)
                     {
-                        _extruderFilamentUpdates.Dequeue();
+                        while (_extruderFilamentUpdates.TryPeek(out Tuple<int, string> filamentMapping))
+                        {
+                            if (DataTransfer.WriteAssignFilament(filamentMapping.Item1, filamentMapping.Item2))
+                            {
+                                _extruderFilamentUpdates.Dequeue();
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
                     }
+                    _assignFilaments = false;
                 }
 
                 // Do another full SPI transfe
@@ -954,7 +972,7 @@ namespace DuetControlServer.SPI
             _channels[channel].InvalidateBuffer(!abortAll);
             while (_channels[channel].NestedMacros.TryPop(out MacroFile macroFile))
             {
-                macroFile.StartCode?.HandleReply(new CodeResult());
+                macroFile.StartCode?.SetCancelled();
                 macroFile.Abort();
                 macroFile.Dispose();
                 if (!abortAll)
@@ -1170,6 +1188,12 @@ namespace DuetControlServer.SPI
             lock (_messagesToSend)
             {
                 _messagesToSend.Clear();
+            }
+
+            // Clear filament assign requests
+            lock (_extruderFilamentUpdates)
+            {
+                while (_extruderFilamentUpdates.TryDequeue(out _)) { }
             }
 
             // Keep this event in the log...

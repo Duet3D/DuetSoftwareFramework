@@ -202,7 +202,51 @@ namespace UnitTests.SPI
             Assert.AreEqual(DuetAPI.CodeChannel.SBC, channel);
         }
 
-#warning FIXME Add missing packets
+        [Test]
+        public void FileChunk()
+        {
+            Span<byte> blob = GetBlob("fileChunk.bin");
+
+            int bytesRead = Reader.ReadFileChunkRequest(blob, out string filename, out uint offset, out uint maxLength);
+            Assert.AreEqual(20, bytesRead);
+
+            // Header
+            Assert.AreEqual(1234, offset);
+            Assert.AreEqual(5678, maxLength);
+
+            // Filename
+            Assert.AreEqual("test.bin", filename);
+        }
+
+        [Test]
+        public void EvaluationResult()
+        {
+            Span<byte> blob = GetBlob("evaluationResult.bin");
+
+            int bytesRead = Reader.ReadEvaluationResult(blob, out string expression, out object result);
+            Assert.AreEqual(32, bytesRead);
+
+            // Header
+            Assert.AreEqual(300, (int)result);
+
+            // Expression
+            Assert.AreEqual("move.axes[0].position", expression);
+        }
+
+        [Test]
+        public void DoCode()
+        {
+            Span<byte> blob = GetBlob("doCode.bin");
+
+            int bytesRead = Reader.ReadDoCode(blob, out CodeChannel channel, out string code);
+            Assert.AreEqual(24, bytesRead);
+
+            // Header
+            Assert.AreEqual(DuetAPI.CodeChannel.Aux, channel);
+
+            // Code
+            Assert.AreEqual("M20 S2 P\"0:/macros\"", code);
+        }
 
         private Span<byte> GetBlob(string filename)
         {

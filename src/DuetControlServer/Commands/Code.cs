@@ -446,7 +446,10 @@ namespace DuetControlServer.Commands
             // Evaluate echo commands
             if (Keyword == KeywordType.Echo)
             {
-                await Interface.Flush(this);
+                if (!await Interface.Flush(this))
+                {
+                    throw new OperationCanceledException();
+                }
 
                 StringBuilder builder = new StringBuilder();
                 foreach (string expression in KeywordArgument.Split(','))
@@ -474,10 +477,13 @@ namespace DuetControlServer.Commands
                     }
                     catch (CodeParserException e)
                     {
+                        InternallyProcessed = true;
                         Result = new CodeResult(MessageType.Error, $"Failed to evaluate \"{trimmedExpression}\": {e.Message}");
                         return true;
                     }
                 }
+
+                InternallyProcessed = true;
                 Result = new CodeResult(MessageType.Success, builder.ToString());
                 return true;
             }

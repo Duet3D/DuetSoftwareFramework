@@ -2073,6 +2073,11 @@
             Heater is active
             </summary>
         </member>
+        <member name="F:DuetAPI.Machine.HeaterState.Fault">
+            <summary>
+            Heater faulted
+            </summary>
+        </member>
         <member name="F:DuetAPI.Machine.HeaterState.Tuning">
             <summary>
             Heater is being tuned
@@ -2459,6 +2464,11 @@
         <member name="P:DuetAPI.Machine.Job.FirstLayerDuration">
             <summary>
             Duration of the first layer (in s or null)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Job.LastDuration">
+            <summary>
+            Total duration of the last job (in s or null)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Job.LastFileName">

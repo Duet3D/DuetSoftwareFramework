@@ -7,12 +7,12 @@ namespace DuetAPI.Machine
     /// State of a heater
     /// </summary>
     [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
-    public enum HeaterState : int
+    public enum HeaterState
     {
         /// <summary>
         /// Heater is turned off
         /// </summary>
-        Off = 0,
+        Off,
 
         /// <summary>
         /// Heater is in standby mode
@@ -23,6 +23,11 @@ namespace DuetAPI.Machine
         /// Heater is active
         /// </summary>
         Active,
+
+        /// <summary>
+        /// Heater faulted
+        /// </summary>
+        Fault,
 
         /// <summary>
         /// Heater is being tuned

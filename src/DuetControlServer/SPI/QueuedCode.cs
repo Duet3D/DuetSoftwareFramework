@@ -97,11 +97,7 @@ namespace DuetControlServer.SPI
                 {
                     message.Content = message.Content.TrimEnd();
                 }
-
-                if (!DoingNestedMacro)
-                {
-                    SetFinished();
-                }
+                SetFinished();
             }
         }
 
@@ -115,11 +111,7 @@ namespace DuetControlServer.SPI
             {
                 _result.AddRange(result);
             }
-
-            if (!DoingNestedMacro)
-            {
-                SetFinished();
-            }
+            SetFinished();
         }
 
         /// <summary>
@@ -127,8 +119,11 @@ namespace DuetControlServer.SPI
         /// </summary>
         public void SetCancelled()
         {
-            IsFinished = true;
-            _tcs.TrySetCanceled();
+            if (!IsFinished)
+            {
+                IsFinished = true;
+                _tcs.SetCanceled();
+            }
         }
 
         /// <summary>
@@ -137,8 +132,11 @@ namespace DuetControlServer.SPI
         /// <param name="e">Exception to return</param>
         public void SetException(Exception e)
         {
-            IsFinished = true;
-            _tcs.TrySetException(e);
+            if (!IsFinished)
+            {
+                IsFinished = true;
+                _tcs.SetException(e);
+            }
         }
 
         /// <summary>
@@ -146,8 +144,11 @@ namespace DuetControlServer.SPI
         /// </summary>
         public void SetFinished()
         {
-            IsFinished = true;
-            _tcs.TrySetResult(_result);
+            if (!IsFinished)
+            {
+                IsFinished = true;
+                _tcs.SetResult(_result);
+            }
         }
 
         /// <summary>

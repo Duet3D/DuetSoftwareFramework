@@ -118,8 +118,8 @@ namespace DuetControlServer.Model
                                 {
                                     Provider.Get.Boards.Add(new Board
                                     {
-                                        IapFileNameSBC = $"Duet3iap_spi.bin",
-                                        FirmwareFileName = "Duet3Firmware.bin"
+                                        IapFileNameSBC = $"Duet3_SDiap_MB6HC.bin",
+                                        FirmwareFileName = "Duet3Firmware_MB6HC.bin"
                                     });
                                 }
                                 _logger.Warn("Deprecated firmware detected, assuming legacy firmware files. You may have to use bossa to update it");
@@ -144,7 +144,7 @@ namespace DuetControlServer.Model
                                 bool objectModelSynchronized = true;
                                 foreach (JsonProperty seqProperty in result.GetProperty("seqs").EnumerateObject())
                                 {
-                                    if (seqProperty.Name != "reply")
+                                    if (seqProperty.Name != "reply" && (!Settings.UpdateOnly || seqProperty.Name == "boards"))
                                     {
                                         int newSeq = seqProperty.Value.GetInt32();
                                         if (!_lastSeqs.TryGetValue(seqProperty.Name, out int lastSeq) || lastSeq != newSeq)
@@ -205,21 +205,28 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Called when the connection to the Duet has been lost
         /// </summary>
-        /// <param name="errorMessage">Message of the error that led to this event</param>
-        public static void ConnectionLost(string errorMessage)
+        /// <param name="errorMessage">Optional error that led to this event</param>
+        public static void ConnectionLost(string errorMessage = null)
         {
             using (Provider.AccessReadWrite())
             {
                 Provider.Get.Boards.Clear();
-                Provider.Get.State.Status = MachineStatus.Off;
+                if (Provider.Get.State.Status != MachineStatus.Halted && Provider.Get.State.Status != MachineStatus.Updating)
+                {
+                    Provider.Get.State.Status = MachineStatus.Off;
+                }
             }
 
             using (_lock.Lock())
             {
+                // Query the full object model when a connection can be established again
                 _lastSeqs.Clear();
             }
 
-            _ = Utility.Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({errorMessage})");
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                _ = Utility.Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({errorMessage})");
+            }
         }
     }
 }

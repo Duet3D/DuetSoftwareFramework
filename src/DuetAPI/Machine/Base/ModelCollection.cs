@@ -159,7 +159,10 @@ namespace DuetAPI.Machine
             {
                 for (int i = 0; i < Math.Min(list.Count, from.Count); i++)
                 {
-                    list[i] = from[i];
+                    if (!Equals(list[i], from[i]))
+                    {
+                        list[i] = from[i];
+                    }
                 }
             }
 
@@ -196,7 +199,10 @@ namespace DuetAPI.Machine
                     JsonElement jsonItem = jsonElement[i];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
-                        list[i] = null;
+                        if (list[i] != null)
+                        {
+                            list[i] = null;
+                        }
                     }
                     else if (item == null)
                     {
@@ -237,13 +243,20 @@ namespace DuetAPI.Machine
                     JsonElement jsonItem = jsonElement[i];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
-                        list[i] = null;
+                        if (list[i] != null)
+                        {
+                            list[i] = null;
+                        }
                     }
                     else if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
                     {
                         try
                         {
-                            list[i] = Convert.ToBoolean(jsonItem.GetInt32());
+                            bool itemValue = Convert.ToBoolean(jsonItem.GetInt32());
+                            if (!Equals(list[i], itemValue))
+                            {
+                                list[i] = itemValue;
+                            }
                         }
                         catch (FormatException e)
                         {
@@ -254,7 +267,11 @@ namespace DuetAPI.Machine
                     {
                         try
                         {
-                            list[i] = JsonSerializer.Deserialize(jsonItem.GetRawText(), itemType);
+                            object itemValue = JsonSerializer.Deserialize(jsonItem.GetRawText(), itemType);
+                            if (!Equals(list[i], itemValue))
+                            {
+                                list[i] = itemValue;
+                            }
                         }
                         catch (JsonException e)
                         {

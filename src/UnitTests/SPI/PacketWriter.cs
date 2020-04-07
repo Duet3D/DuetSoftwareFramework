@@ -23,7 +23,7 @@ namespace UnitTests.SPI
 
             TransferHeader header = MemoryMarshal.Read<TransferHeader>(span);
             Writer.InitTransferHeader(ref header);
-            
+
             // Header
             Assert.AreEqual(Consts.FormatCode, header.FormatCode);
             Assert.AreEqual(0, header.NumPackets);
@@ -32,18 +32,18 @@ namespace UnitTests.SPI
             Assert.AreEqual(0, header.DataLength);
             Assert.AreEqual(0, header.ChecksumData);
             Assert.AreEqual(0, header.ChecksumHeader);
-            
+
             // No padding
         }
-        
+
         [Test]
         public void PacketHeader()
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
-            
+
             Writer.WritePacketHeader(span, Request.Reset, 12, 1054);
-            
+
             // Header
             ushort request = MemoryMarshal.Read<ushort>(span.Slice(0, 2));
             Assert.AreEqual((ushort)Request.Reset, request);
@@ -82,7 +82,7 @@ namespace UnitTests.SPI
             Assert.AreEqual(-1, minorCode);
             uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
             Assert.AreEqual(0xFFFFFFFF, filePosition);
-            
+
             // No padding
         }
 
@@ -91,7 +91,7 @@ namespace UnitTests.SPI
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
-            
+
             Code code = new Code("G1 X4 Y23.5 Z12.2 J\"testok\" E12:3.45:5.67")
             {
                 Channel = DuetAPI.CodeChannel.File
@@ -99,7 +99,7 @@ namespace UnitTests.SPI
 
             int bytesWritten = Writer.WriteCode(span, code);
             Assert.AreEqual(76, bytesWritten);
-            
+
             // Header
             Assert.AreEqual((byte)DuetAPI.CodeChannel.File, span[0]);
             Assert.AreEqual((byte)CodeFlags.HasMajorCommandNumber, span[1]);
@@ -111,25 +111,25 @@ namespace UnitTests.SPI
             Assert.AreEqual(-1, minorCode);
             uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
             Assert.AreEqual(0xFFFFFFFF, filePosition);
-            
+
             // First parameter (X4)
             Assert.AreEqual((byte)'X', span[16]);
             Assert.AreEqual((byte)DataType.Int, span[17]);
             int intValue = MemoryMarshal.Read<int>(span.Slice(20, 4));
             Assert.AreEqual(4, intValue);
-            
+
             // Second parameter (Y23.5)
             Assert.AreEqual((byte)'Y', span[24]);
             Assert.AreEqual((byte)DataType.Float, span[25]);
             float floatValue = MemoryMarshal.Read<float>(span.Slice(28, 4));
             Assert.AreEqual(23.5, floatValue, 0.00001);
-            
+
             // Third parameter (Z12.2)
             Assert.AreEqual((byte)'Z', span[32]);
             Assert.AreEqual((byte)DataType.Float, span[33]);
             floatValue = MemoryMarshal.Read<float>(span.Slice(36, 4));
             Assert.AreEqual(12.2, floatValue, 0.00001);
-            
+
             // Fourth parameter (J"testok")
             Assert.AreEqual((byte)'J', span[40]);
             Assert.AreEqual((byte)DataType.String, span[41]);
@@ -141,13 +141,13 @@ namespace UnitTests.SPI
             Assert.AreEqual((byte)DataType.FloatArray, span[49]);
             intValue = MemoryMarshal.Read<int>(span.Slice(52, 4));
             Assert.AreEqual(3, intValue);
-            
+
             // Payload of fourth parameter ("test")
             string stringValue = Encoding.UTF8.GetString(span.Slice(56, 6));
             Assert.AreEqual("testok", stringValue);
             Assert.AreEqual(0, span[62]);
             Assert.AreEqual(0, span[63]);
-            
+
             // Payload of fifth parameter (12:3.45:5.67)
             floatValue = MemoryMarshal.Read<float>(span.Slice(64, 4));
             Assert.AreEqual(12, floatValue, 0.00001);
@@ -156,7 +156,7 @@ namespace UnitTests.SPI
             floatValue = MemoryMarshal.Read<float>(span.Slice(72, 4));
             Assert.AreEqual(5.67, floatValue, 0.00001);
         }
-        
+
         [Test]
         public void GetObjectModel()
         {
@@ -183,28 +183,28 @@ namespace UnitTests.SPI
             Assert.AreEqual(0, span[14]);
             Assert.AreEqual(0, span[15]);
         }
-        
+
         [Test]
         public void SetObjectModel()
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
-            
+
             int bytesWritten = Writer.WriteSetObjectModel(span, "foobar", "myval");
             Assert.AreEqual(24, bytesWritten);
-            
+
             // Header
             Assert.AreEqual((byte)DataType.String, span[0]);
             Assert.AreEqual(6, span[1]);                        // Field path length
             int intValue = MemoryMarshal.Read<int>(span.Slice(4, 4));
             Assert.AreEqual(5, intValue);
-            
+
             // Field path
             string field = Encoding.UTF8.GetString(span.Slice(8, 6));
             Assert.AreEqual("foobar", field);
             Assert.AreEqual(0, span[14]);
             Assert.AreEqual(0, span[15]);
-            
+
             // Field value
             string value = Encoding.UTF8.GetString(span.Slice(16, 5));
             Assert.AreEqual("myval", value);
@@ -214,7 +214,7 @@ namespace UnitTests.SPI
             Assert.AreEqual(0, span[22]);
             Assert.AreEqual(0, span[23]);
         }
-        
+
         [Test]
         public void PrintStarted()
         {
@@ -235,7 +235,7 @@ namespace UnitTests.SPI
             };
             info.Filament.Add(123.45F);
             info.Filament.Add(678.9F);
-            
+
             int bytesWritten = Writer.WritePrintStarted(span, info);
             Assert.AreEqual(72, bytesWritten);
 
@@ -264,11 +264,11 @@ namespace UnitTests.SPI
             Assert.AreEqual(123.45, filamentUsageA, 0.0001);
             float filamentUsageB = MemoryMarshal.Read<float>(span.Slice(44, 4));
             Assert.AreEqual(678.9, filamentUsageB, 0.0001);
-            
+
             // File name
             string fileName = Encoding.UTF8.GetString(span.Slice(48, info.FileName.Length));
             Assert.AreEqual(info.FileName, fileName);
-            
+
             // Generated by
             string generatedBy = Encoding.UTF8.GetString(span.Slice(48 + info.FileName.Length, info.GeneratedBy.Length));
             Assert.AreEqual(info.GeneratedBy, generatedBy);
@@ -347,14 +347,14 @@ namespace UnitTests.SPI
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
-            
+
             int bytesWritten = Writer.WriteMacroCompleted(span, DuetAPI.CodeChannel.File, false);
             Assert.AreEqual(4, bytesWritten);
-            
+
             // Header
             Assert.AreEqual((byte)DuetAPI.CodeChannel.File, span[0]);
             Assert.AreEqual(0, span[1]);
-            
+
             // Padding
             Assert.AreEqual(0, span[2]);
             Assert.AreEqual(0, span[3]);
@@ -362,7 +362,7 @@ namespace UnitTests.SPI
 
 
         [Test]
-        public void Heightmap()
+        public void SetHeightmap()
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
@@ -455,6 +455,52 @@ namespace UnitTests.SPI
             Assert.AreEqual("foo bar", filamentName);
         }
 
-#warning FIXME Add missing packets
+        [Test]
+        public void EvaluateExpression()
+        {
+            Span<byte> span = new byte[128];
+            span.Fill(0xFF);
+
+            int bytesWritten = Writer.WriteEvaluateExpression(span, DuetAPI.CodeChannel.SBC, "test expression");
+            Assert.AreEqual(20, bytesWritten);
+
+            // Header
+            Assert.AreEqual((byte)DuetAPI.CodeChannel.SBC, span[0]);
+            Assert.AreEqual(0, span[1]);
+            Assert.AreEqual(0, span[2]);
+            Assert.AreEqual(0, span[3]);
+
+            // Expression
+            string expression = Encoding.UTF8.GetString(span.Slice(4, 15));
+            Assert.AreEqual(expression, "test expression");
+
+            // Padding
+            Assert.AreEqual(0, span[19]);
+        }
+
+        [Test]
+        public void Message()
+        {
+            Span<byte> span = new byte[128];
+            span.Fill(0xFF);
+
+            int bytesWritten = Writer.WriteMessage(span, (MessageTypeFlags)(1 << (int)DuetAPI.CodeChannel.USB), "test\n");
+            Assert.AreEqual(16, bytesWritten);
+
+            // Header
+            uint messageFlags = MemoryMarshal.Read<uint>(span);
+            Assert.AreEqual((MessageTypeFlags)(1 << (int)DuetAPI.CodeChannel.USB), (MessageTypeFlags)messageFlags);
+            uint messageLength = MemoryMarshal.Read<uint>(span.Slice(4));
+            Assert.AreEqual(5, messageLength);
+
+            // Message
+            string message = Encoding.UTF8.GetString(span.Slice(8, 5));
+            Assert.AreEqual(message, "test\n");
+
+            // Padding
+            Assert.AreEqual(0, span[13]);
+            Assert.AreEqual(0, span[14]);
+            Assert.AreEqual(0, span[15]);
+        }
     }
 }

@@ -61,7 +61,7 @@ namespace DuetControlServer
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to load settings");
+                _logger.Fatal(e, "Failed to load settings");
                 return;
             }
 
@@ -83,7 +83,7 @@ namespace DuetControlServer
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to initialize environment");
+                _logger.Fatal(e, "Failed to initialize environment");
                 return;
             }
 
@@ -104,13 +104,13 @@ namespace DuetControlServer
                     }
                     else
                     {
-                        _logger.Error("Duet is not available");
+                        _logger.Fatal("Duet is not available");
                         return;
                     }
                 }
                 catch (Exception e)
                 {
-                    _logger.Error(e, "Failed to connect to Duet");
+                    _logger.Fatal(e, "Failed to connect to Duet");
                     return;
                 }
             }
@@ -123,7 +123,7 @@ namespace DuetControlServer
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to initialize IPC socket");
+                _logger.Fatal(e, "Failed to initialize IPC socket");
                 return;
             }
 

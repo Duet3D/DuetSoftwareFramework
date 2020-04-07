@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Machine;
 using DuetControlServer.Files;
+using DuetControlServer.Model;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -81,6 +82,7 @@ namespace DuetControlServer.Utility
                     {
                         if (extruderObject is Extruder extruder)
                         {
+                            // Extruder removed
                             extruder.PropertyChanged -= ExtruderPropertyChanged;
                         }
                     }
@@ -92,11 +94,11 @@ namespace DuetControlServer.Utility
                     {
                         if (extruderObject is Extruder extruder)
                         {
-                            int extruderDrive = Model.Provider.Get.Move.Extruders.IndexOf(extruder);
-                            if (_filamentMapping.TryGetValue(extruderDrive, out string filamentName) && extruder.Filament != filamentName)
+                            int extruderIndex = Provider.Get.Move.Extruders.IndexOf(extruder);
+                            if (_filamentMapping.TryGetValue(extruderIndex, out string filament) && extruder.Filament != filament)
                             {
-                                // Tell RepRapFirmware about the loaded filament
-                                SPI.Interface.AssignFilament(extruderDrive, filamentName);
+                                // Extruder added. Tell RepRapFirmware about the loaded filament
+                                SPI.Interface.AssignFilament(extruderIndex, filament);
                             }
                             extruder.PropertyChanged += ExtruderPropertyChanged;
                         }
@@ -117,11 +119,20 @@ namespace DuetControlServer.Utility
                 Extruder extruder = (Extruder)sender;
                 using (_lock.Lock())
                 {
-                    int extruderIndex = Model.Provider.Get.Move.Extruders.IndexOf(extruder);
+                    int extruderIndex = Provider.Get.Move.Extruders.IndexOf(extruder);
                     if (!_filamentMapping.TryGetValue(extruderIndex, out string filament) || filament != extruder.Filament)
                     {
-                        _filamentMapping[extruderIndex] = extruder.Filament;
-                        SaveMapping();
+                        if (!string.IsNullOrEmpty(filament) && MacroFile.RunningConfig)
+                        {
+                            // Booting RRF, tell it about the loaded filament
+                            SPI.Interface.AssignFilament(extruderIndex, filament);
+                        }
+                        else
+                        {
+                            // Filament changed
+                            _filamentMapping[extruderIndex] = extruder.Filament;
+                            SaveMapping();
+                        }
                     }
                 }
             }

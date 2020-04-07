@@ -8,31 +8,31 @@
         /// <summary>
         /// Time left based on filament consumption (in s or null)
         /// </summary>
-        public float? Filament
+        public int? Filament
         {
             get => _filament;
 			set => SetPropertyValue(ref _filament, value);
         }
-        private float? _filament;
+        private int? _filament;
 
         /// <summary>
         /// Time left based on file progress (in s or null)
         /// </summary>
-        public float? File
+        public int? File
         {
             get => _file;
 			set => SetPropertyValue(ref _file, value);
         }
-        private float? _file;
+        private int? _file;
         
         /// <summary>
         /// Time left based on the layer progress (in s or null)
         /// </summary>
-        public float? Layer
+        public int? Layer
         {
             get => _layer;
 			set => SetPropertyValue(ref _layer, value);
         }
-        private float? _layer;
+        private int? _layer;
     }
 }
