@@ -49,7 +49,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task Start(string filename)
         {
-            using (await _lock.LockAsync())
+            using (await _lock.LockAsync(Program.CancellationToken))
             {
                 // Close any open file
                 await StopInternal();
@@ -76,7 +76,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task Stop()
         {
-            using (await _lock.LockAsync())
+            using (await _lock.LockAsync(Program.CancellationToken))
             {
                 await StopInternal();
             }
@@ -119,7 +119,7 @@ namespace DuetControlServer.Utility
         /// <param name="msg">Message to log</param>
         public static async Task Log(Message msg)
         {
-            using (await _lock.LockAsync())
+            using (await _lock.LockAsync(Program.CancellationToken))
             {
                 if (_writer != null && !string.IsNullOrWhiteSpace(msg.Content))
                 {

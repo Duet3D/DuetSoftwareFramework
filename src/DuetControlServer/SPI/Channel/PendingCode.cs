@@ -1,29 +1,26 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.Machine;
+using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.Shared;
 using System;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.SPI
+namespace DuetControlServer.SPI.Channel
 {
     /// <summary>
-    /// Class that represents a queued code item.
-    /// There is no need to serialize/deserialize data, so no properties in here 
+    /// Class that represents a queued code that has been sent to RepRapFirmware
     /// </summary>
-    public class QueuedCode
+    public sealed class PendingCode
     {
+        /// <summary>
+        /// Internal code result to return when the code has finished
+        /// </summary>
         private readonly CodeResult _result = new CodeResult();
-        private readonly TaskCompletionSource<CodeResult> _tcs = new TaskCompletionSource<CodeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-        private bool _lastMessageIncomplete;
 
         /// <summary>
-        /// Constructor for a queued code
+        /// Task to complete when the code has finished
         /// </summary>
-        /// <param name="code">Code to execute</param>
-        public QueuedCode(Commands.Code code)
-        {
-            Code = code;
-        }
+        private readonly TaskCompletionSource<CodeResult> _tcs = new TaskCompletionSource<CodeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         /// <summary>
         /// Code item to execute
@@ -31,14 +28,24 @@ namespace DuetControlServer.SPI
         public Commands.Code Code { get; }
 
         /// <summary>
-        /// Indicates if the code is ready to be sent to the firmware
+        /// Size of this code in binary representation
         /// </summary>
-        public bool IsReadyToSend { get; set; }
+        public int BinarySize { get; }
 
         /// <summary>
-        /// Indicates if this code is currently suspended
+        /// Constructor for a queued code
         /// </summary>
-        public bool IsSuspended { get; set; }
+        /// <param name="code">Code to execute</param>
+        public PendingCode(Commands.Code code)
+        {
+            Code = code;
+            BinarySize = Consts.BufferedCodeHeaderSize + DataTransfer.GetCodeSize(code);
+        }
+
+        /// <summary>
+        /// Task that is resolved when the code has finished
+        /// </summary>
+        public Task<CodeResult> Task { get => _tcs.Task; }
 
         /// <summary>
         /// Indicates if the code has been finished because of a G-code reply
@@ -46,19 +53,9 @@ namespace DuetControlServer.SPI
         public bool IsFinished { get; private set; }
 
         /// <summary>
-        /// Size of this code in binary representation
+        /// Indicates if the last code reply was incomplete (i.e. sent with the Push flag)
         /// </summary>
-        public int BinarySize { get; set; }
-
-        /// <summary>
-        /// Indicates if RepRapFirmware requested a macro file for execution as part of this code
-        /// </summary>
-        public bool DoingNestedMacro { get; set; }
-
-        /// <summary>
-        /// Task that is resolved when the code has finished
-        /// </summary>
-        public Task<CodeResult> Task { get => _tcs.Task; }
+        private bool _lastMessageIncomplete;
 
         /// <summary>
         /// Process a code reply from the firmware
@@ -67,14 +64,7 @@ namespace DuetControlServer.SPI
         /// <param name="reply">Raw code reply</param>
         public void HandleReply(MessageTypeFlags messageType, string reply)
         {
-            if (string.IsNullOrEmpty(reply))
-            {
-                if (_result.Count == 0)
-                {
-                    _result.Add(MessageType.Success, string.Empty);
-                }
-            }
-            else
+            if (!string.IsNullOrEmpty(reply))
             {
                 if (_lastMessageIncomplete)
                 {
@@ -102,16 +92,15 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Process a code reply
+        /// Append a code reply
         /// </summary>
         /// <param name="result">Code reply</param>
-        public void HandleReply(CodeResult result)
+        public void AppendReply(CodeResult result)
         {
-            if (result != null && !result.IsEmpty)
+            if (!result.IsEmpty)
             {
                 _result.AddRange(result);
             }
-            SetFinished();
         }
 
         /// <summary>

@@ -53,11 +53,6 @@ namespace DuetControlServer.IPC.Processors
             /// List of intercepting connections
             /// </summary>
             public readonly List<Interception> Items = new List<Interception>();
-
-            /// <summary>
-            /// Current code being intercepted
-            /// </summary>
-            public Commands.Code CodeBeingIntercepted;
         }
 
         /// <summary>
@@ -239,7 +234,6 @@ namespace DuetControlServer.IPC.Processors
                     using (await _connections[type].LockAsync())
                     {
                         _connections[type].InterceptingConnection = processor.Connection.Id;
-                        _connections[type].CodeBeingIntercepted = code;
                         try
                         {
                             try
@@ -261,7 +255,6 @@ namespace DuetControlServer.IPC.Processors
                         finally
                         {
                             _connections[type].InterceptingConnection = -1;
-                            _connections[type].CodeBeingIntercepted = null;
                         }
                     }
                 }
@@ -279,26 +272,6 @@ namespace DuetControlServer.IPC.Processors
             return (_connections[InterceptionMode.Pre].InterceptingConnection == connection) ||
                    (_connections[InterceptionMode.Post].InterceptingConnection == connection) ||
                    (_connections[InterceptionMode.Executed].InterceptingConnection == connection);
-        }
-
-        /// <summary>
-        /// Checks if the given connection is currently intercepting a code and returns the code being intercepted
-        /// </summary>
-        /// <param name="sourceConnection">Connection to check</param>
-        /// <returns>Code being intercepted</returns>
-        public static async Task<Commands.Code> GetInterceptingCode(int sourceConnection)
-        {
-            foreach (InterceptionMode mode in Enum.GetValues(typeof(InterceptionMode)))
-            {
-                using (await _connections[mode].LockAsync())
-                {
-                    if (_connections[mode].InterceptingConnection == sourceConnection)
-                    {
-                        return _connections[mode].CodeBeingIntercepted;
-                    }
-                }
-            }
-            return null;
         }
     }
 }

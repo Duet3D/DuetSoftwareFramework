@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Machine;
+using DuetControlServer.FileExecution;
 using DuetControlServer.Files;
 using DuetControlServer.Model;
 using Nito.AsyncEx;
@@ -122,7 +123,7 @@ namespace DuetControlServer.Utility
                     int extruderIndex = Provider.Get.Move.Extruders.IndexOf(extruder);
                     if (!_filamentMapping.TryGetValue(extruderIndex, out string filament) || filament != extruder.Filament)
                     {
-                        if (!string.IsNullOrEmpty(filament) && MacroFile.RunningConfig)
+                        if (!string.IsNullOrEmpty(filament) && Macro.RunningConfig)
                         {
                             // Booting RRF, tell it about the loaded filament
                             SPI.Interface.AssignFilament(extruderIndex, filament);
@@ -143,7 +144,7 @@ namespace DuetControlServer.Utility
         /// </summary>
         private static async void SaveMapping()
         {
-            using (await _lock.LockAsync())
+            using (await _lock.LockAsync(Program.CancellationToken))
             {
                 string filename = await FilePath.ToPhysicalAsync(FilamentsCsvFile, FileDirectory.System);
                 using FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.Write);

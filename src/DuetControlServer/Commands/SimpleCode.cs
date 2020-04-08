@@ -76,6 +76,7 @@ namespace DuetControlServer.Commands
                     }
                     else if (IPC.Processors.Interception.IsInterceptingConnection(SourceConnection))
                     {
+                        // Need to bypass the ordering lock for codes being inserted...
                         priorityCodes.Add(code);
                     }
                     else

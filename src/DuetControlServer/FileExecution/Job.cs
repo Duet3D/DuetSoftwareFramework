@@ -35,13 +35,13 @@ namespace DuetControlServer.FileExecution
         /// Lock this class
         /// </summary>
         /// <returns>Disposable lock</returns>
-        public static IDisposable Lock() => _lock.Lock();
+        public static IDisposable Lock() => _lock.Lock(Program.CancellationToken);
 
         /// <summary>
         /// Lock this class asynchronously
         /// </summary>
         /// <returns>Disposable lock</returns>
-        public static AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync();
+        public static AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
 
         /// <summary>
         /// Condition to trigger when the print is supposed to resume
@@ -342,7 +342,7 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public static async Task Diagnostics(StringBuilder builder)
         {
-            using (await _lock.LockAsync())
+            using (await _lock.LockAsync(Program.CancellationToken))
             {
                 if (IsFileSelected)
                 {

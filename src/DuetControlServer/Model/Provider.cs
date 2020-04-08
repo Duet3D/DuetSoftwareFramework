@@ -188,7 +188,7 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task WaitForUpdate(CancellationToken cancellationToken)
         {
-            using (await _updateLock.LockAsync())
+            using (await _updateLock.LockAsync(cancellationToken))
             {
                 await _updateEvent.WaitAsync(cancellationToken);
                 Program.CancelSource.Token.ThrowIfCancellationRequested();

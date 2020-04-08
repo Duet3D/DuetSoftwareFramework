@@ -1,11 +1,11 @@
 ﻿using System.Threading.Tasks;
 
-namespace DuetControlServer.SPI
+namespace DuetControlServer.SPI.Channel
 {
     /// <summary>
     /// Queued lock/unlock request
     /// </summary>
-    public class QueuedLockRequest
+    public class LockRequest
     {
         /// <summary>
         /// Task completion source that completes when the lock request has been resolved
@@ -32,7 +32,7 @@ namespace DuetControlServer.SPI
         /// Creates a new queued lock/unlock request instance
         /// </summary>
         /// <param name="isLockRequest">Whether the resource shall be locked</param>
-        public QueuedLockRequest(bool isLockRequest) => IsLockRequest = isLockRequest;
+        public LockRequest(bool isLockRequest) => IsLockRequest = isLockRequest;
 
         /// <summary>
         /// Resolve the pending task with the given result

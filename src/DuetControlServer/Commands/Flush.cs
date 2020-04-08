@@ -17,14 +17,6 @@ namespace DuetControlServer.Commands
         /// Wait for all pending codes of the given channel to finish
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public override async Task<bool> Execute()
-        {
-            Code code = await IPC.Processors.Interception.GetInterceptingCode(SourceConnection);
-            if (code != null)
-            {
-                return await Interface.Flush(code);
-            }
-            return await Interface.Flush(Channel);
-        }
+        public override Task<bool> Execute() => Interface.Flush(Channel);
     }
 }
