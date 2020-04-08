@@ -126,12 +126,12 @@ namespace DuetControlServer.Files
 
         private static async Task WriteToolParameters(StreamWriter writer, bool forceWrite)
         {
-            if (Model.Provider.Get.Tools.Any(tool => tool.OffsetsProbed != 0))
+            if (Model.Provider.Get.Tools.Any(tool => tool != null && tool.OffsetsProbed != 0))
             {
                 await writer.WriteLineAsync("; Probed tool offsets");
                 foreach (Tool tool in Model.Provider.Get.Tools)
                 {
-                    if (tool.OffsetsProbed != 0 || forceWrite)
+                    if (tool != null && (tool.OffsetsProbed != 0 || forceWrite))
                     {
                         List<string> values = new List<string>();
                         for (int i = 0; i < Model.Provider.Get.Move.Axes.Count; i++)

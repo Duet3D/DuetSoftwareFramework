@@ -613,11 +613,14 @@ namespace DuetControlServer.SPI.Channel
             {
                 if (CurrentState.MacroCompleted)
                 {
-                    _logger.Info("Finished intermediate macro file {0}", Path.GetFileName(CurrentState.Macro.FileName));
+                    if (!CurrentState.Macro.HadError)
+                    {
+                        _logger.Info("Finished intermediate macro file {0}", Path.GetFileName(CurrentState.Macro.FileName));
+                    }
                     startCode = CurrentState.MacroStartCode;
                     Pop();
                 }
-                else if (fromCode && BufferedCodes.Count > 0)
+                else if (BufferedCodes.Count > 0)
                 {
                     startCode = BufferedCodes[0];
                     BytesBuffered -= startCode.BinarySize;
