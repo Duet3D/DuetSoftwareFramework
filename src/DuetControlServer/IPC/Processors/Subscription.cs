@@ -274,22 +274,29 @@ namespace DuetControlServer.IPC.Processors
                             return nodeObject;
                         }
 
-                        for (int k = currentList.Count; k > pathNode.Count; k--)
+                        for (int k = currentList.Count; k > pathNode.List.Count; k--)
                         {
                             currentList.RemoveAt(k - 1);
                         }
                     }
                     else
                     {
-                        currentList = new List<object>(pathNode.Count);
+                        currentList = new List<object>(pathNode.List.Count);
                         currentDictionary.Add(pathNode.Name, currentList);
                     }
 
                     Type itemType = (path[i + 1] is string) ? typeof(Dictionary<string, object>) : typeof(List<object>);
-                    for (int k = currentList.Count; k < pathNode.Count; k++)
+                    for (int k = currentList.Count; k < pathNode.List.Count; k++)
                     {
-                        object newItem = Activator.CreateInstance(itemType);
-                        currentList.Add(newItem);
+                        if (pathNode.List[k] == null)
+                        {
+                            currentList.Add(null);
+                        }
+                        else
+                        {
+                            object newItem = Activator.CreateInstance(itemType);
+                            currentList.Add(newItem);
+                        }
                     }
 
                     object currentItem = currentList[pathNode.Index];
@@ -362,25 +369,32 @@ namespace DuetControlServer.IPC.Processors
                             {
                                 objectCollectionList = (List<object>)objectCollection;
 
-                                for (int k = objectCollectionList.Count; k > pathNode.Count; k--)
+                                for (int k = objectCollectionList.Count; k > pathNode.List.Count; k--)
                                 {
                                     objectCollectionList.RemoveAt(k - 1);
                                 }
                             }
                             else
                             {
-                                objectCollectionList = new List<object>(pathNode.Count);
+                                objectCollectionList = new List<object>(pathNode.List.Count);
                                 objectCollectionNode.Add(pathNode.Name, objectCollectionList);
                             }
 
                             Type itemType = (value is IList) ? typeof(List<object>) : typeof(Dictionary<string, object>);
-                            for (int k = objectCollectionList.Count; k < pathNode.Count; k++)
+                            for (int k = objectCollectionList.Count; k < pathNode.List.Count; k++)
                             {
-                                object newItem = Activator.CreateInstance(itemType);
-                                objectCollectionList.Add(newItem);
+                                if (pathNode.List[k] == null)
+                                {
+                                    objectCollectionList.Add(null);
+                                }
+                                else
+                                {
+                                    object newItem = Activator.CreateInstance(itemType);
+                                    objectCollectionList.Add(newItem);
+                                }
                             }
 
-                            if (pathNode.Index < pathNode.Count)
+                            if (pathNode.Index < pathNode.List.Count)
                             {
                                 objectCollectionList[pathNode.Index] = value;
                             }

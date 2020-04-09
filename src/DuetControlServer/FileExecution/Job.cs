@@ -56,7 +56,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Job file being read from
         /// </summary>
-        private static BaseFile _file;
+        private static CodeFile _file;
 
         /// <summary>
         /// Indicates if a file has been selected for printing
@@ -120,7 +120,7 @@ namespace DuetControlServer.FileExecution
         {
             // Analyze and open the file
             ParsedFileInfo info = await InfoParser.Parse(fileName);
-            BaseFile file = new BaseFile(fileName, CodeChannel.File);
+            CodeFile file = new CodeFile(fileName, CodeChannel.File);
 
             // A file being printed may start another file print
             if (IsFileSelected)

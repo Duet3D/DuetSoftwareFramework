@@ -209,7 +209,7 @@ namespace DuetControlServer.SPI.Channel
                     }
                     else
                     {
-                        channelDiagostics.AppendLine($"Responding to invalid macro requested by: {((state.MacroStartCode == null) ? "system" : state.MacroStartCode.ToString())}");
+                        channelDiagostics.AppendLine($"Responding to invalid macro requested by {((state.MacroStartCode == null) ? "system" : state.MacroStartCode.ToString())}");
                     }
                 }
                 foreach (PendingCode suspendedCode in state.SuspendedCodes)

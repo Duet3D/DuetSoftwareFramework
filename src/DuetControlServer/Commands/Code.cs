@@ -117,7 +117,7 @@ namespace DuetControlServer.Commands
         private InternalCodeType _codeType;
 
         /// <summary>
-        /// Lock that is maintained as long as this code blocks the execution of the next code
+        /// Lock that is maintained as long as this code prevents the next code from being started
         /// </summary>
         private IDisposable _codeStartLock;
 
@@ -169,8 +169,7 @@ namespace DuetControlServer.Commands
                 _codeType = InternalCodeType.Regular;
                 _logger.Debug("Waiting for execution of {0}", this);
             }
-            AsyncLock startLock = (Macro == null) ? _codeStartLocks[(int)Channel, (int)_codeType] : Macro.StartLock;
-            return startLock.LockAsync(CancellationToken);
+            return _codeStartLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken);
         }
 
         /// <summary>
@@ -178,18 +177,20 @@ namespace DuetControlServer.Commands
         /// </summary>
         private void StartNextCode()
         {
-            _codeStartLock?.Dispose();
-            _codeStartLock = null;
+            if (_codeStartLock != null)
+            {
+                _codeStartLock.Dispose();
+                _codeStartLock = null;
+            }
         }
 
         /// <summary>
         /// Start the next available G/M/T-code and wait until this code may finish
         /// </summary>
-        /// <returns>Task that completes when the code may finish</returns>
+        /// <returns>Asynchronous task</returns>
         private AwaitableDisposable<IDisposable> WaitForFinish()
         {
-            AsyncLock finishLock = (Macro == null) ? _codeFinishLocks[(int)Channel, (int)_codeType] : Macro.FinishLock;
-            AwaitableDisposable<IDisposable> finishTask = finishLock.LockAsync(CancellationToken);
+            AwaitableDisposable<IDisposable> finishTask = _codeFinishLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken);
             if (!Flags.HasFlag(CodeFlags.Unbuffered))
             {
                 StartNextCode();
@@ -205,10 +206,10 @@ namespace DuetControlServer.Commands
         {
             if (_codeType == InternalCodeType.Regular || _codeType == InternalCodeType.Macro)
             {
-                int type = (int)(_codeType == InternalCodeType.Macro ? InternalCodeType.InsertedFromMacro : InternalCodeType.Inserted);
-                using (await _codeStartLocks[(int)Channel, type].LockAsync(CancellationToken))
+                int insertedType = (int)(_codeType == InternalCodeType.Macro ? InternalCodeType.InsertedFromMacro : InternalCodeType.Inserted);
+                using (await _codeStartLocks[(int)Channel, insertedType].LockAsync(CancellationToken))
                 {
-                    using (await _codeFinishLocks[(int)Channel, type].LockAsync(CancellationToken)) { }
+                    using (await _codeFinishLocks[(int)Channel, insertedType].LockAsync(CancellationToken)) { }
                 }
             }
         }
@@ -360,7 +361,10 @@ namespace DuetControlServer.Commands
             // Attempt to process the code internally first
             if (!InternallyProcessed && await ProcessInternally())
             {
-                await CodeExecuted();
+                using (await WaitForFinish())
+                {
+                    await CodeExecuted();
+                }
                 return;
             }
 
@@ -368,7 +372,10 @@ namespace DuetControlServer.Commands
             if (Type == CodeType.Comment)
             {
                 Result = new CodeResult();
-                await CodeExecuted();
+                using (await WaitForFinish())
+                {
+                    await CodeExecuted();
+                }
                 return;
             }
 
@@ -391,22 +398,30 @@ namespace DuetControlServer.Commands
                 rrfTask = Interface.ProcessCode(this);
             }
 
-            // Start the next available code and make sure to finish this code in the right order
-            using (await WaitForFinish())
+            // Start the next code if applicable to buffer codes in RRF for greater throughput
+            if (!Flags.HasFlag(CodeFlags.Unbuffered))
             {
-                try
+                StartNextCode();
+            }
+
+            try
+            {
+                // Wait for the code to be processed by RepRapFirmware
+                Result = await rrfTask;
+                using (await WaitForFinish())
                 {
-                    // Wait for the code to be processed by RepRapFirmware
-                    Result = await rrfTask;
                     await CodeExecuted();
                 }
-                catch (OperationCanceledException)
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancelling a code clears the result
+                Result = null;
+                using (await WaitForFinish())
                 {
-                    // Cancelling a code clears the result
-                    Result = null;
                     await CodeExecuted();
-                    throw;
                 }
+                throw;
             }
         }
 

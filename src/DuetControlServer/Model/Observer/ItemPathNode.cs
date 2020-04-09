@@ -24,12 +24,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Internal list reference
         /// </summary>
-        private readonly IList _list;
-
-        /// <summary>
-        /// Count of the items in the list or 0 if unknown
-        /// </summary>
-        public int Count { get => (_list != null) ? _list.Count : 0; }
+        public readonly IList List;
 
         /// <summary>
         /// Constructor of this class
@@ -41,7 +36,7 @@ namespace DuetControlServer.Model
         {
             Name = name;
             Index = index;
-            _list = list;
+            List = list;
         }
 
         /// <summary>
@@ -55,19 +50,19 @@ namespace DuetControlServer.Model
                     obj is ItemPathNode other &&
                     other.Name == Name &&
                     other.Index == Index &&
-                    other.Count == Count);
+                    other.List.Count == List.Count);
         }
 
         /// <summary>
         /// Compute a hash code for this instance
         /// </summary>
         /// <returns></returns>
-        public override int GetHashCode() => HashCode.Combine(Name.GetHashCode(), Index.GetHashCode(), Count.GetHashCode());
+        public override int GetHashCode() => HashCode.Combine(Name.GetHashCode(), Index.GetHashCode(), List.Count.GetHashCode());
 
         /// <summary>
         /// Convert an item node to a string (for debugging)
         /// </summary>
         /// <returns>String representation of this node</returns>
-        public override string ToString() => $"{Name}[{Index} of {Count}]";
+        public override string ToString() => $"{Name}[{Index} of {List.Count}]";
     }
 }

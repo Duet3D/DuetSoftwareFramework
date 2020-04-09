@@ -6,9 +6,9 @@ using System.IO;
 namespace DuetControlServer.Files
 {
     /// <summary>
-    /// Base class for files that read G-codes line by line
+    /// Class to read G/M/T-codes from files
     /// </summary>
-    public class BaseFile : IDisposable
+    public class CodeFile : IDisposable
     {
         /// <summary>
         /// File being read from
@@ -80,7 +80,7 @@ namespace DuetControlServer.Files
         /// </summary>
         /// <param name="fileName">Name of the file to process or null if it is optional</param>
         /// <param name="channel">Channel to send the codes to</param>
-        public BaseFile(string fileName, CodeChannel channel)
+        public CodeFile(string fileName, CodeChannel channel)
         {
             FileName = fileName;
             Channel = channel;
@@ -92,7 +92,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Finalizer of a base file
         /// </summary>
-        ~BaseFile() => Dispose(false);
+        ~CodeFile() => Dispose(false);
 
         /// <summary>
         /// Dispose this instance

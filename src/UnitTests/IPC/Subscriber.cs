@@ -1,4 +1,5 @@
-﻿using DuetControlServer.Model;
+﻿using DuetAPI.Machine;
+using DuetControlServer.Model;
 using NUnit.Framework;
 using System.Collections.Generic;
 
@@ -35,7 +36,7 @@ namespace UnitTests.IPC
             }
 
             // boards[0 of 2]/v12/current
-            object[] pathB = new object[] { new ItemPathNode("boards", 0, new object[2]), "v12", "current" };
+            object[] pathB = new object[] { new ItemPathNode("boards", 0, new object[] { new Board(), new Board() }), "v12", "current" };
             object resultB = DuetControlServer.IPC.Processors.Subscription.GetPathNode(root, pathB);
 
             Assert.AreEqual(2, root.Count);
@@ -85,7 +86,7 @@ namespace UnitTests.IPC
             }
 
             // move.axes[0 of 2].homed
-            object[] pathC = new object[] { "move", new ItemPathNode("axes", 0, new object[3]), "homed" };
+            object[] pathC = new object[] { "move", new ItemPathNode("axes", 0, new object[] { new Axis(), new Axis(), new Axis() }), "homed" };
             object resultC = DuetControlServer.IPC.Processors.Subscription.GetPathNode(root, pathC);
 
             Assert.AreEqual(3, root.Count);

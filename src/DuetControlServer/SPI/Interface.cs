@@ -392,7 +392,7 @@ namespace DuetControlServer.SPI
                 else
                 {
                     // Wait for the IAP binary to restart the controller
-                    DataTransfer.WaitForIapReset();
+                    await DataTransfer.WaitForIapReset();
                     _logger.Info("Firmware update successful");
                 }
             }

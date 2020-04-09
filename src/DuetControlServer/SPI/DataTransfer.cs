@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Model;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.SPI
 {
@@ -817,15 +818,8 @@ namespace DuetControlServer.SPI
                 segment.AsSpan(bytesRead).Fill(0xFF);
             }
 
-            // In theory the response of this could be checked to consist only of 0x1A bytes
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(segment, segment);
-
-            // If the IAP program does not respond with 0x1A, something is wrong
-            if (segment[0] != 0x1A)
-            {
-                throw new OperationCanceledException("Invalid response from IAP");
-            }
             return true;
         }
 
@@ -862,9 +856,12 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Wait for the IAP program to reset the controller
         /// </summary>
-        public static void WaitForIapReset()
+        public static async Task WaitForIapReset()
         {
-            Thread.Sleep(Consts.IapRebootDelay);
+            // Wait a moment for the firmware to start
+            await Task.Delay(Consts.IapRebootDelay);
+
+            // Wait for the first data transfer from the firmware
             _waitingForFirstTransfer = true;
         }
         

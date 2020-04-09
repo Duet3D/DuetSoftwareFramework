@@ -90,7 +90,7 @@ namespace DuetControlServer.Model
                         }
                         if (senderList.Count == 0)
                         {
-                            nodePath = AddToPath(path, new ItemPathNode(collectionName, 0, null));
+                            nodePath = AddToPath(path, new ItemPathNode(collectionName, 0, senderList));
                             OnPropertyPathChanged?.Invoke(nodePath, PropertyChangeType.ObjectCollection, null);
                         }
                         break;

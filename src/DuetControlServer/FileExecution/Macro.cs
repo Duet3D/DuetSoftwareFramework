@@ -67,7 +67,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// File to read from
         /// </summary>
-        private readonly BaseFile _file;
+        private readonly CodeFile _file;
 
         /// <summary>
         /// Name of the file being executed
@@ -147,7 +147,7 @@ namespace DuetControlServer.FileExecution
             _logger = NLog.LogManager.GetLogger(Path.GetFileName(fileName));
             try
             {
-                _file = new BaseFile(fileName, channel);
+                _file = new CodeFile(fileName, channel);
                 _logger.Info("Starting macro file on channel {0}", channel);
             }
             catch (Exception e)
@@ -338,16 +338,6 @@ namespace DuetControlServer.FileExecution
             // File has finished
             return null;
         }
-
-        /// <summary>
-        /// Internal lock to guarantee that macro codes are started in the right order
-        /// </summary>
-        internal AsyncLock StartLock { get; } = new AsyncLock();
-
-        /// <summary>
-        /// Internal lock to guarantee that macro codes are finished in the right order
-        /// </summary>
-        internal AsyncLock FinishLock { get; } = new AsyncLock();
 
         /// <summary>
         /// Indicates if this instance has been disposed

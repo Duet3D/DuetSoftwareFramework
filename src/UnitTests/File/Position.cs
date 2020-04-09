@@ -12,7 +12,7 @@ namespace UnitTests.File
         public void TestPosition()
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes/Cura.gcode");
-            BaseFile file = new BaseFile(filePath, DuetAPI.CodeChannel.File);
+            CodeFile file = new CodeFile(filePath, DuetAPI.CodeChannel.File);
             Code code;
 
             // Line 1
