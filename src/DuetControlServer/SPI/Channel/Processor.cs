@@ -609,6 +609,7 @@ namespace DuetControlServer.SPI.Channel
         {
             if (!CurrentState.WaitingForAcknowledgement)
             {
+                _logger.Debug("Waiting for acknowledgement");
                 Push().WaitingForAcknowledgement = true;
             }
         }
@@ -620,6 +621,7 @@ namespace DuetControlServer.SPI.Channel
         {
             if (CurrentState.WaitingForAcknowledgement)
             {
+                _logger.Debug("Message acknowledged");
                 Pop();
             }
         }

@@ -18,9 +18,9 @@ namespace DuetControlServer.FileExecution
     public sealed class Macro : IDisposable
     {
         /// <summary>
-        /// Logger instance
+        /// Static logger instance
         /// </summary>
-        private readonly NLog.Logger _logger;
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
         /// Lock for this instance
@@ -144,17 +144,16 @@ namespace DuetControlServer.FileExecution
             }
 
             // Try to start the macro file
-            _logger = NLog.LogManager.GetLogger(Path.GetFileName(fileName));
             try
             {
                 _file = new CodeFile(fileName, channel);
-                _logger.Info("Starting macro file on channel {0}", channel);
+                _logger.Info("Starting macro file {0} on channel {1}", name, channel);
             }
             catch (Exception e)
             {
                 if (!(e is FileNotFoundException))
                 {
-                    _logger.Error(e, "Failed to start macro file: {0}", e.Message);
+                    _logger.Error(e, "Failed to start macro file {0}: {1}", name, e.Message);
                 }
                 HadError = true;
             }
@@ -183,8 +182,15 @@ namespace DuetControlServer.FileExecution
 
             _cts.Cancel();
             _file?.Abort();
-
-            _logger.Info("Aborted macro file");
+            
+            if (FileName != null)
+            {
+                _logger.Info("Aborted macro file {0}", Path.GetFileName(FileName));
+            }
+            else
+            {
+                _logger.Info("Aborted invalid macro file");
+            }
         }
 
         /// <summary>
@@ -256,7 +262,14 @@ namespace DuetControlServer.FileExecution
                     using (await _lock.LockAsync(Program.CancellationToken))
                     {
                         // No more codes to process, macro file has finished
-                        _logger.Debug("Finished codes from macro file");
+                        if (FileName != null)
+                        {
+                            _logger.Debug("Finished codes from macro file {0}", Path.GetFileName(FileName));
+                        }
+                        else
+                        {
+                            _logger.Debug("Finished codes from invalid macro file (non-existent config?)");
+                        }
                         IsExecuting = false;
                     }
                     break;
@@ -331,7 +344,7 @@ namespace DuetControlServer.FileExecution
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to read code from macro file", Path.GetFileName(FileName));
+                _logger.Error(e, "Failed to read code from macro file {0}", Path.GetFileName(FileName));
                 Abort();
             }
 
