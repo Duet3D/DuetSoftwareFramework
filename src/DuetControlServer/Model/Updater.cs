@@ -2,6 +2,7 @@
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -157,6 +158,9 @@ namespace DuetControlServer.Model
                                     }
                                 }
 
+                                // Update the layers
+                                UpdateLayers();
+
                                 if (objectModelSynchronized)
                                 {
                                     // Notify clients waiting for the machine model to be synchronized
@@ -200,6 +204,67 @@ namespace DuetControlServer.Model
                 }
             }
             while (true);
+        }
+
+        /// <summary>
+        /// Update the layers
+        /// </summary>
+        private static void UpdateLayers()
+        {
+            if (Provider.Get.State.Status != MachineStatus.Processing && Provider.Get.State.Status != MachineStatus.Simulating)
+            {
+                // Don't do anything if no print is in progress
+                return;
+            }
+
+            // Check if the last layer is complete
+            if (Provider.Get.Job.Layer > Provider.Get.Job.Layers.Count + 1)
+            {
+                float[] extrRaw = (from extruder in Provider.Get.Move.Extruders
+                                   where extruder != null
+                                   select extruder.RawPosition).ToArray();
+                float fractionPrinted = (float)((double)Provider.Get.Job.FilePosition / Provider.Get.Job.File.Size);
+                float currentHeight = Provider.Get.Move.Axes.FirstOrDefault(axis => axis.Letter == 'Z').UserPosition ?? 0F;
+
+                float lastHeight = 0F, lastProgress = 0F;
+                int lastDuration = 0;
+                float[] lastFilamentUsage = new float[extrRaw.Length];
+                foreach (Layer l in Provider.Get.Job.Layers)
+                {
+                    lastHeight += l.Height;
+                    lastDuration += l.Duration;
+                    lastProgress += l.FractionPrinted;
+                    for (int i = 0; i < Math.Min(lastFilamentUsage.Length, l.Filament.Count); i++)
+                    {
+                        lastFilamentUsage[i] += l.Filament[i];
+                    }
+                }
+
+                float[] filamentUsage = new float[extrRaw.Length];
+                for (int i = 0; i < filamentUsage.Length; i++)
+                {
+                    filamentUsage[i] = extrRaw[i] - lastFilamentUsage[i];
+                }
+
+                int printDuration = Provider.Get.Job.Duration.Value - Provider.Get.Job.WarmUpDuration.Value;
+                Layer layer = new Layer
+                {
+                    Duration = printDuration - lastDuration,
+                    FractionPrinted = fractionPrinted - lastProgress,
+                    Height = (Provider.Get.Job.Layer > 2) ? currentHeight - lastHeight : Provider.Get.Job.File.FirstLayerHeight
+                };
+                foreach (float filamentItem in filamentUsage)
+                {
+                    layer.Filament.Add(filamentItem);
+                }
+
+                Provider.Get.Job.Layers.Add(layer);
+            }
+            else if (Provider.Get.Job.Layer < Provider.Get.Job.Layers.Count)
+            {
+                // Starting a new print job, clear the layers
+                Provider.Get.Job.Layers.Clear();
+            }
         }
 
         /// <summary>

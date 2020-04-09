@@ -135,11 +135,11 @@
         /// <summary>
         /// Time needed to heat up the heaters (in s or null)
         /// </summary>
-        public float? WarmUpDuration
+        public int? WarmUpDuration
         {
             get => _warmUpDuration;
 			set => SetPropertyValue(ref _warmUpDuration, value);
         }
-        private float? _warmUpDuration;
+        private int? _warmUpDuration;
     }
 }

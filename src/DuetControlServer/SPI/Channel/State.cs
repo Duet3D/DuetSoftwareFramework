@@ -10,6 +10,11 @@ namespace DuetControlServer.SPI.Channel
     public class State
     {
         /// <summary>
+        /// Indicates if this state is waiting for a confirmation
+        /// </summary>
+        public bool WaitingForAcknowledgement { get; set; }
+
+        /// <summary>
         /// Queue of pending lock/unlock requests
         /// </summary>
         public Queue<LockRequest> LockRequests { get; } = new Queue<LockRequest>();
@@ -46,10 +51,5 @@ namespace DuetControlServer.SPI.Channel
         /// Queue of pending flush requests
         /// </summary>
         public Queue<TaskCompletionSource<bool>> FlushRequests { get; } = new Queue<TaskCompletionSource<bool>>();
-
-        /// <summary>
-        /// Indicates if this state is waiting for a confirmation
-        /// </summary>
-        public bool WaitingForAcknowledgement { get; set; }
     }
 }

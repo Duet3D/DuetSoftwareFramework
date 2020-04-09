@@ -259,9 +259,10 @@ namespace DuetControlServer.SPI
             {
                 _printStoppedReason = stopReason;
             }
+
             using (await _channels[CodeChannel.File].LockAsync())
             {
-                _channels[CodeChannel.File].InvalidateBuffer();
+                _channels[CodeChannel.File].Invalidate();
             }
         }
 
@@ -893,7 +894,7 @@ namespace DuetControlServer.SPI
             // Resolve pending and buffered codes on the file channel
             using (await _channels[CodeChannel.File].LockAsync())
             {
-                _channels[CodeChannel.File].InvalidateBuffer();
+                _channels[CodeChannel.File].Invalidate();
             }
         }
 

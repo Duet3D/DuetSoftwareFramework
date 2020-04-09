@@ -8,12 +8,12 @@
         /// <summary>
         /// Duration of the layer (in s or null if unknown)
         /// </summary>
-        public float Duration
+        public int Duration
         {
             get => _duration;
 			set => SetPropertyValue(ref _duration, value);
         }
-        private float _duration;
+        private int _duration;
 
         /// <summary>
         /// Actual amount of filament extruded during this layer (in mm)

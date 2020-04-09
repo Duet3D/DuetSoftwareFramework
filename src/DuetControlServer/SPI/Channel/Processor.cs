@@ -134,11 +134,23 @@ namespace DuetControlServer.SPI.Channel
             State oldState = Stack.Pop();
             CurrentState = Stack.Peek();
 
+            // Invalidate obsolete lock requests and supended codes
+            while (oldState.LockRequests.TryDequeue(out LockRequest lockRequest))
+            {
+                lockRequest.Resolve(false);
+            }
+
+            while (oldState.SuspendedCodes.TryDequeue(out PendingCode suspendedCode))
+            {
+                suspendedCode.SetCancelled();
+            }
+
             // Make sure macro files are properly disposed
             if (oldState.Macro != null)
             {
                 using (oldState.Macro.Lock())
                 {
+
                     if (oldState.Macro.IsExecuting)
                     {
                         oldState.Macro.Abort();
@@ -155,6 +167,17 @@ namespace DuetControlServer.SPI.Channel
                     }
                     oldState.Macro.Dispose();
                 }
+            }
+
+            // Invalidate pending codes and flush requests
+            while (oldState.PendingCodes.TryDequeue(out PendingCode pendingCode))
+            {
+                pendingCode.SetCancelled();
+            }
+
+            while (oldState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
+            {
+                source.SetResult(false);
             }
         }
 
@@ -197,6 +220,10 @@ namespace DuetControlServer.SPI.Channel
                     channelDiagostics.AppendLine("> Next stack level");
                 }
 
+                if (state.WaitingForAcknowledgement)
+                {
+                    channelDiagostics.AppendLine("Waiting for acknowledgement");
+                }
                 if (state.LockRequests.Count > 0)
                 {
                     channelDiagostics.AppendLine($"Number of lock/unlock requests: {state.LockRequests.Count(item => item.IsLockRequest)}/{state.LockRequests.Count(item => !item.IsLockRequest)}");
@@ -320,7 +347,6 @@ namespace DuetControlServer.SPI.Channel
         {
             while (CurrentState.Macro != null)
             {
-                InvalidateBuffer();
                 Pop();
                 if (!abortAll)
                 {
@@ -711,46 +737,6 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
-        /// Invalidate all the buffered G/M/T-codes
-        /// </summary>
-        public void InvalidateBuffer()
-        {
-            // Remove every buffered code of this channel if every code is being invalidated
-            foreach (PendingCode bufferedCode in BufferedCodes)
-            {
-                bufferedCode.SetCancelled();
-            }
-
-            BytesBuffered = 0;
-            BufferedCodes.Clear();
-
-            // Cancel pending lock/unlock requests
-            while (CurrentState.LockRequests.TryDequeue(out LockRequest lockRequest))
-            {
-                lockRequest.Resolve(false);
-            }
-
-            // Invalidate suspended and pending codes
-            while (CurrentState.SuspendedCodes.TryDequeue(out PendingCode suspendedCode))
-            {
-                suspendedCode.SetCancelled();
-            }
-            while (CurrentState.PendingCodes.TryDequeue(out PendingCode pendingCode))
-            {
-                pendingCode.SetCancelled();
-            }
-
-            // Cancel pending flush requests
-            while (CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
-            {
-                source.SetResult(false);
-            }
-
-            // Do not send codes to RRF until it has cleared its internal buffer
-            IsBlocked = true;
-        }
-
-        /// <summary>
         /// Invalidate every request and buffered code on this channel
         /// </summary>
         /// <returns>If any resource has been invalidated</returns>
@@ -758,8 +744,10 @@ namespace DuetControlServer.SPI.Channel
         {
             bool resourceInvalidated = false;
 
+            // Clear codes that are still pending but have not been fed into the SPI interface yet
             Code.CancelPending(Channel);
 
+            // Clear codes being processed
             foreach (PendingCode bufferedCode in BufferedCodes)
             {
                 bufferedCode.SetCancelled();
@@ -768,15 +756,16 @@ namespace DuetControlServer.SPI.Channel
             BufferedCodes.Clear();
             BytesBuffered = 0;
 
+            // Invalidate the stack
             do
             {
-                foreach (LockRequest lockRequest in CurrentState.LockRequests)
+                while (CurrentState.LockRequests.TryDequeue(out LockRequest lockRequest))
                 {
                     lockRequest.Resolve(false);
                     resourceInvalidated = true;
                 }
 
-                foreach (PendingCode suspendedCode in CurrentState.SuspendedCodes)
+                while (CurrentState.SuspendedCodes.TryDequeue(out PendingCode suspendedCode))
                 {
                     suspendedCode.SetCancelled();
                     resourceInvalidated = true;
@@ -785,7 +774,7 @@ namespace DuetControlServer.SPI.Channel
                 // Macro files and their start codes are disposed by Pop()
                 resourceInvalidated |= (CurrentState.Macro != null);
 
-                foreach (PendingCode pendingCode in CurrentState.PendingCodes)
+                while (CurrentState.PendingCodes.TryDequeue(out PendingCode pendingCode))
                 {
                     pendingCode.SetCancelled();
                     resourceInvalidated = true;
@@ -801,11 +790,11 @@ namespace DuetControlServer.SPI.Channel
                 {
                     break;
                 }
-
                 Pop();
             }
             while (true);
 
+            // Done
             IsBlocked = true;
             return resourceInvalidated;
         }
