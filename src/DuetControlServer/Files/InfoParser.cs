@@ -269,6 +269,8 @@ namespace DuetControlServer.Files
                 {
                     line = c + line;
                 }
+
+                Program.CancellationToken.ThrowIfCancellationRequested();
             }
             while (true);
         }

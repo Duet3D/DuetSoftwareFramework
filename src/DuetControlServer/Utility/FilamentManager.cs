@@ -65,7 +65,7 @@ namespace DuetControlServer.Utility
                 }
             }
 
-            Model.Provider.Get.Move.Extruders.CollectionChanged += Extruders_CollectionChanged;
+            Provider.Get.Move.Extruders.CollectionChanged += Extruders_CollectionChanged;
         }
 
         /// <summary>

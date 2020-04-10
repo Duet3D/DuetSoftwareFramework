@@ -182,13 +182,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Code channel</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task MessageAcknowledged(CodeChannel channel)
-        {
-            using (await _channels[channel].LockAsync())
-            {
-                _channels[channel].MessageAcknowledged();
-            }
-        }
+        public static Task MessageAcknowledged() => _channels.MessageAcknowledged();
 
         /// <summary>
         /// Enqueue a G/M/T-code synchronously and obtain a task that completes when the code has finished
@@ -782,12 +776,34 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Buffer for truncated log messages
+        /// </summary>
+        private static string _partialLogMessage;
+
+        /// <summary>
         /// Process an incoming message
         /// </summary>
         /// <returns>Asynchronous task</returns>
         private static async Task HandleMessage()
         {
             DataTransfer.ReadMessage(out MessageTypeFlags flags, out string reply);
+
+            // Deal with log messages
+            if (flags.HasFlag(MessageTypeFlags.LogMessage))
+            {
+                _partialLogMessage += reply;
+                if (!flags.HasFlag(MessageTypeFlags.PushFlag))
+                {
+                    if (!string.IsNullOrWhiteSpace(_partialLogMessage))
+                    {
+                        MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                                            : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                                                : MessageType.Success;
+                        await Utility.Logger.Log(type, _partialLogMessage);
+                    }
+                    _partialLogMessage = null;
+                }
+            }
 
             // Deal with generic replies
             if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage ||

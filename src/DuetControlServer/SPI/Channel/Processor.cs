@@ -4,9 +4,11 @@ using DuetAPI.Machine;
 using DuetControlServer.FileExecution;
 using DuetControlServer.Files;
 using DuetControlServer.SPI.Communication.Shared;
+using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -41,19 +43,6 @@ namespace DuetControlServer.SPI.Channel
 
             CurrentState = new State();
             Stack.Push(CurrentState);
-
-            Model.Provider.Get.Inputs[Channel].PropertyChanged += (sender, e) =>
-            {
-                if (e.PropertyName.Equals(nameof(InputChannel.State)) &&
-                    (InputChannelState)sender.GetType().GetProperty(e.PropertyName).GetValue(sender) != InputChannelState.AwaitingAcknowledgement)
-                {
-                    using (_lock.Lock())
-                    {
-                        // Make sure the G-code flow is resumed even if the message box is closed from RRF
-                        MessageAcknowledged();
-                    }
-                }
-            };
         }
 
         /// <summary>
@@ -134,6 +123,13 @@ namespace DuetControlServer.SPI.Channel
             State oldState = Stack.Pop();
             CurrentState = Stack.Peek();
 
+            // Remove potential event listeners
+            if (oldState.WaitingForAcknowledgement)
+            {
+                Model.Provider.Get.Inputs[Channel].PropertyChanged -= InputPropertyChanged;
+                _propertyChangedRegistered = false;
+            }
+
             // Invalidate obsolete lock requests and supended codes
             while (oldState.LockRequests.TryDequeue(out LockRequest lockRequest))
             {
@@ -150,10 +146,11 @@ namespace DuetControlServer.SPI.Channel
             {
                 using (oldState.Macro.Lock())
                 {
-
+                    bool macroAborted = false;
                     if (oldState.Macro.IsExecuting)
                     {
                         oldState.Macro.Abort();
+                        macroAborted = true;
                     }
                     else if (oldState.Macro.FileName != null)
                     {
@@ -163,6 +160,10 @@ namespace DuetControlServer.SPI.Channel
                     if (oldState.MacroStartCode != null)
                     {
                         oldState.MacroStartCode.AppendReply(oldState.Macro.Result);
+                        if (macroAborted)
+                        {
+                            oldState.MacroStartCode.SetFinished();
+                        }
                         _logger.Debug("==> Starting code: {0}", oldState.MacroStartCode);
                     }
                     oldState.Macro.Dispose();
@@ -232,7 +233,7 @@ namespace DuetControlServer.SPI.Channel
                 {
                     if (state.Macro.FileName != null)
                     {
-                        channelDiagostics.AppendLine($"{(state.Macro.IsExecuting ? "Executing" : "Finishing")} macro {state.Macro.FileName ?? "n/a"}, started by: {((state.MacroStartCode == null) ? "system" : state.MacroStartCode.ToString())}");
+                        channelDiagostics.AppendLine($"{(state.Macro.IsExecuting ? "Executing" : "Finishing")} macro {state.Macro.FileName ?? "n/a"}, started by {((state.MacroStartCode == null) ? "system" : state.MacroStartCode.ToString())}");
                     }
                     else
                     {
@@ -266,6 +267,11 @@ namespace DuetControlServer.SPI.Channel
         /// <param name="code">Code to process</param>
         public Task<CodeResult> ProcessCode(Code code)
         {
+            if (code.CancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<CodeResult>(code.CancellationToken);
+            }
+
             PendingCode item = new PendingCode(code);
             if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
             {
@@ -345,7 +351,12 @@ namespace DuetControlServer.SPI.Channel
         /// <param name="abortAll">Whether to abort all files</param>
         public void AbortFile(bool abortAll)
         {
-            while (CurrentState.Macro != null)
+            if (CurrentState.WaitingForAcknowledgement)
+            {
+                MessageAcknowledged();
+            }
+
+            while (CurrentState.Macro != null || CurrentState.WaitingForAcknowledgement)
             {
                 Pop();
                 if (!abortAll)
@@ -495,11 +506,11 @@ namespace DuetControlServer.SPI.Channel
                     }
                     catch (AggregateException ae)
                     {
-                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code} from firmware: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code} from firmware: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
                     }
                     catch (Exception e)
                     {
-                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code} from firmware: [{e.GetType().Name}] {e.Message}");
+                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code} from firmware: [{e.GetType().Name}] {e.Message}");
                     }
                 }, TaskContinuationOptions.RunContinuationsAsynchronously);
             }
@@ -540,8 +551,6 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Partial log message that has not been printed yet
         /// </summary>
-        private string _partialLogMessage;
-
         /// <summary>
         /// Handle a G-code reply
         /// </summary>
@@ -550,23 +559,6 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>Whether the reply could be processed</returns>
         public bool HandleReply(MessageTypeFlags flags, string reply)
         {
-            // Deal with log messages
-            if (flags.HasFlag(MessageTypeFlags.LogMessage))
-            {
-                _partialLogMessage += reply;
-                if (!flags.HasFlag(MessageTypeFlags.PushFlag))
-                {
-                    if (!string.IsNullOrWhiteSpace(_partialLogMessage))
-                    {
-                        MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
-                                            : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
-                                                : MessageType.Success;
-                        Utility.Logger.Log(type, _partialLogMessage);
-                    }
-                    _partialLogMessage = null;
-                }
-            }
-
             // Deal with codes being executed
             if (BufferedCodes.Count > 0)
             {
@@ -594,13 +586,58 @@ namespace DuetControlServer.SPI.Channel
                 return true;
             }
 
+            // Check if a possibly finished G-code (that showed a message box) tried to output an extra message
+            if (CurrentState.Macro != null || CurrentState.WaitingForAcknowledgement)
+            {
+                foreach (State state in Stack)
+                {
+                    if (state.Macro != null)
+                    {
+                        if (!string.IsNullOrEmpty(reply))
+                        {
+                            MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                                : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                                    : MessageType.Success;
+                            using (state.Macro.Lock())
+                            {
+                                state.Macro.Result.Add(type, reply);
+                            }
+                        }
+                        return true;
+                    }
+                }
+            }
+
             // Unless this message comes from the file or code queue it is out-of-order...
-            if (Channel != CodeChannel.File && Channel != CodeChannel.Queue && !string.IsNullOrEmpty(reply))
+            if (Channel != CodeChannel.Queue)
             {
                 _logger.Warn("Out-of-order reply: '{0}'", reply);
             }
             return false;
         }
+
+        /// <summary>
+        /// Event that is called when a property of this input channel in the OM has changed while waiting for acknowledgement
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event args</param>
+        private void InputPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName.Equals(nameof(InputChannel.State)) &&
+                (InputChannelState)sender.GetType().GetProperty(e.PropertyName).GetValue(sender) != InputChannelState.AwaitingAcknowledgement)
+            {
+                using (_lock.Lock())
+                {
+                    // Make sure the G-code flow is resumed even if the message box is closed from RRF
+                    MessageAcknowledged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Indicates if the event handler <see cref="InputPropertyChanged(object, PropertyChangedEventArgs)"/> is registered
+        /// </summary>
+        private bool _propertyChangedRegistered;
 
         /// <summary>
         /// Wait for a message to be acknowledged
@@ -610,7 +647,15 @@ namespace DuetControlServer.SPI.Channel
             if (!CurrentState.WaitingForAcknowledgement)
             {
                 _logger.Debug("Waiting for acknowledgement");
-                Push().WaitingForAcknowledgement = true;
+
+                State newState = Push();
+                newState.WaitingForAcknowledgement = true;
+
+                if (!_propertyChangedRegistered)
+                {
+                    Model.Provider.Get.Inputs[Channel].PropertyChanged += InputPropertyChanged;
+                    _propertyChangedRegistered = true;
+                }
             }
         }
 
@@ -685,7 +730,7 @@ namespace DuetControlServer.SPI.Channel
                     else
                     {
                         // No configuration file found
-                        await Utility.Logger.LogOutput(MessageType.Error, $"Macro files {FilePath.ConfigFile} and {FilePath.ConfigFileFallback} not found");
+                        await Logger.LogOutput(MessageType.Error, $"Macro files {FilePath.ConfigFile} and {FilePath.ConfigFileFallback} not found");
                     }
                 }
                 else if (reportMissing)
@@ -693,7 +738,7 @@ namespace DuetControlServer.SPI.Channel
                     if (!fromCode || BufferedCodes.Count == 0 || BufferedCodes[0].Code.Type != CodeType.MCode || BufferedCodes[0].Code.MajorNumber != 98)
                     {
                         // M98 outputs its own warning message via RRF
-                        await Utility.Logger.LogOutput(MessageType.Error, $"Macro file {fileName} not found");
+                        await Logger.LogOutput(MessageType.Error, $"Macro file {fileName} not found");
                     }
                 }
                 else if (FilePath.DeployProbePattern.IsMatch(fileName))
@@ -746,9 +791,6 @@ namespace DuetControlServer.SPI.Channel
         {
             bool resourceInvalidated = false;
 
-            // Clear codes that are still pending but have not been fed into the SPI interface yet
-            Code.CancelPending(Channel);
-
             // Clear codes being processed
             foreach (PendingCode bufferedCode in BufferedCodes)
             {
@@ -795,6 +837,9 @@ namespace DuetControlServer.SPI.Channel
                 Pop();
             }
             while (true);
+
+            // Clear codes that are still pending but have not been fed into the SPI interface yet
+            Code.CancelPending(Channel);
 
             // Done
             IsBlocked = true;

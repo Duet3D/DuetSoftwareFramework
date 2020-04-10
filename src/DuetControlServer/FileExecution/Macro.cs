@@ -275,7 +275,7 @@ namespace DuetControlServer.FileExecution
                     break;
                 }
             }
-            while (true);
+            while (!Program.CancellationToken.IsCancellationRequested);
         }
 
         /// <summary>

@@ -889,11 +889,6 @@ namespace DuetControlServer.Codes
                     }
                     break;
 
-                // Acknowledge message
-                case 292:
-                    await SPI.Interface.MessageAcknowledged(code.Channel);
-                    break;
-
                 // Set compatibility
                 case 555:
                     // FIXME Temporary until the machine model provides a field for this

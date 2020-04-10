@@ -86,7 +86,7 @@ namespace DuetControlServer.IPC
                         connectionTasks.Add(connectionTask);
                     }
                 }
-                while (true);
+                while (!Program.CancellationToken.IsCancellationRequested);
             }
             catch (SocketException)
             {
