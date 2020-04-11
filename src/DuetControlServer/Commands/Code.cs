@@ -169,7 +169,7 @@ namespace DuetControlServer.Commands
                 _codeType = InternalCodeType.Regular;
                 _logger.Debug("Waiting for execution of {0}", this);
             }
-            return _codeStartLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken);
+            return (Macro == null) ? _codeStartLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken) : Macro.WaitForCodeExecution();
         }
 
         /// <summary>

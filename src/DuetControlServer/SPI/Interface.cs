@@ -178,13 +178,6 @@ namespace DuetControlServer.SPI
         public static Task<CodeChannel> GetIdleChannel() => _channels.GetIdleChannel();
 
         /// <summary>
-        /// Called when a message has been acknowledged
-        /// </summary>
-        /// <param name="channel">Code channel</param>
-        /// <returns>Asynchronous task</returns>
-        public static Task MessageAcknowledged() => _channels.MessageAcknowledged();
-
-        /// <summary>
         /// Enqueue a G/M/T-code synchronously and obtain a task that completes when the code has finished
         /// </summary>
         /// <param name="code">Code to execute</param>
@@ -856,6 +849,8 @@ namespace DuetControlServer.SPI
         private static async Task HandleMacroRequest()
         {
             DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename);
+            _logger.Trace("Received macro request for file {0} on channel {1}", filename, channel);
+
             using (await _channels[channel].LockAsync())
             {
                 await _channels[channel].DoMacroFile(filename, reportMissing, fromCode);
@@ -870,14 +865,6 @@ namespace DuetControlServer.SPI
         {
             DataTransfer.ReadAbortFile(out CodeChannel channel, out bool abortAll);
             _logger.Info("Received file abort request on channel {0} for {1}", channel, abortAll ? "all files" : "the last file");
-
-            if (abortAll && channel == CodeChannel.File)
-            {
-                using (await FileExecution.Job.LockAsync())
-                {
-                    FileExecution.Job.Abort();
-                }
-            }
 
             using (await _channels[channel].LockAsync())
             {

@@ -414,7 +414,7 @@ namespace DuetControlServer.SPI.Serialization
                 throw new ArgumentException("Value is too long", nameof(info.FileName));
             }
 
-            Span<byte> unicodeGeneratedBy = Encoding.UTF8.GetBytes(info.GeneratedBy);
+            Span<byte> unicodeGeneratedBy = Encoding.UTF8.GetBytes(info.GeneratedBy ?? string.Empty);
             if (unicodeGeneratedBy.Length > 254)
             {
                 throw new ArgumentException("Value is too long", nameof(info.GeneratedBy));

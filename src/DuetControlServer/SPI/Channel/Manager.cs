@@ -86,21 +86,6 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
-        /// Called when a message box has been acknowledged
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public async Task MessageAcknowledged()
-        {
-            foreach (Processor channel in _channels)
-            {
-                using (await channel.LockAsync())
-                {
-                    channel.MessageAcknowledged();
-                }
-            }
-        }
-
-        /// <summary>
         /// Process requests in the G-code channel processors
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -110,7 +95,7 @@ namespace DuetControlServer.SPI.Channel
             do
             {
                 dataProcessed = false;
-                foreach (Channel.Processor channel in _channels)
+                foreach (Processor channel in _channels)
                 {
                     using (await channel.LockAsync())
                     {

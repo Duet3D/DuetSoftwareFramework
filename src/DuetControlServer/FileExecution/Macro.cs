@@ -65,6 +65,20 @@ namespace DuetControlServer.FileExecution
         private readonly CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
         /// <summary>
+        /// Internal lock used for starting codes in the right order
+        /// </summary>
+        private readonly AsyncLock _codeStartLock = new AsyncLock();
+
+        /// <summary>
+        /// Method to wait until a new code can be started in the right order
+        /// </summary>
+        /// <returns>Disposable lock</returns>
+        /// <remarks>
+        /// This is required in case a flush is requested before another nested macro is started
+        /// </remarks>
+        public AwaitableDisposable<IDisposable> WaitForCodeExecution() => _codeStartLock.LockAsync(_cts.Token);
+
+        /// <summary>
         /// File to read from
         /// </summary>
         private readonly CodeFile _file;
@@ -72,10 +86,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Name of the file being executed
         /// </summary>
-        public string FileName
-        {
-            get => _file?.FileName;
-        }
+        public string FileName { get; }
 
         /// <summary>
         /// Indicates if config.g is being processed
@@ -114,6 +125,11 @@ namespace DuetControlServer.FileExecution
         public bool IsExecuting { get; private set; }
 
         /// <summary>
+        /// Indicates if the macro file has been aborted
+        /// </summary>
+        public bool IsAborted { get; private set; }
+
+        /// <summary>
         /// Indicates if an error occurred while executing the macro file
         /// </summary>
         public bool HadError { get; private set; }
@@ -127,6 +143,7 @@ namespace DuetControlServer.FileExecution
         /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
         public Macro(string fileName, CodeChannel channel, bool isNested, int sourceConnection)
         {
+            FileName = fileName;
             Channel = channel;
             IsNested = isNested;
             SourceConnection = sourceConnection;
@@ -167,18 +184,17 @@ namespace DuetControlServer.FileExecution
             }
         }
 
-
         /// <summary>
         /// Abort this macro
         /// </summary>
         public void Abort()
         {
-            if (!IsExecuting)
+            if (IsAborted)
             {
                 return;
             }
             IsExecuting = false;
-            HadError = true;
+            IsAborted = HadError = true;
 
             _cts.Cancel();
             _file?.Abort();
@@ -262,14 +278,7 @@ namespace DuetControlServer.FileExecution
                     using (await _lock.LockAsync(Program.CancellationToken))
                     {
                         // No more codes to process, macro file has finished
-                        if (FileName != null)
-                        {
-                            _logger.Debug("Finished codes from macro file {0}", Path.GetFileName(FileName));
-                        }
-                        else
-                        {
-                            _logger.Debug("Finished codes from invalid macro file (non-existent config?)");
-                        }
+                        _logger.Debug("Finished codes from macro file {0}", Path.GetFileName(FileName));
                         IsExecuting = false;
                     }
                     break;
