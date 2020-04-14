@@ -259,7 +259,7 @@
         </member>
         <member name="P:DuetAPI.Commands.Code.Comment">
             <summary>
-            Comment of the G/M/T-code
+            Comment of the G/M/T-code. May be null if no comment is present
             </summary>
             <remarks>
             The parser combines different comment segments and concatenates them as a single value.
@@ -4411,7 +4411,7 @@
         </member>
         <member name="P:DuetAPI.Machine.Spindle.Current">
             <summary>
-            Current RPM
+            Current RPM, negative if anticlockwise direction
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Spindle.Frequency">
@@ -4592,6 +4592,46 @@
             Display a message box with an Ok button that sends M292 P0 or a cancel button that sends M292 P1 when clicked
             </summary>
         </member>
+        <member name="T:DuetAPI.Machine.RestorePoint">
+            <summary>
+            Class holding information about a restore point
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.RestorePoint.Coords">
+            <summary>
+            Axis coordinates of the the restore point (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.RestorePoint.ExtruderPos">
+            <summary>
+            The virtual extruder position at the start of this move
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.RestorePoint.FeedRate">
+            <summary>
+            Requested feedrate (in mm/s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.RestorePoint.IoBits">
+            <summary>
+            The output port bits setting for this move
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.RestorePoint.LaserPwm">
+            <summary>
+            Laser PWM value (0..1) or null if not applicable
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.RestorePoint.SpindleSpeeds">
+            <summary>
+            The spindle RPMs that were set, negative if anticlockwise direction
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.RestorePoint.ToolNumber">
+            <summary>
+            The tool number that was active
+            </summary>
+        </member>
         <member name="T:DuetAPI.Machine.State">
             <summary>
             Information about the machine state
@@ -4655,6 +4695,11 @@
         <member name="P:DuetAPI.Machine.State.PreviousTool">
             <summary>
             Number of the previous tool
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.RestorePoints">
+            <summary>
+            List of restore points
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.State.Status">

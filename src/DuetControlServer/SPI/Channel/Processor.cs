@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
@@ -96,8 +97,8 @@ namespace DuetControlServer.SPI.Channel
                 _logger.Debug("Suspending code {0}", bufferedCode);
                 CurrentState.SuspendedCodes.Enqueue(bufferedCode);
             }
-            BufferedCodes.Clear();
             BytesBuffered = 0;
+            BufferedCodes.Clear();
 
             // Do not send codes to RRF until it has cleared its internal buffer
             IsBlocked = true;
@@ -162,9 +163,10 @@ namespace DuetControlServer.SPI.Channel
                     if (oldState.MacroStartCode != null)
                     {
                         oldState.MacroStartCode.AppendReply(oldState.Macro.Result);
-                        _logger.Debug("==> Starting code: {0}", oldState.MacroStartCode);
+                        _logger.Debug("==> Unfinished starting code: {0}", oldState.MacroStartCode);
 
                         BufferedCodes.Insert(0, oldState.MacroStartCode);
+                        BytesBuffered += oldState.MacroStartCode.BinarySize;
                     }
                     oldState.Macro.Dispose();
                 }
@@ -349,7 +351,7 @@ namespace DuetControlServer.SPI.Channel
                 MessageAcknowledged();
             }
 
-            if (Channel == CodeChannel.File && CurrentState.Macro == null)
+            if (Channel == CodeChannel.File && (abortAll || CurrentState.Macro == null))
             {
                 using (FileExecution.Job.Lock())
                 {
@@ -357,8 +359,13 @@ namespace DuetControlServer.SPI.Channel
                 }
             }
 
+            PendingCode lastMacroStartCode = null;
             while (CurrentState.Macro != null || CurrentState.WaitingForAcknowledgement)
             {
+                if (CurrentState.MacroStartCode != null)
+                {
+                    lastMacroStartCode = CurrentState.MacroStartCode;
+                }
                 Pop();
                 if (!abortAll)
                 {
@@ -368,20 +375,20 @@ namespace DuetControlServer.SPI.Channel
 
             if (abortAll)
             {
-                foreach (PendingCode bufferedCode in BufferedCodes)
-                {
-                    bufferedCode.SetCancelled();
-                }
-                BufferedCodes.Clear();
-                BytesBuffered = 0;
+                // Cancel all buffered and regular codes. Macro codes have been invalidated at this point
+                InvalidateRegular();
             }
             else
             {
+                // Invalidate all the buffered codes except for the one that invoked the last macro file
                 for (int i = BufferedCodes.Count - 1; i > 0; i--)
                 {
-                    BufferedCodes[i].SetCancelled();
-                    BytesBuffered -= BufferedCodes[i].BinarySize;
-                    BufferedCodes.RemoveAt(i);
+                    if (BufferedCodes[i] != lastMacroStartCode)
+                    {
+                        BufferedCodes[i].SetCancelled();
+                        BytesBuffered -= BufferedCodes[i].BinarySize;
+                        BufferedCodes.RemoveAt(i);
+                    }
                 }
             }
         }
@@ -551,6 +558,13 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>True if the code could be buffered</returns>
         private bool BufferCode(PendingCode pendingCode)
         {
+            if (pendingCode.Code.CancellationToken.IsCancellationRequested)
+            {
+                // Don't send cancelled codes to the firmware...
+                pendingCode.SetCancelled();
+                return true;
+            }
+
             try
             {
                 if ((BytesBuffered == 0 || BytesBuffered + pendingCode.BinarySize <= Settings.MaxBufferSpacePerChannel) &&
@@ -570,6 +584,11 @@ namespace DuetControlServer.SPI.Channel
                 return true;
             }
         }
+
+        /// <summary>
+        /// Indicates if the next empty response is supposed to be suppressed (e.g. because a print event just occurred)
+        /// </summary>
+        private bool _suppressEmptyReply;
 
         /// <summary>
         /// Partial log message that has not been printed yet
@@ -606,9 +625,11 @@ namespace DuetControlServer.SPI.Channel
                     {
                         CurrentState.MacroStartCode = null;
                     }
-
                     Pop();
-                    _logger.Debug("==> Starting code: {0}", startCode);
+                    if (startCode.IsFinished)
+                    {
+                        _logger.Debug("==> Finished starting code: {0}", startCode);
+                    }
                     return true;
                 }
 
@@ -626,7 +647,14 @@ namespace DuetControlServer.SPI.Channel
             // Unless this message comes from the file or code queue it is out-of-order...
             if (Channel != CodeChannel.Queue)
             {
-                _logger.Warn("Out-of-order reply: '{0}'", reply);
+                if (!string.IsNullOrEmpty(reply) || !_suppressEmptyReply)
+                {
+                    _logger.Warn("Out-of-order reply: '{0}'", reply);
+                }
+                else
+                {
+                    _suppressEmptyReply = false;
+                }
             }
             return false;
         }
@@ -798,6 +826,47 @@ namespace DuetControlServer.SPI.Channel
             State newState = Push();
             newState.MacroStartCode = startCode;
             newState.Macro = new Macro(physicalFile, Channel, startCode != null, (startCode != null) ? startCode.Code.SourceConnection : 0);
+        }
+
+        /// <summary>
+        /// Invalidate buffered and regular codes + requests
+        /// </summary>
+        public void InvalidateRegular()
+        {
+            foreach (PendingCode bufferedCode in BufferedCodes)
+            {
+                bufferedCode.SetCancelled();
+            }
+            BytesBuffered = 0;
+            BufferedCodes.Clear();
+
+            foreach (State state in Stack)
+            {
+                if (!state.WaitingForAcknowledgement && state.Macro == null)
+                {
+                    while (state.LockRequests.TryDequeue(out LockRequest lockRequest))
+                    {
+                        lockRequest.Resolve(false);
+                    }
+
+                    while (state.SuspendedCodes.TryDequeue(out PendingCode suspendedCode))
+                    {
+                        suspendedCode.SetCancelled();
+                    }
+
+                    while (state.PendingCodes.TryDequeue(out PendingCode pendingCode))
+                    {
+                        pendingCode.SetCancelled();
+                    }
+
+                    while (state.FlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
+                    {
+                        source.SetResult(false);
+                    }
+                }
+            }
+
+            _suppressEmptyReply = true;
         }
 
         /// <summary>

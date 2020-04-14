@@ -60,11 +60,6 @@ namespace DuetControlServer.FileExecution
         public CodeResult Result { get; } = new CodeResult();
 
         /// <summary>
-        /// Internal cancellation token source used for codes
-        /// </summary>
-        private readonly CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-
-        /// <summary>
         /// Internal lock used for starting codes in the right order
         /// </summary>
         private readonly AsyncLock _codeStartLock = new AsyncLock();
@@ -76,7 +71,7 @@ namespace DuetControlServer.FileExecution
         /// <remarks>
         /// This is required in case a flush is requested before another nested macro is started
         /// </remarks>
-        public AwaitableDisposable<IDisposable> WaitForCodeExecution() => _codeStartLock.LockAsync(_cts.Token);
+        public AwaitableDisposable<IDisposable> WaitForCodeExecution() => _codeStartLock.LockAsync(_file.CancellationToken);
 
         /// <summary>
         /// File to read from
@@ -193,10 +188,8 @@ namespace DuetControlServer.FileExecution
             {
                 return;
             }
-            IsExecuting = false;
             IsAborted = HadError = true;
-
-            _cts.Cancel();
+            IsExecuting = false;
             _file?.Abort();
             
             if (FileName != null)
@@ -340,7 +333,6 @@ namespace DuetControlServer.FileExecution
                 // Update code information
                 if (result != null)
                 {
-                    result.CancellationToken = _cts.Token;
                     result.FilePosition = null;
                     result.Flags |= CodeFlags.IsFromMacro;
                     if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
@@ -389,7 +381,6 @@ namespace DuetControlServer.FileExecution
             }
 
             // Dispose the used resources
-            _cts.Dispose();
             _file?.Dispose();
             disposed = true;
         }

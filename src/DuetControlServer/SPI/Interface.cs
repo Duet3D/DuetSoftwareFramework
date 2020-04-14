@@ -249,7 +249,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[CodeChannel.File].LockAsync())
             {
-                _channels[CodeChannel.File].Invalidate();
+                _channels[CodeChannel.File].InvalidateRegular();
             }
         }
 
@@ -746,6 +746,7 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         private static void HandleObjectModel()
         {
+            _logger.Trace("Received object model");
             if (DataTransfer.ProtocolVersion == 1)
             {
                 DataTransfer.ReadLegacyConfigResponse(out ReadOnlySpan<byte> json);
@@ -780,6 +781,7 @@ namespace DuetControlServer.SPI
         private static async Task HandleMessage()
         {
             DataTransfer.ReadMessage(out MessageTypeFlags flags, out string reply);
+            _logger.Trace("Received message [{0}] {1}", flags, reply);
 
             // Deal with log messages
             if (flags.HasFlag(MessageTypeFlags.LogMessage))
@@ -879,14 +881,7 @@ namespace DuetControlServer.SPI
         private static async Task HandlePrintPaused()
         {
             DataTransfer.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
-
-            // Pause the print
-            using (await FileExecution.Job.LockAsync())
-            {
-                // Do NOT supply a file position if this is a pause request initiated from G-code because that would lead to an endless loop
-                bool filePositionValid = filePosition != Consts.NoFilePosition && pauseReason != PrintPausedReason.GCode && pauseReason != PrintPausedReason.FilamentChange;
-                FileExecution.Job.Pause(filePositionValid ? (long?)filePosition : null, pauseReason);
-            }
+            _logger.Trace("Received print pause notification for file position {0}, reason {1}", filePosition, pauseReason);
 
             // Update the object model
             using (await Model.Provider.AccessReadWriteAsync())
@@ -894,10 +889,18 @@ namespace DuetControlServer.SPI
                 Model.Provider.Get.State.Status = MachineStatus.Paused;
             }
 
+            // Pause the print
+            using (await FileExecution.Job.LockAsync())
+            {
+                // Do NOT supply a file position if this is a pause request initiated from G-code because that would lead to an endless loop
+                bool filePositionValid = (filePosition != Consts.NoFilePosition) && (pauseReason != PrintPausedReason.GCode) && (pauseReason != PrintPausedReason.FilamentChange);
+                FileExecution.Job.Pause(filePositionValid ? (long?)filePosition : null, pauseReason);
+            }
+
             // Resolve pending and buffered codes on the file channel
             using (await _channels[CodeChannel.File].LockAsync())
             {
-                _channels[CodeChannel.File].Invalidate();
+                _channels[CodeChannel.File].InvalidateRegular();
             }
         }
 
@@ -908,6 +911,8 @@ namespace DuetControlServer.SPI
         private static async Task HandleHeightMap()
         {
             DataTransfer.ReadHeightMap(out Heightmap map);
+            _logger.Trace("Received heightmap");
+
             using (await _heightmapLock.LockAsync(Program.CancellationToken))
             {
                 _getHeightmapRequest?.SetResult(map);
@@ -922,6 +927,7 @@ namespace DuetControlServer.SPI
         private static async Task HandleResourceLocked()
         {
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
+            _logger.Trace("Received resource locked notification for channel {0}", channel);
 
             using (await _channels[channel].LockAsync())
             {
@@ -963,6 +969,7 @@ namespace DuetControlServer.SPI
         private static void HandleEvaluationResult()
         {
             DataTransfer.ReadEvaluationResult(out string expression, out object result);
+            _logger.Trace("Received evaluation result for expression {0} = {1}", expression, result);
 
             lock (_evaluateExpressionRequests)
             {
@@ -991,6 +998,7 @@ namespace DuetControlServer.SPI
         private static async Task HandleDoCode()
         {
             DataTransfer.ReadDoCode(out CodeChannel channel, out string code);
+            _logger.Trace("Received firmware code request on channel {0} => {1}", channel, code);
 
             using (await _channels[channel].LockAsync())
             {
@@ -1001,6 +1009,7 @@ namespace DuetControlServer.SPI
         private static async Task HandleWaitForAcknowledgement()
         {
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
+            _logger.Trace("Received wait for message acknowledgement on channel {0}", channel);
 
             using (await _channels[channel].LockAsync())
             {

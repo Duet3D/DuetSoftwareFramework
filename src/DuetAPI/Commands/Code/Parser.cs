@@ -264,7 +264,7 @@ namespace DuetAPI.Commands
                             else if (int.TryParse(value, out int majorNumber))
                             {
                                 result.MajorNumber = majorNumber;
-                                unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
+                                unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 28 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
                             }
                             else if (!string.IsNullOrWhiteSpace(value) || result.Type != CodeType.TCode)
                             {

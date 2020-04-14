@@ -17,7 +17,7 @@
         private float _active;
         
         /// <summary>
-        /// Current RPM
+        /// Current RPM, negative if anticlockwise direction
         /// </summary>
         public float Current
         {

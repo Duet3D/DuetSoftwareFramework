@@ -2,6 +2,7 @@
 using DuetControlServer.Commands;
 using System;
 using System.IO;
+using System.Threading;
 
 namespace DuetControlServer.Files
 {
@@ -71,9 +72,37 @@ namespace DuetControlServer.Files
         public bool IsFinished { get; private set; }
 
         /// <summary>
+        /// Internal cancellation token source used for codes
+        /// </summary>
+        private CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+
+        /// <summary>
+        /// Cancellation token that is triggered when the file is cancelled/aborted
+        /// </summary>
+        public CancellationToken CancellationToken { get => _cts.Token; }
+
+        /// <summary>
+        /// Cancel pending codes
+        /// </summary>
+        public void CancelPendingCodes()
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+        }
+
+        /// <summary>
         /// Request cancellation of this file
         /// </summary>
-        public virtual void Abort() => IsAborted = IsFinished = true;
+        public virtual void Abort()
+        {
+            if (IsAborted)
+            {
+                return;
+            }
+            IsAborted = IsFinished = true;
+            _cts.Cancel();
+        }
 
         /// <summary>
         /// Constructor of the base class for reading from a G-code file
@@ -123,6 +152,7 @@ namespace DuetControlServer.Files
             {
                 _reader.Dispose();
                 _fileStream.Dispose();
+                _cts.Dispose();
             }
 
             disposed = true;
@@ -143,6 +173,7 @@ namespace DuetControlServer.Files
             // Read the next available non-empty code and keep track of the line number
             Code code = new Code()
             {
+                CancellationToken = _cts.Token,
                 Channel = Channel,
                 LineNumber = LineNumber,
                 FilePosition = Position

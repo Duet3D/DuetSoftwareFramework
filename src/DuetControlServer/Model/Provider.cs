@@ -42,11 +42,6 @@ namespace DuetControlServer.Model
             private readonly CancellationTokenSource _releaseCts;
 
             /// <summary>
-            /// CTS to trigger when the lock is released or the program is being terminated
-            /// </summary>
-            private readonly CancellationTokenSource _combinedCts;
-
-            /// <summary>
             /// Constructor of the lock wrapper
             /// </summary>
             /// <param name="lockItem">Actual lock</param>
@@ -58,21 +53,19 @@ namespace DuetControlServer.Model
 
                 if (Settings.MaxMachineModelLockTime > 0)
                 {
-                    _releaseCts = new CancellationTokenSource();
-                    _combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_releaseCts.Token, Program.CancelSource.Token);
+                    _releaseCts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
                     StackTrace stackTrace = new StackTrace(true);
                     _ = Task.Run(async () =>
                     {
                         try
                         {
-                            await Task.Delay(Settings.MaxMachineModelLockTime, _combinedCts.Token);
+                            await Task.Delay(Settings.MaxMachineModelLockTime, _releaseCts.Token);
                             _logger.Fatal("{0} deadlock detected, stack trace of the deadlock:\n{1}", isWriteLock ? "Writer" : "Reader", stackTrace);
                             Program.CancelSource.Cancel();
                         }
                         finally
                         {
-                            _combinedCts.Dispose();
                             _releaseCts.Dispose();
                         }
                     });

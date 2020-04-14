@@ -297,10 +297,13 @@ namespace DuetControlServer.FileExecution
         /// <param name="pauseReason">Reason why the print has been paused</param>
         public static void Pause(long? filePosition, PrintPausedReason pauseReason)
         {
-            Code.CancelPending(CodeChannel.File);
-            IsPaused = true;
-            _pausePosition = filePosition;
-            _pauseReason = pauseReason;
+            if (IsFileSelected)
+            {
+                _file.CancelPendingCodes();
+                IsPaused = true;
+                _pausePosition = filePosition;
+                _pauseReason = pauseReason;
+            }
         }
 
         /// <summary>
@@ -320,7 +323,6 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         public static void Cancel()
         {
-            Code.CancelPending(CodeChannel.File);
             _file?.Abort();
             Resume();
         }

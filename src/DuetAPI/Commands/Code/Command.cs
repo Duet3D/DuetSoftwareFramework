@@ -90,7 +90,7 @@ namespace DuetAPI.Commands
         public CodeFlags Flags { get; set; } = CodeFlags.None;
         
         /// <summary>
-        /// Comment of the G/M/T-code
+        /// Comment of the G/M/T-code. May be null if no comment is present
         /// </summary>
         /// <remarks>
         /// The parser combines different comment segments and concatenates them as a single value.

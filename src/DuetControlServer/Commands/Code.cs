@@ -107,7 +107,7 @@ namespace DuetControlServer.Commands
                 oldCTS.Dispose();
 
                 // Create a new one
-                _cancellationTokenSources[(int)channel] = new CancellationTokenSource();
+                _cancellationTokenSources[(int)channel] = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
             }
         }
 
@@ -303,7 +303,7 @@ namespace DuetControlServer.Commands
                 int numChannel = (int)Channel;
                 using (await FileLocks[numChannel].LockAsync(CancellationToken))
                 {
-                    if (FilesBeingWritten[numChannel] != null && Type != CodeType.MCode && MajorNumber != 29)
+                    if (FilesBeingWritten[numChannel] != null && (Type != CodeType.MCode || MajorNumber != 29))
                     {
                         _logger.Debug("Writing {0}{1}", this, logSuffix);
                         FilesBeingWritten[numChannel].WriteLine(this);

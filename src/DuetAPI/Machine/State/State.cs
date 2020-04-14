@@ -126,6 +126,11 @@
         private int _previousTool = -1;
 
         /// <summary>
+        /// List of restore points
+        /// </summary>
+        public ModelCollection<RestorePoint> RestorePoints { get; } = new ModelCollection<RestorePoint>();
+
+        /// <summary>
         /// Current state of the machine
         /// </summary>
         public MachineStatus Status

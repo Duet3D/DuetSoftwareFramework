@@ -27,6 +27,11 @@ namespace DuetControlServer.Utility
         private const string FilamentsCsvHeader = "RepRapFirmware filament assignment file v1";
 
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// Lock for this class
         /// </summary>
         private static readonly AsyncLock _lock = new AsyncLock();
@@ -99,6 +104,7 @@ namespace DuetControlServer.Utility
                             if (_filamentMapping.TryGetValue(extruderIndex, out string filament) && extruder.Filament != filament)
                             {
                                 // Extruder added. Tell RepRapFirmware about the loaded filament
+                                _logger.Debug("Assigning filament {0} to extruder drive {1}", filament, extruderIndex);
                                 SPI.Interface.AssignFilament(extruderIndex, filament);
                             }
                             extruder.PropertyChanged += ExtruderPropertyChanged;
@@ -126,11 +132,13 @@ namespace DuetControlServer.Utility
                         if (!string.IsNullOrEmpty(filament) && Macro.RunningConfig)
                         {
                             // Booting RRF, tell it about the loaded filament
+                            _logger.Debug("Assigning filament {0} to extruder drive {1}", filament, extruderIndex);
                             SPI.Interface.AssignFilament(extruderIndex, filament);
                         }
                         else
                         {
                             // Filament changed
+                            _logger.Debug("Filament {0} has been assigned to extruder drive {1}", extruder.Filament, extruderIndex);
                             _filamentMapping[extruderIndex] = extruder.Filament;
                             SaveMapping();
                         }
