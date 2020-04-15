@@ -3,6 +3,7 @@ using DuetControlServer.Files;
 using NUnit.Framework;
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace UnitTests.File
 {
@@ -10,14 +11,14 @@ namespace UnitTests.File
     public class Config
     {
         [Test]
-        public void ProcessConfig()
+        public async Task ProcessConfig()
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes/config.g");
             CodeFile macro = new CodeFile(filePath, DuetAPI.CodeChannel.Trigger);
 
             do
             {
-                Code code = macro.ReadCode();
+                Code code = await macro.ReadCodeAsync();
                 Console.WriteLine(code);
             } while (!macro.IsFinished);
 

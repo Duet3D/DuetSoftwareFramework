@@ -178,6 +178,19 @@ namespace DuetControlServer.SPI
         public static Task<CodeChannel> GetIdleChannel() => _channels.GetIdleChannel();
 
         /// <summary>
+        /// Check if a code channel is waiting for acknowledgement
+        /// </summary>
+        /// <param name="channel">Channel to query</param>
+        /// <returns>Whether the channel is awaiting acknowledgement</returns>
+        public static bool IsWaitingForAcknowledgement(CodeChannel channel)
+        {
+            using (_channels[channel].Lock())
+            {
+                return _channels[channel].IsWaitingForAcknowledgement;
+            }
+        }
+
+        /// <summary>
         /// Enqueue a G/M/T-code synchronously and obtain a task that completes when the code has finished
         /// </summary>
         /// <param name="code">Code to execute</param>
@@ -207,6 +220,19 @@ namespace DuetControlServer.SPI
             using (_channels[channel].Lock())
             {
                 return _channels[channel].Flush();
+            }
+        }
+
+        /// <summary>
+        /// Wait for all pending codes on the same stack level as the given code to finish
+        /// </summary>
+        /// <param name="code">Code waiting for the flush</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public static Task<bool> Flush(Code code)
+        {
+            using (_channels[code.Channel].Lock())
+            {
+                return _channels[code.Channel].Flush(code);
             }
         }
 
@@ -249,7 +275,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[CodeChannel.File].LockAsync())
             {
-                _channels[CodeChannel.File].InvalidateRegular();
+                _channels[CodeChannel.File].AbortFile(true, true);
             }
         }
 
@@ -870,7 +896,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[channel].LockAsync())
             {
-                _channels[channel].AbortFile(abortAll);
+                _channels[channel].AbortFile(abortAll, false);
             }
         }
 

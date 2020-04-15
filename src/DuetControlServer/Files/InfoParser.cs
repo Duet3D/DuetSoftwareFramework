@@ -51,7 +51,7 @@ namespace DuetControlServer.Files
         private static async Task ParseHeader(StreamReader reader, ParsedFileInfo partialFileInfo)
         {
             Code code = new Code() { LineNumber = 0 };     // keep track of the line number in case parsing errors occur
-            bool inRelativeMode = false, lastLineHadInfo = false, enforcingAbsolutePosition = false;
+            bool inRelativeMode = false, lastLineHadInfo = false;
             do
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
@@ -64,10 +64,10 @@ namespace DuetControlServer.Files
                 }
 
                 // See what codes to deal with
-                bool gotNewInfo = false;
+                bool gotNewInfo = false, seenNewLine = true;
                 using (StringReader stringReader = new StringReader(line))
                 {
-                    while (DuetAPI.Commands.Code.Parse(stringReader, code, ref enforcingAbsolutePosition))
+                    while (DuetAPI.Commands.Code.Parse(stringReader, code, ref seenNewLine))
                     {
                         if (code.Type == CodeType.GCode && partialFileInfo.FirstLayerHeight == 0)
                         {
@@ -135,7 +135,7 @@ namespace DuetControlServer.Files
             int bufferPointer = 0;
 
             Code code = new Code() { LineNumber = -1 };     // keep track of the line number in case parsing errors occur
-            bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = partialFileInfo.Filament.Count > 0, enforcingAbsolutePosition = false;
+            bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = partialFileInfo.Filament.Count > 0;
             do
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
@@ -149,10 +149,10 @@ namespace DuetControlServer.Files
                 bufferPointer = readResult.BufferPointer;
 
                 // See what codes to deal with
-                bool gotNewInfo = false;
+                bool gotNewInfo = false, seenNewLine = true;
                 using (StringReader stringReader = new StringReader(readResult.Line))
                 {
-                    while (DuetAPI.Commands.Code.Parse(stringReader, code, ref enforcingAbsolutePosition))
+                    while (DuetAPI.Commands.Code.Parse(stringReader, code, ref seenNewLine))
                     {
                         if (code.Type == CodeType.GCode && partialFileInfo.Height == 0)
                         {

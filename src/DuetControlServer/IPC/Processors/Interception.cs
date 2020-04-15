@@ -7,6 +7,7 @@ using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using Nito.AsyncEx;
+using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -36,7 +37,12 @@ namespace DuetControlServer.IPC.Processors
             /// <summary>
             /// Connection intercepting a running code
             /// </summary>
-            public volatile int InterceptingConnection = -1;
+            public int InterceptingConnection = -1;
+
+            /// <summary>
+            /// Current code being intercepted
+            /// </summary>
+            public Code CodeBeingIntercepted;
 
             /// <summary>
             /// Asynchronous lock for this interception type
@@ -45,6 +51,12 @@ namespace DuetControlServer.IPC.Processors
 
             /// <summary>
             /// Lock this connection container
+            /// </summary>
+            /// <returns>Disposable lock</returns>
+            public IDisposable Lock() => _lock.Lock(Program.CancellationToken);
+
+            /// <summary>
+            /// Lock this connection container asynchronously
             /// </summary>
             /// <returns>Disposable lock</returns>
             public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
@@ -234,27 +246,33 @@ namespace DuetControlServer.IPC.Processors
                     using (await _connections[type].LockAsync())
                     {
                         _connections[type].InterceptingConnection = processor.Connection.Id;
+                        _connections[type].CodeBeingIntercepted = code;
+                    }
+
+                    try
+                    {
                         try
                         {
-                            try
+                            processor.Connection.Logger.Debug("Intercepting code {0} ({1})", code, type);
+                            if (await processor.Intercept(code))
                             {
-                                processor.Connection.Logger.Debug("Intercepting code {0} ({1})", code, type);
-                                if (await processor.Intercept(code))
-                                {
-                                    processor.Connection.Logger.Debug("Code has been resolved");
-                                    return true;
-                                }
-                                processor.Connection.Logger.Debug("Code has been ignored");
+                                processor.Connection.Logger.Debug("Code has been resolved");
+                                return true;
                             }
-                            catch (OperationCanceledException)
-                            {
-                                processor.Connection.Logger.Debug("Code has been cancelled");
-                                throw;
-                            }
+                            processor.Connection.Logger.Debug("Code has been ignored");
                         }
-                        finally
+                        catch (OperationCanceledException)
+                        {
+                            processor.Connection.Logger.Debug("Code has been cancelled");
+                            throw;
+                        }
+                    }
+                    finally
+                    {
+                        using (await _connections[type].LockAsync())
                         {
                             _connections[type].InterceptingConnection = -1;
+                            _connections[type].CodeBeingIntercepted = null;
                         }
                     }
                 }
@@ -269,9 +287,37 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>True if the connection is intercepting a code</returns>
         public static bool IsInterceptingConnection(int connection)
         {
-            return (_connections[InterceptionMode.Pre].InterceptingConnection == connection) ||
-                   (_connections[InterceptionMode.Post].InterceptingConnection == connection) ||
-                   (_connections[InterceptionMode.Executed].InterceptingConnection == connection);
+            foreach (ConnectionContainer container in _connections.Values)
+            {
+                using (container.Lock())
+                {
+                    if (container.InterceptingConnection == connection)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Get the code being intercepted from a given connection
+        /// </summary>
+        /// <param name="connection">Connection ID to look up</param>
+        /// <returns>Code being intercepted</returns>
+        public static Code GetCodeBeingIntercepted(int connection)
+        {
+            foreach (ConnectionContainer container in _connections.Values)
+            {
+                using (container.Lock())
+                {
+                    if (container.InterceptingConnection == connection)
+                    {
+                        return container.CodeBeingIntercepted;
+                    }
+                }
+            }
+            return null;
         }
     }
 }

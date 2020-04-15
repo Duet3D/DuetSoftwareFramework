@@ -329,7 +329,7 @@
             </summary>
             <param name="reader">Input to read from</param>
             <param name="result">Code to fill</param>
-            <param name="enforcingAbsolutePosition">If G53 is in effect for the current line</param>
+            <param name="seenNewLine">If this is the first code or a NL character has been parsed</param>
             <returns>Whether anything could be read</returns>
             <exception cref="T:DuetAPI.Commands.CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
         </member>

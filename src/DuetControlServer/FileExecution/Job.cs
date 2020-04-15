@@ -181,7 +181,7 @@ namespace DuetControlServer.FileExecution
                         {
                             while (!IsPaused && codeTasks.Count < Math.Max(1, Settings.BufferedPrintCodes))
                             {
-                                Code readCode = _file.ReadCode();
+                                Code readCode = await _file.ReadCodeAsync();
                                 if (readCode == null)
                                 {
                                     break;

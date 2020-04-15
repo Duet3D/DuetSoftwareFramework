@@ -26,8 +26,8 @@ namespace DuetAPI.Commands
         {
             using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(code));
             using StreamReader reader = new StreamReader(stream);
-            bool enforcingAbsolutePosition = false;
-            Parse(reader, this, ref enforcingAbsolutePosition);
+            bool seenNewLine = true;
+            Parse(reader, this, ref seenNewLine);
         }
 
         /// <summary>

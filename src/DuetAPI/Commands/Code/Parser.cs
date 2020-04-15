@@ -14,24 +14,21 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="reader">Input to read from</param>
         /// <param name="result">Code to fill</param>
-        /// <param name="enforcingAbsolutePosition">If G53 is in effect for the current line</param>
+        /// <param name="seenNewLine">If this is the first code or a NL character has been parsed</param>
         /// <returns>Whether anything could be read</returns>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
-        public static bool Parse(TextReader reader, Code result, ref bool enforcingAbsolutePosition)
+        public static bool Parse(TextReader reader, Code result, ref bool seenNewLine)
         {
             char letter = '\0', c;
             string value = string.Empty;
 
             bool contentRead = false, unprecedentedParameter = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
-            bool readingAtStart = true, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
+            bool readingAtStart = seenNewLine, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
             bool wasQuoted = false, wasExpression = false;
+            seenNewLine = false;
 
             Encoding encoding = (reader is StreamReader sr) ? sr.CurrentEncoding : Encoding.UTF8;
-            if (enforcingAbsolutePosition)
-            {
-                result.Flags = CodeFlags.EnforceAbsolutePosition;
-            }
             result.Length = 0;
             do
             {
@@ -236,7 +233,6 @@ namespace DuetAPI.Commands
                             {
                                 result.MajorNumber = null;
                                 result.Flags |= CodeFlags.EnforceAbsolutePosition;
-                                enforcingAbsolutePosition = true;
                             }
 
                             result.Type = (CodeType)upperLetter;
@@ -401,7 +397,7 @@ namespace DuetAPI.Commands
                     }
                 }
             } while (c != '\n');
-            enforcingAbsolutePosition &= (c != '\n');
+            seenNewLine |= (c == '\n');
 
             // Do not allow malformed codes
             if (inEncapsulatedComment)

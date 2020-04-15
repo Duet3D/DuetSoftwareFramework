@@ -6,7 +6,6 @@ using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -218,7 +217,7 @@ namespace DuetControlServer.FileExecution
                 {
                     while (codes.Count < Settings.BufferedMacroCodes)
                     {
-                        Code readCode = ReadCode();
+                        Code readCode = await ReadCode();
                         if (readCode == null)
                         {
                             // No more codes available
@@ -283,8 +282,8 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Read the next available code
         /// </summary>
-        /// <returns></returns>
-        private Code ReadCode()
+        /// <returns>Read code</returns>
+        private async Task<Code> ReadCode()
         {
             Code result;
 
@@ -321,13 +320,13 @@ namespace DuetControlServer.FileExecution
                             break;
 
                         default:
-                            result = _file?.ReadCode();
+                            result = (_file != null) ? await _file.ReadCodeAsync() : null;
                             break;
                     }
                 }
                 else
                 {
-                    result = _file?.ReadCode();
+                    result = (_file != null) ? await _file.ReadCodeAsync() : null;
                 }
 
                 // Update code information

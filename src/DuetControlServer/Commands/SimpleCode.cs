@@ -43,14 +43,26 @@ namespace DuetControlServer.Commands
         {
             using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(Code));
             using StreamReader reader = new StreamReader(stream);
-            bool enforcingAbsolutePosition = false;
+
+            bool seenNewLine = true, enforcingAbsolutePositions = false;
+            byte indent = 0;
             while (!reader.EndOfStream)
             {
-                Code code = new Code() { Channel = Channel, SourceConnection = SourceConnection };
-                if (DuetAPI.Commands.Code.Parse(reader, code, ref enforcingAbsolutePosition))
+                Code code = new Code()
+                {
+                    Channel = Channel,
+                    Flags = enforcingAbsolutePositions ? CodeFlags.EnforceAbsolutePosition : CodeFlags.None,
+                    Indent = indent,
+                    SourceConnection = SourceConnection
+                };
+
+                if (DuetAPI.Commands.Code.Parse(reader, code, ref seenNewLine))
                 {
                     yield return code;
                 }
+
+                enforcingAbsolutePositions = seenNewLine ? false : code.Flags.HasFlag(CodeFlags.EnforceAbsolutePosition);
+                indent = seenNewLine ? (byte)0 : code.Indent;
             }
         }
 

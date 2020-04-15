@@ -37,7 +37,7 @@ namespace DuetControlServer.Codes
                 // Sleep or Conditional stop
                 case 0:
                 case 1:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         using (await FileExecution.Job.LockAsync())
                         {
@@ -60,7 +60,7 @@ namespace DuetControlServer.Codes
 
                 // List SD card
                 case 20:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         CodeParameter pParam = code.Parameter('P');
                         string directory = await FilePath.ToPhysicalAsync(pParam ?? "", FileDirectory.GCodes);
@@ -135,7 +135,7 @@ namespace DuetControlServer.Codes
                 // Select a file to print
                 case 23:
                 case 32:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         string file = code.GetUnprecedentedString();
                         if (string.IsNullOrWhiteSpace(file))
@@ -169,7 +169,7 @@ namespace DuetControlServer.Codes
 
                 // Resume a file print
                 case 24:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         using (await FileExecution.Job.LockAsync())
                         {
@@ -186,7 +186,7 @@ namespace DuetControlServer.Codes
 
                 // Set SD position
                 case 26:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         using (await FileExecution.Job.LockAsync())
                         {
@@ -210,7 +210,7 @@ namespace DuetControlServer.Codes
 
                 // Report SD print status
                 case 27:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         using (await FileExecution.Job.LockAsync())
                         {
@@ -225,7 +225,7 @@ namespace DuetControlServer.Codes
 
                 // Begin write to SD card
                 case 28:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         int numChannel = (int)code.Channel;
                         using (await Commands.Code.FileLocks[numChannel].LockAsync(code.CancellationToken))
@@ -261,7 +261,7 @@ namespace DuetControlServer.Codes
 
                 // End write to SD card
                 case 29:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         int numChannel = (int)code.Channel;
                         using (await Commands.Code.FileLocks[numChannel].LockAsync(code.CancellationToken))
@@ -286,7 +286,7 @@ namespace DuetControlServer.Codes
 
                 // Delete a file on the SD card
                 case 30:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         string file = code.GetUnprecedentedString();
                         string physicalFile = await FilePath.ToPhysicalAsync(file);
@@ -309,7 +309,7 @@ namespace DuetControlServer.Codes
                 case 36:
                     if (code.Parameters.Count > 0)
                     {
-                        if (await SPI.Interface.Flush(code.Channel))
+                        if (await SPI.Interface.Flush(code))
                         {
                             string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString());
                             try
@@ -331,7 +331,7 @@ namespace DuetControlServer.Codes
 
                 // Simulate file
                 case 37:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         CodeParameter pParam = code.Parameter('P');
                         if (pParam != null)
@@ -365,7 +365,7 @@ namespace DuetControlServer.Codes
 
                 // Compute SHA1 hash of target file
                 case 38:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         string file = code.GetUnprecedentedString();
                         string physicalFile = await FilePath.ToPhysicalAsync(file);
@@ -394,7 +394,7 @@ namespace DuetControlServer.Codes
 
                 // Report SD card information
                 case 39:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         using (await Model.Provider.AccessReadOnlyAsync())
                         {
@@ -455,7 +455,7 @@ namespace DuetControlServer.Codes
 
                 // Save heightmap
                 case 374:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
                         string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.System);
@@ -502,7 +502,7 @@ namespace DuetControlServer.Codes
 
                 // Load heightmap
                 case 375:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
                         string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.System);
@@ -545,7 +545,7 @@ namespace DuetControlServer.Codes
 
                 // Create Directory on SD-Card
                 case 470:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         string path = code.Parameter('P');
                         if (path == null)
@@ -568,7 +568,7 @@ namespace DuetControlServer.Codes
 
                 // Rename File/Directory on SD-Card
                 case 471:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         string from = code.Parameter('S');
                         string to = code.Parameter('T');
@@ -607,7 +607,7 @@ namespace DuetControlServer.Codes
 
                 // Store parameters
                 case 500:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         await ConfigOverride.Save(code);
                         return new CodeResult();
@@ -616,7 +616,7 @@ namespace DuetControlServer.Codes
 
                 // Print settings
                 case 503:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         string configFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFile, FileDirectory.System);
                         if (File.Exists(configFile))
@@ -637,7 +637,7 @@ namespace DuetControlServer.Codes
 
                 // Set configuration file folder
                 case 505:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         string directory = code.Parameter('P'), physicalDirectory = await FilePath.ToPhysicalAsync(directory, "sys");
                         if (Directory.Exists(physicalDirectory))
@@ -655,7 +655,7 @@ namespace DuetControlServer.Codes
 
                 // Set Name
                 case 550:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         // Verify the P parameter
                         string pParam = code.Parameter('P');
@@ -700,7 +700,7 @@ namespace DuetControlServer.Codes
 
                 // Configure filament
                 case 703:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
                         break;
@@ -709,7 +709,7 @@ namespace DuetControlServer.Codes
 
                 // Set current RTC date and time
                 case 905:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         bool seen = false;
 
@@ -750,7 +750,7 @@ namespace DuetControlServer.Codes
 
                 // Start/stop event logging to SD card
                 case 929:
-                    if (await SPI.Interface.Flush(code.Channel))
+                    if (await SPI.Interface.Flush(code))
                     {
                         CodeParameter sParam = code.Parameter('S');
                         if (sParam == null)
@@ -785,7 +785,7 @@ namespace DuetControlServer.Codes
                 case 997:
                     if (((int[])code.Parameter('S', new int[] { 0 })).Contains(0) && code.Parameter('B', 0) == 0)
                     {
-                        if (await SPI.Interface.Flush(code.Channel))
+                        if (await SPI.Interface.Flush(code))
                         {
                             string iapFile, firmwareFile;
                             using (await Model.Provider.AccessReadOnlyAsync())

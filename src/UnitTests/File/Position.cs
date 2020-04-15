@@ -2,6 +2,7 @@
 using DuetControlServer.Files;
 using NUnit.Framework;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace UnitTests.File
 {
@@ -9,24 +10,24 @@ namespace UnitTests.File
     public class Position
     {
         [Test]
-        public void TestPosition()
+        public async Task TestPosition()
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes/Cura.gcode");
             CodeFile file = new CodeFile(filePath, DuetAPI.CodeChannel.File);
             Code code;
 
             // Line 1
-            code = file.ReadCode();
+            code = await file.ReadCodeAsync();
             Assert.AreEqual(0, code.FilePosition);
             Assert.AreEqual(15, code.Length);
 
             // Line 2
-            code = file.ReadCode();
+            code = await file.ReadCodeAsync();
             Assert.AreEqual(15, code.FilePosition);
             Assert.AreEqual(11, code.Length);
 
             // Line 3
-            code = file.ReadCode();
+            code = await file.ReadCodeAsync();
             Assert.AreEqual(26, code.FilePosition);
             Assert.AreEqual(26, code.Length);
 
@@ -34,7 +35,7 @@ namespace UnitTests.File
             file.Position = 15;
 
             // Read it again
-            code = file.ReadCode();
+            code = await file.ReadCodeAsync();
             Assert.AreEqual(15, code.FilePosition);
             Assert.AreEqual(11, code.Length);
         }

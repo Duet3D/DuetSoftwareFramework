@@ -3,6 +3,7 @@ using DuetControlServer.Commands;
 using System;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.Files
 {
@@ -159,10 +160,10 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
-        /// Read the next available code
+        /// Read the next available code asynchronously
         /// </summary>
         /// <returns>Read code or null if none found</returns>
-        public virtual Code ReadCode()
+        public virtual Task<Code> ReadCodeAsync()
         {
             // Deal with closed files
             if (IsFinished || IsAborted)
@@ -192,9 +193,9 @@ namespace DuetControlServer.Files
             if (!codeRead)
             {
                 IsFinished = true;
-                return null;
+                return Task.FromResult<Code>(null);
             }
-            return code;
+            return Task.FromResult<Code>(code);
         }
     }
 }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -9,6 +8,7 @@ using DuetAPI.Connection;
 using DuetAPI.Machine;
 using DuetControlServer.Codes;
 using DuetControlServer.IPC.Processors;
+using DuetControlServer.Model;
 using DuetControlServer.SPI;
 using Nito.AsyncEx;
 
@@ -36,24 +36,29 @@ namespace DuetControlServer.Commands
             Regular = 0,
 
             /// <summary>
+            /// Regular G/M/T-code for a message prompt awaiting acknowledgement
+            /// </summary>
+            Acknowledgement = 1,
+
+            /// <summary>
             /// Inserted code from an intercepting connection
             /// </summary>
-            Inserted = 1,
+            Inserted = 2,
 
             /// <summary>
             /// Code from a macro file
             /// </summary>
-            Macro = 2,
+            Macro = 3,
 
             /// <summary>
             /// Inserted macro code from an intercepting connection
             /// </summary>
-            InsertedFromMacro = 3,
+            InsertedFromMacro = 4,
 
             /// <summary>
             /// Code with <see cref="CodeFlags.IsPrioritized"/> set
             /// </summary>
-            Prioritized = 4
+            Prioritized = 5
         }
 
         /// <summary>
@@ -145,31 +150,36 @@ namespace DuetControlServer.Commands
             {
                 _codeType = InternalCodeType.Prioritized;
                 _logger.Debug("Waiting for execution of {0} (prioritized)", this);
+                return _codeStartLocks[(int)Channel, (int)InternalCodeType.Prioritized].LockAsync(CancellationToken);
             }
-            else if (Interception.IsInterceptingConnection(SourceConnection))
+            if (Interception.IsInterceptingConnection(SourceConnection))
             {
                 if (Flags.HasFlag(CodeFlags.IsFromMacro))
                 {
                     _codeType = InternalCodeType.InsertedFromMacro;
                     _logger.Debug("Waiting for execution of {0} (inserted from macro)", this);
+                    return _codeStartLocks[(int)Channel, (int)InternalCodeType.InsertedFromMacro].LockAsync(CancellationToken);
                 }
-                else
-                {
-                    _codeType = InternalCodeType.Inserted;
-                    _logger.Debug("Waiting for execution of {0} (inserted)", this);
-                }
+                _codeType = InternalCodeType.Inserted;
+                _logger.Debug("Waiting for execution of {0} (inserted)", this);
+                return _codeStartLocks[(int)Channel, (int)InternalCodeType.Inserted].LockAsync(CancellationToken);
             }
-            else if (Flags.HasFlag(CodeFlags.IsFromMacro))
+            if (Flags.HasFlag(CodeFlags.IsFromMacro))
             {
                 _codeType = InternalCodeType.Macro;
                 _logger.Debug("Waiting for execution of {0} (macro code)", this);
+                return (Macro == null) ? _codeStartLocks[(int)Channel, (int)InternalCodeType.Macro].LockAsync(CancellationToken) : Macro.WaitForCodeExecution();
             }
-            else
+            // FIXME M0/M1 are not meant to be used while a message box is open
+            if (Interface.IsWaitingForAcknowledgement(Channel) && (Type != CodeType.MCode || (MajorNumber != 0 && MajorNumber != 1)))
             {
-                _codeType = InternalCodeType.Regular;
-                _logger.Debug("Waiting for execution of {0}", this);
+                _codeType = InternalCodeType.Acknowledgement;
+                _logger.Debug("Waiting for execution of {0} (acknowledgement)", this);
+                return _codeStartLocks[(int)Channel, (int)InternalCodeType.Acknowledgement].LockAsync(CancellationToken);
             }
-            return (Macro == null) ? _codeStartLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken) : Macro.WaitForCodeExecution();
+            _codeType = InternalCodeType.Regular;
+            _logger.Debug("Waiting for execution of {0}", this);
+            return _codeStartLocks[(int)Channel, (int)InternalCodeType.Regular].LockAsync(CancellationToken);
         }
 
         /// <summary>
@@ -241,12 +251,17 @@ namespace DuetControlServer.Commands
         /// <returns>True if Marlin is being emulated</returns>
         public async Task<bool> EmulatingMarlin()
         {
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Provider.AccessReadOnlyAsync())
             {
-                Compatibility compatibility = Model.Provider.Get.Inputs[Channel].Compatibility;
+                Compatibility compatibility = Provider.Get.Inputs[Channel].Compatibility;
                 return compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP;
             }
         }
+
+        /// <summary>
+        /// Indicates if this code is supposed to deal with a message box awaiting acknowledgement
+        /// </summary>
+        public bool IsForAcknowledgement { get => _codeType == InternalCodeType.Acknowledgement; }
 
         /// <summary>
         /// This indicates if this code is cancelling a print.
@@ -445,53 +460,20 @@ namespace DuetControlServer.Commands
                 }
             }
 
-            // Evaluate echo commands
-            if (Keyword == KeywordType.Echo)
+            // Expand Linux expressions
+            if (ExpressionParser.HasLinuxExpressions(this))
             {
-                if (!await Interface.Flush(Channel))
+                if (!await Interface.Flush(this))
                 {
                     throw new OperationCanceledException();
                 }
-
-                StringBuilder builder = new StringBuilder();
-                foreach (string expression in KeywordArgument.Split(','))
+#if false
+                await Model.Provider.WaitForUpdate(CancellationToken);
+                using (await Model.Provider.AccessReadOnlyAsync())
                 {
-                    string trimmedExpression = expression.Trim();
-                    try
-                    {
-                        // FIXME This should only replace Linux expressions after Pre and perform the final evaluation after Post
-                        bool expressionFound;
-                        object expressionResult;
-                        using (await Model.Provider.AccessReadOnlyAsync())
-                        {
-                            expressionFound = Model.Filter.GetSpecific(trimmedExpression, true, out expressionResult);
-                        }
-                        if (!expressionFound)
-                        {
-                            expressionResult = await Interface.EvaluateExpression(Channel, trimmedExpression);
-                        }
-
-                        if (builder.Length != 0)
-                        {
-                            builder.Append(' ');
-                        }
-                        builder.Append(expressionResult);
-                    }
-                    catch (CodeParserException e)
-                    {
-                        InternallyProcessed = true;
-                        Result = new CodeResult(MessageType.Error, $"Failed to evaluate \"{trimmedExpression}\": {e.Message}");
-                        return true;
-                    }
+                    await PrepareExpressions(Model.Provider.Get, false);
                 }
-
-                InternallyProcessed = true;
-                Result = new CodeResult(MessageType.Success, builder.ToString());
-                return true;
-            }
-            else if (Keyword != KeywordType.None)
-            {
-                throw new NotSupportedException();
+#endif
             }
 
             // Attempt to process the code internally
@@ -528,6 +510,32 @@ namespace DuetControlServer.Commands
                     ResolvedByInterceptor = InternallyProcessed = true;
                     return true;
                 }
+            }
+
+            // Evaluate echo commands
+            if (Keyword == KeywordType.Echo)
+            {
+                if (!await Interface.Flush(this))
+                {
+                    throw new OperationCanceledException();
+                }
+
+#if false
+                await Provider.WaitForUpdate(CancellationToken);
+                using (await Provider.AccessReadOnlyAsync())
+                {
+                    await PrepareExpressions(Provider.Get, true);
+                }
+#endif
+
+                InternallyProcessed = true;
+                Result = new CodeResult(MessageType.Success, KeywordArgument);
+                return true;
+            }
+            else if (Keyword != KeywordType.None)
+            {
+                // Other meta keywords must be handled before we get here...
+                throw new InvalidOperationException();
             }
 
             // Code has not been interpreted yet - let RRF deal with it

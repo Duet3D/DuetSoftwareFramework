@@ -76,14 +76,14 @@ namespace LinuxDevices
         /// <summary>
         /// Finalizer of this instance
         /// </summary>
-        ~InputGpioPin() => Dispose(false);
+        ~InputGpioPin() => DisposeInternal();
 
         /// <summary>
         /// Disposes this instance
         /// </summary>
         public void Dispose()
         {
-            Dispose(true);
+            DisposeInternal();
             GC.SuppressFinalize(this);
         }
 
@@ -96,7 +96,7 @@ namespace LinuxDevices
         /// Dispose this instance internally
         /// </summary>
         /// <param name="disposing">Release managed resources</param>
-        private void Dispose(bool disposing)
+        private void DisposeInternal()
         {
             if (disposed)
             {

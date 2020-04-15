@@ -423,6 +423,42 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseMultipleCodesIndented()
+        {
+            DuetControlServer.Commands.SimpleCode simpleCode = new DuetControlServer.Commands.SimpleCode { Code = "    G1 X5 Y5 G1 X10 Y10\nG1 X15 Y15" };
+            IList<DuetControlServer.Commands.Code> codes = simpleCode.Parse().ToList();
+
+            Assert.AreEqual(3, codes.Count);
+
+            Assert.AreEqual(CodeType.GCode, codes[0].Type);
+            Assert.AreEqual(4, codes[0].Indent);
+            Assert.AreEqual(1, codes[0].MajorNumber);
+            Assert.AreEqual(2, codes[0].Parameters.Count);
+            Assert.AreEqual('X', codes[0].Parameters[0].Letter);
+            Assert.AreEqual(5, (int)codes[0].Parameters[0]);
+            Assert.AreEqual('Y', codes[0].Parameters[1].Letter);
+            Assert.AreEqual(5, (int)codes[0].Parameters[1]);
+
+            Assert.AreEqual(CodeType.GCode, codes[1].Type);
+            Assert.AreEqual(4, codes[1].Indent);
+            Assert.AreEqual(1, codes[1].MajorNumber);
+            Assert.AreEqual(2, codes[1].Parameters.Count);
+            Assert.AreEqual('X', codes[1].Parameters[0].Letter);
+            Assert.AreEqual(10, (int)codes[1].Parameters[0]);
+            Assert.AreEqual('Y', codes[1].Parameters[1].Letter);
+            Assert.AreEqual(10, (int)codes[1].Parameters[1]);
+
+            Assert.AreEqual(CodeType.GCode, codes[2].Type);
+            Assert.AreEqual(0, codes[2].Indent);
+            Assert.AreEqual(1, codes[2].MajorNumber);
+            Assert.AreEqual(2, codes[2].Parameters.Count);
+            Assert.AreEqual('X', codes[2].Parameters[0].Letter);
+            Assert.AreEqual(15, (int)codes[2].Parameters[0]);
+            Assert.AreEqual('Y', codes[2].Parameters[1].Letter);
+            Assert.AreEqual(15, (int)codes[2].Parameters[1]);
+        }
+
+        [Test]
         public void ParseCompactCode()
         {
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M302D\"dummy\"P1");
