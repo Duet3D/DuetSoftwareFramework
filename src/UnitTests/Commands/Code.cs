@@ -338,7 +338,7 @@ namespace UnitTests.Commands
         [Test]
         public void ParseKeywords()
         {
-            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("  if machine.tool.is.great <= 0.03 (some nice) ; comment");
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("  if machine.tool.is.great <= 0.03 (some nice); comment");
             Assert.AreEqual(2, code.Indent);
             Assert.AreEqual(KeywordType.If, code.Keyword);
             Assert.AreEqual("machine.tool.is.great <= 0.03", code.KeywordArgument);
@@ -380,6 +380,10 @@ namespace UnitTests.Commands
             Assert.AreEqual(2, code.Indent);
             Assert.AreEqual(KeywordType.Set, code.Keyword);
             Assert.AreEqual("asdf=\"meh\"", code.KeywordArgument);
+
+            code = new DuetControlServer.Commands.Code("echo {{3 + 3} + (volumes[0].freeSpace - 4)}");
+            Assert.AreEqual(KeywordType.Echo, code.Keyword);
+            Assert.AreEqual("{{3 + 3} + (volumes[0].freeSpace - 4)}", code.KeywordArgument);
         }
 
         [Test]

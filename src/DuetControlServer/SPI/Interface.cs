@@ -50,11 +50,16 @@ namespace DuetControlServer.SPI
         private static Stream _iapStream, _firmwareStream;
         private static TaskCompletionSource<object> _firmwareUpdateRequest;
 
+        // Firmware halt/restart requests
+        private static readonly AsyncLock _firmwareActionLock = new AsyncLock();
+        private static TaskCompletionSource<object> _firmwareHaltRequest;
+        private static TaskCompletionSource<object> _firmwareResetRequest;
+
         // Miscellaneous requests
         private static readonly Queue<Tuple<int, string>> _extruderFilamentUpdates = new Queue<Tuple<int, string>>();
         private static readonly AsyncLock _printStopppedReasonLock = new AsyncLock();
         private static PrintStoppedReason? _printStoppedReason;
-        private static volatile bool _emergencyStopRequested, _resetRequested, _printStarted, _assignFilaments;
+        private static volatile bool _printStarted, _assignFilaments;
         private static readonly Queue<Tuple<MessageTypeFlags, string>> _messagesToSend = new Queue<Tuple<MessageTypeFlags, string>>();
 
         // Partial incoming message (if any)
@@ -120,6 +125,7 @@ namespace DuetControlServer.SPI
 
                 EvaluateExpressionRequest newItem = new EvaluateExpressionRequest(channel, expression);
                 _evaluateExpressionRequests.Add(newItem);
+                _logger.Debug("Evaluating {0} on channel {1}", expression, channel);
                 return newItem.Task;
             }
         }
@@ -240,20 +246,40 @@ namespace DuetControlServer.SPI
         /// Request an immediate emergency stop
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task RequestEmergencyStop()
+        public static async Task EmergencyStop()
         {
-            _emergencyStopRequested = true;
             await Invalidate("Firmware halted");
+
+            Task onFirmwareHalted;
+            using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
+            {
+                if (_firmwareHaltRequest == null)
+                {
+                    _firmwareHaltRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+                onFirmwareHalted = _firmwareHaltRequest.Task;
+            }
+            await onFirmwareHalted;
         }
 
         /// <summary>
-        /// Request a firmware reset
+        /// Perform a firmware reset and wait for it to finish
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task RequestReset()
+        public static async Task Reset()
         {
-            _resetRequested = true;
             await Invalidate("Firmware reset imminent");
+
+            Task onFirmwareReset;
+            using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
+            {
+                if (_firmwareResetRequest == null)
+                {
+                    _firmwareResetRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+                onFirmwareReset = _firmwareResetRequest.Task;
+            }
+            await onFirmwareReset;
         }
 
         /// <summary>
@@ -474,20 +500,27 @@ namespace DuetControlServer.SPI
 
             do
             {
-                // Check if an emergency stop has been requested
-                if (_emergencyStopRequested && DataTransfer.WriteEmergencyStop())
+                using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
                 {
-                    _emergencyStopRequested = false;
-                    _logger.Warn("Emergency stop");
-                    DataTransfer.PerformFullTransfer();
-                }
+                    // Check if an emergency stop has been requested
+                    if (_firmwareHaltRequest != null && DataTransfer.WriteEmergencyStop())
+                    {
+                        _logger.Warn("Emergency stop");
+                        DataTransfer.PerformFullTransfer();
 
-                // Check if a firmware reset has been requested
-                if (_resetRequested && DataTransfer.WriteReset())
-                {
-                    _resetRequested = false;
-                    _logger.Warn("Resetting controller");
-                    DataTransfer.PerformFullTransfer();
+                        _firmwareHaltRequest.SetResult(null);
+                        _firmwareHaltRequest = null;
+                    }
+
+                    // Check if a firmware reset has been requested
+                    if (_firmwareResetRequest != null && DataTransfer.WriteReset())
+                    {
+                        _logger.Warn("Resetting controller");
+                        DataTransfer.PerformFullTransfer();
+
+                        _firmwareResetRequest.SetResult(null);
+                        _firmwareResetRequest = null;
+                    }
                 }
 
                 // Check if a firmware update is supposed to be performed
@@ -531,7 +564,6 @@ namespace DuetControlServer.SPI
                 // Invalidate data if a controller reset has been performed
                 if (DataTransfer.HadReset())
                 {
-                    _emergencyStopRequested = _resetRequested = false;
                     await Invalidate("Controller has been reset");
                 }
 
@@ -637,11 +669,21 @@ namespace DuetControlServer.SPI
                 // Ask for expressions to be evaluated
                 lock (_evaluateExpressionRequests)
                 {
+                    int numEvaluationsSent = 0;
                     foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
                     {
                         if (!request.Written)
                         {
-                            request.Written = DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression);
+                            if (DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression))
+                            {
+                                request.Written = true;
+
+                                numEvaluationsSent++;
+                                if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
+                                {
+                                    break;
+                                }
+                            }
                         }
                     }
                 }

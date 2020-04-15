@@ -37,6 +37,11 @@ namespace DuetControlServer.SPI.Communication
         public const int MaxMessageLength = 256;
 
         /// <summary>
+        /// Maximum number of evaluation requests to send per transfer
+        /// </summary>
+        public const int MaxEvaluationRequestsPerTransfer = 32;
+
+        /// <summary>
         /// Size of the header prefixing a buffered code
         /// </summary>
         public const int BufferedCodeHeaderSize = 4;

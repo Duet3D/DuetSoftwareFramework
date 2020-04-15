@@ -29,6 +29,11 @@ namespace DuetControlServer
         public static readonly CancellationToken CancellationToken = CancelSource.Token;
 
         /// <summary>
+        /// Cancellation token to be called when the program has been terminated
+        /// </summary>
+        private static readonly CancellationTokenSource _programTerminated = new CancellationTokenSource();
+
+        /// <summary>
         /// Entry point of the program
         /// </summary>
         /// <param name="args">Command-line arguments</param>
@@ -197,6 +202,7 @@ namespace DuetControlServer
             // End
             _logger.Debug("Application has shut down");
             NLog.LogManager.Shutdown();
+            _programTerminated.Cancel();
         }
 
         /// <summary>
@@ -243,6 +249,27 @@ namespace DuetControlServer
                 _logger.Fatal("Another instance is already running. Stopping.");
             }
             return true;
+        }
+
+        /// <summary>
+        /// Terminate this program and kill it forcefully if required
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static async Task Terminate()
+        {
+            try
+            {
+                // Try to shut down this program normally
+                CancelSource.Cancel();
+                await Task.Delay(4000, _programTerminated.Token);
+
+                // If that fails, kill it
+                Environment.Exit(1);
+            }
+            catch (OperationCanceledException)
+            {
+                // expected
+            }
         }
     }
 }

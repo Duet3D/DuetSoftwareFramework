@@ -436,7 +436,7 @@ namespace DuetControlServer.Codes
 
                 // Emergency Stop - unconditional and interpreteted immediately when read
                 case 112:
-                    await SPI.Interface.RequestEmergencyStop();
+                    await SPI.Interface.EmergencyStop();
                     using (await Model.Provider.AccessReadWriteAsync())
                     {
                         Model.Provider.Get.State.Status = MachineStatus.Halted;
@@ -829,7 +829,7 @@ namespace DuetControlServer.Codes
                 case 999:
                     if (code.Parameters.Count == 0)
                     {
-                        await SPI.Interface.RequestReset();
+                        await SPI.Interface.Reset();
                         return new CodeResult();
                     }
                     break;
@@ -891,7 +891,6 @@ namespace DuetControlServer.Codes
 
                 // Set compatibility
                 case 555:
-                    // FIXME Temporary until the machine model provides a field for this
                     if (code.Parameter('P') != null)
                     {
                         Compatibility compatibility = (Compatibility)(int)code.Parameter('P');
@@ -901,6 +900,17 @@ namespace DuetControlServer.Codes
                         }
                     }
                     break;
+
+#if !NO_RESET_RESTART
+                // Reset controller
+                case 999:
+                    if (code.Parameters.Count == 0)
+                    {
+                        // As requested by users, M999 now restarts DCS
+                        _ = Task.Run(Program.Terminate);
+                    }
+                    break;
+#endif
             }
         }
 

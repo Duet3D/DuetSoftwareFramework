@@ -1,4 +1,7 @@
-﻿using System.IO;
+﻿using DuetAPI.Utility;
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -25,7 +28,8 @@ namespace DuetAPI.Commands
             bool contentRead = false, unprecedentedParameter = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
             bool readingAtStart = seenNewLine, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
-            bool wasQuoted = false, wasExpression = false;
+            bool wasQuoted = false, wasCondition = false, wasExpression = false;
+            int numCurlyBraces = 0, numRoundBraces = 0;
             seenNewLine = false;
 
             Encoding encoding = (reader is StreamReader sr) ? sr.CurrentEncoding : Encoding.UTF8;
@@ -69,9 +73,13 @@ namespace DuetAPI.Commands
                     }
                     else
                     {
-                        // Even though RepRapFirmware treats comments in braces differently,
-                        // the correct approach should be to switch back to reading mode when the comment tag is closed
+                        // End of encapsulated comment
                         inEncapsulatedComment = false;
+                        if (wasCondition)
+                        {
+                            inCondition = true;
+                            wasCondition = false;
+                        }
                     }
                     continue;
                 }
@@ -87,9 +95,37 @@ namespace DuetAPI.Commands
                             inCondition = false;
                             inFinalComment = true;
                             break;
+                        case '{':
+                            result.KeywordArgument += '{';
+                            numCurlyBraces++;
+                            break;
+                        case '}':
+                            result.KeywordArgument += '}';
+                            numCurlyBraces--;
+                            break;
                         case '(':
-                            inCondition = false;
-                            inEncapsulatedComment = true;
+                            if (numCurlyBraces > 0)
+                            {
+                                result.KeywordArgument += '(';
+                                numRoundBraces++;
+                            }
+                            else
+                            {
+                                inCondition = false;
+                                wasCondition = true;
+                                inEncapsulatedComment = true;
+                            }
+                            break;
+                        case ')':
+                            if (numRoundBraces > 0)
+                            {
+                                result.KeywordArgument += ')';
+                                numRoundBraces--;
+                            }
+                            else
+                            {
+                                throw new CodeParserException("Unexpected closing round brace", result);
+                            }
                             break;
                         default:
                             if (!char.IsWhiteSpace(c) || !string.IsNullOrEmpty(result.KeywordArgument))
@@ -135,12 +171,41 @@ namespace DuetAPI.Commands
                     }
                     else if (inExpression)
                     {
-                        if (c == '}')
+                        if (c == '{')
                         {
-                            // No longer in an expression
-                            inExpression = false;
-                            wasExpression = true;
-                            endingChunk = true;
+                            // Starting inner expression
+                            numCurlyBraces++;
+                        }
+                        else if (c == '}')
+                        {
+                            numCurlyBraces--;
+                            if (numCurlyBraces == 0)
+                            {
+                                // Check if the round braces are properly terminated
+                                if (numRoundBraces > 0)
+                                {
+                                    throw new CodeParserException("Unterminated round brace", result);
+                                }
+                                if (numRoundBraces < 0)
+                                {
+                                    throw new CodeParserException("Too many closing round braces", result);
+                                }
+
+                                // No longer in an expression
+                                inExpression = false;
+                                wasExpression = true;
+                                endingChunk = true;
+                            }
+                        }
+                        else if (c == '(')
+                        {
+                            // Starting inner expression
+                            numRoundBraces++;
+                        }
+                        else if (c == ')')
+                        {
+                            // Ending inner expression
+                            numRoundBraces--;
                         }
                         value += c;
                     }
@@ -163,6 +228,7 @@ namespace DuetAPI.Commands
                             value = "{";
                             inExpression = true;
                             isNumericParameter = false;
+                            numCurlyBraces++;
                         }
                         else
                         {
@@ -358,7 +424,7 @@ namespace DuetAPI.Commands
                         // Starting final comment
                         contentRead = inFinalComment = true;
                     }
-                    else if (c == '(')
+                    else if (c == '(' && !inExpression)
                     {
                         // Starting encapsulated comment
                         contentRead = inEncapsulatedComment = true;
@@ -372,6 +438,7 @@ namespace DuetAPI.Commands
                             value = "{";
                             inExpression = true;
                             inQuotes = false;
+                            numCurlyBraces++;
                         }
                         else if (c == '"')
                         {
@@ -408,9 +475,13 @@ namespace DuetAPI.Commands
             {
                 throw new CodeParserException("Unterminated string", result);
             }
-            if (inExpression)
+            if (numCurlyBraces > 0)
             {
-                throw new CodeParserException("Unterminated expression", result);
+                throw new CodeParserException("Unterminated curly brace", result);
+            }
+            if (numCurlyBraces < 0)
+            {
+                throw new CodeParserException("Too many closing curly braces", result);
             }
             if (result.KeywordArgument != null)
             {
@@ -426,40 +497,7 @@ namespace DuetAPI.Commands
             }
 
             // M569, M584, and M915 use driver identifiers
-            if (result.Type == CodeType.MCode)
-            {
-                try
-                {
-                    switch (result.MajorNumber)
-                    {
-                        case 569:
-                        case 915:
-                            foreach (CodeParameter parameter in result.Parameters)
-                            {
-                                if (!parameter.IsExpression && char.ToUpperInvariant(parameter.Letter) == 'P')
-                                {
-                                    parameter.ConvertDriverIds(result);
-                                }
-                            }
-                            break;
-
-                        case 584:
-                            foreach (CodeParameter parameter in result.Parameters)
-                            {
-                                char upper = char.ToUpperInvariant(parameter.Letter);
-                                if (!parameter.IsExpression && (Machine.Axis.Letters.Contains(upper) || upper == 'E'))
-                                {
-                                    parameter.ConvertDriverIds(result);
-                                }
-                            }
-                            break;
-                    }
-                }
-                catch (CodeParserException e)
-                {
-                    throw new CodeParserException(e.Message, result);
-                }
-            }
+            result.ConvertDriverIds();
 
             // End
             return contentRead;
@@ -486,6 +524,77 @@ namespace DuetAPI.Commands
                 {
                     code.Parameters.Add(new CodeParameter(c, string.Empty, false, false));
                 }
+            }
+        }
+
+        /// <summary>
+        /// Convert parameters of this code to driver id(s)
+        /// </summary>
+        /// <exception cref="CodeParserException">Driver ID could not be parsed</exception>
+        public void ConvertDriverIds()
+        {
+            if (Type == CodeType.MCode)
+            {
+                switch (MajorNumber)
+                {
+                    case 569:
+                    case 915:
+                        foreach (CodeParameter parameter in Parameters)
+                        {
+                            if (!parameter.IsExpression && char.ToUpperInvariant(parameter.Letter) == 'P')
+                            {
+                                ConvertDriverIds(parameter);
+                            }
+                        }
+                        break;
+
+                    case 584:
+                        foreach (CodeParameter parameter in Parameters)
+                        {
+                            char upper = char.ToUpperInvariant(parameter.Letter);
+                            if (!parameter.IsExpression && (Machine.Axis.Letters.Contains(upper) || upper == 'E'))
+                            {
+                                ConvertDriverIds(parameter);
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Convert a given parameter to driver id(s)
+        /// </summary>
+        /// <exception cref="CodeParserException">Driver ID could not be parsed</exception>
+        private void ConvertDriverIds(CodeParameter parameter)
+        {
+            if (!parameter.IsExpression)
+            {
+                List<DriverId> drivers = new List<DriverId>();
+
+                string[] parameters = parameter.StringValue.Split(':');
+                foreach (string value in parameters)
+                {
+                    try
+                    {
+                        DriverId id = new DriverId(value);
+                        drivers.Add(id);
+                    }
+                    catch (ArgumentException e)
+                    {
+                        throw new CodeParserException(e.Message + $" from {parameter.Letter} parameter", this);
+                    }
+                }
+
+                if (drivers.Count == 1)
+                {
+                    parameter.ParsedValue = drivers[0];
+                }
+                else
+                {
+                    parameter.ParsedValue = drivers.ToArray();
+                }
+                parameter.IsDriverId = true;
             }
         }
     }

@@ -446,6 +446,12 @@ namespace DuetControlServer.Commands
         /// <returns>Whether the code could be processed internally</returns>
         private async Task<bool> ProcessInternally()
         {
+            if (Keyword != KeywordType.None && Keyword != KeywordType.Echo)
+            {
+                // Other meta keywords must be handled before we get here...
+                throw new InvalidOperationException();
+            }
+
             // Pre-process this code
             if (!Flags.HasFlag(CodeFlags.IsPreProcessed))
             {
@@ -461,19 +467,13 @@ namespace DuetControlServer.Commands
             }
 
             // Expand Linux expressions
-            if (ExpressionParser.HasLinuxExpressions(this))
+            if (Keyword == KeywordType.None && Expressions.ContainsLinuxFields(this))
             {
                 if (!await Interface.Flush(this))
                 {
                     throw new OperationCanceledException();
                 }
-#if false
-                await Model.Provider.WaitForUpdate(CancellationToken);
-                using (await Model.Provider.AccessReadOnlyAsync())
-                {
-                    await PrepareExpressions(Model.Provider.Get, false);
-                }
-#endif
+                await Expressions.Evaluate(this, true);
             }
 
             // Attempt to process the code internally
@@ -492,7 +492,7 @@ namespace DuetControlServer.Commands
                     break;
             }
 
-            if (Result != null)
+            if (Result != null && Keyword == KeywordType.None)
             {
                 InternallyProcessed = true;
                 return true;
@@ -512,7 +512,7 @@ namespace DuetControlServer.Commands
                 }
             }
 
-            // Evaluate echo commands
+            // Evaluate echo
             if (Keyword == KeywordType.Echo)
             {
                 if (!await Interface.Flush(this))
@@ -520,22 +520,11 @@ namespace DuetControlServer.Commands
                     throw new OperationCanceledException();
                 }
 
-#if false
-                await Provider.WaitForUpdate(CancellationToken);
-                using (await Provider.AccessReadOnlyAsync())
-                {
-                    await PrepareExpressions(Provider.Get, true);
-                }
-#endif
+                string result = await Expressions.Evaluate(this, false);
+                Result = new CodeResult(MessageType.Success, result);
 
                 InternallyProcessed = true;
-                Result = new CodeResult(MessageType.Success, KeywordArgument);
                 return true;
-            }
-            else if (Keyword != KeywordType.None)
-            {
-                // Other meta keywords must be handled before we get here...
-                throw new InvalidOperationException();
             }
 
             // Code has not been interpreted yet - let RRF deal with it

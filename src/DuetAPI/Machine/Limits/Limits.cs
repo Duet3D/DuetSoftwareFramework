@@ -26,7 +26,7 @@
 		private int? _axesPlusExtruders;
 
 		/// <summary>
-		/// Maximum number of axes + extruders or null if unknown
+		/// Maximum number of bed heaters or null if unknown
 		/// </summary>
 		public int? BedHeaters
 		{

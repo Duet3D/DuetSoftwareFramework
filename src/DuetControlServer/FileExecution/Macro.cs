@@ -217,7 +217,7 @@ namespace DuetControlServer.FileExecution
                 {
                     while (codes.Count < Settings.BufferedMacroCodes)
                     {
-                        Code readCode = await ReadCode();
+                        Code readCode = await ReadCodeAsync();
                         if (readCode == null)
                         {
                             // No more codes available
@@ -280,10 +280,10 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Read the next available code
+        /// Read the next available code asynchronously
         /// </summary>
         /// <returns>Read code</returns>
-        private async Task<Code> ReadCode()
+        private async Task<Code> ReadCodeAsync()
         {
             Code result;
 

@@ -138,6 +138,10 @@ namespace DuetControlServer.Commands
                     }
                 }
             }
+            catch (CodeParserException cpe)
+            {
+                result.Add(MessageType.Error, cpe.Message);
+            }
             catch (OperationCanceledException)
             {
                 // Report when a code is cancelled

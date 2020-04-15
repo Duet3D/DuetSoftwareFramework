@@ -343,6 +343,18 @@
             <param name="isQuoted">Whether the parameter is a quoted string</param>
             <param name="isSingleParameter">Whether the parameter is definitely a single parameter</param>
         </member>
+        <member name="M:DuetAPI.Commands.Code.ConvertDriverIds">
+            <summary>
+            Convert parameters of this code to driver id(s)
+            </summary>
+            <exception cref="T:DuetAPI.Commands.CodeParserException">Driver ID could not be parsed</exception>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.ConvertDriverIds(DuetAPI.Commands.CodeParameter)">
+            <summary>
+            Convert a given parameter to driver id(s)
+            </summary>
+            <exception cref="T:DuetAPI.Commands.CodeParserException">Driver ID could not be parsed</exception>
+        </member>
         <member name="T:DuetAPI.Commands.KeywordType">
             <summary>
             Types of conditional G-code
@@ -499,12 +511,12 @@
             Indicates if this parameter is a driver identifier
             </summary>
         </member>
-        <member name="F:DuetAPI.Commands.CodeParameter._stringValue">
+        <member name="F:DuetAPI.Commands.CodeParameter.StringValue">
             <summary>
             Unparsed string representation of the code parameter or an empty string if none present
             </summary>
         </member>
-        <member name="F:DuetAPI.Commands.CodeParameter._parsedValue">
+        <member name="F:DuetAPI.Commands.CodeParameter.ParsedValue">
             <summary>
             Internal parsed representation of the string value (one of string, int, uint, float, int[], uint[] or float[])
             </summary>
@@ -525,13 +537,6 @@
             </summary>
             <param name="letter">Letter of the code parameter (automatically converted to upper-case)</param>
             <param name="value">Value of this parameter</param>
-        </member>
-        <member name="M:DuetAPI.Commands.CodeParameter.ConvertDriverIds(DuetAPI.Commands.Code)">
-            <summary>
-            Convert this parameter to driver id(s)
-            </summary>
-            <param name="code">Code that owns this parameter</param>
-            <exception cref="T:DuetAPI.Commands.CodeParserException">Driver ID could not be parsed</exception>
         </member>
         <member name="P:DuetAPI.Commands.CodeParameter.Type">
             <summary>
@@ -712,6 +717,14 @@
             </summary>
             <param name="message">Exception message</param>
             <param name="code">Code being parsed</param>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParserException.#ctor(System.String,DuetAPI.Commands.Code,System.Exception)">
+            <summary>
+            Creates a new CodeParserException with details where the parser failed to read data
+            </summary>
+            <param name="message">Exception message</param>
+            <param name="code">Code being parsed</param>
+            <param name="inner">Inner exception</param>
         </member>
         <member name="M:DuetAPI.Commands.CodeParserException.#ctor(System.String,System.Exception)">
             <summary>
@@ -2640,7 +2653,7 @@
         </member>
         <member name="P:DuetAPI.Machine.Limits.BedHeaters">
             <summary>
-            Maximum number of axes + extruders or null if unknown
+            Maximum number of bed heaters or null if unknown
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Limits.Boards">

@@ -1,9 +1,11 @@
 ﻿using DuetAPI;
-using DuetControlServer.Commands;
+using DuetAPI.Commands;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Files
 {
@@ -33,6 +35,11 @@ namespace DuetControlServer.Files
         public CodeChannel Channel { get; }
 
         /// <summary>
+        /// Internal stack for conditional G-code execution
+        /// </summary>
+        private readonly Stack<CodeFileState> _stack = new Stack<CodeFileState>();
+
+        /// <summary>
         /// Gets or sets the current file position in bytes
         /// </summary>
         public long Position
@@ -56,6 +63,21 @@ namespace DuetControlServer.Files
         /// Number of the current line
         /// </summary>
         public long? LineNumber { get; private set; } = 0;
+
+        /// <summary>
+        /// Whether this is the first code to parse or a NL was parsed
+        /// </summary>
+        private bool _seenNewLine = true;
+
+        /// <summary>
+        /// Whether G53 is in effect
+        /// </summary>
+        private bool _enforcingAbsolutePosition;
+
+        /// <summary>
+        /// Current indentation level
+        /// </summary>
+        private byte _indent;
 
         /// <summary>
         /// Returns the length of the file in bytes
@@ -160,42 +182,83 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
-        /// Read the next available code asynchronously
+        /// Read the next available code and interpret conditional codes except for echo
         /// </summary>
         /// <returns>Read code or null if none found</returns>
-        public virtual Task<Code> ReadCodeAsync()
+        /// <exception cref="CodeParserException">Failed to read the next code</exception>
+        public Task<Code> ReadCodeAsync()
         {
             // Deal with closed files
             if (IsFinished || IsAborted)
             {
-                return null;
-            }
-
-            // Read the next available non-empty code and keep track of the line number
-            Code code = new Code()
-            {
-                CancellationToken = _cts.Token,
-                Channel = Channel,
-                LineNumber = LineNumber,
-                FilePosition = Position
-            };
-
-            bool codeRead, enforcingAbsolutePosition = false;
-            do
-            {
-                codeRead = DuetAPI.Commands.Code.Parse(_reader, code, ref enforcingAbsolutePosition);
-                _position += code.Length.Value;
-                LineNumber = code.LineNumber;
-            }
-            while (!codeRead && !_reader.EndOfStream);
-
-            // Return it
-            if (!codeRead)
-            {
-                IsFinished = true;
                 return Task.FromResult<Code>(null);
             }
-            return Task.FromResult<Code>(code);
+
+            do
+            {
+                // Read the next available non-empty code
+                Code code = new Code
+                {
+                    CancellationToken = _cts.Token,
+                    Channel = Channel,
+                    Flags = _enforcingAbsolutePosition ? CodeFlags.EnforceAbsolutePosition : CodeFlags.None,
+                    Indent = _indent,
+                    LineNumber = LineNumber,
+                    FilePosition = Position
+                };
+
+                bool codeRead;
+                do
+                {
+                    codeRead = DuetAPI.Commands.Code.Parse(_reader, code, ref _seenNewLine);
+                    _position += code.Length.Value;
+                    LineNumber = code.LineNumber;
+
+                    // Check if a NL has been parsed
+                    _indent = _seenNewLine ? (byte)0 : code.Indent;
+                    _enforcingAbsolutePosition = _seenNewLine ? false : code.Flags.HasFlag(CodeFlags.EnforceAbsolutePosition);
+                }
+                while (!codeRead && !_reader.EndOfStream);
+
+                // Check if this is the end of the last block
+                CodeFileState lastBlock;
+                if (_stack.TryPeek(out lastBlock) && (!codeRead || code.Indent <= lastBlock.StartingCode.Indent))
+                {
+                    lastBlock.Iterations++;
+                }
+
+                // Check if any more codes could be read
+                if (!codeRead)
+                {
+                    IsFinished = true;
+                    return Task.FromResult<Code>(null);
+                }
+
+#if true
+                return Task.FromResult(code);
+#else
+                // Check for conditional G-code
+                switch (code.Keyword)
+                {
+                    case KeywordType.If:
+                        if (await SPI.Interface.Flush(Channel))
+                        {
+                            string expression = ""; // await Model.ExpressionParser.PrepareExpression(code.KeywordArgument);
+                            _stack.Push(new CodeFileState
+                            {
+                                StartingCode = code,
+                                LastResult = await SPI.Interface.EvaluateExpression(Channel, expression)
+                            });
+                        }
+                        break;
+
+                    case KeywordType.Echo:
+                    case KeywordType.None:
+                        return code;
+                }
+#endif
+            }
+            while (true);
         }
     }
 }
