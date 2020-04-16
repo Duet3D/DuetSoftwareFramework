@@ -407,11 +407,13 @@ namespace DuetControlServer.SPI.Channel
         /// <param name="printStopped">Whether the print has been stopped</param>
         public void AbortFile(bool abortAll, bool printStopped)
         {
-            if (CurrentState.WaitingForAcknowledgement)
+            // Kill the pending message(s)
+            while (CurrentState.WaitingForAcknowledgement)
             {
                 MessageAcknowledged();
             }
 
+            // Stop the file print if necessary
             if (Channel == CodeChannel.File && !printStopped && (abortAll || CurrentState.Macro == null))
             {
                 using (FileExecution.Job.Lock())
@@ -420,27 +422,33 @@ namespace DuetControlServer.SPI.Channel
                 }
             }
 
-            PendingCode lastMacroStartCode = null;
-            while (!CurrentState.WaitingForAcknowledgement && CurrentState.Macro != null)
-            {
-                if (CurrentState.MacroStartCode != null)
-                {
-                    lastMacroStartCode = CurrentState.MacroStartCode;
-                }
-                Pop();
-                if (!abortAll)
-                {
-                    break;
-                }
-            }
-
             if (abortAll)
             {
-                // Cancel all buffered and regular codes. Macro codes have been invalidated at this point
+                // Invalidate stack levels running macro files and resolve their start codes
+                while (CurrentState.WaitingForAcknowledgement || CurrentState.Macro != null)
+                {
+                    if (CurrentState.MacroStartCode != null)
+                    {
+                        CurrentState.MacroStartCode.AppendReply(CurrentState.Macro.Result);
+                        CurrentState.MacroStartCode.SetFinished();
+                        CurrentState.MacroStartCode = null;
+                    }
+
+                    Pop();
+                }
+
+                // Cancel all other buffered and regular codes
                 InvalidateRegular();
             }
             else
             {
+                // Invalidate the last stack level if a macro file is running
+                PendingCode lastMacroStartCode = CurrentState.MacroStartCode;
+                if (CurrentState.Macro != null)
+                {
+                    Pop();
+                }
+
                 // Invalidate all the buffered codes except for the one that invoked the last macro file
                 for (int i = BufferedCodes.Count - 1; i > 0; i--)
                 {

@@ -38,7 +38,7 @@ namespace DuetControlServer.SPI.Channel
         public bool MacroCompleted { get; set; }
 
         /// <summary>
-        /// Code that started a macro file
+        /// Code that started the macro file of this state
         /// </summary>
         public PendingCode MacroStartCode { get; set; }
 
