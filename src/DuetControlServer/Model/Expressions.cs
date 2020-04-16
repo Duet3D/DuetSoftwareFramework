@@ -191,7 +191,7 @@ namespace DuetControlServer.Model
                     string trimmedExpression = expression.Trim();
                     try
                     {
-                        string result = await Evaluate(code.Channel, trimmedExpression, replaceOnlyLinuxFields);
+                        string result = await Evaluate(code.Channel, trimmedExpression, replaceOnlyLinuxFields, false);
                         if (builder.Length != 0)
                         {
                             builder.Append(' ');
@@ -211,7 +211,7 @@ namespace DuetControlServer.Model
                 string keywordArgument = code.KeywordArgument.Trim();
                 try
                 {
-                    string result = await Evaluate(code.Channel, keywordArgument, replaceOnlyLinuxFields);
+                    string result = await Evaluate(code.Channel, keywordArgument, replaceOnlyLinuxFields, false);
                     return result;
                 }
                 catch (CodeParserException cpe)
@@ -227,8 +227,8 @@ namespace DuetControlServer.Model
                     string trimmedExpression = code.Parameters[i].ToString().Trim();
                     try
                     {
-                        string parameterValue = await Evaluate(code.Channel, trimmedExpression, replaceOnlyLinuxFields);
-                        code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue);
+                        string parameterValue = await Evaluate(code.Channel, trimmedExpression, replaceOnlyLinuxFields, true);
+                        code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue, true);
                     }
                     catch (CodeParserException cpe)
                     {
@@ -246,9 +246,10 @@ namespace DuetControlServer.Model
         /// <param name="channel">Channel to evaluate this on</param>
         /// <param name="expression">Expression(s) to replace</param>
         /// <param name="onlyLinuxFields">Whether to replace only Linux fields</param>
+        /// <param name="encodeResult">Whether the final result shall be encoded</param>
         /// <returns>Replaced expression(s)</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
-        private static async Task<string> Evaluate(CodeChannel channel, string expression, bool onlyLinuxFields)
+        private static async Task<string> Evaluate(CodeChannel channel, string expression, bool onlyLinuxFields, bool encodeResult)
         {
             Stack<bool> lastBraceCurly = new Stack<bool>();
             Stack<StringBuilder> parsedExpressions = new Stack<StringBuilder>();
@@ -286,7 +287,7 @@ namespace DuetControlServer.Model
                         }
 
                         string subExpression = parsedExpressions.Pop().ToString();
-                        string evaluationResult = await EvaluateToString(channel, subExpression.Trim(), onlyLinuxFields);
+                        string evaluationResult = await EvaluateToString(channel, subExpression.Trim(), onlyLinuxFields, true);
                         if (subExpression == evaluationResult || onlyLinuxFields)
                         {
                             parsedExpressions.Peek().Append(lastWasCurly ? '{' : '(');
@@ -319,7 +320,7 @@ namespace DuetControlServer.Model
                 throw new CodeParserException($"Unterminated {(wasCurly ? "curly" : "round")} brace");
             }
 
-            return await EvaluateToString(channel, parsedExpressions.Pop().ToString().Trim(), onlyLinuxFields);
+            return await EvaluateToString(channel, parsedExpressions.Pop().ToString().Trim(), onlyLinuxFields, encodeResult);
         }
 
         /// <summary>
@@ -328,8 +329,9 @@ namespace DuetControlServer.Model
         /// <param name="channel">Code channel</param>
         /// <param name="expression">Expression to evaluate</param>
         /// <param name="onlyLinuxFields">Whether to replace only Linux fields</param>
+        /// <param name="encodeResult">Whether the final result shall be encoded</param>
         /// <returns>String result or the expresion</returns>
-        private static async Task<string> EvaluateToString(CodeChannel channel, string expression, bool onlyLinuxFields)
+        private static async Task<string> EvaluateToString(CodeChannel channel, string expression, bool onlyLinuxFields, bool encodeResult)
         {
             StringBuilder result = new StringBuilder(), partialExpression = new StringBuilder();
             bool inQuotes = false;
@@ -368,7 +370,7 @@ namespace DuetControlServer.Model
                     }
                     if (Filter.GetSpecific(subFilter, onlyLinuxFields, out object linuxField))
                     {
-                        string subResult = ObjectToString(linuxField, wantsCount);
+                        string subResult = ObjectToString(linuxField, wantsCount, false);
                         if (subExpression == expression)
                         {
                             return subResult;
@@ -402,14 +404,14 @@ namespace DuetControlServer.Model
             }
             if (Filter.GetSpecific(finalFilter, onlyLinuxFields, out object finalLinuxField))
             {
-                return ObjectToString(finalLinuxField, wantsFinalCount);
+                return ObjectToString(finalLinuxField, wantsFinalCount, encodeResult);
             }
 
             // If that failed, try to evaluate the expression in RRF as the final step
             if (!onlyLinuxFields)
             {
                 object firmwareField = await SPI.Interface.EvaluateExpression(channel, finalExpression);
-                return ObjectToString(firmwareField, false);
+                return ObjectToString(firmwareField, false, encodeResult);
             }
 
             // In case we're not done yet, return only the partial expression value
@@ -421,8 +423,9 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="obj">Object to convert</param>
         /// <param name="wantsCount">Whether the count is wanted</param>
+        /// <param name="encodeStrings">Whether the value is supposed to be encoded if it is a string</param>
         /// <returns>String representation of obj</returns>
-        private static string ObjectToString(object obj, bool wantsCount)
+        private static string ObjectToString(object obj, bool wantsCount, bool encodeStrings)
         {
             if (obj == null)
             {
@@ -434,7 +437,7 @@ namespace DuetControlServer.Model
             }
             if (obj is string stringValue)
             {
-                return '"' + stringValue.Replace("\"", "\"\"") + '"';
+                return encodeStrings ? ('"' + stringValue.Replace("\"", "\"\"") + '"') : stringValue;
             }
             if (obj is IList list)
             {

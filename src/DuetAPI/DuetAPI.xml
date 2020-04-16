@@ -531,12 +531,13 @@
             <param name="isDriverId">Whether this is a driver ID</param>
             <remarks>This constructor does not parsed long (aka int64) values because RRF cannot handle them</remarks>
         </member>
-        <member name="M:DuetAPI.Commands.CodeParameter.#ctor(System.Char,System.Object)">
+        <member name="M:DuetAPI.Commands.CodeParameter.#ctor(System.Char,System.Object,System.Boolean)">
             <summary>
             Creates a new CodeParameter instance and with the given value
             </summary>
             <param name="letter">Letter of the code parameter (automatically converted to upper-case)</param>
             <param name="value">Value of this parameter</param>
+            <param name="isExpression">Whether the value is an expression</param>
         </member>
         <member name="P:DuetAPI.Commands.CodeParameter.Type">
             <summary>

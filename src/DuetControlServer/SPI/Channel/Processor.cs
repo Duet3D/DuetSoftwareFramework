@@ -141,7 +141,7 @@ namespace DuetControlServer.SPI.Channel
                 suspendedCode.SetCancelled();
             }
 
-            // Make sure macro files are properly disposed
+            // Deal with macro files
             if (oldState.Macro != null)
             {
                 using (oldState.Macro.Lock())
@@ -158,20 +158,16 @@ namespace DuetControlServer.SPI.Channel
                     {
                         _logger.Trace("Finished macro file {0}", Path.GetFileName(oldState.Macro.FileName));
                     }
-
-                    if (oldState.MacroStartCode != null)
-                    {
-                        oldState.MacroStartCode.AppendReply(oldState.Macro.Result);
-                        _logger.Debug("==> Unfinished starting code: {0}", oldState.MacroStartCode);
-
-                        BufferedCodes.Insert(0, oldState.MacroStartCode);
-                        BytesBuffered += oldState.MacroStartCode.BinarySize;
-                    }
-                    oldState.Macro.Dispose();
                 }
             }
 
-            // Invalidate pending codes and flush requests
+            // Invalidate macro start codes, pending codes, and flush requests
+            if (oldState.MacroStartCode != null && !oldState.MacroStartCode.IsFinished)
+            {
+                _logger.Warn("==> Cancelling unfinished starting code: {0]", oldState.MacroStartCode);
+                oldState.MacroStartCode.SetCancelled();
+            }
+
             while (oldState.PendingCodes.TryDequeue(out PendingCode pendingCode))
             {
                 pendingCode.SetCancelled();
@@ -427,14 +423,37 @@ namespace DuetControlServer.SPI.Channel
                 // Invalidate stack levels running macro files and resolve their start codes
                 while (CurrentState.WaitingForAcknowledgement || CurrentState.Macro != null)
                 {
+                    PendingCode startCode = null;
                     if (CurrentState.MacroStartCode != null)
                     {
-                        CurrentState.MacroStartCode.AppendReply(CurrentState.Macro.Result);
-                        CurrentState.MacroStartCode.SetFinished();
+                        // Propagate final macro results to the code that started the macro
+                        using (CurrentState.Macro.Lock())
+                        {
+                            PendingCode macroStartCode = CurrentState.MacroStartCode;
+                            CurrentState.Macro.FinishAsync().ContinueWith(async task =>
+                            {
+                                CodeResult result = await task;
+                                if (!macroStartCode.IsFinished)
+                                {
+                                    macroStartCode.AppendReply(result);
+                                    macroStartCode.SetFinished();
+                                }
+                                else
+                                {
+                                    await Logger.LogOutput(result);
+                                }
+                            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+                        }
+
+                        startCode = CurrentState.MacroStartCode;
                         CurrentState.MacroStartCode = null;
                     }
 
                     Pop();
+                    if (startCode != null)
+                    {
+                        _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                    }
                 }
 
                 // Cancel all other buffered and regular codes
@@ -446,7 +465,41 @@ namespace DuetControlServer.SPI.Channel
                 PendingCode lastMacroStartCode = CurrentState.MacroStartCode;
                 if (CurrentState.Macro != null)
                 {
+                    PendingCode startCode = null;
+                    if (CurrentState.MacroStartCode != null)
+                    {
+                        // Propagate final macro results to the code that started the macro
+                        using (CurrentState.Macro.Lock())
+                        {
+                            PendingCode macroStartCode = CurrentState.MacroStartCode;
+                            CurrentState.Macro.FinishAsync().ContinueWith(async task =>
+                            {
+                                CodeResult result = await task;
+                                if (!macroStartCode.IsFinished)
+                                {
+                                    macroStartCode.AppendReply(result);
+                                    macroStartCode.SetFinished();
+                                }
+                                else
+                                {
+                                    await Logger.LogOutput(result);
+                                }
+                            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+                        }
+
+                        // Codes requesting only one file to be closed are M99 or M291 P1 which are not finished at this point
+                        BufferedCodes.Insert(0, CurrentState.MacroStartCode);
+                        BytesBuffered += CurrentState.MacroStartCode.BinarySize;
+
+                        startCode = CurrentState.MacroStartCode;
+                        CurrentState.MacroStartCode = null;
+                    }
+
                     Pop();
+                    if (startCode != null)
+                    {
+                        _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                    }
                 }
 
                 // Invalidate all the buffered codes except for the one that invoked the last macro file
@@ -685,15 +738,24 @@ namespace DuetControlServer.SPI.Channel
             // Check for final empty replies to macro files being closed
             if (CurrentState.MacroCompleted)
             {
-                PendingCode startCode = CurrentState.MacroStartCode;
-                if (startCode != null)
+                if (CurrentState.MacroStartCode != null)
                 {
-                    startCode.AppendReply(CurrentState.Macro.Result);
-                    startCode.HandleReply(flags, reply);
-                    if (startCode.IsFinished)
+                    using (CurrentState.Macro.Lock())
                     {
-                        CurrentState.MacroStartCode = null;
+                        CurrentState.MacroStartCode.AppendReply(CurrentState.Macro.Result);
+                        CurrentState.Macro.Result = new CodeResult();
                     }
+
+                    CurrentState.MacroStartCode.HandleReply(flags, reply);
+                    if (!CurrentState.MacroStartCode.IsFinished)
+                    {
+                        // Last message must have been incomplete - wait for the full response
+                        return true;
+                    }
+
+                    PendingCode startCode = CurrentState.MacroStartCode;
+                    CurrentState.MacroStartCode = null;
+
                     Pop();
                     if (startCode.IsFinished)
                     {
