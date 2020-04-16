@@ -901,16 +901,14 @@ namespace DuetControlServer.Codes
                     }
                     break;
 
-#if !NO_RESET_RESTART
                 // Reset controller
                 case 999:
-                    if (code.Parameters.Count == 0)
+                    if (!Settings.NoTerminateOnReset && code.Parameters.Count == 0)
                     {
-                        // As requested by users, M999 now restarts DCS
+                        // DCS is supposed to terminate via M999 unless this option is explicitly disabled
                         _ = Task.Run(Program.Terminate);
                     }
                     break;
-#endif
             }
         }
 

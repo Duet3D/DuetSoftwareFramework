@@ -52,16 +52,16 @@ namespace CodeLogger
             // Start waiting for incoming codes
             Task[] tasks = new Task[]
             {
-                PrintIncomingCodes("pre", preConnection),
-                PrintIncomingCodes("post", postConnection),
-                PrintIncomingCodes("executed", executedConnection)
+                PrintIncomingCodes(preConnection),
+                PrintIncomingCodes(postConnection),
+                PrintIncomingCodes(executedConnection)
             };
 
             // Wait for all tasks to finish
             await Task.WhenAll(tasks);
         }
 
-        private static async Task PrintIncomingCodes(string prefix, InterceptConnection connection)
+        private static async Task PrintIncomingCodes(InterceptConnection connection)
         {
             try
             {
@@ -75,7 +75,7 @@ namespace CodeLogger
                     // Codes initiated from the intercepting connection cannot be intercepted from the same connection.
                     await connection.IgnoreCode();
 
-                    Console.WriteLine($"[{prefix}] {code.Channel}: {code}");
+                    Console.WriteLine($"[{connection.Mode}] {code.Channel}: {code}");
                 }
                 while (true);
             }

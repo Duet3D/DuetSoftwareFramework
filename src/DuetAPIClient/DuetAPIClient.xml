@@ -52,7 +52,6 @@
             <param name="channel">Code channel to wait for</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>True if all pending codes could be flushed</returns>
-            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.GetFileInfo(System.String,System.Threading.CancellationToken)">

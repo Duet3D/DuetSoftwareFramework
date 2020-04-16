@@ -200,7 +200,7 @@ namespace DuetControlServer
             while (mainTasks.Count > 0);
 
             // End
-            _logger.Debug("Application has shut down");
+            _logger.Info("Application has shut down");
             NLog.LogManager.Shutdown();
             _programTerminated.Cancel();
         }

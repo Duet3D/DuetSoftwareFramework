@@ -78,6 +78,11 @@ namespace DuetControlServer
         public static string BaseDirectory { get; set; } = "/opt/dsf/sd";
 
         /// <summary>
+        /// Set this to true to prevent M999 from stopping this application
+        /// </summary>
+        public static bool NoTerminateOnReset { get; set; }
+
+        /// <summary>
         /// Internal model update interval after which properties of the machine model from
         /// the host controller (e.g. network information and mass storages) are updated (in ms)
         /// </summary>
@@ -251,6 +256,7 @@ namespace DuetControlServer
                     Console.WriteLine("-u, --update: Update RepRapFirmware and exit");
                     Console.WriteLine("-l, --log-level [trace,debug,info,warn,error,fatal,off]: Set minimum log level");
                     Console.WriteLine("-c, --config: Override path to the JSON config file");
+                    Console.WriteLine("-r, --no-reset-stop: Do not terminate this application when M999 has been processed");
                     Console.WriteLine("-S, --socket-directory: Specify the UNIX socket directory");
                     Console.WriteLine("-s, --socket-file: Specify the UNIX socket file");
                     Console.WriteLine("-u, --socket-user <user>: Specify the owning user of the UNIX socket file");
@@ -332,9 +338,13 @@ namespace DuetControlServer
                 {
                     BaseDirectory = arg;
                 }
-                else if (arg == "-u" || lastArg == "--update")
+                else if (arg == "-u" || arg == "--update")
                 {
                     UpdateOnly = true;
+                }
+                else if (arg == "-r" || arg == "--no-terminate-on-reset")
+                {
+                    NoTerminateOnReset = true;
                 }
                 else if (arg == "--no-spi-task")
                 {
@@ -380,6 +390,18 @@ namespace DuetControlServer
                                     while (reader.Read() && reader.TokenType != JsonTokenType.EndObject) { }
                                 }
                             }
+                        }
+                        break;
+
+                    case JsonTokenType.True:
+                    case JsonTokenType.False:
+                        if (property.PropertyType == typeof(bool))
+                        {
+                            property.SetValue(null, reader.GetBoolean());
+                        }
+                        else
+                        {
+                            throw new JsonException($"Bad boolean type: {property.PropertyType.Name}");
                         }
                         break;
 
@@ -458,6 +480,10 @@ namespace DuetControlServer
                     if (value is string stringValue)
                     {
                         writer.WriteString(property.Name, stringValue);
+                    }
+                    else if (value is bool boolValue)
+                    {
+                        writer.WriteBoolean(property.Name, boolValue);
                     }
                     else if (value is int intValue)
                     {

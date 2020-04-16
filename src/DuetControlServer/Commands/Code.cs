@@ -41,24 +41,14 @@ namespace DuetControlServer.Commands
             Acknowledgement = 1,
 
             /// <summary>
-            /// Inserted code from an intercepting connection
-            /// </summary>
-            Inserted = 2,
-
-            /// <summary>
             /// Code from a macro file
             /// </summary>
-            Macro = 3,
-
-            /// <summary>
-            /// Inserted macro code from an intercepting connection
-            /// </summary>
-            InsertedFromMacro = 4,
+            Macro = 2,
 
             /// <summary>
             /// Code with <see cref="CodeFlags.IsPrioritized"/> set
             /// </summary>
-            Prioritized = 5
+            Prioritized = 3
         }
 
         /// <summary>
@@ -145,31 +135,35 @@ namespace DuetControlServer.Commands
                 CancellationToken = _cancellationTokenSources[(int)Channel].Token;
             }
 
-            // Assign a priority to this code and create a task that completes when it can be started
+            // Codes from interceptors do not have any order control to avoid deadlocks
+            Code codeBeingIntercepted = Interception.GetCodeBeingIntercepted(SourceConnection);
+            if (codeBeingIntercepted != null)
+            {
+                if (codeBeingIntercepted.Macro != null)
+                {
+                    Flags |= CodeFlags.IsFromMacro;
+                    Macro = codeBeingIntercepted.Macro;
+                }
+                return Task.FromResult<IDisposable>(null);
+            }
+
+            // Wait for pending high priority codes
             if (Flags.HasFlag(CodeFlags.IsPrioritized))
             {
                 _codeType = InternalCodeType.Prioritized;
                 _logger.Debug("Waiting for execution of {0} (prioritized)", this);
                 return _codeStartLocks[(int)Channel, (int)InternalCodeType.Prioritized].LockAsync(CancellationToken);
             }
-            if (Interception.IsInterceptingConnection(SourceConnection))
-            {
-                if (Flags.HasFlag(CodeFlags.IsFromMacro))
-                {
-                    _codeType = InternalCodeType.InsertedFromMacro;
-                    _logger.Debug("Waiting for execution of {0} (inserted from macro)", this);
-                    return _codeStartLocks[(int)Channel, (int)InternalCodeType.InsertedFromMacro].LockAsync(CancellationToken);
-                }
-                _codeType = InternalCodeType.Inserted;
-                _logger.Debug("Waiting for execution of {0} (inserted)", this);
-                return _codeStartLocks[(int)Channel, (int)InternalCodeType.Inserted].LockAsync(CancellationToken);
-            }
+
+            // Wait for pending codes from the current macro
             if (Flags.HasFlag(CodeFlags.IsFromMacro))
             {
                 _codeType = InternalCodeType.Macro;
                 _logger.Debug("Waiting for execution of {0} (macro code)", this);
                 return (Macro == null) ? _codeStartLocks[(int)Channel, (int)InternalCodeType.Macro].LockAsync(CancellationToken) : Macro.WaitForCodeExecution();
             }
+
+            // Wait for pending codes for message acknowledgements
             // FIXME M0/M1 are not meant to be used while a message box is open
             if (Interface.IsWaitingForAcknowledgement(Channel) && (Type != CodeType.MCode || (MajorNumber != 0 && MajorNumber != 1)))
             {
@@ -177,6 +171,8 @@ namespace DuetControlServer.Commands
                 _logger.Debug("Waiting for execution of {0} (acknowledgement)", this);
                 return _codeStartLocks[(int)Channel, (int)InternalCodeType.Acknowledgement].LockAsync(CancellationToken);
             }
+
+            // Wait for pending regular codes
             _codeType = InternalCodeType.Regular;
             _logger.Debug("Waiting for execution of {0}", this);
             return _codeStartLocks[(int)Channel, (int)InternalCodeType.Regular].LockAsync(CancellationToken);
@@ -198,30 +194,19 @@ namespace DuetControlServer.Commands
         /// Start the next available G/M/T-code and wait until this code may finish
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        private AwaitableDisposable<IDisposable> WaitForFinish()
+        private Task<IDisposable> WaitForFinish()
         {
+            if (Interception.IsInterceptingConnection(SourceConnection))
+            {
+                return Task.FromResult<IDisposable>(null);
+            }
+
             AwaitableDisposable<IDisposable> finishTask = _codeFinishLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken);
             if (!Flags.HasFlag(CodeFlags.Unbuffered))
             {
                 StartNextCode();
             }
             return finishTask;
-        }
-
-        /// <summary>
-        /// Wait for inserted codes to be internally processed
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private async Task WaitForInsertedCodes()
-        {
-            if (_codeType == InternalCodeType.Regular || _codeType == InternalCodeType.Macro)
-            {
-                int insertedType = (int)(_codeType == InternalCodeType.Macro ? InternalCodeType.InsertedFromMacro : InternalCodeType.Inserted);
-                using (await _codeStartLocks[(int)Channel, insertedType].LockAsync(CancellationToken))
-                {
-                    using (await _codeFinishLocks[(int)Channel, insertedType].LockAsync(CancellationToken)) { }
-                }
-            }
         }
         #endregion
 
@@ -456,7 +441,6 @@ namespace DuetControlServer.Commands
             if (!Flags.HasFlag(CodeFlags.IsPreProcessed))
             {
                 bool resolved = await Interception.Intercept(this, InterceptionMode.Pre);
-                await WaitForInsertedCodes();
 
                 Flags |= CodeFlags.IsPreProcessed;
                 if (resolved)
@@ -502,7 +486,6 @@ namespace DuetControlServer.Commands
             if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
             {
                 bool resolved = await Interception.Intercept(this, InterceptionMode.Post);
-                await WaitForInsertedCodes();
 
                 Flags |= CodeFlags.IsPostProcessed;
                 if (resolved)
@@ -614,7 +597,6 @@ namespace DuetControlServer.Commands
 
             // Done
             await Interception.Intercept(this, InterceptionMode.Executed);
-            await WaitForInsertedCodes();
         }
     }
 }
