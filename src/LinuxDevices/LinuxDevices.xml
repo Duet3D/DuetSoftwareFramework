@@ -33,11 +33,10 @@
             Indicates if this instance has been disposed
             </summary>
         </member>
-        <member name="M:LinuxDevices.InputGpioPin.Dispose(System.Boolean)">
+        <member name="M:LinuxDevices.InputGpioPin.DisposeInternal">
             <summary>
             Dispose this instance internally
             </summary>
-            <param name="disposing">Release managed resources</param>
         </member>
         <member name="P:LinuxDevices.InputGpioPin.Value">
             <summary>
