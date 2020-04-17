@@ -236,7 +236,7 @@
             <param name="socketPath">Path to the UNIX socket file</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
-            <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
+            <exception cref="T:DuetAPI.Connection.IncompatibleVersionException">API level is incompatible</exception>
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
@@ -264,7 +264,7 @@
             <param name="command">Command to run</param>
             <param name="cancellationToken">Cancellation token</param>
             <returns>Command result</returns>
-            <exception cref="T:DuetAPIClient.Exceptions.InternalServerException">Deserialized internal error from DCS</exception>
+            <exception cref="T:DuetAPIClient.InternalServerException">Deserialized internal error from DCS</exception>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
         </member>
@@ -276,7 +276,7 @@
             <param name="cancellationToken">Cancellation token</param>
             <returns>Command result</returns>
             <typeparam name="T">Type of the command result</typeparam>
-            <exception cref="T:DuetAPIClient.Exceptions.InternalServerException">Deserialized internal error from DCS</exception>
+            <exception cref="T:DuetAPIClient.InternalServerException">Deserialized internal error from DCS</exception>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
         </member>
@@ -346,47 +346,10 @@
             <param name="socketPath">Path to the UNIX socket file</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
-            <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
+            <exception cref="T:DuetAPI.Connection.IncompatibleVersionException">API level is incompatible</exception>
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Init message could not be processed</exception>
-        </member>
-        <member name="T:DuetAPIClient.Exceptions.IncompatibleVersionException">
-            <summary>
-            Exception class that is thrown if the API version of the client is incompatible to the server
-            </summary>
-        </member>
-        <member name="M:DuetAPIClient.Exceptions.IncompatibleVersionException.#ctor">
-            <summary>
-            Creates a new exception instance
-            </summary>
-        </member>
-        <member name="M:DuetAPIClient.Exceptions.IncompatibleVersionException.#ctor(System.String)">
-            <summary>
-            Creates a new exception instance
-            </summary>
-            <param name="message">Error message</param>
-        </member>
-        <member name="M:DuetAPIClient.Exceptions.IncompatibleVersionException.#ctor(System.String,System.Exception)">
-            <summary>
-            Creates a new exception instance
-            </summary>
-            <param name="message">Error message</param>
-            <param name="innerException">Inner exception</param>
-        </member>
-        <member name="T:DuetAPIClient.Exceptions.InternalServerException">
-            <summary>
-            Wrapper around internal server-side exceptions that are reported as part of command responses
-            </summary>
-            <seealso cref="T:DuetAPI.Commands.ErrorResponse"/>
-        </member>
-        <member name="M:DuetAPIClient.Exceptions.InternalServerException.#ctor(System.String,System.String,System.String)">
-            <summary>
-            Creates a new CommandException instance
-            </summary>
-            <param name="command">Name of the command that failed</param>
-            <param name="type">Type of the thrown .NET error</param>
-            <param name="message">Message of the thrown .NET error</param>
         </member>
         <member name="T:DuetAPIClient.HttpEndpointConnection">
             <summary>
@@ -579,7 +542,7 @@
             <param name="socketPath">Path to the UNIX socket file</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
-            <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
+            <exception cref="T:DuetAPI.Connection.IncompatibleVersionException">API level is incompatible</exception>
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Init message could not be processed</exception>
@@ -626,6 +589,20 @@
             <seealso cref="T:DuetAPI.Machine.Message"/>
             <seealso cref="T:DuetAPI.Commands.Resolve"/>
         </member>
+        <member name="T:DuetAPIClient.InternalServerException">
+            <summary>
+            Wrapper around internal server-side exceptions that are reported as part of command responses
+            </summary>
+            <seealso cref="T:DuetAPI.Commands.ErrorResponse"/>
+        </member>
+        <member name="M:DuetAPIClient.InternalServerException.#ctor(System.String,System.String,System.String)">
+            <summary>
+            Creates a new CommandException instance
+            </summary>
+            <param name="command">Name of the command that failed</param>
+            <param name="type">Type of the thrown .NET error</param>
+            <param name="message">Message of the thrown .NET error</param>
+        </member>
         <member name="T:DuetAPIClient.SubscribeConnection">
             <summary>
             Connection class for subscribing to model updates
@@ -657,7 +634,7 @@
             <param name="socketPath">Path to the UNIX socket file</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
-            <exception cref="T:DuetAPIClient.Exceptions.IncompatibleVersionException">API level is incompatible</exception>
+            <exception cref="T:DuetAPI.Connection.IncompatibleVersionException">API level is incompatible</exception>
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Init message could not be processed</exception>

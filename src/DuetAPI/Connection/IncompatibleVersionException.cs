@@ -1,6 +1,6 @@
 using System;
 
-namespace DuetAPIClient.Exceptions
+namespace DuetAPI.Connection
 {
     /// <summary>
     /// Exception class that is thrown if the API version of the client is incompatible to the server
@@ -10,8 +10,7 @@ namespace DuetAPIClient.Exceptions
         /// <summary>
         /// Creates a new exception instance
         /// </summary>
-        public IncompatibleVersionException()
-        { }
+        public IncompatibleVersionException() { }
 
         /// <summary>
         /// Creates a new exception instance

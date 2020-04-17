@@ -1,6 +1,6 @@
 using System;
 
-namespace DuetAPIClient.Exceptions
+namespace DuetAPIClient
 {
     /// <summary>
     /// Wrapper around internal server-side exceptions that are reported as part of command responses

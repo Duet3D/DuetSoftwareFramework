@@ -7,7 +7,6 @@ using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.Machine;
-using DuetAPIClient.Exceptions;
 
 namespace DuetAPIClient
 {

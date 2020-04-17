@@ -9,7 +9,6 @@ using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
-using DuetAPIClient.Exceptions;
 
 namespace DuetAPIClient
 {
@@ -98,22 +97,24 @@ namespace DuetAPIClient
             UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(socketPath);
             _unixSocket.Connect(endPoint);
 
-            // Verify server init message
+            // Read the server init message
             ServerInitMessage ownMessage = new ServerInitMessage();
             ServerInitMessage serverMessage = await Receive<ServerInitMessage>(cancellationToken);
-            if (serverMessage.Version < ownMessage.Version)
-            {
-                throw new IncompatibleVersionException($"Incompatible API version (need {ownMessage.Version}, got {serverMessage.Version}");
-            }
             Id = serverMessage.Id;
 
             // Switch mode
+            initMessage.Version = Defaults.ProtocolVersion;
             await Send(initMessage, cancellationToken);
 
+            // Check the result
             BaseResponse response = await ReceiveResponse(cancellationToken);
             if (!response.Success)
             {
                 ErrorResponse errorResponse = (ErrorResponse)response;
+                if (errorResponse.ErrorType == nameof(IncompatibleVersionException))
+                {
+                    throw new IncompatibleVersionException(errorResponse.ErrorMessage);
+                }
                 throw new IOException($"Could not set connection type {_connectionMode} ({errorResponse.ErrorType}: {errorResponse.ErrorMessage})");
             }
         }

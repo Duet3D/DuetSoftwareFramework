@@ -132,6 +132,14 @@ namespace DuetControlServer.Codes
                     }
                     throw new OperationCanceledException();
 
+                // Initialize SD card
+                case 21:
+                    throw new NotSupportedException();
+
+                // Release SD card
+                case 22:
+                    throw new NotSupportedException();
+
                 // Select a file to print
                 case 23:
                 case 32:

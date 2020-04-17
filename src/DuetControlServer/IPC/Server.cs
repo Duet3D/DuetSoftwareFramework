@@ -17,6 +17,12 @@ namespace DuetControlServer.IPC
     public static class Server
     {
         /// <summary>
+        /// Minimum supported protocol version number
+        /// </summary>
+        /// <seealso cref="DuetAPI.Connection.Defaults.ProtocolVersion"/>
+        public const int MinimumProtocolVersion = 4;
+
+        /// <summary>
         /// UNIX socket for inter-process communication
         /// </summary>
         private static readonly Socket _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
@@ -157,6 +163,17 @@ namespace DuetControlServer.IPC
             {
                 string response = await conn.ReceivePlainJson();
                 ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response, JsonHelper.DefaultJsonOptions);
+
+                // Check the version number
+                if (initMessage.Version < MinimumProtocolVersion)
+                {
+                    string message = $"Incompatible protocol version (got {initMessage.Version}, need {MinimumProtocolVersion} or higher)";
+                    conn.Logger.Warn(message);
+                    await conn.SendResponse(new IncompatibleVersionException(message));
+                    return null;
+                }
+
+                // Check the requested mode
                 switch (initMessage.Mode)
                 {
                     case ConnectionMode.Command:

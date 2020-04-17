@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using DuetAPI.Connection;
 using DuetAPI.Machine;
 using DuetAPIClient;
-using DuetAPIClient.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;

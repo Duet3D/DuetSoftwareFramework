@@ -1187,6 +1187,11 @@
             Static class that holds the connection defaults
             </summary>
         </member>
+        <member name="F:DuetAPI.Connection.Defaults.ProtocolVersion">
+            <summary>
+            Current API protocol version number
+            </summary>
+        </member>
         <member name="F:DuetAPI.Connection.Defaults.SocketDirectory">
             <summary>
             Default directory in which DSF-related UNIX sockets reside
@@ -1207,6 +1212,29 @@
             Default code channel to use
             </summary>
         </member>
+        <member name="T:DuetAPI.Connection.IncompatibleVersionException">
+            <summary>
+            Exception class that is thrown if the API version of the client is incompatible to the server
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Connection.IncompatibleVersionException.#ctor">
+            <summary>
+            Creates a new exception instance
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Connection.IncompatibleVersionException.#ctor(System.String)">
+            <summary>
+            Creates a new exception instance
+            </summary>
+            <param name="message">Error message</param>
+        </member>
+        <member name="M:DuetAPI.Connection.IncompatibleVersionException.#ctor(System.String,System.Exception)">
+            <summary>
+            Creates a new exception instance
+            </summary>
+            <param name="message">Error message</param>
+            <param name="innerException">Inner exception</param>
+        </member>
         <member name="T:DuetAPI.Connection.InitMessages.ClientInitMessage">
             <summary>
             An instance of this class is sent from the client to the server as a response to the <see cref="T:DuetAPI.Connection.InitMessages.ServerInitMessage"/>.
@@ -1217,6 +1245,15 @@
             <summary>
             Desired mode of the new connection
             </summary>
+        </member>
+        <member name="P:DuetAPI.Connection.InitMessages.ClientInitMessage.Version">
+            <summary>
+            Version number of the client-side API
+            </summary>
+            <seealso cref="F:DuetAPI.Connection.Defaults.ProtocolVersion"/>
+            <remarks>
+            If this version is incompatible to DCS, a <see cref="T:DuetAPI.Connection.IncompatibleVersionException"/> is returned when a connection is being established
+            </remarks>
         </member>
         <member name="T:DuetAPI.Connection.InitMessages.CommandInitMessage">
             <summary>
@@ -1267,9 +1304,7 @@
         </member>
         <member name="P:DuetAPI.Connection.InitMessages.ServerInitMessage.Version">
             <summary>
-            Version of the server-side API. A client is supposed to check if the received API level is greater than
-            or equal to its own API level once a connection has been etablished. This is recommended to ensure that all
-            of the required commands are actually supported by the control server
+            Version of the server-side API
             </summary>
         </member>
         <member name="P:DuetAPI.Connection.InitMessages.ServerInitMessage.Id">
