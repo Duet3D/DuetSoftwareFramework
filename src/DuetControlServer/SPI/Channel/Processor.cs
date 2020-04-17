@@ -759,6 +759,7 @@ namespace DuetControlServer.SPI.Channel
                     Pop();
                     if (startCode.IsFinished)
                     {
+                        IsBlocked = true;   // don't send more codes until the next transfer because an abort file request may be pending
                         _logger.Debug("==> Finished starting code: {0}", startCode);
                     }
                     return true;

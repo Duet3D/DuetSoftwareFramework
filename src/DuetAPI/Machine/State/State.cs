@@ -48,6 +48,7 @@
         /// <summary>
         /// Version of the Duet Software Framework package
         /// </summary>
+        [LinuxProperty]
         public string DsfVersion
         {
             get => _dsfVersion;

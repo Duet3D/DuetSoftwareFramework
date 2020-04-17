@@ -165,7 +165,8 @@ namespace DuetControlServer.Commands
 
             // Wait for pending codes for message acknowledgements
             // FIXME M0/M1 are not meant to be used while a message box is open
-            if (Interface.IsWaitingForAcknowledgement(Channel) && (Type != CodeType.MCode || (MajorNumber != 0 && MajorNumber != 1)))
+            if (!Flags.HasFlag(CodeFlags.IsFromFirmware) && Interface.IsWaitingForAcknowledgement(Channel) &&
+                (Type != CodeType.MCode || (MajorNumber != 0 && MajorNumber != 1)))
             {
                 _codeType = InternalCodeType.Acknowledgement;
                 _logger.Debug("Waiting for execution of {0} (acknowledgement)", this);

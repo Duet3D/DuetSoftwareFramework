@@ -10,7 +10,7 @@ namespace DuetAPI.Connection.InitMessages
         /// or equal to its own API level once a connection has been etablished. This is recommended to ensure that all
         /// of the required commands are actually supported by the control server
         /// </summary>
-        public int Version { get; } = 3;
+        public int Version { get; } = 4;
         
         /// <summary>
         /// Unique connection ID assigned by the control server to allow clients to track their commands

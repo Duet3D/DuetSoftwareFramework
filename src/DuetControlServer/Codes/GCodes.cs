@@ -66,8 +66,15 @@ namespace DuetControlServer.Codes
                                     }
                                     else
                                     {
-                                        map = await SPI.Interface.GetHeightmap();
-                                        await SPI.Interface.UnlockAll(code.Channel);
+                                        try
+                                        {
+                                            map = await SPI.Interface.GetHeightmap();
+                                        }
+                                        finally
+                                        {
+                                            await SPI.Interface.UnlockAll(code.Channel);
+                                        }
+
                                         if (map.NumX * map.NumY > 0)
                                         {
                                             await map.Save(physicalFile);
