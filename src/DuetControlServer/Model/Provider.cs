@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Machine;
@@ -133,7 +132,7 @@ namespace DuetControlServer.Model
         /// </summary>
         public static void Init()
         {
-            Get.State.DsfVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            Get.State.DsfVersion = Program.Version;
             Get.Network.Hostname = Environment.MachineName;
             Get.Network.Name = Environment.MachineName;
         }

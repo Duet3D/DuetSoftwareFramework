@@ -14,6 +14,11 @@ namespace DuetControlServer
     public static class Program
     {
         /// <summary>
+        /// Version of this application
+        /// </summary>
+        public static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
+
+        /// <summary>
         /// Logger instance
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
@@ -48,8 +53,7 @@ namespace DuetControlServer
             }
             else
             {
-                string version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
-                Console.WriteLine($"Duet Control Server v{version}");
+                Console.WriteLine($"Duet Control Server v{Version}");
                 Console.WriteLine("Written by Christian Hammacher for Duet3D");
                 Console.WriteLine("Licensed under the terms of the GNU Public License Version 3");
                 Console.WriteLine();
