@@ -20,7 +20,7 @@ namespace UnitTests.File
             {
                 Code code = await macro.ReadCodeAsync();
                 Console.WriteLine(code);
-            } while (!macro.IsFinished);
+            } while (!macro.IsClosed);
 
             // End
         }

@@ -492,7 +492,7 @@ namespace DuetWebServer.Controllers
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new CommandConnection();
-            await connection.Connect(_configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.FullSocketPath));
+            await connection.Connect(_configuration.GetValue("SocketPath", Defaults.FullSocketPath));
             return connection;
         }
 

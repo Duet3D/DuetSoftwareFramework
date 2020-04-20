@@ -173,9 +173,9 @@
             List of cancellation tokens to cancel pending codes while they are waiting for their execution
             </summary>
         </member>
-        <member name="M:DuetControlServer.Commands.Code.Init">
+        <member name="M:DuetControlServer.Commands.Code.#cctor">
             <summary>
-            Initialize the code scheduler
+            Static constructor of this class
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.Code.CancelPending(DuetAPI.CodeChannel)">
@@ -267,9 +267,14 @@
             Indicates whether the code has been internally processed
             </summary>
         </member>
-        <member name="P:DuetControlServer.Commands.Code.Macro">
+        <member name="F:DuetControlServer.Commands.Code.File">
             <summary>
-            Macro file that started this code
+            File that started this code
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Commands.Code.Macro">
+            <summary>
+            Macro that started this code or null
             </summary>
         </member>
         <member name="F:DuetControlServer.Commands.Code.ResolvedByInterceptor">
@@ -425,9 +430,9 @@
             Locks to avoid race conditions when executing multiple text-based codes via the same channel
             </summary>
         </member>
-        <member name="M:DuetControlServer.Commands.SimpleCode.Init">
+        <member name="M:DuetControlServer.Commands.SimpleCode.#cctor">
             <summary>
-            Initialize this class
+            Static constructor of this class
             </summary>
         </member>
         <member name="P:DuetControlServer.Commands.SimpleCode.SourceConnection">
@@ -785,10 +790,56 @@
             Dispose this instance
             </summary>
         </member>
+        <member name="T:DuetControlServer.Files.CodeBlock">
+            <summary>
+            Class representing a code block in a conditional G-code file
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Files.CodeBlock.StartingCode">
+            <summary>
+            Code starting this block
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Files.CodeBlock.LastResult">
+            <summary>
+            Last evaluation result of the conditional start code
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Files.CodeBlock.ExpectingElse">
+            <summary>
+            Indicates if the corresponding condition may be followed by elif/else
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Files.CodeBlock.ContinueLoop">
+            <summary>
+            Indicates if continue was called in a while loop
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Files.CodeBlock.Iterations">
+            <summary>
+            Number of times this block has been run
+            </summary>
+        </member>
         <member name="T:DuetControlServer.Files.CodeFile">
             <summary>
             Class to read G/M/T-codes from files
             </summary>
+        </member>
+        <member name="F:DuetControlServer.Files.CodeFile._openFiles">
+            <summary>
+            Dictionary holding the currently open code files
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Files.CodeFile.#cctor">
+            <summary>
+            Static constructor of this class
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Files.CodeFile.AbortAll(DuetAPI.CodeChannel)">
+            <summary>
+            Abort all running macro files on a given code channel
+            </summary>
+            <param name="channel">Code channel</param>
         </member>
         <member name="F:DuetControlServer.Files.CodeFile._fileStream">
             <summary>
@@ -810,14 +861,29 @@
             Channel to send the codes to
             </summary>
         </member>
-        <member name="F:DuetControlServer.Files.CodeFile._stack">
+        <member name="F:DuetControlServer.Files.CodeFile._codeBlocks">
             <summary>
             Internal stack for conditional G-code execution
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Files.CodeFile._lastCodeBlock">
+            <summary>
+            Last code block
             </summary>
         </member>
         <member name="P:DuetControlServer.Files.CodeFile.Position">
             <summary>
             Gets or sets the current file position in bytes
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Files.CodeFile.Iterations">
+            <summary>
+            Number of iterations of the current loop
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Files.CodeFile.LastResult">
+            <summary>
+            Result of the last G/M/T-code (0 = success, 1 = warning, 2 = error)
             </summary>
         </member>
         <member name="P:DuetControlServer.Files.CodeFile.LineNumber">
@@ -909,26 +975,7 @@
             </summary>
             <returns>Read code or null if none found</returns>
             <exception cref="T:DuetAPI.Commands.CodeParserException">Failed to read the next code</exception>
-        </member>
-        <member name="T:DuetControlServer.Files.CodeFileState">
-            <summary>
-            Class representing a stack level in a conditional G-code file
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.Files.CodeFileState.StartingCode">
-            <summary>
-            Code starting this block
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.Files.CodeFileState.LastResult">
-            <summary>
-            Last evaluation result of the start code
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.Files.CodeFileState.Iterations">
-            <summary>
-            Number of times this block has been run
-            </summary>
+            <exception cref="T:System.OperationCanceledException">Failed to flush the pending codes</exception>
         </member>
         <member name="T:DuetControlServer.Files.ConfigOverride">
             <summary>
@@ -1589,7 +1636,7 @@
             Class providing functions for expression testing and evaluation
             </summary>
         </member>
-        <member name="M:DuetControlServer.Model.Expressions.ContainsLinuxFields(DuetAPI.Commands.Code)">
+        <member name="M:DuetControlServer.Model.Expressions.ContainsLinuxFields(DuetControlServer.Commands.Code)">
             <summary>
             Checks if the given code contains any Linux object model fields
             </summary>
@@ -1597,7 +1644,7 @@
             <returns>Whether the code contains any Linux object model fields</returns>
             <exception cref="T:DuetAPI.Commands.CodeParserException">Failed to parse expression</exception>
         </member>
-        <member name="M:DuetControlServer.Model.Expressions.ContainsLinuxFields(System.String,DuetAPI.Commands.Code)">
+        <member name="M:DuetControlServer.Model.Expressions.ContainsLinuxFields(System.String,DuetControlServer.Commands.Code)">
             <summary>
             Checks if the given expression string contains any Linux object model fields
             </summary>
@@ -1613,7 +1660,7 @@
             <param name="expression">Expression without indices to check</param>
             <returns>Whether the given expression is a Linux object model field</returns>
         </member>
-        <member name="M:DuetControlServer.Model.Expressions.Evaluate(DuetAPI.Commands.Code,System.Boolean)">
+        <member name="M:DuetControlServer.Model.Expressions.Evaluate(DuetControlServer.Commands.Code,System.Boolean)">
             <summary>
             Evaluate a conditional code
             </summary>
@@ -1621,22 +1668,22 @@
             <param name="replaceOnlyLinuxFields">Whether to evaluate only Linux attributes (not applicable for echo)</param>
             <returns>Evaluation result or null</returns>
         </member>
-        <member name="M:DuetControlServer.Model.Expressions.Evaluate(DuetAPI.CodeChannel,System.String,System.Boolean,System.Boolean)">
+        <member name="M:DuetControlServer.Model.Expressions.Evaluate(DuetControlServer.Commands.Code,System.String,System.Boolean,System.Boolean)">
             <summary>
             Evaluate sub-expression(s)
             </summary>
-            <param name="channel">Channel to evaluate this on</param>
+            <param name="code">Code holding the expression(s)</param>
             <param name="expression">Expression(s) to replace</param>
             <param name="onlyLinuxFields">Whether to replace only Linux fields</param>
             <param name="encodeResult">Whether the final result shall be encoded</param>
             <returns>Replaced expression(s)</returns>
             <exception cref="T:DuetAPI.Commands.CodeParserException">Failed to parse expression(s)</exception>
         </member>
-        <member name="M:DuetControlServer.Model.Expressions.EvaluateToString(DuetAPI.CodeChannel,System.String,System.Boolean,System.Boolean)">
+        <member name="M:DuetControlServer.Model.Expressions.EvaluateToString(DuetControlServer.Commands.Code,System.String,System.Boolean,System.Boolean)">
             <summary>
             Evaluate a sub-expression to string
             </summary>
-            <param name="channel">Code channel</param>
+            <param name="code">Code holdng the expresisng</param>
             <param name="expression">Expression to evaluate</param>
             <param name="onlyLinuxFields">Whether to replace only Linux fields</param>
             <param name="encodeResult">Whether the final result shall be encoded</param>

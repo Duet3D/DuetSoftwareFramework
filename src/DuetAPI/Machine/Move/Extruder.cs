@@ -71,7 +71,7 @@
         public ExtruderNonlinear Nonlinear { get; private set; } = new ExtruderNonlinear();
 
         /// <summary>
-        /// Extruder position
+        /// Extruder position (in mm)
         /// </summary>
         public float Position
         {
@@ -81,7 +81,7 @@
         private float _position;
 
         /// <summary>
-        /// Motor jerk (in mm/s)
+        /// Pressure advance
         /// </summary>
         public float PressureAdvance
         {
@@ -91,7 +91,7 @@
         private float _pressureAdvance;
 
         /// <summary>
-        /// Raw extruder position without extrusion factor applied
+        /// Raw extruder position without extrusion factor applied (in mm)
         /// </summary>
         public float RawPosition
         {

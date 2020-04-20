@@ -86,7 +86,7 @@
         private byte _stackDepth = 0;
 
         /// <summary>
-        /// Number of the current line
+        /// State of this input channel
         /// </summary>
         public InputChannelState State
         {

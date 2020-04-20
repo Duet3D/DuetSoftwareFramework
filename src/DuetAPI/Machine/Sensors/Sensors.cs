@@ -18,7 +18,7 @@
         public ModelCollection<Endstop> Endstops { get; } = new ModelCollection<Endstop>();
 
         /// <summary>
-        /// List of configured endstops
+        /// List of configured filament monitors
         /// </summary>
         /// <seealso cref="FilamentMonitor"/>
         public ModelCollection<FilamentMonitor> FilamentMonitors { get; } = new ModelCollection<FilamentMonitor>();
@@ -27,7 +27,7 @@
         /// List of general-purpose input ports
         /// </summary>
         /// <seealso cref="GpInputPort"/>
-        public ModelCollection<GpInputPort> Inputs { get; } = new ModelCollection<GpInputPort>();
+        public ModelCollection<GpInputPort> GpIn { get; } = new ModelCollection<GpInputPort>();
 
         /// <summary>
         /// List of configured probes

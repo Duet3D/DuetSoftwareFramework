@@ -73,7 +73,7 @@ namespace DuetAPI.Machine
         private float _layerHeight;
 
         /// <summary>
-        /// Number of total layers or null if unknown
+        /// Number of total layers or 0 if unknown
         /// </summary>
         public int NumLayers
         {

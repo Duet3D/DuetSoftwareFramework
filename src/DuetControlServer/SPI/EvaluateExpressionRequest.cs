@@ -38,7 +38,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Internal TCS for the task
         /// </summary>
-        private readonly TaskCompletionSource<object> _tcs = new TaskCompletionSource<object>(TaskContinuationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<object> _tcs = new TaskCompletionSource<object>();
 
         /// <summary>
         /// Task that completes when the request has been fulfilled
@@ -49,7 +49,7 @@ namespace DuetControlServer.SPI
         /// Set the result of the evaluated expression
         /// </summary>
         /// <param name="result">Result to set</param>
-        public void SetResult(object result) => _tcs.TrySetResult(result);
+        public void SetResult(object result) => _tcs.SetResult(result);
 
         /// <summary>
         /// Set the task to canceled
@@ -60,6 +60,6 @@ namespace DuetControlServer.SPI
         /// Set an exception for the task
         /// </summary>
         /// <param name="exception">Exception to set</param>
-        public void SetException(Exception exception) => _tcs.TrySetException(exception);
+        public void SetException(Exception exception) => _tcs.SetException(exception);
     }
 }

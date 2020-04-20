@@ -80,7 +80,7 @@ namespace DuetControlServer.Utility
         /// <param name="e">Event arguments</param>
         private static void Extruders_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            using (_lock.Lock())
+            using (_lock.Lock(Program.CancellationToken))
             {
                 if (e.OldItems != null)
                 {
@@ -124,7 +124,7 @@ namespace DuetControlServer.Utility
             if (e.PropertyName == nameof(Extruder.Filament))
             {
                 Extruder extruder = (Extruder)sender;
-                using (_lock.Lock())
+                using (_lock.Lock(Program.CancellationToken))
                 {
                     int extruderIndex = Provider.Get.Move.Extruders.IndexOf(extruder);
                     if (!_filamentMapping.TryGetValue(extruderIndex, out string filament) || filament != extruder.Filament)

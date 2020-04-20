@@ -1,7 +1,7 @@
 ﻿namespace DuetAPI.Machine
 {
     /// <summary>
-    /// Information about core kinematics
+    /// Information about hangprinter kinematics
     /// </summary>
     public sealed class HangprinterKinematics : Kinematics
     {

@@ -68,11 +68,11 @@ namespace DuetAPI.Machine
 
             if (jsonElement.TryGetProperty("type", out JsonElement nameProperty))
             {
-                FilamentMonitorType kinematicsName = (FilamentMonitorType)JsonSerializer.Deserialize(nameProperty.GetRawText(), typeof(FilamentMonitorType));
-                Type requiredType = GetFilamentMonitorType(kinematicsName);
+                FilamentMonitorType filamentMonitorType = (FilamentMonitorType)JsonSerializer.Deserialize(nameProperty.GetRawText(), typeof(FilamentMonitorType));
+                Type requiredType = GetFilamentMonitorType(filamentMonitorType);
                 if (GetType() != requiredType)
                 {
-                    Kinematics newInstance = (Kinematics)Activator.CreateInstance(requiredType);
+                    FilamentMonitor newInstance = (FilamentMonitor)Activator.CreateInstance(requiredType);
                     newInstance.UpdateFromJson(jsonElement);
                     return newInstance;
                 }

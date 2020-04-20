@@ -201,20 +201,7 @@ namespace DuetAPI.Commands
         {
             if (Keyword != KeywordType.None)
             {
-                return Keyword switch
-                {
-                    KeywordType.Abort => "abort " + KeywordArgument,
-                    KeywordType.Break => "break",
-                    KeywordType.Echo => "echo " + KeywordArgument,
-                    KeywordType.Else => "else",
-                    KeywordType.ElseIf => "elif " + KeywordArgument,
-                    KeywordType.If => "if " + KeywordArgument,
-                    KeywordType.Return => "return " + KeywordArgument,
-                    KeywordType.Set => "set " + KeywordArgument,
-                    KeywordType.Var => "var " + KeywordArgument,
-                    KeywordType.While => "while " + KeywordArgument,
-                    _ => throw new NotImplementedException()
-                };
+                return KeywordToString() + ((KeywordArgument == null) ? string.Empty : " " + KeywordArgument);
             }
 
             if (Type == CodeType.Comment)
@@ -281,6 +268,11 @@ namespace DuetAPI.Commands
         /// <returns>Command fraction of the code</returns>
         public string ToShortString()
         {
+            if (Keyword != KeywordType.None)
+            {
+                return KeywordToString();
+            }
+
             if (Type == CodeType.Comment)
             {
                 return "(comment)";
@@ -295,6 +287,29 @@ namespace DuetAPI.Commands
                 return $"{(char)Type}{MajorNumber}";
             }
             return $"{(char)Type}";
+        }
+
+        /// <summary>
+        /// Convert the keyword to a string
+        /// </summary>
+        /// <returns></returns>
+        private string KeywordToString()
+        {
+            return Keyword switch
+            {
+                KeywordType.If => "if",
+                KeywordType.ElseIf => "elif",
+                KeywordType.Else => "else",
+                KeywordType.While => "while",
+                KeywordType.Break => "break",
+                KeywordType.Continue => "continue",
+                KeywordType.Return => "return",
+                KeywordType.Abort => "abort",
+                KeywordType.Var => "var",
+                KeywordType.Set => "set",
+                KeywordType.Echo => "echo",
+                _ => throw new NotImplementedException()
+            };
         }
     }
 }

@@ -6,7 +6,7 @@
     public sealed class Layer : ModelObject
     {
         /// <summary>
-        /// Duration of the layer (in s or null if unknown)
+        /// Duration of the layer (in s)
         /// </summary>
         public int Duration
         {

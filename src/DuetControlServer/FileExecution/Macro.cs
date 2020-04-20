@@ -2,10 +2,12 @@
 using DuetAPI.Commands;
 using DuetAPI.Machine;
 using DuetControlServer.Files;
+using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -59,6 +61,26 @@ namespace DuetControlServer.FileExecution
         public CodeResult Result { get; set; } = new CodeResult();
 
         /// <summary>
+        /// Internal cancellation token source used for codes
+        /// </summary>
+        private CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+
+        /// <summary>
+        /// Cancellation token that is triggered when the file is cancelled/aborted
+        /// </summary>
+        public CancellationToken CancellationToken { get => _cts.Token; }
+
+        /// <summary>
+        /// Cancel pending codes
+        /// </summary>
+        public void CancelPendingCodes()
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+        }
+
+        /// <summary>
         /// Internal lock used for starting codes in the right order
         /// </summary>
         private readonly AsyncLock _codeStartLock = new AsyncLock();
@@ -70,7 +92,7 @@ namespace DuetControlServer.FileExecution
         /// <remarks>
         /// This is required in case a flush is requested before another nested macro is started
         /// </remarks>
-        public AwaitableDisposable<IDisposable> WaitForCodeExecution() => _codeStartLock.LockAsync(_file.CancellationToken);
+        public AwaitableDisposable<IDisposable> WaitForCodeStart() => _codeStartLock.LockAsync(CancellationToken);
 
         /// <summary>
         /// File to read from
@@ -124,18 +146,19 @@ namespace DuetControlServer.FileExecution
         public bool IsAborted { get; private set; }
 
         /// <summary>
-        /// Indicates if an error occurred while executing the macro file
+        /// Indicates if the macro file could be opened
         /// </summary>
-        public bool HadError { get; private set; }
+        public bool FileOpened { get => _file != null; }
 
         /// <summary>
         /// Constructor of a macro
         /// </summary>
         /// <param name="fileName">Filename of the macro</param>
+        /// <param name="physicalFile">Physical path of the macro</param>
         /// <param name="channel">Code requesting the macro</param>
         /// <param name="isNested">Whether the code was started from a G/M/T-code</param>
         /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
-        public Macro(string fileName, CodeChannel channel, bool isNested, int sourceConnection)
+        public Macro(string fileName, string physicalFile, CodeChannel channel, bool isNested, int sourceConnection)
         {
             FileName = fileName;
             Channel = channel;
@@ -143,7 +166,7 @@ namespace DuetControlServer.FileExecution
             SourceConnection = sourceConnection;
 
             // Are we executing config.g?
-            string name = Path.GetFileName(fileName);
+            string name = Path.GetFileName(physicalFile);
             if (isNested)
             {
                 IsConfigOverride = (name == FilePath.ConfigOverrideFile);
@@ -157,16 +180,15 @@ namespace DuetControlServer.FileExecution
             // Try to start the macro file
             try
             {
-                _file = new CodeFile(fileName, channel);
-                _logger.Info("Starting macro file {0} on channel {1}", name, channel);
+                _file = new CodeFile(physicalFile, channel);
+                _logger.Info("Starting macro file {0} on channel {1}", fileName, channel);
             }
             catch (Exception e)
             {
                 if (!(e is FileNotFoundException))
                 {
-                    _logger.Error(e, "Failed to start macro file {0}: {1}", name, e.Message);
+                    _logger.Error(e, "Failed to start macro file {0}: {1}", fileName, e.Message);
                 }
-                HadError = true;
             }
             finally
             {
@@ -181,24 +203,24 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Abort this macro
         /// </summary>
-        public void Abort()
+        /// <returns>Asynchronous task</returns>
+        public async Task Abort()
         {
             if (IsAborted)
             {
                 return;
             }
-            IsAborted = HadError = true;
+            IsAborted = true;
             IsExecuting = false;
-            _file?.Abort();
-            
-            if (FileName != null)
+            if (_file != null)
             {
-                _logger.Info("Aborted macro file {0}", Path.GetFileName(FileName));
+                using (await _file.LockAsync())
+                {
+                    _file.Close();
+                }
             }
-            else
-            {
-                _logger.Info("Aborted invalid macro file");
-            }
+
+            _logger.Info("Aborted macro file {0}", FileName);
         }
 
         /// <summary>
@@ -216,12 +238,13 @@ namespace DuetControlServer.FileExecution
             {
                 return Task.FromResult(Result);
             }
+            _cts.Cancel();
 
             if (_finishTCS != null)
             {
                 return _finishTCS.Task;
             }
-            _finishTCS = new TaskCompletionSource<CodeResult>();
+            _finishTCS = new TaskCompletionSource<CodeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             return _finishTCS.Task;
         }
 
@@ -237,9 +260,9 @@ namespace DuetControlServer.FileExecution
             do
             {
                 // Fill up the macro code buffer
-                using (await _lock.LockAsync(Program.CancellationToken))
+                while (codes.Count < Settings.BufferedMacroCodes)
                 {
-                    while (codes.Count < Settings.BufferedMacroCodes)
+                    try
                     {
                         Code readCode = await ReadCodeAsync();
                         if (readCode == null)
@@ -250,6 +273,33 @@ namespace DuetControlServer.FileExecution
 
                         codes.Enqueue(readCode);
                         codesBeingExecuted.Enqueue(readCode.Execute());
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        using (await _lock.LockAsync(Program.CancellationToken))
+                        {
+                            await Abort();
+                        }
+                    }
+                    catch (AggregateException ae)
+                    {
+                        using (await _file.LockAsync())
+                        {
+                            _file.Close();
+                        }
+
+                        await Logger.LogOutput(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {ae.InnerException.Message}");
+                        _logger.Error(ae.InnerException, "Failed to read code from macro {0}", FileName);
+                    }
+                    catch (Exception e)
+                    {
+                        using (await _file.LockAsync())
+                        {
+                            _file.Close();
+                        }
+
+                        await Logger.LogOutput(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {e.Message}");
+                        _logger.Error(e, "Failed to read code from macro {0}", FileName);
                     }
                 }
 
@@ -268,38 +318,39 @@ namespace DuetControlServer.FileExecution
 
                             if (!IsNested)
                             {
-                                await Utility.Logger.LogOutput(result);
+                                await Logger.LogOutput(result);
                             }
                         }
                     }
                     catch (OperationCanceledException)
                     {
-                        // Code has been cancelled. Don't log this
+                        // Code has been cancelled, don't log this. In the future this may terminate the macro file
                     }
                     catch (AggregateException ae)
                     {
-                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
                         using (await _lock.LockAsync(Program.CancellationToken))
                         {
-                            Abort();
+                            await Abort();
                         }
+
+                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                        _logger.Error(ae.InnerException, "Failed execute code from macro {0}", FileName);
                     }
                     catch (Exception e)
                     {
-                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()}: [{e.GetType().Name}] {e.Message}");
                         using (await _lock.LockAsync(Program.CancellationToken))
                         {
-                            Abort();
+                            await Abort();
                         }
+
+                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{e.GetType().Name}] {e.Message}");
+                        _logger.Error(e, "Failed execute code from macro {0}", FileName);
                     }
                 }
                 else
                 {
-                    using (await _lock.LockAsync(Program.CancellationToken))
-                    {
-                        // No more codes to process, macro file has finished
-                        _logger.Debug("Finished codes from macro file {0}", Path.GetFileName(FileName));
-                    }
+                    // No more codes to process, macro file has finished
+                    _logger.Debug("Finished codes from macro file {0}", FileName);
                     break;
                 }
             }
@@ -328,65 +379,58 @@ namespace DuetControlServer.FileExecution
         {
             Code result;
 
-            try
+            // When executing config.g, perform some extra steps...
+            if (IsConfig)
             {
-                // When executing config.g, perform some extra steps...
-                if (IsConfig)
+                switch (_extraStep)
                 {
-                    switch (_extraStep)
-                    {
-                        case ConfigExtraSteps.SendHostname:
-                            result = new Code
-                            {
-                                Channel = Channel,
-                                InternallyProcessed = true,          // don't check our own hostname
-                                Type = CodeType.MCode,
-                                MajorNumber = 550
-                            };
-                            result.Parameters.Add(new CodeParameter('P', Environment.MachineName));
-                            _extraStep = ConfigExtraSteps.SendDateTime;
-                            break;
+                    case ConfigExtraSteps.SendHostname:
+                        result = new Code
+                        {
+                            Channel = Channel,
+                            InternallyProcessed = true,          // don't check our own hostname
+                            Type = CodeType.MCode,
+                            MajorNumber = 550
+                        };
+                        result.Parameters.Add(new CodeParameter('P', Environment.MachineName));
+                        _extraStep = ConfigExtraSteps.SendDateTime;
+                        break;
 
-                        case ConfigExtraSteps.SendDateTime:
-                            result = new Code
-                            {
-                                Channel = Channel,
-                                InternallyProcessed = true,          // don't update our own datetime
-                                Type = CodeType.MCode,
-                                MajorNumber = 905
-                            };
-                            result.Parameters.Add(new CodeParameter('P', DateTime.Now.ToString("yyyy-MM-dd")));
-                            result.Parameters.Add(new CodeParameter('S', DateTime.Now.ToString("HH:mm:ss")));
-                            _extraStep = ConfigExtraSteps.Done;
-                            break;
+                    case ConfigExtraSteps.SendDateTime:
+                        result = new Code
+                        {
+                            Channel = Channel,
+                            InternallyProcessed = true,          // don't update our own datetime
+                            Type = CodeType.MCode,
+                            MajorNumber = 905
+                        };
+                        result.Parameters.Add(new CodeParameter('P', DateTime.Now.ToString("yyyy-MM-dd")));
+                        result.Parameters.Add(new CodeParameter('S', DateTime.Now.ToString("HH:mm:ss")));
+                        _extraStep = ConfigExtraSteps.Done;
+                        break;
 
-                        default:
-                            result = (_file != null) ? await _file.ReadCodeAsync() : null;
-                            break;
-                    }
-                }
-                else
-                {
-                    result = (_file != null) ? await _file.ReadCodeAsync() : null;
-                }
-
-                // Update code information
-                if (result != null)
-                {
-                    result.FilePosition = null;
-                    result.Flags |= CodeFlags.IsFromMacro;
-                    if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
-                    if (IsConfigOverride) { result.Flags |= CodeFlags.IsFromConfigOverride; }
-                    if (IsNested) { result.Flags |= CodeFlags.IsNestedMacro; }
-                    result.Macro = this;
-                    result.SourceConnection = SourceConnection;
-                    return result;
+                    default:
+                        result = (_file != null) ? await _file.ReadCodeAsync() : null;
+                        break;
                 }
             }
-            catch (Exception e)
+            else
             {
-                _logger.Error(e, "Failed to read code from macro file {0}", Path.GetFileName(FileName));
-                Abort();
+                result = (_file != null) ? await _file.ReadCodeAsync() : null;
+            }
+
+            // Update code information
+            if (result != null)
+            {
+                result.CancellationToken = CancellationToken;
+                result.FilePosition = null;
+                result.Flags |= CodeFlags.IsFromMacro;
+                result.Macro = this;
+                if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
+                if (IsConfigOverride) { result.Flags |= CodeFlags.IsFromConfigOverride; }
+                if (IsNested) { result.Flags |= CodeFlags.IsNestedMacro; }
+                result.SourceConnection = SourceConnection;
+                return result;
             }
 
             // File has finished
@@ -421,6 +465,7 @@ namespace DuetControlServer.FileExecution
             }
 
             // Dispose the used resources
+            _cts.Dispose();
             _file?.Dispose();
             _finishTCS?.SetCanceled();
             disposed = true;

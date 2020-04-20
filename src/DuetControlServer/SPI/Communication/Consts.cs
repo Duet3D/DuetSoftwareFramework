@@ -34,7 +34,7 @@ namespace DuetControlServer.SPI.Communication
         /// <summary>
         /// Maximum supported length of messages to be sent to RepRapFirmware
         /// </summary>
-        public const int MaxMessageLength = 256;
+        public const int MaxMessageLength = 4096;
 
         /// <summary>
         /// Maximum number of evaluation requests to send per transfer

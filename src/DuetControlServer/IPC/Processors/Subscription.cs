@@ -35,14 +35,17 @@ namespace DuetControlServer.IPC.Processors
         private static readonly List<Subscription> _subscriptions = new List<Subscription>();
 
         /// <summary>
-        /// Checks if any subscribers are connected
+        /// True if any subscribers are connected
         /// </summary>
-        /// <returns>True if subscribers are connected</returns>
-        public static bool AreClientsConnected()
+        public static bool AreClientsConnected
         {
-            lock (_subscriptions)
+            get
             {
-                return _subscriptions.Count > 0;
+                lock (_subscriptions)
+                {
+                    // TODO here it would be better to check for subscribers waiting to messages
+                    return _subscriptions.Count > 0;
+                }
             }
         }
 

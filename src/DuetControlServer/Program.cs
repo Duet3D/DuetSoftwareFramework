@@ -83,8 +83,6 @@ namespace DuetControlServer
             // Initialize everything
             try
             {
-                Commands.Code.Init();
-                Commands.SimpleCode.Init();
                 Model.Provider.Init();
                 Model.Observer.Init();
                 Utility.FilamentManager.Init();

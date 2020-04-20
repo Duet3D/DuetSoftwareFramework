@@ -6,23 +6,13 @@
     public sealed class GpInputPort : ModelObject
     {
         /// <summary>
-        /// Indicates if the port has been configured
+        /// Value of this port (0..1)
         /// </summary>
-        public bool Configured
-        {
-            get => _configured;
-			set => SetPropertyValue(ref _configured, value);
-        }
-        private bool _configured;
-
-        /// <summary>
-        /// Value of this port or null if it is not configured
-        /// </summary>
-        public bool? Value
+        public float Value
         {
             get => _value;
 			set => SetPropertyValue(ref _value, value);
         }
-        private bool? _value;
+        private float _value;
     }
 }

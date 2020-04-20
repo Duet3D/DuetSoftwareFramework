@@ -323,6 +323,12 @@
             </summary>
             <returns>Command fraction of the code</returns>
         </member>
+        <member name="M:DuetAPI.Commands.Code.KeywordToString">
+            <summary>
+            Convert the keyword to a string
+            </summary>
+            <returns></returns>
+        </member>
         <member name="M:DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code,System.Boolean@)">
             <summary>
             Parse the next available G/M/T-code from the given stream
@@ -357,7 +363,7 @@
         </member>
         <member name="T:DuetAPI.Commands.KeywordType">
             <summary>
-            Types of conditional G-code
+            Enumeration of conditional G-code keywords
             </summary>
         </member>
         <member name="F:DuetAPI.Commands.KeywordType.None">
@@ -389,6 +395,7 @@
             <summary>
             Break instruction
             </summary>
+            <seealso cref="F:DuetAPI.Commands.KeywordType.While"/>
         </member>
         <member name="F:DuetAPI.Commands.KeywordType.Return">
             <summary>
@@ -414,6 +421,12 @@
             <summary>
             Echo operation
             </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.KeywordType.Continue">
+            <summary>
+            Continue instruction
+            </summary>
+            <seealso cref="F:DuetAPI.Commands.KeywordType.While"/>
         </member>
         <member name="T:DuetAPI.Commands.CodeFlags">
             <summary>
@@ -718,14 +731,6 @@
             </summary>
             <param name="message">Exception message</param>
             <param name="code">Code being parsed</param>
-        </member>
-        <member name="M:DuetAPI.Commands.CodeParserException.#ctor(System.String,DuetAPI.Commands.Code,System.Exception)">
-            <summary>
-            Creates a new CodeParserException with details where the parser failed to read data
-            </summary>
-            <param name="message">Exception message</param>
-            <param name="code">Code being parsed</param>
-            <param name="inner">Inner exception</param>
         </member>
         <member name="M:DuetAPI.Commands.CodeParserException.#ctor(System.String,System.Exception)">
             <summary>
@@ -1852,12 +1857,12 @@
         </member>
         <member name="P:DuetAPI.Machine.FanThermostaticControl.HighTemperature">
             <summary>
-            Upper temperature range required to turn on the fan on (in C)
+            Upper temperature range required to turn on the fan (in C)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.FanThermostaticControl.LowTemperature">
             <summary>
-            Lower temperature range required to turn on the fan on (in C)
+            Lower temperature range required to turn on the fan (in C)
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.Heat">
@@ -1916,7 +1921,7 @@
         </member>
         <member name="P:DuetAPI.Machine.Heater.Max">
             <summary>
-            Maximum allowed temperature for this heater (in C)
+            Maximum temperature allowed for this heater (in C)
             </summary>
             <remarks>
             This is only temporary and should be replaced by a representation of the heater protection as in RRF
@@ -1924,7 +1929,7 @@
         </member>
         <member name="P:DuetAPI.Machine.Heater.Min">
             <summary>
-            Maximum allowed temperature for this heater (in C)
+            Minimum temperature allowed for this heater (in C)
             </summary>
             <remarks>
             This is only temporary and should be replaced by a representation of the heater protection as in RRF
@@ -1967,7 +1972,7 @@
         </member>
         <member name="P:DuetAPI.Machine.HeaterModel.DeadTime">
             <summary>
-            Dead time of this heater or null if unknown
+            Dead time
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.HeaterModel.Enabled">
@@ -1977,7 +1982,7 @@
         </member>
         <member name="P:DuetAPI.Machine.HeaterModel.Gain">
             <summary>
-            Gain value or null if unknown
+            Gain value
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.HeaterModel.Inverted">
@@ -1987,7 +1992,7 @@
         </member>
         <member name="P:DuetAPI.Machine.HeaterModel.MaxPwm">
             <summary>
-            Maximum PWM or null if unknown
+            Maximum PWM value
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.HeaterModel.PID">
@@ -1997,12 +2002,12 @@
         </member>
         <member name="P:DuetAPI.Machine.HeaterModel.StandardVoltage">
             <summary>
-            Standard voltage of this heater or null if unknown
+            Standard voltage or null if unknown
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.HeaterModel.TimeConstant">
             <summary>
-            Time constant or null if unknown
+            Time constant
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.HeaterModelPID">
@@ -2314,7 +2319,7 @@
         </member>
         <member name="P:DuetAPI.Machine.InputChannel.State">
             <summary>
-            Number of the current line
+            State of this input channel
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.InputChannel.LineNumber">
@@ -2577,7 +2582,7 @@
         </member>
         <member name="P:DuetAPI.Machine.Layer.Duration">
             <summary>
-            Duration of the layer (in s or null if unknown)
+            Duration of the layer (in s)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Layer.Filament">
@@ -2637,7 +2642,7 @@
         </member>
         <member name="P:DuetAPI.Machine.ParsedFileInfo.NumLayers">
             <summary>
-            Number of total layers or null if unknown
+            Number of total layers or 0 if unknown
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.ParsedFileInfo.PrintTime">
@@ -3163,17 +3168,17 @@
         </member>
         <member name="P:DuetAPI.Machine.Extruder.Position">
             <summary>
-            Extruder position
+            Extruder position (in mm)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Extruder.PressureAdvance">
             <summary>
-            Motor jerk (in mm/s)
+            Pressure advance
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Extruder.RawPosition">
             <summary>
-            Raw extruder position without extrusion factor applied
+            Raw extruder position without extrusion factor applied (in mm)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Extruder.Speed">
@@ -3288,7 +3293,7 @@
         </member>
         <member name="T:DuetAPI.Machine.HangprinterKinematics">
             <summary>
-            Information about core kinematics
+            Information about hangprinter kinematics
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.HangprinterKinematics.AnchorA">
@@ -4262,14 +4267,9 @@
             Details about a general-purpose input port
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.GpInputPort.Configured">
-            <summary>
-            Indicates if the port has been configured
-            </summary>
-        </member>
         <member name="P:DuetAPI.Machine.GpInputPort.Value">
             <summary>
-            Value of this port or null if it is not configured
+            Value of this port (0..1)
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.Probe">
@@ -4435,11 +4435,11 @@
         </member>
         <member name="P:DuetAPI.Machine.Sensors.FilamentMonitors">
             <summary>
-            List of configured endstops
+            List of configured filament monitors
             </summary>
             <seealso cref="T:DuetAPI.Machine.FilamentMonitor"/>
         </member>
-        <member name="P:DuetAPI.Machine.Sensors.Inputs">
+        <member name="P:DuetAPI.Machine.Sensors.GpIn">
             <summary>
             List of general-purpose input ports
             </summary>
@@ -4499,6 +4499,16 @@
         <member name="P:DuetAPI.Machine.BeepRequest.Frequency">
             <summary>
             Frequency of the requested beep (in Hz)
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.GpOutputPort">
+            <summary>
+            Details about a general-purpose output port
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.GpOutputPort.Pwm">
+            <summary>
+            PWM value of this port (0..1)
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.MachineMode">
@@ -4651,7 +4661,7 @@
         </member>
         <member name="P:DuetAPI.Machine.RestorePoint.Coords">
             <summary>
-            Axis coordinates of the the restore point (in mm)
+            Axis coordinates of the restore point (in mm)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.RestorePoint.ExtruderPos">
@@ -4713,6 +4723,12 @@
             <summary>
             Version of the Duet Software Framework package
             </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.GpOut">
+            <summary>
+            List of general-purpose output ports
+            </summary>
+            <seealso cref="T:DuetAPI.Machine.GpOutputPort"/>
         </member>
         <member name="P:DuetAPI.Machine.State.LaserPwm">
             <summary>
@@ -5096,16 +5112,26 @@
             Helper class to generate RRF-style file lists
             </summary>
         </member>
-        <member name="M:DuetAPI.Utility.FileLists.MakeFileListContainer(System.Object,System.String,System.Int32)">
+        <member name="M:DuetAPI.Utility.FileLists.MakeFileListContainer(System.Collections.IList,System.String,System.Int32,System.Boolean)">
             <summary>
             Make a filelist container for M20
             </summary>
             <param name="items">Items to include</param>
             <param name="directory">RRF directory</param>
             <param name="startAt">First item</param>
+            <param name="finished">True if the file list is complete</param>
             <returns>JSON file list object</returns>
         </member>
-        <member name="M:DuetAPI.Utility.FileLists.GetFiles(System.String,System.String,System.Int32,System.Boolean)">
+        <member name="M:DuetAPI.Utility.FileLists.GetFileListSize(System.Collections.IList,System.String,System.Int32)">
+            <summary>
+            Get an estimate how big the UTF8-encoded file list will be in bytes
+            </summary>
+            <param name="items">Items to include</param>
+            <param name="directory">RRF directory</param>
+            <param name="startAt">First item</param>
+            <returns>Size of the UTF8-encoded file list in bytes</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.FileLists.GetFiles(System.String,System.String,System.Int32,System.Boolean,System.Int32)">
             <summary>
             Get a /rr_files or M20 files response
             </summary>
@@ -5113,15 +5139,17 @@
             <param name="physicalDirectory">Physical directory</param>
             <param name="startAt">First item to send</param>
             <param name="flagDirs">Prefix directories with an asterisk</param>
+            <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
             <returns>JSON file list</returns>
         </member>
-        <member name="M:DuetAPI.Utility.FileLists.GetFileList(System.String,System.String,System.Int32)">
+        <member name="M:DuetAPI.Utility.FileLists.GetFileList(System.String,System.String,System.Int32,System.Int32)">
             <summary>
             Get a /rr_filelist or M20 files response
             </summary>
             <param name="directory">RRF path to the directory</param>
             <param name="physicalDirectory">Physical directory</param>
             <param name="startAt">First file index to return. Set startAt to -1 to omit error handling and the JSON object container</param>
+            <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
             <returns>JSON list</returns>
         </member>
         <member name="T:DuetAPI.Utility.Heightmap">

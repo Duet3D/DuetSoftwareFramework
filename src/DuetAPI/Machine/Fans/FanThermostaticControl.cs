@@ -11,7 +11,7 @@
         public ModelCollection<int> Heaters { get; } = new ModelCollection<int>();
         
         /// <summary>
-        /// Upper temperature range required to turn on the fan on (in C)
+        /// Upper temperature range required to turn on the fan (in C)
         /// </summary>
         public float? HighTemperature
         {
@@ -21,7 +21,7 @@
         private float? _highTemperature;
 
         /// <summary>
-        /// Lower temperature range required to turn on the fan on (in C)
+        /// Lower temperature range required to turn on the fan (in C)
         /// </summary>
         public float? LowTemperature
         {

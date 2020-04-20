@@ -20,9 +20,9 @@ namespace DuetControlServer.Commands
         private static readonly AsyncLock[] _channelLocks = new AsyncLock[Inputs.Total];
 
         /// <summary>
-        /// Initialize this class
+        /// Static constructor of this class
         /// </summary>
-        public static void Init()
+        static SimpleCode()
         {
             for (int i = 0; i < Inputs.Total; i++)
             {

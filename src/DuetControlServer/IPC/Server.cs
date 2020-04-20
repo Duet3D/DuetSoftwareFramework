@@ -19,7 +19,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Minimum supported protocol version number
         /// </summary>
-        /// <seealso cref="DuetAPI.Connection.Defaults.ProtocolVersion"/>
+        /// <seealso cref="Defaults.ProtocolVersion"/>
         public const int MinimumProtocolVersion = 4;
 
         /// <summary>

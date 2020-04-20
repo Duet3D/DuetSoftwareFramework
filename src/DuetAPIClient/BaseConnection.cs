@@ -202,9 +202,9 @@ namespace DuetAPIClient
         protected async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
             using JsonDocument jsonDocument = await ReceiveJson(cancellationToken);
-            if (typeof(T) == typeof(DuetAPI.Machine.MachineModel))
+            if (typeof(T) == typeof(MachineModel))
             {
-                DuetAPI.Machine.MachineModel newModel = new DuetAPI.Machine.MachineModel();
+                MachineModel newModel = new MachineModel();
                 newModel.UpdateFromJson(jsonDocument.RootElement);
                 return (T)(object)newModel;
             }

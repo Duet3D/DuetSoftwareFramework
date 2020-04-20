@@ -26,7 +26,7 @@
         private float _current = -273.15F;
 
         /// <summary>
-        /// Maximum allowed temperature for this heater (in C)
+        /// Maximum temperature allowed for this heater (in C)
         /// </summary>
         /// <remarks>
         /// This is only temporary and should be replaced by a representation of the heater protection as in RRF
@@ -39,7 +39,7 @@
         private float _max = 285F;
 
         /// <summary>
-        /// Maximum allowed temperature for this heater (in C)
+        /// Minimum temperature allowed for this heater (in C)
         /// </summary>
         /// <remarks>
         /// This is only temporary and should be replaced by a representation of the heater protection as in RRF

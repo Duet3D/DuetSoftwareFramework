@@ -1,5 +1,4 @@
-﻿using DuetAPI;
-using DuetAPI.Commands;
+﻿using DuetAPI.Commands;
 using DuetAPI.Machine;
 using System;
 using System.Collections;
@@ -7,6 +6,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Model
 {
@@ -37,7 +37,7 @@ namespace DuetControlServer.Model
             }
 
             // Conditional code
-            if (code.Keyword != KeywordType.None)
+            if (code.Keyword != KeywordType.None && code.KeywordArgument != null)
             {
                 return ContainsLinuxFields(code.KeywordArgument, code);
             }
@@ -142,6 +142,12 @@ namespace DuetControlServer.Model
         /// <returns>Whether the given expression is a Linux object model field</returns>
         public static bool IsLinuxExpression(string expression)
         {
+            // Check for special variables
+            if (expression == "iterations" || expression == "line" || expression == "result")
+            {
+                return true;
+            }
+
             // We neither read from nor write data to the OM so don't care about locking it
             ModelObject model = Provider.Get;
 
@@ -183,40 +189,40 @@ namespace DuetControlServer.Model
         /// <returns>Evaluation result or null</returns>
         public static async Task<string> Evaluate(Code code, bool replaceOnlyLinuxFields)
         {
-            if (code.Keyword == KeywordType.Echo)
+            if (code.KeywordArgument != null)
             {
-                StringBuilder builder = new StringBuilder();
-                foreach (string expression in code.KeywordArgument.Split(','))
+                if (code.Keyword == KeywordType.Echo)
                 {
-                    string trimmedExpression = expression.Trim();
-                    try
+                    StringBuilder builder = new StringBuilder();
+                    foreach (string expression in code.KeywordArgument.Split(','))
                     {
-                        string result = await Evaluate(code.Channel, trimmedExpression, replaceOnlyLinuxFields, false);
-                        if (builder.Length != 0)
+                        string trimmedExpression = expression.Trim();
+                        try
                         {
-                            builder.Append(' ');
+                            string result = await EvaluateExpression(code, trimmedExpression, replaceOnlyLinuxFields, false);
+                            if (builder.Length != 0)
+                            {
+                                builder.Append(' ');
+                            }
+                            builder.Append(result);
                         }
-                        builder.Append(result);
+                        catch (CodeParserException cpe)
+                        {
+                            throw new CodeParserException($"Failed to evaluate \"{trimmedExpression}\": {cpe.Message}", cpe);
+                        }
                     }
-                    catch (CodeParserException cpe)
-                    {
-                        throw new CodeParserException($"Failed to evaluate \"{trimmedExpression}\": {cpe.Message}", code, cpe);
-                    }
+                    return builder.ToString();
                 }
-                return builder.ToString();
-            }
 
-            if (code.Keyword != KeywordType.None)
-            {
                 string keywordArgument = code.KeywordArgument.Trim();
                 try
                 {
-                    string result = await Evaluate(code.Channel, keywordArgument, replaceOnlyLinuxFields, false);
+                    string result = await EvaluateExpression(code, keywordArgument, replaceOnlyLinuxFields, false);
                     return result;
                 }
                 catch (CodeParserException cpe)
                 {
-                    throw new CodeParserException($"Failed to evaluate \"{keywordArgument}\": {cpe.Message}", code, cpe);
+                    throw new CodeParserException($"Failed to evaluate \"{keywordArgument}\": {cpe.Message}", cpe);
                 }
             }
 
@@ -227,12 +233,12 @@ namespace DuetControlServer.Model
                     string trimmedExpression = code.Parameters[i].ToString().Trim();
                     try
                     {
-                        string parameterValue = await Evaluate(code.Channel, trimmedExpression, replaceOnlyLinuxFields, true);
+                        string parameterValue = await EvaluateExpression(code, trimmedExpression, replaceOnlyLinuxFields, true);
                         code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue, true);
                     }
                     catch (CodeParserException cpe)
                     {
-                        throw new CodeParserException($"Failed to evaluate \"{trimmedExpression}\": {cpe.Message}", code, cpe);
+                        throw new CodeParserException($"Failed to evaluate \"{trimmedExpression}\": {cpe.Message}", cpe);
                     }
                 }
             }
@@ -241,15 +247,15 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
-        /// Evaluate sub-expression(s)
+        /// Evaluate expression(s)
         /// </summary>
-        /// <param name="channel">Channel to evaluate this on</param>
+        /// <param name="code">Code holding the expression(s)</param>
         /// <param name="expression">Expression(s) to replace</param>
         /// <param name="onlyLinuxFields">Whether to replace only Linux fields</param>
         /// <param name="encodeResult">Whether the final result shall be encoded</param>
         /// <returns>Replaced expression(s)</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
-        private static async Task<string> Evaluate(CodeChannel channel, string expression, bool onlyLinuxFields, bool encodeResult)
+        private static async Task<string> EvaluateExpression(Code code, string expression, bool onlyLinuxFields, bool encodeResult)
         {
             Stack<bool> lastBraceCurly = new Stack<bool>();
             Stack<StringBuilder> parsedExpressions = new Stack<StringBuilder>();
@@ -283,11 +289,11 @@ namespace DuetControlServer.Model
                     {
                         if (c != (lastWasCurly ? '}' : ')'))
                         {
-                            throw new CodeParserException($"Unexpected {(lastWasCurly ? "curly" : "round")} brace");
+                            throw new CodeParserException($"Unexpected {(lastWasCurly ? "curly" : "round")} brace", code);
                         }
 
                         string subExpression = parsedExpressions.Pop().ToString();
-                        string evaluationResult = await EvaluateToString(channel, subExpression.Trim(), onlyLinuxFields, true);
+                        string evaluationResult = await EvaluateSubExpression(code, subExpression.Trim(), onlyLinuxFields, true);
                         if (subExpression == evaluationResult || onlyLinuxFields)
                         {
                             parsedExpressions.Peek().Append(lastWasCurly ? '{' : '(');
@@ -301,7 +307,7 @@ namespace DuetControlServer.Model
                     }
                     else
                     {
-                        throw new CodeParserException($"Unexpected '{c}'");
+                        throw new CodeParserException($"Unexpected '{c}'", code);
                     }
                 }
                 else
@@ -313,25 +319,26 @@ namespace DuetControlServer.Model
 
             if (inQuotes && lastC != '"')
             {
-                throw new CodeParserException("Unterminated quotes");
+                throw new CodeParserException("Unterminated quotes", code);
             }
             if (lastBraceCurly.TryPeek(out bool wasCurly))
             {
-                throw new CodeParserException($"Unterminated {(wasCurly ? "curly" : "round")} brace");
+                throw new CodeParserException($"Unterminated {(wasCurly ? "curly" : "round")} brace", code);
             }
 
-            return await EvaluateToString(channel, parsedExpressions.Pop().ToString().Trim(), onlyLinuxFields, encodeResult);
+            return await EvaluateSubExpression(code, parsedExpressions.Pop().ToString().Trim(), onlyLinuxFields, encodeResult);
         }
 
         /// <summary>
-        /// Evaluate a sub-expression to string
+        /// Evaluate a sub-expression
         /// </summary>
-        /// <param name="channel">Code channel</param>
+        /// <param name="code">Code holdng the sub-expression</param>
         /// <param name="expression">Expression to evaluate</param>
         /// <param name="onlyLinuxFields">Whether to replace only Linux fields</param>
         /// <param name="encodeResult">Whether the final result shall be encoded</param>
         /// <returns>String result or the expresion</returns>
-        private static async Task<string> EvaluateToString(CodeChannel channel, string expression, bool onlyLinuxFields, bool encodeResult)
+        /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
+        private static async Task<string> EvaluateSubExpression(Code code, string expression, bool onlyLinuxFields, bool encodeResult)
         {
             StringBuilder result = new StringBuilder(), partialExpression = new StringBuilder();
             bool inQuotes = false;
@@ -362,24 +369,54 @@ namespace DuetControlServer.Model
                 }
                 else if (partialExpression.Length > 0)
                 {
-                    string subExpression = partialExpression.ToString().Trim(), subFilter = subExpression;
-                    bool wantsCount = subExpression.StartsWith('#');
-                    if (wantsCount)
+                    string subExpression = partialExpression.ToString().Trim();
+                    if (subExpression == "iterations")
                     {
-                        subFilter = subExpression.Substring(1);
-                    }
-                    if (Filter.GetSpecific(subFilter, onlyLinuxFields, out object linuxField))
-                    {
-                        string subResult = ObjectToString(linuxField, wantsCount, false);
-                        if (subExpression == expression)
+                        if (code.File == null)
                         {
-                            return subResult;
+                            throw new CodeParserException("not executing a file", code);
                         }
-                        result.Append(subResult);
+                        using (await code.File.LockAsync())
+                        {
+                            result.Append(code.File.GetIterations(code));
+                        }
+                    }
+                    else if (subExpression == "line")
+                    {
+                        result.Append(code.LineNumber);
+                    }
+                    else if (subExpression == "result")
+                    {
+                        if (code.File == null)
+                        {
+                            throw new CodeParserException("not executing a file", code);
+                        }
+                        using (await code.File.LockAsync())
+                        {
+                            result.Append(code.File.LastResult);
+                        }
                     }
                     else
                     {
-                        result.Append(partialExpression);
+                        string subFilter = subExpression;
+                        bool wantsCount = subExpression.StartsWith('#');
+                        if (wantsCount)
+                        {
+                            subFilter = subExpression.Substring(1);
+                        }
+                        if (Filter.GetSpecific(subFilter, onlyLinuxFields, out object linuxField))
+                        {
+                            string subResult = ObjectToString(linuxField, wantsCount, false, code);
+                            if (subExpression == expression)
+                            {
+                                return subResult;
+                            }
+                            result.Append(subResult);
+                        }
+                        else
+                        {
+                            result.Append(partialExpression);
+                        }
                     }
 
                     partialExpression.Clear();
@@ -396,7 +433,34 @@ namespace DuetControlServer.Model
             }
 
             // Try to evaluate the resulting expression from DSF one last time
-            string finalExpression = result.ToString(), finalFilter = finalExpression;
+            string finalExpression = result.ToString();
+            if (finalExpression == "iterations")
+            {
+                if (code.File == null)
+                {
+                    throw new CodeParserException("not executing a file", code);
+                }
+                using (await code.File.LockAsync())
+                {
+                    return code.File.GetIterations(code).ToString();
+                }
+            }
+            if (finalExpression == "line")
+            {
+                return code.LineNumber.ToString();
+            }
+            if (finalExpression == "result")
+            {
+                if (code.File == null)
+                {
+                    throw new CodeParserException("not executing a file", code);
+                }
+                using (await code.File.LockAsync())
+                {
+                    return code.File.LastResult.ToString();
+                }
+            }
+            string finalFilter = finalExpression;
             bool wantsFinalCount = finalExpression.StartsWith('#');
             if (wantsFinalCount)
             {
@@ -404,14 +468,14 @@ namespace DuetControlServer.Model
             }
             if (Filter.GetSpecific(finalFilter, onlyLinuxFields, out object finalLinuxField))
             {
-                return ObjectToString(finalLinuxField, wantsFinalCount, encodeResult);
+                return ObjectToString(finalLinuxField, wantsFinalCount, encodeResult, code);
             }
 
             // If that failed, try to evaluate the expression in RRF as the final step
             if (!onlyLinuxFields)
             {
-                object firmwareField = await SPI.Interface.EvaluateExpression(channel, finalExpression);
-                return ObjectToString(firmwareField, false, encodeResult);
+                object firmwareField = await SPI.Interface.EvaluateExpression(code.Channel, finalExpression);
+                return ObjectToString(firmwareField, false, encodeResult, code);
             }
 
             // In case we're not done yet, return only the partial expression value
@@ -424,8 +488,9 @@ namespace DuetControlServer.Model
         /// <param name="obj">Object to convert</param>
         /// <param name="wantsCount">Whether the count is wanted</param>
         /// <param name="encodeStrings">Whether the value is supposed to be encoded if it is a string</param>
+        /// <param name="code">Code requesting the conversion</param>
         /// <returns>String representation of obj</returns>
-        private static string ObjectToString(object obj, bool wantsCount, bool encodeStrings)
+        private static string ObjectToString(object obj, bool wantsCount, bool encodeStrings, Code code)
         {
             if (obj == null)
             {
@@ -445,7 +510,7 @@ namespace DuetControlServer.Model
                 {
                     return list.Count.ToString();
                 }
-                throw new CodeParserException("missing array index");
+                throw new CodeParserException("missing array index", code);
             }
             if (obj.GetType().IsClass)
             {

@@ -1,9 +1,11 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
+using DuetAPI.Machine;
+using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading;
+using System.Linq;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -12,8 +14,54 @@ namespace DuetControlServer.Files
     /// <summary>
     /// Class to read G/M/T-codes from files
     /// </summary>
-    public class CodeFile : IDisposable
+    public sealed class CodeFile : IDisposable
     {
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// Dictionary holding the currently open code files
+        /// </summary>
+        private static readonly List<CodeFile>[] _openFiles = new List<CodeFile>[Inputs.Total];
+
+        /// <summary>
+        /// Lock for accessing the list of open files
+        /// </summary>
+        private static readonly AsyncLock _openFilesLock = new AsyncLock();
+
+        /// <summary>
+        /// Static constructor of this class
+        /// </summary>
+        static CodeFile()
+        {
+            for (int i = 0; i < Inputs.Total; i++)
+            {
+                _openFiles[i] = new List<CodeFile>();
+            }
+        }
+
+        /// <summary>
+        /// Abort all running macro files on a given code channel
+        /// </summary>
+        /// <param name="channel">Code channel</param>
+        /// <returns>Asynchronous task</returns>
+        private static async Task AbortAll(CodeChannel channel)
+        {
+            int numChannel = (int)channel;
+            using (await _openFilesLock.LockAsync(Program.CancellationToken))
+            {
+                foreach (CodeFile file in _openFiles[numChannel])
+                {
+                    using (await file.LockAsync())
+                    {
+                        file.Close();
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// File being read from
         /// </summary>
@@ -23,6 +71,23 @@ namespace DuetControlServer.Files
         /// Reader for the file stream
         /// </summary>
         private readonly StreamReader _reader;
+
+        /// <summary>
+        /// Internal lock
+        /// </summary>
+        private readonly AsyncLock _lock = new AsyncLock();
+
+        /// <summary>
+        /// Lock this instance
+        /// </summary>
+        /// <returns>Disposable lock</returns>
+        public IDisposable Lock() => _lock.Lock(Program.CancellationToken);
+
+        /// <summary>
+        /// Lock this instance asynchronously
+        /// </summary>
+        /// <returns>Disposable lock</returns>
+        public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
 
         /// <summary>
         /// File path to the file being executed
@@ -37,7 +102,12 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Internal stack for conditional G-code execution
         /// </summary>
-        private readonly Stack<CodeFileState> _stack = new Stack<CodeFileState>();
+        private readonly Stack<CodeBlock> _codeBlocks = new Stack<CodeBlock>();
+
+        /// <summary>
+        /// Last code block
+        /// </summary>
+        private CodeBlock _lastCodeBlock;
 
         /// <summary>
         /// Gets or sets the current file position in bytes
@@ -47,9 +117,8 @@ namespace DuetControlServer.Files
             get => _position;
             set
             {
-                if (!IsAborted)
+                if (!IsClosed)
                 {
-                    IsFinished = false;
                     _fileStream.Seek(value, SeekOrigin.Begin);
                     _reader.DiscardBufferedData();
                     _position = value;
@@ -58,6 +127,29 @@ namespace DuetControlServer.Files
             }
         }
         private long _position;
+
+        /// <summary>
+        /// Get the current number of iterations of the current loop
+        /// </summary>
+        /// <param name="code">Code that requested the number of iterations</param>
+        /// <returns>Number of iterations</returns>
+        /// <exception cref="CodeParserException">Query came outside a while loop</exception>
+        public int GetIterations(Code code)
+        {
+            foreach (CodeBlock codeBlock in _codeBlocks)
+            {
+                if (codeBlock.StartingCode.Keyword == KeywordType.While)
+                {
+                    return codeBlock.Iterations;
+                }
+            }
+            throw new CodeParserException("'iterations' used when not inside a loop", code);
+        }
+
+        /// <summary>
+        /// Result of the last G/M/T-code (0 = success, 1 = warning, 2 = error)
+        /// </summary>
+        public int LastResult { get; set; }
 
         /// <summary>
         /// Number of the current line
@@ -85,47 +177,9 @@ namespace DuetControlServer.Files
         public long Length { get => _fileStream.Length; }
 
         /// <summary>
-        /// Indicates if this file is supposed to be aborted
+        /// Indicates if this file is closed
         /// </summary>
-        public bool IsAborted { get; private set; }
-
-        /// <summary>
-        /// Indicates if the file has been finished
-        /// </summary>
-        public bool IsFinished { get; private set; }
-
-        /// <summary>
-        /// Internal cancellation token source used for codes
-        /// </summary>
-        private CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-
-        /// <summary>
-        /// Cancellation token that is triggered when the file is cancelled/aborted
-        /// </summary>
-        public CancellationToken CancellationToken { get => _cts.Token; }
-
-        /// <summary>
-        /// Cancel pending codes
-        /// </summary>
-        public void CancelPendingCodes()
-        {
-            _cts.Cancel();
-            _cts.Dispose();
-            _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-        }
-
-        /// <summary>
-        /// Request cancellation of this file
-        /// </summary>
-        public virtual void Abort()
-        {
-            if (IsAborted)
-            {
-                return;
-            }
-            IsAborted = IsFinished = true;
-            _cts.Cancel();
-        }
+        public bool IsClosed { get; private set; }
 
         /// <summary>
         /// Constructor of the base class for reading from a G-code file
@@ -139,6 +193,11 @@ namespace DuetControlServer.Files
 
             _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
             _reader = new StreamReader(_fileStream);
+
+            lock (_openFiles)
+            {
+                _openFiles[(int)channel].Add(this);
+            }
         }
 
         /// <summary>
@@ -164,18 +223,26 @@ namespace DuetControlServer.Files
         /// Dispose this instance internally
         /// </summary>
         /// <param name="disposing">True if this instance is being disposed</param>
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (disposed)
             {
                 return;
             }
 
+            lock (_openFiles)
+            {
+                _openFiles[(int)Channel].Remove(this);
+            }
+
             if (disposing)
             {
-                _reader.Dispose();
-                _fileStream.Dispose();
-                _cts.Dispose();
+                using (_lock.Lock())
+                {
+                    IsClosed = true;
+                    _reader.Dispose();
+                    _fileStream.Dispose();
+                }
             }
 
             disposed = true;
@@ -186,79 +253,264 @@ namespace DuetControlServer.Files
         /// </summary>
         /// <returns>Read code or null if none found</returns>
         /// <exception cref="CodeParserException">Failed to read the next code</exception>
-        public Task<Code> ReadCodeAsync()
+        /// <exception cref="OperationCanceledException">Failed to flush the pending codes</exception>
+        /// <remarks>
+        /// This instance must NOT be locked when this is called
+        /// </remarks>
+        public async Task<Code> ReadCodeAsync()
         {
-            // Deal with closed files
-            if (IsFinished || IsAborted)
+            while (true)
             {
-                return Task.FromResult<Code>(null);
-            }
-
-            do
-            {
-                // Read the next available non-empty code
+                bool codeRead;
                 Code code = new Code
                 {
-                    CancellationToken = _cts.Token,
                     Channel = Channel,
+                    File = this,
                     Flags = _enforcingAbsolutePosition ? CodeFlags.EnforceAbsolutePosition : CodeFlags.None,
                     Indent = _indent,
                     LineNumber = LineNumber,
                     FilePosition = Position
                 };
 
-                bool codeRead;
-                do
+                // Read the next available code
+                using (await _lock.LockAsync(Program.CancellationToken))
                 {
-                    codeRead = DuetAPI.Commands.Code.Parse(_reader, code, ref _seenNewLine);
-                    _position += code.Length.Value;
-                    LineNumber = code.LineNumber;
+                    if (IsClosed)
+                    {
+                        return null;
+                    }
 
-                    // Check if a NL has been parsed
-                    _indent = _seenNewLine ? (byte)0 : code.Indent;
-                    _enforcingAbsolutePosition = _seenNewLine ? false : code.Flags.HasFlag(CodeFlags.EnforceAbsolutePosition);
-                }
-                while (!codeRead && !_reader.EndOfStream);
+                    do
+                    {
+                        codeRead = DuetAPI.Commands.Code.Parse(_reader, code, ref _seenNewLine);
+                        _position += code.Length.Value;
+                        LineNumber = code.LineNumber;
 
-                // Check if this is the end of the last block
-                CodeFileState lastBlock;
-                if (_stack.TryPeek(out lastBlock) && (!codeRead || code.Indent <= lastBlock.StartingCode.Indent))
-                {
-                    lastBlock.Iterations++;
-                }
+                        // Check if a NL has been parsed
+                        _indent = _seenNewLine ? (byte)0 : code.Indent;
+                        _enforcingAbsolutePosition = _seenNewLine ? false : code.Flags.HasFlag(CodeFlags.EnforceAbsolutePosition);
+                    }
+                    while (!codeRead && !_reader.EndOfStream);
 
-                // Check if any more codes could be read
-                if (!codeRead)
-                {
-                    IsFinished = true;
-                    return Task.FromResult<Code>(null);
-                }
+                    if (codeRead)
+                    {
+                        _logger.Trace("Read code {0}", code);
+                    }
 
-#if true
-                return Task.FromResult(code);
-#else
-                // Check for conditional G-code
-                switch (code.Keyword)
-                {
-                    case KeywordType.If:
-                        if (await SPI.Interface.Flush(Channel))
+                    // Check if this is the end of the last block(s)
+                    bool readAgain = false;
+                    while (_codeBlocks.TryPeek(out CodeBlock state))
+                    {
+                        if (!codeRead || ((code.Keyword != KeywordType.None || code.Type != CodeType.Comment) && code.Indent <= state.StartingCode.Indent))
                         {
-                            string expression = ""; // await Model.ExpressionParser.PrepareExpression(code.KeywordArgument);
-                            _stack.Push(new CodeFileState
+                            if (state.StartingCode.Keyword == KeywordType.If ||
+                                state.StartingCode.Keyword == KeywordType.ElseIf ||
+                                state.StartingCode.Keyword == KeywordType.Else)
                             {
-                                StartingCode = code,
-                                LastResult = await SPI.Interface.EvaluateExpression(Channel, expression)
-                            });
-                        }
-                        break;
+                                // End of conditional block
+                                _logger.Debug("End of {0} block", state.StartingCode.Keyword);
+                                _lastCodeBlock = _codeBlocks.Pop();
+                            }
+                            else if (state.StartingCode.Keyword == KeywordType.While)
+                            {
+                                if (state.ProcessBlock && !state.SeenCodes)
+                                {
+                                    throw new CodeParserException("empty while loop detected", code);
+                                }
 
-                    case KeywordType.Echo:
-                    case KeywordType.None:
-                        return code;
+                                if (!codeRead || code.FilePosition != state.StartingCode.FilePosition)
+                                {
+                                    // End of while loop
+                                    if (state.ProcessBlock || state.ContinueLoop)
+                                    {
+                                        Position = state.StartingCode.FilePosition.Value;
+                                        state.ContinueLoop = false;
+                                        state.Iterations++;
+                                        readAgain = true;
+                                        _logger.Debug("Restarting {0} block, iterations = {1}", state.StartingCode.Keyword, state.Iterations);
+                                        break;
+                                    }
+                                    _logger.Debug("End of {0} block", state.StartingCode.Keyword);
+                                    _lastCodeBlock = _codeBlocks.Pop();
+                                }
+                                else
+                                {
+                                    // Restarting while loop
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    if (readAgain)
+                    {
+                        // Parse the while loop including condition once again
+                        _seenNewLine = true;
+                        continue;
+                    }
+
+                    // Check if any more codes could be read
+                    if (!codeRead)
+                    {
+                        Close();
+                        return null;
+                    }
                 }
-#endif
+
+                // Process only codes where the corresponding condition is met
+                if (!_codeBlocks.TryPeek(out CodeBlock codeBlock) || codeBlock.ProcessBlock)
+                {
+                    // FIXME If/ElseIf/Else/While are not sent to the interceptors
+                    if (codeBlock != null && (code.Keyword != KeywordType.While || code.FilePosition != codeBlock.StartingCode.FilePosition))
+                    {
+                        codeBlock.SeenCodes = true;
+                    }
+
+                    switch (code.Keyword)
+                    {
+                        case KeywordType.If:
+                        case KeywordType.ElseIf:
+                        case KeywordType.While:
+                            // Check elif condition
+                            if (code.Keyword == KeywordType.ElseIf)
+                            {
+                                if (_lastCodeBlock == null || _lastCodeBlock.StartingCode.Indent != code.Indent ||
+                                    (_lastCodeBlock.StartingCode.Keyword != KeywordType.If && _lastCodeBlock.StartingCode.Keyword != KeywordType.ElseIf))
+                                {
+                                    throw new CodeParserException("unexpected elif condition", code);
+                                }
+
+                                if (!_lastCodeBlock.ExpectingElse)
+                                {
+                                    // Last if/elif condition was true, ignore the following block
+                                    _logger.Debug("Skipping {0} block", code.Keyword);
+                                    using (await _lock.LockAsync(Program.CancellationToken))
+                                    {
+                                        _codeBlocks.Push(new CodeBlock
+                                        {
+                                            StartingCode = code
+                                        });
+                                    }
+                                    break;
+                                }
+                            }
+
+                            // Check if or while conditions
+                            if (await SPI.Interface.Flush(Channel))
+                            {
+                                // Start a new conditional block if necessary
+                                _logger.Debug("Evaluating {0} block", code.Keyword);
+                                if (code.Keyword != KeywordType.While || codeBlock == null || codeBlock.StartingCode.FilePosition != code.FilePosition)
+                                {
+                                    using (await _lock.LockAsync(Program.CancellationToken))
+                                    {
+                                        codeBlock = new CodeBlock
+                                        {
+                                            StartingCode = code
+                                        };
+                                        _codeBlocks.Push(codeBlock);
+                                    }
+                                }
+
+                                // Evaluate the condition
+                                string evaluationResult = await Model.Expressions.Evaluate(code, false);
+                                if (evaluationResult != "true" && evaluationResult != "false")
+                                {
+                                    throw new CodeParserException($"invalid conditional result '{evaluationResult}', must be either true or false", code);
+                                }
+                                _logger.Debug("Evaluation result: ", evaluationResult);
+                                codeBlock.ProcessBlock = (evaluationResult == "true");
+                                codeBlock.ExpectingElse = (code.Keyword != KeywordType.While && evaluationResult == "false");
+                                break;
+                            }
+                            throw new OperationCanceledException();
+
+                        case KeywordType.Else:
+                            if (_lastCodeBlock == null || _lastCodeBlock.StartingCode.Indent != code.Indent ||
+                                (_lastCodeBlock.StartingCode.Keyword != KeywordType.If && _lastCodeBlock.StartingCode.Keyword != KeywordType.ElseIf))
+                            {
+                                throw new CodeParserException("unexpected else", code);
+                            }
+
+                            // else condition is true if the last if/elif condition was false
+                            _logger.Debug("{0} {1} block", _lastCodeBlock.ExpectingElse ? "Starting" : "Skipping", code.Keyword);
+                            using (await _lock.LockAsync(Program.CancellationToken))
+                            {
+                                _codeBlocks.Push(new CodeBlock
+                                {
+                                    StartingCode = code,
+                                    ProcessBlock = _lastCodeBlock.ExpectingElse
+                                });
+                            }
+                            break;
+
+                        case KeywordType.Break:
+                        case KeywordType.Continue:
+                            if (!_codeBlocks.Any(codeBlock => codeBlock.StartingCode.Keyword == KeywordType.While))
+                            {
+                                throw new CodeParserException("break or continue cannot be called outside while loop", code);
+                            }
+                            _logger.Debug("Doing {0}", code.Keyword);
+
+                            foreach (CodeBlock state in _codeBlocks)
+                            {
+                                state.ProcessBlock = false;
+                                if (state.StartingCode.Keyword == KeywordType.While)
+                                {
+                                    state.ContinueLoop = (code.Keyword == KeywordType.Continue);
+                                    break;
+                                }
+                            }
+                            break;
+
+                        case KeywordType.Abort:
+                            if (await SPI.Interface.Flush(code.Channel))
+                            {
+                                _logger.Debug("Doing {0}", code.Keyword);
+                                await AbortAll(Channel);
+
+                                code.CancellationToken = Program.CancellationToken;
+                                return code;
+                            }
+                            throw new OperationCanceledException();
+
+                        case KeywordType.Return:
+                            using (await _lock.LockAsync(Program.CancellationToken))
+                            {
+                                Close();
+                            }
+                            return code;
+
+                        case KeywordType.Echo:
+                        case KeywordType.None:
+                            if (codeBlock != null)
+                            {
+                                codeBlock.SeenCodes = true;
+                            }
+                            return code;
+
+                        default:
+                            throw new CodeParserException($"Keyword {code.Keyword} is not supported", code);
+                    }
+                }
             }
-            while (true);
+        }
+
+        /// <summary>
+        /// Close this file
+        /// </summary>
+        public void Close()
+        {
+            if (IsClosed)
+            {
+                return;
+            }
+            IsClosed = true;
+            _reader.Close();
+            _fileStream.Close();
         }
     }
 }

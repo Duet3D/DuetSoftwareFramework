@@ -57,6 +57,12 @@
         private string _dsfVersion;
 
         /// <summary>
+        /// List of general-purpose output ports
+        /// </summary>
+        /// <seealso cref="GpOutputPort"/>
+        public ModelCollection<GpOutputPort> GpOut { get; } = new ModelCollection<GpOutputPort>();
+
+        /// <summary>
         /// Current laser PWM (0..1) or null if not applicable
         /// </summary>
         public float? LaserPwm

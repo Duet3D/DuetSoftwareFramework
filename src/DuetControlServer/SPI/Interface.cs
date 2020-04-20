@@ -12,6 +12,7 @@ using DuetControlServer.Files;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
+using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using Code = DuetControlServer.Commands.Code;
 
@@ -138,7 +139,7 @@ namespace DuetControlServer.SPI
         public static Task<Heightmap> GetHeightmap()
         {
             TaskCompletionSource<Heightmap> tcs;
-            using (_heightmapLock.Lock())
+            using (_heightmapLock.Lock(Program.CancellationToken))
             {
                 if (_getHeightmapRequest == null)
                 {
@@ -163,14 +164,15 @@ namespace DuetControlServer.SPI
         /// <exception cref="InvalidOperationException">Heightmap is already being set</exception>
         public static Task SetHeightmap(Heightmap map)
         {
-            TaskCompletionSource<object> tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-            using (_heightmapLock.Lock())
+            TaskCompletionSource<object> tcs;
+            using (_heightmapLock.Lock(Program.CancellationToken))
             {
                 if (_setHeightmapRequest != null)
                 {
                     throw new InvalidProgramException("Heightmap is already being set");
                 }
 
+                tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _heightmapToSet = map;
                 _setHeightmapRequest = tcs;
             }
@@ -301,7 +303,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[CodeChannel.File].LockAsync())
             {
-                _channels[CodeChannel.File].AbortFile(true, true);
+                await _channels[CodeChannel.File].AbortFile(true, true);
             }
         }
 
@@ -373,7 +375,7 @@ namespace DuetControlServer.SPI
                 // Get the CRC16 checksum of the firmware binary
                 byte[] firmwareBlob = new byte[_firmwareStream.Length];
                 await _firmwareStream.ReadAsync(firmwareBlob, 0, (int)_firmwareStream.Length);
-                ushort crc16 = Utility.CRC16.Calculate(firmwareBlob);
+                ushort crc16 = CRC16.Calculate(firmwareBlob);
 
                 // Send the IAP binary to the firmware
                 _logger.Info("Flashing IAP binary");
@@ -426,7 +428,7 @@ namespace DuetControlServer.SPI
                 if (numRetries == 3)
                 {
                     // Failed to flash the firmware
-                    await Utility.Logger.LogOutput(MessageType.Error, "Could not flash the firmware binary after 3 attempts. Please install it manually via bossac.");
+                    await Logger.LogOutput(MessageType.Error, "Could not flash the firmware binary after 3 attempts. Please install it manually via bossac.");
                     Program.CancelSource.Cancel();
                 }
                 else
@@ -520,6 +522,12 @@ namespace DuetControlServer.SPI
 
                         _firmwareResetRequest.SetResult(null);
                         _firmwareResetRequest = null;
+
+                        if (!Settings.NoTerminateOnReset)
+                        {
+                            // Wait for the program to terminate and don't perform any extra transfers
+                            await Task.Delay(-1, Program.CancellationToken);
+                        }
                     }
                 }
 
@@ -862,7 +870,7 @@ namespace DuetControlServer.SPI
                         MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                                             : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                                 : MessageType.Success;
-                        await Utility.Logger.Log(type, _partialLogMessage);
+                        await Logger.Log(type, _partialLogMessage);
                     }
                     _partialLogMessage = null;
                 }
@@ -906,7 +914,7 @@ namespace DuetControlServer.SPI
                     MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                                         : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                             : MessageType.Success;
-                    await Utility.Logger.LogOutput(type, _partialGenericMessage.TrimEnd());
+                    await Logger.LogOutput(type, _partialGenericMessage.TrimEnd());
                 }
                 _partialGenericMessage = null;
             }
@@ -938,7 +946,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[channel].LockAsync())
             {
-                _channels[channel].AbortFile(abortAll, false);
+                await _channels[channel].AbortFile(abortAll, false);
             }
         }
 
@@ -1097,7 +1105,7 @@ namespace DuetControlServer.SPI
             using (await FileExecution.Job.LockAsync())
             {
                 outputMessage = FileExecution.Job.IsProcessing;
-                FileExecution.Job.Abort();
+                await FileExecution.Job.Abort();
             }
 
             // Resolve pending macros, unbuffered (system) codes and flush requests
@@ -1105,7 +1113,7 @@ namespace DuetControlServer.SPI
             {
                 using (await channel.LockAsync())
                 {
-                    outputMessage |= channel.Invalidate();
+                    outputMessage |= await channel.Invalidate();
                 }
             }
             _bytesReserved = _bufferSpace = 0;
@@ -1161,11 +1169,11 @@ namespace DuetControlServer.SPI
             {
                 if (outputMessage)
                 {
-                    await Utility.Logger.LogOutput(MessageType.Warning, message);
+                    await Logger.LogOutput(MessageType.Warning, message);
                 }
                 else
                 {
-                    await Utility.Logger.Log(MessageType.Warning, message);
+                    await Logger.Log(MessageType.Warning, message);
                 }
             }
         }

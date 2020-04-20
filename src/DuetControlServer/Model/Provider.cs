@@ -85,7 +85,7 @@ namespace DuetControlServer.Model
                     }
 
                     // Clear the messages again if anyone is connected
-                    if (IPC.Processors.Subscription.AreClientsConnected() && Get.Messages.Count > 0)
+                    if (IPC.Processors.Subscription.AreClientsConnected && Get.Messages.Count > 0)
                     {
                         Get.Messages.Clear();
                     }
@@ -210,8 +210,7 @@ namespace DuetControlServer.Model
                         break;
                 }
 
-                // Attempt to forward messages directly to subscribers. If none are available,
-                // append it to the object model so potential clients can fetch it for a limited period of time
+                // Send it to the object model
                 using (await AccessReadWriteAsync())
                 {
                     Get.Messages.Add(message);

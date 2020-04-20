@@ -338,28 +338,36 @@ namespace UnitTests.Commands
         [Test]
         public void ParseKeywords()
         {
-            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("  if machine.tool.is.great <= 0.03 (some nice); comment");
-            Assert.AreEqual(2, code.Indent);
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("if machine.tool.is.great <= {(0.03 - 0.001) + {foo}} (some nice) ; comment");
+            Assert.AreEqual(0, code.Indent);
             Assert.AreEqual(KeywordType.If, code.Keyword);
-            Assert.AreEqual("machine.tool.is.great <= 0.03", code.KeywordArgument);
+            Assert.AreEqual("machine.tool.is.great <= {(0.03 - 0.001) + {foo}}", code.KeywordArgument);
             Assert.AreEqual("some nice comment", code.Comment);
 
             code = new DuetAPI.Commands.Code("  elif true");
+            Assert.AreEqual(2, code.Indent);
             Assert.AreEqual(KeywordType.ElseIf, code.Keyword);
             Assert.AreEqual("true", code.KeywordArgument);
 
             code = new DuetAPI.Commands.Code("  else");
+            Assert.AreEqual(2, code.Indent);
             Assert.AreEqual(KeywordType.Else, code.Keyword);
             Assert.IsNull(code.KeywordArgument);
 
             code = new DuetAPI.Commands.Code("  while machine.autocal.stddev > 0.04");
+            Assert.AreEqual(2, code.Indent);
             Assert.AreEqual(KeywordType.While, code.Keyword);
             Assert.AreEqual("machine.autocal.stddev > 0.04", code.KeywordArgument);
 
-            code = new DuetAPI.Commands.Code("    break 3");
+            code = new DuetAPI.Commands.Code("    break");
             Assert.AreEqual(4, code.Indent);
             Assert.AreEqual(KeywordType.Break, code.Keyword);
-            Assert.AreEqual("3", code.KeywordArgument);
+            Assert.IsNull(code.KeywordArgument);
+
+            code = new DuetAPI.Commands.Code("  continue");
+            Assert.AreEqual(2, code.Indent);
+            Assert.AreEqual(KeywordType.Continue, code.Keyword);
+            Assert.IsNull(code.KeywordArgument);
 
             code = new DuetAPI.Commands.Code("    return");
             Assert.AreEqual(4, code.Indent);
@@ -382,6 +390,7 @@ namespace UnitTests.Commands
             Assert.AreEqual("asdf=\"meh\"", code.KeywordArgument);
 
             code = new DuetControlServer.Commands.Code("echo {{3 + 3} + (volumes[0].freeSpace - 4)}");
+            Assert.AreEqual(0, code.Indent);
             Assert.AreEqual(KeywordType.Echo, code.Keyword);
             Assert.AreEqual("{{3 + 3} + (volumes[0].freeSpace - 4)}", code.KeywordArgument);
         }

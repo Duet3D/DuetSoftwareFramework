@@ -6,7 +6,7 @@
     public sealed class RestorePoint : ModelObject
     {
         /// <summary>
-        /// Axis coordinates of the the restore point (in mm)
+        /// Axis coordinates of the restore point (in mm)
         /// </summary>
         public ModelCollection<float> Coords { get; } = new ModelCollection<float>();
 

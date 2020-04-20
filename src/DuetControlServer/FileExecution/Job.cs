@@ -79,6 +79,11 @@ namespace DuetControlServer.FileExecution
         public static bool IsPaused { get; private set; }
 
         /// <summary>
+        /// Indicates if the file print has been cancelled
+        /// </summary>
+        public static bool IsCancelled { get; private set; }
+
+        /// <summary>
         /// Indicates if the file print has been aborted
         /// </summary>
         public static bool IsAborted { get; private set; }
@@ -94,12 +99,35 @@ namespace DuetControlServer.FileExecution
         private static PrintPausedReason _pauseReason;
 
         /// <summary>
-        /// Reports the current file position
+        /// Get the current file position
         /// </summary>
-        public static long FilePosition
+        /// <returns>File position</returns>
+        public static async Task<long> GetFilePosition()
         {
-            get => _file.Position;
-            set => _file.Position = value;
+            if (_file == null)
+            {
+                return 0;
+            }
+            using (await _file.LockAsync())
+            {
+                return _file.Position;
+            }
+        }
+
+        /// <summary>
+        /// Set the current file position
+        /// </summary>
+        /// <param name="filePosition">New file position</param>
+        /// <returns>File position</returns>
+        public static async Task SetFilePosition(long filePosition)
+        {
+            if (_file != null)
+            {
+                using (await _file.LockAsync())
+                {
+                    _file.Position = filePosition;
+                }
+            }
         }
 
         /// <summary>
@@ -125,12 +153,12 @@ namespace DuetControlServer.FileExecution
             // A file being printed may start another file print
             if (IsFileSelected)
             {
-                Cancel();
+                await Cancel();
                 await _finished.WaitAsync(Program.CancellationToken);
             }
 
             // Update the state
-            IsAborted = false;
+            IsCancelled = IsAborted = false;
             IsSimulating = simulating;
             _file = file;
             _pausePosition = null;
@@ -158,7 +186,7 @@ namespace DuetControlServer.FileExecution
                 using (await _lock.LockAsync(Program.CancellationToken))
                 {
                     await _resume.WaitAsync(Program.CancellationToken);
-                    startingNewPrint = !_file.IsAborted;
+                    startingNewPrint = !_file.IsClosed;
                     IsProcessing = startingNewPrint;
                 }
 
@@ -177,9 +205,17 @@ namespace DuetControlServer.FileExecution
                     do
                     {
                         // Fill up the code buffer unless the print is paused
-                        using (await _lock.LockAsync(Program.CancellationToken))
+                        while (true)
                         {
-                            while (!IsPaused && codeTasks.Count < Math.Max(1, Settings.BufferedPrintCodes))
+                            using (await _lock.LockAsync(Program.CancellationToken))
+                            {
+                                if (IsPaused || codeTasks.Count >= Math.Max(1, Settings.BufferedPrintCodes))
+                                {
+                                    break;
+                                }
+                            }
+
+                            try
                             {
                                 Code readCode = await _file.ReadCodeAsync();
                                 if (readCode == null)
@@ -189,6 +225,33 @@ namespace DuetControlServer.FileExecution
 
                                 codes.Enqueue(readCode);
                                 codeTasks.Enqueue(readCode.Execute());
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                using (await _file.LockAsync())
+                                {
+                                    _file.Close();
+                                }
+                            }
+                            catch (AggregateException ae)
+                            {
+                                using (await _file.LockAsync())
+                                {
+                                    _file.Close();
+                                }
+
+                                await Utility.Logger.LogOutput(MessageType.Error, $"Failed to read code from job file: {ae.InnerException.Message}");
+                                _logger.Error(ae.InnerException);
+                            }
+                            catch (Exception e)
+                            {
+                                using (await _lock.LockAsync(Program.CancellationToken))
+                                {
+                                    _file.Close();
+                                }
+
+                                await Utility.Logger.LogOutput(MessageType.Error, $"Failed to read code from job file: {e.Message}");
+                                _logger.Error(e);
                             }
                         }
 
@@ -203,7 +266,20 @@ namespace DuetControlServer.FileExecution
                             }
                             catch (OperationCanceledException)
                             {
-                                // May happen when the file being printed is exchanged, printed, or when a third-party plugin decided to cancel the code
+                                // Code has been cancelled, don't log this. In the future this may terminate the job file
+                                // Note this can happen as well when the file being printed is exchanged
+                            }
+                            catch (AggregateException ae)
+                            {
+
+                                await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                                _logger.Error(ae);
+
+                                using (await _lock.LockAsync(Program.CancellationToken))
+                                {
+                                    await Abort();
+                                    break;
+                                }
                             }
                             catch (Exception e)
                             {
@@ -212,7 +288,7 @@ namespace DuetControlServer.FileExecution
 
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
-                                    Abort();
+                                    await Abort();
                                     break;
                                 }
                             }
@@ -224,8 +300,9 @@ namespace DuetControlServer.FileExecution
                                 if (IsPaused)
                                 {
                                     // Adjust the file position
-                                    FilePosition = (_pausePosition != null) ? _pausePosition.Value : nextFilePosition;
-                                    _logger.Info("Job has been paused at byte {0}, reason {1}", FilePosition, _pauseReason);
+                                    long newFilePosition = (_pausePosition != null) ? _pausePosition.Value : nextFilePosition;
+                                    await SetFilePosition(newFilePosition);
+                                    _logger.Info("Job has been paused at byte {0}, reason {1}", newFilePosition, _pauseReason);
 
                                     // Wait for the print to be resumed
                                     IsProcessing = false;
@@ -244,18 +321,15 @@ namespace DuetControlServer.FileExecution
                     using (await _lock.LockAsync(Program.CancellationToken))
                     {
                         // Notify RepRapFirmware that the print file has been closed
-                        if (_file.IsAborted)
+                        if (IsCancelled)
                         {
-                            if (IsAborted)
-                            {
-                                _logger.Info("Aborted job file");
-                                await SPI.Interface.SetPrintStopped(PrintStoppedReason.Abort);
-                            }
-                            else
-                            {
-                                _logger.Info("Cancelled job file");
-                                await SPI.Interface.SetPrintStopped(PrintStoppedReason.UserCancelled);
-                            }
+                            _logger.Info("Cancelled job file");
+                            await SPI.Interface.SetPrintStopped(PrintStoppedReason.UserCancelled);
+                        }
+                        else if (IsAborted)
+                        {
+                            _logger.Info("Aborted job file");
+                            await SPI.Interface.SetPrintStopped(PrintStoppedReason.Abort);
                         }
                         else
                         {
@@ -266,8 +340,8 @@ namespace DuetControlServer.FileExecution
                         // Update the object model again
                         using (await Model.Provider.AccessReadWriteAsync())
                         {
-                            Model.Provider.Get.Job.LastFileAborted = _file.IsAborted && IsAborted;
-                            Model.Provider.Get.Job.LastFileCancelled = _file.IsAborted && !IsAborted;
+                            Model.Provider.Get.Job.LastFileAborted = IsAborted;
+                            Model.Provider.Get.Job.LastFileCancelled = IsCancelled;
                             Model.Provider.Get.Job.LastFileSimulated = IsSimulating;
                             Model.Provider.Get.Job.LastFileName = Model.Provider.Get.Job.File.FileName;
                         }
@@ -299,7 +373,7 @@ namespace DuetControlServer.FileExecution
         {
             if (IsFileSelected)
             {
-                _file.CancelPendingCodes();
+                Code.CancelPending(CodeChannel.File);
                 IsPaused = true;
                 _pausePosition = filePosition;
                 _pauseReason = pauseReason;
@@ -321,20 +395,35 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Cancel the current print (e.g. when M0 is called)
         /// </summary>
-        public static void Cancel()
+        /// <returns>Asynchronous task</returns>
+        public static async Task Cancel()
         {
-            _file?.Abort();
-            Resume();
+            if (IsFileSelected)
+            {
+                using (await _file.LockAsync())
+                {
+                    _file.Close();
+                }
+                IsCancelled = true;
+                Resume();
+            }
         }
 
         /// <summary>
         /// Abort the current print. This is called when the print could not complete as expected
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static void Abort()
+        public static async Task Abort()
         {
-            IsAborted = true;
-            Cancel();
+            if (IsFileSelected)
+            {
+                using (await _file.LockAsync())
+                {
+                    _file.Close();
+                }
+                IsAborted = true;
+                Resume();
+            }
         }
 
         /// <summary>
@@ -360,6 +449,10 @@ namespace DuetControlServer.FileExecution
                     if (IsPaused)
                     {
                         builder.Append(", paused");
+                    }
+                    if (IsCancelled)
+                    {
+                        builder.Append(", cancelled");
                     }
                     if (IsAborted)
                     {

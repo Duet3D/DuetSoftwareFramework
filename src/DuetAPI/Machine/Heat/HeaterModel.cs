@@ -6,7 +6,7 @@
     public sealed class HeaterModel : ModelObject
     {
         /// <summary>
-        /// Dead time of this heater or null if unknown
+        /// Dead time
         /// </summary>
         public float DeadTime
         {
@@ -26,7 +26,7 @@
         private bool _enabled;
 
         /// <summary>
-        /// Gain value or null if unknown
+        /// Gain value
         /// </summary>
         public float Gain
         {
@@ -46,7 +46,7 @@
         private bool _inverted;
 
         /// <summary>
-        /// Maximum PWM or null if unknown
+        /// Maximum PWM value
         /// </summary>
         public float MaxPwm
         {
@@ -61,7 +61,7 @@
         public HeaterModelPID PID { get; } = new HeaterModelPID();
 
         /// <summary>
-        /// Standard voltage of this heater or null if unknown
+        /// Standard voltage or null if unknown
         /// </summary>
         public float? StandardVoltage
         {
@@ -71,7 +71,7 @@
         private float? _standardVoltage;
 
         /// <summary>
-        /// Time constant or null if unknown
+        /// Time constant
         /// </summary>
         public float TimeConstant
         {

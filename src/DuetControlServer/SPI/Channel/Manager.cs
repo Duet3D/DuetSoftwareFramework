@@ -133,7 +133,7 @@ namespace DuetControlServer.SPI.Channel
                 {
                     using (await channel.LockAsync())
                     {
-                        return channel.HandleReply(flags, reply);
+                        return await channel.HandleReply(flags, reply);
                     }
                 }
             }

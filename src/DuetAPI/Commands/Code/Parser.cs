@@ -363,6 +363,11 @@ namespace DuetAPI.Commands
                                 result.Keyword = KeywordType.Break;
                                 inCondition = true;
                             }
+                            else if (letter == 'c' && value == "ontinue")
+                            {
+                                result.Keyword = KeywordType.Continue;
+                                inCondition = true;
+                            }
                             else if (letter == 'r' && value == "eturn")
                             {
                                 result.Keyword = KeywordType.Return;

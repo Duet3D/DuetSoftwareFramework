@@ -268,7 +268,7 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
-        /// Called when the connection to the Duet has been lost
+        /// Called by the SPI subsystem when the connection to the Duet has been lost
         /// </summary>
         /// <param name="errorMessage">Optional error that led to this event</param>
         public static void ConnectionLost(string errorMessage = null)
@@ -282,7 +282,7 @@ namespace DuetControlServer.Model
                 }
             }
 
-            using (_lock.Lock())
+            using (_lock.Lock(Program.CancellationToken))
             {
                 // Query the full object model when a connection can be established again
                 _lastSeqs.Clear();
