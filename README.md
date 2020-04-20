@@ -619,13 +619,10 @@ The following third-party bindings are available:
 
 To ensure flawless operation of the most critical components, Duet Software Framework relies on unit tests via the NUnit framework. These unit tests can be found in the [src/UnitTests](/src/UnitTests) directory.
 
-## Known issues
+## Known incompatibilities
 
 - `killall` may not be used to terminate DuetControlServer. Since it sends SIGTERM to all processes including worker threads of the .NET task scheduler, an abnormal program termination is the consequence. It is better to send SIGTERM only to the main PID
-- G-Code checksums and M998 are currently not supported
-- Some G-codes behave differently when executed directly by RepRapFirmware instead of DCS
-- Conditional G-codes (aka meta commands) except for `echo` are not supported yet
-- Print/Simulation times are not written to G-code files yet
+- G-Code checksums and M998 are not supported
 
 ## Reporting issues
 
