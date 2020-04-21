@@ -496,15 +496,12 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Commands.Code.Parameters
   nameWithType: Code.Parameters
-- uid: DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code,System.Boolean@)
-  name: Parse(TextReader, Code, ref Boolean)
-  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Parse_System_IO_TextReader_DuetAPI_Commands_Code_System_Boolean__
-  commentId: M:DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code,System.Boolean@)
-  name.vb: Parse(TextReader, Code, ByRef Boolean)
-  fullName: DuetAPI.Commands.Code.Parse(System.IO.TextReader, DuetAPI.Commands.Code, ref System.Boolean)
-  fullName.vb: DuetAPI.Commands.Code.Parse(System.IO.TextReader, DuetAPI.Commands.Code, ByRef System.Boolean)
-  nameWithType: Code.Parse(TextReader, Code, ref Boolean)
-  nameWithType.vb: Code.Parse(TextReader, Code, ByRef Boolean)
+- uid: DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code)
+  name: Parse(TextReader, Code)
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Parse_System_IO_TextReader_DuetAPI_Commands_Code_
+  commentId: M:DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code)
+  fullName: DuetAPI.Commands.Code.Parse(System.IO.TextReader, DuetAPI.Commands.Code)
+  nameWithType: Code.Parse(TextReader, Code)
 - uid: DuetAPI.Commands.Code.Parse*
   name: Parse
   href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Parse_
@@ -512,12 +509,25 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Commands.Code.Parse
   nameWithType: Code.Parse
-- uid: DuetAPI.Commands.Code.Reset(System.Boolean)
-  name: Reset(Boolean)
-  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Reset_System_Boolean_
-  commentId: M:DuetAPI.Commands.Code.Reset(System.Boolean)
-  fullName: DuetAPI.Commands.Code.Reset(System.Boolean)
-  nameWithType: Code.Reset(Boolean)
+- uid: DuetAPI.Commands.Code.ParseAsync(System.IO.StreamReader,DuetAPI.Commands.Code,DuetAPI.Commands.CodeParserBuffer)
+  name: ParseAsync(StreamReader, Code, CodeParserBuffer)
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_ParseAsync_System_IO_StreamReader_DuetAPI_Commands_Code_DuetAPI_Commands_CodeParserBuffer_
+  commentId: M:DuetAPI.Commands.Code.ParseAsync(System.IO.StreamReader,DuetAPI.Commands.Code,DuetAPI.Commands.CodeParserBuffer)
+  fullName: DuetAPI.Commands.Code.ParseAsync(System.IO.StreamReader, DuetAPI.Commands.Code, DuetAPI.Commands.CodeParserBuffer)
+  nameWithType: Code.ParseAsync(StreamReader, Code, CodeParserBuffer)
+- uid: DuetAPI.Commands.Code.ParseAsync*
+  name: ParseAsync
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_ParseAsync_
+  commentId: Overload:DuetAPI.Commands.Code.ParseAsync
+  isSpec: "True"
+  fullName: DuetAPI.Commands.Code.ParseAsync
+  nameWithType: Code.ParseAsync
+- uid: DuetAPI.Commands.Code.Reset
+  name: Reset()
+  href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Reset
+  commentId: M:DuetAPI.Commands.Code.Reset
+  fullName: DuetAPI.Commands.Code.Reset()
+  nameWithType: Code.Reset()
 - uid: DuetAPI.Commands.Code.Reset*
   name: Reset
   href: api/DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Reset_
@@ -963,6 +973,57 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Commands.CodeParameterConverter.Write
   nameWithType: CodeParameterConverter.Write
+- uid: DuetAPI.Commands.CodeParserBuffer
+  name: CodeParserBuffer
+  href: api/DuetAPI.Commands.CodeParserBuffer.html
+  commentId: T:DuetAPI.Commands.CodeParserBuffer
+  fullName: DuetAPI.Commands.CodeParserBuffer
+  nameWithType: CodeParserBuffer
+- uid: DuetAPI.Commands.CodeParserBuffer.#ctor(System.Int32,System.Boolean)
+  name: CodeParserBuffer(Int32, Boolean)
+  href: api/DuetAPI.Commands.CodeParserBuffer.html#DuetAPI_Commands_CodeParserBuffer__ctor_System_Int32_System_Boolean_
+  commentId: M:DuetAPI.Commands.CodeParserBuffer.#ctor(System.Int32,System.Boolean)
+  fullName: DuetAPI.Commands.CodeParserBuffer.CodeParserBuffer(System.Int32, System.Boolean)
+  nameWithType: CodeParserBuffer.CodeParserBuffer(Int32, Boolean)
+- uid: DuetAPI.Commands.CodeParserBuffer.#ctor*
+  name: CodeParserBuffer
+  href: api/DuetAPI.Commands.CodeParserBuffer.html#DuetAPI_Commands_CodeParserBuffer__ctor_
+  commentId: Overload:DuetAPI.Commands.CodeParserBuffer.#ctor
+  isSpec: "True"
+  fullName: DuetAPI.Commands.CodeParserBuffer.CodeParserBuffer
+  nameWithType: CodeParserBuffer.CodeParserBuffer
+- uid: DuetAPI.Commands.CodeParserBuffer.GetPosition(System.IO.StreamReader)
+  name: GetPosition(StreamReader)
+  href: api/DuetAPI.Commands.CodeParserBuffer.html#DuetAPI_Commands_CodeParserBuffer_GetPosition_System_IO_StreamReader_
+  commentId: M:DuetAPI.Commands.CodeParserBuffer.GetPosition(System.IO.StreamReader)
+  fullName: DuetAPI.Commands.CodeParserBuffer.GetPosition(System.IO.StreamReader)
+  nameWithType: CodeParserBuffer.GetPosition(StreamReader)
+- uid: DuetAPI.Commands.CodeParserBuffer.GetPosition*
+  name: GetPosition
+  href: api/DuetAPI.Commands.CodeParserBuffer.html#DuetAPI_Commands_CodeParserBuffer_GetPosition_
+  commentId: Overload:DuetAPI.Commands.CodeParserBuffer.GetPosition
+  isSpec: "True"
+  fullName: DuetAPI.Commands.CodeParserBuffer.GetPosition
+  nameWithType: CodeParserBuffer.GetPosition
+- uid: DuetAPI.Commands.CodeParserBuffer.Invalidate
+  name: Invalidate()
+  href: api/DuetAPI.Commands.CodeParserBuffer.html#DuetAPI_Commands_CodeParserBuffer_Invalidate
+  commentId: M:DuetAPI.Commands.CodeParserBuffer.Invalidate
+  fullName: DuetAPI.Commands.CodeParserBuffer.Invalidate()
+  nameWithType: CodeParserBuffer.Invalidate()
+- uid: DuetAPI.Commands.CodeParserBuffer.Invalidate*
+  name: Invalidate
+  href: api/DuetAPI.Commands.CodeParserBuffer.html#DuetAPI_Commands_CodeParserBuffer_Invalidate_
+  commentId: Overload:DuetAPI.Commands.CodeParserBuffer.Invalidate
+  isSpec: "True"
+  fullName: DuetAPI.Commands.CodeParserBuffer.Invalidate
+  nameWithType: CodeParserBuffer.Invalidate
+- uid: DuetAPI.Commands.CodeParserBuffer.LineNumber
+  name: LineNumber
+  href: api/DuetAPI.Commands.CodeParserBuffer.html#DuetAPI_Commands_CodeParserBuffer_LineNumber
+  commentId: F:DuetAPI.Commands.CodeParserBuffer.LineNumber
+  fullName: DuetAPI.Commands.CodeParserBuffer.LineNumber
+  nameWithType: CodeParserBuffer.LineNumber
 - uid: DuetAPI.Commands.CodeParserException
   name: CodeParserException
   href: api/DuetAPI.Commands.CodeParserException.html
@@ -987,12 +1048,6 @@ references:
   commentId: M:DuetAPI.Commands.CodeParserException.#ctor(System.String,DuetAPI.Commands.Code)
   fullName: DuetAPI.Commands.CodeParserException.CodeParserException(System.String, DuetAPI.Commands.Code)
   nameWithType: CodeParserException.CodeParserException(String, Code)
-- uid: DuetAPI.Commands.CodeParserException.#ctor(System.String,DuetAPI.Commands.Code,System.Exception)
-  name: CodeParserException(String, Code, Exception)
-  href: api/DuetAPI.Commands.CodeParserException.html#DuetAPI_Commands_CodeParserException__ctor_System_String_DuetAPI_Commands_Code_System_Exception_
-  commentId: M:DuetAPI.Commands.CodeParserException.#ctor(System.String,DuetAPI.Commands.Code,System.Exception)
-  fullName: DuetAPI.Commands.CodeParserException.CodeParserException(System.String, DuetAPI.Commands.Code, System.Exception)
-  nameWithType: CodeParserException.CodeParserException(String, Code, Exception)
 - uid: DuetAPI.Commands.CodeParserException.#ctor(System.String,System.Exception)
   name: CodeParserException(String, Exception)
   href: api/DuetAPI.Commands.CodeParserException.html#DuetAPI_Commands_CodeParserException__ctor_System_String_System_Exception_
@@ -1369,6 +1424,12 @@ references:
   commentId: F:DuetAPI.Commands.KeywordType.Break
   fullName: DuetAPI.Commands.KeywordType.Break
   nameWithType: KeywordType.Break
+- uid: DuetAPI.Commands.KeywordType.Continue
+  name: Continue
+  href: api/DuetAPI.Commands.KeywordType.html#DuetAPI_Commands_KeywordType_Continue
+  commentId: F:DuetAPI.Commands.KeywordType.Continue
+  fullName: DuetAPI.Commands.KeywordType.Continue
+  nameWithType: KeywordType.Continue
 - uid: DuetAPI.Commands.KeywordType.Echo
   name: Echo
   href: api/DuetAPI.Commands.KeywordType.html#DuetAPI_Commands_KeywordType_Echo
@@ -3960,19 +4021,6 @@ references:
   commentId: T:DuetAPI.Machine.GpInputPort
   fullName: DuetAPI.Machine.GpInputPort
   nameWithType: GpInputPort
-- uid: DuetAPI.Machine.GpInputPort.Configured
-  name: Configured
-  href: api/DuetAPI.Machine.GpInputPort.html#DuetAPI_Machine_GpInputPort_Configured
-  commentId: P:DuetAPI.Machine.GpInputPort.Configured
-  fullName: DuetAPI.Machine.GpInputPort.Configured
-  nameWithType: GpInputPort.Configured
-- uid: DuetAPI.Machine.GpInputPort.Configured*
-  name: Configured
-  href: api/DuetAPI.Machine.GpInputPort.html#DuetAPI_Machine_GpInputPort_Configured_
-  commentId: Overload:DuetAPI.Machine.GpInputPort.Configured
-  isSpec: "True"
-  fullName: DuetAPI.Machine.GpInputPort.Configured
-  nameWithType: GpInputPort.Configured
 - uid: DuetAPI.Machine.GpInputPort.Value
   name: Value
   href: api/DuetAPI.Machine.GpInputPort.html#DuetAPI_Machine_GpInputPort_Value
@@ -3986,6 +4034,25 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.GpInputPort.Value
   nameWithType: GpInputPort.Value
+- uid: DuetAPI.Machine.GpOutputPort
+  name: GpOutputPort
+  href: api/DuetAPI.Machine.GpOutputPort.html
+  commentId: T:DuetAPI.Machine.GpOutputPort
+  fullName: DuetAPI.Machine.GpOutputPort
+  nameWithType: GpOutputPort
+- uid: DuetAPI.Machine.GpOutputPort.Pwm
+  name: Pwm
+  href: api/DuetAPI.Machine.GpOutputPort.html#DuetAPI_Machine_GpOutputPort_Pwm
+  commentId: P:DuetAPI.Machine.GpOutputPort.Pwm
+  fullName: DuetAPI.Machine.GpOutputPort.Pwm
+  nameWithType: GpOutputPort.Pwm
+- uid: DuetAPI.Machine.GpOutputPort.Pwm*
+  name: Pwm
+  href: api/DuetAPI.Machine.GpOutputPort.html#DuetAPI_Machine_GpOutputPort_Pwm_
+  commentId: Overload:DuetAPI.Machine.GpOutputPort.Pwm
+  isSpec: "True"
+  fullName: DuetAPI.Machine.GpOutputPort.Pwm
+  nameWithType: GpOutputPort.Pwm
 - uid: DuetAPI.Machine.HangprinterKinematics
   name: HangprinterKinematics
   href: api/DuetAPI.Machine.HangprinterKinematics.html
@@ -8320,6 +8387,19 @@ references:
   commentId: T:DuetAPI.Machine.RotatingMagnetFilamentMonitor
   fullName: DuetAPI.Machine.RotatingMagnetFilamentMonitor
   nameWithType: RotatingMagnetFilamentMonitor
+- uid: DuetAPI.Machine.RotatingMagnetFilamentMonitor.#ctor
+  name: RotatingMagnetFilamentMonitor()
+  href: api/DuetAPI.Machine.RotatingMagnetFilamentMonitor.html#DuetAPI_Machine_RotatingMagnetFilamentMonitor__ctor
+  commentId: M:DuetAPI.Machine.RotatingMagnetFilamentMonitor.#ctor
+  fullName: DuetAPI.Machine.RotatingMagnetFilamentMonitor.RotatingMagnetFilamentMonitor()
+  nameWithType: RotatingMagnetFilamentMonitor.RotatingMagnetFilamentMonitor()
+- uid: DuetAPI.Machine.RotatingMagnetFilamentMonitor.#ctor*
+  name: RotatingMagnetFilamentMonitor
+  href: api/DuetAPI.Machine.RotatingMagnetFilamentMonitor.html#DuetAPI_Machine_RotatingMagnetFilamentMonitor__ctor_
+  commentId: Overload:DuetAPI.Machine.RotatingMagnetFilamentMonitor.#ctor
+  isSpec: "True"
+  fullName: DuetAPI.Machine.RotatingMagnetFilamentMonitor.RotatingMagnetFilamentMonitor
+  nameWithType: RotatingMagnetFilamentMonitor.RotatingMagnetFilamentMonitor
 - uid: DuetAPI.Machine.RotatingMagnetFilamentMonitor.Calibrated
   name: Calibrated
   href: api/DuetAPI.Machine.RotatingMagnetFilamentMonitor.html#DuetAPI_Machine_RotatingMagnetFilamentMonitor_Calibrated
@@ -8581,19 +8661,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Sensors.FilamentMonitors
   nameWithType: Sensors.FilamentMonitors
-- uid: DuetAPI.Machine.Sensors.Inputs
-  name: Inputs
-  href: api/DuetAPI.Machine.Sensors.html#DuetAPI_Machine_Sensors_Inputs
-  commentId: P:DuetAPI.Machine.Sensors.Inputs
-  fullName: DuetAPI.Machine.Sensors.Inputs
-  nameWithType: Sensors.Inputs
-- uid: DuetAPI.Machine.Sensors.Inputs*
-  name: Inputs
-  href: api/DuetAPI.Machine.Sensors.html#DuetAPI_Machine_Sensors_Inputs_
-  commentId: Overload:DuetAPI.Machine.Sensors.Inputs
+- uid: DuetAPI.Machine.Sensors.GpIn
+  name: GpIn
+  href: api/DuetAPI.Machine.Sensors.html#DuetAPI_Machine_Sensors_GpIn
+  commentId: P:DuetAPI.Machine.Sensors.GpIn
+  fullName: DuetAPI.Machine.Sensors.GpIn
+  nameWithType: Sensors.GpIn
+- uid: DuetAPI.Machine.Sensors.GpIn*
+  name: GpIn
+  href: api/DuetAPI.Machine.Sensors.html#DuetAPI_Machine_Sensors_GpIn_
+  commentId: Overload:DuetAPI.Machine.Sensors.GpIn
   isSpec: "True"
-  fullName: DuetAPI.Machine.Sensors.Inputs
-  nameWithType: Sensors.Inputs
+  fullName: DuetAPI.Machine.Sensors.GpIn
+  nameWithType: Sensors.GpIn
 - uid: DuetAPI.Machine.Sensors.Probes
   name: Probes
   href: api/DuetAPI.Machine.Sensors.html#DuetAPI_Machine_Sensors_Probes
@@ -8786,6 +8866,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.State.DsfVersion
   nameWithType: State.DsfVersion
+- uid: DuetAPI.Machine.State.GpOut
+  name: GpOut
+  href: api/DuetAPI.Machine.State.html#DuetAPI_Machine_State_GpOut
+  commentId: P:DuetAPI.Machine.State.GpOut
+  fullName: DuetAPI.Machine.State.GpOut
+  nameWithType: State.GpOut
+- uid: DuetAPI.Machine.State.GpOut*
+  name: GpOut
+  href: api/DuetAPI.Machine.State.html#DuetAPI_Machine_State_GpOut_
+  commentId: Overload:DuetAPI.Machine.State.GpOut
+  isSpec: "True"
+  fullName: DuetAPI.Machine.State.GpOut
+  nameWithType: State.GpOut
 - uid: DuetAPI.Machine.State.LaserPwm
   name: LaserPwm
   href: api/DuetAPI.Machine.State.html#DuetAPI_Machine_State_LaserPwm
@@ -9586,12 +9679,12 @@ references:
   commentId: T:DuetAPI.Utility.FileLists
   fullName: DuetAPI.Utility.FileLists
   nameWithType: FileLists
-- uid: DuetAPI.Utility.FileLists.GetFileList(System.String,System.String,System.Int32)
-  name: GetFileList(String, String, Int32)
-  href: api/DuetAPI.Utility.FileLists.html#DuetAPI_Utility_FileLists_GetFileList_System_String_System_String_System_Int32_
-  commentId: M:DuetAPI.Utility.FileLists.GetFileList(System.String,System.String,System.Int32)
-  fullName: DuetAPI.Utility.FileLists.GetFileList(System.String, System.String, System.Int32)
-  nameWithType: FileLists.GetFileList(String, String, Int32)
+- uid: DuetAPI.Utility.FileLists.GetFileList(System.String,System.String,System.Int32,System.Int32)
+  name: GetFileList(String, String, Int32, Int32)
+  href: api/DuetAPI.Utility.FileLists.html#DuetAPI_Utility_FileLists_GetFileList_System_String_System_String_System_Int32_System_Int32_
+  commentId: M:DuetAPI.Utility.FileLists.GetFileList(System.String,System.String,System.Int32,System.Int32)
+  fullName: DuetAPI.Utility.FileLists.GetFileList(System.String, System.String, System.Int32, System.Int32)
+  nameWithType: FileLists.GetFileList(String, String, Int32, Int32)
 - uid: DuetAPI.Utility.FileLists.GetFileList*
   name: GetFileList
   href: api/DuetAPI.Utility.FileLists.html#DuetAPI_Utility_FileLists_GetFileList_
@@ -9599,12 +9692,12 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Utility.FileLists.GetFileList
   nameWithType: FileLists.GetFileList
-- uid: DuetAPI.Utility.FileLists.GetFiles(System.String,System.String,System.Int32,System.Boolean)
-  name: GetFiles(String, String, Int32, Boolean)
-  href: api/DuetAPI.Utility.FileLists.html#DuetAPI_Utility_FileLists_GetFiles_System_String_System_String_System_Int32_System_Boolean_
-  commentId: M:DuetAPI.Utility.FileLists.GetFiles(System.String,System.String,System.Int32,System.Boolean)
-  fullName: DuetAPI.Utility.FileLists.GetFiles(System.String, System.String, System.Int32, System.Boolean)
-  nameWithType: FileLists.GetFiles(String, String, Int32, Boolean)
+- uid: DuetAPI.Utility.FileLists.GetFiles(System.String,System.String,System.Int32,System.Boolean,System.Int32)
+  name: GetFiles(String, String, Int32, Boolean, Int32)
+  href: api/DuetAPI.Utility.FileLists.html#DuetAPI_Utility_FileLists_GetFiles_System_String_System_String_System_Int32_System_Boolean_System_Int32_
+  commentId: M:DuetAPI.Utility.FileLists.GetFiles(System.String,System.String,System.Int32,System.Boolean,System.Int32)
+  fullName: DuetAPI.Utility.FileLists.GetFiles(System.String, System.String, System.Int32, System.Boolean, System.Int32)
+  nameWithType: FileLists.GetFiles(String, String, Int32, Boolean, Int32)
 - uid: DuetAPI.Utility.FileLists.GetFiles*
   name: GetFiles
   href: api/DuetAPI.Utility.FileLists.html#DuetAPI_Utility_FileLists_GetFiles_
@@ -11028,6 +11121,12 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.Code.Execute
   nameWithType: Code.Execute
+- uid: DuetControlServer.Commands.Code.File
+  name: File
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_File
+  commentId: F:DuetControlServer.Commands.Code.File
+  fullName: DuetControlServer.Commands.Code.File
+  nameWithType: Code.File
 - uid: DuetControlServer.Commands.Code.FileLocks
   name: FileLocks
   href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_FileLocks
@@ -11040,19 +11139,6 @@ references:
   commentId: F:DuetControlServer.Commands.Code.FilesBeingWritten
   fullName: DuetControlServer.Commands.Code.FilesBeingWritten
   nameWithType: Code.FilesBeingWritten
-- uid: DuetControlServer.Commands.Code.Init
-  name: Init()
-  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Init
-  commentId: M:DuetControlServer.Commands.Code.Init
-  fullName: DuetControlServer.Commands.Code.Init()
-  nameWithType: Code.Init()
-- uid: DuetControlServer.Commands.Code.Init*
-  name: Init
-  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Init_
-  commentId: Overload:DuetControlServer.Commands.Code.Init
-  isSpec: "True"
-  fullName: DuetControlServer.Commands.Code.Init
-  nameWithType: Code.Init
 - uid: DuetControlServer.Commands.Code.InternallyProcessed
   name: InternallyProcessed
   href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_InternallyProcessed
@@ -11075,14 +11161,7 @@ references:
 - uid: DuetControlServer.Commands.Code.Macro
   name: Macro
   href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Macro
-  commentId: P:DuetControlServer.Commands.Code.Macro
-  fullName: DuetControlServer.Commands.Code.Macro
-  nameWithType: Code.Macro
-- uid: DuetControlServer.Commands.Code.Macro*
-  name: Macro
-  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_Macro_
-  commentId: Overload:DuetControlServer.Commands.Code.Macro
-  isSpec: "True"
+  commentId: F:DuetControlServer.Commands.Code.Macro
   fullName: DuetControlServer.Commands.Code.Macro
   nameWithType: Code.Macro
 - uid: DuetControlServer.Commands.Code.ResolvedByInterceptor
@@ -11307,32 +11386,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Commands.SimpleCode.Execute
   nameWithType: SimpleCode.Execute
-- uid: DuetControlServer.Commands.SimpleCode.Init
-  name: Init()
-  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_Init
-  commentId: M:DuetControlServer.Commands.SimpleCode.Init
-  fullName: DuetControlServer.Commands.SimpleCode.Init()
-  nameWithType: SimpleCode.Init()
-- uid: DuetControlServer.Commands.SimpleCode.Init*
-  name: Init
-  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_Init_
-  commentId: Overload:DuetControlServer.Commands.SimpleCode.Init
+- uid: DuetControlServer.Commands.SimpleCode.ParseAsync
+  name: ParseAsync()
+  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_ParseAsync
+  commentId: M:DuetControlServer.Commands.SimpleCode.ParseAsync
+  fullName: DuetControlServer.Commands.SimpleCode.ParseAsync()
+  nameWithType: SimpleCode.ParseAsync()
+- uid: DuetControlServer.Commands.SimpleCode.ParseAsync*
+  name: ParseAsync
+  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_ParseAsync_
+  commentId: Overload:DuetControlServer.Commands.SimpleCode.ParseAsync
   isSpec: "True"
-  fullName: DuetControlServer.Commands.SimpleCode.Init
-  nameWithType: SimpleCode.Init
-- uid: DuetControlServer.Commands.SimpleCode.Parse
-  name: Parse()
-  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_Parse
-  commentId: M:DuetControlServer.Commands.SimpleCode.Parse
-  fullName: DuetControlServer.Commands.SimpleCode.Parse()
-  nameWithType: SimpleCode.Parse()
-- uid: DuetControlServer.Commands.SimpleCode.Parse*
-  name: Parse
-  href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_Parse_
-  commentId: Overload:DuetControlServer.Commands.SimpleCode.Parse
-  isSpec: "True"
-  fullName: DuetControlServer.Commands.SimpleCode.Parse
-  nameWithType: SimpleCode.Parse
+  fullName: DuetControlServer.Commands.SimpleCode.ParseAsync
+  nameWithType: SimpleCode.ParseAsync
 - uid: DuetControlServer.Commands.SimpleCode.SourceConnection
   name: SourceConnection
   href: api/DuetControlServer.Commands.SimpleCode.html#DuetControlServer_Commands_SimpleCode_SourceConnection
@@ -11480,19 +11546,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Job.FileLength
   nameWithType: Job.FileLength
-- uid: DuetControlServer.FileExecution.Job.FilePosition
-  name: FilePosition
-  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_FilePosition
-  commentId: P:DuetControlServer.FileExecution.Job.FilePosition
-  fullName: DuetControlServer.FileExecution.Job.FilePosition
-  nameWithType: Job.FilePosition
-- uid: DuetControlServer.FileExecution.Job.FilePosition*
-  name: FilePosition
-  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_FilePosition_
-  commentId: Overload:DuetControlServer.FileExecution.Job.FilePosition
+- uid: DuetControlServer.FileExecution.Job.GetFilePosition
+  name: GetFilePosition()
+  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_GetFilePosition
+  commentId: M:DuetControlServer.FileExecution.Job.GetFilePosition
+  fullName: DuetControlServer.FileExecution.Job.GetFilePosition()
+  nameWithType: Job.GetFilePosition()
+- uid: DuetControlServer.FileExecution.Job.GetFilePosition*
+  name: GetFilePosition
+  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_GetFilePosition_
+  commentId: Overload:DuetControlServer.FileExecution.Job.GetFilePosition
   isSpec: "True"
-  fullName: DuetControlServer.FileExecution.Job.FilePosition
-  nameWithType: Job.FilePosition
+  fullName: DuetControlServer.FileExecution.Job.GetFilePosition
+  nameWithType: Job.GetFilePosition
 - uid: DuetControlServer.FileExecution.Job.IsAborted
   name: IsAborted
   href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_IsAborted
@@ -11506,6 +11572,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Job.IsAborted
   nameWithType: Job.IsAborted
+- uid: DuetControlServer.FileExecution.Job.IsCancelled
+  name: IsCancelled
+  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_IsCancelled
+  commentId: P:DuetControlServer.FileExecution.Job.IsCancelled
+  fullName: DuetControlServer.FileExecution.Job.IsCancelled
+  nameWithType: Job.IsCancelled
+- uid: DuetControlServer.FileExecution.Job.IsCancelled*
+  name: IsCancelled
+  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_IsCancelled_
+  commentId: Overload:DuetControlServer.FileExecution.Job.IsCancelled
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.Job.IsCancelled
+  nameWithType: Job.IsCancelled
 - uid: DuetControlServer.FileExecution.Job.IsFileSelected
   name: IsFileSelected
   href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_IsFileSelected
@@ -11639,18 +11718,31 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Job.SelectFile
   nameWithType: Job.SelectFile
+- uid: DuetControlServer.FileExecution.Job.SetFilePosition(System.Int64)
+  name: SetFilePosition(Int64)
+  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_SetFilePosition_System_Int64_
+  commentId: M:DuetControlServer.FileExecution.Job.SetFilePosition(System.Int64)
+  fullName: DuetControlServer.FileExecution.Job.SetFilePosition(System.Int64)
+  nameWithType: Job.SetFilePosition(Int64)
+- uid: DuetControlServer.FileExecution.Job.SetFilePosition*
+  name: SetFilePosition
+  href: api/DuetControlServer.FileExecution.Job.html#DuetControlServer_FileExecution_Job_SetFilePosition_
+  commentId: Overload:DuetControlServer.FileExecution.Job.SetFilePosition
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.Job.SetFilePosition
+  nameWithType: Job.SetFilePosition
 - uid: DuetControlServer.FileExecution.Macro
   name: Macro
   href: api/DuetControlServer.FileExecution.Macro.html
   commentId: T:DuetControlServer.FileExecution.Macro
   fullName: DuetControlServer.FileExecution.Macro
   nameWithType: Macro
-- uid: DuetControlServer.FileExecution.Macro.#ctor(System.String,DuetAPI.CodeChannel,System.Boolean,System.Int32)
-  name: Macro(String, CodeChannel, Boolean, Int32)
-  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro__ctor_System_String_DuetAPI_CodeChannel_System_Boolean_System_Int32_
-  commentId: M:DuetControlServer.FileExecution.Macro.#ctor(System.String,DuetAPI.CodeChannel,System.Boolean,System.Int32)
-  fullName: DuetControlServer.FileExecution.Macro.Macro(System.String, DuetAPI.CodeChannel, System.Boolean, System.Int32)
-  nameWithType: Macro.Macro(String, CodeChannel, Boolean, Int32)
+- uid: DuetControlServer.FileExecution.Macro.#ctor(System.String,System.String,DuetAPI.CodeChannel,System.Boolean,System.Int32)
+  name: Macro(String, String, CodeChannel, Boolean, Int32)
+  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro__ctor_System_String_System_String_DuetAPI_CodeChannel_System_Boolean_System_Int32_
+  commentId: M:DuetControlServer.FileExecution.Macro.#ctor(System.String,System.String,DuetAPI.CodeChannel,System.Boolean,System.Int32)
+  fullName: DuetControlServer.FileExecution.Macro.Macro(System.String, System.String, DuetAPI.CodeChannel, System.Boolean, System.Int32)
+  nameWithType: Macro.Macro(String, String, CodeChannel, Boolean, Int32)
 - uid: DuetControlServer.FileExecution.Macro.#ctor*
   name: Macro
   href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro__ctor_
@@ -11671,6 +11763,32 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Macro.Abort
   nameWithType: Macro.Abort
+- uid: DuetControlServer.FileExecution.Macro.CancellationToken
+  name: CancellationToken
+  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_CancellationToken
+  commentId: P:DuetControlServer.FileExecution.Macro.CancellationToken
+  fullName: DuetControlServer.FileExecution.Macro.CancellationToken
+  nameWithType: Macro.CancellationToken
+- uid: DuetControlServer.FileExecution.Macro.CancellationToken*
+  name: CancellationToken
+  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_CancellationToken_
+  commentId: Overload:DuetControlServer.FileExecution.Macro.CancellationToken
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.Macro.CancellationToken
+  nameWithType: Macro.CancellationToken
+- uid: DuetControlServer.FileExecution.Macro.CancelPendingCodes
+  name: CancelPendingCodes()
+  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_CancelPendingCodes
+  commentId: M:DuetControlServer.FileExecution.Macro.CancelPendingCodes
+  fullName: DuetControlServer.FileExecution.Macro.CancelPendingCodes()
+  nameWithType: Macro.CancelPendingCodes()
+- uid: DuetControlServer.FileExecution.Macro.CancelPendingCodes*
+  name: CancelPendingCodes
+  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_CancelPendingCodes_
+  commentId: Overload:DuetControlServer.FileExecution.Macro.CancelPendingCodes
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.Macro.CancelPendingCodes
+  nameWithType: Macro.CancelPendingCodes
 - uid: DuetControlServer.FileExecution.Macro.Channel
   name: Channel
   href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_Channel
@@ -11710,6 +11828,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Macro.FileName
   nameWithType: Macro.FileName
+- uid: DuetControlServer.FileExecution.Macro.FileOpened
+  name: FileOpened
+  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_FileOpened
+  commentId: P:DuetControlServer.FileExecution.Macro.FileOpened
+  fullName: DuetControlServer.FileExecution.Macro.FileOpened
+  nameWithType: Macro.FileOpened
+- uid: DuetControlServer.FileExecution.Macro.FileOpened*
+  name: FileOpened
+  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_FileOpened_
+  commentId: Overload:DuetControlServer.FileExecution.Macro.FileOpened
+  isSpec: "True"
+  fullName: DuetControlServer.FileExecution.Macro.FileOpened
+  nameWithType: Macro.FileOpened
 - uid: DuetControlServer.FileExecution.Macro.FinishAsync
   name: FinishAsync()
   href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_FinishAsync
@@ -11723,19 +11854,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Macro.FinishAsync
   nameWithType: Macro.FinishAsync
-- uid: DuetControlServer.FileExecution.Macro.HadError
-  name: HadError
-  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_HadError
-  commentId: P:DuetControlServer.FileExecution.Macro.HadError
-  fullName: DuetControlServer.FileExecution.Macro.HadError
-  nameWithType: Macro.HadError
-- uid: DuetControlServer.FileExecution.Macro.HadError*
-  name: HadError
-  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_HadError_
-  commentId: Overload:DuetControlServer.FileExecution.Macro.HadError
-  isSpec: "True"
-  fullName: DuetControlServer.FileExecution.Macro.HadError
-  nameWithType: Macro.HadError
 - uid: DuetControlServer.FileExecution.Macro.IsAborted
   name: IsAborted
   href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_IsAborted
@@ -11866,25 +11984,109 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.FileExecution.Macro.SourceConnection
   nameWithType: Macro.SourceConnection
-- uid: DuetControlServer.FileExecution.Macro.WaitForCodeExecution
-  name: WaitForCodeExecution()
-  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_WaitForCodeExecution
-  commentId: M:DuetControlServer.FileExecution.Macro.WaitForCodeExecution
-  fullName: DuetControlServer.FileExecution.Macro.WaitForCodeExecution()
-  nameWithType: Macro.WaitForCodeExecution()
-- uid: DuetControlServer.FileExecution.Macro.WaitForCodeExecution*
-  name: WaitForCodeExecution
-  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_WaitForCodeExecution_
-  commentId: Overload:DuetControlServer.FileExecution.Macro.WaitForCodeExecution
+- uid: DuetControlServer.FileExecution.Macro.WaitForCodeStart
+  name: WaitForCodeStart()
+  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_WaitForCodeStart
+  commentId: M:DuetControlServer.FileExecution.Macro.WaitForCodeStart
+  fullName: DuetControlServer.FileExecution.Macro.WaitForCodeStart()
+  nameWithType: Macro.WaitForCodeStart()
+- uid: DuetControlServer.FileExecution.Macro.WaitForCodeStart*
+  name: WaitForCodeStart
+  href: api/DuetControlServer.FileExecution.Macro.html#DuetControlServer_FileExecution_Macro_WaitForCodeStart_
+  commentId: Overload:DuetControlServer.FileExecution.Macro.WaitForCodeStart
   isSpec: "True"
-  fullName: DuetControlServer.FileExecution.Macro.WaitForCodeExecution
-  nameWithType: Macro.WaitForCodeExecution
+  fullName: DuetControlServer.FileExecution.Macro.WaitForCodeStart
+  nameWithType: Macro.WaitForCodeStart
 - uid: DuetControlServer.Files
   name: DuetControlServer.Files
   href: api/DuetControlServer.Files.html
   commentId: N:DuetControlServer.Files
   fullName: DuetControlServer.Files
   nameWithType: DuetControlServer.Files
+- uid: DuetControlServer.Files.CodeBlock
+  name: CodeBlock
+  href: api/DuetControlServer.Files.CodeBlock.html
+  commentId: T:DuetControlServer.Files.CodeBlock
+  fullName: DuetControlServer.Files.CodeBlock
+  nameWithType: CodeBlock
+- uid: DuetControlServer.Files.CodeBlock.ContinueLoop
+  name: ContinueLoop
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_ContinueLoop
+  commentId: P:DuetControlServer.Files.CodeBlock.ContinueLoop
+  fullName: DuetControlServer.Files.CodeBlock.ContinueLoop
+  nameWithType: CodeBlock.ContinueLoop
+- uid: DuetControlServer.Files.CodeBlock.ContinueLoop*
+  name: ContinueLoop
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_ContinueLoop_
+  commentId: Overload:DuetControlServer.Files.CodeBlock.ContinueLoop
+  isSpec: "True"
+  fullName: DuetControlServer.Files.CodeBlock.ContinueLoop
+  nameWithType: CodeBlock.ContinueLoop
+- uid: DuetControlServer.Files.CodeBlock.ExpectingElse
+  name: ExpectingElse
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_ExpectingElse
+  commentId: P:DuetControlServer.Files.CodeBlock.ExpectingElse
+  fullName: DuetControlServer.Files.CodeBlock.ExpectingElse
+  nameWithType: CodeBlock.ExpectingElse
+- uid: DuetControlServer.Files.CodeBlock.ExpectingElse*
+  name: ExpectingElse
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_ExpectingElse_
+  commentId: Overload:DuetControlServer.Files.CodeBlock.ExpectingElse
+  isSpec: "True"
+  fullName: DuetControlServer.Files.CodeBlock.ExpectingElse
+  nameWithType: CodeBlock.ExpectingElse
+- uid: DuetControlServer.Files.CodeBlock.Iterations
+  name: Iterations
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_Iterations
+  commentId: P:DuetControlServer.Files.CodeBlock.Iterations
+  fullName: DuetControlServer.Files.CodeBlock.Iterations
+  nameWithType: CodeBlock.Iterations
+- uid: DuetControlServer.Files.CodeBlock.Iterations*
+  name: Iterations
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_Iterations_
+  commentId: Overload:DuetControlServer.Files.CodeBlock.Iterations
+  isSpec: "True"
+  fullName: DuetControlServer.Files.CodeBlock.Iterations
+  nameWithType: CodeBlock.Iterations
+- uid: DuetControlServer.Files.CodeBlock.ProcessBlock
+  name: ProcessBlock
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_ProcessBlock
+  commentId: P:DuetControlServer.Files.CodeBlock.ProcessBlock
+  fullName: DuetControlServer.Files.CodeBlock.ProcessBlock
+  nameWithType: CodeBlock.ProcessBlock
+- uid: DuetControlServer.Files.CodeBlock.ProcessBlock*
+  name: ProcessBlock
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_ProcessBlock_
+  commentId: Overload:DuetControlServer.Files.CodeBlock.ProcessBlock
+  isSpec: "True"
+  fullName: DuetControlServer.Files.CodeBlock.ProcessBlock
+  nameWithType: CodeBlock.ProcessBlock
+- uid: DuetControlServer.Files.CodeBlock.SeenCodes
+  name: SeenCodes
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_SeenCodes
+  commentId: P:DuetControlServer.Files.CodeBlock.SeenCodes
+  fullName: DuetControlServer.Files.CodeBlock.SeenCodes
+  nameWithType: CodeBlock.SeenCodes
+- uid: DuetControlServer.Files.CodeBlock.SeenCodes*
+  name: SeenCodes
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_SeenCodes_
+  commentId: Overload:DuetControlServer.Files.CodeBlock.SeenCodes
+  isSpec: "True"
+  fullName: DuetControlServer.Files.CodeBlock.SeenCodes
+  nameWithType: CodeBlock.SeenCodes
+- uid: DuetControlServer.Files.CodeBlock.StartingCode
+  name: StartingCode
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_StartingCode
+  commentId: P:DuetControlServer.Files.CodeBlock.StartingCode
+  fullName: DuetControlServer.Files.CodeBlock.StartingCode
+  nameWithType: CodeBlock.StartingCode
+- uid: DuetControlServer.Files.CodeBlock.StartingCode*
+  name: StartingCode
+  href: api/DuetControlServer.Files.CodeBlock.html#DuetControlServer_Files_CodeBlock_StartingCode_
+  commentId: Overload:DuetControlServer.Files.CodeBlock.StartingCode
+  isSpec: "True"
+  fullName: DuetControlServer.Files.CodeBlock.StartingCode
+  nameWithType: CodeBlock.StartingCode
 - uid: DuetControlServer.Files.CodeFile
   name: CodeFile
   href: api/DuetControlServer.Files.CodeFile.html
@@ -11904,45 +12106,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Files.CodeFile.CodeFile
   nameWithType: CodeFile.CodeFile
-- uid: DuetControlServer.Files.CodeFile.Abort
-  name: Abort()
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Abort
-  commentId: M:DuetControlServer.Files.CodeFile.Abort
-  fullName: DuetControlServer.Files.CodeFile.Abort()
-  nameWithType: CodeFile.Abort()
-- uid: DuetControlServer.Files.CodeFile.Abort*
-  name: Abort
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Abort_
-  commentId: Overload:DuetControlServer.Files.CodeFile.Abort
-  isSpec: "True"
-  fullName: DuetControlServer.Files.CodeFile.Abort
-  nameWithType: CodeFile.Abort
-- uid: DuetControlServer.Files.CodeFile.CancellationToken
-  name: CancellationToken
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_CancellationToken
-  commentId: P:DuetControlServer.Files.CodeFile.CancellationToken
-  fullName: DuetControlServer.Files.CodeFile.CancellationToken
-  nameWithType: CodeFile.CancellationToken
-- uid: DuetControlServer.Files.CodeFile.CancellationToken*
-  name: CancellationToken
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_CancellationToken_
-  commentId: Overload:DuetControlServer.Files.CodeFile.CancellationToken
-  isSpec: "True"
-  fullName: DuetControlServer.Files.CodeFile.CancellationToken
-  nameWithType: CodeFile.CancellationToken
-- uid: DuetControlServer.Files.CodeFile.CancelPendingCodes
-  name: CancelPendingCodes()
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_CancelPendingCodes
-  commentId: M:DuetControlServer.Files.CodeFile.CancelPendingCodes
-  fullName: DuetControlServer.Files.CodeFile.CancelPendingCodes()
-  nameWithType: CodeFile.CancelPendingCodes()
-- uid: DuetControlServer.Files.CodeFile.CancelPendingCodes*
-  name: CancelPendingCodes
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_CancelPendingCodes_
-  commentId: Overload:DuetControlServer.Files.CodeFile.CancelPendingCodes
-  isSpec: "True"
-  fullName: DuetControlServer.Files.CodeFile.CancelPendingCodes
-  nameWithType: CodeFile.CancelPendingCodes
 - uid: DuetControlServer.Files.CodeFile.Channel
   name: Channel
   href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Channel
@@ -11956,18 +12119,25 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Files.CodeFile.Channel
   nameWithType: CodeFile.Channel
+- uid: DuetControlServer.Files.CodeFile.Close
+  name: Close()
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Close
+  commentId: M:DuetControlServer.Files.CodeFile.Close
+  fullName: DuetControlServer.Files.CodeFile.Close()
+  nameWithType: CodeFile.Close()
+- uid: DuetControlServer.Files.CodeFile.Close*
+  name: Close
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Close_
+  commentId: Overload:DuetControlServer.Files.CodeFile.Close
+  isSpec: "True"
+  fullName: DuetControlServer.Files.CodeFile.Close
+  nameWithType: CodeFile.Close
 - uid: DuetControlServer.Files.CodeFile.Dispose
   name: Dispose()
   href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Dispose
   commentId: M:DuetControlServer.Files.CodeFile.Dispose
   fullName: DuetControlServer.Files.CodeFile.Dispose()
   nameWithType: CodeFile.Dispose()
-- uid: DuetControlServer.Files.CodeFile.Dispose(System.Boolean)
-  name: Dispose(Boolean)
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Dispose_System_Boolean_
-  commentId: M:DuetControlServer.Files.CodeFile.Dispose(System.Boolean)
-  fullName: DuetControlServer.Files.CodeFile.Dispose(System.Boolean)
-  nameWithType: CodeFile.Dispose(Boolean)
 - uid: DuetControlServer.Files.CodeFile.Dispose*
   name: Dispose
   href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Dispose_
@@ -12001,32 +12171,45 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Files.CodeFile.Finalize
   nameWithType: CodeFile.Finalize
-- uid: DuetControlServer.Files.CodeFile.IsAborted
-  name: IsAborted
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_IsAborted
-  commentId: P:DuetControlServer.Files.CodeFile.IsAborted
-  fullName: DuetControlServer.Files.CodeFile.IsAborted
-  nameWithType: CodeFile.IsAborted
-- uid: DuetControlServer.Files.CodeFile.IsAborted*
-  name: IsAborted
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_IsAborted_
-  commentId: Overload:DuetControlServer.Files.CodeFile.IsAborted
+- uid: DuetControlServer.Files.CodeFile.GetIterations(DuetControlServer.Commands.Code)
+  name: GetIterations(Code)
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_GetIterations_DuetControlServer_Commands_Code_
+  commentId: M:DuetControlServer.Files.CodeFile.GetIterations(DuetControlServer.Commands.Code)
+  fullName: DuetControlServer.Files.CodeFile.GetIterations(DuetControlServer.Commands.Code)
+  nameWithType: CodeFile.GetIterations(Code)
+- uid: DuetControlServer.Files.CodeFile.GetIterations*
+  name: GetIterations
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_GetIterations_
+  commentId: Overload:DuetControlServer.Files.CodeFile.GetIterations
   isSpec: "True"
-  fullName: DuetControlServer.Files.CodeFile.IsAborted
-  nameWithType: CodeFile.IsAborted
-- uid: DuetControlServer.Files.CodeFile.IsFinished
-  name: IsFinished
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_IsFinished
-  commentId: P:DuetControlServer.Files.CodeFile.IsFinished
-  fullName: DuetControlServer.Files.CodeFile.IsFinished
-  nameWithType: CodeFile.IsFinished
-- uid: DuetControlServer.Files.CodeFile.IsFinished*
-  name: IsFinished
-  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_IsFinished_
-  commentId: Overload:DuetControlServer.Files.CodeFile.IsFinished
+  fullName: DuetControlServer.Files.CodeFile.GetIterations
+  nameWithType: CodeFile.GetIterations
+- uid: DuetControlServer.Files.CodeFile.IsClosed
+  name: IsClosed
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_IsClosed
+  commentId: P:DuetControlServer.Files.CodeFile.IsClosed
+  fullName: DuetControlServer.Files.CodeFile.IsClosed
+  nameWithType: CodeFile.IsClosed
+- uid: DuetControlServer.Files.CodeFile.IsClosed*
+  name: IsClosed
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_IsClosed_
+  commentId: Overload:DuetControlServer.Files.CodeFile.IsClosed
   isSpec: "True"
-  fullName: DuetControlServer.Files.CodeFile.IsFinished
-  nameWithType: CodeFile.IsFinished
+  fullName: DuetControlServer.Files.CodeFile.IsClosed
+  nameWithType: CodeFile.IsClosed
+- uid: DuetControlServer.Files.CodeFile.LastResult
+  name: LastResult
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_LastResult
+  commentId: P:DuetControlServer.Files.CodeFile.LastResult
+  fullName: DuetControlServer.Files.CodeFile.LastResult
+  nameWithType: CodeFile.LastResult
+- uid: DuetControlServer.Files.CodeFile.LastResult*
+  name: LastResult
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_LastResult_
+  commentId: Overload:DuetControlServer.Files.CodeFile.LastResult
+  isSpec: "True"
+  fullName: DuetControlServer.Files.CodeFile.LastResult
+  nameWithType: CodeFile.LastResult
 - uid: DuetControlServer.Files.CodeFile.Length
   name: Length
   href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Length
@@ -12053,6 +12236,32 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Files.CodeFile.LineNumber
   nameWithType: CodeFile.LineNumber
+- uid: DuetControlServer.Files.CodeFile.Lock
+  name: Lock()
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Lock
+  commentId: M:DuetControlServer.Files.CodeFile.Lock
+  fullName: DuetControlServer.Files.CodeFile.Lock()
+  nameWithType: CodeFile.Lock()
+- uid: DuetControlServer.Files.CodeFile.Lock*
+  name: Lock
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Lock_
+  commentId: Overload:DuetControlServer.Files.CodeFile.Lock
+  isSpec: "True"
+  fullName: DuetControlServer.Files.CodeFile.Lock
+  nameWithType: CodeFile.Lock
+- uid: DuetControlServer.Files.CodeFile.LockAsync
+  name: LockAsync()
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_LockAsync
+  commentId: M:DuetControlServer.Files.CodeFile.LockAsync
+  fullName: DuetControlServer.Files.CodeFile.LockAsync()
+  nameWithType: CodeFile.LockAsync()
+- uid: DuetControlServer.Files.CodeFile.LockAsync*
+  name: LockAsync
+  href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_LockAsync_
+  commentId: Overload:DuetControlServer.Files.CodeFile.LockAsync
+  isSpec: "True"
+  fullName: DuetControlServer.Files.CodeFile.LockAsync
+  nameWithType: CodeFile.LockAsync
 - uid: DuetControlServer.Files.CodeFile.Position
   name: Position
   href: api/DuetControlServer.Files.CodeFile.html#DuetControlServer_Files_CodeFile_Position
@@ -12079,51 +12288,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Files.CodeFile.ReadCodeAsync
   nameWithType: CodeFile.ReadCodeAsync
-- uid: DuetControlServer.Files.CodeFileState
-  name: CodeFileState
-  href: api/DuetControlServer.Files.CodeFileState.html
-  commentId: T:DuetControlServer.Files.CodeFileState
-  fullName: DuetControlServer.Files.CodeFileState
-  nameWithType: CodeFileState
-- uid: DuetControlServer.Files.CodeFileState.Iterations
-  name: Iterations
-  href: api/DuetControlServer.Files.CodeFileState.html#DuetControlServer_Files_CodeFileState_Iterations
-  commentId: P:DuetControlServer.Files.CodeFileState.Iterations
-  fullName: DuetControlServer.Files.CodeFileState.Iterations
-  nameWithType: CodeFileState.Iterations
-- uid: DuetControlServer.Files.CodeFileState.Iterations*
-  name: Iterations
-  href: api/DuetControlServer.Files.CodeFileState.html#DuetControlServer_Files_CodeFileState_Iterations_
-  commentId: Overload:DuetControlServer.Files.CodeFileState.Iterations
-  isSpec: "True"
-  fullName: DuetControlServer.Files.CodeFileState.Iterations
-  nameWithType: CodeFileState.Iterations
-- uid: DuetControlServer.Files.CodeFileState.LastResult
-  name: LastResult
-  href: api/DuetControlServer.Files.CodeFileState.html#DuetControlServer_Files_CodeFileState_LastResult
-  commentId: P:DuetControlServer.Files.CodeFileState.LastResult
-  fullName: DuetControlServer.Files.CodeFileState.LastResult
-  nameWithType: CodeFileState.LastResult
-- uid: DuetControlServer.Files.CodeFileState.LastResult*
-  name: LastResult
-  href: api/DuetControlServer.Files.CodeFileState.html#DuetControlServer_Files_CodeFileState_LastResult_
-  commentId: Overload:DuetControlServer.Files.CodeFileState.LastResult
-  isSpec: "True"
-  fullName: DuetControlServer.Files.CodeFileState.LastResult
-  nameWithType: CodeFileState.LastResult
-- uid: DuetControlServer.Files.CodeFileState.StartingCode
-  name: StartingCode
-  href: api/DuetControlServer.Files.CodeFileState.html#DuetControlServer_Files_CodeFileState_StartingCode
-  commentId: P:DuetControlServer.Files.CodeFileState.StartingCode
-  fullName: DuetControlServer.Files.CodeFileState.StartingCode
-  nameWithType: CodeFileState.StartingCode
-- uid: DuetControlServer.Files.CodeFileState.StartingCode*
-  name: StartingCode
-  href: api/DuetControlServer.Files.CodeFileState.html#DuetControlServer_Files_CodeFileState_StartingCode_
-  commentId: Overload:DuetControlServer.Files.CodeFileState.StartingCode
-  isSpec: "True"
-  fullName: DuetControlServer.Files.CodeFileState.StartingCode
-  nameWithType: CodeFileState.StartingCode
 - uid: DuetControlServer.Files.ConfigOverride
   name: ConfigOverride
   href: api/DuetControlServer.Files.ConfigOverride.html
@@ -12693,11 +12857,11 @@ references:
   fullName: DuetControlServer.IPC.Processors.Subscription.Subscription
   nameWithType: Subscription.Subscription
 - uid: DuetControlServer.IPC.Processors.Subscription.AreClientsConnected
-  name: AreClientsConnected()
+  name: AreClientsConnected
   href: api/DuetControlServer.IPC.Processors.Subscription.html#DuetControlServer_IPC_Processors_Subscription_AreClientsConnected
-  commentId: M:DuetControlServer.IPC.Processors.Subscription.AreClientsConnected
-  fullName: DuetControlServer.IPC.Processors.Subscription.AreClientsConnected()
-  nameWithType: Subscription.AreClientsConnected()
+  commentId: P:DuetControlServer.IPC.Processors.Subscription.AreClientsConnected
+  fullName: DuetControlServer.IPC.Processors.Subscription.AreClientsConnected
+  nameWithType: Subscription.AreClientsConnected
 - uid: DuetControlServer.IPC.Processors.Subscription.AreClientsConnected*
   name: AreClientsConnected
   href: api/DuetControlServer.IPC.Processors.Subscription.html#DuetControlServer_IPC_Processors_Subscription_AreClientsConnected_
@@ -12790,11 +12954,11 @@ references:
   commentId: T:DuetControlServer.Model.Expressions
   fullName: DuetControlServer.Model.Expressions
   nameWithType: Expressions
-- uid: DuetControlServer.Model.Expressions.ContainsLinuxFields(DuetAPI.Commands.Code)
+- uid: DuetControlServer.Model.Expressions.ContainsLinuxFields(DuetControlServer.Commands.Code)
   name: ContainsLinuxFields(Code)
-  href: api/DuetControlServer.Model.Expressions.html#DuetControlServer_Model_Expressions_ContainsLinuxFields_DuetAPI_Commands_Code_
-  commentId: M:DuetControlServer.Model.Expressions.ContainsLinuxFields(DuetAPI.Commands.Code)
-  fullName: DuetControlServer.Model.Expressions.ContainsLinuxFields(DuetAPI.Commands.Code)
+  href: api/DuetControlServer.Model.Expressions.html#DuetControlServer_Model_Expressions_ContainsLinuxFields_DuetControlServer_Commands_Code_
+  commentId: M:DuetControlServer.Model.Expressions.ContainsLinuxFields(DuetControlServer.Commands.Code)
+  fullName: DuetControlServer.Model.Expressions.ContainsLinuxFields(DuetControlServer.Commands.Code)
   nameWithType: Expressions.ContainsLinuxFields(Code)
 - uid: DuetControlServer.Model.Expressions.ContainsLinuxFields*
   name: ContainsLinuxFields
@@ -12803,11 +12967,11 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Model.Expressions.ContainsLinuxFields
   nameWithType: Expressions.ContainsLinuxFields
-- uid: DuetControlServer.Model.Expressions.Evaluate(DuetAPI.Commands.Code,System.Boolean)
+- uid: DuetControlServer.Model.Expressions.Evaluate(DuetControlServer.Commands.Code,System.Boolean)
   name: Evaluate(Code, Boolean)
-  href: api/DuetControlServer.Model.Expressions.html#DuetControlServer_Model_Expressions_Evaluate_DuetAPI_Commands_Code_System_Boolean_
-  commentId: M:DuetControlServer.Model.Expressions.Evaluate(DuetAPI.Commands.Code,System.Boolean)
-  fullName: DuetControlServer.Model.Expressions.Evaluate(DuetAPI.Commands.Code, System.Boolean)
+  href: api/DuetControlServer.Model.Expressions.html#DuetControlServer_Model_Expressions_Evaluate_DuetControlServer_Commands_Code_System_Boolean_
+  commentId: M:DuetControlServer.Model.Expressions.Evaluate(DuetControlServer.Commands.Code,System.Boolean)
+  fullName: DuetControlServer.Model.Expressions.Evaluate(DuetControlServer.Commands.Code, System.Boolean)
   nameWithType: Expressions.Evaluate(Code, Boolean)
 - uid: DuetControlServer.Model.Expressions.Evaluate*
   name: Evaluate
@@ -13388,19 +13552,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Settings.FilamentFilters
   nameWithType: Settings.FilamentFilters
-- uid: DuetControlServer.Settings.FileInfoReadBufferSize
-  name: FileInfoReadBufferSize
-  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_FileInfoReadBufferSize
-  commentId: P:DuetControlServer.Settings.FileInfoReadBufferSize
-  fullName: DuetControlServer.Settings.FileInfoReadBufferSize
-  nameWithType: Settings.FileInfoReadBufferSize
-- uid: DuetControlServer.Settings.FileInfoReadBufferSize*
-  name: FileInfoReadBufferSize
-  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_FileInfoReadBufferSize_
-  commentId: Overload:DuetControlServer.Settings.FileInfoReadBufferSize
+- uid: DuetControlServer.Settings.FileBufferSize
+  name: FileBufferSize
+  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_FileBufferSize
+  commentId: P:DuetControlServer.Settings.FileBufferSize
+  fullName: DuetControlServer.Settings.FileBufferSize
+  nameWithType: Settings.FileBufferSize
+- uid: DuetControlServer.Settings.FileBufferSize*
+  name: FileBufferSize
+  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_FileBufferSize_
+  commentId: Overload:DuetControlServer.Settings.FileBufferSize
   isSpec: "True"
-  fullName: DuetControlServer.Settings.FileInfoReadBufferSize
-  nameWithType: Settings.FileInfoReadBufferSize
+  fullName: DuetControlServer.Settings.FileBufferSize
+  nameWithType: Settings.FileBufferSize
 - uid: DuetControlServer.Settings.FileInfoReadLimitFooter
   name: FileInfoReadLimitFooter
   href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_FileInfoReadLimitFooter
@@ -13729,19 +13893,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Settings.SpiPollDelay
   nameWithType: Settings.SpiPollDelay
-- uid: DuetControlServer.Settings.SpiPollDelaySimulating
-  name: SpiPollDelaySimulating
-  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SpiPollDelaySimulating
-  commentId: P:DuetControlServer.Settings.SpiPollDelaySimulating
-  fullName: DuetControlServer.Settings.SpiPollDelaySimulating
-  nameWithType: Settings.SpiPollDelaySimulating
-- uid: DuetControlServer.Settings.SpiPollDelaySimulating*
-  name: SpiPollDelaySimulating
-  href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SpiPollDelaySimulating_
-  commentId: Overload:DuetControlServer.Settings.SpiPollDelaySimulating
-  isSpec: "True"
-  fullName: DuetControlServer.Settings.SpiPollDelaySimulating
-  nameWithType: Settings.SpiPollDelaySimulating
 - uid: DuetControlServer.Settings.SpiTransferTimeout
   name: SpiTransferTimeout
   href: api/DuetControlServer.Settings.html#DuetControlServer_Settings_SpiTransferTimeout

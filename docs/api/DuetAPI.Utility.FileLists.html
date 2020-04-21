@@ -132,6 +132,9 @@
                             <a href="DuetAPI.Commands.CodeParameterConverter.html" title="CodeParameterConverter" class="">CodeParameterConverter</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Commands.CodeParserBuffer.html" title="CodeParserBuffer" class="">CodeParserBuffer</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Commands.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
                           </li>
                           <li class="">
@@ -334,6 +337,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.GpInputPort.html" title="GpInputPort" class="">GpInputPort</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.GpOutputPort.html" title="GpOutputPort" class="">GpOutputPort</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.HangprinterKinematics.html" title="HangprinterKinematics" class="">HangprinterKinematics</a>
@@ -711,10 +717,10 @@
                         
                         <ul class="nav level2">
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
+                            <a href="DuetControlServer.Files.CodeBlock.html" title="CodeBlock" class="">CodeBlock</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFileState.html" title="CodeFileState" class="">CodeFileState</a>
+                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Files.ConfigOverride.html" title="ConfigOverride" class="">ConfigOverride</a>
@@ -1088,13 +1094,13 @@
   <h3 id="methods">Methods
   </h3>
   <a id="DuetAPI_Utility_FileLists_GetFileList_" data-uid="DuetAPI.Utility.FileLists.GetFileList*"></a>
-  <h4 id="DuetAPI_Utility_FileLists_GetFileList_System_String_System_String_System_Int32_" data-uid="DuetAPI.Utility.FileLists.GetFileList(System.String,System.String,System.Int32)">GetFileList(String, String, Int32)</h4>
+  <h4 id="DuetAPI_Utility_FileLists_GetFileList_System_String_System_String_System_Int32_System_Int32_" data-uid="DuetAPI.Utility.FileLists.GetFileList(System.String,System.String,System.Int32,System.Int32)">GetFileList(String, String, Int32, Int32)</h4>
   <div class="markdown level1 summary"><p>Get a /rr_filelist or M20 files response</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static string GetFileList(string directory, string physicalDirectory, int startAt = -1)</code></pre>
+    <pre><code class="lang-csharp hljs">public static string GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1124,6 +1130,12 @@
         <td><p>First file index to return. Set startAt to -1 to omit error handling and the JSON object container</p>
 </td>
       </tr>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><span class="parametername">maxSize</span></td>
+        <td><p>Maximum size of the file list in bytes or -1 if unset</p>
+</td>
+      </tr>
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
@@ -1143,13 +1155,13 @@
     </tbody>
   </table>
   <a id="DuetAPI_Utility_FileLists_GetFiles_" data-uid="DuetAPI.Utility.FileLists.GetFiles*"></a>
-  <h4 id="DuetAPI_Utility_FileLists_GetFiles_System_String_System_String_System_Int32_System_Boolean_" data-uid="DuetAPI.Utility.FileLists.GetFiles(System.String,System.String,System.Int32,System.Boolean)">GetFiles(String, String, Int32, Boolean)</h4>
+  <h4 id="DuetAPI_Utility_FileLists_GetFiles_System_String_System_String_System_Int32_System_Boolean_System_Int32_" data-uid="DuetAPI.Utility.FileLists.GetFiles(System.String,System.String,System.Int32,System.Boolean,System.Int32)">GetFiles(String, String, Int32, Boolean, Int32)</h4>
   <div class="markdown level1 summary"><p>Get a /rr_files or M20 files response</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false)</code></pre>
+    <pre><code class="lang-csharp hljs">public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1183,6 +1195,12 @@
         <td><span class="xref">System.Boolean</span></td>
         <td><span class="parametername">flagDirs</span></td>
         <td><p>Prefix directories with an asterisk</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><span class="parametername">maxSize</span></td>
+        <td><p>Maximum size of the file list in bytes or -1 if unset</p>
 </td>
       </tr>
     </tbody>

@@ -132,6 +132,9 @@
                             <a href="DuetAPI.Commands.CodeParameterConverter.html" title="CodeParameterConverter" class="">CodeParameterConverter</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Commands.CodeParserBuffer.html" title="CodeParserBuffer" class="">CodeParserBuffer</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Commands.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
                           </li>
                           <li class="">
@@ -334,6 +337,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.GpInputPort.html" title="GpInputPort" class="">GpInputPort</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.GpOutputPort.html" title="GpOutputPort" class="">GpOutputPort</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.HangprinterKinematics.html" title="HangprinterKinematics" class="">HangprinterKinematics</a>
@@ -710,11 +716,11 @@
                       <a href="DuetControlServer.Files.html" title="DuetControlServer.Files" class="">DuetControlServer.Files</a>
                         
                         <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Files.CodeBlock.html" title="CodeBlock" class="">CodeBlock</a>
+                          </li>
                           <li class="active">
                             <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="active">CodeFile</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.Files.CodeFileState.html" title="CodeFileState" class="">CodeFileState</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Files.ConfigOverride.html" title="ConfigOverride" class="">ConfigOverride</a>
@@ -1087,7 +1093,7 @@
   <h6><strong>Assembly</strong>: DuetControlServer.dll</h6>
   <h5 id="DuetControlServer_Files_CodeFile_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public class CodeFile : IDisposable</code></pre>
+    <pre><code class="lang-csharp hljs">public sealed class CodeFile : IDisposable</code></pre>
   </div>
   <h3 id="constructors">Constructors
   </h3>
@@ -1126,30 +1132,6 @@
   </table>
   <h3 id="properties">Properties
   </h3>
-  <a id="DuetControlServer_Files_CodeFile_CancellationToken_" data-uid="DuetControlServer.Files.CodeFile.CancellationToken*"></a>
-  <h4 id="DuetControlServer_Files_CodeFile_CancellationToken" data-uid="DuetControlServer.Files.CodeFile.CancellationToken">CancellationToken</h4>
-  <div class="markdown level1 summary"><p>Cancellation token that is triggered when the file is cancelled/aborted</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public CancellationToken CancellationToken { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Threading.CancellationToken</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_Files_CodeFile_Channel_" data-uid="DuetControlServer.Files.CodeFile.Channel*"></a>
   <h4 id="DuetControlServer_Files_CodeFile_Channel" data-uid="DuetControlServer.Files.CodeFile.Channel">Channel</h4>
   <div class="markdown level1 summary"><p>Channel to send the codes to</p>
@@ -1198,14 +1180,14 @@
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_Files_CodeFile_IsAborted_" data-uid="DuetControlServer.Files.CodeFile.IsAborted*"></a>
-  <h4 id="DuetControlServer_Files_CodeFile_IsAborted" data-uid="DuetControlServer.Files.CodeFile.IsAborted">IsAborted</h4>
-  <div class="markdown level1 summary"><p>Indicates if this file is supposed to be aborted</p>
+  <a id="DuetControlServer_Files_CodeFile_IsClosed_" data-uid="DuetControlServer.Files.CodeFile.IsClosed*"></a>
+  <h4 id="DuetControlServer_Files_CodeFile_IsClosed" data-uid="DuetControlServer.Files.CodeFile.IsClosed">IsClosed</h4>
+  <div class="markdown level1 summary"><p>Indicates if this file is closed</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public bool IsAborted { get; }</code></pre>
+    <pre><code class="lang-csharp hljs">public bool IsClosed { get; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1222,14 +1204,14 @@
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_Files_CodeFile_IsFinished_" data-uid="DuetControlServer.Files.CodeFile.IsFinished*"></a>
-  <h4 id="DuetControlServer_Files_CodeFile_IsFinished" data-uid="DuetControlServer.Files.CodeFile.IsFinished">IsFinished</h4>
-  <div class="markdown level1 summary"><p>Indicates if the file has been finished</p>
+  <a id="DuetControlServer_Files_CodeFile_LastResult_" data-uid="DuetControlServer.Files.CodeFile.LastResult*"></a>
+  <h4 id="DuetControlServer_Files_CodeFile_LastResult" data-uid="DuetControlServer.Files.CodeFile.LastResult">LastResult</h4>
+  <div class="markdown level1 summary"><p>Result of the last G/M/T-code (0 = success, 1 = warning, 2 = error)</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public bool IsFinished { get; }</code></pre>
+    <pre><code class="lang-csharp hljs">public int LastResult { get; set; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1241,7 +1223,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="xref">System.Int32</span></td>
         <td></td>
       </tr>
     </tbody>
@@ -1320,23 +1302,14 @@
   </table>
   <h3 id="methods">Methods
   </h3>
-  <a id="DuetControlServer_Files_CodeFile_Abort_" data-uid="DuetControlServer.Files.CodeFile.Abort*"></a>
-  <h4 id="DuetControlServer_Files_CodeFile_Abort" data-uid="DuetControlServer.Files.CodeFile.Abort">Abort()</h4>
-  <div class="markdown level1 summary"><p>Request cancellation of this file</p>
+  <a id="DuetControlServer_Files_CodeFile_Close_" data-uid="DuetControlServer.Files.CodeFile.Close*"></a>
+  <h4 id="DuetControlServer_Files_CodeFile_Close" data-uid="DuetControlServer.Files.CodeFile.Close">Close()</h4>
+  <div class="markdown level1 summary"><p>Close this file</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public virtual void Abort()</code></pre>
-  </div>
-  <a id="DuetControlServer_Files_CodeFile_CancelPendingCodes_" data-uid="DuetControlServer.Files.CodeFile.CancelPendingCodes*"></a>
-  <h4 id="DuetControlServer_Files_CodeFile_CancelPendingCodes" data-uid="DuetControlServer.Files.CodeFile.CancelPendingCodes">CancelPendingCodes()</h4>
-  <div class="markdown level1 summary"><p>Cancel pending codes</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public void CancelPendingCodes()</code></pre>
+    <pre><code class="lang-csharp hljs">public void Close()</code></pre>
   </div>
   <a id="DuetControlServer_Files_CodeFile_Dispose_" data-uid="DuetControlServer.Files.CodeFile.Dispose*"></a>
   <h4 id="DuetControlServer_Files_CodeFile_Dispose" data-uid="DuetControlServer.Files.CodeFile.Dispose">Dispose()</h4>
@@ -1347,14 +1320,23 @@
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
-  <a id="DuetControlServer_Files_CodeFile_Dispose_" data-uid="DuetControlServer.Files.CodeFile.Dispose*"></a>
-  <h4 id="DuetControlServer_Files_CodeFile_Dispose_System_Boolean_" data-uid="DuetControlServer.Files.CodeFile.Dispose(System.Boolean)">Dispose(Boolean)</h4>
-  <div class="markdown level1 summary"><p>Dispose this instance internally</p>
+  <a id="DuetControlServer_Files_CodeFile_Finalize_" data-uid="DuetControlServer.Files.CodeFile.Finalize*"></a>
+  <h4 id="DuetControlServer_Files_CodeFile_Finalize" data-uid="DuetControlServer.Files.CodeFile.Finalize">Finalize()</h4>
+  <div class="markdown level1 summary"><p>Finalizer of a base file</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">protected virtual void Dispose(bool disposing)</code></pre>
+    <pre><code class="lang-csharp hljs">protected void Finalize()</code></pre>
+  </div>
+  <a id="DuetControlServer_Files_CodeFile_GetIterations_" data-uid="DuetControlServer.Files.CodeFile.GetIterations*"></a>
+  <h4 id="DuetControlServer_Files_CodeFile_GetIterations_DuetControlServer_Commands_Code_" data-uid="DuetControlServer.Files.CodeFile.GetIterations(DuetControlServer.Commands.Code)">GetIterations(Code)</h4>
+  <div class="markdown level1 summary"><p>Get the current number of iterations of the current loop</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int GetIterations(Code code)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1367,22 +1349,95 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
-        <td><span class="parametername">disposing</span></td>
-        <td><p>True if this instance is being disposed</p>
+        <td><a class="xref" href="DuetControlServer.Commands.Code.html">Code</a></td>
+        <td><span class="parametername">code</span></td>
+        <td><p>Code that requested the number of iterations</p>
 </td>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_Files_CodeFile_Finalize_" data-uid="DuetControlServer.Files.CodeFile.Finalize*"></a>
-  <h4 id="DuetControlServer_Files_CodeFile_Finalize" data-uid="DuetControlServer.Files.CodeFile.Finalize">Finalize()</h4>
-  <div class="markdown level1 summary"><p>Finalizer of a base file</p>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><p>Number of iterations</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.Commands.CodeParserException.html">CodeParserException</a></td>
+        <td><p>Query came outside a while loop</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_Files_CodeFile_Lock_" data-uid="DuetControlServer.Files.CodeFile.Lock*"></a>
+  <h4 id="DuetControlServer_Files_CodeFile_Lock" data-uid="DuetControlServer.Files.CodeFile.Lock">Lock()</h4>
+  <div class="markdown level1 summary"><p>Lock this instance</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">protected void Finalize()</code></pre>
+    <pre><code class="lang-csharp hljs">public IDisposable Lock()</code></pre>
   </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.IDisposable</span></td>
+        <td><p>Disposable lock</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_Files_CodeFile_LockAsync_" data-uid="DuetControlServer.Files.CodeFile.LockAsync*"></a>
+  <h4 id="DuetControlServer_Files_CodeFile_LockAsync" data-uid="DuetControlServer.Files.CodeFile.LockAsync">LockAsync()</h4>
+  <div class="markdown level1 summary"><p>Lock this instance asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public AwaitableDisposable&lt;IDisposable&gt; LockAsync()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">Nito.AsyncEx.AwaitableDisposable</span>&lt;<span class="xref">System.IDisposable</span>&gt;</td>
+        <td><p>Disposable lock</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_Files_CodeFile_ReadCodeAsync_" data-uid="DuetControlServer.Files.CodeFile.ReadCodeAsync*"></a>
   <h4 id="DuetControlServer_Files_CodeFile_ReadCodeAsync" data-uid="DuetControlServer.Files.CodeFile.ReadCodeAsync">ReadCodeAsync()</h4>
   <div class="markdown level1 summary"><p>Read the next available code and interpret conditional codes except for echo</p>
@@ -1408,6 +1463,9 @@
       </tr>
     </tbody>
   </table>
+  <h5 id="DuetControlServer_Files_CodeFile_ReadCodeAsync_remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>This instance must NOT be locked when this is called</p>
+</div>
   <h5 class="exceptions">Exceptions</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
@@ -1420,6 +1478,11 @@
       <tr>
         <td><a class="xref" href="DuetAPI.Commands.CodeParserException.html">CodeParserException</a></td>
         <td><p>Failed to read the next code</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Failed to flush the pending codes</p>
 </td>
       </tr>
     </tbody>

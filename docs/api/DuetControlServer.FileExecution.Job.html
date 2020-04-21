@@ -132,6 +132,9 @@
                             <a href="DuetAPI.Commands.CodeParameterConverter.html" title="CodeParameterConverter" class="">CodeParameterConverter</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Commands.CodeParserBuffer.html" title="CodeParserBuffer" class="">CodeParserBuffer</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Commands.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
                           </li>
                           <li class="">
@@ -334,6 +337,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.GpInputPort.html" title="GpInputPort" class="">GpInputPort</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.GpOutputPort.html" title="GpOutputPort" class="">GpOutputPort</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.HangprinterKinematics.html" title="HangprinterKinematics" class="">HangprinterKinematics</a>
@@ -711,10 +717,10 @@
                         
                         <ul class="nav level2">
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
+                            <a href="DuetControlServer.Files.CodeBlock.html" title="CodeBlock" class="">CodeBlock</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFileState.html" title="CodeFileState" class="">CodeFileState</a>
+                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Files.ConfigOverride.html" title="ConfigOverride" class="">ConfigOverride</a>
@@ -1114,14 +1120,14 @@
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_FileExecution_Job_FilePosition_" data-uid="DuetControlServer.FileExecution.Job.FilePosition*"></a>
-  <h4 id="DuetControlServer_FileExecution_Job_FilePosition" data-uid="DuetControlServer.FileExecution.Job.FilePosition">FilePosition</h4>
-  <div class="markdown level1 summary"><p>Reports the current file position</p>
+  <a id="DuetControlServer_FileExecution_Job_IsAborted_" data-uid="DuetControlServer.FileExecution.Job.IsAborted*"></a>
+  <h4 id="DuetControlServer_FileExecution_Job_IsAborted" data-uid="DuetControlServer.FileExecution.Job.IsAborted">IsAborted</h4>
+  <div class="markdown level1 summary"><p>Indicates if the file print has been aborted</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static long FilePosition { get; set; }</code></pre>
+    <pre><code class="lang-csharp hljs">public static bool IsAborted { get; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1133,19 +1139,19 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Int64</span></td>
+        <td><span class="xref">System.Boolean</span></td>
         <td></td>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_FileExecution_Job_IsAborted_" data-uid="DuetControlServer.FileExecution.Job.IsAborted*"></a>
-  <h4 id="DuetControlServer_FileExecution_Job_IsAborted" data-uid="DuetControlServer.FileExecution.Job.IsAborted">IsAborted</h4>
-  <div class="markdown level1 summary"><p>Indicates if the file print has been aborted</p>
+  <a id="DuetControlServer_FileExecution_Job_IsCancelled_" data-uid="DuetControlServer.FileExecution.Job.IsCancelled*"></a>
+  <h4 id="DuetControlServer_FileExecution_Job_IsCancelled" data-uid="DuetControlServer.FileExecution.Job.IsCancelled">IsCancelled</h4>
+  <div class="markdown level1 summary"><p>Indicates if the file print has been cancelled</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static bool IsAborted { get; }</code></pre>
+    <pre><code class="lang-csharp hljs">public static bool IsCancelled { get; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1258,6 +1264,9 @@
       </tr>
     </tbody>
   </table>
+  <h5 id="DuetControlServer_FileExecution_Job_IsSimulating_remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>This is volatile to allow fast access without locking the class first</p>
+</div>
   <h3 id="methods">Methods
   </h3>
   <a id="DuetControlServer_FileExecution_Job_Abort_" data-uid="DuetControlServer.FileExecution.Job.Abort*"></a>
@@ -1267,8 +1276,24 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void Abort()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task Abort()</code></pre>
   </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_FileExecution_Job_Cancel_" data-uid="DuetControlServer.FileExecution.Job.Cancel*"></a>
   <h4 id="DuetControlServer_FileExecution_Job_Cancel" data-uid="DuetControlServer.FileExecution.Job.Cancel">Cancel()</h4>
   <div class="markdown level1 summary"><p>Cancel the current print (e.g. when M0 is called)</p>
@@ -1276,8 +1301,24 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void Cancel()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task Cancel()</code></pre>
   </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_FileExecution_Job_Diagnostics_" data-uid="DuetControlServer.FileExecution.Job.Diagnostics*"></a>
   <h4 id="DuetControlServer_FileExecution_Job_Diagnostics_System_Text_StringBuilder_" data-uid="DuetControlServer.FileExecution.Job.Diagnostics(System.Text.StringBuilder)">Diagnostics(StringBuilder)</h4>
   <div class="markdown level1 summary"><p>Print diagnostics of this class</p>
@@ -1317,6 +1358,31 @@
       <tr>
         <td><span class="xref">System.Threading.Tasks.Task</span></td>
         <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_FileExecution_Job_GetFilePosition_" data-uid="DuetControlServer.FileExecution.Job.GetFilePosition*"></a>
+  <h4 id="DuetControlServer_FileExecution_Job_GetFilePosition" data-uid="DuetControlServer.FileExecution.Job.GetFilePosition">GetFilePosition()</h4>
+  <div class="markdown level1 summary"><p>Get the current file position</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task&lt;long&gt; GetFilePosition()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Int64</span>&gt;</td>
+        <td><p>File position</p>
 </td>
       </tr>
     </tbody>
@@ -1489,6 +1555,49 @@
   <h5 id="DuetControlServer_FileExecution_Job_SelectFile_System_String_System_Boolean__remarks">Remarks</h5>
   <div class="markdown level1 remarks"><p>This class has to be locked when this method is called</p>
 </div>
+  <a id="DuetControlServer_FileExecution_Job_SetFilePosition_" data-uid="DuetControlServer.FileExecution.Job.SetFilePosition*"></a>
+  <h4 id="DuetControlServer_FileExecution_Job_SetFilePosition_System_Int64_" data-uid="DuetControlServer.FileExecution.Job.SetFilePosition(System.Int64)">SetFilePosition(Int64)</h4>
+  <div class="markdown level1 summary"><p>Set the current file position</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task SetFilePosition(long filePosition)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int64</span></td>
+        <td><span class="parametername">filePosition</span></td>
+        <td><p>New file position</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>File position</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
 </article>
           </div>
           

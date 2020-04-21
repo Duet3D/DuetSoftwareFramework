@@ -132,6 +132,9 @@
                             <a href="DuetAPI.Commands.CodeParameterConverter.html" title="CodeParameterConverter" class="">CodeParameterConverter</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Commands.CodeParserBuffer.html" title="CodeParserBuffer" class="">CodeParserBuffer</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Commands.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
                           </li>
                           <li class="">
@@ -334,6 +337,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.GpInputPort.html" title="GpInputPort" class="">GpInputPort</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.GpOutputPort.html" title="GpOutputPort" class="">GpOutputPort</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.HangprinterKinematics.html" title="HangprinterKinematics" class="">HangprinterKinematics</a>
@@ -711,10 +717,10 @@
                         
                         <ul class="nav level2">
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
+                            <a href="DuetControlServer.Files.CodeBlock.html" title="CodeBlock" class="">CodeBlock</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFileState.html" title="CodeFileState" class="">CodeFileState</a>
+                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Files.ConfigOverride.html" title="ConfigOverride" class="">ConfigOverride</a>
@@ -1233,14 +1239,14 @@ public static string ConfigFilename { get; set; }</code></pre>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_Settings_FileInfoReadBufferSize_" data-uid="DuetControlServer.Settings.FileInfoReadBufferSize*"></a>
-  <h4 id="DuetControlServer_Settings_FileInfoReadBufferSize" data-uid="DuetControlServer.Settings.FileInfoReadBufferSize">FileInfoReadBufferSize</h4>
-  <div class="markdown level1 summary"><p>Size of the read buffer used for file parsing in bytes</p>
+  <a id="DuetControlServer_Settings_FileBufferSize_" data-uid="DuetControlServer.Settings.FileBufferSize*"></a>
+  <h4 id="DuetControlServer_Settings_FileBufferSize" data-uid="DuetControlServer.Settings.FileBufferSize">FileBufferSize</h4>
+  <div class="markdown level1 summary"><p>Size of the read buffer used when reading from files (in bytes)</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int FileInfoReadBufferSize { get; set; }</code></pre>
+    <pre><code class="lang-csharp hljs">public static int FileBufferSize { get; set; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1826,30 +1832,6 @@ public static bool NoSpiTask { get; set; }</code></pre>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static int SpiPollDelay { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_Settings_SpiPollDelaySimulating_" data-uid="DuetControlServer.Settings.SpiPollDelaySimulating*"></a>
-  <h4 id="DuetControlServer_Settings_SpiPollDelaySimulating" data-uid="DuetControlServer.Settings.SpiPollDelaySimulating">SpiPollDelaySimulating</h4>
-  <div class="markdown level1 summary"><p>Time to wait after every full transfer when simulating a file (in ms)</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static int SpiPollDelaySimulating { get; set; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">

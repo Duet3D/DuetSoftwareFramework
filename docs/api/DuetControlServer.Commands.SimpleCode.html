@@ -132,6 +132,9 @@
                             <a href="DuetAPI.Commands.CodeParameterConverter.html" title="CodeParameterConverter" class="">CodeParameterConverter</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Commands.CodeParserBuffer.html" title="CodeParserBuffer" class="">CodeParserBuffer</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Commands.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
                           </li>
                           <li class="">
@@ -334,6 +337,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.GpInputPort.html" title="GpInputPort" class="">GpInputPort</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.GpOutputPort.html" title="GpOutputPort" class="">GpOutputPort</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.HangprinterKinematics.html" title="HangprinterKinematics" class="">HangprinterKinematics</a>
@@ -711,10 +717,10 @@
                         
                         <ul class="nav level2">
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
+                            <a href="DuetControlServer.Files.CodeBlock.html" title="CodeBlock" class="">CodeBlock</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFileState.html" title="CodeFileState" class="">CodeFileState</a>
+                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Files.ConfigOverride.html" title="ConfigOverride" class="">ConfigOverride</a>
@@ -1171,23 +1177,14 @@
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_Commands_SimpleCode_Init_" data-uid="DuetControlServer.Commands.SimpleCode.Init*"></a>
-  <h4 id="DuetControlServer_Commands_SimpleCode_Init" data-uid="DuetControlServer.Commands.SimpleCode.Init">Init()</h4>
-  <div class="markdown level1 summary"><p>Initialize this class</p>
+  <a id="DuetControlServer_Commands_SimpleCode_ParseAsync_" data-uid="DuetControlServer.Commands.SimpleCode.ParseAsync*"></a>
+  <h4 id="DuetControlServer_Commands_SimpleCode_ParseAsync" data-uid="DuetControlServer.Commands.SimpleCode.ParseAsync">ParseAsync()</h4>
+  <div class="markdown level1 summary"><p>Parse codes from the given input string asynchronously</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void Init()</code></pre>
-  </div>
-  <a id="DuetControlServer_Commands_SimpleCode_Parse_" data-uid="DuetControlServer.Commands.SimpleCode.Parse*"></a>
-  <h4 id="DuetControlServer_Commands_SimpleCode_Parse" data-uid="DuetControlServer.Commands.SimpleCode.Parse">Parse()</h4>
-  <div class="markdown level1 summary"><p>Parse codes from the given input string</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public IEnumerable&lt;Code&gt; Parse()</code></pre>
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;Code&gt; ParseAsync()</code></pre>
   </div>
   <h5 class="returns">Returns</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1199,7 +1196,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Collections.Generic.IEnumerable</span>&lt;<a class="xref" href="DuetControlServer.Commands.Code.html">Code</a>&gt;</td>
+        <td><span class="xref">System.Collections.Generic.IAsyncEnumerable</span>&lt;<a class="xref" href="DuetControlServer.Commands.Code.html">Code</a>&gt;</td>
         <td><p>Parsed G/M/T-codes</p>
 </td>
       </tr>

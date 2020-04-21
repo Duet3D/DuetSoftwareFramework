@@ -132,6 +132,9 @@
                             <a href="DuetAPI.Commands.CodeParameterConverter.html" title="CodeParameterConverter" class="">CodeParameterConverter</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Commands.CodeParserBuffer.html" title="CodeParserBuffer" class="">CodeParserBuffer</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Commands.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
                           </li>
                           <li class="">
@@ -334,6 +337,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.GpInputPort.html" title="GpInputPort" class="">GpInputPort</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.GpOutputPort.html" title="GpOutputPort" class="">GpOutputPort</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.HangprinterKinematics.html" title="HangprinterKinematics" class="">HangprinterKinematics</a>
@@ -711,10 +717,10 @@
                         
                         <ul class="nav level2">
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
+                            <a href="DuetControlServer.Files.CodeBlock.html" title="CodeBlock" class="">CodeBlock</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFileState.html" title="CodeFileState" class="">CodeFileState</a>
+                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Files.ConfigOverride.html" title="ConfigOverride" class="">ConfigOverride</a>
@@ -1106,7 +1112,7 @@
       <a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Parameters">Code.Parameters</a>
     </div>
     <div>
-      <a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Reset_System_Boolean_">Code.Reset(Boolean)</a>
+      <a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Reset">Code.Reset()</a>
     </div>
     <div>
       <a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Parameter_System_Char_">Code.Parameter(Char)</a>
@@ -1124,10 +1130,13 @@
       <a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_ToShortString">Code.ToShortString()</a>
     </div>
     <div>
-      <a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Parse_System_IO_TextReader_DuetAPI_Commands_Code_System_Boolean__">Code.Parse(TextReader, Code, Boolean)</a>
+      <a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_Parse_System_IO_TextReader_DuetAPI_Commands_Code_">Code.Parse(TextReader, Code)</a>
     </div>
     <div>
       <a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_ConvertDriverIds">Code.ConvertDriverIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_ParseAsync_System_IO_StreamReader_DuetAPI_Commands_Code_DuetAPI_Commands_CodeParserBuffer_">Code.ParseAsync(StreamReader, Code, CodeParserBuffer)</a>
     </div>
     <div>
       <a class="xref" href="DuetAPI.Commands.Command-1.html#DuetAPI_Commands_Command_1_Invoke">Command&lt;CodeResult&gt;.Invoke()</a>
@@ -1199,6 +1208,29 @@
   </table>
   <h3 id="fields">Fields
   </h3>
+  <h4 id="DuetControlServer_Commands_Code_File" data-uid="DuetControlServer.Commands.Code.File">File</h4>
+  <div class="markdown level1 summary"><p>File that started this code</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public CodeFile File</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetControlServer.Files.CodeFile.html">CodeFile</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h4 id="DuetControlServer_Commands_Code_FileLocks" data-uid="DuetControlServer.Commands.Code.FileLocks">FileLocks</h4>
   <div class="markdown level1 summary"><p>Lock around the files being written</p>
 </div>
@@ -1264,6 +1296,29 @@
     <tbody>
       <tr>
         <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 id="DuetControlServer_Commands_Code_Macro" data-uid="DuetControlServer.Commands.Code.Macro">Macro</h4>
+  <div class="markdown level1 summary"><p>Macro that started this code or null</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Macro Macro</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetControlServer.FileExecution.Macro.html">Macro</a></td>
         <td></td>
       </tr>
     </tbody>
@@ -1366,30 +1421,6 @@ FIXME Remove this again when the SBC interface has got its own task in RRF</p>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_Commands_Code_Macro_" data-uid="DuetControlServer.Commands.Code.Macro*"></a>
-  <h4 id="DuetControlServer_Commands_Code_Macro" data-uid="DuetControlServer.Commands.Code.Macro">Macro</h4>
-  <div class="markdown level1 summary"><p>Macro file that started this code</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Macro Macro { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="DuetControlServer.FileExecution.Macro.html">Macro</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <h3 id="methods">Methods
   </h3>
   <a id="DuetControlServer_Commands_Code_CancelPending_" data-uid="DuetControlServer.Commands.Code.CancelPending*"></a>
@@ -1487,15 +1518,6 @@ FIXME Remove this again when the SBC interface has got its own task in RRF</p>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_Commands_Code_Init_" data-uid="DuetControlServer.Commands.Code.Init*"></a>
-  <h4 id="DuetControlServer_Commands_Code_Init" data-uid="DuetControlServer.Commands.Code.Init">Init()</h4>
-  <div class="markdown level1 summary"><p>Initialize the code scheduler</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void Init()</code></pre>
-  </div>
 </article>
           </div>
           

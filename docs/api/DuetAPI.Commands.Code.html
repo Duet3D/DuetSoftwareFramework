@@ -132,6 +132,9 @@
                             <a href="DuetAPI.Commands.CodeParameterConverter.html" title="CodeParameterConverter" class="">CodeParameterConverter</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Commands.CodeParserBuffer.html" title="CodeParserBuffer" class="">CodeParserBuffer</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Commands.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
                           </li>
                           <li class="">
@@ -334,6 +337,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.GpInputPort.html" title="GpInputPort" class="">GpInputPort</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.GpOutputPort.html" title="GpOutputPort" class="">GpOutputPort</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.HangprinterKinematics.html" title="HangprinterKinematics" class="">HangprinterKinematics</a>
@@ -711,10 +717,10 @@
                         
                         <ul class="nav level2">
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
+                            <a href="DuetControlServer.Files.CodeBlock.html" title="CodeBlock" class="">CodeBlock</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Files.CodeFileState.html" title="CodeFileState" class="">CodeFileState</a>
+                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Files.ConfigOverride.html" title="ConfigOverride" class="">ConfigOverride</a>
@@ -1127,7 +1133,7 @@
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">code</span></td>
-        <td><p>G/M/T-Code</p>
+        <td><p>UTF8-encoded G/M/T-Code</p>
 </td>
       </tr>
     </tbody>
@@ -1670,13 +1676,13 @@ retrieve the parameter which does not have a letter assigned</p>
     </tbody>
   </table>
   <a id="DuetAPI_Commands_Code_Parse_" data-uid="DuetAPI.Commands.Code.Parse*"></a>
-  <h4 id="DuetAPI_Commands_Code_Parse_System_IO_TextReader_DuetAPI_Commands_Code_System_Boolean__" data-uid="DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code,System.Boolean@)">Parse(TextReader, Code, ref Boolean)</h4>
+  <h4 id="DuetAPI_Commands_Code_Parse_System_IO_TextReader_DuetAPI_Commands_Code_" data-uid="DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code)">Parse(TextReader, Code)</h4>
   <div class="markdown level1 summary"><p>Parse the next available G/M/T-code from the given stream</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static bool Parse(TextReader reader, Code result, ref bool seenNewLine)</code></pre>
+    <pre><code class="lang-csharp hljs">public static bool Parse(TextReader reader, Code result)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1698,12 +1704,6 @@ retrieve the parameter which does not have a letter assigned</p>
         <td><a class="xref" href="DuetAPI.Commands.Code.html">Code</a></td>
         <td><span class="parametername">result</span></td>
         <td><p>Code to fill</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Boolean</span></td>
-        <td><span class="parametername">seenNewLine</span></td>
-        <td><p>If this is the first code or a NL character has been parsed</p>
 </td>
       </tr>
     </tbody>
@@ -1740,14 +1740,14 @@ retrieve the parameter which does not have a letter assigned</p>
       </tr>
     </tbody>
   </table>
-  <a id="DuetAPI_Commands_Code_Reset_" data-uid="DuetAPI.Commands.Code.Reset*"></a>
-  <h4 id="DuetAPI_Commands_Code_Reset_System_Boolean_" data-uid="DuetAPI.Commands.Code.Reset(System.Boolean)">Reset(Boolean)</h4>
-  <div class="markdown level1 summary"><p>Reset this instance</p>
+  <a id="DuetAPI_Commands_Code_ParseAsync_" data-uid="DuetAPI.Commands.Code.ParseAsync*"></a>
+  <h4 id="DuetAPI_Commands_Code_ParseAsync_System_IO_StreamReader_DuetAPI_Commands_Code_DuetAPI_Commands_CodeParserBuffer_" data-uid="DuetAPI.Commands.Code.ParseAsync(System.IO.StreamReader,DuetAPI.Commands.Code,DuetAPI.Commands.CodeParserBuffer)">ParseAsync(StreamReader, Code, CodeParserBuffer)</h4>
+  <div class="markdown level1 summary"><p>Parse the next available G/M/T-code from the given stream asynchronously</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public void Reset(bool keepLineNumber)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; ParseAsync(StreamReader reader, Code result, CodeParserBuffer buffer)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1760,13 +1760,66 @@ retrieve the parameter which does not have a letter assigned</p>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
-        <td><span class="parametername">keepLineNumber</span></td>
-        <td><p>Keep the line number</p>
+        <td><span class="xref">System.IO.StreamReader</span></td>
+        <td><span class="parametername">reader</span></td>
+        <td><p>Input to read from</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetAPI.Commands.Code.html">Code</a></td>
+        <td><span class="parametername">result</span></td>
+        <td><p>Code to fill</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetAPI.Commands.CodeParserBuffer.html">CodeParserBuffer</a></td>
+        <td><span class="parametername">buffer</span></td>
+        <td><p>Internal buffer for parsing codes</p>
 </td>
       </tr>
     </tbody>
   </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
+        <td><p>Whether anything could be read</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.Commands.CodeParserException.html">CodeParserException</a></td>
+        <td><p>Thrown if the code contains errors like unterminated strings or unterminated comments</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetAPI_Commands_Code_Reset_" data-uid="DuetAPI.Commands.Code.Reset*"></a>
+  <h4 id="DuetAPI_Commands_Code_Reset" data-uid="DuetAPI.Commands.Code.Reset">Reset()</h4>
+  <div class="markdown level1 summary"><p>Reset this instance</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Reset()</code></pre>
+  </div>
   <a id="DuetAPI_Commands_Code_ToShortString_" data-uid="DuetAPI.Commands.Code.ToShortString*"></a>
   <h4 id="DuetAPI_Commands_Code_ToShortString" data-uid="DuetAPI.Commands.Code.ToShortString">ToShortString()</h4>
   <div class="markdown level1 summary"><p>Convert only the command portion to a text-based G/M/T-code (e.g. G28)</p>

@@ -196,7 +196,7 @@
             <summary>
             Create a new Code instance and attempt to parse the given code string
             </summary>
-            <param name="code">G/M/T-Code</param>
+            <param name="code">UTF8-encoded G/M/T-Code</param>
         </member>
         <member name="P:DuetAPI.Commands.Code.SourceConnection">
             <summary>
@@ -282,11 +282,10 @@
             </summary>
             <seealso cref="T:DuetAPI.Commands.CodeParameter"/>
         </member>
-        <member name="M:DuetAPI.Commands.Code.Reset(System.Boolean)">
+        <member name="M:DuetAPI.Commands.Code.Reset">
             <summary>
             Reset this instance
             </summary>
-            <param name="keepLineNumber">Keep the line number</param>
         </member>
         <member name="M:DuetAPI.Commands.Code.Parameter(System.Char)">
             <summary>
@@ -329,13 +328,12 @@
             </summary>
             <returns></returns>
         </member>
-        <member name="M:DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code,System.Boolean@)">
+        <member name="M:DuetAPI.Commands.Code.Parse(System.IO.TextReader,DuetAPI.Commands.Code)">
             <summary>
             Parse the next available G/M/T-code from the given stream
             </summary>
             <param name="reader">Input to read from</param>
             <param name="result">Code to fill</param>
-            <param name="seenNewLine">If this is the first code or a NL character has been parsed</param>
             <returns>Whether anything could be read</returns>
             <exception cref="T:DuetAPI.Commands.CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
         </member>
@@ -360,6 +358,16 @@
             Convert a given parameter to driver id(s)
             </summary>
             <exception cref="T:DuetAPI.Commands.CodeParserException">Driver ID could not be parsed</exception>
+        </member>
+        <member name="M:DuetAPI.Commands.Code.ParseAsync(System.IO.StreamReader,DuetAPI.Commands.Code,DuetAPI.Commands.CodeParserBuffer)">
+            <summary>
+            Parse the next available G/M/T-code from the given stream asynchronously
+            </summary>
+            <param name="reader">Input to read from</param>
+            <param name="result">Code to fill</param>
+            <param name="buffer">Internal buffer for parsing codes</param>
+            <returns>Whether anything could be read</returns>
+            <exception cref="T:DuetAPI.Commands.CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
         </member>
         <member name="T:DuetAPI.Commands.KeywordType">
             <summary>
@@ -708,6 +716,70 @@
             <param name="writer">JSON writer</param>
             <param name="value">Value to serialize</param>
             <param name="options">Write options</param>
+        </member>
+        <member name="T:DuetAPI.Commands.CodeParserBuffer">
+            <summary>
+            Internal buffer for reading asynchronously from files
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParserBuffer.#ctor(System.Int32,System.Boolean)">
+            <summary>
+            Default constructor of this class
+            </summary>
+            <param name="bufferSize">How many bytes to buffer when reading from a file</param>
+            <param name="lineNumbersValid">Indicates if line numbers are valid</param>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeParserBuffer.SeenNewLine">
+            <summary>
+            Indicates if the last 
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeParserBuffer.Indent">
+            <summary>
+            Last indentation level
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeParserBuffer.EnforcingAbsolutePosition">
+            <summary>
+            Whether the line started with G53
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeParserBuffer.Buffer">
+            <summary>
+            Internal buffer
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeParserBuffer.BufferPointer">
+            <summary>
+            Pointer in the buffer
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeParserBuffer.BufferSize">
+            <summary>
+            How many bytes are available for reading
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParserBuffer.InvalidateData">
+            <summary>
+            Invalidate the buffer internally
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Commands.CodeParserBuffer.LineNumber">
+            <summary>
+            Current line number
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParserBuffer.Invalidate">
+            <summary>
+            Invalidate the buffer
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParserBuffer.GetPosition(System.IO.StreamReader)">
+            <summary>
+            Get the actual byte position when reading from a stream
+            </summary>
+            <param name="reader">Reader to read from</param>
+            <returns>Actual position in bytes</returns>
         </member>
         <member name="T:DuetAPI.Commands.CodeParserException">
             <summary>
@@ -4250,6 +4322,11 @@
         <member name="T:DuetAPI.Machine.RotatingMagnetFilamentMonitor">
             <summary>
             Information about a rotating magnet filament monitor
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Machine.RotatingMagnetFilamentMonitor.#ctor">
+            <summary>
+            Constructor of this class
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.RotatingMagnetFilamentMonitor.Calibrated">
