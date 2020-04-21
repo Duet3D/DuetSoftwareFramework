@@ -2559,6 +2559,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Axis.MaxProbed
   nameWithType: Axis.MaxProbed
+- uid: DuetAPI.Machine.Axis.Microstepping
+  name: Microstepping
+  href: api/DuetAPI.Machine.Axis.html#DuetAPI_Machine_Axis_Microstepping
+  commentId: P:DuetAPI.Machine.Axis.Microstepping
+  fullName: DuetAPI.Machine.Axis.Microstepping
+  nameWithType: Axis.Microstepping
+- uid: DuetAPI.Machine.Axis.Microstepping*
+  name: Microstepping
+  href: api/DuetAPI.Machine.Axis.html#DuetAPI_Machine_Axis_Microstepping_
+  commentId: Overload:DuetAPI.Machine.Axis.Microstepping
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Axis.Microstepping
+  nameWithType: Axis.Microstepping
 - uid: DuetAPI.Machine.Axis.Min
   name: Min
   href: api/DuetAPI.Machine.Axis.html#DuetAPI_Machine_Axis_Min
@@ -2598,6 +2611,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Axis.Speed
   nameWithType: Axis.Speed
+- uid: DuetAPI.Machine.Axis.StepsPerMm
+  name: StepsPerMm
+  href: api/DuetAPI.Machine.Axis.html#DuetAPI_Machine_Axis_StepsPerMm
+  commentId: P:DuetAPI.Machine.Axis.StepsPerMm
+  fullName: DuetAPI.Machine.Axis.StepsPerMm
+  nameWithType: Axis.StepsPerMm
+- uid: DuetAPI.Machine.Axis.StepsPerMm*
+  name: StepsPerMm
+  href: api/DuetAPI.Machine.Axis.html#DuetAPI_Machine_Axis_StepsPerMm_
+  commentId: Overload:DuetAPI.Machine.Axis.StepsPerMm
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Axis.StepsPerMm
+  nameWithType: Axis.StepsPerMm
 - uid: DuetAPI.Machine.Axis.UserPosition
   name: UserPosition
   href: api/DuetAPI.Machine.Axis.html#DuetAPI_Machine_Axis_UserPosition
@@ -3643,6 +3669,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Extruder.Jerk
   nameWithType: Extruder.Jerk
+- uid: DuetAPI.Machine.Extruder.Microstepping
+  name: Microstepping
+  href: api/DuetAPI.Machine.Extruder.html#DuetAPI_Machine_Extruder_Microstepping
+  commentId: P:DuetAPI.Machine.Extruder.Microstepping
+  fullName: DuetAPI.Machine.Extruder.Microstepping
+  nameWithType: Extruder.Microstepping
+- uid: DuetAPI.Machine.Extruder.Microstepping*
+  name: Microstepping
+  href: api/DuetAPI.Machine.Extruder.html#DuetAPI_Machine_Extruder_Microstepping_
+  commentId: Overload:DuetAPI.Machine.Extruder.Microstepping
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Extruder.Microstepping
+  nameWithType: Extruder.Microstepping
 - uid: DuetAPI.Machine.Extruder.Nonlinear
   name: Nonlinear
   href: api/DuetAPI.Machine.Extruder.html#DuetAPI_Machine_Extruder_Nonlinear
@@ -3708,6 +3747,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Extruder.Speed
   nameWithType: Extruder.Speed
+- uid: DuetAPI.Machine.Extruder.StepsPerMm
+  name: StepsPerMm
+  href: api/DuetAPI.Machine.Extruder.html#DuetAPI_Machine_Extruder_StepsPerMm
+  commentId: P:DuetAPI.Machine.Extruder.StepsPerMm
+  fullName: DuetAPI.Machine.Extruder.StepsPerMm
+  nameWithType: Extruder.StepsPerMm
+- uid: DuetAPI.Machine.Extruder.StepsPerMm*
+  name: StepsPerMm
+  href: api/DuetAPI.Machine.Extruder.html#DuetAPI_Machine_Extruder_StepsPerMm_
+  commentId: Overload:DuetAPI.Machine.Extruder.StepsPerMm
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Extruder.StepsPerMm
+  nameWithType: Extruder.StepsPerMm
 - uid: DuetAPI.Machine.ExtruderNonlinear
   name: ExtruderNonlinear
   href: api/DuetAPI.Machine.ExtruderNonlinear.html
@@ -3966,19 +4018,6 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.FilamentMonitor.Type
   nameWithType: FilamentMonitor.Type
-- uid: DuetAPI.Machine.FilamentMonitor.UpdateFromJson(System.Text.Json.JsonElement)
-  name: UpdateFromJson(JsonElement)
-  href: api/DuetAPI.Machine.FilamentMonitor.html#DuetAPI_Machine_FilamentMonitor_UpdateFromJson_System_Text_Json_JsonElement_
-  commentId: M:DuetAPI.Machine.FilamentMonitor.UpdateFromJson(System.Text.Json.JsonElement)
-  fullName: DuetAPI.Machine.FilamentMonitor.UpdateFromJson(System.Text.Json.JsonElement)
-  nameWithType: FilamentMonitor.UpdateFromJson(JsonElement)
-- uid: DuetAPI.Machine.FilamentMonitor.UpdateFromJson*
-  name: UpdateFromJson
-  href: api/DuetAPI.Machine.FilamentMonitor.html#DuetAPI_Machine_FilamentMonitor_UpdateFromJson_
-  commentId: Overload:DuetAPI.Machine.FilamentMonitor.UpdateFromJson
-  isSpec: "True"
-  fullName: DuetAPI.Machine.FilamentMonitor.UpdateFromJson
-  nameWithType: FilamentMonitor.UpdateFromJson
 - uid: DuetAPI.Machine.FilamentMonitorType
   name: FilamentMonitorType
   href: api/DuetAPI.Machine.FilamentMonitorType.html
@@ -5378,19 +5417,6 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Kinematics.Name
   nameWithType: Kinematics.Name
-- uid: DuetAPI.Machine.Kinematics.UpdateFromJson(System.Text.Json.JsonElement)
-  name: UpdateFromJson(JsonElement)
-  href: api/DuetAPI.Machine.Kinematics.html#DuetAPI_Machine_Kinematics_UpdateFromJson_System_Text_Json_JsonElement_
-  commentId: M:DuetAPI.Machine.Kinematics.UpdateFromJson(System.Text.Json.JsonElement)
-  fullName: DuetAPI.Machine.Kinematics.UpdateFromJson(System.Text.Json.JsonElement)
-  nameWithType: Kinematics.UpdateFromJson(JsonElement)
-- uid: DuetAPI.Machine.Kinematics.UpdateFromJson*
-  name: UpdateFromJson
-  href: api/DuetAPI.Machine.Kinematics.html#DuetAPI_Machine_Kinematics_UpdateFromJson_
-  commentId: Overload:DuetAPI.Machine.Kinematics.UpdateFromJson
-  isSpec: "True"
-  fullName: DuetAPI.Machine.Kinematics.UpdateFromJson
-  nameWithType: Kinematics.UpdateFromJson
 - uid: DuetAPI.Machine.KinematicsName
   name: KinematicsName
   href: api/DuetAPI.Machine.KinematicsName.html
@@ -6617,6 +6643,38 @@ references:
   commentId: F:DuetAPI.Machine.MessageType.Warning
   fullName: DuetAPI.Machine.MessageType.Warning
   nameWithType: MessageType.Warning
+- uid: DuetAPI.Machine.Microstepping
+  name: Microstepping
+  href: api/DuetAPI.Machine.Microstepping.html
+  commentId: T:DuetAPI.Machine.Microstepping
+  fullName: DuetAPI.Machine.Microstepping
+  nameWithType: Microstepping
+- uid: DuetAPI.Machine.Microstepping.Interpolated
+  name: Interpolated
+  href: api/DuetAPI.Machine.Microstepping.html#DuetAPI_Machine_Microstepping_Interpolated
+  commentId: P:DuetAPI.Machine.Microstepping.Interpolated
+  fullName: DuetAPI.Machine.Microstepping.Interpolated
+  nameWithType: Microstepping.Interpolated
+- uid: DuetAPI.Machine.Microstepping.Interpolated*
+  name: Interpolated
+  href: api/DuetAPI.Machine.Microstepping.html#DuetAPI_Machine_Microstepping_Interpolated_
+  commentId: Overload:DuetAPI.Machine.Microstepping.Interpolated
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Microstepping.Interpolated
+  nameWithType: Microstepping.Interpolated
+- uid: DuetAPI.Machine.Microstepping.Value
+  name: Value
+  href: api/DuetAPI.Machine.Microstepping.html#DuetAPI_Machine_Microstepping_Value
+  commentId: P:DuetAPI.Machine.Microstepping.Value
+  fullName: DuetAPI.Machine.Microstepping.Value
+  nameWithType: Microstepping.Value
+- uid: DuetAPI.Machine.Microstepping.Value*
+  name: Value
+  href: api/DuetAPI.Machine.Microstepping.html#DuetAPI_Machine_Microstepping_Value_
+  commentId: Overload:DuetAPI.Machine.Microstepping.Value
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Microstepping.Value
+  nameWithType: Microstepping.Value
 - uid: DuetAPI.Machine.MinMaxCurrent`1
   name: MinMaxCurrent<T>
   href: api/DuetAPI.Machine.MinMaxCurrent-1.html
@@ -9956,6 +10014,12 @@ references:
   commentId: F:DuetAPI.Utility.JsonHelper.DefaultJsonOptions
   fullName: DuetAPI.Utility.JsonHelper.DefaultJsonOptions
   nameWithType: JsonHelper.DefaultJsonOptions
+- uid: DuetAPI.Utility.JsonHelper.DefaultJsonOptionsNoConverters
+  name: DefaultJsonOptionsNoConverters
+  href: api/DuetAPI.Utility.JsonHelper.html#DuetAPI_Utility_JsonHelper_DefaultJsonOptionsNoConverters
+  commentId: F:DuetAPI.Utility.JsonHelper.DefaultJsonOptionsNoConverters
+  fullName: DuetAPI.Utility.JsonHelper.DefaultJsonOptionsNoConverters
+  nameWithType: JsonHelper.DefaultJsonOptionsNoConverters
 - uid: DuetAPI.Utility.JsonHelper.ReceiveUtf8Json(System.Net.Sockets.Socket,System.Threading.CancellationToken)
   name: ReceiveUtf8Json(Socket, CancellationToken)
   href: api/DuetAPI.Utility.JsonHelper.html#DuetAPI_Utility_JsonHelper_ReceiveUtf8Json_System_Net_Sockets_Socket_System_Threading_CancellationToken_
@@ -10001,6 +10065,50 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Utility.JsonLowerCaseStringEnumConverter.CreateConverter
   nameWithType: JsonLowerCaseStringEnumConverter.CreateConverter
+- uid: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1
+  name: JsonPolymorphicWriteOnlyConverter<T>
+  href: api/DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter-1.html
+  commentId: T:DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1
+  name.vb: JsonPolymorphicWriteOnlyConverter(Of T)
+  fullName: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter<T>
+  fullName.vb: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter(Of T)
+  nameWithType: JsonPolymorphicWriteOnlyConverter<T>
+  nameWithType.vb: JsonPolymorphicWriteOnlyConverter(Of T)
+- uid: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)
+  name: Read(ref Utf8JsonReader, Type, JsonSerializerOptions)
+  href: api/DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter-1.html#DuetAPI_Utility_JsonPolymorphicWriteOnlyConverter_1_Read_System_Text_Json_Utf8JsonReader__System_Type_System_Text_Json_JsonSerializerOptions_
+  commentId: M:DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)
+  name.vb: Read(ByRef Utf8JsonReader, Type, JsonSerializerOptions)
+  fullName: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter<T>.Read(ref System.Text.Json.Utf8JsonReader, System.Type, System.Text.Json.JsonSerializerOptions)
+  fullName.vb: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter(Of T).Read(ByRef System.Text.Json.Utf8JsonReader, System.Type, System.Text.Json.JsonSerializerOptions)
+  nameWithType: JsonPolymorphicWriteOnlyConverter<T>.Read(ref Utf8JsonReader, Type, JsonSerializerOptions)
+  nameWithType.vb: JsonPolymorphicWriteOnlyConverter(Of T).Read(ByRef Utf8JsonReader, Type, JsonSerializerOptions)
+- uid: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1.Read*
+  name: Read
+  href: api/DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter-1.html#DuetAPI_Utility_JsonPolymorphicWriteOnlyConverter_1_Read_
+  commentId: Overload:DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1.Read
+  isSpec: "True"
+  fullName: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter<T>.Read
+  fullName.vb: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter(Of T).Read
+  nameWithType: JsonPolymorphicWriteOnlyConverter<T>.Read
+  nameWithType.vb: JsonPolymorphicWriteOnlyConverter(Of T).Read
+- uid: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1.Write(System.Text.Json.Utf8JsonWriter,`0,System.Text.Json.JsonSerializerOptions)
+  name: Write(Utf8JsonWriter, T, JsonSerializerOptions)
+  href: api/DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter-1.html#DuetAPI_Utility_JsonPolymorphicWriteOnlyConverter_1_Write_System_Text_Json_Utf8JsonWriter__0_System_Text_Json_JsonSerializerOptions_
+  commentId: M:DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1.Write(System.Text.Json.Utf8JsonWriter,`0,System.Text.Json.JsonSerializerOptions)
+  fullName: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter<T>.Write(System.Text.Json.Utf8JsonWriter, T, System.Text.Json.JsonSerializerOptions)
+  fullName.vb: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter(Of T).Write(System.Text.Json.Utf8JsonWriter, T, System.Text.Json.JsonSerializerOptions)
+  nameWithType: JsonPolymorphicWriteOnlyConverter<T>.Write(Utf8JsonWriter, T, JsonSerializerOptions)
+  nameWithType.vb: JsonPolymorphicWriteOnlyConverter(Of T).Write(Utf8JsonWriter, T, JsonSerializerOptions)
+- uid: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1.Write*
+  name: Write
+  href: api/DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter-1.html#DuetAPI_Utility_JsonPolymorphicWriteOnlyConverter_1_Write_
+  commentId: Overload:DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1.Write
+  isSpec: "True"
+  fullName: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter<T>.Write
+  fullName.vb: DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter(Of T).Write
+  nameWithType: JsonPolymorphicWriteOnlyConverter<T>.Write
+  nameWithType.vb: JsonPolymorphicWriteOnlyConverter(Of T).Write
 - uid: DuetAPI.Utility.JsonRegexListConverter
   name: JsonRegexListConverter
   href: api/DuetAPI.Utility.JsonRegexListConverter.html
