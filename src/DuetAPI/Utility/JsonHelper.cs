@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DuetAPI.Machine;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
@@ -107,6 +108,21 @@ namespace DuetAPI.Utility
         /// Default JSON (de-)serialization options
         /// </summary>
         public static readonly JsonSerializerOptions DefaultJsonOptions = new JsonSerializerOptions
+        {
+            Converters = {
+                new JsonPolymorphicWriteOnlyConverter<Kinematics>(),
+                new JsonPolymorphicWriteOnlyConverter<FilamentMonitor>()
+            },
+            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
+
+        /// <summary>
+        /// Default JSON (de-)serialization options without converters
+        /// </summary>
+        public static readonly JsonSerializerOptions DefaultJsonOptionsNoConverters = new JsonSerializerOptions
         {
             DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,

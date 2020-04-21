@@ -104,9 +104,16 @@ namespace DuetControlServer.Commands
                 foreach (Code priorityCode in priorityCodes)
                 {
                     CodeResult codeResult = await priorityCode.Execute();
-                    if (codeResult != null)
+                    try
                     {
-                        result.AddRange(codeResult);
+                        if (codeResult != null)
+                        {
+                            result.AddRange(codeResult);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // not logged
                     }
                 }
 
@@ -124,10 +131,17 @@ namespace DuetControlServer.Commands
 
                     foreach (Task<CodeResult> codeTask in codeTasks)
                     {
-                        CodeResult codeResult = await codeTask;
-                        if (codeResult != null)
+                        try
                         {
-                            result.AddRange(codeResult);
+                            CodeResult codeResult = await codeTask;
+                            if (codeResult != null)
+                            {
+                                result.AddRange(codeResult);
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // not logged
                         }
                     }
                 }
@@ -135,11 +149,6 @@ namespace DuetControlServer.Commands
             catch (CodeParserException cpe)
             {
                 result.Add(MessageType.Error, cpe.Message);
-            }
-            catch (OperationCanceledException)
-            {
-                // Report when a code is cancelled
-                result.Add(MessageType.Error, "Code has been cancelled");
             }
             return result.ToString();
         }

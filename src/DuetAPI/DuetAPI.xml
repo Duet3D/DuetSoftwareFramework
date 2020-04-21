@@ -3126,6 +3126,11 @@
             Whether the axis maximum was probed
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Axis.Microstepping">
+            <summary>
+            Microstepping configuration
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Axis.Min">
             <summary>
             Minimum travel of this axis (in mm)
@@ -3139,6 +3144,11 @@
         <member name="P:DuetAPI.Machine.Axis.Speed">
             <summary>
             Maximum speed (in mm/s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Axis.StepsPerMm">
+            <summary>
+            Number of microsteps per mm
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Axis.UserPosition">
@@ -3239,6 +3249,11 @@
             Motor jerk (in mm/s)
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Extruder.Microstepping">
+            <summary>
+            Microstepping configuration
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Extruder.Nonlinear">
             <summary>
             Nonlinear extrusion parameters (see M592)
@@ -3262,6 +3277,11 @@
         <member name="P:DuetAPI.Machine.Extruder.Speed">
             <summary>
             Maximum speed (in mm/s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Extruder.StepsPerMm">
+            <summary>
+            Number of microsteps per mm
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.ExtruderNonlinear">
@@ -3416,12 +3436,14 @@
             <param name="name">Kinematics name</param>
             <returns>Required type</returns>
         </member>
-        <member name="M:DuetAPI.Machine.Kinematics.UpdateFromJson(System.Text.Json.JsonElement)">
+        <member name="M:DuetAPI.Machine.Kinematics.UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
             <summary>
-            Update this instance from a given JSON object
+            Update this instance from a given JSON element
             </summary>
-            <param name="jsonElement">JSON object</param>
+            <param name="jsonElement">Element to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="T:DuetAPI.Machine.KinematicsName">
             <summary>
@@ -3514,6 +3536,21 @@
             <param name="writer">JSON writer</param>
             <param name="value">Value to serialize</param>
             <param name="options">Write options</param>
+        </member>
+        <member name="T:DuetAPI.Machine.Microstepping">
+            <summary>
+            Microstepping configuration
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Microstepping.Interpolated">
+            <summary>
+            Indicates if the stepper driver uses interpolation
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Microstepping.Value">
+            <summary>
+            Microsteps per full step
+            </summary>
         </member>
         <member name="T:DuetAPI.Machine.MotorsIdleControl">
             <summary>
@@ -4103,12 +4140,14 @@
             <param name="type">Filament monitor type</param>
             <returns>Required type</returns>
         </member>
-        <member name="M:DuetAPI.Machine.FilamentMonitor.UpdateFromJson(System.Text.Json.JsonElement)">
+        <member name="M:DuetAPI.Machine.FilamentMonitor.UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
             <summary>
-            Update this instance from a given JSON object
+            Update this instance from a given JSON element
             </summary>
-            <param name="jsonElement">JSON object</param>
+            <param name="jsonElement">Element to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="T:DuetAPI.Machine.FilamentMonitorType">
             <summary>
@@ -5421,6 +5460,11 @@
             Default JSON (de-)serialization options
             </summary>
         </member>
+        <member name="F:DuetAPI.Utility.JsonHelper.DefaultJsonOptionsNoConverters">
+            <summary>
+            Default JSON (de-)serialization options without converters
+            </summary>
+        </member>
         <member name="M:DuetAPI.Utility.JsonHelper.ReceiveUtf8Json(System.Net.Sockets.Socket,System.Threading.CancellationToken)">
             <summary>
             Receive a serialized JSON object from a socket in UTF-8 format
@@ -5479,6 +5523,29 @@
             </summary>
             <param name="writer">JSON writer</param>
             <param name="value">Value to write</param>
+            <param name="options">Write options</param>
+        </member>
+        <member name="T:DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1">
+            <summary>
+            JSON converter for converting inherited class types to JSON
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Read from JSON
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="typeToConvert">Type to convert</param>
+            <param name="options">Read options</param>
+            <returns>Read value</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter`1.Write(System.Text.Json.Utf8JsonWriter,`0,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Write a CodeParameter to JSON
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="value">Value to serialize</param>
             <param name="options">Write options</param>
         </member>
     </members>

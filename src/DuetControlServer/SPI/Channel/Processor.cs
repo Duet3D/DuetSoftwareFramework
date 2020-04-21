@@ -298,7 +298,8 @@ namespace DuetControlServer.SPI.Channel
 
                 if (!found)
                 {
-                    return Task.FromException<CodeResult>(new ArgumentException("Invalid macro code"));
+                    // Trying to execute a G/M/T-code on a macro that has been closed while the code was being processed internally
+                    return Task.FromException<CodeResult>(new OperationCanceledException());
                 }
             }
             else if (code.IsForAcknowledgement)

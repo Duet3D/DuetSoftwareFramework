@@ -106,6 +106,11 @@
         private bool _maxProbed;
 
         /// <summary>
+        /// Microstepping configuration
+        /// </summary>
+        public Microstepping Microstepping { get; } = new Microstepping();
+
+        /// <summary>
         /// Minimum travel of this axis (in mm)
         /// </summary>
         public float Min
@@ -134,6 +139,16 @@
 			set => SetPropertyValue(ref _speed, value);
         }
         private float _speed = 100F;
+
+        /// <summary>
+        /// Number of microsteps per mm
+        /// </summary>
+        public float StepsPerMm
+        {
+            get => _stepsPerMm;
+            set => SetPropertyValue(ref _stepsPerMm, value);
+        }
+        private float _stepsPerMm = 80F;
 
         /// <summary>
         /// Current user position (in mm) or null if unknown

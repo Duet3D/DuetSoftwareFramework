@@ -66,6 +66,11 @@
         private float _jerk = 15F;
 
         /// <summary>
+        /// Microstepping configuration
+        /// </summary>
+        public Microstepping Microstepping { get; } = new Microstepping();
+
+        /// <summary>
         /// Nonlinear extrusion parameters (see M592)
         /// </summary>
         public ExtruderNonlinear Nonlinear { get; private set; } = new ExtruderNonlinear();
@@ -109,5 +114,15 @@
 			set => SetPropertyValue(ref _speed, value);
         }
         private float _speed = 100F;
+
+        /// <summary>
+        /// Number of microsteps per mm
+        /// </summary>
+        public float StepsPerMm
+        {
+            get => _stepsPerMm;
+            set => SetPropertyValue(ref _stepsPerMm, value);
+        }
+        private float _stepsPerMm = 420F;
     }
 }

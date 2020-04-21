@@ -1,5 +1,7 @@
-﻿using System;
+﻿using DuetAPI.Utility;
+using System;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.Machine
 {
@@ -45,11 +47,13 @@ namespace DuetAPI.Machine
         }
 
         /// <summary>
-        /// Update this instance from a given JSON object
+        /// Update this instance from a given JSON element
         /// </summary>
-        /// <param name="jsonElement">JSON object</param>
+        /// <param name="jsonElement">Element to update this intance from</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
-        public override ModelObject UpdateFromJson(JsonElement jsonElement)
+        /// <exception cref="JsonException">Failed to deserialize data</exception>
+        internal override ModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
@@ -67,7 +71,7 @@ namespace DuetAPI.Machine
                     return newInstance;
                 }
             }
-            base.UpdateFromJson(jsonElement);
+            base.UpdateFromJson(jsonElement, ignoreSbcProperties);
             return this;
         }
     }

@@ -206,7 +206,7 @@ namespace DuetAPI.Machine
         /// </summary>
         /// <param name="jsonElement">Element to update this intance from</param>
         /// <returns>Updated instance</returns>
-        public virtual ModelObject UpdateFromJson(JsonElement jsonElement) => UpdateFromJson(jsonElement, false);
+        public ModelObject UpdateFromJson(JsonElement jsonElement) => UpdateFromJson(jsonElement, false);
 
         /// <summary>
         /// Update this instance from a given JSON element
