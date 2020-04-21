@@ -19,6 +19,12 @@ namespace DuetAPI.Commands
         /// <param name="result">Code to fill</param>
         /// <returns>Whether anything could be read</returns>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
+        /// <remarks>
+        /// In general it is better to use <see cref="ParseAsync(StreamReader, Code, CodeParserBuffer)"/> because this implementation
+        /// - does not update the line number unless it is specified using the 'N' character
+        /// - does not set the corresponding flag for G53 after the first code on a line
+        /// - sets the indentation level only for the first code in a line
+        /// </remarks>
         public static bool Parse(TextReader reader, Code result)
         {
             char letter = '\0', c;

@@ -63,21 +63,6 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
-        /// File being read from
-        /// </summary>
-        private readonly FileStream _fileStream;
-
-        /// <summary>
-        /// Reader for the file stream
-        /// </summary>
-        private readonly StreamReader _reader;
-
-        /// <summary>
-        /// Internal buffer used for reading from files
-        /// </summary>
-        private readonly CodeParserBuffer _parserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
-
-        /// <summary>
         /// Internal lock
         /// </summary>
         private readonly AsyncLock _lock = new AsyncLock();
@@ -93,6 +78,21 @@ namespace DuetControlServer.Files
         /// </summary>
         /// <returns>Disposable lock</returns>
         public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
+
+        /// <summary>
+        /// File being read from
+        /// </summary>
+        private readonly FileStream _fileStream;
+
+        /// <summary>
+        /// Reader for the file stream
+        /// </summary>
+        private readonly StreamReader _reader;
+
+        /// <summary>
+        /// Internal buffer used for reading from files
+        /// </summary>
+        private readonly CodeParserBuffer _parserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
 
         /// <summary>
         /// File path to the file being executed
@@ -113,6 +113,11 @@ namespace DuetControlServer.Files
         /// Last code block
         /// </summary>
         private CodeBlock _lastCodeBlock;
+
+        /// <summary>
+        /// Internal queue of codes read used to determine when pending codes have been processed
+        /// </summary>
+        private readonly Queue<Code> _pendingCodes = new Queue<Code>();
 
         /// <summary>
         /// Gets or sets the current file position in bytes
@@ -269,6 +274,12 @@ namespace DuetControlServer.Files
                         return null;
                     }
 
+                    while (_pendingCodes.TryPeek(out Code pendingCode) && pendingCode.IsExecuted)
+                    {
+                        // Clean up the pending codes whenever a new code is read to save memory
+                        _pendingCodes.Dequeue();
+                    }
+
                     do
                     {
                         codeRead = await DuetAPI.Commands.Code.ParseAsync(_reader, code, _parserBuffer);
@@ -281,32 +292,39 @@ namespace DuetControlServer.Files
                     {
                         _logger.Trace("Read code {0}", code);
                     }
+                }
 
-                    // Check if this is the end of the last block(s)
-                    bool readAgain = false;
-                    while (_codeBlocks.TryPeek(out CodeBlock state))
+                // Check if this is the end of the last block(s)
+                bool readAgain = false;
+                while (_codeBlocks.TryPeek(out CodeBlock state))
+                {
+                    if (!codeRead || ((code.Keyword != KeywordType.None || code.Type != CodeType.Comment) && code.Indent <= state.StartingCode.Indent))
                     {
-                        if (!codeRead || ((code.Keyword != KeywordType.None || code.Type != CodeType.Comment) && code.Indent <= state.StartingCode.Indent))
+                        if (state.StartingCode.Keyword == KeywordType.If ||
+                            state.StartingCode.Keyword == KeywordType.ElseIf ||
+                            state.StartingCode.Keyword == KeywordType.Else)
                         {
-                            if (state.StartingCode.Keyword == KeywordType.If ||
-                                state.StartingCode.Keyword == KeywordType.ElseIf ||
-                                state.StartingCode.Keyword == KeywordType.Else)
+                            // End of conditional block
+                            using (await _lock.LockAsync(Program.CancellationToken))
                             {
-                                // End of conditional block
                                 _logger.Debug("End of {0} block", state.StartingCode.Keyword);
                                 _lastCodeBlock = _codeBlocks.Pop();
                             }
-                            else if (state.StartingCode.Keyword == KeywordType.While)
+                        }
+                        else if (state.StartingCode.Keyword == KeywordType.While)
+                        {
+                            if (state.ProcessBlock && !state.SeenCodes)
                             {
-                                if (state.ProcessBlock && !state.SeenCodes)
-                                {
-                                    throw new CodeParserException("empty while loop detected", code);
-                                }
+                                throw new CodeParserException("empty while loop detected", code);
+                            }
 
-                                if (!codeRead || code.FilePosition != state.StartingCode.FilePosition)
+                            if (!codeRead || code.FilePosition != state.StartingCode.FilePosition)
+                            {
+                                // End of while loop
+                                if (state.ProcessBlock || state.ContinueLoop)
                                 {
-                                    // End of while loop
-                                    if (state.ProcessBlock || state.ContinueLoop)
+                                    await WaitForPendingCodes();
+                                    using (await _lock.LockAsync(Program.CancellationToken))
                                     {
                                         Position = state.StartingCode.FilePosition.Value;
                                         _parserBuffer.LineNumber = LineNumber = state.StartingCode.LineNumber;
@@ -314,35 +332,42 @@ namespace DuetControlServer.Files
                                         state.Iterations++;
                                         readAgain = true;
                                         _logger.Debug("Restarting {0} block, iterations = {1}", state.StartingCode.Keyword, state.Iterations);
-                                        break;
                                     }
+                                    break;
+                                }
+
+                                using (await _lock.LockAsync(Program.CancellationToken))
+                                {
                                     _logger.Debug("End of {0} block", state.StartingCode.Keyword);
                                     _lastCodeBlock = _codeBlocks.Pop();
                                 }
-                                else
-                                {
-                                    // Restarting while loop
-                                    break;
-                                }
+                            }
+                            else
+                            {
+                                // Restarting while loop
+                                break;
                             }
                         }
-                        else
-                        {
-                            break;
-                        }
                     }
-                    if (readAgain)
+                    else
                     {
-                        // Parse the while loop including condition once again
-                        continue;
+                        break;
                     }
+                }
+                if (readAgain)
+                {
+                    // Parse the while loop including condition once again
+                    continue;
+                }
 
-                    // Check if any more codes could be read
-                    if (!codeRead)
+                // Check if any more codes could be read
+                if (!codeRead)
+                {
+                    using (await _lock.LockAsync(Program.CancellationToken))
                     {
                         Close();
-                        return null;
                     }
+                    return null;
                 }
 
                 // Process only codes where the corresponding condition is met
@@ -383,35 +408,31 @@ namespace DuetControlServer.Files
                                 }
                             }
 
-                            // Check if or while conditions
-                            if (await SPI.Interface.Flush(Channel))
+                            // Start a new conditional block if necessary
+                            await WaitForPendingCodes();
+                            _logger.Debug("Evaluating {0} block", code.Keyword);
+                            if (code.Keyword != KeywordType.While || codeBlock == null || codeBlock.StartingCode.FilePosition != code.FilePosition)
                             {
-                                // Start a new conditional block if necessary
-                                _logger.Debug("Evaluating {0} block", code.Keyword);
-                                if (code.Keyword != KeywordType.While || codeBlock == null || codeBlock.StartingCode.FilePosition != code.FilePosition)
+                                using (await _lock.LockAsync(Program.CancellationToken))
                                 {
-                                    using (await _lock.LockAsync(Program.CancellationToken))
+                                    codeBlock = new CodeBlock
                                     {
-                                        codeBlock = new CodeBlock
-                                        {
-                                            StartingCode = code
-                                        };
-                                        _codeBlocks.Push(codeBlock);
-                                    }
+                                        StartingCode = code
+                                    };
+                                    _codeBlocks.Push(codeBlock);
                                 }
-
-                                // Evaluate the condition
-                                string evaluationResult = await Model.Expressions.Evaluate(code, false);
-                                if (evaluationResult != "true" && evaluationResult != "false")
-                                {
-                                    throw new CodeParserException($"invalid conditional result '{evaluationResult}', must be either true or false", code);
-                                }
-                                _logger.Debug("Evaluation result: ", evaluationResult);
-                                codeBlock.ProcessBlock = (evaluationResult == "true");
-                                codeBlock.ExpectingElse = (code.Keyword != KeywordType.While && evaluationResult == "false");
-                                break;
                             }
-                            throw new OperationCanceledException();
+
+                            // Evaluate the condition
+                            string evaluationResult = await Model.Expressions.Evaluate(code, false);
+                            if (evaluationResult != "true" && evaluationResult != "false")
+                            {
+                                throw new CodeParserException($"invalid conditional result '{evaluationResult}', must be either true or false", code);
+                            }
+                            _logger.Debug("Evaluation result: ", evaluationResult);
+                            codeBlock.ProcessBlock = (evaluationResult == "true");
+                            codeBlock.ExpectingElse = (code.Keyword != KeywordType.While && evaluationResult == "false");
+                            break;
 
                         case KeywordType.Else:
                             if (_lastCodeBlock == null || _lastCodeBlock.StartingCode.Indent != code.Indent ||
@@ -452,17 +473,12 @@ namespace DuetControlServer.Files
                             break;
 
                         case KeywordType.Abort:
-                            if (await SPI.Interface.Flush(code.Channel))
-                            {
-                                _logger.Debug("Doing {0}", code.Keyword);
-                                await AbortAll(Channel);
-
-                                code.CancellationToken = Program.CancellationToken;
-                                return code;
-                            }
-                            throw new OperationCanceledException();
+                            _logger.Debug("Doing {0}", code.Keyword);
+                            await AbortAll(Channel);
+                            return code;
 
                         case KeywordType.Return:
+                            _logger.Debug("Doing {0}", code.Keyword);
                             using (await _lock.LockAsync(Program.CancellationToken))
                             {
                                 Close();
@@ -475,12 +491,52 @@ namespace DuetControlServer.Files
                             {
                                 codeBlock.SeenCodes = true;
                             }
+                            using (await _lock.LockAsync(Program.CancellationToken))
+                            {
+                                _pendingCodes.Enqueue(code);
+                            }
                             return code;
 
                         default:
                             throw new CodeParserException($"Keyword {code.Keyword} is not supported", code);
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Wait for pending codes from the file being read
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        private async Task WaitForPendingCodes()
+        {
+            if (_pendingCodes.TryPeek(out _))
+            {
+                while (await SPI.Interface.Flush(Channel))
+                {
+                    using (await _lock.LockAsync(Program.CancellationToken))
+                    {
+                        if (IsClosed)
+                        {
+                            // Canot continue if the file has been closed
+                            throw new OperationCanceledException();
+                        }
+
+                        while (_pendingCodes.TryPeek(out Code pendingCode) && pendingCode.IsExecuted)
+                        {
+                            // Remove executed codes from the internal queue
+                            _pendingCodes.Dequeue();
+                        }
+
+                        if (!_pendingCodes.TryPeek(out _))
+                        {
+                            // No more pending codes, resume normal code execution
+                            return;
+                        }
+                    }
+                }
+                throw new OperationCanceledException();
             }
         }
 

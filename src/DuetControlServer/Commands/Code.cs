@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -269,8 +270,16 @@ namespace DuetControlServer.Commands
             Task<CodeResult> executingTask = WaitForExecution()
                 .ContinueWith(async task =>
                 {
-                    _codeStartLock = await task;
-                    return await ExecuteInternally();
+                    try
+                    {
+                        _codeStartLock = await task;
+                        return await ExecuteInternally();
+                    }
+                    catch
+                    {
+                        IsExecuted = true;
+                        throw;
+                    }
                 }, TaskContinuationOptions.RunContinuationsAsynchronously)
                 .Unwrap();
 
@@ -357,6 +366,7 @@ namespace DuetControlServer.Commands
             {
                 // Make sure the next code is started no matter what happened before
                 StartNextCode();
+                IsExecuted = true;
             }
             return Result;
         }
@@ -524,6 +534,16 @@ namespace DuetControlServer.Commands
             // Code has not been interpreted yet - let RRF deal with it
             return false;
         }
+
+        /// <summary>
+        /// Indicates if the code has been finished
+        /// </summary>
+        public bool IsExecuted
+        {
+            get => _isExecuted;
+            set => _isExecuted = value;
+        }
+        private volatile bool _isExecuted;
 
         /// <summary>
         /// Executed when the code has finished
