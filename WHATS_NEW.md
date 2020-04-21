@@ -29,8 +29,6 @@ Bug fixes:
 - Filament sensors and move.kinematics were neither properly updated nor serialized
 - Codes of macros being cancelled were sometimes aborted with a wrong exception
 
-- Rotating magnet filament sensor was not properly instantiated in the OM
-
 Version 2.0.0
 ==============
 Compatible files:
