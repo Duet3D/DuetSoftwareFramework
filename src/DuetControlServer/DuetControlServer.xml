@@ -300,6 +300,11 @@
             </summary>
             <returns>Whether the code could be processed internally</returns>
         </member>
+        <member name="P:DuetControlServer.Commands.Code.IsExecuted">
+            <summary>
+            Indicates if the code has been finished
+            </summary>
+        </member>
         <member name="M:DuetControlServer.Commands.Code.CodeExecuted">
             <summary>
             Executed when the code has finished
@@ -891,21 +896,6 @@
             <param name="channel">Code channel</param>
             <returns>Asynchronous task</returns>
         </member>
-        <member name="F:DuetControlServer.Files.CodeFile._fileStream">
-            <summary>
-            File being read from
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Files.CodeFile._reader">
-            <summary>
-            Reader for the file stream
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Files.CodeFile._parserBuffer">
-            <summary>
-            Internal buffer used for reading from files
-            </summary>
-        </member>
         <member name="F:DuetControlServer.Files.CodeFile._lock">
             <summary>
             Internal lock
@@ -922,6 +912,21 @@
             Lock this instance asynchronously
             </summary>
             <returns>Disposable lock</returns>
+        </member>
+        <member name="F:DuetControlServer.Files.CodeFile._fileStream">
+            <summary>
+            File being read from
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Files.CodeFile._reader">
+            <summary>
+            Reader for the file stream
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Files.CodeFile._parserBuffer">
+            <summary>
+            Internal buffer used for reading from files
+            </summary>
         </member>
         <member name="P:DuetControlServer.Files.CodeFile.FileName">
             <summary>
@@ -941,6 +946,11 @@
         <member name="F:DuetControlServer.Files.CodeFile._lastCodeBlock">
             <summary>
             Last code block
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.Files.CodeFile._pendingCodes">
+            <summary>
+            Internal queue of codes read used to determine when pending codes have been processed
             </summary>
         </member>
         <member name="P:DuetControlServer.Files.CodeFile.Position">
@@ -1014,6 +1024,13 @@
             <remarks>
             This instance must NOT be locked when this is called
             </remarks>
+        </member>
+        <member name="M:DuetControlServer.Files.CodeFile.WaitForPendingCodes">
+            <summary>
+            Wait for pending codes from the file being read
+            </summary>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
         </member>
         <member name="M:DuetControlServer.Files.CodeFile.Close">
             <summary>

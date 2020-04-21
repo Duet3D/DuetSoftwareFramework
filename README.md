@@ -357,13 +357,20 @@ sudo systemctl restart sshd
 sudo passwd
 ```
 
-After that, open a new console in one of the DSF application directories (where a .csproj file lies) and run 
+Then make sure to shut down all the DSF components before you continue, else you may get errors:
+
+```
+sudo systemctl stop duetcontrolserver
+sudo systemctl stop duetwebserver
+```
+
+After that, open a new local console in one of the DSF application directories (where a .csproj file lies) and run:
 
 ```
 dotnet publish-ssh -r linux-arm --ssh-host duet3 --ssh-user root --ssh-password raspberry --ssh-path /opt/dsf/bin /p:DefineConstants=VERIFY_OBJECT_MODEL
 ```
 
-This will replace the stock DSF component with your own compiled variant. Make sure to shut down all the DSF components before you do this, else you may get errors.
+This will replace the stock DSF component with your own compiled variant.
 If you do not wish to publish everything to your board at the time of compiling, have a look at the `dotnet publish` command.
 
 ### 3.2 Building on the SBC itself

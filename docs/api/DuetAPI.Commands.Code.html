@@ -1724,6 +1724,14 @@ retrieve the parameter which does not have a letter assigned</p>
       </tr>
     </tbody>
   </table>
+  <h5 id="DuetAPI_Commands_Code_Parse_System_IO_TextReader_DuetAPI_Commands_Code__remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>In general it is better to use <a class="xref" href="DuetAPI.Commands.Code.html#DuetAPI_Commands_Code_ParseAsync_System_IO_StreamReader_DuetAPI_Commands_Code_DuetAPI_Commands_CodeParserBuffer_">ParseAsync(StreamReader, Code, CodeParserBuffer)</a> because this implementation</p>
+<ul>
+<li>does not update the line number unless it is specified using the 'N' character</li>
+<li>does not set the corresponding flag for G53 after the first code on a line</li>
+<li>sets the indentation level only for the first code in a line</li>
+</ul>
+</div>
   <h5 class="exceptions">Exceptions</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>

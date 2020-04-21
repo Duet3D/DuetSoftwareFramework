@@ -11145,6 +11145,19 @@ references:
   commentId: F:DuetControlServer.Commands.Code.InternallyProcessed
   fullName: DuetControlServer.Commands.Code.InternallyProcessed
   nameWithType: Code.InternallyProcessed
+- uid: DuetControlServer.Commands.Code.IsExecuted
+  name: IsExecuted
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_IsExecuted
+  commentId: P:DuetControlServer.Commands.Code.IsExecuted
+  fullName: DuetControlServer.Commands.Code.IsExecuted
+  nameWithType: Code.IsExecuted
+- uid: DuetControlServer.Commands.Code.IsExecuted*
+  name: IsExecuted
+  href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_IsExecuted_
+  commentId: Overload:DuetControlServer.Commands.Code.IsExecuted
+  isSpec: "True"
+  fullName: DuetControlServer.Commands.Code.IsExecuted
+  nameWithType: Code.IsExecuted
 - uid: DuetControlServer.Commands.Code.IsForAcknowledgement
   name: IsForAcknowledgement
   href: api/DuetControlServer.Commands.Code.html#DuetControlServer_Commands_Code_IsForAcknowledgement
