@@ -98,6 +98,14 @@
     public class RotatingMagnetFilamentMonitor : FilamentMonitor
     {
 		/// <summary>
+		/// Constructor of this class
+		/// </summary>
+		public RotatingMagnetFilamentMonitor()
+		{
+			Type = FilamentMonitorType.RotatingMagnet;
+		}
+
+		/// <summary>
 		/// Calibrated properties of this filament monitor
 		/// </summary>
 		public RotatingMagnetFilamentMonitorCalibrated Calibrated { get; } = new RotatingMagnetFilamentMonitorCalibrated();

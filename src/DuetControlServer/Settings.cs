@@ -120,11 +120,6 @@ namespace DuetControlServer
         public static int SpiPollDelay { get; set; } = 25;
 
         /// <summary>
-        /// Time to wait after every full transfer when simulating a file (in ms)
-        /// </summary>
-        public static int SpiPollDelaySimulating { get; set; } = 5;
-
-        /// <summary>
         /// Path to the GPIO chip device node
         /// </summary>
         public static string GpioChipDevice { get; set; } = "/dev/gpiochip0";
@@ -161,9 +156,9 @@ namespace DuetControlServer
         public static int MaxMachineModelLockTime { get; set; } = -1;
 
         /// <summary>
-        /// Size of the read buffer used for file parsing in bytes
+        /// Size of the read buffer used when reading from files (in bytes)
         /// </summary>
-        public static int FileInfoReadBufferSize { get; set; } = 8192;
+        public static int FileBufferSize { get; set; } = 8192;
 
         /// <summary>
         /// How many bytes to parse max at the beginning of a file to retrieve G-code file information (12KiB)

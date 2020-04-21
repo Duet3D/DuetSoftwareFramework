@@ -123,6 +123,7 @@ namespace DuetControlServer.SPI.Channel
             // Pop the stack
             State oldState = Stack.Pop();
             CurrentState = Stack.Peek();
+            _isWaitingForAcknowledgement = CurrentState.WaitingForAcknowledgement;
 
             // Remove potential event listeners
             if (oldState.WaitingForAcknowledgement)
@@ -255,10 +256,14 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Checks if this channel is waiting for acknowledgement
         /// </summary>
+        /// <remarks>
+        /// This is volatile to allow fast access without locking this instance first
+        /// </remarks>
         public bool IsWaitingForAcknowledgement
         {
-            get => CurrentState.WaitingForAcknowledgement;
+            get => _isWaitingForAcknowledgement;
         }
+        private volatile bool _isWaitingForAcknowledgement;
 
         /// <summary>
         /// Process another code
@@ -821,6 +826,7 @@ namespace DuetControlServer.SPI.Channel
 
                 State newState = Push();
                 newState.WaitingForAcknowledgement = true;
+                _isWaitingForAcknowledgement = true;
 
                 if (!_propertyChangedRegistered)
                 {

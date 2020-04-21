@@ -21,13 +21,12 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Create a new Code instance and attempt to parse the given code string
         /// </summary>
-        /// <param name="code">G/M/T-Code</param>
+        /// <param name="code">UTF8-encoded G/M/T-Code</param>
         public Code(string code)
         {
             using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(code));
             using StreamReader reader = new StreamReader(stream);
-            bool seenNewLine = true;
-            Parse(reader, this, ref seenNewLine);
+            Parse(reader, this);
         }
 
         /// <summary>
@@ -117,16 +116,12 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Reset this instance
         /// </summary>
-        /// <param name="keepLineNumber">Keep the line number</param>
-        public void Reset(bool keepLineNumber)
+        public void Reset()
         {
             Result = null;
             Type = CodeType.Comment;
             Channel = Defaults.InputChannel;
-            if (!keepLineNumber)
-            {
-                LineNumber = null;
-            }
+            LineNumber = null;
             Indent = 0;
             Keyword = KeywordType.None;
             KeywordArgument = null;

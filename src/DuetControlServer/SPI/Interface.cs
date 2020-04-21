@@ -190,13 +190,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Channel to query</param>
         /// <returns>Whether the channel is awaiting acknowledgement</returns>
-        public static bool IsWaitingForAcknowledgement(CodeChannel channel)
-        {
-            using (_channels[channel].Lock())
-            {
-                return _channels[channel].IsWaitingForAcknowledgement;
-            }
-        }
+        public static bool IsWaitingForAcknowledgement(CodeChannel channel) => _channels[channel].IsWaitingForAcknowledgement;
 
         /// <summary>
         /// Enqueue a G/M/T-code synchronously and obtain a task that completes when the code has finished
@@ -742,7 +736,7 @@ namespace DuetControlServer.SPI
                 {
                     isSimulating = Model.Provider.Get.State.Status == MachineStatus.Simulating;
                 }
-                await Task.Delay(isSimulating ? Settings.SpiPollDelaySimulating : Settings.SpiPollDelay, Program.CancellationToken);
+                await Task.Delay(Settings.SpiPollDelay, Program.CancellationToken);
             }
             while (true);
         }

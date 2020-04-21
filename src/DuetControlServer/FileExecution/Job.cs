@@ -71,7 +71,15 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Indicates if a file is being simulated
         /// </summary>
-        public static bool IsSimulating { get; private set; }
+        /// <remarks>
+        /// This is volatile to allow fast access without locking the class first
+        /// </remarks>
+        public static bool IsSimulating
+        {
+            get => _isSimulating;
+            private set => _isSimulating = value;
+        }
+        private static volatile bool _isSimulating;
 
         /// <summary>
         /// Indicates if the file print has been paused

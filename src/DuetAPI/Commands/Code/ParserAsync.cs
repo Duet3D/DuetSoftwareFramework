@@ -1,48 +1,73 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace DuetAPI.Commands
 {
     public partial class Code
     {
-        // Numeric parameters may hold only characters of this string 
-        private const string NumericParameterChars = "01234567890+-.e";
-
         /// <summary>
-        /// Parse the next available G/M/T-code from the given stream
+        /// Parse the next available G/M/T-code from the given stream asynchronously
         /// </summary>
         /// <param name="reader">Input to read from</param>
         /// <param name="result">Code to fill</param>
+        /// <param name="buffer">Internal buffer for parsing codes</param>
         /// <returns>Whether anything could be read</returns>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
-        public static bool Parse(TextReader reader, Code result)
+        public static async Task<bool> ParseAsync(StreamReader reader, Code result, CodeParserBuffer buffer)
         {
             char letter = '\0', c;
             string value = string.Empty;
 
             bool contentRead = false, unprecedentedParameter = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
-            bool readingAtStart = true, isLineNumber = false, isNumericParameter = false, endingChunk = false;
+            bool readingAtStart = buffer.SeenNewLine, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
             bool wasQuoted = false, wasCondition = false, wasExpression = false;
             int numCurlyBraces = 0, numRoundBraces = 0;
+            buffer.SeenNewLine = false;
 
-            Encoding encoding = (reader is StreamReader sr) ? sr.CurrentEncoding : Encoding.UTF8;
+            result.Flags = buffer.EnforcingAbsolutePosition ? CodeFlags.EnforceAbsolutePosition : CodeFlags.None;
+            result.Indent = buffer.Indent;
             result.Length = 0;
+            result.LineNumber = buffer.LineNumber;
+
             do
             {
-                // Read the next character
-                int currentChar = reader.Read();
-                c = (currentChar < 0) ? '\n' : (char)currentChar;
-                result.Length += encoding.GetByteCount(new char[] { c });
+                // Check if the buffer needs to be filled
+                if (buffer.BufferPointer >= buffer.BufferSize)
+                {
+                    buffer.BufferSize = await reader.ReadAsync(buffer.Buffer);
+                    buffer.BufferPointer = 0;
+                }
 
+                // Read the next character
+                c = (buffer.BufferPointer < buffer.BufferSize) ? buffer.Buffer[buffer.BufferPointer] : '\n';
+                result.Length += reader.CurrentEncoding.GetByteCount(buffer.Buffer, buffer.BufferPointer, 1);
+                buffer.BufferPointer++;
+
+                if (c == '\n' && !hadLineNumber && buffer.LineNumber != null)
+                {
+                    // Keep track of the line number (if possible)
+                    buffer.LineNumber++;
+                }
                 if (c == '\r')
                 {
                     // Ignore CR
                     continue;
+                }
+
+                // Stop if another G/M/T code is coming up and this one is complete
+                if (contentRead && !inFinalComment && !inEncapsulatedComment && !inCondition && !inChunk)
+                {
+                    char nextChar = char.ToUpperInvariant(c);
+                    if (result.MajorNumber != null && result.MajorNumber != 53 && (nextChar == 'G' || nextChar == 'M' || nextChar == 'T') &&
+                        (nextChar == 'M' || result.Type != CodeType.MCode || result.Parameters.Any(item => item.Letter == nextChar)))
+                    {
+                        // Note that M-codes may have G or T parameters but only one
+                        buffer.BufferPointer--;
+                        break;
+                    }
                 }
 
                 if (inFinalComment)
@@ -261,6 +286,7 @@ namespace DuetAPI.Commands
                             throw new CodeParserException("Indentation too big", result);
                         }
                         result.Indent++;
+                        buffer.Indent++;
                     }
                     else
                     {
@@ -280,8 +306,10 @@ namespace DuetAPI.Commands
                             if (long.TryParse(value, out long lineNumber))
                             {
                                 result.LineNumber = lineNumber;
+                                buffer.LineNumber = lineNumber;
                             }
                             isLineNumber = false;
+                            hadLineNumber = true;
                         }
                         else if ((upperLetter == 'G' || upperLetter == 'M' || upperLetter == 'T') &&
                                  (result.MajorNumber == null || (result.Type == CodeType.GCode && result.MajorNumber == 53)))
@@ -291,6 +319,7 @@ namespace DuetAPI.Commands
                             {
                                 result.MajorNumber = null;
                                 result.Flags |= CodeFlags.EnforceAbsolutePosition;
+                                buffer.EnforcingAbsolutePosition = true;
                             }
 
                             result.Type = (CodeType)upperLetter;
@@ -447,20 +476,13 @@ namespace DuetAPI.Commands
                         }
                     }
                 }
-
-                if (!inFinalComment && !inEncapsulatedComment && !inCondition && !inChunk)
-                {
-                    // Stop if another G/M/T code is coming up and this one is complete
-                    int next = reader.Peek();
-                    char nextChar = (next == -1) ? '\n' : char.ToUpperInvariant((char)next);
-                    if (result.MajorNumber != null && result.MajorNumber != 53 && (nextChar == 'G' || nextChar == 'M' || nextChar == 'T') &&
-                        (nextChar == 'M' || result.Type != CodeType.MCode || result.Parameters.Any(item => item.Letter == nextChar)))
-                    {
-                        // Note that M-codes may have G or T parameters but only one
-                        break;
-                    }
-                }
             } while (c != '\n');
+
+            // Check if the state can be reset
+            if (c == '\n')
+            {
+                buffer.InvalidateData();
+            }
 
             // Do not allow malformed codes
             if (inEncapsulatedComment)
@@ -497,101 +519,6 @@ namespace DuetAPI.Commands
 
             // End
             return contentRead;
-        }
-
-        /// <summary>
-        /// Add a new parameter to a given <see cref="Code"/> instance
-        /// </summary>
-        /// <param name="code">Code to add the parameter to</param>
-        /// <param name="letter">Letter of the parameter to 0 if unprecedented</param>
-        /// <param name="value">Value of the parameter</param>
-        /// <param name="isQuoted">Whether the parameter is a quoted string</param>
-        /// <param name="isSingleParameter">Whether the parameter is definitely a single parameter</param>
-        private static void AddParameter(Code code, char letter, string value, bool isQuoted, bool isSingleParameter)
-        {
-            if (isQuoted || isSingleParameter)
-            {
-                code.Parameters.Add(new CodeParameter(letter, value, isQuoted, false));
-            }
-            else
-            {
-                code.Parameters.Add(new CodeParameter(letter, string.Empty, false, false));
-                foreach (char c in value)
-                {
-                    code.Parameters.Add(new CodeParameter(c, string.Empty, false, false));
-                }
-            }
-        }
-
-        /// <summary>
-        /// Convert parameters of this code to driver id(s)
-        /// </summary>
-        /// <exception cref="CodeParserException">Driver ID could not be parsed</exception>
-        public void ConvertDriverIds()
-        {
-            if (Type == CodeType.MCode)
-            {
-                switch (MajorNumber)
-                {
-                    case 569:
-                    case 915:
-                        foreach (CodeParameter parameter in Parameters)
-                        {
-                            if (!parameter.IsExpression && char.ToUpperInvariant(parameter.Letter) == 'P')
-                            {
-                                ConvertDriverIds(parameter);
-                            }
-                        }
-                        break;
-
-                    case 584:
-                        foreach (CodeParameter parameter in Parameters)
-                        {
-                            char upper = char.ToUpperInvariant(parameter.Letter);
-                            if (!parameter.IsExpression && (Machine.Axis.Letters.Contains(upper) || upper == 'E'))
-                            {
-                                ConvertDriverIds(parameter);
-                            }
-                        }
-                        break;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Convert a given parameter to driver id(s)
-        /// </summary>
-        /// <exception cref="CodeParserException">Driver ID could not be parsed</exception>
-        private void ConvertDriverIds(CodeParameter parameter)
-        {
-            if (!parameter.IsExpression)
-            {
-                List<DriverId> drivers = new List<DriverId>();
-
-                string[] parameters = parameter.StringValue.Split(':');
-                foreach (string value in parameters)
-                {
-                    try
-                    {
-                        DriverId id = new DriverId(value);
-                        drivers.Add(id);
-                    }
-                    catch (ArgumentException e)
-                    {
-                        throw new CodeParserException(e.Message + $" from {parameter.Letter} parameter", this);
-                    }
-                }
-
-                if (drivers.Count == 1)
-                {
-                    parameter.ParsedValue = drivers[0];
-                }
-                else
-                {
-                    parameter.ParsedValue = drivers.ToArray();
-                }
-                parameter.IsDriverId = true;
-            }
         }
     }
 }

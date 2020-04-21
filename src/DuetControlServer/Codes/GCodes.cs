@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
@@ -24,6 +25,12 @@ namespace DuetControlServer.Codes
         /// <returns>Result of the code if the code completed, else null</returns>
         public static async Task<CodeResult> Process(Commands.Code code)
         {
+            if (code.Channel == CodeChannel.File && FileExecution.Job.IsSimulating)
+            {
+                // Ignore M-codes from files in simulation mode...
+                return null;
+            }
+
             switch (code.MajorNumber)
             {
                 // Save or load heightmap

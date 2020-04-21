@@ -73,6 +73,11 @@ namespace DuetControlServer.Files
         private readonly StreamReader _reader;
 
         /// <summary>
+        /// Internal buffer used for reading from files
+        /// </summary>
+        private readonly CodeParserBuffer _parserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
+
+        /// <summary>
         /// Internal lock
         /// </summary>
         private readonly AsyncLock _lock = new AsyncLock();
@@ -122,7 +127,8 @@ namespace DuetControlServer.Files
                     _fileStream.Seek(value, SeekOrigin.Begin);
                     _reader.DiscardBufferedData();
                     _position = value;
-                    LineNumber = (value == 0) ? (long?)0 : null;
+                    _parserBuffer.Invalidate();
+                    _parserBuffer.LineNumber = LineNumber = (value == 0) ? (long?)1 : null;
                 }
             }
         }
@@ -154,22 +160,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Number of the current line
         /// </summary>
-        public long? LineNumber { get; private set; } = 0;
-
-        /// <summary>
-        /// Whether this is the first code to parse or a NL was parsed
-        /// </summary>
-        private bool _seenNewLine = true;
-
-        /// <summary>
-        /// Whether G53 is in effect
-        /// </summary>
-        private bool _enforcingAbsolutePosition;
-
-        /// <summary>
-        /// Current indentation level
-        /// </summary>
-        private byte _indent;
+        public long? LineNumber { get; private set; } = 1;
 
         /// <summary>
         /// Returns the length of the file in bytes
@@ -261,18 +252,16 @@ namespace DuetControlServer.Files
         {
             while (true)
             {
+                // Read the next available code
                 bool codeRead;
                 Code code = new Code
                 {
                     Channel = Channel,
                     File = this,
-                    Flags = _enforcingAbsolutePosition ? CodeFlags.EnforceAbsolutePosition : CodeFlags.None,
-                    Indent = _indent,
                     LineNumber = LineNumber,
                     FilePosition = Position
                 };
 
-                // Read the next available code
                 using (await _lock.LockAsync(Program.CancellationToken))
                 {
                     if (IsClosed)
@@ -282,15 +271,11 @@ namespace DuetControlServer.Files
 
                     do
                     {
-                        codeRead = DuetAPI.Commands.Code.Parse(_reader, code, ref _seenNewLine);
+                        codeRead = await DuetAPI.Commands.Code.ParseAsync(_reader, code, _parserBuffer);
                         _position += code.Length.Value;
                         LineNumber = code.LineNumber;
-
-                        // Check if a NL has been parsed
-                        _indent = _seenNewLine ? (byte)0 : code.Indent;
-                        _enforcingAbsolutePosition = _seenNewLine ? false : code.Flags.HasFlag(CodeFlags.EnforceAbsolutePosition);
                     }
-                    while (!codeRead && !_reader.EndOfStream);
+                    while (!codeRead && _parserBuffer.GetPosition(_reader) < _fileStream.Length);
 
                     if (codeRead)
                     {
@@ -324,6 +309,7 @@ namespace DuetControlServer.Files
                                     if (state.ProcessBlock || state.ContinueLoop)
                                     {
                                         Position = state.StartingCode.FilePosition.Value;
+                                        _parserBuffer.LineNumber = LineNumber = state.StartingCode.LineNumber;
                                         state.ContinueLoop = false;
                                         state.Iterations++;
                                         readAgain = true;
@@ -348,7 +334,6 @@ namespace DuetControlServer.Files
                     if (readAgain)
                     {
                         // Parse the while loop including condition once again
-                        _seenNewLine = true;
                         continue;
                     }
 

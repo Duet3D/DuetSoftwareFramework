@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
@@ -22,7 +23,7 @@ namespace DuetControlServer.Files
         public static async Task<ParsedFileInfo> Parse(string fileName)
         {
             using FileStream fileStream = new FileStream(fileName, FileMode.Open);
-            using StreamReader reader = new StreamReader(fileStream, null, true, Settings.FileInfoReadBufferSize);
+            using StreamReader reader = new StreamReader(fileStream, null, true, Settings.FileBufferSize);
             ParsedFileInfo result = new ParsedFileInfo
             {
                 FileName = await FilePath.ToVirtualAsync(fileName),
@@ -50,76 +51,65 @@ namespace DuetControlServer.Files
         /// <returns>Asynchronous task</returns>
         private static async Task ParseHeader(StreamReader reader, ParsedFileInfo partialFileInfo)
         {
-            Code code = new Code() { LineNumber = 0 };     // keep track of the line number in case parsing errors occur
-            bool inRelativeMode = false, lastLineHadInfo = false;
-            do
+            Code code = new Code();
+            CodeParserBuffer codeParserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
+
+            bool inRelativeMode = false, lastCodeHadInfo = false, gotNewInfo = false;
+            long fileReadLimit = Math.Min(Settings.FileInfoReadLimitHeader + Settings.FileBufferSize, reader.BaseStream.Length);
+            while (codeParserBuffer.GetPosition(reader) < fileReadLimit)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
-
-                // Read another line
-                string line = await reader.ReadLineAsync();
-                if (line == null)
+                if (!await DuetAPI.Commands.Code.ParseAsync(reader, code, codeParserBuffer))
                 {
-                    break;
+                    continue;
                 }
 
-                // See what codes to deal with
-                bool gotNewInfo = false, seenNewLine = true;
-                using (StringReader stringReader = new StringReader(line))
+                if (code.Type == CodeType.GCode && partialFileInfo.FirstLayerHeight == 0)
                 {
-                    while (DuetAPI.Commands.Code.Parse(stringReader, code, ref seenNewLine))
+                    if (code.MajorNumber == 91)
                     {
-                        if (code.Type == CodeType.GCode && partialFileInfo.FirstLayerHeight == 0)
-                        {
-                            if (code.MajorNumber == 91)
-                            {
-                                // G91 code (relative positioning)
-                                inRelativeMode = true;
-                                gotNewInfo = true;
-                            }
-                            else if (inRelativeMode)
-                            {
-                                // G90 (absolute positioning)
-                                inRelativeMode = (code.MajorNumber != 90);
-                                gotNewInfo = true;
-                            }
-                            else if (code.MajorNumber == 0 || code.MajorNumber == 1)
-                            {
-                                // G0/G1 is a move, see if there is a Z parameter present
-                                CodeParameter zParam = code.Parameter('Z');
-                                if (zParam != null)
-                                {
-                                    float z = zParam;
-                                    if (z <= Settings.MaxLayerHeight)
-                                    {
-                                        partialFileInfo.FirstLayerHeight = z;
-                                        gotNewInfo = true;
-                                    }
-                                }
-                            }
-                        }
-                        else if (!string.IsNullOrWhiteSpace(code.Comment))
-                        {
-                            gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(line, ref partialFileInfo);
-                            gotNewInfo |= FindFilamentUsed(line, ref partialFileInfo);
-                            gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(line, ref partialFileInfo);
-                            gotNewInfo |= (partialFileInfo.PrintTime == null) && FindPrintTime(line, ref partialFileInfo);
-                            gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(line, ref partialFileInfo);
-                        }
-
-                        code.Reset(true);
+                        // G91 code (relative positioning)
+                        inRelativeMode = true;
+                        gotNewInfo = true;
                     }
+                    else if (inRelativeMode)
+                    {
+                        // G90 (absolute positioning)
+                        inRelativeMode = (code.MajorNumber != 90);
+                        gotNewInfo = true;
+                    }
+                    else if (code.MajorNumber == 0 || code.MajorNumber == 1)
+                    {
+                        // G0/G1 is a move, see if there is a Z parameter present
+                        CodeParameter zParam = code.Parameter('Z');
+                        if (zParam != null)
+                        {
+                            float z = zParam;
+                            if (z <= Settings.MaxLayerHeight)
+                            {
+                                partialFileInfo.FirstLayerHeight = z;
+                                gotNewInfo = true;
+                            }
+                        }
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(code.Comment))
+                {
+                    gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
+                    gotNewInfo |= FindFilamentUsed(code.Comment, ref partialFileInfo);
+                    gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(code.Comment, ref partialFileInfo);
+                    gotNewInfo |= (partialFileInfo.PrintTime == null) && FindPrintTime(code.Comment, ref partialFileInfo);
+                    gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
                 }
 
                 // Is the file info complete?
-                if (!gotNewInfo && !lastLineHadInfo && IsFileInfoComplete(partialFileInfo))
+                if (!gotNewInfo && !lastCodeHadInfo && IsFileInfoComplete(partialFileInfo))
                 {
                     break;
                 }
-                lastLineHadInfo = gotNewInfo;
-                // Code.Parse() increments the LineNumber, no need to do it here
+                lastCodeHadInfo = gotNewInfo;
+                code.Reset();
             }
-            while (reader.BaseStream.Position < Settings.FileInfoReadLimitHeader + Settings.FileInfoReadBufferSize);
         }
 
         /// <summary>
@@ -131,10 +121,10 @@ namespace DuetControlServer.Files
         private static async Task ParseFooter(StreamReader reader, ParsedFileInfo partialFileInfo)
         {
             reader.BaseStream.Seek(0, SeekOrigin.End);
-            char[] buffer = new char[Settings.FileInfoReadBufferSize];
+            char[] buffer = new char[Settings.FileBufferSize];
             int bufferPointer = 0;
 
-            Code code = new Code() { LineNumber = -1 };     // keep track of the line number in case parsing errors occur
+            Code code = new Code();
             bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = partialFileInfo.Filament.Count > 0;
             do
             {
@@ -149,10 +139,10 @@ namespace DuetControlServer.Files
                 bufferPointer = readResult.BufferPointer;
 
                 // See what codes to deal with
-                bool gotNewInfo = false, seenNewLine = true;
+                bool gotNewInfo = false;
                 using (StringReader stringReader = new StringReader(readResult.Line))
                 {
-                    while (DuetAPI.Commands.Code.Parse(stringReader, code, ref seenNewLine))
+                    while (DuetAPI.Commands.Code.Parse(stringReader, code))
                     {
                         if (code.Type == CodeType.GCode && partialFileInfo.Height == 0)
                         {
@@ -188,7 +178,8 @@ namespace DuetControlServer.Files
                             gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(readResult.Line, ref partialFileInfo);
                         }
 
-                        code.Reset(true);
+                        // Prepare to read the next code
+                        code.Reset();
                     }
                 }
 
@@ -198,7 +189,6 @@ namespace DuetControlServer.Files
                     break;
                 }
                 lastLineHadInfo = gotNewInfo;
-                code.LineNumber--;
             }
             while (reader.BaseStream.Length - reader.BaseStream.Position < Settings.FileInfoReadLimitFooter + buffer.Length);
         }
