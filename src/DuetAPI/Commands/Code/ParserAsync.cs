@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 
 namespace DuetAPI.Commands
@@ -16,7 +17,7 @@ namespace DuetAPI.Commands
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
         public static async Task<bool> ParseAsync(StreamReader reader, Code result, CodeParserBuffer buffer)
         {
-            char letter = '\0', c;
+            char letter = '\0', lastC, c = '\0';
             string value = string.Empty;
 
             bool contentRead = false, unprecedentedParameter = false;
@@ -41,6 +42,7 @@ namespace DuetAPI.Commands
                 }
 
                 // Read the next character
+                lastC = c;
                 c = (buffer.BufferPointer < buffer.BufferSize) ? buffer.Buffer[buffer.BufferPointer] : '\n';
                 result.Length += reader.CurrentEncoding.GetByteCount(buffer.Buffer, buffer.BufferPointer, 1);
                 buffer.BufferPointer++;
@@ -165,11 +167,18 @@ namespace DuetAPI.Commands
                     {
                         if (c == '"')
                         {
-                            if (reader.Peek() == '"')
+                            if (buffer.BufferPointer >= buffer.BufferSize)
+                            {
+                                buffer.BufferSize = await reader.ReadAsync(buffer.Buffer);
+                                buffer.BufferPointer = 0;
+                            }
+
+                            char nextC = (buffer.BufferPointer < buffer.BufferSize) ? buffer.Buffer[buffer.BufferPointer] : '\0';
+                            if (nextC == '"')
                             {
                                 // Treat subsequent double quotes as a single quote char
                                 value += '"';
-                                reader.Read();
+                                buffer.BufferPointer++;
                                 result.Length++;
                             }
                             else

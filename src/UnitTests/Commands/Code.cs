@@ -599,6 +599,23 @@ namespace UnitTests.Commands
                 Assert.AreEqual(0, code.Indent);
                 Assert.AreEqual(5, code.LineNumber);
             }
+
+            codeString = "M291 P\"Please go to <a href=\"\"https://www.duet3d.com/StartHere\"\" target=\"\"_blank\"\">this</a> page for further instructions on how to set it up.\" R\"Welcome to your new Duet 3!\" S1 T0";
+            codeBytes = Encoding.UTF8.GetBytes(codeString);
+            using (MemoryStream memoryStream = new MemoryStream(codeBytes))
+            {
+                using StreamReader reader = new StreamReader(memoryStream);
+                CodeParserBuffer buffer = new CodeParserBuffer(128, true);
+
+                DuetAPI.Commands.Code code = new DuetAPI.Commands.Code();
+                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(291, code.MajorNumber);
+                Assert.AreEqual("Please go to <a href=\"https://www.duet3d.com/StartHere\" target=\"_blank\">this</a> page for further instructions on how to set it up.", (string)code.Parameter('P'));
+                Assert.AreEqual("Welcome to your new Duet 3!", (string)code.Parameter('R'));
+                Assert.AreEqual(1, (int)code.Parameter('S'));
+                Assert.AreEqual(0, (int)code.Parameter('T'));
+            }
         }
     }
 }

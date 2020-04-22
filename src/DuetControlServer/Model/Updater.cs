@@ -141,6 +141,12 @@ namespace DuetControlServer.Model
                                     Provider.Get.UpdateFromFirmwareModel(string.Empty, result);
                                 }
 
+                                // Request limits if no sequence numbers have been set yet
+                                if (_lastSeqs.Count == 0)
+                                {
+                                    SPI.Interface.RequestObjectModel("limits", "d99vn");
+                                }
+
                                 // Request object model updates wherever needed
                                 bool objectModelSynchronized = true;
                                 foreach (JsonProperty seqProperty in result.GetProperty("seqs").EnumerateObject())
