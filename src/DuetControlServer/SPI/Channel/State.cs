@@ -1,4 +1,5 @@
-﻿using DuetControlServer.FileExecution;
+﻿using DuetControlServer.Commands;
+using DuetControlServer.FileExecution;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -22,7 +23,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Queue of suspended G/M/T-codes to resend when this state becomes active again
         /// </summary>
-        public Queue<PendingCode> SuspendedCodes { get; } = new Queue<PendingCode>();
+        public Queue<Code> SuspendedCodes { get; } = new Queue<Code>();
 
         /// <summary>
         /// Macro being executed on this state
@@ -40,12 +41,12 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Code that started the macro file of this state
         /// </summary>
-        public PendingCode MacroStartCode { get; set; }
+        public Code MacroStartCode { get; set; }
 
         /// <summary>
         /// Queue of pending G/M/T-codes that have not been buffered yet
         /// </summary>
-        public Queue<PendingCode> PendingCodes { get; } = new Queue<PendingCode>();
+        public Queue<Code> PendingCodes { get; } = new Queue<Code>();
 
         /// <summary>
         /// Queue of pending flush requests

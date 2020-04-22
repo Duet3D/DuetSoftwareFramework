@@ -404,9 +404,9 @@ namespace DuetControlServer.Model
                         {
                             subFilter = subExpression.Substring(1);
                         }
-                        if (Filter.GetSpecific(subFilter, onlyLinuxFields, out object linuxField))
+                        if (Filter.GetSpecific(subFilter, true, out object linuxField))
                         {
-                            string subResult = ObjectToString(linuxField, wantsCount, false, code);
+                            string subResult = ObjectToString(linuxField, wantsCount, true, code);
                             if (subExpression == expression)
                             {
                                 return subResult;
@@ -466,7 +466,7 @@ namespace DuetControlServer.Model
             {
                 finalFilter = finalExpression.Substring(1);
             }
-            if (Filter.GetSpecific(finalFilter, onlyLinuxFields, out object finalLinuxField))
+            if (Filter.GetSpecific(finalFilter, true, out object finalLinuxField))
             {
                 return ObjectToString(finalLinuxField, wantsFinalCount, encodeResult, code);
             }

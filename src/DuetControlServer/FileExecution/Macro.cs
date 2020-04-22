@@ -86,6 +86,11 @@ namespace DuetControlServer.FileExecution
         private readonly AsyncLock _codeStartLock = new AsyncLock();
 
         /// <summary>
+        /// Internal lock used for starting codes in the right order
+        /// </summary>
+        private readonly AsyncLock _codeFinishLock = new AsyncLock();
+
+        /// <summary>
         /// Method to wait until a new code can be started in the right order
         /// </summary>
         /// <returns>Disposable lock</returns>
@@ -93,6 +98,15 @@ namespace DuetControlServer.FileExecution
         /// This is required in case a flush is requested before another nested macro is started
         /// </remarks>
         public AwaitableDisposable<IDisposable> WaitForCodeStart() => _codeStartLock.LockAsync(CancellationToken);
+
+        /// <summary>
+        /// Method to wait until a new code can be finished in the right order
+        /// </summary>
+        /// <returns>Disposable lock</returns>
+        /// <remarks>
+        /// This is required in case a flush is requested before another nested macro is started
+        /// </remarks>
+        public AwaitableDisposable<IDisposable> WaitForCodeFinish() => _codeFinishLock.LockAsync(CancellationToken);
 
         /// <summary>
         /// File to read from

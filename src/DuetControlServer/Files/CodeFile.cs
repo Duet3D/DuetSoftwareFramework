@@ -328,6 +328,7 @@ namespace DuetControlServer.Files
                                     {
                                         Position = state.StartingCode.FilePosition.Value;
                                         _parserBuffer.LineNumber = LineNumber = state.StartingCode.LineNumber;
+                                        state.ProcessBlock = true;
                                         state.ContinueLoop = false;
                                         state.Iterations++;
                                         readAgain = true;
@@ -429,7 +430,7 @@ namespace DuetControlServer.Files
                             {
                                 throw new CodeParserException($"invalid conditional result '{evaluationResult}', must be either true or false", code);
                             }
-                            _logger.Debug("Evaluation result: ", evaluationResult);
+                            _logger.Debug("Evaluation result: {0} = {1}", code.KeywordArgument, evaluationResult);
                             codeBlock.ProcessBlock = (evaluationResult == "true");
                             codeBlock.ExpectingElse = (code.Keyword != KeywordType.While && evaluationResult == "false");
                             break;

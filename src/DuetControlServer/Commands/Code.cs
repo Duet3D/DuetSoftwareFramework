@@ -197,15 +197,16 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Start the next available G/M/T-code and wait until this code may finish
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private Task<IDisposable> WaitForFinish()
+        /// <returns>Awaitable disposable</returns>
+        private AwaitableDisposable<IDisposable> WaitForFinish()
         {
+            _logger.Debug("Waiting for finish of {0}", this);
             if (Interception.IsInterceptingConnection(SourceConnection))
             {
-                return Task.FromResult<IDisposable>(null);
+                return new AwaitableDisposable<IDisposable>(Task.FromResult<IDisposable>(null));
             }
 
-            AwaitableDisposable<IDisposable> finishTask = _codeFinishLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken);
+            AwaitableDisposable<IDisposable> finishTask = (Macro == null) ? _codeFinishLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken) : Macro.WaitForCodeFinish();
             if (!Flags.HasFlag(CodeFlags.Unbuffered))
             {
                 StartNextCode();
@@ -397,24 +398,9 @@ namespace DuetControlServer.Commands
                 return;
             }
 
-            // Cancel this code if it came from a file and if it was processed while the print was being paused.
-            // If that is not the case, let RepRapFirmware process this code
-            Task<CodeResult> rrfTask;
-            if (Channel == CodeChannel.File)
-            {
-                using (await FileExecution.Job.LockAsync())
-                {
-                    if (FileExecution.Job.IsPaused)
-                    {
-                        throw new OperationCanceledException();
-                    }
-                    rrfTask = Interface.ProcessCode(this);
-                }
-            }
-            else
-            {
-                rrfTask = Interface.ProcessCode(this);
-            }
+            // Enqueue this code for further processing in RepRapFirmware
+            FirmwareTCS = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            await Interface.ProcessCode(this);
 
             // Start the next code if applicable to buffer codes in RRF for greater throughput
             if (!Flags.HasFlag(CodeFlags.Unbuffered))
@@ -422,19 +408,17 @@ namespace DuetControlServer.Commands
                 StartNextCode();
             }
 
+            // Wait for the code to be processed by RepRapFirmware
             try
             {
-                // Wait for the code to be processed by RepRapFirmware
-                Result = await rrfTask;
                 using (await WaitForFinish())
                 {
+                    await FirmwareTask;
                     await CodeExecuted();
                 }
             }
-            catch (OperationCanceledException oce)
+            catch (OperationCanceledException)
             {
-                _logger.Trace(oce, "Code {0} cancelled", this);
-
                 // Cancelling a code clears the result
                 Result = null;
                 using (await WaitForFinish())
@@ -535,7 +519,22 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
-        /// Indicates if the code has been finished
+        /// TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
+        /// </summary>
+        public TaskCompletionSource<object> FirmwareTCS { get; private set; }
+
+        /// <summary>
+        /// Task to complete when the code has finished
+        /// </summary>
+        public Task FirmwareTask { get => FirmwareTCS.Task; }
+
+        /// <summary>
+        /// Size of this code in binary representation
+        /// </summary>
+        public int BinarySize { get; set; }
+
+        /// <summary>
+        /// Indicates if the code has been fully executed (including the Executed interceptor if applicable)
         /// </summary>
         public bool IsExecuted
         {

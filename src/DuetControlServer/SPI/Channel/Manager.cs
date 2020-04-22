@@ -101,7 +101,7 @@ namespace DuetControlServer.SPI.Channel
                     {
                         if (!channel.IsBlocked)
                         {
-                            if (channel.Run())
+                            if (await channel.Run())
                             {
                                 // Something could be processed
                                 dataProcessed = true;
