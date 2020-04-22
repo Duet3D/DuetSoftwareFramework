@@ -1,6 +1,34 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 2.1.0
+==============
+
+Compatible files:
+- RepRapFirmware 3.01-RC9
+- DuetWebControl 2.1.4
+
+Changed behaviour:
+- Implemented conditional G-code according to https://duet3d.dozuki.com/Wiki/GCode_Meta_Commands (same command set as supported by RRF)
+- DuetAPI version number has been increased, however the previous one is still accepted
+- DuetAPI uses relaxed JSON escaping like in the DCS settings file
+- Added new fields stepsPerMm and microstepping to Axis amd Extruder items to DuetAPI
+- Increased maximum size of messages being sent to the firmware from 256 bytes to 4KiB
+- Removed SpiPollDelaySimulating and renamed SpiPollDelaySimulating to FileBufferSize in the DCS settings (the latter is now used for code files, too)
+- Simple text-based codes no longer report when they are cancelled
+
+Known issues:
+- Print/Simulation times are not written to G-code files
+- Comments for object cancellation detection are not parsed (work-around is to use M486 directly)
+
+Bug fixes:
+- DuetControlServer could sporadically hang when printing a file
+- Fixed deadlock that could occur when the SPI task tried to resolve pending requests
+- M20 was not fully compatible with RRF
+- Concatenating code parser exception caused the line to be appended multiple times
+- Filament sensors and move.kinematics were neither properly updated nor serialized
+- Codes of macros being cancelled were sometimes aborted with a wrong exception
+
 Version 2.0.0
 ==============
 Compatible files:
