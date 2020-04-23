@@ -246,6 +246,9 @@ namespace DuetControlServer.FileExecution
         /// Wait for this macro to finish asynchronously
         /// </summary>
         /// <returns>Code result of the finished macro</returns>
+        /// <remarks>
+        /// This task is always resolved and never cancelled
+        /// </remarks>
         public Task<CodeResult> FinishAsync()
         {
             if (!IsExecuting)
@@ -342,33 +345,27 @@ namespace DuetControlServer.FileExecution
                     }
                     catch (CodeParserException cpe)
                     {
+                        await Logger.LogOutput(MessageType.Error, cpe.Message);
                         using (await _lock.LockAsync(Program.CancellationToken))
                         {
                             await Abort();
                         }
-
-                        await Logger.LogOutput(MessageType.Error, cpe.Message);
-                        _logger.Error(cpe);
                     }
                     catch (AggregateException ae)
                     {
+                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
                         using (await _lock.LockAsync(Program.CancellationToken))
                         {
                             await Abort();
                         }
-
-                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
-                        _logger.Error(ae.InnerException, "Failed execute code from macro {0}", FileName);
                     }
                     catch (Exception e)
                     {
+                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{e.GetType().Name}] {e.Message}");
                         using (await _lock.LockAsync(Program.CancellationToken))
                         {
                             await Abort();
                         }
-
-                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{e.GetType().Name}] {e.Message}");
-                        _logger.Error(e, "Failed execute code from macro {0}", FileName);
                     }
                 }
                 else
@@ -384,6 +381,10 @@ namespace DuetControlServer.FileExecution
             using (await _lock.LockAsync(Program.CancellationToken))
             {
                 IsExecuting = false;
+                if (!IsAborted)
+                {
+                    _logger.Info("Finished macro file {0}", FileName);
+                }
                 if (_finishTCS != null)
                 {
                     _finishTCS.SetResult(Result);

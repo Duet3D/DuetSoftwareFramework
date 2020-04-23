@@ -156,6 +156,16 @@
 		private int? _monitorsPerHeater;
 
 		/// <summary>
+		/// Maximum number of restore points or null if unknown
+		/// </summary>
+		public int? RestorePoints
+		{
+			get => _restorePoints;
+			set => SetPropertyValue(ref _restorePoints, value);
+		}
+		private int? _restorePoints;
+
+		/// <summary>
 		/// Maximum number of sensors or null if unknown
 		/// </summary>
 		public int? Sensors
@@ -174,6 +184,26 @@
 			set => SetPropertyValue(ref _spindles, value);
 		}
 		private int? _spindles;
+
+		/// <summary>
+		/// Maximum number of tools or null if unknown
+		/// </summary>
+		public int? Tools
+		{
+			get => _tools;
+			set => SetPropertyValue(ref _tools, value);
+		}
+		private int? _tools;
+
+		/// <summary>
+		/// Maximum number of tracked objects or null if unknown
+		/// </summary>
+		public int? TrackedObjects
+		{
+			get => _trackedObjects;
+			set => SetPropertyValue(ref _trackedObjects, value);
+		}
+		private int? _trackedObjects;
 
 		/// <summary>
 		/// Maximum number of triggers or null if unknown

@@ -153,13 +153,22 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="letter">Letter of the code parameter (automatically converted to upper-case)</param>
         /// <param name="value">Value of this parameter</param>
-        /// <param name="isExpression">Whether the value is an expression</param>
-        public CodeParameter(char letter, object value, bool isExpression = false)
+        public CodeParameter(char letter, object value)
         {
             Letter = letter;
-            StringValue = value.ToString();
             ParsedValue = value;
-            IsExpression = isExpression;
+            if (value is string stringValue)
+            {
+                StringValue = stringValue;
+                if (stringValue.StartsWith('{') && stringValue.EndsWith('}'))
+                {
+                    IsExpression = true;
+                }
+            }
+            else
+            {
+                StringValue = value.ToString();
+            }
         }
 
         /// <summary>

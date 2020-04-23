@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -121,7 +122,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Cancellation token that may be used to cancel this code
         /// </summary>
-        public CancellationToken CancellationToken { get; set; }
+        internal CancellationToken CancellationToken { get; set; }
 
         /// <summary>
         /// Create a task that waits until this code can be executed.
@@ -251,13 +252,13 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Indicates if this code is supposed to deal with a message box awaiting acknowledgement
         /// </summary>
-        public bool IsForAcknowledgement { get => _codeType == InternalCodeType.Acknowledgement; }
+        internal bool IsForAcknowledgement { get => _codeType == InternalCodeType.Acknowledgement; }
 
         /// <summary>
         /// This indicates if this code is cancelling a print.
         /// FIXME Remove this again when the SBC interface has got its own task in RRF
         /// </summary>
-        public bool CancellingPrint { get; set; }
+        internal bool CancellingPrint { get; set; }
 
         /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish
@@ -290,22 +291,22 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Indicates whether the code has been internally processed
         /// </summary>
-        public bool InternallyProcessed;
+        internal bool InternallyProcessed { get; set; }
 
         /// <summary>
         /// File that started this code
         /// </summary>
-        public Files.CodeFile File;
+        internal Files.CodeFile File { get; set; }
 
         /// <summary>
         /// Macro that started this code or null
         /// </summary>
-        public Macro Macro;
+        internal Macro Macro { get; set; }
 
         /// <summary>
         /// Indicates if this code has been resolved by an interceptor
         /// </summary>
-        public bool ResolvedByInterceptor;
+        internal bool ResolvedByInterceptor { get; private set; }
 
         /// <summary>
         /// Execute the given code internally
@@ -521,25 +522,25 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
         /// </summary>
-        public TaskCompletionSource<object> FirmwareTCS { get; private set; }
+        internal TaskCompletionSource<object> FirmwareTCS { get; private set; }
 
         /// <summary>
         /// Task to complete when the code has finished
         /// </summary>
-        public Task FirmwareTask { get => FirmwareTCS.Task; }
+        internal Task FirmwareTask { get => FirmwareTCS.Task; }
 
         /// <summary>
         /// Size of this code in binary representation
         /// </summary>
-        public int BinarySize { get; set; }
+        internal int BinarySize { get; set; }
 
         /// <summary>
         /// Indicates if the code has been fully executed (including the Executed interceptor if applicable)
         /// </summary>
-        public bool IsExecuted
+        internal bool IsExecuted
         {
             get => _isExecuted;
-            set => _isExecuted = value;
+            private set => _isExecuted = value;
         }
         private volatile bool _isExecuted;
 

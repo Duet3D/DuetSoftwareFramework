@@ -558,13 +558,12 @@
             <param name="isDriverId">Whether this is a driver ID</param>
             <remarks>This constructor does not parsed long (aka int64) values because RRF cannot handle them</remarks>
         </member>
-        <member name="M:DuetAPI.Commands.CodeParameter.#ctor(System.Char,System.Object,System.Boolean)">
+        <member name="M:DuetAPI.Commands.CodeParameter.#ctor(System.Char,System.Object)">
             <summary>
             Creates a new CodeParameter instance and with the given value
             </summary>
             <param name="letter">Letter of the code parameter (automatically converted to upper-case)</param>
             <param name="value">Value of this parameter</param>
-            <param name="isExpression">Whether the value is an expression</param>
         </member>
         <member name="P:DuetAPI.Commands.CodeParameter.Type">
             <summary>
@@ -2838,6 +2837,11 @@
             Maximum number of monitors per heater or null if unknown
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Limits.RestorePoints">
+            <summary>
+            Maximum number of restore points or null if unknown
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Limits.Sensors">
             <summary>
             Maximum number of sensors or null if unknown
@@ -2846,6 +2850,16 @@
         <member name="P:DuetAPI.Machine.Limits.Spindles">
             <summary>
             Maximum number of spindles or null if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Limits.Tools">
+            <summary>
+            Maximum number of tools or null if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Limits.TrackedObjects">
+            <summary>
+            Maximum number of tracked objects or null if unknown
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Limits.Triggers">

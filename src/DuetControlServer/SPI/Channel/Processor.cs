@@ -156,7 +156,7 @@ namespace DuetControlServer.SPI.Channel
                     }
                     else if (Channel != CodeChannel.Daemon)
                     {
-                        _logger.Info("Finished macro file {0}", oldState.Macro.FileName);
+                        _logger.Debug("Finished macro file {0}", oldState.Macro.FileName);
                     }
                     else
                     {

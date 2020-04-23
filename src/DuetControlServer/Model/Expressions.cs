@@ -234,7 +234,12 @@ namespace DuetControlServer.Model
                     try
                     {
                         string parameterValue = await EvaluateExpression(code, trimmedExpression, replaceOnlyLinuxFields, true);
-                        code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue, true);
+                        if (!parameterValue.StartsWith('{') && !parameterValue.EndsWith('}'))
+                        {
+                            // Encapsulate even fully expanded parameters so that plugins and RRF know it was an expression
+                            parameterValue = '{' + parameterValue + '}';
+                        }
+                        code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue);
                     }
                     catch (CodeParserException cpe)
                     {

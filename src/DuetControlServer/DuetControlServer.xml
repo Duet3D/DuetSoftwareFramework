@@ -300,9 +300,24 @@
             </summary>
             <returns>Whether the code could be processed internally</returns>
         </member>
+        <member name="P:DuetControlServer.Commands.Code.FirmwareTCS">
+            <summary>
+            TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Commands.Code.FirmwareTask">
+            <summary>
+            Task to complete when the code has finished
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Commands.Code.BinarySize">
+            <summary>
+            Size of this code in binary representation
+            </summary>
+        </member>
         <member name="P:DuetControlServer.Commands.Code.IsExecuted">
             <summary>
-            Indicates if the code has been finished
+            Indicates if the code has been fully executed (including the Executed interceptor)
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.Code.CodeExecuted">
@@ -721,9 +736,23 @@
             Internal lock used for starting codes in the right order
             </summary>
         </member>
+        <member name="F:DuetControlServer.FileExecution.Macro._codeFinishLock">
+            <summary>
+            Internal lock used for starting codes in the right order
+            </summary>
+        </member>
         <member name="M:DuetControlServer.FileExecution.Macro.WaitForCodeStart">
             <summary>
             Method to wait until a new code can be started in the right order
+            </summary>
+            <returns>Disposable lock</returns>
+            <remarks>
+            This is required in case a flush is requested before another nested macro is started
+            </remarks>
+        </member>
+        <member name="M:DuetControlServer.FileExecution.Macro.WaitForCodeFinish">
+            <summary>
+            Method to wait until a new code can be finished in the right order
             </summary>
             <returns>Disposable lock</returns>
             <remarks>
@@ -2643,87 +2672,6 @@
             </summary>
             <returns>Enumerator</returns>
         </member>
-        <member name="T:DuetControlServer.SPI.Channel.PendingCode">
-            <summary>
-            Class that represents a queued code that has been sent to RepRapFirmware
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Channel.PendingCode._result">
-            <summary>
-            Internal code result to return when the code has finished
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Channel.PendingCode._tcs">
-            <summary>
-            Task to complete when the code has finished
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.SPI.Channel.PendingCode.Code">
-            <summary>
-            Code item to execute
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.SPI.Channel.PendingCode.BinarySize">
-            <summary>
-            Size of this code in binary representation
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.SPI.Channel.PendingCode.#ctor(DuetControlServer.Commands.Code)">
-            <summary>
-            Constructor for a queued code
-            </summary>
-            <param name="code">Code to execute</param>
-        </member>
-        <member name="P:DuetControlServer.SPI.Channel.PendingCode.Task">
-            <summary>
-            Task that is resolved when the code has finished
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.SPI.Channel.PendingCode.IsFinished">
-            <summary>
-            Indicates if the code has been finished because of a G-code reply
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.SPI.Channel.PendingCode._lastMessageIncomplete">
-            <summary>
-            Indicates if the last code reply was incomplete (i.e. sent with the Push flag)
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.SPI.Channel.PendingCode.HandleReply(DuetControlServer.SPI.Communication.Shared.MessageTypeFlags,System.String)">
-            <summary>
-            Process a code reply from the firmware
-            </summary>
-            <param name="messageType">Message type flags</param>
-            <param name="reply">Raw code reply</param>
-        </member>
-        <member name="M:DuetControlServer.SPI.Channel.PendingCode.AppendReply(DuetAPI.Commands.CodeResult)">
-            <summary>
-            Append a code reply
-            </summary>
-            <param name="result">Code reply</param>
-        </member>
-        <member name="M:DuetControlServer.SPI.Channel.PendingCode.SetCancelled">
-            <summary>
-            Report that this code has been cancelled
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.SPI.Channel.PendingCode.SetException(System.Exception)">
-            <summary>
-            Report that something went wrong while executing this code
-            </summary>
-            <param name="e">Exception to return</param>
-        </member>
-        <member name="M:DuetControlServer.SPI.Channel.PendingCode.SetFinished">
-            <summary>
-            Called to resolve the task because it has finished
-            </summary>
-        </member>
-        <member name="M:DuetControlServer.SPI.Channel.PendingCode.ToString">
-            <summary>
-            Convert this instance to a string
-            </summary>
-            <returns>String representation</returns>
-        </member>
         <member name="T:DuetControlServer.SPI.Channel.Processor">
             <summary>
             Class used to process data on a single code channel
@@ -2868,7 +2816,7 @@
             </summary>
             <param name="code">Code to perform</param>
         </member>
-        <member name="M:DuetControlServer.SPI.Channel.Processor.BufferCode(DuetControlServer.SPI.Channel.PendingCode)">
+        <member name="M:DuetControlServer.SPI.Channel.Processor.BufferCode(DuetControlServer.Commands.Code)">
             <summary>
             Store a pending code for transmission to RepRapFirmware
             </summary>
@@ -2887,6 +2835,19 @@
             <param name="flags">Message flags</param>
             <param name="reply">Code reply</param>
             <returns>Whether the reply could be processed</returns>
+        </member>
+        <member name="F:DuetControlServer.SPI.Channel.Processor._lastPartialMessage">
+            <summary>
+            Holds the last incomplete code reply
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.SPI.Channel.Processor.HandleCodeReply(DuetControlServer.Commands.Code,DuetControlServer.SPI.Communication.Shared.MessageTypeFlags,System.String)">
+            <summary>
+            Process a firmware code reply
+            </summary>
+            <param name="code">Destination code</param>
+            <param name="flags">Reply flags</param>
+            <param name="reply">Reply</param>
         </member>
         <member name="M:DuetControlServer.SPI.Channel.Processor.InputPropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)">
             <summary>

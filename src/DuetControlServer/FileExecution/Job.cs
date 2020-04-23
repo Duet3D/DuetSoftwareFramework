@@ -279,35 +279,26 @@ namespace DuetControlServer.FileExecution
                             }
                             catch (CodeParserException cpe)
                             {
+                                await Utility.Logger.LogOutput(MessageType.Error, cpe.Message);
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
                                     await Abort();
                                 }
-
-                                await Utility.Logger.LogOutput(MessageType.Error, cpe.Message);
-                                _logger.Error(cpe);
                             }
                             catch (AggregateException ae)
                             {
-
                                 await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
-                                _logger.Error(ae);
-
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
                                     await Abort();
-                                    break;
                                 }
                             }
                             catch (Exception e)
                             {
                                 await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
-                                _logger.Error(e);
-
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
                                     await Abort();
-                                    break;
                                 }
                             }
                         }
