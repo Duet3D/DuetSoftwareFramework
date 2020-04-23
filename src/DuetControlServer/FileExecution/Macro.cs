@@ -346,26 +346,14 @@ namespace DuetControlServer.FileExecution
                     catch (CodeParserException cpe)
                     {
                         await Logger.LogOutput(MessageType.Error, cpe.Message);
-                        using (await _lock.LockAsync(Program.CancellationToken))
-                        {
-                            await Abort();
-                        }
                     }
                     catch (AggregateException ae)
                     {
                         await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
-                        using (await _lock.LockAsync(Program.CancellationToken))
-                        {
-                            await Abort();
-                        }
                     }
                     catch (Exception e)
                     {
                         await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{e.GetType().Name}] {e.Message}");
-                        using (await _lock.LockAsync(Program.CancellationToken))
-                        {
-                            await Abort();
-                        }
                     }
                 }
                 else

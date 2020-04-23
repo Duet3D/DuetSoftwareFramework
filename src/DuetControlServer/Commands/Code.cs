@@ -14,6 +14,7 @@ using DuetControlServer.IPC.Processors;
 using DuetControlServer.Model;
 using DuetControlServer.SPI;
 using Nito.AsyncEx;
+using Job = DuetControlServer.FileExecution.Job;
 
 namespace DuetControlServer.Commands
 {
@@ -206,7 +207,6 @@ namespace DuetControlServer.Commands
                 StartNextCode();
             }
 
-            _logger.Debug("Waiting for finish of {0}", this);
             if (Interception.IsInterceptingConnection(SourceConnection))
             {
                 return new AwaitableDisposable<IDisposable>(Task.FromResult<IDisposable>(null));
@@ -363,21 +363,24 @@ namespace DuetControlServer.Commands
                     throw;
                 }
             }
-            catch
+            catch (Exception e) when (!(e is OperationCanceledException))
             {
-                // Start the next code even if an exception has occurred
-                _ = Interface.Flush(Channel).ContinueWith(async task =>
+                // Cancel the running file and then start the next code if an exception has occurred
+                if (Macro != null)
                 {
-                    try
+                    using (await Macro.LockAsync())
                     {
-                        // Perform a flush so that files have a chance to invalidate pending codes first
-                        await task;
+                        await Macro.Abort();
                     }
-                    finally
+                }
+                else if (Channel == CodeChannel.File)
+                {
+                    using (await Job.LockAsync())
                     {
-                        StartNextCode();
+                        await Job.Abort();
                     }
-                }, TaskContinuationOptions.RunContinuationsAsynchronously);
+                }
+                StartNextCode();
                 throw;
             }
             finally
@@ -397,6 +400,7 @@ namespace DuetControlServer.Commands
             // Attempt to process the code internally first
             if (!InternallyProcessed && await ProcessInternally())
             {
+                _logger.Debug("Waiting for finish of {0}", this);
                 using (await WaitForFinish())
                 {
                     await CodeExecuted();
@@ -407,6 +411,7 @@ namespace DuetControlServer.Commands
             // Comments are resolved in DCS but they may be interpreted by third-party plugins
             if (Keyword == KeywordType.None && Type == CodeType.Comment)
             {
+                _logger.Debug("Waiting for finish of {0}", this);
                 using (await WaitForFinish())
                 {
                     Result = new CodeResult();
@@ -422,6 +427,7 @@ namespace DuetControlServer.Commands
             // Wait for the code to be processed by RepRapFirmware
             try
             {
+                _logger.Debug("Waiting for finish of {0}", this);
                 using (await WaitForFinish())
                 {
                     await FirmwareTask;
