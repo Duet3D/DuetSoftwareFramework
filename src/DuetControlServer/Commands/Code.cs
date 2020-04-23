@@ -201,6 +201,11 @@ namespace DuetControlServer.Commands
         /// <returns>Awaitable disposable</returns>
         private AwaitableDisposable<IDisposable> WaitForFinish()
         {
+            if (!Flags.HasFlag(CodeFlags.Unbuffered))
+            {
+                StartNextCode();
+            }
+
             _logger.Debug("Waiting for finish of {0}", this);
             if (Interception.IsInterceptingConnection(SourceConnection))
             {
@@ -208,10 +213,6 @@ namespace DuetControlServer.Commands
             }
 
             AwaitableDisposable<IDisposable> finishTask = (Macro == null) ? _codeFinishLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken) : Macro.WaitForCodeFinish();
-            if (!Flags.HasFlag(CodeFlags.Unbuffered))
-            {
-                StartNextCode();
-            }
             return finishTask;
         }
         #endregion
@@ -276,10 +277,9 @@ namespace DuetControlServer.Commands
                         _codeStartLock = await task;
                         return await ExecuteInternally();
                     }
-                    catch
+                    finally
                     {
                         IsExecuted = true;
-                        throw;
                     }
                 }, TaskContinuationOptions.RunContinuationsAsynchronously)
                 .Unwrap();
@@ -363,11 +363,27 @@ namespace DuetControlServer.Commands
                     throw;
                 }
             }
+            catch
+            {
+                // Start the next code even if an exception has occurred
+                _ = Interface.Flush(Channel).ContinueWith(async task =>
+                {
+                    try
+                    {
+                        // Perform a flush so that files have a chance to invalidate pending codes first
+                        await task;
+                    }
+                    finally
+                    {
+                        StartNextCode();
+                    }
+                }, TaskContinuationOptions.RunContinuationsAsynchronously);
+                throw;
+            }
             finally
             {
-                // Make sure the next code is started no matter what happened before
+                // Start the next (unbuffered or unsupported) code if everything went well
                 StartNextCode();
-                IsExecuted = true;
             }
             return Result;
         }
@@ -391,9 +407,9 @@ namespace DuetControlServer.Commands
             // Comments are resolved in DCS but they may be interpreted by third-party plugins
             if (Keyword == KeywordType.None && Type == CodeType.Comment)
             {
-                Result = new CodeResult();
                 using (await WaitForFinish())
                 {
+                    Result = new CodeResult();
                     await CodeExecuted();
                 }
                 return;
@@ -402,12 +418,6 @@ namespace DuetControlServer.Commands
             // Enqueue this code for further processing in RepRapFirmware
             FirmwareTCS = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             await Interface.ProcessCode(this);
-
-            // Start the next code if applicable to buffer codes in RRF for greater throughput
-            if (!Flags.HasFlag(CodeFlags.Unbuffered))
-            {
-                StartNextCode();
-            }
 
             // Wait for the code to be processed by RepRapFirmware
             try
@@ -421,9 +431,9 @@ namespace DuetControlServer.Commands
             catch (OperationCanceledException)
             {
                 // Cancelling a code clears the result
-                Result = null;
                 using (await WaitForFinish())
                 {
+                    Result = null;
                     await CodeExecuted();
                 }
                 throw;
