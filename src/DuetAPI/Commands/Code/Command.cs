@@ -214,7 +214,7 @@ namespace DuetAPI.Commands
             {
                 if (parameter.Letter != '\0')
                 {
-                    if (parameter.Type == typeof(string))
+                    if (parameter.Type == typeof(string) && !parameter.IsExpression)
                     {
                         builder.Append($" {parameter.Letter}\"{((string)parameter).Replace("\"", "\"\"")}\"");
                     }
@@ -225,7 +225,7 @@ namespace DuetAPI.Commands
                 }
                 else
                 {
-                    if (parameter.Type == typeof(string))
+                    if (parameter.Type == typeof(string) && !parameter.IsExpression)
                     {
                         builder.Append($" \"{((string)parameter).Replace("\"", "\"\"")}\"");
                     }

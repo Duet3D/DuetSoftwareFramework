@@ -340,6 +340,16 @@ namespace DuetControlServer.FileExecution
                     {
                         // Code has been cancelled, don't log this. In the future this may terminate the macro file
                     }
+                    catch (CodeParserException cpe)
+                    {
+                        using (await _lock.LockAsync(Program.CancellationToken))
+                        {
+                            await Abort();
+                        }
+
+                        await Logger.LogOutput(MessageType.Error, cpe.Message);
+                        _logger.Error(cpe);
+                    }
                     catch (AggregateException ae)
                     {
                         using (await _lock.LockAsync(Program.CancellationToken))

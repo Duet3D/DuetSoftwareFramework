@@ -230,7 +230,7 @@ namespace DuetControlServer.Model
             {
                 if (code.Parameters[i].IsExpression)
                 {
-                    string trimmedExpression = code.Parameters[i].ToString().Trim();
+                    string trimmedExpression = ((string)code.Parameters[i]).Trim();
                     try
                     {
                         string parameterValue = await EvaluateExpression(code, trimmedExpression, replaceOnlyLinuxFields, true);
