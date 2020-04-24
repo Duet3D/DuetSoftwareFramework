@@ -466,7 +466,7 @@ namespace DuetControlServer.SPI
             }
             if (message.Length > Consts.MaxMessageLength)
             {
-                throw new ArgumentException("message too long");
+                throw new ArgumentException($"{nameof(message)} too long");
             }
 
             lock (_messagesToSend)
@@ -474,12 +474,6 @@ namespace DuetControlServer.SPI
                 _messagesToSend.Enqueue(new Tuple<MessageTypeFlags, string>(flags, message));
             }
         }
-
-        /// <summary>
-        /// Initialize physical transfer and perform initial data transfer.
-        /// This is only called once on initialization
-        /// </summary>
-        public static void Connect() => DataTransfer.PerformFullTransfer(false);
 
         /// <summary>
         /// Perform communication with the RepRapFirmware controller

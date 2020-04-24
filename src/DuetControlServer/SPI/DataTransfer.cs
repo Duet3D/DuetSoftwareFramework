@@ -99,10 +99,7 @@ namespace DuetControlServer.SPI
             }
 
             // Perform the first transfer
-            if (!PerformFullTransfer(false))
-            {
-                throw new Exception("Failed to perform first transfer");
-            }
+            PerformFullTransfer(true);
         }
 
         /// <summary>
@@ -135,9 +132,8 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Perform a full data transfer synchronously
         /// </summary>
-        /// <param name="mustSucceed">Keep retrying until the transfer succeeds</param>
-        /// <returns>Whether new data could be transferred</returns>
-        public static bool PerformFullTransfer(bool mustSucceed = true)
+        /// <param name="connecting">Whether this an initial connection is being established</param>
+        public static void PerformFullTransfer(bool connecting = false)
         {
             _lastTransferNumber = _rxHeader.SequenceNumber;
 
@@ -205,13 +201,13 @@ namespace DuetControlServer.SPI
                     {
                         Updater.ConnectionLost();
                         _waitingForFirstTransfer = _hadTimeout = true;
-                        return PerformFullTransfer(mustSucceed);
+                        PerformFullTransfer(connecting);
                     }
-                    return true;
+                    break;
                 }
                 catch (OperationCanceledException e)
                 {
-                    if (_waitingForFirstTransfer || Program.CancellationToken.IsCancellationRequested)
+                    if (connecting || Program.CancellationToken.IsCancellationRequested)
                     {
                         throw;
                     }
@@ -225,9 +221,7 @@ namespace DuetControlServer.SPI
                     }
                 }
             }
-            while (mustSucceed);
-
-            return false;
+            while (!Program.CancellationToken.IsCancellationRequested);
         }
 
         /// <summary>
