@@ -225,7 +225,7 @@ namespace DuetControlServer.FileExecution
                 return;
             }
             IsAborted = true;
-            IsExecuting = false;
+
             if (_file != null)
             {
                 using (await _file.LockAsync())
@@ -345,7 +345,7 @@ namespace DuetControlServer.FileExecution
                     }
                     catch (CodeParserException cpe)
                     {
-                        await Logger.LogOutput(MessageType.Error, cpe.Message);
+                        await Logger.LogOutput(MessageType.Error, cpe.Message + " of " + Path.GetFileName(FileName));
                     }
                     catch (AggregateException ae)
                     {

@@ -1,7 +1,9 @@
-﻿using System;
+﻿using DuetAPI.Machine;
+using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace DuetAPI.Utility

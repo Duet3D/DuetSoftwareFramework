@@ -63,6 +63,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Set up the SPI device and the controller for the transfer ready pin
         /// </summary>
+        /// <exception cref="OperationCanceledException">Failed to connect to board</exception>
         public static void Init()
         {
             // Initialize TX header. This only needs to happen once
@@ -95,6 +96,12 @@ namespace DuetControlServer.SPI
             catch (Exception e)
             {
                 _logger.Warn(e, "Failed to retrieve Kernel SPI buffer size");
+            }
+
+            // Perform the first transfer
+            if (!PerformFullTransfer(false))
+            {
+                throw new Exception("Failed to perform first transfer");
             }
         }
 
@@ -204,7 +211,7 @@ namespace DuetControlServer.SPI
                 }
                 catch (OperationCanceledException e)
                 {
-                    if (Program.CancellationToken.IsCancellationRequested)
+                    if (_waitingForFirstTransfer || Program.CancellationToken.IsCancellationRequested)
                     {
                         throw;
                     }

@@ -3195,6 +3195,11 @@
             Deceleration of the current move (in mm/s^2)
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.CurrentMove.LaserPwm">
+            <summary>
+            Laser PWM of the current move (0..1) or null if not applicable
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.CurrentMove.RequestedSpeed">
             <summary>
             Requested speed of the current move (in mm/s)
@@ -4868,7 +4873,7 @@
         </member>
         <member name="P:DuetAPI.Machine.State.LaserPwm">
             <summary>
-            Current laser PWM (0..1) or null if not applicable
+            Laser PWM of the next commanded move (0..1) or null if not applicable
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.State.LogFile">

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -69,7 +70,17 @@ namespace DuetControlServer.Codes
                                         {
                                             Model.Provider.Get.Move.Compensation.File = virtualFile;
                                         }
-                                        return new CodeResult(MessageType.Success, $"Height map loaded from file {file}");
+
+                                        CodeResult result = new CodeResult();
+                                        using (await Model.Provider.AccessReadOnlyAsync())
+                                        {
+                                            if (Model.Provider.Get.Move.Axes.Any(axis => axis.Letter == 'Z' && !axis.Homed))
+                                            {
+                                                result.Add(MessageType.Warning, "The height map was loaded when the current Z=0 datum was not determined. This may result in a height offset.");
+                                            }
+                                        }
+                                        result.Add(MessageType.Success, $"Height map loaded from file {file}");
+                                        return result;
                                     }
                                     else
                                     {

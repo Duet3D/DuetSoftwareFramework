@@ -479,8 +479,7 @@ namespace DuetControlServer.SPI
         /// Initialize physical transfer and perform initial data transfer.
         /// This is only called once on initialization
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public static bool Connect() => DataTransfer.PerformFullTransfer(false);
+        public static void Connect() => DataTransfer.PerformFullTransfer(false);
 
         /// <summary>
         /// Perform communication with the RepRapFirmware controller

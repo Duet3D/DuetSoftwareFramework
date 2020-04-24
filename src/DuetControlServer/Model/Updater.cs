@@ -282,6 +282,7 @@ namespace DuetControlServer.Model
             using (Provider.AccessReadWrite())
             {
                 Provider.Get.Boards.Clear();
+                Provider.Get.Move.Compensation.File = null;
                 if (Provider.Get.State.Status != MachineStatus.Halted && Provider.Get.State.Status != MachineStatus.Updating)
                 {
                     Provider.Get.State.Status = MachineStatus.Off;

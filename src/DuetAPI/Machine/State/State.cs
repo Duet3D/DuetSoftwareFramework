@@ -63,7 +63,7 @@
         public ModelCollection<GpOutputPort> GpOut { get; } = new ModelCollection<GpOutputPort>();
 
         /// <summary>
-        /// Current laser PWM (0..1) or null if not applicable
+        /// Laser PWM of the next commanded move (0..1) or null if not applicable
         /// </summary>
         public float? LaserPwm
         {

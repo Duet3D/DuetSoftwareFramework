@@ -26,7 +26,7 @@
   "MaxLayerHeight": 0.9,
   "LayerHeightFilters": [
     {
-      "Pattern": "\\slayer_height\\D+(?<mm>(\\d+\\.?\\d*))",
+      "Pattern": "^\\s*layer_height\\D+(?<mm>(\\d+\\.?\\d*))",
       "Options": 17
     },
     {
@@ -96,7 +96,7 @@
   ],
   "PrintTimeFilters": [
     {
-      "Pattern": "estimated printing time = ((?<h>(\\d+))h\\s*)?((?<m>(\\d+))m\\s*)?((?<s>(\\d+))s)?",
+      "Pattern": "estimated printing time .*= ((?<h>(\\d+))h\\s*)?((?<m>(\\d+))m\\s*)?((?<s>(\\d+))s)?",
       "Options": 17
     },
     {

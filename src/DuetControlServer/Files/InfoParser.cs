@@ -170,11 +170,11 @@ namespace DuetControlServer.Files
                         }
                         else if (!string.IsNullOrWhiteSpace(code.Comment))
                         {
-                            gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(readResult.Line, ref partialFileInfo);
-                            gotNewInfo |= !hadFilament && FindFilamentUsed(readResult.Line, ref partialFileInfo);
-                            gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(readResult.Line, ref partialFileInfo);
-                            gotNewInfo |= (partialFileInfo.PrintTime == null) && FindPrintTime(readResult.Line, ref partialFileInfo);
-                            gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(readResult.Line, ref partialFileInfo);
+                            gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
+                            gotNewInfo |= !hadFilament && FindFilamentUsed(code.Comment, ref partialFileInfo);
+                            gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(code.Comment, ref partialFileInfo);
+                            gotNewInfo |= (partialFileInfo.PrintTime == null) && FindPrintTime(code.Comment, ref partialFileInfo);
+                            gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
                         }
 
                         // Prepare to read the next code

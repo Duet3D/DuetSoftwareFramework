@@ -411,11 +411,11 @@ namespace DuetControlServer.Model
                         }
                         if (Filter.GetSpecific(subFilter, true, out object linuxField))
                         {
-                            string subResult = ObjectToString(linuxField, wantsCount, true, code);
                             if (subExpression == expression)
                             {
-                                return subResult;
+                                return ObjectToString(linuxField, wantsCount, encodeResult, code);
                             }
+                            string subResult = ObjectToString(linuxField, wantsCount, true, code);
                             result.Append(subResult);
                         }
                         else

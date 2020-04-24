@@ -54,10 +54,7 @@ namespace DuetControlServer.Codes
                                 {
                                     return new CodeResult(MessageType.Error, "Pause the print before attempting to cancel it");
                                 }
-
-                                // Invalidate the print file and make sure no more codes are read from it
                                 code.CancellingPrint = true;
-                                await FileExecution.Job.Cancel();
                             }
                         }
                         break;
@@ -558,7 +555,17 @@ namespace DuetControlServer.Codes
                                 {
                                     Model.Provider.Get.Move.Compensation.File = virtualFile;
                                 }
-                                return new CodeResult(MessageType.Success, $"Height map loaded from file {file}");
+
+                                CodeResult result = new CodeResult();
+                                using (await Model.Provider.AccessReadOnlyAsync())
+                                {
+                                    if (Model.Provider.Get.Move.Axes.Any(axis => axis.Letter == 'Z' && !axis.Homed))
+                                    {
+                                        result.Add(MessageType.Warning, "The height map was loaded when the current Z=0 datum was not determined. This may result in a height offset.");
+                                    }
+                                }
+                                result.Add(MessageType.Success, $"Height map loaded from file {file}");
+                                return result;
                             }
                         }
                         catch (Exception e)
@@ -882,6 +889,20 @@ namespace DuetControlServer.Codes
 
             switch (code.MajorNumber)
             {
+                // Stop or Unconditional stop
+                // Sleep or Conditional stop
+                case 0:
+                case 1:
+                    using (await FileExecution.Job.LockAsync())
+                    {
+                        if (FileExecution.Job.IsFileSelected)
+                        {
+                            // Invalidate the print file and make sure no more codes are read from it
+                            await FileExecution.Job.Cancel();
+                        }
+                    }
+                    break;
+
                 // Resume print
                 // Select file and start SD print
                 // Simulate file

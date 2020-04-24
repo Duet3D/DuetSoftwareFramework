@@ -14,7 +14,7 @@
 			set => SetPropertyValue(ref _acceleration, value);
         }
         private float _acceleration;
-        
+
         /// <summary>
         /// Deceleration of the current move (in mm/s^2)
         /// </summary>
@@ -24,7 +24,17 @@
 			set => SetPropertyValue(ref _deceleration, value);
         }
         private float _deceleration;
-        
+
+        /// <summary>
+        /// Laser PWM of the current move (0..1) or null if not applicable
+        /// </summary>
+        public float? LaserPwm
+        {
+            get => _laserPwm;
+            set => SetPropertyValue(ref _laserPwm, value);
+        }
+        private float? _laserPwm = null;
+
         /// <summary>
         /// Requested speed of the current move (in mm/s)
         /// </summary>

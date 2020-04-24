@@ -16,6 +16,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
+using Job = DuetControlServer.FileExecution.Job;
 
 namespace DuetControlServer.SPI.Channel
 {
@@ -438,6 +439,7 @@ namespace DuetControlServer.SPI.Channel
                         using (await CurrentState.Macro.LockAsync())
                         {
                             Code macroStartCode = CurrentState.MacroStartCode;
+                            await CurrentState.Macro.Abort();
                             _ = CurrentState.Macro.FinishAsync().ContinueWith(async task =>
                             {
                                 CodeResult result = await task;
@@ -487,6 +489,7 @@ namespace DuetControlServer.SPI.Channel
                         using (await CurrentState.Macro.LockAsync())
                         {
                             Code macroStartCode = CurrentState.MacroStartCode;
+                            await CurrentState.Macro.Abort();
                             _ = CurrentState.Macro.FinishAsync().ContinueWith(async task =>
                             {
                                 CodeResult result = await task;
@@ -834,6 +837,7 @@ namespace DuetControlServer.SPI.Channel
             {
                 // Deal with incomplete replies
                 reply = _lastPartialMessage + reply;
+                _lastPartialMessage = null;
             }
 
             if (flags.HasFlag(MessageTypeFlags.PushFlag))

@@ -180,7 +180,7 @@ namespace DuetControlServer
         /// </summary>
         public static List<Regex> LayerHeightFilters { get; set; } = new List<Regex>
         {
-            new Regex(@"\slayer_height\D+(?<mm>(\d+\.?\d*))", RegexFlags),              // Slic3r / Prusa Slicer
+            new Regex(@"^\s*layer_height\D+(?<mm>(\d+\.?\d*))", RegexFlags),            // Slic3r / Prusa Slicer
             new Regex(@"Layer height\D+(?<mm>(\d+\.?\d*))", RegexFlags),                // Cura
             new Regex(@"layerHeight\D+(?<mm>(\d+\.?\d*))", RegexFlags),                 // Simplify3D
             new Regex(@"layer_thickness_mm\D+(?<mm>(\d+\.?\d*))", RegexFlags),          // KISSlicer and Canvas
@@ -217,7 +217,7 @@ namespace DuetControlServer
         /// </summary>
         public static List<Regex> PrintTimeFilters { get; set; } = new List<Regex>
         {
-            new Regex(@"estimated printing time = ((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                                     // Slic3r PE
+            new Regex(@"estimated printing time .*= ((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                                     // Slic3r PE
             new Regex(@"TIME:(?<s>(\d+\.?\d*))", RegexFlags),                                                                                           // Cura
             new Regex(@"Build time: ((?<h>\d+) hour(s)?\s*)?((?<m>\d+) minute(s)?\s*)?((?<s>(\d+) second(s)?))?", RegexFlags),                                    // Simplify3D
             new Regex(@"Estimated Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?", RegexFlags)   // KISSlicer and Canvas

@@ -94,7 +94,7 @@ namespace DuetControlServer
                 return;
             }
 
-            // Connect to RRF controller
+            // Set up SPI subsystem and connect to RRF controller
             if (Settings.NoSpiTask)
             {
                 _logger.Warn("Connection to Duet is NOT established, things may not work as expected");
@@ -103,21 +103,14 @@ namespace DuetControlServer
             {
                 try
                 {
-                    SPI.DataTransfer.Init();
                     SPI.Interface.Init();
-                    if (SPI.Interface.Connect())
-                    {
-                        _logger.Info("Connection to Duet established");
-                    }
-                    else
-                    {
-                        _logger.Fatal("Duet is not available");
-                        return;
-                    }
+                    SPI.DataTransfer.Init();
+                    _logger.Info("Connection to Duet established");
                 }
                 catch (Exception e)
                 {
-                    _logger.Fatal(e, "Failed to connect to Duet");
+                    _logger.Fatal("Could not connect to Duet ({0})", e.Message);
+                    _logger.Debug(e);
                     return;
                 }
             }
