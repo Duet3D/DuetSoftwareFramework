@@ -216,7 +216,7 @@
             <summary>
             Start the next available G/M/T-code and wait until this code may finish
             </summary>
-            <returns>Asynchronous task</returns>
+            <returns>Awaitable disposable</returns>
         </member>
         <member name="F:DuetControlServer.Commands.Code.FileLocks">
             <summary>
@@ -262,22 +262,22 @@
             <returns>Result of the code</returns>
             <exception cref="T:System.OperationCanceledException">Code has been cancelled</exception>
         </member>
-        <member name="F:DuetControlServer.Commands.Code.InternallyProcessed">
+        <member name="P:DuetControlServer.Commands.Code.InternallyProcessed">
             <summary>
             Indicates whether the code has been internally processed
             </summary>
         </member>
-        <member name="F:DuetControlServer.Commands.Code.File">
+        <member name="P:DuetControlServer.Commands.Code.File">
             <summary>
             File that started this code
             </summary>
         </member>
-        <member name="F:DuetControlServer.Commands.Code.Macro">
+        <member name="P:DuetControlServer.Commands.Code.Macro">
             <summary>
             Macro that started this code or null
             </summary>
         </member>
-        <member name="F:DuetControlServer.Commands.Code.ResolvedByInterceptor">
+        <member name="P:DuetControlServer.Commands.Code.ResolvedByInterceptor">
             <summary>
             Indicates if this code has been resolved by an interceptor
             </summary>
@@ -317,7 +317,7 @@
         </member>
         <member name="P:DuetControlServer.Commands.Code.IsExecuted">
             <summary>
-            Indicates if the code has been fully executed (including the Executed interceptor)
+            Indicates if the code has been fully executed (including the Executed interceptor if applicable)
             </summary>
         </member>
         <member name="M:DuetControlServer.Commands.Code.CodeExecuted">
@@ -835,6 +835,9 @@
             Wait for this macro to finish asynchronously
             </summary>
             <returns>Code result of the finished macro</returns>
+            <remarks>
+            This task is always resolved and never cancelled
+            </remarks>
         </member>
         <member name="M:DuetControlServer.FileExecution.Macro.Run">
             <summary>
@@ -4097,6 +4100,7 @@
             <summary>
             Set up the SPI device and the controller for the transfer ready pin
             </summary>
+            <exception cref="T:System.OperationCanceledException">Failed to connect to board</exception>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.GetFullTransfersPerSecond">
             <summary>
@@ -4114,8 +4118,7 @@
             <summary>
             Perform a full data transfer synchronously
             </summary>
-            <param name="mustSucceed">Keep retrying until the transfer succeeds</param>
-            <returns>Whether new data could be transferred</returns>
+            <param name="connecting">Whether this an initial connection is being established</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.HadReset">
             <summary>
@@ -4655,13 +4658,6 @@
             <param name="flags">Message flags</param>
             <param name="message">Message content</param>
             <exception cref="T:System.InvalidOperationException">Incompatible firmware</exception>
-        </member>
-        <member name="M:DuetControlServer.SPI.Interface.Connect">
-            <summary>
-            Initialize physical transfer and perform initial data transfer.
-            This is only called once on initialization
-            </summary>
-            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.Run">
             <summary>

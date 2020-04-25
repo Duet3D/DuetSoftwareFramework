@@ -68,6 +68,7 @@ The following command-line arguments are available:
 - `-u`, `--update`: Update RepRapFirmware and exit. This works even if another instance is already started
 - `-l`, `--log-level`: Set the minimum log level. Valid options are: `trace`, `debug` , `info` , `warn`, `error`, `fatal`, `off` Default is `info`
 - `-c`, `--config`: Override the path to the JSON configuration file. Defaults to `/opt/dsf/conf/config.json`
+- `-r`, `--no-reset-stop`: Do not terminate this application when M999 has been processed
 - `-S`, `--socket-directory`: Override the path where DCS creates UNIX sockets. Defaults to `/var/run/dsf`
 - `-s`, `--socket-file`: Override the filename of DCS's UNIX socket. Defaults to `dcs.sock`
 - `-b`, `--base-directory`: Set the base directory of the virtual SD card directoy. This is used for RepRapFirmware compatibility. Defaults to `/opt/dsf/sd`
@@ -83,7 +84,7 @@ More technical documentation about this can be found [here](https://chrishamm.gi
 
 ### Inter-Process Communication
 
-DuetControlServer provides a UNIX socket for inter-process commmunication. This socket usually resides in `/var/log/dsf/dcs.sock` .
+DuetControlServer provides a UNIX socket for inter-process commmunication. This socket usually resides in `/var/run/dsf/dcs.sock` .
 For .NET Core, DSF provides the `DuetAPIClient` class library which is also used internally by the DSF core applications.
 
 Technical information about the way the communication over the UNIX socket works can be found in the [API description](#api).
@@ -643,5 +644,5 @@ To launch DuetControlServer with this log level on DuetPi, you may run the follo
 
 ```
 sudo systemctl stop duetcontrolserver
-sudo /opt/dsf/bin/DuetControlServer --log-level debug
+sudo /opt/dsf/bin/DuetControlServer -l debug -r
 ```

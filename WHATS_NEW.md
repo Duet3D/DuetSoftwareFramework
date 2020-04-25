@@ -1,6 +1,36 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 2.1.1
+==============
+
+Compatible files:
+- RepRapFirmware 3.01-RC10
+- DuetWebControl 2.1.5
+
+Changed behaviour:
+- If DCS cannot establish a connection to RRF, the error message is always printed
+- Code parser exceptions report the filename
+- File info parser scans parsed comments in the file footer like in the file header
+- Increased priority in systemd service for DCS and start it at `basic.target` instead of `multi-user.target`
+
+Known issues:
+- Print/Simulation times are not written to G-code files
+- Comments for object cancellation detection are not parsed (work-around is to use M486 directly)
+- Codes with invalid expressions may not instantly terminate a macro or job file
+
+Bug fixes:
+- Expression code parameters were not properly printed in the log
+- Double quotes were incorrectly parsed
+- limits key was not updated in the object model
+- Height map file was overwritten by the RepRapFirmware object model
+- G29 S1/M375 didn't print an offset warning when a heightmap was loaded without homing Z first
+- Order of M0/M1 and notification about the print being cancelled was wrong
+- Some internal fields of the Code object were incorrectly serialized
+- Codes could finish in the wrong order
+- PrusaSlicer print time and layer height were not parsed correctly
+- Expression fields were always evaluated from the DSF object model
+
 Version 2.1.0
 ==============
 

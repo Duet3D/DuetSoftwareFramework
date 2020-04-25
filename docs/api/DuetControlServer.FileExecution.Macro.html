@@ -834,9 +834,6 @@
                             <a href="DuetControlServer.SPI.Channel.Manager.html" title="Manager" class="">Manager</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Channel.PendingCode.html" title="PendingCode" class="">PendingCode</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Channel.Processor.html" title="Processor" class="">Processor</a>
                           </li>
                           <li class="">
@@ -1514,6 +1511,9 @@
       </tr>
     </tbody>
   </table>
+  <h5 id="DuetControlServer_FileExecution_Macro_FinishAsync_remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>This task is always resolved and never cancelled</p>
+</div>
   <a id="DuetControlServer_FileExecution_Macro_Lock_" data-uid="DuetControlServer.FileExecution.Macro.Lock*"></a>
   <h4 id="DuetControlServer_FileExecution_Macro_Lock" data-uid="DuetControlServer.FileExecution.Macro.Lock">Lock()</h4>
   <div class="markdown level1 summary"><p>Lock this instance</p>
@@ -1564,6 +1564,34 @@
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_FileExecution_Macro_WaitForCodeFinish_" data-uid="DuetControlServer.FileExecution.Macro.WaitForCodeFinish*"></a>
+  <h4 id="DuetControlServer_FileExecution_Macro_WaitForCodeFinish" data-uid="DuetControlServer.FileExecution.Macro.WaitForCodeFinish">WaitForCodeFinish()</h4>
+  <div class="markdown level1 summary"><p>Method to wait until a new code can be finished in the right order</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public AwaitableDisposable&lt;IDisposable&gt; WaitForCodeFinish()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">Nito.AsyncEx.AwaitableDisposable</span>&lt;<span class="xref">System.IDisposable</span>&gt;</td>
+        <td><p>Disposable lock</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetControlServer_FileExecution_Macro_WaitForCodeFinish_remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>This is required in case a flush is requested before another nested macro is started</p>
+</div>
   <a id="DuetControlServer_FileExecution_Macro_WaitForCodeStart_" data-uid="DuetControlServer.FileExecution.Macro.WaitForCodeStart*"></a>
   <h4 id="DuetControlServer_FileExecution_Macro_WaitForCodeStart" data-uid="DuetControlServer.FileExecution.Macro.WaitForCodeStart">WaitForCodeStart()</h4>
   <div class="markdown level1 summary"><p>Method to wait until a new code can be started in the right order</p>

@@ -834,9 +834,6 @@
                             <a href="DuetControlServer.SPI.Channel.Manager.html" title="Manager" class="">Manager</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Channel.PendingCode.html" title="PendingCode" class="">PendingCode</a>
-                          </li>
-                          <li class="">
                             <a href="DuetControlServer.SPI.Channel.Processor.html" title="Processor" class="">Processor</a>
                           </li>
                           <li class="">
@@ -1329,6 +1326,22 @@
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static void Init()</code></pre>
   </div>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Failed to connect to board</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_DataTransfer_MonitorTransferReadyPin_" data-uid="DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin*"></a>
   <h4 id="DuetControlServer_SPI_DataTransfer_MonitorTransferReadyPin" data-uid="DuetControlServer.SPI.DataTransfer.MonitorTransferReadyPin">MonitorTransferReadyPin()</h4>
   <div class="markdown level1 summary"><p>Internal function to monitor the transfer ready pin</p>
@@ -1345,7 +1358,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static bool PerformFullTransfer(bool mustSucceed = true)</code></pre>
+    <pre><code class="lang-csharp hljs">public static void PerformFullTransfer(bool connecting = false)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1359,24 +1372,8 @@
     <tbody>
       <tr>
         <td><span class="xref">System.Boolean</span></td>
-        <td><span class="parametername">mustSucceed</span></td>
-        <td><p>Keep retrying until the transfer succeeds</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Boolean</span></td>
-        <td><p>Whether new data could be transferred</p>
+        <td><span class="parametername">connecting</span></td>
+        <td><p>Whether this an initial connection is being established</p>
 </td>
       </tr>
     </tbody>
