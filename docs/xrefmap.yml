@@ -4005,19 +4005,6 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.FilamentMonitor.Enabled
   nameWithType: FilamentMonitor.Enabled
-- uid: DuetAPI.Machine.FilamentMonitor.FilamentPresent
-  name: FilamentPresent
-  href: api/DuetAPI.Machine.FilamentMonitor.html#DuetAPI_Machine_FilamentMonitor_FilamentPresent
-  commentId: P:DuetAPI.Machine.FilamentMonitor.FilamentPresent
-  fullName: DuetAPI.Machine.FilamentMonitor.FilamentPresent
-  nameWithType: FilamentMonitor.FilamentPresent
-- uid: DuetAPI.Machine.FilamentMonitor.FilamentPresent*
-  name: FilamentPresent
-  href: api/DuetAPI.Machine.FilamentMonitor.html#DuetAPI_Machine_FilamentMonitor_FilamentPresent_
-  commentId: Overload:DuetAPI.Machine.FilamentMonitor.FilamentPresent
-  isSpec: "True"
-  fullName: DuetAPI.Machine.FilamentMonitor.FilamentPresent
-  nameWithType: FilamentMonitor.FilamentPresent
 - uid: DuetAPI.Machine.FilamentMonitor.Type
   name: Type
   href: api/DuetAPI.Machine.FilamentMonitor.html#DuetAPI_Machine_FilamentMonitor_Type
@@ -5594,6 +5581,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.LaserFilamentMonitor.Configured
   nameWithType: LaserFilamentMonitor.Configured
+- uid: DuetAPI.Machine.LaserFilamentMonitor.FilamentPresent
+  name: FilamentPresent
+  href: api/DuetAPI.Machine.LaserFilamentMonitor.html#DuetAPI_Machine_LaserFilamentMonitor_FilamentPresent
+  commentId: P:DuetAPI.Machine.LaserFilamentMonitor.FilamentPresent
+  fullName: DuetAPI.Machine.LaserFilamentMonitor.FilamentPresent
+  nameWithType: LaserFilamentMonitor.FilamentPresent
+- uid: DuetAPI.Machine.LaserFilamentMonitor.FilamentPresent*
+  name: FilamentPresent
+  href: api/DuetAPI.Machine.LaserFilamentMonitor.html#DuetAPI_Machine_LaserFilamentMonitor_FilamentPresent_
+  commentId: Overload:DuetAPI.Machine.LaserFilamentMonitor.FilamentPresent
+  isSpec: "True"
+  fullName: DuetAPI.Machine.LaserFilamentMonitor.FilamentPresent
+  nameWithType: LaserFilamentMonitor.FilamentPresent
 - uid: DuetAPI.Machine.LaserFilamentMonitorCalibrated
   name: LaserFilamentMonitorCalibrated
   href: api/DuetAPI.Machine.LaserFilamentMonitorCalibrated.html
@@ -7415,6 +7415,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.MoveCompensation.ProbeGrid
   nameWithType: MoveCompensation.ProbeGrid
+- uid: DuetAPI.Machine.MoveCompensation.Skew
+  name: Skew
+  href: api/DuetAPI.Machine.MoveCompensation.html#DuetAPI_Machine_MoveCompensation_Skew
+  commentId: P:DuetAPI.Machine.MoveCompensation.Skew
+  fullName: DuetAPI.Machine.MoveCompensation.Skew
+  nameWithType: MoveCompensation.Skew
+- uid: DuetAPI.Machine.MoveCompensation.Skew*
+  name: Skew
+  href: api/DuetAPI.Machine.MoveCompensation.html#DuetAPI_Machine_MoveCompensation_Skew_
+  commentId: Overload:DuetAPI.Machine.MoveCompensation.Skew
+  isSpec: "True"
+  fullName: DuetAPI.Machine.MoveCompensation.Skew
+  nameWithType: MoveCompensation.Skew
 - uid: DuetAPI.Machine.MoveCompensation.Type
   name: Type
   href: api/DuetAPI.Machine.MoveCompensation.html#DuetAPI_Machine_MoveCompensation_Type
@@ -8536,6 +8549,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.RotatingMagnetFilamentMonitor.Configured
   nameWithType: RotatingMagnetFilamentMonitor.Configured
+- uid: DuetAPI.Machine.RotatingMagnetFilamentMonitor.FilamentPresent
+  name: FilamentPresent
+  href: api/DuetAPI.Machine.RotatingMagnetFilamentMonitor.html#DuetAPI_Machine_RotatingMagnetFilamentMonitor_FilamentPresent
+  commentId: P:DuetAPI.Machine.RotatingMagnetFilamentMonitor.FilamentPresent
+  fullName: DuetAPI.Machine.RotatingMagnetFilamentMonitor.FilamentPresent
+  nameWithType: RotatingMagnetFilamentMonitor.FilamentPresent
+- uid: DuetAPI.Machine.RotatingMagnetFilamentMonitor.FilamentPresent*
+  name: FilamentPresent
+  href: api/DuetAPI.Machine.RotatingMagnetFilamentMonitor.html#DuetAPI_Machine_RotatingMagnetFilamentMonitor_FilamentPresent_
+  commentId: Overload:DuetAPI.Machine.RotatingMagnetFilamentMonitor.FilamentPresent
+  isSpec: "True"
+  fullName: DuetAPI.Machine.RotatingMagnetFilamentMonitor.FilamentPresent
+  nameWithType: RotatingMagnetFilamentMonitor.FilamentPresent
 - uid: DuetAPI.Machine.RotatingMagnetFilamentMonitorCalibrated
   name: RotatingMagnetFilamentMonitorCalibrated
   href: api/DuetAPI.Machine.RotatingMagnetFilamentMonitorCalibrated.html
@@ -8821,6 +8847,70 @@ references:
   commentId: F:DuetAPI.Machine.SessionType.Telnet
   fullName: DuetAPI.Machine.SessionType.Telnet
   nameWithType: SessionType.Telnet
+- uid: DuetAPI.Machine.SimpleFilamentMonitor
+  name: SimpleFilamentMonitor
+  href: api/DuetAPI.Machine.SimpleFilamentMonitor.html
+  commentId: T:DuetAPI.Machine.SimpleFilamentMonitor
+  fullName: DuetAPI.Machine.SimpleFilamentMonitor
+  nameWithType: SimpleFilamentMonitor
+- uid: DuetAPI.Machine.SimpleFilamentMonitor.FilamentPresent
+  name: FilamentPresent
+  href: api/DuetAPI.Machine.SimpleFilamentMonitor.html#DuetAPI_Machine_SimpleFilamentMonitor_FilamentPresent
+  commentId: P:DuetAPI.Machine.SimpleFilamentMonitor.FilamentPresent
+  fullName: DuetAPI.Machine.SimpleFilamentMonitor.FilamentPresent
+  nameWithType: SimpleFilamentMonitor.FilamentPresent
+- uid: DuetAPI.Machine.SimpleFilamentMonitor.FilamentPresent*
+  name: FilamentPresent
+  href: api/DuetAPI.Machine.SimpleFilamentMonitor.html#DuetAPI_Machine_SimpleFilamentMonitor_FilamentPresent_
+  commentId: Overload:DuetAPI.Machine.SimpleFilamentMonitor.FilamentPresent
+  isSpec: "True"
+  fullName: DuetAPI.Machine.SimpleFilamentMonitor.FilamentPresent
+  nameWithType: SimpleFilamentMonitor.FilamentPresent
+- uid: DuetAPI.Machine.Skew
+  name: Skew
+  href: api/DuetAPI.Machine.Skew.html
+  commentId: T:DuetAPI.Machine.Skew
+  fullName: DuetAPI.Machine.Skew
+  nameWithType: Skew
+- uid: DuetAPI.Machine.Skew.TanXY
+  name: TanXY
+  href: api/DuetAPI.Machine.Skew.html#DuetAPI_Machine_Skew_TanXY
+  commentId: P:DuetAPI.Machine.Skew.TanXY
+  fullName: DuetAPI.Machine.Skew.TanXY
+  nameWithType: Skew.TanXY
+- uid: DuetAPI.Machine.Skew.TanXY*
+  name: TanXY
+  href: api/DuetAPI.Machine.Skew.html#DuetAPI_Machine_Skew_TanXY_
+  commentId: Overload:DuetAPI.Machine.Skew.TanXY
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Skew.TanXY
+  nameWithType: Skew.TanXY
+- uid: DuetAPI.Machine.Skew.TanXZ
+  name: TanXZ
+  href: api/DuetAPI.Machine.Skew.html#DuetAPI_Machine_Skew_TanXZ
+  commentId: P:DuetAPI.Machine.Skew.TanXZ
+  fullName: DuetAPI.Machine.Skew.TanXZ
+  nameWithType: Skew.TanXZ
+- uid: DuetAPI.Machine.Skew.TanXZ*
+  name: TanXZ
+  href: api/DuetAPI.Machine.Skew.html#DuetAPI_Machine_Skew_TanXZ_
+  commentId: Overload:DuetAPI.Machine.Skew.TanXZ
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Skew.TanXZ
+  nameWithType: Skew.TanXZ
+- uid: DuetAPI.Machine.Skew.TanYZ
+  name: TanYZ
+  href: api/DuetAPI.Machine.Skew.html#DuetAPI_Machine_Skew_TanYZ
+  commentId: P:DuetAPI.Machine.Skew.TanYZ
+  fullName: DuetAPI.Machine.Skew.TanYZ
+  nameWithType: Skew.TanYZ
+- uid: DuetAPI.Machine.Skew.TanYZ*
+  name: TanYZ
+  href: api/DuetAPI.Machine.Skew.html#DuetAPI_Machine_Skew_TanYZ_
+  commentId: Overload:DuetAPI.Machine.Skew.TanYZ
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Skew.TanYZ
+  nameWithType: Skew.TanYZ
 - uid: DuetAPI.Machine.Spindle
   name: Spindle
   href: api/DuetAPI.Machine.Spindle.html

@@ -5,10 +5,10 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Class BeepRequest
+    <title>Class SimpleFilamentMonitor
    </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Class BeepRequest
+    <meta name="title" content="Class SimpleFilamentMonitor
    ">
     <meta name="generator" content="docfx 2.51.0.0">
     
@@ -275,8 +275,8 @@
                           <li class="">
                             <a href="DuetAPI.Machine.Axis.html" title="Axis" class="">Axis</a>
                           </li>
-                          <li class="active">
-                            <a href="DuetAPI.Machine.BeepRequest.html" title="BeepRequest" class="active">BeepRequest</a>
+                          <li class="">
+                            <a href="DuetAPI.Machine.BeepRequest.html" title="BeepRequest" class="">BeepRequest</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.Board.html" title="Board" class="">Board</a>
@@ -530,8 +530,8 @@
                           <li class="">
                             <a href="DuetAPI.Machine.SessionType.html" title="SessionType" class="">SessionType</a>
                           </li>
-                          <li class="">
-                            <a href="DuetAPI.Machine.SimpleFilamentMonitor.html" title="SimpleFilamentMonitor" class="">SimpleFilamentMonitor</a>
+                          <li class="active">
+                            <a href="DuetAPI.Machine.SimpleFilamentMonitor.html" title="SimpleFilamentMonitor" class="active">SimpleFilamentMonitor</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.Skew.html" title="Skew" class="">Skew</a>
@@ -1057,19 +1057,20 @@
         </div>
         <div class="article row grid-right">
           <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="DuetAPI.Machine.BeepRequest">
+            <article class="content wrap" id="_content" data-uid="DuetAPI.Machine.SimpleFilamentMonitor">
   
   
-  <h1 id="DuetAPI_Machine_BeepRequest" data-uid="DuetAPI.Machine.BeepRequest" class="text-break">Class BeepRequest
+  <h1 id="DuetAPI_Machine_SimpleFilamentMonitor" data-uid="DuetAPI.Machine.SimpleFilamentMonitor" class="text-break">Class SimpleFilamentMonitor
   </h1>
-  <div class="markdown level0 summary"><p>Details about a requested beep</p>
+  <div class="markdown level0 summary"><p>Representation of a simple filament monitor</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
     <h5>Inheritance</h5>
     <div class="level0"><span class="xref">System.Object</span></div>
     <div class="level1"><a class="xref" href="DuetAPI.Machine.ModelObject.html">ModelObject</a></div>
-    <div class="level2"><span class="xref">BeepRequest</span></div>
+    <div class="level2"><a class="xref" href="DuetAPI.Machine.FilamentMonitor.html">FilamentMonitor</a></div>
+    <div class="level3"><span class="xref">SimpleFilamentMonitor</span></div>
   </div>
   <div classs="implements">
     <h5>Implements</h5>
@@ -1079,6 +1080,12 @@
   </div>
   <div class="inheritedMembers">
     <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.FilamentMonitor.html#DuetAPI_Machine_FilamentMonitor_Enabled">FilamentMonitor.Enabled</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.FilamentMonitor.html#DuetAPI_Machine_FilamentMonitor_Type">FilamentMonitor.Type</a>
+    </div>
     <div>
       <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_JsonProperties">ModelObject.JsonProperties</a>
     </div>
@@ -1130,20 +1137,20 @@
   </div>
   <h6><strong>Namespace</strong>: <a class="xref" href="DuetAPI.Machine.html">DuetAPI.Machine</a></h6>
   <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
-  <h5 id="DuetAPI_Machine_BeepRequest_syntax">Syntax</h5>
+  <h5 id="DuetAPI_Machine_SimpleFilamentMonitor_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class BeepRequest : ModelObject, ICloneable, INotifyPropertyChanging, INotifyPropertyChanged</code></pre>
+    <pre><code class="lang-csharp hljs">public class SimpleFilamentMonitor : FilamentMonitor, ICloneable, INotifyPropertyChanging, INotifyPropertyChanged</code></pre>
   </div>
   <h3 id="properties">Properties
   </h3>
-  <a id="DuetAPI_Machine_BeepRequest_Duration_" data-uid="DuetAPI.Machine.BeepRequest.Duration*"></a>
-  <h4 id="DuetAPI_Machine_BeepRequest_Duration" data-uid="DuetAPI.Machine.BeepRequest.Duration">Duration</h4>
-  <div class="markdown level1 summary"><p>Duration of the requested beep (in ms)</p>
+  <a id="DuetAPI_Machine_SimpleFilamentMonitor_FilamentPresent_" data-uid="DuetAPI.Machine.SimpleFilamentMonitor.FilamentPresent*"></a>
+  <h4 id="DuetAPI_Machine_SimpleFilamentMonitor_FilamentPresent" data-uid="DuetAPI.Machine.SimpleFilamentMonitor.FilamentPresent">FilamentPresent</h4>
+  <div class="markdown level1 summary"><p>Indicates if a filament is present</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public int Duration { get; set; }</code></pre>
+    <pre><code class="lang-csharp hljs">public bool FilamentPresent { get; set; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1155,31 +1162,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetAPI_Machine_BeepRequest_Frequency_" data-uid="DuetAPI.Machine.BeepRequest.Frequency*"></a>
-  <h4 id="DuetAPI_Machine_BeepRequest_Frequency" data-uid="DuetAPI.Machine.BeepRequest.Frequency">Frequency</h4>
-  <div class="markdown level1 summary"><p>Frequency of the requested beep (in Hz)</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public int Frequency { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Int32</span></td>
+        <td><span class="xref">System.Boolean</span></td>
         <td></td>
       </tr>
     </tbody>

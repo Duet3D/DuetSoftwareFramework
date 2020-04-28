@@ -531,6 +531,12 @@
                             <a href="DuetAPI.Machine.SessionType.html" title="SessionType" class="">SessionType</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.SimpleFilamentMonitor.html" title="SimpleFilamentMonitor" class="">SimpleFilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Machine.Skew.html" title="Skew" class="">Skew</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.Spindle.html" title="Spindle" class="">Spindle</a>
                           </li>
                           <li class="">
@@ -1078,9 +1084,6 @@
       <a class="xref" href="DuetAPI.Machine.FilamentMonitor.html#DuetAPI_Machine_FilamentMonitor_Enabled">FilamentMonitor.Enabled</a>
     </div>
     <div>
-      <a class="xref" href="DuetAPI.Machine.FilamentMonitor.html#DuetAPI_Machine_FilamentMonitor_FilamentPresent">FilamentMonitor.FilamentPresent</a>
-    </div>
-    <div>
       <a class="xref" href="DuetAPI.Machine.FilamentMonitor.html#DuetAPI_Machine_FilamentMonitor_Type">FilamentMonitor.Type</a>
     </div>
     <div>
@@ -1158,7 +1161,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public RotatingMagnetFilamentMonitorCalibrated Calibrated { get; }</code></pre>
+    <pre><code class="lang-csharp hljs">public RotatingMagnetFilamentMonitorCalibrated Calibrated { get; set; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1195,6 +1198,30 @@
     <tbody>
       <tr>
         <td><a class="xref" href="DuetAPI.Machine.RotatingMagnetFilamentMonitorConfigured.html">RotatingMagnetFilamentMonitorConfigured</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetAPI_Machine_RotatingMagnetFilamentMonitor_FilamentPresent_" data-uid="DuetAPI.Machine.RotatingMagnetFilamentMonitor.FilamentPresent*"></a>
+  <h4 id="DuetAPI_Machine_RotatingMagnetFilamentMonitor_FilamentPresent" data-uid="DuetAPI.Machine.RotatingMagnetFilamentMonitor.FilamentPresent">FilamentPresent</h4>
+  <div class="markdown level1 summary"><p>Indicates if a filament is present</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool? FilamentPresent { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Nullable</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
         <td></td>
       </tr>
     </tbody>

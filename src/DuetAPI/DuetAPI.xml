@@ -3698,6 +3698,11 @@
             Settings of the current probe grid
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.MoveCompensation.Skew">
+            <summary>
+            Information about the configured orthogonal axis parameters
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.MoveCompensation.Type">
             <summary>
             Type of the compensation in use
@@ -3772,6 +3777,26 @@
         <member name="P:DuetAPI.Machine.ProbeGrid.Radius">
             <summary>
             Probing radius for delta kinematics
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.Skew">
+            <summary>
+            Class holding details about orthogonoal axis compensation parameters
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Skew.TanXY">
+            <summary>
+            Tangent of the skew angle for the XY axes
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Skew.TanXZ">
+            <summary>
+            Tangent of the skew angle for the XZ axes
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Skew.TanYZ">
+            <summary>
+            Tangent of the skew angle for the YZ axes
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.InterfaceType">
@@ -4142,11 +4167,6 @@
             Indicates if this filament monitor is enabled
             </summary>
         </member>
-        <member name="P:DuetAPI.Machine.FilamentMonitor.FilamentPresent">
-            <summary>
-            Indicates if a filament is present
-            </summary>
-        </member>
         <member name="P:DuetAPI.Machine.FilamentMonitor.Type">
             <summary>
             Type of this filament monitor
@@ -4261,6 +4281,11 @@
         <member name="P:DuetAPI.Machine.LaserFilamentMonitor.Configured">
             <summary>
             Configured properties of this filament monitor
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.LaserFilamentMonitor.FilamentPresent">
+            <summary>
+            Indicates if a filament is present
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.PulsedFilamentMonitorCalibrated">
@@ -4401,6 +4426,21 @@
         <member name="P:DuetAPI.Machine.RotatingMagnetFilamentMonitor.Configured">
             <summary>
             Configured properties of this filament monitor
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.RotatingMagnetFilamentMonitor.FilamentPresent">
+            <summary>
+            Indicates if a filament is present
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.SimpleFilamentMonitor">
+            <summary>
+            Representation of a simple filament monitor
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.SimpleFilamentMonitor.FilamentPresent">
+            <summary>
+            Indicates if a filament is present
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.GpInputPort">
@@ -4817,7 +4857,7 @@
         </member>
         <member name="P:DuetAPI.Machine.RestorePoint.IoBits">
             <summary>
-            The output port bits setting for this move
+            The output port bits setting for this move or null if not applicable
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.RestorePoint.LaserPwm">

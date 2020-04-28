@@ -5,10 +5,10 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Class BeepRequest
+    <title>Class Skew
    </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Class BeepRequest
+    <meta name="title" content="Class Skew
    ">
     <meta name="generator" content="docfx 2.51.0.0">
     
@@ -275,8 +275,8 @@
                           <li class="">
                             <a href="DuetAPI.Machine.Axis.html" title="Axis" class="">Axis</a>
                           </li>
-                          <li class="active">
-                            <a href="DuetAPI.Machine.BeepRequest.html" title="BeepRequest" class="active">BeepRequest</a>
+                          <li class="">
+                            <a href="DuetAPI.Machine.BeepRequest.html" title="BeepRequest" class="">BeepRequest</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.Board.html" title="Board" class="">Board</a>
@@ -533,8 +533,8 @@
                           <li class="">
                             <a href="DuetAPI.Machine.SimpleFilamentMonitor.html" title="SimpleFilamentMonitor" class="">SimpleFilamentMonitor</a>
                           </li>
-                          <li class="">
-                            <a href="DuetAPI.Machine.Skew.html" title="Skew" class="">Skew</a>
+                          <li class="active">
+                            <a href="DuetAPI.Machine.Skew.html" title="Skew" class="active">Skew</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.Spindle.html" title="Spindle" class="">Spindle</a>
@@ -1057,19 +1057,19 @@
         </div>
         <div class="article row grid-right">
           <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="DuetAPI.Machine.BeepRequest">
+            <article class="content wrap" id="_content" data-uid="DuetAPI.Machine.Skew">
   
   
-  <h1 id="DuetAPI_Machine_BeepRequest" data-uid="DuetAPI.Machine.BeepRequest" class="text-break">Class BeepRequest
+  <h1 id="DuetAPI_Machine_Skew" data-uid="DuetAPI.Machine.Skew" class="text-break">Class Skew
   </h1>
-  <div class="markdown level0 summary"><p>Details about a requested beep</p>
+  <div class="markdown level0 summary"><p>Class holding details about orthogonoal axis compensation parameters</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
     <h5>Inheritance</h5>
     <div class="level0"><span class="xref">System.Object</span></div>
     <div class="level1"><a class="xref" href="DuetAPI.Machine.ModelObject.html">ModelObject</a></div>
-    <div class="level2"><span class="xref">BeepRequest</span></div>
+    <div class="level2"><span class="xref">Skew</span></div>
   </div>
   <div classs="implements">
     <h5>Implements</h5>
@@ -1130,20 +1130,20 @@
   </div>
   <h6><strong>Namespace</strong>: <a class="xref" href="DuetAPI.Machine.html">DuetAPI.Machine</a></h6>
   <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
-  <h5 id="DuetAPI_Machine_BeepRequest_syntax">Syntax</h5>
+  <h5 id="DuetAPI_Machine_Skew_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class BeepRequest : ModelObject, ICloneable, INotifyPropertyChanging, INotifyPropertyChanged</code></pre>
+    <pre><code class="lang-csharp hljs">public sealed class Skew : ModelObject, ICloneable, INotifyPropertyChanging, INotifyPropertyChanged</code></pre>
   </div>
   <h3 id="properties">Properties
   </h3>
-  <a id="DuetAPI_Machine_BeepRequest_Duration_" data-uid="DuetAPI.Machine.BeepRequest.Duration*"></a>
-  <h4 id="DuetAPI_Machine_BeepRequest_Duration" data-uid="DuetAPI.Machine.BeepRequest.Duration">Duration</h4>
-  <div class="markdown level1 summary"><p>Duration of the requested beep (in ms)</p>
+  <a id="DuetAPI_Machine_Skew_TanXY_" data-uid="DuetAPI.Machine.Skew.TanXY*"></a>
+  <h4 id="DuetAPI_Machine_Skew_TanXY" data-uid="DuetAPI.Machine.Skew.TanXY">TanXY</h4>
+  <div class="markdown level1 summary"><p>Tangent of the skew angle for the XY axes</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public int Duration { get; set; }</code></pre>
+    <pre><code class="lang-csharp hljs">public float TanXY { get; set; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1155,19 +1155,19 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Int32</span></td>
+        <td><span class="xref">System.Single</span></td>
         <td></td>
       </tr>
     </tbody>
   </table>
-  <a id="DuetAPI_Machine_BeepRequest_Frequency_" data-uid="DuetAPI.Machine.BeepRequest.Frequency*"></a>
-  <h4 id="DuetAPI_Machine_BeepRequest_Frequency" data-uid="DuetAPI.Machine.BeepRequest.Frequency">Frequency</h4>
-  <div class="markdown level1 summary"><p>Frequency of the requested beep (in Hz)</p>
+  <a id="DuetAPI_Machine_Skew_TanXZ_" data-uid="DuetAPI.Machine.Skew.TanXZ*"></a>
+  <h4 id="DuetAPI_Machine_Skew_TanXZ" data-uid="DuetAPI.Machine.Skew.TanXZ">TanXZ</h4>
+  <div class="markdown level1 summary"><p>Tangent of the skew angle for the XZ axes</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public int Frequency { get; set; }</code></pre>
+    <pre><code class="lang-csharp hljs">public float TanXZ { get; set; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1179,7 +1179,31 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Int32</span></td>
+        <td><span class="xref">System.Single</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetAPI_Machine_Skew_TanYZ_" data-uid="DuetAPI.Machine.Skew.TanYZ*"></a>
+  <h4 id="DuetAPI_Machine_Skew_TanYZ" data-uid="DuetAPI.Machine.Skew.TanYZ">TanYZ</h4>
+  <div class="markdown level1 summary"><p>Tangent of the skew angle for the YZ axes</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public float TanYZ { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Single</span></td>
         <td></td>
       </tr>
     </tbody>

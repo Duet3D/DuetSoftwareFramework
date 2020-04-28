@@ -1,6 +1,24 @@
 Summary of important changes in recent versions
 ===============================================
 
+
+Version 2.1.2
+==============
+
+Compatible files:
+- RepRapFirmware 3.01-RC10
+- DuetWebControl 2.1.5
+
+Known issues:
+- Print/Simulation times are not written to G-code files
+- Comments for object cancellation detection are not parsed (work-around is to use M486 directly)
+- Codes with invalid expressions may not instantly terminate a macro or job file
+
+Bug fixes:
+- Leading G53 wasn't added to string representations of parsed codes
+- Starting DCS with the fifo CPU scheduler via systemd could lead to maximum CPU usage
+- Some nullable RRF OM fields were not declared as such in the DSF OM
+
 Version 2.1.1
 ==============
 
