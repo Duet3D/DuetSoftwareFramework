@@ -21,9 +21,9 @@
         public float FeedRate { get; set; }
 
         /// <summary>
-        /// The output port bits setting for this move
+        /// The output port bits setting for this move or null if not applicable
         /// </summary>
-        public int IoBits { get; set; }
+        public int? IoBits { get; set; }
 
         /// <summary>
         /// Laser PWM value (0..1) or null if not applicable

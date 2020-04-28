@@ -273,15 +273,16 @@ namespace DuetAPI.Commands
                 return "(comment)";
             }
 
+            string prefix = Flags.HasFlag(CodeFlags.EnforceAbsolutePosition) ? "G53 " : string.Empty;
             if (MajorNumber != null)
             {
                 if (MinorNumber != null)
                 {
-                    return $"{(char)Type}{MajorNumber}.{MinorNumber}";
+                    return prefix + $"{(char)Type}{MajorNumber}.{MinorNumber}";
                 }
-                return $"{(char)Type}{MajorNumber}";
+                return prefix + $"{(char)Type}{MajorNumber}";
             }
-            return $"{(char)Type}";
+            return prefix + $"{(char)Type}";
         }
 
         /// <summary>

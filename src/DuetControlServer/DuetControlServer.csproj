@@ -6,9 +6,9 @@
     <LangVersion>default</LangVersion>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D Ltd</Company>
-    <AssemblyVersion>2.1.1.0</AssemblyVersion>
-    <FileVersion>2.1.1.0</FileVersion>
-    <Version>2.1.1</Version>
+    <AssemblyVersion>2.1.2.0</AssemblyVersion>
+    <FileVersion>2.1.2.0</FileVersion>
+    <Version>2.1.2</Version>
     <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <RepositoryUrl>https://github.com/chrishamm/DuetSoftwareFramework.git</RepositoryUrl>

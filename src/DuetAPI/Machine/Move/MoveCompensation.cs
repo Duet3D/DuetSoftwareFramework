@@ -42,6 +42,11 @@
 		public ProbeGrid ProbeGrid { get; } = new ProbeGrid();
 
 		/// <summary>
+		/// Information about the configured orthogonal axis parameters
+		/// </summary>
+		public Skew Skew { get; } = new Skew();
+
+		/// <summary>
 		/// Type of the compensation in use
 		/// </summary>
 		public MoveCompensationType Type

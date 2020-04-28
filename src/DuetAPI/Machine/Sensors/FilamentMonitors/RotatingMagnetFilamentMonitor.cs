@@ -108,11 +108,26 @@
 		/// <summary>
 		/// Calibrated properties of this filament monitor
 		/// </summary>
-		public RotatingMagnetFilamentMonitorCalibrated Calibrated { get; } = new RotatingMagnetFilamentMonitorCalibrated();
+		public RotatingMagnetFilamentMonitorCalibrated Calibrated
+		{
+			get => _calibrated;
+			set => SetPropertyValue(ref _calibrated, value);
+		}
+		private RotatingMagnetFilamentMonitorCalibrated _calibrated = new RotatingMagnetFilamentMonitorCalibrated();
 
 		/// <summary>
 		/// Configured properties of this filament monitor
 		/// </summary>
 		public RotatingMagnetFilamentMonitorConfigured Configured { get; } = new RotatingMagnetFilamentMonitorConfigured();
-    }
+
+		/// <summary>
+		/// Indicates if a filament is present
+		/// </summary>
+		public bool? FilamentPresent
+		{
+			get => _filamentPresent;
+			set => SetPropertyValue(ref _filamentPresent, value);
+		}
+		private bool? _filamentPresent;
+	}
 }

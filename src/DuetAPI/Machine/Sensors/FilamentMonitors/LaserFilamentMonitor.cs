@@ -98,11 +98,26 @@
 		/// <summary>
 		/// Calibrated properties of this filament monitor
 		/// </summary>
-		public LaserFilamentMonitorCalibrated Calibrated { get; } = new LaserFilamentMonitorCalibrated();
+		public LaserFilamentMonitorCalibrated Calibrated
+		{
+			get => _calibrated;
+			set => SetPropertyValue(ref _calibrated, value);
+		}
+		private LaserFilamentMonitorCalibrated _calibrated = new LaserFilamentMonitorCalibrated();
 
 		/// <summary>
 		/// Configured properties of this filament monitor
 		/// </summary>
 		public LaserFilamentMonitorConfigured Configured { get; } = new LaserFilamentMonitorConfigured();
-    }
+
+		/// <summary>
+		/// Indicates if a filament is present
+		/// </summary>
+		public bool? FilamentPresent
+		{
+			get => _filamentPresent;
+			set => SetPropertyValue(ref _filamentPresent, value);
+		}
+		private bool? _filamentPresent;
+	}
 }

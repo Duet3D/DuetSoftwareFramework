@@ -7,7 +7,6 @@ TimeoutStopSec=15
 Restart=always
 RestartSec=5
 Type=simple
-CPUSchedulingPolicy=fifo
 CPUSchedulingPriority=20
 
 [Install]
