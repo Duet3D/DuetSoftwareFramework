@@ -9,7 +9,6 @@ Compatible files:
 - DuetWebControl 2.1.6
 
 Changed behaviour:
-- Increased API version number because fans[].actualValue is now nullable
 - Warning message is shown in the DCS log when API clients with an old version number connect
 
 Known issues:

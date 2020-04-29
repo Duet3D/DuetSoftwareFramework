@@ -1138,12 +1138,12 @@
   </h3>
   <a id="DuetAPI_Machine_Fan_ActualValue_" data-uid="DuetAPI.Machine.Fan.ActualValue*"></a>
   <h4 id="DuetAPI_Machine_Fan_ActualValue" data-uid="DuetAPI.Machine.Fan.ActualValue">ActualValue</h4>
-  <div class="markdown level1 summary"><p>Value of this fan (0..1 or null if unknown)</p>
+  <div class="markdown level1 summary"><p>Value of this fan (0..1 or -1 if unknown)</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public float? ActualValue { get; set; }</code></pre>
+    <pre><code class="lang-csharp hljs">public float ActualValue { get; set; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1155,7 +1155,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Nullable</span>&lt;<span class="xref">System.Single</span>&gt;</td>
+        <td><span class="xref">System.Single</span></td>
         <td></td>
       </tr>
     </tbody>
