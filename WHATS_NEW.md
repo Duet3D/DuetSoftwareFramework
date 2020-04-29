@@ -1,6 +1,26 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 2.1.3
+==============
+
+Compatible files:
+- RepRapFirmware 3.01-RC11
+- DuetWebControl 2.1.6
+
+Changed behaviour:
+- Increased API version number because fans[].actualValue is now nullable
+- Warning message is shown in the DCS log when API clients with an old version number connect
+
+Known issues:
+- Print/Simulation times are not written to G-code files
+- Comments for object cancellation detection are not parsed (work-around is to use M486 directly)
+- Codes with invalid expressions may not instantly terminate a macro or job file
+
+Bug fixes:
+- Unchanged arrays could be reported in Patch subscription mode
+- Initial query in Patch mode was not working
+- Web server did not clear HTTP endpoints under certain circumstances
 
 Version 2.1.2
 ==============

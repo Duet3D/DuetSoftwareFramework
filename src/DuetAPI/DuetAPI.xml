@@ -1879,7 +1879,7 @@
         </member>
         <member name="P:DuetAPI.Machine.Fan.ActualValue">
             <summary>
-            Value of this fan (0..1)
+            Value of this fan (0..1 or null if unknown)
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Fan.Blip">
