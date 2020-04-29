@@ -112,7 +112,7 @@ namespace DuetControlServer.IPC.Processors
                         Dictionary<string, object> patchModel = new Dictionary<string, object>();
                         foreach (object[] filter in _filters)
                         {
-                            Dictionary<string, object> partialModel = Filter.GetFiltered(_filters);
+                            Dictionary<string, object> partialModel = Filter.GetFiltered(filter);
                             Filter.MergeFiltered(patchModel, partialModel);
                         }
                         jsonData = JsonSerializer.SerializeToUtf8Bytes(patchModel, JsonHelper.DefaultJsonOptions);

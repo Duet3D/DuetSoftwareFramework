@@ -246,7 +246,7 @@ namespace DuetAPI.Machine
 #endif
                             }
                         }
-                        else if (modelObject == null || property.PropertyType != modelObject.GetType())
+                        else if (modelObject == null)
                         {
                             modelObject = (ModelObject)Activator.CreateInstance(property.PropertyType);
                             modelObject = modelObject.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);

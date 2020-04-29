@@ -172,6 +172,10 @@ namespace DuetControlServer.IPC
                     await conn.SendResponse(new IncompatibleVersionException(message));
                     return null;
                 }
+                else if (initMessage.Version != Defaults.ProtocolVersion)
+                {
+                    conn.Logger.Warn("Client with outdated protocol version connected (got {0}, want {1})", initMessage.Version, Defaults.ProtocolVersion);
+                }
 
                 // Check the requested mode
                 switch (initMessage.Mode)

@@ -88,11 +88,8 @@ namespace DuetControlServer.Model
                         {
                             UnsubscribeFromModelObject((ModelObject)item);
                         }
-                        if (senderList.Count == 0)
-                        {
-                            nodePath = AddToPath(path, new ItemPathNode(collectionName, 0, senderList));
-                            OnPropertyPathChanged?.Invoke(nodePath, PropertyChangeType.ObjectCollection, null);
-                        }
+                        nodePath = AddToPath(path, new ItemPathNode(collectionName, senderList.Count, senderList));
+                        OnPropertyPathChanged?.Invoke(nodePath, PropertyChangeType.ObjectCollection, null);
                         break;
                     case NotifyCollectionChangedAction.Reset:
                         // This is NOT used because e.OldItems is not populated...

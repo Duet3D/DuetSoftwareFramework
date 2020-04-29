@@ -136,6 +136,7 @@ namespace DuetWebServer.Services
                         model = await subscribeConnection.GetMachineModel(_stopRequest.Token);
                         lock (Endpoints)
                         {
+                            Endpoints.Clear();
                             foreach (HttpEndpoint ep in model.HttpEndpoints)
                             {
                                 string fullPath = $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
@@ -160,7 +161,6 @@ namespace DuetWebServer.Services
                             if (jsonPatch.RootElement.TryGetProperty("httpEndpoints", out _))
                             {
                                 _logger.LogInformation("New number of custom HTTP endpoints: {0}", model.HttpEndpoints.Count);
-
 
                                 lock (Endpoints)
                                 {

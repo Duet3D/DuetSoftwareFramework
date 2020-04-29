@@ -274,7 +274,7 @@ namespace UnitTests.Machine
             TestContext.Out.WriteLine("Remove item");
             Provider.Get.Heat.Heaters.RemoveAt(0);
 
-            Assert.AreEqual(2, numEvents);
+            Assert.AreEqual(3, numEvents);
             Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
             Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 1, new object[2]) }, recordedPath);
             Assert.AreEqual(Provider.Get.Heat.Heaters[1], recordedValue);

@@ -6,14 +6,14 @@
     public sealed class Fan : ModelObject
     {
         /// <summary>
-        /// Value of this fan (0..1)
+        /// Value of this fan (0..1 or null if unknown)
         /// </summary>
-        public float ActualValue
+        public float? ActualValue
         {
             get => _actualValue;
 			set => SetPropertyValue(ref _actualValue, value);
         }
-        private float _actualValue;
+        private float? _actualValue;
 
         /// <summary>
         /// Blip value indicating how long the fan is supposed to run at 100% when turning it on to get it started (in s)

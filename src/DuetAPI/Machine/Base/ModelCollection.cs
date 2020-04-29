@@ -155,6 +155,35 @@ namespace DuetAPI.Machine
                     }
                 }
             }
+            else if (itemType.IsArray)
+            {
+                for (int i = 0; i < Math.Min(list.Count, from.Count); i++)
+                {
+                    if (list[i] == null || from[i] == null)
+                    {
+                        list[i] = from[i];
+                    }
+                    else
+                    {
+                        IList listItem = (IList)list[i], fromItem = (IList)from[i];
+                        if (listItem.Count != fromItem.Count)
+                        {
+                            list[i] = from[i];
+                        }
+                        else
+                        {
+                            for (int k = 0; k < listItem.Count; k++)
+                            {
+                                if (!Equals(listItem[k], fromItem[k]))
+                                {
+                                    list[i] = from[i];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             else
             {
                 for (int i = 0; i < Math.Min(list.Count, from.Count); i++)
@@ -268,7 +297,26 @@ namespace DuetAPI.Machine
                         try
                         {
                             object itemValue = JsonSerializer.Deserialize(jsonItem.GetRawText(), itemType);
-                            if (!Equals(list[i], itemValue))
+                            if (itemType.IsArray)
+                            {
+                                IList listItem = (IList)list[i], newItem = (IList)itemValue;
+                                if (listItem == null || listItem.Count != newItem.Count)
+                                {
+                                    list[i] = itemValue;
+                                }
+                                else
+                                {
+                                    for (int k = 0; k < listItem.Count; k++)
+                                    {
+                                        if (!Equals(listItem[k], newItem[k]))
+                                        {
+                                            list[i] = itemValue;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            else if (!Equals(list[i], itemValue))
                             {
                                 list[i] = itemValue;
                             }

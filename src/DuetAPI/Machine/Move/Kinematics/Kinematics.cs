@@ -67,12 +67,10 @@ namespace DuetAPI.Machine
                 if (GetType() != requiredType)
                 {
                     Kinematics newInstance = (Kinematics)Activator.CreateInstance(requiredType);
-                    newInstance.UpdateFromJson(jsonElement);
-                    return newInstance;
+                    return newInstance.UpdateFromJson(jsonElement);
                 }
             }
-            base.UpdateFromJson(jsonElement, ignoreSbcProperties);
-            return this;
+            return base.UpdateFromJson(jsonElement, ignoreSbcProperties);
         }
     }
 }
