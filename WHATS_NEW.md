@@ -20,6 +20,7 @@ Bug fixes:
 - Unchanged arrays could be reported in Patch subscription mode
 - Initial query in Patch mode was not working
 - Web server did not clear HTTP endpoints under certain circumstances
+- echo expressions were not parsed correctly if strings contained commas
 
 Version 2.1.2
 ==============
