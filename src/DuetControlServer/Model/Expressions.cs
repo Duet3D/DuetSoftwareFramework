@@ -16,6 +16,48 @@ namespace DuetControlServer.Model
     public static class Expressions
     {
         /// <summary>
+        /// Split an echo expression separated by commas
+        /// </summary>
+        /// <param name="expression">Expression to spli</param>
+        /// <returns>Expression items</returns>
+        private static IEnumerable<string> SplitExpression(string expression)
+        {
+            StringBuilder parsedExpression = new StringBuilder();
+            bool inQuotes = false;
+            char lastC = '\0';
+            foreach (char c in expression)
+            {
+                if (inQuotes)
+                {
+                    if (lastC != '"' && c == '"')
+                    {
+                        inQuotes = false;
+                    }
+                    parsedExpression.Append(c);
+                }
+                else if (c == '"')
+                {
+                    inQuotes = true;
+                    parsedExpression.Append(c);
+                }
+                else if (c == ',')
+                {
+                    yield return parsedExpression.ToString().Trim();
+                    parsedExpression.Clear();
+                }
+                else
+                {
+                    parsedExpression.Append(c);
+                }
+            }
+
+            if (parsedExpression.Length > 0)
+            {
+                yield return parsedExpression.ToString().Trim();
+            }
+        }
+
+        /// <summary>
         /// Checks if the given code contains any Linux object model fields
         /// </summary>
         /// <param name="code">Code to check</param>
@@ -26,7 +68,7 @@ namespace DuetControlServer.Model
             // echo command
             if (code.Keyword == KeywordType.Echo)
             {
-                foreach (string expression in code.KeywordArgument.Split(','))
+                foreach (string expression in SplitExpression(code.KeywordArgument))
                 {
                     if (ContainsLinuxFields(expression, code))
                     {
@@ -194,12 +236,11 @@ namespace DuetControlServer.Model
                 if (code.Keyword == KeywordType.Echo)
                 {
                     StringBuilder builder = new StringBuilder();
-                    foreach (string expression in code.KeywordArgument.Split(','))
+                    foreach (string expression in SplitExpression(code.KeywordArgument))
                     {
-                        string trimmedExpression = expression.Trim();
                         try
                         {
-                            string result = await EvaluateExpression(code, trimmedExpression, replaceOnlyLinuxFields, false);
+                            string result = await EvaluateExpression(code, expression, replaceOnlyLinuxFields, false);
                             if (builder.Length != 0)
                             {
                                 builder.Append(' ');
@@ -208,7 +249,7 @@ namespace DuetControlServer.Model
                         }
                         catch (CodeParserException cpe)
                         {
-                            throw new CodeParserException($"Failed to evaluate \"{trimmedExpression}\": {cpe.Message}", cpe);
+                            throw new CodeParserException($"Failed to evaluate \"{expression}\": {cpe.Message}", cpe);
                         }
                     }
                     return builder.ToString();
