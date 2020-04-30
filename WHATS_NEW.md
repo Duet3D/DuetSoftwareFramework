@@ -21,6 +21,7 @@ Bug fixes:
 - Initial query in Patch mode was not working
 - Web server did not clear HTTP endpoints under certain circumstances
 - echo expressions were not parsed correctly if strings contained commas
+- Changing the system time just before a controller reset could lead to an abnormal program termination
 
 Version 2.1.2
 ==============
