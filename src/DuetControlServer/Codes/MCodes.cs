@@ -978,6 +978,10 @@ namespace DuetControlServer.Codes
             SPI.DataTransfer.Diagnostics(builder);
             await FileExecution.Job.Diagnostics(builder);
 
+            if (result.Count > 0)
+            {
+                result[^1].Content = result[^1].Content.TrimEnd();
+            }
             result.Add(MessageType.Success, builder.ToString().TrimEnd());
         }
     }

@@ -48,6 +48,7 @@ namespace DuetControlServer.Model
                     Code code = new Code
                     {
                         InternallyProcessed = true,
+                        Flags = CodeFlags.Asynchronous,
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
                         MajorNumber = 905
@@ -65,6 +66,7 @@ namespace DuetControlServer.Model
                     Code code = new Code
                     {
                         InternallyProcessed = true,
+                        Flags = CodeFlags.Asynchronous,
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
                         MajorNumber = 550
