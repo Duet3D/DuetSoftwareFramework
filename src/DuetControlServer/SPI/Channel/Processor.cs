@@ -983,15 +983,27 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // FIXME Check if the actual macro filename has to be adjusted - will become obsolete when RRF gets its own task for the Linux interface
-            if (startCode != null)
+            if (startCode != null && startCode.CancellingPrint)
             {
-                if ((fileName == "stop.g" || fileName == "sleep.g") && startCode.CancellingPrint)
+                string cancelFile = await FilePath.ToPhysicalAsync("cancel.g", FileDirectory.System);
+                if (File.Exists(cancelFile))
                 {
-                    string cancelFile = await FilePath.ToPhysicalAsync("cancel.g", FileDirectory.System);
-                    if (File.Exists(cancelFile))
+                    fileName = "cancel.g";
+                }
+                else if (startCode.MajorNumber == 0)
+                {
+                    string stopFile = await FilePath.ToPhysicalAsync("stop.g", FileDirectory.System);
+                    if (File.Exists(stopFile))
                     {
-                        // Execute cancel.g instead of stop.g if it exists
-                        fileName = "cancel.g";
+                        fileName = "stop.g";
+                    }
+                }
+                else if (startCode.MajorNumber == 1)
+                {
+                    string sleepFile = await FilePath.ToPhysicalAsync("sleep.g", FileDirectory.System);
+                    if (File.Exists(sleepFile))
+                    {
+                        fileName = "sleep.g";
                     }
                 }
             }

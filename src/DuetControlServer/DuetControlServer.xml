@@ -2814,6 +2814,11 @@
             Called when a resource has been locked
             </summary>
         </member>
+        <member name="M:DuetControlServer.SPI.Channel.Processor.ResolveCommentCodes">
+            <summary>
+            Resolve pending comment codes
+            </summary>
+        </member>
         <member name="M:DuetControlServer.SPI.Channel.Processor.Run">
             <summary>
             Process pending requests on this channel

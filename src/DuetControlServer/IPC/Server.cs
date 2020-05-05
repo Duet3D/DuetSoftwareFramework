@@ -20,7 +20,7 @@ namespace DuetControlServer.IPC
         /// Minimum supported protocol version number
         /// </summary>
         /// <seealso cref="Defaults.ProtocolVersion"/>
-        public const int MinimumProtocolVersion = 4;
+        public const int MinimumProtocolVersion = 7;
 
         /// <summary>
         /// UNIX socket for inter-process communication
