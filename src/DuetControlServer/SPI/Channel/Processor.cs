@@ -555,7 +555,8 @@ namespace DuetControlServer.SPI.Channel
         {
             while (BufferedCodes.Count > 0 && BufferedCodes[0].Type == CodeType.Comment)
             {
-                BufferedCodes[0].FirmwareTCS.SetResult(new CodeResult());
+                BufferedCodes[0].Result = new CodeResult();
+                BufferedCodes[0].FirmwareTCS.SetResult(null);
                 BytesBuffered -= BufferedCodes[0].BinarySize;
                 BufferedCodes.RemoveAt(0);
             }
