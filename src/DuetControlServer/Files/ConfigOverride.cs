@@ -163,7 +163,7 @@ namespace DuetControlServer.Files
                         values.Add($"{axis.Letter}{Model.Provider.Get.Move.Axes[axisIndex].WorkplaceOffsets[i]:F2}");
                     }
                 }
-                await writer.WriteLineAsync($"G10 L2 P{i} {string.Join(' ', values)}");
+                await writer.WriteLineAsync($"G10 L2 P{i + 1} {string.Join(' ', values)}");
             }
         }
     }

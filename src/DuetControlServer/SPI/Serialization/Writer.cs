@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.LinuxRequests;
 using DuetControlServer.SPI.Communication.Shared;
 using Code = DuetControlServer.Commands.Code;
+using CodeFlags = DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags;
 using CodeParameter = DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter;
 
 namespace DuetControlServer.SPI.Serialization
@@ -80,12 +82,12 @@ namespace DuetControlServer.SPI.Serialization
                 Channel = code.Channel,
                 FilePosition = (uint)(code.FilePosition ?? 0xFFFFFFFF),
                 Letter = (byte)code.Type,
-                MajorCode = code.MajorNumber ?? -1,
+                MajorCode = (code.Type == CodeType.Comment) ? 0 : (code.MajorNumber ?? -1),
                 MinorCode = code.MinorNumber ?? -1,
-                NumParameters = (byte)code.Parameters.Count
+                NumParameters = (byte)((code.Type == CodeType.Comment) ? 1 : code.Parameters.Count)
             };
 
-            if (code.MajorNumber != null)
+            if (code.Type == CodeType.Comment || code.MajorNumber != null)
             {
                 header.Flags |= CodeFlags.HasMajorCommandNumber;
             }
@@ -112,129 +114,151 @@ namespace DuetControlServer.SPI.Serialization
                 MemoryMarshal.Write(to.Slice(bytesWritten), ref lineNumber);
                 bytesWritten += Marshal.SizeOf<int>();
             }
-            
+
             // Write parameters
-            List<object> extraParameters = new List<object>();
-            foreach (var parameter in code.Parameters)
+            if (code.Type == CodeType.Comment)
             {
+                // Write comment as an unprecedented parameter
+                string comment = (code.Comment ?? string.Empty).Trim();
                 CodeParameter binaryParam = new CodeParameter
                 {
-                    Letter = (byte)parameter.Letter
+                    Letter = (byte)'@',
+                    IntValue = comment.Length,
+                    Type = DataType.String
                 };
-                if (parameter.Type == typeof(int))
-                {
-                    binaryParam.Type = DataType.Int;
-                    binaryParam.IntValue = parameter;
-                }
-                else if (parameter.Type == typeof(uint))
-                {
-                    binaryParam.Type = DataType.UInt;
-                    binaryParam.UIntValue = parameter;
-                }
-                else if (parameter.Type == typeof(DriverId))
-                {
-                    binaryParam.Type = DataType.DriverId;
-                    binaryParam.UIntValue = parameter;
-                }
-                else if (parameter.Type == typeof(float))
-                {
-                    binaryParam.Type = DataType.Float;
-                    binaryParam.FloatValue = parameter;
-                }
-                else if (parameter.Type == typeof(int[]))
-                {
-                    binaryParam.Type = DataType.IntArray;
-                    int[] array = parameter;
-                    binaryParam.IntValue = array.Length;
-                    extraParameters.Add(array);
-                }
-                else if (parameter.Type == typeof(uint[]))
-                {
-                    binaryParam.Type = DataType.UIntArray;
-                    uint[] array = parameter;
-                    binaryParam.IntValue = array.Length;
-                    extraParameters.Add(array);
-                }
-                else if (parameter.Type == typeof(DriverId[]))
-                {
-                    binaryParam.Type = DataType.DriverIdArray;
-                    DriverId[] array = parameter;
-                    binaryParam.IntValue = array.Length;
-                    extraParameters.Add(array);
-                }
-                else if (parameter.Type == typeof(float[]))
-                {
-                    binaryParam.Type = DataType.FloatArray;
-                    float[] array = parameter;
-                    binaryParam.IntValue = array.Length;
-                    extraParameters.Add(array);
-                }
-                else if (parameter.Type == typeof(string))
-                {
-                    string value = parameter;
-                    binaryParam.Type = parameter.IsExpression ? DataType.Expression : DataType.String;
-                    binaryParam.IntValue = value.Length;
-                    extraParameters.Add(value);
-                }
-                // Boolean values are not supported for codes. Use integers instead
-                else
-                {
-                    throw new ArgumentException("Unsupported type", parameter.Type.Name);
-                }
-                
                 MemoryMarshal.Write(to.Slice(bytesWritten), ref binaryParam);
                 bytesWritten += Marshal.SizeOf(binaryParam);
+
+                Span<byte> asUnicode = Encoding.UTF8.GetBytes(comment);
+                asUnicode.CopyTo(to.Slice(bytesWritten));
+                bytesWritten += asUnicode.Length;
+                bytesWritten = AddPadding(to, bytesWritten);
             }
-            
-            // Write extra parameters
-            foreach (object parameter in extraParameters)
+            else
             {
-                if (parameter is int[] intArray)
+                // Write code parameters
+                List<object> extraParameters = new List<object>();
+                foreach (var parameter in code.Parameters)
                 {
-                    foreach (int val in intArray)
+                    CodeParameter binaryParam = new CodeParameter
                     {
-                        int value = val;
-                        MemoryMarshal.Write(to.Slice(bytesWritten), ref value);
-                        bytesWritten += Marshal.SizeOf(value);
-                    }
-                }
-                else if (parameter is uint[] uintArray)
-                {
-                    foreach (uint val in uintArray)
+                        Letter = (byte)parameter.Letter
+                    };
+                    if (parameter.Type == typeof(int))
                     {
-                        uint value = val;
-                        MemoryMarshal.Write(to.Slice(bytesWritten), ref value);
-                        bytesWritten += Marshal.SizeOf(value);
+                        binaryParam.Type = DataType.Int;
+                        binaryParam.IntValue = parameter;
                     }
-                }
-                else if (parameter is DriverId[] driverIdArray)
-                {
-                    foreach (DriverId val in driverIdArray)
+                    else if (parameter.Type == typeof(uint))
                     {
-                        uint value = val;
-                        MemoryMarshal.Write(to.Slice(bytesWritten), ref value);
-                        bytesWritten += Marshal.SizeOf(value);
+                        binaryParam.Type = DataType.UInt;
+                        binaryParam.UIntValue = parameter;
                     }
-                }
-                else if (parameter is float[] floatArray)
-                {
-                    foreach (float val in floatArray)
+                    else if (parameter.Type == typeof(DriverId))
                     {
-                        float value = val;
-                        MemoryMarshal.Write(to.Slice(bytesWritten), ref value);
-                        bytesWritten += Marshal.SizeOf(value);
+                        binaryParam.Type = DataType.DriverId;
+                        binaryParam.UIntValue = parameter;
                     }
+                    else if (parameter.Type == typeof(float))
+                    {
+                        binaryParam.Type = DataType.Float;
+                        binaryParam.FloatValue = parameter;
+                    }
+                    else if (parameter.Type == typeof(int[]))
+                    {
+                        binaryParam.Type = DataType.IntArray;
+                        int[] array = parameter;
+                        binaryParam.IntValue = array.Length;
+                        extraParameters.Add(array);
+                    }
+                    else if (parameter.Type == typeof(uint[]))
+                    {
+                        binaryParam.Type = DataType.UIntArray;
+                        uint[] array = parameter;
+                        binaryParam.IntValue = array.Length;
+                        extraParameters.Add(array);
+                    }
+                    else if (parameter.Type == typeof(DriverId[]))
+                    {
+                        binaryParam.Type = DataType.DriverIdArray;
+                        DriverId[] array = parameter;
+                        binaryParam.IntValue = array.Length;
+                        extraParameters.Add(array);
+                    }
+                    else if (parameter.Type == typeof(float[]))
+                    {
+                        binaryParam.Type = DataType.FloatArray;
+                        float[] array = parameter;
+                        binaryParam.IntValue = array.Length;
+                        extraParameters.Add(array);
+                    }
+                    else if (parameter.Type == typeof(string))
+                    {
+                        string value = parameter;
+                        binaryParam.Type = parameter.IsExpression ? DataType.Expression : DataType.String;
+                        binaryParam.IntValue = value.Length;
+                        extraParameters.Add(value);
+                    }
+                    // Boolean values are not supported for codes. Use integers instead
+                    else
+                    {
+                        throw new ArgumentException("Unsupported type", parameter.Type.Name);
+                    }
+
+                    MemoryMarshal.Write(to.Slice(bytesWritten), ref binaryParam);
+                    bytesWritten += Marshal.SizeOf(binaryParam);
                 }
-                else if (parameter is string value)
+
+                // Write extra parameters
+                foreach (object parameter in extraParameters)
                 {
-                    Span<byte> asUnicode = Encoding.UTF8.GetBytes(value);
-                    asUnicode.CopyTo(to.Slice(bytesWritten));
-                    bytesWritten += asUnicode.Length;
-                    bytesWritten = AddPadding(to, bytesWritten);
-                }
-                else
-                {
-                    throw new ArgumentException("Unsupported type", parameter.GetType().Name);
+                    if (parameter is int[] intArray)
+                    {
+                        foreach (int val in intArray)
+                        {
+                            int value = val;
+                            MemoryMarshal.Write(to.Slice(bytesWritten), ref value);
+                            bytesWritten += Marshal.SizeOf(value);
+                        }
+                    }
+                    else if (parameter is uint[] uintArray)
+                    {
+                        foreach (uint val in uintArray)
+                        {
+                            uint value = val;
+                            MemoryMarshal.Write(to.Slice(bytesWritten), ref value);
+                            bytesWritten += Marshal.SizeOf(value);
+                        }
+                    }
+                    else if (parameter is DriverId[] driverIdArray)
+                    {
+                        foreach (DriverId val in driverIdArray)
+                        {
+                            uint value = val;
+                            MemoryMarshal.Write(to.Slice(bytesWritten), ref value);
+                            bytesWritten += Marshal.SizeOf(value);
+                        }
+                    }
+                    else if (parameter is float[] floatArray)
+                    {
+                        foreach (float val in floatArray)
+                        {
+                            float value = val;
+                            MemoryMarshal.Write(to.Slice(bytesWritten), ref value);
+                            bytesWritten += Marshal.SizeOf(value);
+                        }
+                    }
+                    else if (parameter is string value)
+                    {
+                        Span<byte> asUnicode = Encoding.UTF8.GetBytes(value);
+                        asUnicode.CopyTo(to.Slice(bytesWritten));
+                        bytesWritten += asUnicode.Length;
+                        bytesWritten = AddPadding(to, bytesWritten);
+                    }
+                    else
+                    {
+                        throw new ArgumentException("Unsupported type", parameter.GetType().Name);
+                    }
                 }
             }
 

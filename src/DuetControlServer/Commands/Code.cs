@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -403,18 +402,6 @@ namespace DuetControlServer.Commands
                 _logger.Debug("Waiting for finish of {0}", this);
                 using (await WaitForFinish())
                 {
-                    await CodeExecuted();
-                }
-                return;
-            }
-
-            // Comments are resolved in DCS but they may be interpreted by third-party plugins
-            if (Keyword == KeywordType.None && Type == CodeType.Comment)
-            {
-                _logger.Debug("Waiting for finish of {0}", this);
-                using (await WaitForFinish())
-                {
-                    Result = new CodeResult();
                     await CodeExecuted();
                 }
                 return;

@@ -1,6 +1,26 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 2.2.0
+==============
+
+Compatible files:
+- RepRapFirmware 3.01-RC?
+- DuetWebControl 2.1.7
+
+Changed behaviour:
+- Changed letter of unprecedented parameters from '\0' to '@'
+- Increased default and minimum API version number to 7
+- Whole line comments are now sent to RepRapFirmware
+
+Known issues:
+- Print/Simulation times are not written to G-code files
+- Codes with invalid expressions may not instantly terminate a macro or job file
+
+Bug fixes:
+- Expressions in square brackets were not evaluatated
+- M500 wrote workplace coordinates without offsetting the indices by 1
+
 Version 2.1.3
 ==============
 

@@ -594,7 +594,7 @@ namespace DuetAPI.Commands
         {
             if (reader.TokenType == JsonTokenType.StartObject)
             {
-                char letter = '\0';
+                char letter = '@';
                 string propertyName = string.Empty, value = string.Empty;
                 bool isString = false, isDriverId = false;
 

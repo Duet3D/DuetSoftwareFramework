@@ -63,6 +63,11 @@
             Code channel that executes the daemon process
             </summary>
         </member>
+        <member name="F:DuetAPI.CodeChannel.Aux2">
+            <summary>
+            Code channel for the second UART port
+            </summary>
+        </member>
         <member name="F:DuetAPI.CodeChannel.Autopause">
             <summary>
             Code channel that executes macros on power fail, heater faults and filament out
@@ -864,7 +869,7 @@
         </member>
         <member name="F:DuetAPI.Commands.CodeType.Comment">
             <summary>
-            Comment type (ignored during execution)
+            Whole line comment
             </summary>
         </member>
         <member name="F:DuetAPI.Commands.CodeType.GCode">
@@ -1791,6 +1796,11 @@
         <member name="P:DuetAPI.Machine.Board.Supports12864">
             <summary>
             Indicates if this board supports external 12864 displays
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Board.UniqueId">
+            <summary>
+            Unique identifier of the board
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Board.V12">
@@ -3646,6 +3656,11 @@
         <member name="P:DuetAPI.Machine.Move.TravelAcceleration">
             <summary>
             Maximum acceleration allowed while travelling (in mm/s^2)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.Move.VirtualEPos">
+            <summary>
+            Virtual total extruder position
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.Move.WorkspaceNumber">

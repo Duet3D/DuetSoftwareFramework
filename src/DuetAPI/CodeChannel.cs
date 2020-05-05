@@ -63,13 +63,18 @@ namespace DuetAPI
         Daemon = 9,
 
         /// <summary>
+        /// Code channel for the second UART port
+        /// </summary>
+        Aux2 = 10,
+
+        /// <summary>
         /// Code channel that executes macros on power fail, heater faults and filament out
         /// </summary>
-        Autopause = 10,
+        Autopause = 11,
 
         /// <summary>
         /// Unknown code channel
         /// </summary>
-        Unknown = 11
+        Unknown = 12
     }
 }

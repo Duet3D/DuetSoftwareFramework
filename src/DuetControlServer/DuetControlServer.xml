@@ -1710,6 +1710,13 @@
             Class providing functions for expression testing and evaluation
             </summary>
         </member>
+        <member name="M:DuetControlServer.Model.Expressions.SplitExpression(System.String)">
+            <summary>
+            Split an echo expression separated by commas
+            </summary>
+            <param name="expression">Expression to spli</param>
+            <returns>Expression items</returns>
+        </member>
         <member name="M:DuetControlServer.Model.Expressions.ContainsLinuxFields(DuetControlServer.Commands.Code)">
             <summary>
             Checks if the given code contains any Linux object model fields

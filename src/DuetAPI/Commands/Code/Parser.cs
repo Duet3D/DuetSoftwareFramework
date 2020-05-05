@@ -406,7 +406,14 @@ namespace DuetAPI.Commands
                         }
                         else if (letter == '\0' || result.Parameter(letter) == null)
                         {
-                            if (!unprecedentedParameter)
+                            if (unprecedentedParameter)
+                            {
+                                if (letter == '\0')
+                                {
+                                    letter = '@';
+                                }
+                            }
+                            else
                             {
                                 letter = char.ToUpperInvariant(letter);
                             }

@@ -1,6 +1,5 @@
 ﻿using System.IO;
 using System.Linq;
-using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 
 namespace DuetAPI.Commands
@@ -437,7 +436,14 @@ namespace DuetAPI.Commands
                         }
                         else if (letter == '\0' || result.Parameter(letter) == null)
                         {
-                            if (!unprecedentedParameter)
+                            if (unprecedentedParameter)
+                            {
+                                if (letter == '\0')
+                                {
+                                    letter = '@';
+                                }
+                            }
+                            else
                             {
                                 letter = char.ToUpperInvariant(letter);
                             }

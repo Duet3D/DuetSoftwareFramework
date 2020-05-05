@@ -104,7 +104,7 @@ namespace DuetControlServer.Model
         /// <exception cref="CodeParserException">Failed to parse expression</exception>
         private static bool ContainsLinuxFields(string expression, Code code)
         {
-            Stack<bool> lastBraceCurly = new Stack<bool>();
+            Stack<char> lastBracketTypes = new Stack<char>();
             Stack<StringBuilder> parsedExpressions = new Stack<StringBuilder>();
             parsedExpressions.Push(new StringBuilder());
 
@@ -124,18 +124,28 @@ namespace DuetControlServer.Model
                 {
                     inQuotes = true;
                 }
-                else if (c == '{' || c == '(')
+                else if (c == '{' || c == '(' || c == '[')
                 {
-                    lastBraceCurly.Push(c == '{');
+                    lastBracketTypes.Push(c);
                     parsedExpressions.Push(new StringBuilder());
                 }
-                else if (c == '}' || c == ')')
+                else if (c == '}' || c == ')' || c == ']')
                 {
-                    if (lastBraceCurly.TryPop(out bool lastWasCurly))
+                    if (lastBracketTypes.TryPop(out char lastBracketType))
                     {
-                        if (c != (lastWasCurly ? '}' : ')'))
+                        if ((lastBracketType == '{' && c != '}') ||
+                            (lastBracketType == '(' && c != ')') ||
+                            (lastBracketType == '[' && c != ']'))
                         {
-                            throw new CodeParserException($"Unexpected {(lastWasCurly ? "curly" : "round")} brace", code);
+                            if (c == '}')
+                            {
+                                throw new CodeParserException($"Unexpected curly bracket", code);
+                            }
+                            if (c == ')')
+                            {
+                                throw new CodeParserException($"Unexpected round bracket", code);
+                            }
+                            throw new CodeParserException($"Unexpected square bracket", code);
                         }
 
                         string subExpression = parsedExpressions.Pop().ToString();
@@ -146,7 +156,15 @@ namespace DuetControlServer.Model
                     }
                     else
                     {
-                        throw new CodeParserException($"Unexpected {(c == '}' ? "curly" : "round")} brace", code);
+                        if (c == '}')
+                        {
+                            throw new CodeParserException($"Unexpected curly bracket", code);
+                        }
+                        if (c == ')')
+                        {
+                            throw new CodeParserException($"Unexpected round bracket", code);
+                        }
+                        throw new CodeParserException($"Unexpected square bracket", code);
                     }
                 }
                 else if (c == '.' || char.IsLetter(c))
@@ -169,9 +187,18 @@ namespace DuetControlServer.Model
             {
                 throw new CodeParserException("Unterminated quotes", code);
             }
-            if (lastBraceCurly.TryPeek(out bool wasCurly))
+
+            if (lastBracketTypes.TryPeek(out char lastBracket))
             {
-                throw new CodeParserException($"Unterminated {(wasCurly ? "curly" : "round")} brace", code);
+                if (lastBracket == '{')
+                {
+                    throw new CodeParserException($"Unterminated curly bracket", code);
+                }
+                if (lastBracket == '(')
+                {
+                    throw new CodeParserException($"Unterminated round bracket", code);
+                }
+                throw new CodeParserException($"Unterminated square bracket", code);
             }
 
             return IsLinuxExpression(parsedExpressions.Peek().ToString());
@@ -303,7 +330,7 @@ namespace DuetControlServer.Model
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
         private static async Task<string> EvaluateExpression(Code code, string expression, bool onlyLinuxFields, bool encodeResult)
         {
-            Stack<bool> lastBraceCurly = new Stack<bool>();
+            Stack<char> lastBracketTypes = new Stack<char>();
             Stack<StringBuilder> parsedExpressions = new Stack<StringBuilder>();
             parsedExpressions.Push(new StringBuilder());
 
@@ -324,27 +351,42 @@ namespace DuetControlServer.Model
                     inQuotes = true;
                     parsedExpressions.Peek().Append(c);
                 }
-                else if (c == '{' || c == '(')
+                else if (c == '{' || c == '(' || c == '[')
                 {
-                    lastBraceCurly.Push(c == '{');
+                    lastBracketTypes.Push(c);
                     parsedExpressions.Push(new StringBuilder());
                 }
-                else if (c == '}' || c == ')')
+                else if (c == '}' || c == ')' || c == ']')
                 {
-                    if (lastBraceCurly.TryPop(out bool lastWasCurly))
+                    if (lastBracketTypes.TryPop(out char lastBracketType))
                     {
-                        if (c != (lastWasCurly ? '}' : ')'))
+                        char expectedBracketType = lastBracketType switch
                         {
-                            throw new CodeParserException($"Unexpected {(lastWasCurly ? "curly" : "round")} brace", code);
+                            '{' => '}',
+                            '(' => ')',
+                            _   => ']'
+                        };
+
+                        if (c != expectedBracketType)
+                        {
+                            if (c == '}')
+                            {
+                                throw new CodeParserException($"Unexpected curly bracket", code);
+                            }
+                            if (c == ')')
+                            {
+                                throw new CodeParserException($"Unexpected round bracket", code);
+                            }
+                            throw new CodeParserException($"Unexpected square bracket", code);
                         }
 
                         string subExpression = parsedExpressions.Pop().ToString();
                         string evaluationResult = await EvaluateSubExpression(code, subExpression.Trim(), onlyLinuxFields, true);
                         if (subExpression == evaluationResult || onlyLinuxFields)
                         {
-                            parsedExpressions.Peek().Append(lastWasCurly ? '{' : '(');
+                            parsedExpressions.Peek().Append(lastBracketType);
                             parsedExpressions.Peek().Append(evaluationResult);
-                            parsedExpressions.Peek().Append(lastWasCurly ? '}' : ')');
+                            parsedExpressions.Peek().Append(expectedBracketType);
                         }
                         else
                         {
@@ -367,9 +409,18 @@ namespace DuetControlServer.Model
             {
                 throw new CodeParserException("Unterminated quotes", code);
             }
-            if (lastBraceCurly.TryPeek(out bool wasCurly))
+
+            if (lastBracketTypes.TryPeek(out char lastBracket))
             {
-                throw new CodeParserException($"Unterminated {(wasCurly ? "curly" : "round")} brace", code);
+                if (lastBracket == '{')
+                {
+                    throw new CodeParserException($"Unterminated curly bracket", code);
+                }
+                if (lastBracket == '(')
+                {
+                    throw new CodeParserException($"Unterminated round bracket", code);
+                }
+                throw new CodeParserException($"Unterminated square bracket", code);
             }
 
             return await EvaluateSubExpression(code, parsedExpressions.Pop().ToString().Trim(), onlyLinuxFields, encodeResult);

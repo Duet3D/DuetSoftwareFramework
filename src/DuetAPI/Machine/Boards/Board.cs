@@ -141,6 +141,16 @@
 		private bool _supports12864;
 
 		/// <summary>
+		/// Unique identifier of the board
+		/// </summary>
+		public string UniqueId
+		{
+			get => _uniqueId;
+			set => SetPropertyValue(ref _uniqueId, value);
+		}
+		private string _uniqueId;
+
+		/// <summary>
 		/// Minimum, maximum, and current voltages on the 12V rail
 		/// </summary>
 		public MinMaxCurrent<float> V12 { get; } = new MinMaxCurrent<float>();

@@ -83,6 +83,16 @@
         private float _travelAcceleration = 10000F;
 
         /// <summary>
+        /// Virtual total extruder position
+        /// </summary>
+        public float VirtualEPos
+        {
+            get => _virtualEPos;
+            set => SetPropertyValue(ref _virtualEPos, value);
+        }
+        private float _virtualEPos;
+
+        /// <summary>
         /// Index of the currently selected workspace
         /// </summary>
         public int WorkspaceNumber

@@ -10,9 +10,9 @@ namespace DuetAPI.Commands
     public enum CodeType
     {
         /// <summary>
-        /// Comment type (ignored during execution)
+        /// Whole line comment
         /// </summary>
-        Comment = 'C',
+        Comment = 'Q',
 
         /// <summary>
         /// G-code

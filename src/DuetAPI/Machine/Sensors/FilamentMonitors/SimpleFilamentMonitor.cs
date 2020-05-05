@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Representation of a simple filament monitor

@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using DuetAPI.Commands;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
@@ -9,6 +10,7 @@ using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.SPI.Serialization;
 using NUnit.Framework;
 using Code = DuetControlServer.Commands.Code;
+using CodeFlags = DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags;
 
 namespace UnitTests.SPI
 {
@@ -155,6 +157,44 @@ namespace UnitTests.SPI
             Assert.AreEqual(3.45, floatValue, 0.00001);
             floatValue = MemoryMarshal.Read<float>(span.Slice(72, 4));
             Assert.AreEqual(5.67, floatValue, 0.00001);
+        }
+
+        [Test]
+        public void Comment()
+        {
+            Span<byte> span = new byte[128];
+            span.Fill(0xFF);
+
+            Code code = new Code("; Hello world")
+            {
+                Channel = DuetAPI.CodeChannel.Telnet
+            };
+
+            int bytesWritten = Writer.WriteCode(span, code);
+            Assert.AreEqual(36, bytesWritten);
+
+            // Header
+            Assert.AreEqual((byte)DuetAPI.CodeChannel.Telnet, span[0]);
+            Assert.AreEqual((byte)CodeFlags.HasMajorCommandNumber, span[1]);
+            Assert.AreEqual(1, span[2]);                    // Number of parameters
+            Assert.AreEqual((byte)'Q', span[3]);            // Code letter
+            int majorCode = MemoryMarshal.Read<int>(span.Slice(4, 4));
+            Assert.AreEqual(0, majorCode);
+            int minorCode = MemoryMarshal.Read<int>(span.Slice(8, 4));
+            Assert.AreEqual(-1, minorCode);
+            uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
+            Assert.AreEqual(0xFFFFFFFF, filePosition);
+
+            // Comment parameter
+            Assert.AreEqual((byte)'@', span[16]);
+            Assert.AreEqual((byte)DataType.String, span[17]);
+            int intValue = MemoryMarshal.Read<int>(span.Slice(20, 4));
+            Assert.AreEqual(11, intValue);
+
+            // Comment payload ("Hello world")
+            string stringValue = Encoding.UTF8.GetString(span.Slice(24, 11));
+            Assert.AreEqual("Hello world", stringValue);
+            Assert.AreEqual(0, span[35]);
         }
 
         [Test]

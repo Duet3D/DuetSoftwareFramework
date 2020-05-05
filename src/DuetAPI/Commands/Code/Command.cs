@@ -161,7 +161,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter p in Parameters)
             {
-                if (p.Letter == '\0')
+                if (p.Letter == '@')
                 {
                     return p;
                 }
@@ -212,7 +212,7 @@ namespace DuetAPI.Commands
             // After this append each parameter and encapsulate it in double quotes
             foreach(CodeParameter parameter in Parameters)
             {
-                if (parameter.Letter != '\0')
+                if (parameter.Letter != '@')
                 {
                     if (parameter.Type == typeof(string) && !parameter.IsExpression)
                     {

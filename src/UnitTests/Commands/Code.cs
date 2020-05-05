@@ -165,7 +165,7 @@ namespace UnitTests.Commands
             Assert.AreEqual(117, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(1, code.Parameters.Count);
-            Assert.AreEqual('\0', code.Parameters[0].Letter);
+            Assert.AreEqual('@', code.Parameters[0].Letter);
             Assert.AreEqual(string.Empty, (string)code.Parameters[0]);
         }
 
@@ -320,9 +320,22 @@ namespace UnitTests.Commands
             Assert.AreEqual(32, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(1, code.Parameters.Count);
-            Assert.AreEqual('\0', code.Parameters[0].Letter);
+            Assert.AreEqual('@', code.Parameters[0].Letter);
             Assert.AreEqual(true, code.Parameters[0].IsExpression);
             Assert.AreEqual("{my.test.value}", (string)code.Parameters[0]);
+        }
+
+        [Test]
+        public void ParseUnprecedentedExpression()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M117 { \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(117, code.MajorNumber);
+            Assert.IsNull(code.MinorNumber);
+            Assert.AreEqual(1, code.Parameters.Count);
+            Assert.AreEqual('@', code.Parameters[0].Letter);
+            Assert.IsTrue(code.Parameters[0].IsExpression);
+            Assert.AreEqual("{ \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }", (string)code.Parameters[0]);
         }
 
         [Test]

@@ -346,14 +346,17 @@ namespace DuetControlServer.FileExecution
                     catch (CodeParserException cpe)
                     {
                         await Logger.LogOutput(MessageType.Error, cpe.Message + " of " + Path.GetFileName(FileName));
+                        _logger.Debug(cpe);
                     }
                     catch (AggregateException ae)
                     {
                         await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                        _logger.Warn(ae);
                     }
                     catch (Exception e)
                     {
                         await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{e.GetType().Name}] {e.Message}");
+                        _logger.Warn(e);
                     }
                 }
                 else
