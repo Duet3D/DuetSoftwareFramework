@@ -5,7 +5,7 @@ Version 2.2.0
 ==============
 
 Compatible files:
-- RepRapFirmware 3.01-RC?
+- RepRapFirmware 3.01
 - DuetWebControl 2.1.7
 
 Changed behaviour:

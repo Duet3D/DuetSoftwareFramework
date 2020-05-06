@@ -25,6 +25,12 @@ references:
   commentId: F:DuetAPI.CodeChannel.Aux
   fullName: DuetAPI.CodeChannel.Aux
   nameWithType: CodeChannel.Aux
+- uid: DuetAPI.CodeChannel.Aux2
+  name: Aux2
+  href: api/DuetAPI.CodeChannel.html#DuetAPI_CodeChannel_Aux2
+  commentId: F:DuetAPI.CodeChannel.Aux2
+  fullName: DuetAPI.CodeChannel.Aux2
+  nameWithType: CodeChannel.Aux2
 - uid: DuetAPI.CodeChannel.Daemon
   name: Daemon
   href: api/DuetAPI.CodeChannel.html#DuetAPI_CodeChannel_Daemon
@@ -2883,6 +2889,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Board.Supports12864
   nameWithType: Board.Supports12864
+- uid: DuetAPI.Machine.Board.UniqueId
+  name: UniqueId
+  href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_UniqueId
+  commentId: P:DuetAPI.Machine.Board.UniqueId
+  fullName: DuetAPI.Machine.Board.UniqueId
+  nameWithType: Board.UniqueId
+- uid: DuetAPI.Machine.Board.UniqueId*
+  name: UniqueId
+  href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_UniqueId_
+  commentId: Overload:DuetAPI.Machine.Board.UniqueId
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Board.UniqueId
+  nameWithType: Board.UniqueId
 - uid: DuetAPI.Machine.Board.V12
   name: V12
   href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_V12
@@ -7299,6 +7318,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Move.TravelAcceleration
   nameWithType: Move.TravelAcceleration
+- uid: DuetAPI.Machine.Move.VirtualEPos
+  name: VirtualEPos
+  href: api/DuetAPI.Machine.Move.html#DuetAPI_Machine_Move_VirtualEPos
+  commentId: P:DuetAPI.Machine.Move.VirtualEPos
+  fullName: DuetAPI.Machine.Move.VirtualEPos
+  nameWithType: Move.VirtualEPos
+- uid: DuetAPI.Machine.Move.VirtualEPos*
+  name: VirtualEPos
+  href: api/DuetAPI.Machine.Move.html#DuetAPI_Machine_Move_VirtualEPos_
+  commentId: Overload:DuetAPI.Machine.Move.VirtualEPos
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Move.VirtualEPos
+  nameWithType: Move.VirtualEPos
 - uid: DuetAPI.Machine.Move.WorkspaceNumber
   name: WorkspaceNumber
   href: api/DuetAPI.Machine.Move.html#DuetAPI_Machine_Move_WorkspaceNumber
@@ -15837,6 +15869,12 @@ references:
   commentId: F:DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.AutoPauseMessage
   fullName: DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.AutoPauseMessage
   nameWithType: MessageTypeFlags.AutoPauseMessage
+- uid: DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.Aux2Message
+  name: Aux2Message
+  href: api/DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.html#DuetControlServer_SPI_Communication_Shared_MessageTypeFlags_Aux2Message
+  commentId: F:DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.Aux2Message
+  fullName: DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.Aux2Message
+  nameWithType: MessageTypeFlags.Aux2Message
 - uid: DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.AuxMessage
   name: AuxMessage
   href: api/DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.html#DuetControlServer_SPI_Communication_Shared_MessageTypeFlags_AuxMessage
