@@ -171,7 +171,7 @@ namespace DuetControlServer.Model
                 {
                     parsedExpressions.Peek().Append(c);
                 }
-                else if (c != '[' && c != ']' && !char.IsDigit(c) && parsedExpressions.Peek().Length > 0)
+                else if (!char.IsDigit(c) && parsedExpressions.Peek().Length > 0)
                 {
                     string subExpression = parsedExpressions.Peek().ToString();
                     if (IsLinuxExpression(subExpression))
@@ -382,7 +382,7 @@ namespace DuetControlServer.Model
 
                         string subExpression = parsedExpressions.Pop().ToString();
                         string evaluationResult = await EvaluateSubExpression(code, subExpression.Trim(), onlyLinuxFields, true);
-                        if (subExpression == evaluationResult || onlyLinuxFields)
+                        if (lastBracketType == '[' || subExpression == evaluationResult || onlyLinuxFields)
                         {
                             parsedExpressions.Peek().Append(lastBracketType);
                             parsedExpressions.Peek().Append(evaluationResult);

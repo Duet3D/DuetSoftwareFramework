@@ -62,9 +62,14 @@ namespace DuetControlServer.SPI.Communication.Shared
         DaemonMessage = 0x200,
 
         /// <summary>
+        /// A message that is to be sent to the second UART port
+        /// </summary>
+        Aux2Message = 0x400,
+
+        /// <summary>
         /// A message that is to be sent to an auto-pause processor
         /// </summary>
-        AutoPauseMessage = 0x400,
+        AutoPauseMessage = 0x800,
         #endregion
 
         #region Special destinations (byte 3)

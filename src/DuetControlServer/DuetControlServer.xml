@@ -3886,6 +3886,11 @@
             A message that is to be sent to a daemon processor
             </summary>
         </member>
+        <member name="F:DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.Aux2Message">
+            <summary>
+            A message that is to be sent to the second UART port
+            </summary>
+        </member>
         <member name="F:DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.AutoPauseMessage">
             <summary>
             A message that is to be sent to an auto-pause processor
