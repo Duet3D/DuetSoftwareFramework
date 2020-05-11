@@ -548,11 +548,6 @@ namespace DuetControlServer.SPI
                         }
 
                         _iapStream = _firmwareStream = null;
-                        if (Settings.UpdateOnly)
-                        {
-                            Program.CancelSource.Cancel();
-                            return;
-                        }
                     }
                 }
 

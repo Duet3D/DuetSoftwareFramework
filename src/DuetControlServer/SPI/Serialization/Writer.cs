@@ -120,16 +120,17 @@ namespace DuetControlServer.SPI.Serialization
             {
                 // Write comment as an unprecedented parameter
                 string comment = (code.Comment ?? string.Empty).Trim();
+                int commentLength = Math.Min(comment.Length, Consts.MaxCommentLength);
                 CodeParameter binaryParam = new CodeParameter
                 {
                     Letter = (byte)'@',
-                    IntValue = comment.Length,
+                    IntValue = commentLength,
                     Type = DataType.String
                 };
                 MemoryMarshal.Write(to.Slice(bytesWritten), ref binaryParam);
                 bytesWritten += Marshal.SizeOf(binaryParam);
 
-                Span<byte> asUnicode = Encoding.UTF8.GetBytes(comment);
+                Span<byte> asUnicode = Encoding.UTF8.GetBytes(comment.Substring(0, commentLength));
                 asUnicode.CopyTo(to.Slice(bytesWritten));
                 bytesWritten += asUnicode.Length;
                 bytesWritten = AddPadding(to, bytesWritten);

@@ -12,6 +12,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -195,9 +196,22 @@ namespace DuetControlServer.SPI.Channel
         /// Write channel diagnostics to the given string builder
         /// </summary>
         /// <param name="builder">Target to write to</param>
-        public void Diagnostics(StringBuilder builder)
+        /// <returns>Asynchronous task</returns>
+        public async Task Diagnostics(StringBuilder builder)
         {
             StringBuilder channelDiagostics = new StringBuilder();
+
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+            IDisposable lockObject = null;
+            try
+            {
+                cts.CancelAfter(2000);
+                lockObject = await _lock.LockAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                channelDiagostics.AppendLine($"Failed to lock {Channel} processor within 2 seconds");
+            }
 
             foreach (Code bufferedCode in BufferedCodes)
             {
@@ -251,6 +265,7 @@ namespace DuetControlServer.SPI.Channel
                 builder.AppendLine($"{Channel}:");
                 builder.Append(channelDiagostics);
             }
+            lockObject?.Dispose();
         }
 
         /// <summary>

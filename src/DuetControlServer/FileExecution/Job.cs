@@ -8,6 +8,7 @@ using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -430,34 +431,45 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public static async Task Diagnostics(StringBuilder builder)
         {
-            using (await _lock.LockAsync(Program.CancellationToken))
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+            IDisposable lockObject = null;
+            try
             {
-                if (IsFileSelected)
-                {
-                    builder.Append($"File {_file.FileName} is selected");
-                    if (IsProcessing)
-                    {
-                        builder.Append(", processing");
-                    }
-                    if (IsSimulating)
-                    {
-                        builder.Append(", simulating");
-                    }
-                    if (IsPaused)
-                    {
-                        builder.Append(", paused");
-                    }
-                    if (IsCancelled)
-                    {
-                        builder.Append(", cancelled");
-                    }
-                    if (IsAborted)
-                    {
-                        builder.Append(", aborted");
-                    }
-                    builder.AppendLine();
-                }
+                cts.CancelAfter(2000);
+                lockObject = await _lock.LockAsync(cts.Token);
             }
+            catch (OperationCanceledException)
+            {
+                builder.AppendLine("Failed to lock Job task within 2 seconds");
+            }
+
+            if (IsFileSelected)
+            {
+                builder.Append($"File {_file.FileName} is selected");
+                if (IsProcessing)
+                {
+                    builder.Append(", processing");
+                }
+                if (IsSimulating)
+                {
+                    builder.Append(", simulating");
+                }
+                if (IsPaused)
+                {
+                    builder.Append(", paused");
+                }
+                if (IsCancelled)
+                {
+                    builder.Append(", cancelled");
+                }
+                if (IsAborted)
+                {
+                    builder.Append(", aborted");
+                }
+                builder.AppendLine();
+            }
+
+            lockObject?.Dispose();
         }
     }
 }

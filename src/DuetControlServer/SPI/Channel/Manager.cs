@@ -46,10 +46,7 @@ namespace DuetControlServer.SPI.Channel
         {
             foreach (Processor channel in _channels)
             {
-                using (await channel.LockAsync())
-                {
-                    channel.Diagnostics(builder);
-                }
+                await channel.Diagnostics(builder);
             }
         }
 

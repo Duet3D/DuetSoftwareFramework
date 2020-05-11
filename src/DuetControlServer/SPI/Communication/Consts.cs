@@ -32,6 +32,11 @@ namespace DuetControlServer.SPI.Communication
         public const int MaxCodeBufferSize = 256;
 
         /// <summary>
+        /// Maximum length of a whole-line comment to send to RRF
+        /// </summary>
+        public const int MaxCommentLength = 100;
+
+        /// <summary>
         /// Maximum supported length of messages to be sent to RepRapFirmware
         /// </summary>
         public const int MaxMessageLength = 4096;

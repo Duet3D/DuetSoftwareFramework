@@ -429,10 +429,7 @@ namespace DuetAPI.Commands
                             {
                                 AddParameter(result, char.ToUpperInvariant(letter), value, false, false);
                             }
-                            else
-                            {
-                                throw new CodeParserException($"Duplicate {letter} parameter", result);
-                            }
+                            // Ignore duplicate parameters
                         }
                         else if (letter == '\0' || result.Parameter(letter) == null)
                         {
@@ -449,10 +446,7 @@ namespace DuetAPI.Commands
                             }
                             AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
                         }
-                        else
-                        {
-                            throw new CodeParserException($"Duplicate {(letter == '\0' ? "unprecedented" : letter.ToString())} parameter", result);
-                        }
+                        // Igmore duplicate parameters
 
                         letter = '\0';
                         value = string.Empty;

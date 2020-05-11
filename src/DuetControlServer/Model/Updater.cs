@@ -1,4 +1,5 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.Commands;
+using DuetAPI.Machine;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -128,6 +129,13 @@ namespace DuetControlServer.Model
 
                             // Cannot perform any further updates...
                             _fullyUpdated.NotifyAll();
+
+                            // Check if the firmware is supposed to be updated
+                            if (Settings.UpdateOnly && !_updatingFirmware)
+                            {
+                                _updatingFirmware = true;
+                                _ = Task.Run(UpdateFirmware);
+                            }
                         }
                         else if (jsonDocument.RootElement.TryGetProperty("key", out JsonElement key) &&
                                  jsonDocument.RootElement.TryGetProperty("result", out JsonElement result))
@@ -171,6 +179,13 @@ namespace DuetControlServer.Model
                                 {
                                     // Notify clients waiting for the machine model to be synchronized
                                     _fullyUpdated.NotifyAll();
+
+                                    // Check if the firmware is supposed to be updated
+                                    if (Settings.UpdateOnly && !_updatingFirmware)
+                                    {
+                                        _updatingFirmware = true;
+                                        _ = Task.Run(UpdateFirmware);
+                                    }
                                 }
                             }
                             else
@@ -210,6 +225,39 @@ namespace DuetControlServer.Model
                 }
             }
             while (true);
+        }
+
+        /// <summary>
+        /// Indicates if the firmware is being updated
+        /// </summary>
+        private static bool _updatingFirmware;
+
+        /// <summary>
+        /// Update the firmware internally
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private static async Task UpdateFirmware()
+        {
+            Console.Write("Updating firmware... ");
+            try
+            {
+                Commands.Code updateCode = new Commands.Code
+                {
+                    Type = CodeType.MCode,
+                    MajorNumber = 997
+                };
+                await updateCode.Execute();
+                Console.WriteLine("Done!");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error: {0}", e.Message);
+                _logger.Debug(e);
+            }
+            finally
+            {
+                Program.CancelSource.Cancel();
+            }
         }
 
         /// <summary>

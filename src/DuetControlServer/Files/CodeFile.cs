@@ -364,10 +364,6 @@ namespace DuetControlServer.Files
                 // Check if any more codes could be read
                 if (!codeRead)
                 {
-                    using (await _lock.LockAsync(Program.CancellationToken))
-                    {
-                        Close();
-                    }
                     return null;
                 }
 
