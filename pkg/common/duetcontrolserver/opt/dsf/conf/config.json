@@ -60,7 +60,7 @@
       "Options": 17
     },
     {
-      "Pattern": "filament used \\[mm\\]\\D+(?<mm>\\d+\\.?\\d*)",
+      "Pattern": "filament used \\[mm\\]\\D+((?<mm>\\d+\\.?\\d*)(\\D+)?)+",
       "Options": 17
     },
     {

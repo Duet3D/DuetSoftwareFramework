@@ -431,22 +431,23 @@ namespace DuetAPI.Commands
                             }
                             // Ignore duplicate parameters
                         }
-                        else if (letter == '\0' || result.Parameter(letter) == null)
+                        else
                         {
-                            if (unprecedentedParameter)
+                            if (letter == '\0')
                             {
-                                if (letter == '\0')
-                                {
-                                    letter = '@';
-                                }
+                                letter = '@';
                             }
-                            else
+                            else if (!unprecedentedParameter)
                             {
                                 letter = char.ToUpperInvariant(letter);
                             }
-                            AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
+
+                            if (result.Parameter(letter) == null)
+                            {
+                                AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
+                            }
+                            // Ignore duplicate parameters
                         }
-                        // Igmore duplicate parameters
 
                         letter = '\0';
                         value = string.Empty;

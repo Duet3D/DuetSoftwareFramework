@@ -195,7 +195,7 @@ namespace DuetControlServer
             new Regex(@"filament used\D+(((?<mm>\d+\.?\d*)mm)(\D+)?)+", RegexFlags),        // Slic3r (mm)
             new Regex(@"filament used\D+(((?<m>\d+\.?\d*)m([^m]|$))(\D+)?)+", RegexFlags),  // Cura (m)
             new Regex(@"filament length\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+", RegexFlags),   // Simplify3D (mm)
-            new Regex(@"filament used \[mm\]\D+(?<mm>\d+\.?\d*)", RegexFlags),              // Prusa Slicer (mm)
+            new Regex(@"filament used \[mm\]\D+((?<mm>\d+\.?\d*)(\D+)?)+", RegexFlags),       // Prusa Slicer (mm)
             new Regex(@"material\#\d+\D+(?<mm>\d+\.?\d*)", RegexFlags),                     // IdeaMaker (mm)
             new Regex(@"Filament used per extruder:\r\n;\s*(?<name>.+)\s+=\s*(?<mm>[0-9.]+)", RegexFlags)   // Canvas
         };

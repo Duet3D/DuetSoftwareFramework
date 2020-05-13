@@ -170,6 +170,18 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseM122DSF()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M122 \"DSF\"");
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(122, code.MajorNumber);
+            Assert.IsNull(code.MinorNumber);
+            Assert.AreEqual(1, code.Parameters.Count);
+            Assert.AreEqual('@', code.Parameters[0].Letter);
+            Assert.AreEqual("DSF", (string)code.Parameters[0]);
+        }
+
+        [Test]
         public void ParseM563()
         {
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M563 P0 D0:1 H1:2                             ; Define tool 0");

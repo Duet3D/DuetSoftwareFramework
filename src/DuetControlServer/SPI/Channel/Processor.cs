@@ -1043,12 +1043,8 @@ namespace DuetControlServer.SPI.Channel
                 }
                 else if (reportMissing)
                 {
-                    if (!fromCode || BufferedCodes.Count == 0 || BufferedCodes[0].Type != CodeType.MCode || BufferedCodes[0].MajorNumber != 98)
-                    {
-                        // M98 outputs its own warning message via RRF
-                        Interface.SendMessage((MessageTypeFlags)(MessageTypeFlags.GenericMessage | MessageTypeFlags.ErrorMessageFlag), $"Macro file {fileName} not found");
-                        await Logger.LogOutput(MessageType.Error, $"Macro file {fileName} not found");
-                    }
+                    // Send a warning message back to RRF
+                    Interface.SendMessage(MessageTypeFlags.GenericMessage | MessageTypeFlags.WarningMessageFlag, $"Macro file {fileName} not found\n");
                 }
                 else if (FilePath.DeployProbePattern.IsMatch(fileName))
                 {

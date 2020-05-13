@@ -39,6 +39,9 @@ namespace DuetAPI.Machine
                     return typeof(DeltaKinematics);
                 case KinematicsName.Hangprinter:
                     return typeof(HangprinterKinematics);
+                case KinematicsName.FiveBarScara:
+                case KinematicsName.Scara:
+                    return typeof(ScaraKinematics);
                 default:
                     return typeof(Kinematics);
             }

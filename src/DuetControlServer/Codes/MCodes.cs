@@ -679,17 +679,26 @@ namespace DuetControlServer.Codes
                 case 505:
                     if (await SPI.Interface.Flush(code))
                     {
-                        string directory = code.Parameter('P'), physicalDirectory = await FilePath.ToPhysicalAsync(directory, "sys");
-                        if (Directory.Exists(physicalDirectory))
+                        string directory = code.Parameter('P');
+                        if (!string.IsNullOrEmpty(directory))
                         {
-                            string virtualDirectory = await FilePath.ToVirtualAsync(physicalDirectory);
-                            using (await Model.Provider.AccessReadWriteAsync())
+                            string physicalDirectory = await FilePath.ToPhysicalAsync(directory, "sys");
+                            if (Directory.Exists(physicalDirectory))
                             {
-                                Model.Provider.Get.Directories.System = virtualDirectory;
+                                string virtualDirectory = await FilePath.ToVirtualAsync(physicalDirectory);
+                                using (await Model.Provider.AccessReadWriteAsync())
+                                {
+                                    Model.Provider.Get.Directories.System = virtualDirectory;
+                                }
+                                return new CodeResult();
                             }
-                            return new CodeResult();
+                            return new CodeResult(MessageType.Error, "Directory not found");
                         }
-                        return new CodeResult(MessageType.Error, "Directory not found");
+
+                        using (await Model.Provider.AccessReadOnlyAsync())
+                        {
+                            return new CodeResult(MessageType.Success, $"Sys file path is {Model.Provider.Get.Directories.System}");
+                        }
                     }
                     throw new OperationCanceledException();
 
