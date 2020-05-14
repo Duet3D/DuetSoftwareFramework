@@ -11,6 +11,7 @@ Compatible files:
 Changed behaviour:
 - Duplicate code parameters are now ignored
 - If M122 cannot obtain locks in DCS within 2s, the lock is ignored
+- SPI poll delay is skipped during updates
 
 Bug fixes:
 - When pausing a print at the end of a file, the file was closed on resume
