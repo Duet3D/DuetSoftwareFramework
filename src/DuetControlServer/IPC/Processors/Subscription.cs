@@ -253,7 +253,7 @@ namespace DuetControlServer.IPC.Processors
                         else
                         {
                             // Stop here if the node type is unsupported
-                            return child;
+                            return null;
                         }
                     }
                     else
