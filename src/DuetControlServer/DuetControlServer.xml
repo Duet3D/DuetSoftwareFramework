@@ -2310,6 +2310,17 @@
             </summary>
             <returns>Asynchronous task</returns>
         </member>
+        <member name="F:DuetControlServer.Model.Updater._updatingFirmware">
+            <summary>
+            Indicates if the firmware is being updated
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Model.Updater.UpdateFirmware">
+            <summary>
+            Update the firmware internally
+            </summary>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="M:DuetControlServer.Model.Updater.UpdateLayers">
             <summary>
             Update the layers
@@ -2767,6 +2778,7 @@
             Write channel diagnostics to the given string builder
             </summary>
             <param name="builder">Target to write to</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="P:DuetControlServer.SPI.Channel.Processor.IsWaitingForAcknowledgement">
             <summary>
@@ -2984,6 +2996,11 @@
         <member name="F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize">
             <summary>
             Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.MaxCommentLength">
+            <summary>
+            Maximum length of a whole-line comment to send to RRF
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Consts.MaxMessageLength">
