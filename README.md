@@ -621,7 +621,7 @@ For further information, check the documentation or have a look at the [CustomHt
 
 The following third-party bindings are available:
 
-- Go: https://github.com/wilriker/goduetapiclient
+- Go and Python: https://github.com/Duet3D/DSF-APIs
 
 ## Unit Tests
 
