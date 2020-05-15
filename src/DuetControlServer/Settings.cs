@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -15,7 +16,6 @@ namespace DuetControlServer
     /// <summary>
     /// Settings provider
     /// </summary>
-    /// <remarks>This class cannot be static because JSON.NET requires an instance for deserialization</remarks>
     public static class Settings
     {
         private const string DefaultConfigFile = "/opt/dsf/conf/config.json";
@@ -78,15 +78,15 @@ namespace DuetControlServer
         public static string BaseDirectory { get; set; } = "/opt/dsf/sd";
 
         /// <summary>
+        /// Set this to true to prevent M999 from stopping this application
+        /// </summary>
+        public static bool NoTerminateOnReset { get; set; }
+
+        /// <summary>
         /// Internal model update interval after which properties of the machine model from
         /// the host controller (e.g. network information and mass storages) are updated (in ms)
         /// </summary>
         public static int HostUpdateInterval { get; set; } = 4000;
-
-        /// <summary>
-        /// How frequently the config response is polled (in ms; temporary; will be removed once the new object model has been finished)
-        /// </summary>
-        public static int ConfigUpdateInterval { get; set; } = 5000;
 
         /// <summary>
         /// Maximum time to keep messages in the object model unless client(s) pick them up (in s).
@@ -100,9 +100,9 @@ namespace DuetControlServer
         public static string SpiDevice { get; set; } = "/dev/spidev0.0";
 
         /// <summary>
-        /// Frequency to use for SPI transfers
+        /// Frequency to use for SPI transfers (in Hz)
         /// </summary>
-        public static int SpiFrequency { get; set; } = 2_000_000;
+        public static int SpiFrequency { get; set; } = 8_000_000;
 
         /// <summary>
         /// Maximum allowed delay between data exchanges during a full transfer (in ms)
@@ -140,15 +140,14 @@ namespace DuetControlServer
         public static int BufferedMacroCodes { get; set; } = 16;
 
         /// <summary>
-        /// Maximum space of buffered codes per channel (in bytes). Must be greater than <see cref="SPI.Communication.Consts.MaxCodeBufferSize"/>
+        /// Maximum space of buffered codes per channel (in bytes)
         /// </summary>
         public static int MaxBufferSpacePerChannel { get; set; } = 1536;
 
         /// <summary>
-        /// Interval of regular status updates (in ms)
+        /// Interval of object model updates (in ms)
         /// </summary>
-        /// <remarks>This is preliminary and will be removed from future versions</remarks>
-        public static double ModelUpdateInterval { get; set; } = 125.0;
+        public static int ModelUpdateInterval { get; set; } = 250;
 
         /// <summary>
         /// Maximum lock time of the object model. If this time is exceeded, a deadlock is reported and the application is terminated.
@@ -157,9 +156,9 @@ namespace DuetControlServer
         public static int MaxMachineModelLockTime { get; set; } = -1;
 
         /// <summary>
-        /// Size of the read buffer used for file parsing in bytes
+        /// Size of the read buffer used when reading from files (in bytes)
         /// </summary>
-        public static int FileInfoReadBufferSize { get; set; } = 8192;
+        public static int FileBufferSize { get; set; } = 8192;
 
         /// <summary>
         /// How many bytes to parse max at the beginning of a file to retrieve G-code file information (12KiB)
@@ -181,7 +180,7 @@ namespace DuetControlServer
         /// </summary>
         public static List<Regex> LayerHeightFilters { get; set; } = new List<Regex>
         {
-            new Regex(@"layer_height\D+(?<mm>(\d+\.?\d*))", RegexFlags),                // Slic3r
+            new Regex(@"^\s*layer_height\D+(?<mm>(\d+\.?\d*))", RegexFlags),            // Slic3r / Prusa Slicer
             new Regex(@"Layer height\D+(?<mm>(\d+\.?\d*))", RegexFlags),                // Cura
             new Regex(@"layerHeight\D+(?<mm>(\d+\.?\d*))", RegexFlags),                 // Simplify3D
             new Regex(@"layer_thickness_mm\D+(?<mm>(\d+\.?\d*))", RegexFlags),          // KISSlicer and Canvas
@@ -195,8 +194,9 @@ namespace DuetControlServer
         {
             new Regex(@"filament used\D+(((?<mm>\d+\.?\d*)mm)(\D+)?)+", RegexFlags),        // Slic3r (mm)
             new Regex(@"filament used\D+(((?<m>\d+\.?\d*)m([^m]|$))(\D+)?)+", RegexFlags),  // Cura (m)
-            new Regex(@"material\#\d+\D+(?<mm>\d+\.?\d*)", RegexFlags),                     // IdeaMaker (mm)
             new Regex(@"filament length\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+", RegexFlags),   // Simplify3D (mm)
+            new Regex(@"filament used \[mm\]\D+((?<mm>\d+\.?\d*)(\D+)?)+", RegexFlags),       // Prusa Slicer (mm)
+            new Regex(@"material\#\d+\D+(?<mm>\d+\.?\d*)", RegexFlags),                     // IdeaMaker (mm)
             new Regex(@"Filament used per extruder:\r\n;\s*(?<name>.+)\s+=\s*(?<mm>[0-9.]+)", RegexFlags)   // Canvas
         };
 
@@ -205,11 +205,11 @@ namespace DuetControlServer
         /// </summary>
         public static List<Regex> GeneratedByFilters { get; set; } = new List<Regex>
         {
-            new Regex(@"generated by\s+(.+)", RegexFlags),                              // Slic3r and Simplify3D
-            new Regex(@";\s*Sliced by\s+(.+)", RegexFlags),                             // IdeaMaker and Canvas
-            new Regex(@";\s*(KISSlicer.*)", RegexFlags),                                // KISSlicer
-            new Regex(@";\s*Sliced at:\s*(.+)", RegexFlags),                            // Cura (old)
-            new Regex(@";\s*Generated with\s*(.+)", RegexFlags)                         // Cura (new)
+            new Regex(@"generated by\s+(.+)", RegexFlags),                          // Slic3r and Simplify3D
+            new Regex(@"Sliced by\s+(.+)", RegexFlags),                             // IdeaMaker and Canvas
+            new Regex(@"(KISSlicer.*)", RegexFlags),                                // KISSlicer
+            new Regex(@"Sliced at:\s*(.+)", RegexFlags),                            // Cura (old)
+            new Regex(@"Generated with\s*(.+)", RegexFlags)                         // Cura (new)
         };
 
         /// <summary>
@@ -217,10 +217,10 @@ namespace DuetControlServer
         /// </summary>
         public static List<Regex> PrintTimeFilters { get; set; } = new List<Regex>
         {
-            new Regex(@"estimated printing time = ((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                                     // Slic3r PE
-            new Regex(@";TIME:(?<s>(\d+\.?\d*))", RegexFlags),                                                                                           // Cura
-            new Regex(@"Build time: ((?<h>\d+) hours\s*)?((?<m>\d+) minutes\s*)?((?<s>(\d+) seconds))?", RegexFlags),                                    // Simplify3D
-            new Regex(@"Estimated Build Time:\s+((?<h>(\d+\.?\d*)) hours\s*)?((?<m>(\d+\.?\d*)) minutes\s*)?((?<s>(\d+\.?\d*)) seconds)?", RegexFlags)   // KISSlicer and Canvas
+            new Regex(@"estimated printing time .*= ((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                                     // Slic3r PE
+            new Regex(@"TIME:(?<s>(\d+\.?\d*))", RegexFlags),                                                                                           // Cura
+            new Regex(@"Build time: ((?<h>\d+) hour(s)?\s*)?((?<m>\d+) minute(s)?\s*)?((?<s>(\d+) second(s)?))?", RegexFlags),                                    // Simplify3D
+            new Regex(@"Estimated Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?", RegexFlags)   // KISSlicer and Canvas
         };
 
         /// <summary>
@@ -228,7 +228,7 @@ namespace DuetControlServer
         /// </summary>
         public static List<Regex> SimulatedTimeFilters { get; set; } = new List<Regex>
         {
-            new Regex(@"; Simulated print time\D+(?<s>(\d+\.?\d*))", RegexFlags)
+            new Regex(@"Simulated print time\D+(?<s>(\d+\.?\d*))", RegexFlags)
         };
 
         /// <summary>
@@ -251,6 +251,7 @@ namespace DuetControlServer
                     Console.WriteLine("-u, --update: Update RepRapFirmware and exit");
                     Console.WriteLine("-l, --log-level [trace,debug,info,warn,error,fatal,off]: Set minimum log level");
                     Console.WriteLine("-c, --config: Override path to the JSON config file");
+                    Console.WriteLine("-r, --no-reset-stop: Do not terminate this application when M999 has been processed");
                     Console.WriteLine("-S, --socket-directory: Specify the UNIX socket directory");
                     Console.WriteLine("-s, --socket-file: Specify the UNIX socket file");
                     Console.WriteLine("-u, --socket-user <user>: Specify the owning user of the UNIX socket file");
@@ -264,44 +265,44 @@ namespace DuetControlServer
             }
 
             // See if the file exists and attempt to load the settings from it, otherwise create it
-            if (File.Exists(ConfigFilename))
+            try
             {
-                LoadFromFile(ConfigFilename);
-                ParseParameters(args);
-
-                if (MaxBufferSpacePerChannel < SPI.Communication.Consts.MaxCodeBufferSize)
+                if (File.Exists(ConfigFilename))
                 {
-                    throw new ArgumentException($"{nameof(MaxBufferSpacePerChannel)} is too low");
+                    LoadFromFile(ConfigFilename);
+                    ParseParameters(args);
+                }
+                else
+                {
+                    ParseParameters(args);
+                    SaveToFile(ConfigFilename);
                 }
             }
-            else
+            finally
             {
-                ParseParameters(args);
-                SaveToFile(ConfigFilename);
+                // Initialize logging
+                LoggingConfiguration logConfig = new LoggingConfiguration();
+                ColoredConsoleTarget logConsoleTarget = new ColoredConsoleTarget
+                {
+                    // Create a layout for messages like:
+                    // [trace] Really verbose stuff
+                    // [debug] Verbose debugging stuff
+                    // [info] This is a regular log message
+                    // [warning] Something not too nice
+                    // [error] IPC#3: This is an IPC error message
+                    //         System.Exception: Foobar
+                    //         at { ... }
+                    // [error] That is some other error message
+                    //         System.Exception: Yada yada
+                    //         at { ... }
+                    // [fatal] System.Exception: Blah blah
+                    //         at { ... }
+                    Layout = @"[${level:lowercase=true}] ${when:when=!contains('${logger}','.') and !ends-with('${logger}','.g'):inner=${logger}${literal:text=\:} }${message}${onexception:when='${message}'!='${exception:format=ToString}'):${newline}   ${exception:format=ToString}}"
+                };
+                logConfig.AddRule(LogLevel, LogLevel.Fatal, logConsoleTarget);
+                LogManager.AutoShutdown = false;
+                LogManager.Configuration = logConfig;
             }
-
-            // Initialize logging
-            LoggingConfiguration logConfig = new LoggingConfiguration();
-            ColoredConsoleTarget logConsoleTarget = new ColoredConsoleTarget
-            {
-                // Create a layout for messages like:
-                // [trace] Really verbose stuff
-                // [debug] Verbose debugging stuff
-                // [info] This is a regular log message
-                // [warning] Something not too nice
-                // [error] IPC#3: This is an IPC error message
-                //         System.Exception: Foobar
-                //         at { ... }
-                // [error] That is some other error message
-                //         System.Exception: Yada yada
-                //         at { ... }
-                // [fatal] System.Exception: Blah blah
-                //         at { ... }
-                Layout = @"[${level:lowercase=true}] ${when:when=!contains('${logger}','.') and !ends-with('${logger}','.g'):inner=${logger}${literal:text=\:} }${message}${onexception:when='${message}'!='${exception:format=ToString}'):${newline}   ${exception:format=ToString}}"
-            };
-            logConfig.AddRule(LogLevel, LogLevel.Fatal, logConsoleTarget);
-            LogManager.AutoShutdown = false;
-            LogManager.Configuration = logConfig;
 
             // Go on
             return true;
@@ -332,9 +333,13 @@ namespace DuetControlServer
                 {
                     BaseDirectory = arg;
                 }
-                else if (arg == "-u" || lastArg == "--update")
+                else if (arg == "-u" || arg == "--update")
                 {
                     UpdateOnly = true;
+                }
+                else if (arg == "-r" || arg == "--no-terminate-on-reset")
+                {
+                    NoTerminateOnReset = true;
                 }
                 else if (arg == "--no-spi-task")
                 {
@@ -380,6 +385,18 @@ namespace DuetControlServer
                                     while (reader.Read() && reader.TokenType != JsonTokenType.EndObject) { }
                                 }
                             }
+                        }
+                        break;
+
+                    case JsonTokenType.True:
+                    case JsonTokenType.False:
+                        if (property.PropertyType == typeof(bool))
+                        {
+                            property.SetValue(null, reader.GetBoolean());
+                        }
+                        else
+                        {
+                            throw new JsonException($"Bad boolean type: {property.PropertyType.Name}");
                         }
                         break;
 
@@ -443,7 +460,11 @@ namespace DuetControlServer
         private static void SaveToFile(string fileName)
         {
             using FileStream fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write);
-            using Utf8JsonWriter writer = new Utf8JsonWriter(fileStream, new JsonWriterOptions() { Indented = true });
+            using Utf8JsonWriter writer = new Utf8JsonWriter(fileStream, new JsonWriterOptions()
+            {
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                Indented = true
+            });
 
             writer.WriteStartObject();
             foreach (PropertyInfo property in typeof(Settings).GetProperties(BindingFlags.Static | BindingFlags.Public))
@@ -454,6 +475,10 @@ namespace DuetControlServer
                     if (value is string stringValue)
                     {
                         writer.WriteString(property.Name, stringValue);
+                    }
+                    else if (value is bool boolValue)
+                    {
+                        writer.WriteBoolean(property.Name, boolValue);
                     }
                     else if (value is int intValue)
                     {

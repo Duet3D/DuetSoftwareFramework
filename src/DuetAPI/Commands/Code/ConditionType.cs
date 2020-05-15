@@ -1,7 +1,7 @@
 ﻿namespace DuetAPI.Commands
 {
     /// <summary>
-    /// Types of conditional G-code
+    /// Enumeration of conditional G-code keywords
     /// </summary>
     public enum KeywordType : byte
     {
@@ -33,6 +33,7 @@
         /// <summary>
         /// Break instruction
         /// </summary>
+        /// <seealso cref="While"/>
         Break,
 
         /// <summary>
@@ -58,6 +59,12 @@
         /// <summary>
         /// Echo operation
         /// </summary>
-        Echo
+        Echo,
+
+        /// <summary>
+        /// Continue instruction
+        /// </summary>
+        /// <seealso cref="While"/>
+        Continue
     }
 }

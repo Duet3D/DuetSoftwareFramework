@@ -1,4 +1,4 @@
-﻿using DuetAPI;
+﻿using DuetAPI.Machine;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands

@@ -1,90 +1,128 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about an extruder drive
     /// </summary>
-    public sealed class Extruder : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class Extruder : ModelObject
     {
         /// <summary>
-        /// Event to trigger when a property has changed
+        /// Acceleration of this extruder (in mm/s^2)
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        public float Acceleration
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            get => _acceleration;
+			set => SetPropertyValue(ref _acceleration, value);
         }
+        private float _acceleration = 500F;
 
         /// <summary>
-        /// Drives of this extruder
+        /// Motor current (in mA)
         /// </summary>
-        public ObservableCollection<int> Drives { get; } = new ObservableCollection<int>();
+        public int Current
+        {
+            get => _current;
+			set => SetPropertyValue(ref _current, value);
+        }
+        private int _current;
 
         /// <summary>
-        /// Extrusion factor to use (1.0 equals 100%)
+        /// Assigned driver
+        /// </summary>
+        public string Driver
+        {
+            get => _driver;
+			set => SetPropertyValue(ref _driver, value);
+        }
+        private string _driver;
+
+        /// <summary>
+        /// Name of the currently loaded filament
+        /// </summary>
+        public string Filament
+        {
+            get => _filament;
+			set => SetPropertyValue(ref _filament, value);
+        }
+        private string _filament = string.Empty;
+
+        /// <summary>
+        /// Extrusion factor to use (0..1 or greater)
         /// </summary>
         public float Factor
         {
             get => _factor;
-            set
-            {
-                if (_factor != value)
-                {
-                    _factor = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _factor, value);
         }
-        private float _factor = 1.0F;
-        
+        private float _factor = 1F;
+
+        /// <summary>
+        /// Motor jerk (in mm/s)
+        /// </summary>
+        public float Jerk
+        {
+            get => _jerk;
+			set => SetPropertyValue(ref _jerk, value);
+        }
+        private float _jerk = 15F;
+
+        /// <summary>
+        /// Microstepping configuration
+        /// </summary>
+        public Microstepping Microstepping { get; } = new Microstepping();
+
         /// <summary>
         /// Nonlinear extrusion parameters (see M592)
         /// </summary>
         public ExtruderNonlinear Nonlinear { get; private set; } = new ExtruderNonlinear();
 
         /// <summary>
-        /// Assigns every property of another instance of this one
+        /// Extruder position (in mm)
         /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
+        public float Position
         {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is Extruder other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            ListHelpers.SetList(Drives, other.Drives);
-            Factor = other.Factor;
-            Nonlinear.Assign(other.Nonlinear);
+            get => _position;
+			set => SetPropertyValue(ref _position, value);
         }
+        private float _position;
 
         /// <summary>
-        /// Creates a clone of this instance
+        /// Pressure advance
         /// </summary>
-        /// <returns>A clone of this instance</returns>
-        public object Clone()
+        public float PressureAdvance
         {
-            Extruder clone = new Extruder
-            {
-                Factor = Factor,
-                Nonlinear = (ExtruderNonlinear)Nonlinear.Clone()
-            };
-
-            ListHelpers.AddItems(clone.Drives, Drives);
-
-            return clone;
+            get => _pressureAdvance;
+			set => SetPropertyValue(ref _pressureAdvance, value);
         }
+        private float _pressureAdvance;
+
+        /// <summary>
+        /// Raw extruder position without extrusion factor applied (in mm)
+        /// </summary>
+        public float RawPosition
+        {
+            get => _rawPosition;
+			set => SetPropertyValue(ref _rawPosition, value);
+        }
+        private float _rawPosition;
+
+        /// <summary>
+        /// Maximum speed (in mm/s)
+        /// </summary>
+        public float Speed
+        {
+            get => _speed;
+			set => SetPropertyValue(ref _speed, value);
+        }
+        private float _speed = 100F;
+
+        /// <summary>
+        /// Number of microsteps per mm
+        /// </summary>
+        public float StepsPerMm
+        {
+            get => _stepsPerMm;
+            set => SetPropertyValue(ref _stepsPerMm, value);
+        }
+        private float _stepsPerMm = 420F;
     }
 }

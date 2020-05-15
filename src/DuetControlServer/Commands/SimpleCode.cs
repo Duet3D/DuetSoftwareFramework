@@ -1,5 +1,5 @@
-﻿using DuetAPI;
-using DuetAPI.Commands;
+﻿using DuetAPI.Commands;
+using DuetAPI.Machine;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -17,14 +17,14 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Locks to avoid race conditions when executing multiple text-based codes via the same channel
         /// </summary>
-        private static readonly AsyncLock[] _channelLocks = new AsyncLock[DuetAPI.Machine.Channels.Total];
+        private static readonly AsyncLock[] _channelLocks = new AsyncLock[Inputs.Total];
 
         /// <summary>
-        /// Initialize this class
+        /// Static constructor of this class
         /// </summary>
-        public static void Init()
+        static SimpleCode()
         {
-            for (int i = 0; i < DuetAPI.Machine.Channels.Total; i++)
+            for (int i = 0; i < Inputs.Total; i++)
             {
                 _channelLocks[i] = new AsyncLock();
             }
@@ -36,18 +36,24 @@ namespace DuetControlServer.Commands
         public int SourceConnection { get; set; }
 
         /// <summary>
-        /// Parse codes from the given input string
+        /// Parse codes from the given input string asynchronously
         /// </summary>
         /// <returns>Parsed G/M/T-codes</returns>
-        public IEnumerable<Code> Parse()
+        public async IAsyncEnumerable<Code> ParseAsync()
         {
             using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(Code));
             using StreamReader reader = new StreamReader(stream);
-            bool enforcingAbsolutePosition = false;
-            while (!reader.EndOfStream)
+            CodeParserBuffer buffer = new CodeParserBuffer((int)stream.Length, Code.Contains('\n'));
+
+            while (buffer.GetPosition(reader) < stream.Length)
             {
-                Code code = new Code() { Channel = Channel, SourceConnection = SourceConnection };
-                if (DuetAPI.Commands.Code.Parse(reader, code, ref enforcingAbsolutePosition))
+                Code code = new Code()
+                {
+                    Channel = Channel,
+                    SourceConnection = SourceConnection
+                };
+
+                if (await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer))
                 {
                     yield return code;
                 }
@@ -65,7 +71,7 @@ namespace DuetControlServer.Commands
             List<Code> codes = new List<Code>(), priorityCodes = new List<Code>();
             try
             {
-                foreach (Code code in Parse())
+                await foreach (Code code in ParseAsync())
                 {
                     // M108, M112, M122, and M999 always go to an idle channel so we (hopefully) get a low-latency response
                     if (code.Type == CodeType.MCode && (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || code.MajorNumber == 999))
@@ -76,6 +82,7 @@ namespace DuetControlServer.Commands
                     }
                     else if (IPC.Processors.Interception.IsInterceptingConnection(SourceConnection))
                     {
+                        // Need to bypass the code order lock for codes being inserted...
                         priorityCodes.Add(code);
                     }
                     else
@@ -97,32 +104,51 @@ namespace DuetControlServer.Commands
                 foreach (Code priorityCode in priorityCodes)
                 {
                     CodeResult codeResult = await priorityCode.Execute();
-                    if (codeResult != null)
+                    try
                     {
-                        result.AddRange(codeResult);
+                        if (codeResult != null)
+                        {
+                            result.AddRange(codeResult);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // not logged
                     }
                 }
 
                 // Execute normal codes next. Use a lock here because multiple codes may be queued for the same channel
                 if (codes.Count > 0)
                 {
-                    using (await _channelLocks[(int)Channel].LockAsync())
+                    Task<CodeResult>[] codeTasks = new Task<CodeResult>[codes.Count];
+                    using (await _channelLocks[(int)Channel].LockAsync(Program.CancellationToken))
                     {
-                        foreach (Code code in codes)
+                        for (int i = 0; i < codes.Count; i++)
                         {
-                            CodeResult codeResult = await code.Execute();
+                            codeTasks[i] = codes[i].Execute();
+                        }
+                    }
+
+                    foreach (Task<CodeResult> codeTask in codeTasks)
+                    {
+                        try
+                        {
+                            CodeResult codeResult = await codeTask;
                             if (codeResult != null)
                             {
                                 result.AddRange(codeResult);
                             }
                         }
+                        catch (OperationCanceledException)
+                        {
+                            // not logged
+                        }
                     }
                 }
             }
-            catch (OperationCanceledException)
+            catch (CodeParserException cpe)
             {
-                // Report when a code is cancelled
-                result.Add(MessageType.Error, "Code has been cancelled");
+                result.Add(MessageType.Error, cpe.Message);
             }
             return result.ToString();
         }

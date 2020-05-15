@@ -19,7 +19,7 @@ namespace DuetControlServer.SPI.Communication
         /// <summary>
         /// Used protocol version. This is incremented whenever the protocol details change
         /// </summary>
-        public const ushort ProtocolVersion = 1;
+        public const ushort ProtocolVersion = 2;
 
         /// <summary>
         /// Size of a packet transfer buffer
@@ -30,6 +30,21 @@ namespace DuetControlServer.SPI.Communication
         /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
         /// </summary>
         public const int MaxCodeBufferSize = 256;
+
+        /// <summary>
+        /// Maximum length of a whole-line comment to send to RRF
+        /// </summary>
+        public const int MaxCommentLength = 100;
+
+        /// <summary>
+        /// Maximum supported length of messages to be sent to RepRapFirmware
+        /// </summary>
+        public const int MaxMessageLength = 4096;
+
+        /// <summary>
+        /// Maximum number of evaluation requests to send per transfer
+        /// </summary>
+        public const int MaxEvaluationRequestsPerTransfer = 32;
 
         /// <summary>
         /// Size of the header prefixing a buffered code

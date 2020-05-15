@@ -24,7 +24,7 @@ namespace DuetControlServer.IPC.Processors
 
         /// <summary>
         /// Worker method for a given connection.
-        /// No <see cref="CancellationToken"/> is passed here, use <see cref="Program.CancelSource"/> instead.
+        /// No <see cref="CancellationToken"/> is passed here, use <see cref="Program.CancellationToken"/> instead.
         /// Once this task exits the connection is terminated.
         /// </summary>
         /// <returns>Task that represents the worker lifecycle</returns>

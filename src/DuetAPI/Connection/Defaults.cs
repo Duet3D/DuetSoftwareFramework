@@ -6,6 +6,11 @@
     public static class Defaults
     {
         /// <summary>
+        /// Current API protocol version number
+        /// </summary>
+        public const int ProtocolVersion = 7;
+
+        /// <summary>
         /// Default directory in which DSF-related UNIX sockets reside
         /// </summary>
         public const string SocketDirectory = "/var/run/dsf";
@@ -23,6 +28,6 @@
         /// <summary>
         /// Default code channel to use
         /// </summary>
-        public const CodeChannel Channel = CodeChannel.SPI;
+        public const CodeChannel InputChannel = CodeChannel.SBC;
     }
 }

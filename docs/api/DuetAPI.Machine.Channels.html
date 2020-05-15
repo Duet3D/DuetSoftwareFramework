@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Class Channels
    ">
-    <meta name="generator" content="docfx 2.48.0.0">
+    <meta name="generator" content="docfx 2.50.0.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -987,8 +987,7 @@
   
   <h1 id="DuetAPI_Machine_Channels" data-uid="DuetAPI.Machine.Channels" class="text-break">Class Channels
   </h1>
-  <div class="markdown level0 summary"><p>Information about the available G/M/T-code channels.
-<a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></p>
+  <div class="markdown level0 summary"><p>Information about the available G/M/T-code channels</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -1132,7 +1131,7 @@
   </table>
   <a id="DuetAPI_Machine_Channels_Daemon_" data-uid="DuetAPI.Machine.Channels.Daemon*"></a>
   <h4 id="DuetAPI_Machine_Channels_Daemon" data-uid="DuetAPI.Machine.Channels.Daemon">Daemon</h4>
-  <div class="markdown level1 summary"><p>G/M/T-code channel for Daemon (deals with config.g and triggers)</p>
+  <div class="markdown level1 summary"><p>Code channel that executes the daemon process</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -1318,6 +1317,30 @@ public Channel this[CodeChannel key] { get; }</code></pre>
       </tr>
     </tbody>
   </table>
+  <a id="DuetAPI_Machine_Channels_Trigger_" data-uid="DuetAPI.Machine.Channels.Trigger*"></a>
+  <h4 id="DuetAPI_Machine_Channels_Trigger" data-uid="DuetAPI.Machine.Channels.Trigger">Trigger</h4>
+  <div class="markdown level1 summary"><p>G/M/T-code channel for triggers and config.g</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Channel Trigger { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.Machine.Channel.html">Channel</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetAPI_Machine_Channels_USB_" data-uid="DuetAPI.Machine.Channels.USB*"></a>
   <h4 id="DuetAPI_Machine_Channels_USB" data-uid="DuetAPI.Machine.Channels.USB">USB</h4>
   <div class="markdown level1 summary"><p>G/M/T-code channel for USB</p>
@@ -1423,6 +1446,10 @@ public Channel this[CodeChannel key] { get; }</code></pre>
   </div>
   <div>
       <span class="xref">System.ICloneable</span>
+  </div>
+  <h3 id="seealso">See Also</h3>
+  <div class="seealso">
+      <div><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></div>
   </div>
 </article>
           </div>

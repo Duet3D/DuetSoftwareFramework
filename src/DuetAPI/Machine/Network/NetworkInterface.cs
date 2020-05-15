@@ -1,43 +1,35 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about a network interface
     /// </summary>
-    public sealed class NetworkInterface : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class NetworkInterface : ModelObject
     {
         /// <summary>
-        /// Event to trigger when a property has changed
+        /// List of active protocols
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
+        public ModelCollection<NetworkProtocol> ActiveProtocols { get; } = new ModelCollection<NetworkProtocol>();
 
         /// <summary>
-        /// Type of this network interface
+        /// Actual IPv4 address of the network adapter
         /// </summary>
-        public InterfaceType Type
+        public string ActualIP
         {
-            get => _type;
-            set
-            {
-                if (_type != value)
-                {
-                    _type = value;
-                    NotifyPropertyChanged();
-                }
-            }
+            get => _actualIP;
+			set => SetPropertyValue(ref _actualIP, value);
         }
-        private InterfaceType _type = InterfaceType.WiFi;
-        
+        private string _actualIP;
+
+        /// <summary>
+        /// Configured IPv4 address of the network adapter
+        /// </summary>
+        public string ConfiguredIP
+        {
+            get => _configuredIP;
+			set => SetPropertyValue(ref _configuredIP, value);
+        }
+        private string _configuredIP;
+
         /// <summary>
         /// Version of the network interface or null if unknown.
         /// This is primarily intended for the ESP8266-based network interfaces as used on the Duet WiFi
@@ -45,118 +37,9 @@ namespace DuetAPI.Machine
         public string FirmwareVersion
         {
             get => _firmwareVersion;
-            set
-            {
-                if (_firmwareVersion != value)
-                {
-                    _firmwareVersion = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _firmwareVersion, value);
         }
         private string _firmwareVersion;
-        
-        /// <summary>
-        /// Speed of the network interface (in MBit, null if unknown, 0 if not connected)
-        /// </summary>
-        public int? Speed
-        {
-            get => _speed;
-            set
-            {
-                if (_speed != value)
-                {
-                    _speed = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private int? _speed;
-        
-        /// <summary>
-        /// Signal of the WiFi adapter (only WiFi, in dBm)
-        /// </summary>
-        public int? Signal
-        {
-            get => _signal;
-            set
-            {
-                if (_signal != value)
-                {
-                    _signal = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private int? _signal;
-
-        /// <summary>
-        /// Physical address of the network adapter
-        /// </summary>
-        public string MacAddress
-        {
-            get => _macAddress;
-            set
-            {
-                if (_macAddress != value)
-                {
-                    _macAddress = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private string _macAddress;
-        
-        /// <summary>
-        /// Configured IPv4 address of the network adapter
-        /// </summary>
-        public string ConfiguredIP
-        {
-            get => _configuredIP;
-            set
-            {
-                if (_configuredIP != value)
-                {
-                    _configuredIP = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private string _configuredIP;
-        
-        /// <summary>
-        /// Actual IPv4 address of the network adapter
-        /// </summary>
-        public string ActualIP
-        {
-            get => _actualIP;
-            set
-            {
-                if (_actualIP != value)
-                {
-                    _actualIP = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private string _actualIP;
-        
-        /// <summary>
-        /// Subnet of the network adapter
-        /// </summary>
-        public string Subnet
-        {
-            get => _subnet;
-            set
-            {
-                if (_subnet != value)
-                {
-                    _subnet = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
-        private string _subnet;
 
         /// <summary>
         /// Gateway of the network adapter
@@ -164,92 +47,68 @@ namespace DuetAPI.Machine
         public string Gateway
         {
             get => _gateway;
-            set
-            {
-                if (_gateway != value)
-                {
-                    _gateway = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _gateway, value);
         }
         private string _gateway;
-        
+
+        /// <summary>
+        /// Physical address of the network adapter
+        /// </summary>
+        public string Mac
+        {
+            get => _mac;
+			set => SetPropertyValue(ref _mac, value);
+        }
+        private string _mac;
+
         /// <summary>
         /// Number of reconnect attempts or null if unknown
         /// </summary>
         public int? NumReconnects
         {
             get => _numReconnects;
-            set
-            {
-                if (_numReconnects != value)
-                {
-                    _numReconnects = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _numReconnects, value);
         }
         private int? _numReconnects;
 
         /// <summary>
-        /// List of active protocols
+        /// Signal of the WiFi adapter (only WiFi, in dBm, or null if unknown)
         /// </summary>
-        public ObservableCollection<NetworkProtocol> ActiveProtocols { get; } = new ObservableCollection<NetworkProtocol>();
+        public int? Signal
+        {
+            get => _signal;
+			set => SetPropertyValue(ref _signal, value);
+        }
+        private int? _signal;
 
         /// <summary>
-        /// Assigns every property of another instance of this one
+        /// Speed of the network interface (in MBit, null if unknown, 0 if not connected)
         /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
+        public int? Speed
         {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is NetworkInterface other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            Type = other.Type;
-            FirmwareVersion = other.FirmwareVersion;
-            Speed = other.Speed;
-            Signal = other.Signal;
-            MacAddress = other.MacAddress;
-            ConfiguredIP = other.ConfiguredIP;
-            ActualIP = other.ActualIP;
-            Subnet = other.Subnet;
-            Gateway = other.Gateway;
-            NumReconnects = other.NumReconnects;
-            ListHelpers.SetList(ActiveProtocols, other.ActiveProtocols);
+            get => _speed;
+			set => SetPropertyValue(ref _speed, value);
         }
+        private int? _speed;
 
         /// <summary>
-        /// Creates a clone of this instance
+        /// Subnet of the network adapter
         /// </summary>
-        /// <returns>A clone of this instance</returns>
-        public object Clone()
+        public string Subnet
         {
-            NetworkInterface clone = new NetworkInterface
-            {
-                Type = Type,
-                FirmwareVersion = FirmwareVersion,
-                Speed = Speed,
-                Signal = Signal,
-                MacAddress = MacAddress,
-                ConfiguredIP = ConfiguredIP,
-                ActualIP = ActualIP,
-                Subnet = Subnet,
-                Gateway = Gateway,
-                NumReconnects = NumReconnects
-            };
-
-            ListHelpers.AddItems(clone.ActiveProtocols, ActiveProtocols);
-
-            return clone;
+            get => _subnet;
+			set => SetPropertyValue(ref _subnet, value);
         }
+        private string _subnet;
+
+        /// <summary>
+        /// Type of this network interface
+        /// </summary>
+        public InterfaceType Type
+        {
+            get => _type;
+			set => SetPropertyValue(ref _type, value);
+        }
+        private InterfaceType _type = InterfaceType.WiFi;
     }
 }

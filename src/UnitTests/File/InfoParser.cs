@@ -1,8 +1,7 @@
 ﻿using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
-using DuetAPI;
-using DuetControlServer;
-using Newtonsoft.Json;
+using DuetAPI.Machine;
 using NUnit.Framework;
 
 namespace UnitTests.File
@@ -12,18 +11,18 @@ namespace UnitTests.File
     {
         [Test]
         [TestCase("Cura.gcode")]
+        [TestCase("PrusaSlicer.gcode")]
         [TestCase("Simplify3D.gcode")]
         [TestCase("Slic3r.gcode")]
         public async Task Test(string fileName)
         {
-            string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "File/GCodes", fileName);
-            ParsedFileInfo info = await FileInfoParser.Parse(filePath);
+            string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes", fileName);
+            ParsedFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath);
 
-            TestContext.Out.Write(JsonConvert.SerializeObject(info, Formatting.Indented));
+            TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(ParsedFileInfo), new JsonSerializerOptions { WriteIndented = true }));
 
             Assert.IsNotNull(info.FileName);
             Assert.AreNotEqual(0, info.Size);
-            Assert.IsNotNull(info.LastModified);
             Assert.AreNotEqual(0, info.Height);
             Assert.AreNotEqual(0, info.FirstLayerHeight);
             Assert.AreNotEqual(0, info.LayerHeight);
@@ -36,21 +35,20 @@ namespace UnitTests.File
         [Test]
         public async Task TestEmpty()
         {
-            string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "File/GCodes/Circle.gcode");
-            ParsedFileInfo info = await FileInfoParser.Parse(filePath);
+            string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes/Circle.gcode");
+            ParsedFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath);
 
-            TestContext.Out.Write(JsonConvert.SerializeObject(info, Formatting.Indented));
+            TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(ParsedFileInfo), new JsonSerializerOptions { WriteIndented = true }));
 
             Assert.IsNotNull(info.FileName);
             Assert.AreNotEqual(0, info.Size);
-            Assert.IsNotNull(info.LastModified);
             Assert.AreEqual(0.5, info.Height);
             Assert.AreEqual(0.5, info.FirstLayerHeight);
             Assert.AreEqual(0, info.LayerHeight);
             Assert.AreEqual(0, info.Filament.Count);
-            Assert.IsEmpty(info.GeneratedBy);
-            Assert.AreEqual(0, info.PrintTime);
-            Assert.AreEqual(0, info.SimulatedTime);
+            Assert.IsNull(info.GeneratedBy);
+            Assert.IsNull(info.PrintTime);
+            Assert.IsNull(info.SimulatedTime);
         }
     }
 }

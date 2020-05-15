@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
-using DuetAPI;
+using DuetAPI.Machine;
+using DuetControlServer.Files;
 
 namespace DuetControlServer.Commands
 {
@@ -12,6 +13,6 @@ namespace DuetControlServer.Commands
         /// Retrieves file information from the given filename
         /// </summary>
         /// <returns>File info</returns>
-        public override Task<ParsedFileInfo> Execute() => FileInfoParser.Parse(FileName);
+        public override Task<ParsedFileInfo> Execute() => InfoParser.Parse(FileName);
     }
 }

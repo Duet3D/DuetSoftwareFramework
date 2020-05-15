@@ -14,6 +14,11 @@ namespace DuetControlServer
     public static class Program
     {
         /// <summary>
+        /// Version of this application
+        /// </summary>
+        public static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
+
+        /// <summary>
         /// Logger instance
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
@@ -21,7 +26,17 @@ namespace DuetControlServer
         /// <summary>
         /// Global cancellation source that is triggered when the program is supposed to terminate
         /// </summary>
-        public static CancellationTokenSource CancelSource { get; } = new CancellationTokenSource();
+        public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
+
+        /// <summary>
+        /// Global cancellation token that is triggered when the program is supposed to terminate
+        /// </summary>
+        public static readonly CancellationToken CancellationToken = CancelSource.Token;
+
+        /// <summary>
+        /// Cancellation token to be called when the program has been terminated
+        /// </summary>
+        private static readonly CancellationTokenSource _programTerminated = new CancellationTokenSource();
 
         /// <summary>
         /// Entry point of the program
@@ -38,7 +53,7 @@ namespace DuetControlServer
             }
             else
             {
-                Console.WriteLine($"Duet Control Server v{Assembly.GetExecutingAssembly().GetName().Version}");
+                Console.WriteLine($"Duet Control Server v{Version}");
                 Console.WriteLine("Written by Christian Hammacher for Duet3D");
                 Console.WriteLine("Licensed under the terms of the GNU Public License Version 3");
                 Console.WriteLine();
@@ -55,7 +70,7 @@ namespace DuetControlServer
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to load settings");
+                _logger.Fatal(e, "Failed to load settings");
                 return;
             }
 
@@ -68,8 +83,6 @@ namespace DuetControlServer
             // Initialize everything
             try
             {
-                Commands.Code.Init();
-                Commands.SimpleCode.Init();
                 Model.Provider.Init();
                 Model.Observer.Init();
                 Utility.FilamentManager.Init();
@@ -77,11 +90,11 @@ namespace DuetControlServer
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to initialize environment");
+                _logger.Fatal(e, "Failed to initialize environment");
                 return;
             }
 
-            // Connect to RRF controller
+            // Set up SPI subsystem and connect to RRF controller
             if (Settings.NoSpiTask)
             {
                 _logger.Warn("Connection to Duet is NOT established, things may not work as expected");
@@ -91,19 +104,13 @@ namespace DuetControlServer
                 try
                 {
                     SPI.Interface.Init();
-                    if (await SPI.Interface.Connect())
-                    {
-                        _logger.Info("Connection to Duet established");
-                    }
-                    else
-                    {
-                        _logger.Error("Duet is not available");
-                        return;
-                    }
+                    SPI.DataTransfer.Init();
+                    _logger.Info("Connection to Duet established");
                 }
                 catch (Exception e)
                 {
-                    _logger.Error(e, "Failed to connect to Duet");
+                    _logger.Fatal("Could not connect to Duet ({0})", e.Message);
+                    _logger.Debug(e);
                     return;
                 }
             }
@@ -116,7 +123,7 @@ namespace DuetControlServer
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to initialize IPC socket");
+                _logger.Fatal(e, "Failed to initialize IPC socket");
                 return;
             }
 
@@ -126,7 +133,7 @@ namespace DuetControlServer
                 { Task.Factory.StartNew(Model.Updater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Update" },
                 { Task.Factory.StartNew(SPI.Interface.Run, TaskCreationOptions.LongRunning).Unwrap(), "SPI" },
                 { Task.Factory.StartNew(IPC.Server.Run, TaskCreationOptions.LongRunning).Unwrap(), "IPC" },
-                { Task.Factory.StartNew(FileExecution.Print.Run, TaskCreationOptions.LongRunning).Unwrap(), "Print" },
+                { Task.Factory.StartNew(FileExecution.Job.Run, TaskCreationOptions.LongRunning).Unwrap(), "Job" },
                 { Task.Factory.StartNew(Model.PeriodicUpdater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Periodic updater" }
             };
 
@@ -188,8 +195,9 @@ namespace DuetControlServer
             while (mainTasks.Count > 0);
 
             // End
-            _logger.Debug("Application has shut down");
+            _logger.Info("Application has shut down");
             NLog.LogManager.Shutdown();
+            _programTerminated.Cancel();
         }
 
         /// <summary>
@@ -236,6 +244,27 @@ namespace DuetControlServer
                 _logger.Fatal("Another instance is already running. Stopping.");
             }
             return true;
+        }
+
+        /// <summary>
+        /// Terminate this program and kill it forcefully if required
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static async Task Terminate()
+        {
+            try
+            {
+                // Try to shut down this program normally
+                CancelSource.Cancel();
+                await Task.Delay(4000, _programTerminated.Token);
+
+                // If that fails, kill it
+                Environment.Exit(1);
+            }
+            catch (OperationCanceledException)
+            {
+                // expected
+            }
         }
     }
 }

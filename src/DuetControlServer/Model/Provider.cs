@@ -1,9 +1,7 @@
 using System;
 using System.Diagnostics;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using DuetAPI;
 using DuetAPI.Machine;
 using Nito.AsyncEx;
 
@@ -33,14 +31,14 @@ namespace DuetControlServer.Model
             private readonly IDisposable _lock;
 
             /// <summary>
+            /// Indicates if this lock is meant for write access
+            /// </summary>
+            private readonly bool _isWriteLock;
+
+            /// <summary>
             /// CTS to trigger when the lock is being released
             /// </summary>
             private readonly CancellationTokenSource _releaseCts;
-
-            /// <summary>
-            /// CTS to trigger when the lock is released or the program is being terminated
-            /// </summary>
-            private readonly CancellationTokenSource _combinedCts;
 
             /// <summary>
             /// Constructor of the lock wrapper
@@ -50,24 +48,23 @@ namespace DuetControlServer.Model
             internal LockWrapper(IDisposable lockItem, bool isWriteLock)
             {
                 _lock = lockItem;
+                _isWriteLock = isWriteLock;
 
                 if (Settings.MaxMachineModelLockTime > 0)
                 {
-                    _releaseCts = new CancellationTokenSource();
-                    _combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_releaseCts.Token, Program.CancelSource.Token);
+                    _releaseCts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
                     StackTrace stackTrace = new StackTrace(true);
                     _ = Task.Run(async () =>
                     {
                         try
                         {
-                            await Task.Delay(Settings.MaxMachineModelLockTime, _combinedCts.Token);
+                            await Task.Delay(Settings.MaxMachineModelLockTime, _releaseCts.Token);
                             _logger.Fatal("{0} deadlock detected, stack trace of the deadlock:\n{1}", isWriteLock ? "Writer" : "Reader", stackTrace);
                             Program.CancelSource.Cancel();
                         }
                         finally
                         {
-                            _combinedCts.Dispose();
                             _releaseCts.Dispose();
                         }
                     });
@@ -79,11 +76,16 @@ namespace DuetControlServer.Model
             /// </summary>
             public void Dispose()
             {
-                // Notify subscribers and clear the messages if anyone is connected
-                if (IPC.Processors.Subscription.AreClientsConnected())
+                if (_isWriteLock)
                 {
-                    IPC.Processors.Subscription.ModelUpdated();
-                    if (Get.Messages.Count > 0)
+                    // It is safe to assume that the object model has been updated
+                    using (_updateLock.Lock(Program.CancellationToken))
+                    {
+                        _updateEvent.NotifyAll();
+                    }
+
+                    // Clear the messages again if anyone is connected
+                    if (IPC.Processors.Subscription.AreClientsConnected && Get.Messages.Count > 0)
                     {
                         Get.Messages.Clear();
                     }
@@ -103,16 +105,54 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Lock for read/write access
         /// </summary>
-        private static readonly AsyncReaderWriterLock _lock = new AsyncReaderWriterLock();
+        private static readonly AsyncReaderWriterLock _readWriteLock = new AsyncReaderWriterLock();
+
+        /// <summary>
+        /// Base lock for update conditions
+        /// </summary>
+        private static readonly AsyncLock _updateLock = new AsyncLock();
+
+        /// <summary>
+        /// Condition variable to trigger when the machine model has been updated
+        /// </summary>
+        private static readonly AsyncConditionVariable _updateEvent = new AsyncConditionVariable(_updateLock);
+
+        /// <summary>
+        /// Get the machine model. Make sure to call the acquire the corresponding lock first!
+        /// </summary>
+        /// <returns>Current Duet machine object model</returns>
+        /// <seealso cref="AccessReadOnlyAsync()"/>
+        /// <seealso cref="AccessReadWriteAsync()"/>
+        /// <seealso cref="WaitForUpdate(CancellationToken)"/>
+        /// <seealso cref="Updater.WaitForFullUpdate(CancellationToken)"/>
+        public static MachineModel Get { get; } = new MachineModel();
 
         /// <summary>
         /// Initialize the object model provider with values that are not expected to change
         /// </summary>
         public static void Init()
         {
-            Get.Electronics.Version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
-            Get.Electronics.Type = "duet3";
-            Get.Electronics.Name = "Duet 3";
+            Get.State.DsfVersion = Program.Version;
+            Get.Network.Hostname = Environment.MachineName;
+            Get.Network.Name = Environment.MachineName;
+        }
+
+        /// <summary>
+        /// Access the machine model for read operations only
+        /// </summary>
+        /// <returns>Disposable lock object to be used with a using directive</returns>
+        public static IDisposable AccessReadOnly()
+        {
+            return new LockWrapper(_readWriteLock.ReaderLock(Program.CancellationToken), false);
+        }
+
+        /// <summary>
+        /// Access the machine model for read/write operations
+        /// </summary>
+        /// <returns>Disposable lock object to be used with a using directive</returns>
+        public static IDisposable AccessReadWrite()
+        {
+            return new LockWrapper(_readWriteLock.WriterLock(Program.CancellationToken), true);
         }
 
         /// <summary>
@@ -121,7 +161,7 @@ namespace DuetControlServer.Model
         /// <returns>Disposable lock object to be used with a using directive</returns>
         public static async Task<IDisposable> AccessReadOnlyAsync()
         {
-            return new LockWrapper(await _lock.ReaderLockAsync(Program.CancelSource.Token), false);
+            return new LockWrapper(await _readWriteLock.ReaderLockAsync(Program.CancellationToken), false);
         }
 
         /// <summary>
@@ -130,16 +170,22 @@ namespace DuetControlServer.Model
         /// <returns>Disposable lock object to be used with a using directive</returns>
         public static async Task<IDisposable> AccessReadWriteAsync()
         {
-            return new LockWrapper(await _lock.WriterLockAsync(Program.CancelSource.Token), true);
+            return new LockWrapper(await _readWriteLock.WriterLockAsync(Program.CancellationToken), true);
         }
 
         /// <summary>
-        /// Get the machine model. Make sure to call the acquire the corresponding lock first!
+        /// Wait for an update to occur
         /// </summary>
-        /// <returns>Current Duet machine object model</returns>
-        /// <seealso cref="AccessReadOnlyAsync()"/>
-        /// <seealso cref="AccessReadWriteAsync()"/>
-        public static MachineModel Get { get; } = new MachineModel();
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task WaitForUpdate(CancellationToken cancellationToken)
+        {
+            using (await _updateLock.LockAsync(cancellationToken))
+            {
+                await _updateEvent.WaitAsync(cancellationToken);
+                Program.CancelSource.Token.ThrowIfCancellationRequested();
+            }
+        }
 
         /// <summary>
         /// Output a generic message
@@ -164,8 +210,7 @@ namespace DuetControlServer.Model
                         break;
                 }
 
-                // Attempt to forward messages directly to subscribers. If none are available,
-                // append it to the object model so potential clients can fetch it for a limited period of time
+                // Send it to the object model
                 using (await AccessReadWriteAsync())
                 {
                     Get.Messages.Add(message);

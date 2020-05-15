@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Connection;
+using DuetAPI.Machine;
 
 namespace DuetAPI.Commands
 {

@@ -9,7 +9,6 @@ using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
-using DuetAPIClient.Exceptions;
 
 namespace DuetAPIClient
 {
@@ -22,7 +21,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Creates a new connection in subscriber mode
         /// </summary>
-        public SubscribeConnection() : base(ConnectionMode.Command) { }
+        public SubscribeConnection() : base(ConnectionMode.Subscribe) { }
 
         /// <summary>
         /// Mode of the subscription
@@ -96,7 +95,6 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
         /// <seealso cref="GetMachineModel"/>
-        /// <seealso cref="JsonPatch.Patch(object, JsonDocument)"/>
         public async Task<JsonDocument> GetMachineModelPatch(CancellationToken cancellationToken = default)
         {
             JsonDocument patch = await ReceiveJson(cancellationToken);

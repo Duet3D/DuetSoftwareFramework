@@ -11,7 +11,7 @@ using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.Machine;
 using DuetAPI.Utility;
-using Nito.AsyncEx;
+using DuetControlServer.Model;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -35,14 +35,17 @@ namespace DuetControlServer.IPC.Processors
         private static readonly List<Subscription> _subscriptions = new List<Subscription>();
 
         /// <summary>
-        /// Checks if any subscribers are connected
+        /// True if any subscribers are connected
         /// </summary>
-        /// <returns>True if subscribers are connected</returns>
-        public static bool AreClientsConnected()
+        public static bool AreClientsConnected
         {
-            lock (_subscriptions)
+            get
             {
-                return _subscriptions.Count > 0;
+                lock (_subscriptions)
+                {
+                    // TODO here it would be better to check for subscribers waiting to messages
+                    return _subscriptions.Count > 0;
+                }
             }
         }
 
@@ -54,17 +57,12 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// List of filters (in Patch mode)
         /// </summary>
-        private readonly string[][] _filters;
+        private readonly object[][] _filters;
 
         /// <summary>
         /// Dictionary of updated fields (in Patch mode)
         /// </summary>
         private readonly Dictionary<string, object> _patch = new Dictionary<string, object>();
-
-        /// <summary>
-        /// Event that is triggered when the object model has been updated
-        /// </summary>
-        private readonly AsyncAutoResetEvent _updateAvailableEvent = new AsyncAutoResetEvent();
         
         /// <summary>
         /// Constructor of the subscription processor
@@ -77,17 +75,16 @@ namespace DuetControlServer.IPC.Processors
             _mode = subscribeInitMessage.SubscriptionMode;
             if (!string.IsNullOrEmpty(subscribeInitMessage.Filter))
             {
-                string[] filterStrings = subscribeInitMessage.Filter.Split(',', '|', '\r', '\n', ' ');
-                _filters = filterStrings.Select(filter => filter.Split('/')).ToArray();
+                _filters = Filter.ConvertFilters(subscribeInitMessage.Filter);
             }
 
             lock (_subscriptions)
             {
                 _subscriptions.Add(this);
             }
-            conn.Logger.Debug("Subscription processor registered");
+            conn.Logger.Debug("Subscription processor registered in {0} mode", _mode);
         }
-        
+
         /// <summary>
         /// Task that keeps pushing model updates to the client
         /// </summary>
@@ -99,14 +96,27 @@ namespace DuetControlServer.IPC.Processors
                 // Subscribe to changes in Patch mode
                 if (_mode == SubscriptionMode.Patch)
                 {
-                    Model.Observer.OnPropertyPathChanged += MachineModelPropertyChanged;
+                    Observer.OnPropertyPathChanged += MachineModelPropertyChanged;
                 }
 
-                // Serialize the whole machine model
+                // Get the requested machine model
                 byte[] jsonData;
-                using (await Model.Provider.AccessReadOnlyAsync())
+                using (await Provider.AccessReadOnlyAsync())
                 {
-                    jsonData = JsonSerializer.SerializeToUtf8Bytes(Model.Provider.Get, JsonHelper.DefaultJsonOptions);
+                    if (_mode == SubscriptionMode.Full || _filters == null)
+                    {
+                        jsonData = JsonSerializer.SerializeToUtf8Bytes(Provider.Get, JsonHelper.DefaultJsonOptions);
+                    }
+                    else
+                    {
+                        Dictionary<string, object> patchModel = new Dictionary<string, object>();
+                        foreach (object[] filter in _filters)
+                        {
+                            Dictionary<string, object> partialModel = Filter.GetFiltered(filter);
+                            Filter.MergeFiltered(patchModel, partialModel);
+                        }
+                        jsonData = JsonSerializer.SerializeToUtf8Bytes(patchModel, JsonHelper.DefaultJsonOptions);
+                    }
                 }
 
                 do
@@ -127,24 +137,21 @@ namespace DuetControlServer.IPC.Processors
                     }
 
                     // Wait for an object model update to complete
-                    using (CancellationTokenSource pollCts = new CancellationTokenSource(Settings.SocketPollInterval))
+                    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+                    cts.CancelAfter(Settings.SocketPollInterval);
+                    try
                     {
-                        using CancellationTokenSource combinedCts = CancellationTokenSource.CreateLinkedTokenSource(pollCts.Token, Program.CancelSource.Token);
-                        try
+                        await Provider.WaitForUpdate(cts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        if (!Program.CancellationToken.IsCancellationRequested)
                         {
-                            await _updateAvailableEvent.WaitAsync(combinedCts.Token);
-                            Program.CancelSource.Token.ThrowIfCancellationRequested();
+                            Connection.Poll();
+                            continue;
                         }
-                        catch (OperationCanceledException)
-                        {
-                            if (pollCts.IsCancellationRequested)
-                            {
-                                Connection.Poll();
-                                continue;
-                            }
-                            Connection.Logger.Debug("Subscriber connection requested to terminate");
-                            throw;
-                        }
+                        Connection.Logger.Debug("Subscriber connection requested to terminate");
+                        throw;
                     }
 
                     // Get the (diff) JSON
@@ -161,13 +168,13 @@ namespace DuetControlServer.IPC.Processors
                     }
                     else
                     {
-                        using (await Model.Provider.AccessReadOnlyAsync())
+                        using (await Provider.AccessReadOnlyAsync())
                         {
-                            jsonData = JsonSerializer.SerializeToUtf8Bytes(Model.Provider.Get, JsonHelper.DefaultJsonOptions);
+                            jsonData = JsonSerializer.SerializeToUtf8Bytes(Provider.Get, JsonHelper.DefaultJsonOptions);
                         }
                     }
                 }
-                while (!Program.CancelSource.IsCancellationRequested);
+                while (!Program.CancellationToken.IsCancellationRequested);
             }
             catch (Exception e)
             {
@@ -186,70 +193,28 @@ namespace DuetControlServer.IPC.Processors
 
                 if (_mode == SubscriptionMode.Patch)
                 {
-                    Model.Observer.OnPropertyPathChanged -= MachineModelPropertyChanged;
+                    Observer.OnPropertyPathChanged -= MachineModelPropertyChanged;
                 }
                 Connection.Logger.Debug("Subscription processor unregistered");
             }
         }
 
-        /// <summary>
-        /// Checks if one of the given filters applies to the path
-        /// </summary>
-        /// <param name="path">Patch path</param>
-        /// <param name="filters">Subscription filters</param>
-        /// <returns>True if a filter applies</returns>
-        private bool CheckFilter(object[] path, string[] filters)
-        {
-            for (int i = 0; i < filters.Length; i++)
-            {
-                string filter = filters[i];
-                if (filter == "**")
-                {
-                    return true;
-                }
-
-                if (i >= path.Length)
-                {
-                    return false;
-                }
-
-                object pathItem = path[i];
-                if (pathItem is string stringItem)
-                {
-                    if (filter != "*" && !filter.Equals(stringItem, StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        return false;
-                    }
-                }
-                else if (pathItem is Model.ItemPathNode listItem)
-                {
-                    if (!filter.Equals(listItem.Name, StringComparison.InvariantCultureIgnoreCase) &&
-                        !filter.Equals($"{listItem.Name}[*]", StringComparison.InvariantCultureIgnoreCase) &&
-                        !filter.Equals($"{listItem.Name}[{listItem.Index}]", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return (path.Length == filters.Length);
-        }
 
         /// <summary>
         /// Check if the change of the given path has to be recorded
         /// </summary>
         /// <param name="path">Change path</param>
         /// <returns>True if a filter applies</returns>
-        private bool CheckFilter(object[] path)
+        private bool CheckFilters(object[] path)
         {
-            if (_filters == null)
+            if (_filters == null || path.Length == 0)
             {
                 return true;
             }
 
-            foreach (string[] filter in _filters)
+            foreach (object[] filter in _filters)
             {
-                if (CheckFilter(path, filter))
+                if (Filter.PathMatches(path, filter))
                 {
                     return true;
                 }
@@ -260,11 +225,12 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Get the object from a path node
         /// </summary>
+        /// <param name="root">Root dictionary</param>
         /// <param name="path">Path node</param>
-        /// <returns>Dictionary or list</returns>
-        private object GetPathNode(object[] path)
+        /// <returns>Item at the given path</returns>
+        public static object GetPathNode(Dictionary<string, object> root, object[] path)
         {
-            Dictionary<string, object> currentDictionary = _patch;
+            Dictionary<string, object> currentDictionary = root;
             List<object> currentList = null;
 
             for (int i = 0; i < path.Length - 1; i++)
@@ -276,8 +242,8 @@ namespace DuetControlServer.IPC.Processors
                     {
                         if (child is Dictionary<string, object> childDictionary)
                         {
-                            currentDictionary = childDictionary;
                             currentList = null;
+                            currentDictionary = childDictionary;
                         }
                         else if (child is List<object> childList)
                         {
@@ -286,7 +252,8 @@ namespace DuetControlServer.IPC.Processors
                         }
                         else
                         {
-                            throw new InvalidOperationException($"Invalid child type {child.GetType().Name} for path {string.Join('/', path)}");
+                            // Stop here if the node type is unsupported
+                            return null;
                         }
                     }
                     else
@@ -296,29 +263,61 @@ namespace DuetControlServer.IPC.Processors
                         currentDictionary = newNode;
                     }
                 }
-                else if (pathItem is Model.ItemPathNode itemPathNode)
+                else if (pathItem is ItemPathNode pathNode)
                 {
-                    if (currentDictionary.TryGetValue(itemPathNode.Name, out object nodeList))
+                    if (currentDictionary.TryGetValue(pathNode.Name, out object nodeObject))
                     {
-                        currentList = (List<object>)nodeList;
+                        if (nodeObject is List<object> nodeList)
+                        {
+                            currentList = nodeList;
+                        }
+                        else
+                        {
+                            // Stop here if the node type is unsupported
+                            return nodeObject;
+                        }
+
+                        for (int k = currentList.Count; k > pathNode.List.Count; k--)
+                        {
+                            currentList.RemoveAt(k - 1);
+                        }
                     }
                     else
                     {
-                        currentList = new List<object>(itemPathNode.Count);
-                        currentDictionary.Add(itemPathNode.Name, currentList);
+                        currentList = new List<object>(pathNode.List.Count);
+                        currentDictionary.Add(pathNode.Name, currentList);
                     }
 
-                    for (int k = currentList.Count; k > itemPathNode.Count; k--)
+                    Type itemType = (path[i + 1] is string) ? typeof(Dictionary<string, object>) : typeof(List<object>);
+                    for (int k = currentList.Count; k < pathNode.List.Count; k++)
                     {
-                        currentList.RemoveAt(k - 1);
+                        if (pathNode.List[k] == null)
+                        {
+                            currentList.Add(null);
+                        }
+                        else
+                        {
+                            object newItem = Activator.CreateInstance(itemType);
+                            currentList.Add(newItem);
+                        }
                     }
 
-                    for (int k = currentList.Count; k < itemPathNode.Count; k++)
+                    object currentItem = currentList[pathNode.Index];
+                    if (currentItem is Dictionary<string, object> dictionaryItem)
                     {
-                        currentList.Add(new Dictionary<string, object>());
+                        currentList = null;
+                        currentDictionary = dictionaryItem;
                     }
-
-                    currentDictionary = (Dictionary<string, object>)currentList[itemPathNode.Index];
+                    else if (currentItem is List<object> listItem)
+                    {
+                        currentList = listItem;
+                        currentDictionary = null;
+                    }
+                    else
+                    {
+                        // Stop here if the item type is unsupported
+                        return null;
+                    }
                 }
             }
 
@@ -333,11 +332,11 @@ namespace DuetControlServer.IPC.Processors
         /// Method that is called when a property of the machine model has changed
         /// </summary>
         /// <param name="path">Path to the property</param>
-        /// <param name="pathType">Type of the path</param>
+        /// <param name="changeType">Type of the change</param>
         /// <param name="value">New value</param>
-        private void MachineModelPropertyChanged(object[] path, Model.PropertyPathChangeType pathType, object value)
+        private void MachineModelPropertyChanged(object[] path, PropertyChangeType changeType, object value)
         {
-            if (!CheckFilter(path))
+            if (!CheckFilters(path))
             {
                 return;
             }
@@ -346,61 +345,65 @@ namespace DuetControlServer.IPC.Processors
             {
                 try
                 {
-                    object node = GetPathNode(path);
-                    switch (pathType)
+                    object node = GetPathNode(_patch, path);
+                    if (node == null)
                     {
-                        case Model.PropertyPathChangeType.Property:
+                        // Skip this update if the underlying object is about to be fully transferred anyway
+                        return;
+                    }
+
+                    switch (changeType)
+                    {
+                        case PropertyChangeType.Property:
                             // Set new property value
                             Dictionary<string, object> propertyNode = (Dictionary<string, object>)node;
                             string propertyName = (string)path[^1];
+
                             propertyNode[propertyName] = value;
                             break;
 
-                        case Model.PropertyPathChangeType.ObjectCollection:
-                            // Update number of object collection items
+                        case PropertyChangeType.ObjectCollection:
+                            // Update an object collection
                             Dictionary<string, object> objectCollectionNode = (Dictionary<string, object>)node;
-                            string objectCollectionName = (string)path[^1];
+                            ItemPathNode pathNode = (ItemPathNode)path[^1];
+
                             List<object> objectCollectionList;
-                            if (objectCollectionNode.TryGetValue(objectCollectionName, out object objectCollection))
+                            if (objectCollectionNode.TryGetValue(pathNode.Name, out object objectCollection))
                             {
                                 objectCollectionList = (List<object>)objectCollection;
+
+                                for (int k = objectCollectionList.Count; k > pathNode.List.Count; k--)
+                                {
+                                    objectCollectionList.RemoveAt(k - 1);
+                                }
                             }
                             else
                             {
-                                objectCollectionList = new List<object>((int)value);
-                                objectCollectionNode.Add(objectCollectionName, objectCollectionList);
+                                objectCollectionList = new List<object>(pathNode.List.Count);
+                                objectCollectionNode.Add(pathNode.Name, objectCollectionList);
                             }
 
-                            for (int k = objectCollectionList.Count; k > (int)value; k--)
+                            Type itemType = (value is IList) ? typeof(List<object>) : typeof(Dictionary<string, object>);
+                            for (int k = objectCollectionList.Count; k < pathNode.List.Count; k++)
                             {
-                                objectCollectionList.RemoveAt(k - 1);
+                                if (pathNode.List[k] == null)
+                                {
+                                    objectCollectionList.Add(null);
+                                }
+                                else
+                                {
+                                    object newItem = Activator.CreateInstance(itemType);
+                                    objectCollectionList.Add(newItem);
+                                }
                             }
 
-                            for (int k = objectCollectionList.Count; k < (int)value; k++)
+                            if (pathNode.Index < pathNode.List.Count)
                             {
-                                objectCollectionList.Add(new Dictionary<string, object>());
+                                objectCollectionList[pathNode.Index] = value;
                             }
                             break;
 
-                        case Model.PropertyPathChangeType.ValueCollection:
-                            // Set new value list
-                            if (node is Dictionary<string, object> valueNode)
-                            {
-                                string valueName = (string)path[^1];
-                                valueNode[valueName] = value;
-                            }
-                            else if (node is List<object> valueCollection)
-                            {
-                                int index = (int)path[^1];
-                                valueCollection[index] = value;
-                            }
-                            else
-                            {
-                                throw new ArgumentException($"Invalid value list type {node.GetType().Name}");
-                            }
-                            break;
-
-                        case Model.PropertyPathChangeType.GrowingCollection:
+                        case PropertyChangeType.GrowingCollection:
                             // Add new items or clear list
                             if (node is Dictionary<string, object> parent)
                             {
@@ -411,10 +414,10 @@ namespace DuetControlServer.IPC.Processors
                                     break;
                                 }
 
-                                List<object> growingCollection;
+                                IList growingCollection;
                                 if (parent.TryGetValue(collectionName, out object obj))
                                 {
-                                    growingCollection = (List<object>)obj;
+                                    growingCollection = (IList)obj;
                                 }
                                 else
                                 {
@@ -443,22 +446,7 @@ namespace DuetControlServer.IPC.Processors
                 }
                 catch (Exception e)
                 {
-                    Connection.Logger.Error(e, "Failed to record {0} = {1} ({2})", string.Join('/', path), value, pathType);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Called to notify the subscribers about a model update
-        /// </summary>
-        public static void ModelUpdated()
-        {
-            lock (_subscriptions)
-            {
-                foreach (Subscription subscription in _subscriptions)
-                {
-                    // Inform every subscriber about new data
-                    subscription._updateAvailableEvent.Set();
+                    Connection.Logger.Error(e, "Failed to record {0} = {1} ({2})", string.Join('/', path), value, changeType);
                 }
             }
         }

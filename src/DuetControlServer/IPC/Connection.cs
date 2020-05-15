@@ -87,10 +87,37 @@ namespace DuetControlServer.IPC
             {
                 try
                 {
-                    using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, Program.CancelSource.Token);
-                    JsonDocument jsonDocument = await JsonDocument.ParseAsync(json);
-                    Logger.Trace(() => $"Received {Encoding.UTF8.GetString(json.ToArray())}");
-                    return jsonDocument;
+                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, Program.CancellationToken);
+                    Logger.Trace(() => $"Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+
+                    return await JsonDocument.ParseAsync(jsonStream);
+                }
+                catch (JsonException e)
+                {
+                    Logger.Error(e, "Received malformed JSON");
+                    await SendResponse(e);
+                }
+            }
+            while (true);
+        }
+
+        /// <summary>
+        /// Read a plain JSON object as a string from the socket
+        /// </summary>
+        /// <returns>JsonDocument for deserialization</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
+        public async Task<string> ReceivePlainJson()
+        {
+            do
+            {
+                try
+                {
+                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, Program.CancellationToken);
+                    Logger.Trace(() => $"Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+
+                    using StreamReader reader = new StreamReader(jsonStream);
+                    return await reader.ReadToEndAsync();
                 }
                 catch (JsonException e)
                 {
@@ -109,8 +136,8 @@ namespace DuetControlServer.IPC
         /// <exception cref="SocketException">Connection has been closed</exception>
         public async Task<BaseCommand> ReceiveCommand()
         {
-            using JsonDocument jsonDoc = await ReceiveJson();
-            foreach (var item in jsonDoc.RootElement.EnumerateObject())
+            using JsonDocument jsonDocument = await ReceiveJson();
+            foreach (JsonProperty item in jsonDocument.RootElement.EnumerateObject())
             {
                 if (item.Name.Equals(nameof(BaseCommand.Command), StringComparison.InvariantCultureIgnoreCase))
                 {
@@ -138,7 +165,7 @@ namespace DuetControlServer.IPC
                     }
 
                     // Perform final deserialization and assign source identifier to this command
-                    BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonDoc.RootElement.GetRawText(), commandType, JsonHelper.DefaultJsonOptions);
+                    BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonDocument.RootElement.GetRawText(), commandType, JsonHelper.DefaultJsonOptions);
                     SetSourceConnection(command);
                     return command;
                 }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DuetAPI.Utility;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -17,6 +18,9 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Letter of the code parameter (e.g. P in M106 P3)
         /// </summary>
+        /// <remarks>
+        /// If this is an unprecedented parameter without a letter, '@' is used
+        /// </remarks>
         public char Letter { get; }
 
         /// <summary>
@@ -27,34 +31,55 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Indicates if this parameter is a driver identifier
         /// </summary>
-        public bool IsDriverId { get; private set; }
+        public bool IsDriverId { get; internal set; }
 
         /// <summary>
         /// Unparsed string representation of the code parameter or an empty string if none present
         /// </summary>
-        private readonly string _stringValue;
+        internal readonly string StringValue;
 
         /// <summary>
         /// Internal parsed representation of the string value (one of string, int, uint, float, int[], uint[] or float[])
         /// </summary>
-        private object _parsedValue;
+        internal object ParsedValue;
         
         /// <summary>
         /// Creates a new CodeParameter instance and parses value to a native data type if applicable
         /// </summary>
         /// <param name="letter">Letter of the code parameter</param>
         /// <param name="value">String representation of the value</param>
-        /// <param name="isString">Whether this is a string. This is set to true if the parameter was inside quotation marks.</param>
+        /// <param name="isString">Whether this is a string. This is set to true if the parameter was inside quotation marks</param>
+        /// <param name="isDriverId">Whether this is a driver ID</param>
         /// <remarks>This constructor does not parsed long (aka int64) values because RRF cannot handle them</remarks>
-        public CodeParameter(char letter, string value, bool isString)
+        public CodeParameter(char letter, string value, bool isString, bool isDriverId)
         {
             Letter = letter;
-            _stringValue = value;
+            StringValue = value;
 
             if (isString)
             {
                 // Value is definitely a string because it is encapsulated in quotation marks
-                _parsedValue = value;
+                ParsedValue = value;
+            }
+            else if (isDriverId)
+            {
+                // Value is a (list of) driver identifier(s)
+                List<DriverId> driverIds = new List<DriverId>();
+
+                foreach (string item in value.Split(':'))
+                {
+                    DriverId driverId = new DriverId(item);
+                    driverIds.Add(driverId);
+                }
+
+                if (driverIds.Count == 1)
+                {
+                    ParsedValue = driverIds[0];
+                }
+                else
+                {
+                    ParsedValue = driverIds.ToArray();
+                }
             }
             else
             {
@@ -64,12 +89,13 @@ namespace DuetAPI.Commands
                 if (string.IsNullOrEmpty(value))
                 {
                     // Empty parameters are repesented as integers with the value 0 (e.g. G92 XY => G92 X0 Y0)
-                    _parsedValue = 0;
+                    ParsedValue = 0;
                 }
                 else if (value.StartsWith('{') && value.EndsWith('}'))
                 {
                     // It is an expression
                     IsExpression = true;
+                    ParsedValue = value;
                 }
                 else if (value.Contains(':'))
                 {
@@ -80,47 +106,47 @@ namespace DuetAPI.Commands
                         if (value.Contains('.'))
                         {
                             // If there is a dot anywhere, attempt to parse it as a float array
-                            _parsedValue = subArgs.Select(subArg => float.Parse(subArg, NumberStyles.Any, CultureInfo.InvariantCulture)).ToArray();
+                            ParsedValue = subArgs.Select(subArg => float.Parse(subArg, NumberStyles.Any, CultureInfo.InvariantCulture)).ToArray();
                         }
                         else
                         {
                             try
                             {
                                 // If there is no dot, it could be an integer array
-                                _parsedValue = subArgs.Select(int.Parse).ToArray();
+                                ParsedValue = subArgs.Select(int.Parse).ToArray();
                             }
                             catch
                             {
                                 // If that failed, attempt to parse everything as a uint array
-                                _parsedValue = subArgs.Select(uint.Parse).ToArray();
+                                ParsedValue = subArgs.Select(uint.Parse).ToArray();
                             }
                         }
                     }
                     catch
                     {
                         // It must be a string (fallback)
-                        _parsedValue = value;
+                        ParsedValue = value;
                     }
                 }
                 else if (int.TryParse(value, out int asInt))
                 {
                     // It is a valid integer
-                    _parsedValue = asInt;
+                    ParsedValue = asInt;
                 }
                 else if (uint.TryParse(value, out uint asUInt))
                 {
                     // It is a valid unsigned integer
-                    _parsedValue = asUInt;
+                    ParsedValue = asUInt;
                 }
                 else if (float.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out float asFloat))
                 {
                     // It is a valid float
-                    _parsedValue = asFloat;
+                    ParsedValue = asFloat;
                 }
                 else
                 {
                     // It is a string
-                    _parsedValue = value;
+                    ParsedValue = value;
                 }
             }
         }
@@ -133,71 +159,18 @@ namespace DuetAPI.Commands
         public CodeParameter(char letter, object value)
         {
             Letter = letter;
-            _stringValue = value.ToString();
-            _parsedValue = value;
-        }
-
-        /// <summary>
-        /// Convert this parameter to driver id(s)
-        /// </summary>
-        /// <remarks>The data remains a uint (array) after the conversion. The top 16 bits reflect the board number and the bottom 16 bits the port</remarks>
-        public void ConvertDriverIds()
-        {
-            if (!IsExpression)
+            ParsedValue = value;
+            if (value is string stringValue)
             {
-                List<uint> drivers = new List<uint>();
-
-                string[] parameters = _stringValue.Split(':');
-                foreach (string value in parameters)
+                StringValue = stringValue;
+                if (stringValue.StartsWith('{') && stringValue.EndsWith('}'))
                 {
-                    string[] segments = value.Split('.');
-                    if (segments.Length == 1)
-                    {
-                        if (ushort.TryParse(segments[0], out ushort port))
-                        {
-                            drivers.Add(port);
-                        }
-                        else
-                        {
-                            throw new CodeParserException($"Failed to parse driver number from {Letter} parameter");
-                        }
-                    }
-                    else if (segments.Length == 2)
-                    {
-                        uint driver;
-                        if (ushort.TryParse(segments[0], out ushort board))
-                        {
-                            driver = (uint)board << 16;
-                        }
-                        else
-                        {
-                            throw new CodeParserException($"Failed to parse board number from {Letter} parameter");
-                        }
-                        if (ushort.TryParse(segments[1], out ushort port))
-                        {
-                            driver |= port;
-                        }
-                        else
-                        {
-                            throw new CodeParserException($"Failed to parse driver number from {Letter} parameter");
-                        }
-                        drivers.Add(driver);
-                    }
-                    else
-                    {
-                        throw new CodeParserException($"Driver value from {Letter} parameter is invalid");
-                    }
+                    IsExpression = true;
                 }
-
-                if (drivers.Count == 1)
-                {
-                    _parsedValue = drivers[0];
-                }
-                else
-                {
-                    _parsedValue = drivers.ToArray();
-                }
-                IsDriverId = true;
+            }
+            else
+            {
+                StringValue = value.ToString();
             }
         }
 
@@ -205,7 +178,7 @@ namespace DuetAPI.Commands
         /// Data type of the internally parsed value
         /// </summary>
         [JsonIgnore]
-        public Type Type => _parsedValue.GetType();
+        public Type Type => ParsedValue.GetType();
 
         /// <summary>
         /// Implicit conversion operator to float
@@ -219,22 +192,22 @@ namespace DuetAPI.Commands
             {
                 throw new ArgumentNullException(nameof(codeParameter));
             }
-            if (codeParameter._parsedValue is float floatValue)
+            if (codeParameter.ParsedValue is float floatValue)
             {
                 return floatValue;
             }
-            if (codeParameter._parsedValue is int intValue)
+            if (codeParameter.ParsedValue is int intValue)
             {
                 return Convert.ToSingle(intValue);
             }
-            if (codeParameter._parsedValue is uint uintValue)
+            if (codeParameter.ParsedValue is uint uintValue)
             {
                 return Convert.ToSingle(uintValue);
             }
             // long won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to float (value {codeParameter._stringValue})");
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to float (value {codeParameter.StringValue})");
         }
-        
+
         /// <summary>
         /// Implicit conversion operator to int
         /// </summary>
@@ -247,16 +220,16 @@ namespace DuetAPI.Commands
             {
                 throw new ArgumentNullException(nameof(codeParameter));
             }
-            if (codeParameter._parsedValue is int intValue)
+            if (codeParameter.ParsedValue is int intValue)
             {
                 return intValue;
             }
-            if (codeParameter._parsedValue is float floatValue)
+            if (codeParameter.ParsedValue is float floatValue)
             {
                 return Convert.ToInt32(floatValue);
             }
             // long and uint won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to integer (value {codeParameter._stringValue})");
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to integer (value {codeParameter.StringValue})");
         }
 
         /// <summary>
@@ -271,20 +244,47 @@ namespace DuetAPI.Commands
             {
                 throw new ArgumentNullException(nameof(codeParameter));
             }
-            if (codeParameter._parsedValue is uint uintValue)
+            if (codeParameter.ParsedValue is uint uintValue)
             {
                 return uintValue;
             }
-            if (codeParameter._parsedValue is int intValue)
+            if (codeParameter.ParsedValue is DriverId driverIdValue)
+            {
+                return driverIdValue;
+            }
+            if (codeParameter.ParsedValue is int intValue)
             {
                 return Convert.ToUInt32(intValue);
             }
-            if (codeParameter._parsedValue is float floatValue)
+            if (codeParameter.ParsedValue is float floatValue)
             {
                 return Convert.ToUInt32(floatValue);
             }
             // long won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to unsigned integer (value {codeParameter._stringValue})");
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to unsigned integer (value {codeParameter.StringValue})");
+        }
+
+        /// <summary>
+        /// Implicit conversion operator to a driver ID
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
+        public static implicit operator DriverId(CodeParameter codeParameter)
+        {
+            if (codeParameter is null)
+            {
+                throw new ArgumentNullException(nameof(codeParameter));
+            }
+            if (codeParameter.ParsedValue is DriverId driverId)
+            {
+                return driverId;
+            }
+            if (codeParameter.ParsedValue is uint uintValue)
+            {
+                return new DriverId(uintValue);
+            }
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to driver ID (value {codeParameter.StringValue})");
         }
 
         /// <summary>
@@ -299,23 +299,23 @@ namespace DuetAPI.Commands
             {
                 throw new ArgumentNullException(nameof(codeParameter));
             }
-            if (codeParameter._parsedValue is long longValue)
+            if (codeParameter.ParsedValue is long longValue)
             {
                 return longValue;
             }
-            if (codeParameter._parsedValue is int intValue)
+            if (codeParameter.ParsedValue is int intValue)
             {
                 return Convert.ToInt64(intValue);
             }
-            if (codeParameter._parsedValue is uint uintValue)
+            if (codeParameter.ParsedValue is uint uintValue)
             {
                 return Convert.ToInt64(uintValue);
             }
-            if (codeParameter._parsedValue is float floatValue)
+            if (codeParameter.ParsedValue is float floatValue)
             {
                 return Convert.ToInt64(floatValue);
             }
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to long (value {codeParameter._stringValue})");
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to long (value {codeParameter.StringValue})");
         }
 
         /// <summary>
@@ -331,7 +331,7 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        public static implicit operator string(CodeParameter codeParameter) => codeParameter?._stringValue;
+        public static implicit operator string(CodeParameter codeParameter) => codeParameter?.StringValue;
 
         /// <summary>
         /// Implicit conversion operator to float array
@@ -345,32 +345,32 @@ namespace DuetAPI.Commands
             {
                 return null;
             }
-            if (codeParameter._parsedValue is float[] floatArray)
+            if (codeParameter.ParsedValue is float[] floatArray)
             {
                 return floatArray;
             }
-            if (codeParameter._parsedValue is float floatValue)
+            if (codeParameter.ParsedValue is float floatValue)
             {
                 return new float[] { floatValue };
             }
-            if (codeParameter._parsedValue is int intValue)
+            if (codeParameter.ParsedValue is int intValue)
             {
                 return new float[] { Convert.ToSingle(intValue) };
             }
-            if (codeParameter._parsedValue is uint uintValue)
+            if (codeParameter.ParsedValue is uint uintValue)
             {
                 return new float[] { Convert.ToSingle(uintValue) };
             }
-            if (codeParameter._parsedValue is int[] intArray)
+            if (codeParameter.ParsedValue is int[] intArray)
             {
                 return intArray.Select(Convert.ToSingle).ToArray();
             }
-            if (codeParameter._parsedValue is uint[] uintArray)
+            if (codeParameter.ParsedValue is uint[] uintArray)
             {
                 return uintArray.Select(Convert.ToSingle).ToArray();
             }
             // long won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to float array (value {codeParameter._stringValue})");
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to float array (value {codeParameter.StringValue})");
         }
 
         /// <summary>
@@ -385,24 +385,24 @@ namespace DuetAPI.Commands
             {
                 return null;
             }
-            if (codeParameter._parsedValue is int[] intArray)
+            if (codeParameter.ParsedValue is int[] intArray)
             {
                 return intArray;
             }
-            if (codeParameter._parsedValue is int intValue)
+            if (codeParameter.ParsedValue is int intValue)
             {
                 return new int[] { intValue };
             }
-            if (codeParameter._parsedValue is float floatValue)
+            if (codeParameter.ParsedValue is float floatValue)
             {
                 return new int[] { Convert.ToInt32(floatValue) };
             }
-            if (codeParameter._parsedValue is float[] floatArray)
+            if (codeParameter.ParsedValue is float[] floatArray)
             {
                 return floatArray.Select(Convert.ToInt32).ToArray();
             }
             // uint and long won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to integer array (value {codeParameter._stringValue})");
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to integer array (value {codeParameter.StringValue})");
         }
 
         /// <summary>
@@ -417,32 +417,71 @@ namespace DuetAPI.Commands
             {
                 return null;
             }
-            if (codeParameter._parsedValue is uint[] uintArray)
+            if (codeParameter.ParsedValue is uint[] uintArray)
             {
                 return uintArray;
             }
-            if (codeParameter._parsedValue is uint uintValue)
+            if (codeParameter.ParsedValue is uint uintValue)
             {
                 return new uint[] { uintValue };
             }
-            if (codeParameter._parsedValue is int intValue && intValue >= 0)
+            if (codeParameter.ParsedValue is DriverId[] driverIdArray)
+            {
+                return driverIdArray.Select(value => (uint)value).ToArray();
+            }
+            if (codeParameter.ParsedValue is DriverId driverIdValue)
+            {
+                return new uint[] { driverIdValue };
+            }
+            if (codeParameter.ParsedValue is int intValue && intValue >= 0)
             {
                 return new uint[] { Convert.ToUInt32(intValue) };
             }
-            if (codeParameter._parsedValue is int[] intArray && intArray.All(value => value >= 0))
+            if (codeParameter.ParsedValue is int[] intArray && intArray.All(value => value >= 0))
             {
                 return intArray.Select(Convert.ToUInt32).ToArray();
             }
-            if (codeParameter._parsedValue is float floatValue && floatValue >= 0F)
+            if (codeParameter.ParsedValue is float floatValue && floatValue >= 0F)
             {
                 return new uint[] { Convert.ToUInt32(floatValue) };
             }
-            if (codeParameter._parsedValue is float[] floatArray && floatArray.All(value => value >= 0F))
+            if (codeParameter.ParsedValue is float[] floatArray && floatArray.All(value => value >= 0F))
             {
                 return floatArray.Select(Convert.ToUInt32).ToArray();
             }
             // long won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to unsigned integer array (value {codeParameter._stringValue})");
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to unsigned integer array (value {codeParameter.StringValue})");
+        }
+
+        /// <summary>
+        /// Implicit conversion operator to a driver ID array
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="ArgumentException">Data type is not convertible</exception>
+        public static implicit operator DriverId[](CodeParameter codeParameter)
+        {
+            if (codeParameter is null)
+            {
+                throw new ArgumentNullException(nameof(codeParameter));
+            }
+            if (codeParameter.ParsedValue is DriverId[] driverIdArray)
+            {
+                return driverIdArray;
+            }
+            if (codeParameter.ParsedValue is DriverId driverId)
+            {
+                return new DriverId[] { driverId };
+            }
+            if (codeParameter.ParsedValue is uint[] uintArray)
+            {
+                return uintArray.Select(value => new DriverId(value)).ToArray();
+            }
+            if (codeParameter.ParsedValue is uint uintValue)
+            {
+                return new DriverId[] { new DriverId(uintValue) };
+            }
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to driver ID array (value {codeParameter.StringValue})");
         }
 
         /// <summary>
@@ -457,39 +496,39 @@ namespace DuetAPI.Commands
             {
                 return null;
             }
-            if (codeParameter._parsedValue is long[] longArray)
+            if (codeParameter.ParsedValue is long[] longArray)
             {
                 return longArray;
             }
-            if (codeParameter._parsedValue is long longValue)
+            if (codeParameter.ParsedValue is long longValue)
             {
                 return new long[] { longValue };
             }
-            if (codeParameter._parsedValue is int intValue)
+            if (codeParameter.ParsedValue is int intValue)
             {
                 return new long[] { Convert.ToInt64(intValue) };
             }
-            if (codeParameter._parsedValue is uint uintValue)
+            if (codeParameter.ParsedValue is uint uintValue)
             {
                 return new long[] { Convert.ToInt64(uintValue) };
             }
-            if (codeParameter._parsedValue is float floatValue)
+            if (codeParameter.ParsedValue is float floatValue)
             {
                 return new long[] { Convert.ToInt64(floatValue) };
             }
-            if (codeParameter._parsedValue is int[] intArray)
+            if (codeParameter.ParsedValue is int[] intArray)
             {
                 return intArray.Select(Convert.ToInt64).ToArray();
             }
-            if (codeParameter._parsedValue is int[] uintArray)
+            if (codeParameter.ParsedValue is int[] uintArray)
             {
                 return uintArray.Select(Convert.ToInt64).ToArray();
             }
-            if (codeParameter._parsedValue is float[] floatArray)
+            if (codeParameter.ParsedValue is float[] floatArray)
             {
                 return floatArray.Select(Convert.ToInt64).ToArray();
             }
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to long array (value {codeParameter._stringValue})");
+            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to long array (value {codeParameter.StringValue})");
         }
 
         /// <summary>
@@ -506,9 +545,9 @@ namespace DuetAPI.Commands
             }
             if (b is CodeParameter other)
             {
-                return a.Letter.Equals(other.Letter) && a._parsedValue.Equals(other._parsedValue);
+                return a.Letter.Equals(other.Letter) && a.ParsedValue.Equals(other.ParsedValue);
             }
-            return a._parsedValue.Equals(b);
+            return a.ParsedValue.Equals(b);
         }
 
         /// <summary>
@@ -532,14 +571,14 @@ namespace DuetAPI.Commands
         /// <returns>Computed hash code</returns>
         public override int GetHashCode()
         {
-            return HashCode.Combine(Letter, _parsedValue);
+            return HashCode.Combine(Letter, ParsedValue);
         }
 
         /// <summary>
         /// Converts this parameter to a string
         /// </summary>
         /// <returns>String representation</returns>
-        public override string ToString() => Letter + _stringValue;
+        public override string ToString() => Letter + StringValue;
     }
     
     /// <summary>
@@ -558,9 +597,9 @@ namespace DuetAPI.Commands
         {
             if (reader.TokenType == JsonTokenType.StartObject)
             {
-                char letter = '\0';
+                char letter = '@';
                 string propertyName = string.Empty, value = string.Empty;
-                bool isString = false;
+                bool isString = false, isDriverId = false;
 
                 while (reader.Read())
                 {
@@ -588,10 +627,26 @@ namespace DuetAPI.Commands
                             {
                                 isString = Convert.ToBoolean(reader.GetInt32());
                             }
+                            else if (propertyName.Equals("isDriverId", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                isDriverId = Convert.ToBoolean(reader.GetInt32());
+                            }
+                            break;
+
+                        case JsonTokenType.True:
+                        case JsonTokenType.False:
+                            if (propertyName.Equals("isString", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                isString = (reader.TokenType == JsonTokenType.True);
+                            }
+                            else if (propertyName.Equals("isDriverId", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                isDriverId = (reader.TokenType == JsonTokenType.True);
+                            }
                             break;
 
                         case JsonTokenType.EndObject:
-                            return new CodeParameter(letter, value, isString);
+                            return new CodeParameter(letter, value, isString, isDriverId);
                     }
                 }
             }
@@ -609,7 +664,11 @@ namespace DuetAPI.Commands
             writer.WriteStartObject();
             writer.WriteString("letter", value.Letter.ToString());
             writer.WriteString("value", value);
-            writer.WriteNumber("isString", Convert.ToInt32(value.Type == typeof(string)));
+            if (value.Type == typeof(DriverId) || value.Type == typeof(DriverId[]))
+            {
+                writer.WriteBoolean("isDriverId", true);
+            }
+            writer.WriteBoolean("isString", value.Type == typeof(string));
             writer.WriteEndObject();
         }
     }

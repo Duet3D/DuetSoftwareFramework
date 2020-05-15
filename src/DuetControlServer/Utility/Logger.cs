@@ -1,4 +1,5 @@
-﻿using DuetAPI;
+﻿using DuetAPI.Commands;
+using DuetAPI.Machine;
 using Nito.AsyncEx;
 using System;
 using System.IO;
@@ -48,7 +49,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task Start(string filename)
         {
-            using (await _lock.LockAsync())
+            using (await _lock.LockAsync(Program.CancellationToken))
             {
                 // Close any open file
                 await StopInternal();
@@ -56,7 +57,7 @@ namespace DuetControlServer.Utility
                 // Initialize access to the log file
                 _fileStream = new FileStream(filename, FileMode.Append, FileAccess.Write);
                 _writer = new StreamWriter(_fileStream) { AutoFlush = true };
-                _logCloseEvent = Program.CancelSource.Token.Register(Stop().Wait);
+                _logCloseEvent = Program.CancellationToken.Register(Stop().Wait);
 
                 // Write the first line
                 await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging started");
@@ -75,7 +76,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task Stop()
         {
-            using (await _lock.LockAsync())
+            using (await _lock.LockAsync(Program.CancellationToken))
             {
                 await StopInternal();
             }
@@ -118,7 +119,7 @@ namespace DuetControlServer.Utility
         /// <param name="msg">Message to log</param>
         public static async Task Log(Message msg)
         {
-            using (await _lock.LockAsync())
+            using (await _lock.LockAsync(Program.CancellationToken))
             {
                 if (_writer != null && !string.IsNullOrWhiteSpace(msg.Content))
                 {
@@ -147,7 +148,7 @@ namespace DuetControlServer.Utility
         /// Write messages including timestamp to the log file
         /// </summary>
         /// <param name="result">Message list</param>
-        public static async Task Log(DuetAPI.Commands.CodeResult result)
+        public static async Task Log(CodeResult result)
         {
             if (result != null)
             {
@@ -174,7 +175,7 @@ namespace DuetControlServer.Utility
         /// </summary>
         /// <param name="result">Code result</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task LogOutput(DuetAPI.Commands.CodeResult result)
+        public static async Task LogOutput(CodeResult result)
         {
             if (result != null)
             {

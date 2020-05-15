@@ -71,6 +71,11 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Do NOT process another code on the same channel before this code has been fully executed
         /// </summary>
-        Unbuffered = 512
+        Unbuffered = 512,
+
+        /// <summary>
+        /// Indicates if this code was requested from the firmware
+        /// </summary>
+        IsFromFirmware = 1024
     }
 }

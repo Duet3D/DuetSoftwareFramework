@@ -6,7 +6,7 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
     /// Flags of a G/M/T-code
     /// </summary>
     [Flags]
-    public enum SpiCodeFlags : byte
+    public enum CodeFlags : byte
     {
         /// <summary>
         /// This code has a valid major code

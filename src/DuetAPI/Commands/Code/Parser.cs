@@ -1,4 +1,7 @@
-﻿using System.IO;
+﻿using DuetAPI.Utility;
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -7,31 +10,33 @@ namespace DuetAPI.Commands
     public partial class Code
     {
         // Numeric parameters may hold only characters of this string 
-        private const string NumericParameterChars = "01234567890+-.e:";
+        private const string NumericParameterChars = "01234567890+-.e";
 
         /// <summary>
         /// Parse the next available G/M/T-code from the given stream
         /// </summary>
         /// <param name="reader">Input to read from</param>
         /// <param name="result">Code to fill</param>
-        /// <param name="enforcingAbsolutePosition">If G53 is in effect for the current line</param>
         /// <returns>Whether anything could be read</returns>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
-        public static bool Parse(TextReader reader, Code result, ref bool enforcingAbsolutePosition)
+        /// <remarks>
+        /// In general it is better to use <see cref="ParseAsync(StreamReader, Code, CodeParserBuffer)"/> because this implementation
+        /// - does not update the line number unless it is specified using the 'N' character
+        /// - does not set the corresponding flag for G53 after the first code on a line
+        /// - sets the indentation level only for the first code in a line
+        /// </remarks>
+        public static bool Parse(TextReader reader, Code result)
         {
             char letter = '\0', c;
             string value = string.Empty;
 
             bool contentRead = false, unprecedentedParameter = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
-            bool readingAtStart = true, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
-            bool wasQuoted = false, wasExpression = false;
+            bool readingAtStart = true, isLineNumber = false, isNumericParameter = false, endingChunk = false;
+            bool wasQuoted = false, wasCondition = false, wasExpression = false;
+            int numCurlyBraces = 0, numRoundBraces = 0;
 
             Encoding encoding = (reader is StreamReader sr) ? sr.CurrentEncoding : Encoding.UTF8;
-            if (enforcingAbsolutePosition)
-            {
-                result.Flags = CodeFlags.EnforceAbsolutePosition;
-            }
             result.Length = 0;
             do
             {
@@ -44,11 +49,6 @@ namespace DuetAPI.Commands
                 {
                     // Ignore CR
                     continue;
-                }
-                if (currentChar == '\n' && !hadLineNumber && result.LineNumber.HasValue)
-                {
-                    // Keep track of the line number (if possible)
-                    result.LineNumber++;
                 }
 
                 if (inFinalComment)
@@ -72,9 +72,13 @@ namespace DuetAPI.Commands
                     }
                     else
                     {
-                        // Even though RepRapFirmware treats comments in braces differently,
-                        // the correct approach should be to switch back to reading mode when the comment tag is closed
+                        // End of encapsulated comment
                         inEncapsulatedComment = false;
+                        if (wasCondition)
+                        {
+                            inCondition = true;
+                            wasCondition = false;
+                        }
                     }
                     continue;
                 }
@@ -90,9 +94,37 @@ namespace DuetAPI.Commands
                             inCondition = false;
                             inFinalComment = true;
                             break;
+                        case '{':
+                            result.KeywordArgument += '{';
+                            numCurlyBraces++;
+                            break;
+                        case '}':
+                            result.KeywordArgument += '}';
+                            numCurlyBraces--;
+                            break;
                         case '(':
-                            inCondition = false;
-                            inEncapsulatedComment = true;
+                            if (numCurlyBraces > 0)
+                            {
+                                result.KeywordArgument += '(';
+                                numRoundBraces++;
+                            }
+                            else
+                            {
+                                inCondition = false;
+                                wasCondition = true;
+                                inEncapsulatedComment = true;
+                            }
+                            break;
+                        case ')':
+                            if (numRoundBraces > 0)
+                            {
+                                result.KeywordArgument += ')';
+                                numRoundBraces--;
+                            }
+                            else
+                            {
+                                throw new CodeParserException("Unexpected closing round brace", result);
+                            }
                             break;
                         default:
                             if (!char.IsWhiteSpace(c) || !string.IsNullOrEmpty(result.KeywordArgument))
@@ -111,34 +143,7 @@ namespace DuetAPI.Commands
 
                 if (inChunk)
                 {
-                    if (!endingChunk && string.IsNullOrEmpty(value))
-                    {
-                        if (char.IsWhiteSpace(c))
-                        {
-                            // Parameter is empty
-                            endingChunk = true;
-                        }
-                        else if (c == '"')
-                        {
-                            // Parameter is a quoted string
-                            inQuotes = true;
-                            isNumericParameter = false;
-                        }
-                        else if (c == '{')
-                        {
-                            // Parameter is an expression
-                            value = "{";
-                            inExpression = true;
-                            isNumericParameter = false;
-                        }
-                        else
-                        {
-                            // Starting numeric or string parameter
-                            isNumericParameter = (c != 'e') && (NumericParameterChars.Contains(c)) && !unprecedentedParameter;
-                            value += c;
-                        }
-                    }
-                    else if (inQuotes)
+                    if (inQuotes)
                     {
                         if (c == '"')
                         {
@@ -165,19 +170,76 @@ namespace DuetAPI.Commands
                     }
                     else if (inExpression)
                     {
-                        if (c == '}')
+                        if (c == '{')
                         {
-                            // No longer in an expression
-                            inExpression = false;
-                            wasExpression = true;
-                            endingChunk = true;
+                            // Starting inner expression
+                            numCurlyBraces++;
+                        }
+                        else if (c == '}')
+                        {
+                            numCurlyBraces--;
+                            if (numCurlyBraces == 0)
+                            {
+                                // Check if the round braces are properly terminated
+                                if (numRoundBraces > 0)
+                                {
+                                    throw new CodeParserException("Unterminated round brace", result);
+                                }
+                                if (numRoundBraces < 0)
+                                {
+                                    throw new CodeParserException("Too many closing round braces", result);
+                                }
+
+                                // No longer in an expression
+                                inExpression = false;
+                                wasExpression = true;
+                                endingChunk = true;
+                            }
+                        }
+                        else if (c == '(')
+                        {
+                            // Starting inner expression
+                            numRoundBraces++;
+                        }
+                        else if (c == ')')
+                        {
+                            // Ending inner expression
+                            numRoundBraces--;
                         }
                         value += c;
+                    }
+                    else if (!endingChunk && string.IsNullOrEmpty(value))
+                    {
+                        if (char.IsWhiteSpace(c))
+                        {
+                            // Parameter is empty
+                            endingChunk = true;
+                        }
+                        else if (c == '"')
+                        {
+                            // Parameter is a quoted string
+                            inQuotes = true;
+                            isNumericParameter = false;
+                        }
+                        else if (c == '{')
+                        {
+                            // Parameter is an expression
+                            value = "{";
+                            inExpression = true;
+                            isNumericParameter = false;
+                            numCurlyBraces++;
+                        }
+                        else
+                        {
+                            // Starting numeric or string parameter
+                            isNumericParameter = (c != 'e') && (c == ':' || NumericParameterChars.Contains(c)) && !unprecedentedParameter;
+                            value += c;
+                        }
                     }
                     else if (endingChunk ||
                         (unprecedentedParameter && c == '\n') ||
                         (!unprecedentedParameter && char.IsWhiteSpace(c)) ||
-                        (isNumericParameter && !NumericParameterChars.Contains(c)))
+                        (isNumericParameter && c != ':' && !NumericParameterChars.Contains(c)))
                     {
                         // Parameter has ended
                         inChunk = endingChunk = false;
@@ -202,7 +264,7 @@ namespace DuetAPI.Commands
                     {
                         if (result.Indent == byte.MaxValue)
                         {
-                            throw new CodeParserException("Indentation too big");
+                            throw new CodeParserException("Indentation too big", result);
                         }
                         result.Indent++;
                     }
@@ -212,7 +274,7 @@ namespace DuetAPI.Commands
                     }
                 }
 
-                if (!inChunk && !readingAtStart)
+                if (!inCondition && !inChunk && !readingAtStart)
                 {
                     if (letter != '\0' || !string.IsNullOrEmpty(value) || wasQuoted)
                     {
@@ -221,12 +283,11 @@ namespace DuetAPI.Commands
                         if (isLineNumber)
                         {
                             // Process line number
-                            if (int.TryParse(value, out int lineNumber))
+                            if (long.TryParse(value, out long lineNumber))
                             {
                                 result.LineNumber = lineNumber;
                             }
                             isLineNumber = false;
-                            hadLineNumber = true;
                         }
                         else if ((upperLetter == 'G' || upperLetter == 'M' || upperLetter == 'T') &&
                                  (result.MajorNumber == null || (result.Type == CodeType.GCode && result.MajorNumber == 53)))
@@ -236,7 +297,6 @@ namespace DuetAPI.Commands
                             {
                                 result.MajorNumber = null;
                                 result.Flags |= CodeFlags.EnforceAbsolutePosition;
-                                enforcingAbsolutePosition = true;
                             }
 
                             result.Type = (CodeType)upperLetter;
@@ -250,7 +310,7 @@ namespace DuetAPI.Commands
                                 }
                                 else
                                 {
-                                    throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({args[0]})");
+                                    throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({args[0]})", result);
                                 }
                                 if (sbyte.TryParse(args[1], out sbyte minorNumber) && minorNumber >= 0)
                                 {
@@ -258,20 +318,20 @@ namespace DuetAPI.Commands
                                 }
                                 else
                                 {
-                                    throw new CodeParserException($"Failed to parse minor {char.ToUpperInvariant((char)result.Type)}-code number ({args[1]})");
+                                    throw new CodeParserException($"Failed to parse minor {char.ToUpperInvariant((char)result.Type)}-code number ({args[1]})", result);
                                 }
                             }
                             else if (int.TryParse(value, out int majorNumber))
                             {
                                 result.MajorNumber = majorNumber;
-                                unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
+                                unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 28 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
                             }
                             else if (!string.IsNullOrWhiteSpace(value) || result.Type != CodeType.TCode)
                             {
-                                throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})");
+                                throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
                             }
                         }
-                        else if (!result.MajorNumber.HasValue && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
+                        else if (result.MajorNumber == null && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
                         {
                             // Check for conditional G-code
                             if (letter == 'i' && value == "f")
@@ -299,6 +359,11 @@ namespace DuetAPI.Commands
                             else if (letter == 'b' && value == "reak")
                             {
                                 result.Keyword = KeywordType.Break;
+                                inCondition = true;
+                            }
+                            else if (letter == 'c' && value == "ontinue")
+                            {
+                                result.Keyword = KeywordType.Continue;
                                 inCondition = true;
                             }
                             else if (letter == 'r' && value == "eturn")
@@ -332,24 +397,26 @@ namespace DuetAPI.Commands
                             }
                             else if (result.Parameter(letter) == null)
                             {
-                                AddParameter(result, letter, value, false, false);
+                                AddParameter(result, char.ToUpperInvariant(letter), value, false, false);
                             }
-                            else
-                            {
-                                throw new CodeParserException($"Duplicate {letter} parameter");
-                            }
-                        }
-                        else if (letter == '\0' || result.Parameter(letter) == null)
-                        {
-                            if (!unprecedentedParameter)
-                            {
-                                letter = char.ToUpperInvariant(letter);
-                            }
-                            AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
+                            // Ignore duplicate parameters
                         }
                         else
                         {
-                            throw new CodeParserException($"Duplicate {letter} parameter");
+                            if (letter == '\0')
+                            {
+                                letter = '@';
+                            }
+                            else if (!unprecedentedParameter)
+                            {
+                                letter = char.ToUpperInvariant(letter);
+                            }
+
+                            if (result.Parameter(letter) == null)
+                            {
+                                AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
+                            }
+                            // Ignore duplicate parameters
                         }
 
                         letter = '\0';
@@ -362,7 +429,7 @@ namespace DuetAPI.Commands
                         // Starting final comment
                         contentRead = inFinalComment = true;
                     }
-                    else if (c == '(')
+                    else if (c == '(' && !inExpression)
                     {
                         // Starting encapsulated comment
                         contentRead = inEncapsulatedComment = true;
@@ -371,8 +438,21 @@ namespace DuetAPI.Commands
                     {
                         // Starting a new parameter
                         contentRead = inChunk = true;
-                        inQuotes = (c == '"');
-                        letter = inQuotes ? '\0' : c;
+                        if (c == '{')
+                        {
+                            value = "{";
+                            inExpression = true;
+                            inQuotes = false;
+                            numCurlyBraces++;
+                        }
+                        else if (c == '"')
+                        {
+                            inQuotes = true;
+                        }
+                        else
+                        {
+                            letter = c;
+                        }
                     }
                 }
 
@@ -381,7 +461,7 @@ namespace DuetAPI.Commands
                     // Stop if another G/M/T code is coming up and this one is complete
                     int next = reader.Peek();
                     char nextChar = (next == -1) ? '\n' : char.ToUpperInvariant((char)next);
-                    if (result.MajorNumber.HasValue && result.MajorNumber != 53 && (nextChar == 'G' || nextChar == 'M' || nextChar == 'T') &&
+                    if (result.MajorNumber != null && result.MajorNumber != 53 && (nextChar == 'G' || nextChar == 'M' || nextChar == 'T') &&
                         (nextChar == 'M' || result.Type != CodeType.MCode || result.Parameters.Any(item => item.Letter == nextChar)))
                     {
                         // Note that M-codes may have G or T parameters but only one
@@ -389,79 +469,136 @@ namespace DuetAPI.Commands
                     }
                 }
             } while (c != '\n');
-            enforcingAbsolutePosition &= (c != '\n');
 
             // Do not allow malformed codes
             if (inEncapsulatedComment)
             {
-                throw new CodeParserException("Unterminated encapsulated comment");
+                throw new CodeParserException("Unterminated encapsulated comment", result);
             }
             if (inQuotes)
             {
-                throw new CodeParserException("Unterminated string");
+                throw new CodeParserException("Unterminated string", result);
             }
-            if (inExpression)
+            if (numCurlyBraces > 0)
             {
-                throw new CodeParserException("Unterminated expression");
+                throw new CodeParserException("Unterminated curly brace", result);
+            }
+            if (numCurlyBraces < 0)
+            {
+                throw new CodeParserException("Too many closing curly braces", result);
             }
             if (result.KeywordArgument != null)
             {
                 result.KeywordArgument = result.KeywordArgument.Trim();
                 if (result.KeywordArgument.Length > 255)
                 {
-                    throw new CodeParserException("Keyword argument too long (> 255)");
+                    throw new CodeParserException("Keyword argument too long (> 255)", result);
                 }
             }
             if (result.Parameters.Count > 255)
             {
-                throw new CodeParserException("Too many parameters (> 255)");
+                throw new CodeParserException("Too many parameters (> 255)", result);
             }
 
-            // M584, M569 and M915 use driver identifiers
-            if (result.Type == CodeType.MCode)
-            {
-                switch (result.MajorNumber)
-                {
-                    case 569:
-                    case 915:
-                        foreach (CodeParameter parameter in result.Parameters)
-                        {
-                            if (char.ToUpperInvariant(parameter.Letter) == 'P')
-                            {
-                                parameter.ConvertDriverIds();
-                            }
-                        }
-                        break;
-
-                    case 584:
-                        foreach (CodeParameter parameter in result.Parameters)
-                        {
-                            if ("XYZUVWABCE".Contains(char.ToUpperInvariant(parameter.Letter)))
-                            {
-                                parameter.ConvertDriverIds();
-                            }
-                        }
-                        break;
-                }
-            }
+            // M569, M584, and M915 use driver identifiers
+            result.ConvertDriverIds();
 
             // End
             return contentRead;
         }
 
+        /// <summary>
+        /// Add a new parameter to a given <see cref="Code"/> instance
+        /// </summary>
+        /// <param name="code">Code to add the parameter to</param>
+        /// <param name="letter">Letter of the parameter to 0 if unprecedented</param>
+        /// <param name="value">Value of the parameter</param>
+        /// <param name="isQuoted">Whether the parameter is a quoted string</param>
+        /// <param name="isSingleParameter">Whether the parameter is definitely a single parameter</param>
         private static void AddParameter(Code code, char letter, string value, bool isQuoted, bool isSingleParameter)
         {
             if (isQuoted || isSingleParameter)
             {
-                code.Parameters.Add(new CodeParameter(letter, value, isQuoted));
+                code.Parameters.Add(new CodeParameter(letter, value, isQuoted, false));
             }
             else
             {
-                code.Parameters.Add(new CodeParameter(letter, string.Empty, false));
+                code.Parameters.Add(new CodeParameter(letter, string.Empty, false, false));
                 foreach (char c in value)
                 {
-                    code.Parameters.Add(new CodeParameter(c, string.Empty, false));
+                    code.Parameters.Add(new CodeParameter(c, string.Empty, false, false));
                 }
+            }
+        }
+
+        /// <summary>
+        /// Convert parameters of this code to driver id(s)
+        /// </summary>
+        /// <exception cref="CodeParserException">Driver ID could not be parsed</exception>
+        public void ConvertDriverIds()
+        {
+            if (Type == CodeType.MCode)
+            {
+                switch (MajorNumber)
+                {
+                    case 569:
+                    case 915:
+                        foreach (CodeParameter parameter in Parameters)
+                        {
+                            if (!parameter.IsExpression && char.ToUpperInvariant(parameter.Letter) == 'P')
+                            {
+                                ConvertDriverIds(parameter);
+                            }
+                        }
+                        break;
+
+                    case 584:
+                        foreach (CodeParameter parameter in Parameters)
+                        {
+                            char upper = char.ToUpperInvariant(parameter.Letter);
+                            if (!parameter.IsExpression && (Machine.Axis.Letters.Contains(upper) || upper == 'E'))
+                            {
+                                ConvertDriverIds(parameter);
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Convert a given parameter to driver id(s)
+        /// </summary>
+        /// <exception cref="CodeParserException">Driver ID could not be parsed</exception>
+        private void ConvertDriverIds(CodeParameter parameter)
+        {
+            if (!parameter.IsExpression)
+            {
+                List<DriverId> drivers = new List<DriverId>();
+
+                string[] parameters = parameter.StringValue.Split(':');
+                foreach (string value in parameters)
+                {
+                    try
+                    {
+                        DriverId id = new DriverId(value);
+                        drivers.Add(id);
+                    }
+                    catch (ArgumentException e)
+                    {
+                        throw new CodeParserException(e.Message + $" from {parameter.Letter} parameter", this);
+                    }
+                }
+
+                if (drivers.Count == 1)
+                {
+                    parameter.ParsedValue = drivers[0];
+                }
+                else
+                {
+                    parameter.ParsedValue = drivers.ToArray();
+                }
+                parameter.IsDriverId = true;
             }
         }
     }

@@ -70,8 +70,8 @@ done
 DEST_DIR=${DEST_DIR:-/tmp/duet/${PACKAGE_TYPE}/${BUILD_TYPE}/${TARGET_ARCH}}
 [ $PKGS -eq 0 ] && CLEANUP=0
 
-dcsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" $SRC_DIR/DuetControlServer/DuetControlServer.csproj)
-dwsver=$(xmllint --xpath "string(//Project/PropertyGroup/AssemblyVersion)" $SRC_DIR/DuetWebServer/DuetWebServer.csproj)
+dcsver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/DuetControlServer/DuetControlServer.csproj)
+dwsver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/DuetWebServer/DuetWebServer.csproj)
 # We always get the sd version from the deb control file even if we're building an rpm
 sdver=$(cat $PKG_DIR/deb/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
 
@@ -166,6 +166,7 @@ build_sd() {
 	rm -rf $DEST_DIR/duetsd_$sdver
 	mkdir -p $DEST_DIR/duetsd_$sdver
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/filaments
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/firmware
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/gcodes
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/macros
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/sys
@@ -183,7 +184,7 @@ build_dwc() {
 		echo "- Using existing repository in $DEST_DIR/DuetWebControl"
 	fi
 
-	dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)-1
+	dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)
 	>/dev/null pushd $DEST_DIR/DuetWebControl
 
 	echo "- Installing dependencies..."

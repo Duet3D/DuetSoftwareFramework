@@ -17,6 +17,12 @@ namespace DuetControlServer.IPC
     public static class Server
     {
         /// <summary>
+        /// Minimum supported protocol version number
+        /// </summary>
+        /// <seealso cref="Defaults.ProtocolVersion"/>
+        public const int MinimumProtocolVersion = 7;
+
+        /// <summary>
         /// UNIX socket for inter-process communication
         /// </summary>
         private static readonly Socket _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
@@ -54,15 +60,15 @@ namespace DuetControlServer.IPC
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
-            // Don't listen for incoming connections if only the firmware is updated
+            // Don't listen for incoming connections if only the firmware is being updated
             if (Settings.UpdateOnly)
             {
-                await Task.Delay(-1, Program.CancelSource.Token);
+                await Task.Delay(-1, Program.CancellationToken);
                 return;
             }
 
             // Make sure to terminate the main socket when the application is being terminated
-            Program.CancelSource.Token.Register(_unixSocket.Close, false);
+            Program.CancellationToken.Register(_unixSocket.Close, false);
 
             // Start accepting incoming connections
             List<Task> connectionTasks = new List<Task>();
@@ -86,7 +92,7 @@ namespace DuetControlServer.IPC
                         connectionTasks.Add(connectionTask);
                     }
                 }
-                while (true);
+                while (!Program.CancellationToken.IsCancellationRequested);
             }
             catch (SocketException)
             {
@@ -155,20 +161,35 @@ namespace DuetControlServer.IPC
         {
             try
             {
-                JsonDocument response = await conn.ReceiveJson();
-                ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                string response = await conn.ReceivePlainJson();
+                ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response, JsonHelper.DefaultJsonOptions);
+
+                // Check the version number
+                if (initMessage.Version < MinimumProtocolVersion)
+                {
+                    string message = $"Incompatible protocol version (got {initMessage.Version}, need {MinimumProtocolVersion} or higher)";
+                    conn.Logger.Warn(message);
+                    await conn.SendResponse(new IncompatibleVersionException(message));
+                    return null;
+                }
+                else if (initMessage.Version != Defaults.ProtocolVersion)
+                {
+                    conn.Logger.Warn("Client with outdated protocol version connected (got {0}, want {1})", initMessage.Version, Defaults.ProtocolVersion);
+                }
+
+                // Check the requested mode
                 switch (initMessage.Mode)
                 {
                     case ConnectionMode.Command:
-                        initMessage = JsonSerializer.Deserialize<CommandInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<CommandInitMessage>(response, JsonHelper.DefaultJsonOptions);
                         return new Command(conn);
 
                     case ConnectionMode.Intercept:
-                        initMessage = JsonSerializer.Deserialize<InterceptInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<InterceptInitMessage>(response, JsonHelper.DefaultJsonOptions);
                         return new Interception(conn, initMessage);
 
                     case ConnectionMode.Subscribe:
-                        initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response, JsonHelper.DefaultJsonOptions);
                         return new Subscription(conn, initMessage);
 
                     default:

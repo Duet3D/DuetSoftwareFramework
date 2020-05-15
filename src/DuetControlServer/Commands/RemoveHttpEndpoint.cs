@@ -1,5 +1,4 @@
 ﻿using DuetAPI.Machine;
-using DuetAPI.Utility;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -28,7 +27,7 @@ namespace DuetControlServer.Commands
                     if (ep.EndpointType == EndpointType && ep.Namespace == Namespace && ep.Path == Path)
                     {
                         _logger.Debug("Removed HTTP endpoint {0} machine/{1}/{2}", EndpointType, Namespace, Path);
-                        ListHelpers.RemoveItem(Model.Provider.Get.HttpEndpoints, i);
+                        Model.Provider.Get.HttpEndpoints.RemoveAt(i);
                         return true;
                     }
                 }

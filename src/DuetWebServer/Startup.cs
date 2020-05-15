@@ -102,7 +102,7 @@ namespace DuetWebServer
             {
                 endpoints.MapControllerRoute("WebSocket", "{controller=WebSocket}");
                 endpoints.MapControllerRoute("default", "{controller=Machine}");
-                if (_configuration.GetValue("UseCors", true))
+                if (_configuration.GetValue("UseCors", false))
                 {
                     endpoints.MapControllers().RequireCors(CorsPolicy);
                 }

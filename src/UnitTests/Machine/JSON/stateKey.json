@@ -1,0 +1,22 @@
+{
+  "atxPower": null,
+  "beep": null,
+  "currentTool": -1,
+  "displayMessage": "",
+  "laserPwm": null,
+  "logFile": "",
+  "machineMode": "FFF",
+  "messageBox": {
+    "axisControls": 0,
+    "message": "Please go to <a href=\"https://www.duet3d.com/StartHere\" target=\"_blank\">this</a> page for further instructions on how to set it up.",
+    "mode": 1,
+    "seq": 1,
+    "timeout": 0,
+    "title": "Welcome your new Duet 3!"
+  },
+  "nextTool": -1,
+  "powerFailScript": "",
+  "previousTool": -1,
+  "status": "idle",
+  "upTime": 1002
+}

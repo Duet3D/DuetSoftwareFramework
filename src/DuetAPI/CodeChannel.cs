@@ -1,11 +1,15 @@
-﻿namespace DuetAPI
+﻿using System.Text.Json.Serialization;
+
+namespace DuetAPI
 {
     /// <summary>
-    /// Enumeration of every available code channel
+    /// Enumeration of supported input channel names
     /// </summary>
-    /// <seealso cref="Commands.Code"/>
-    /// <seealso cref="Commands.SimpleCode"/>
-    /// <seealso cref="Machine.Channels"/>
+    /// <remarks>
+    /// The indices of this enum are tightly coupled with RepRapFirmware.
+    /// Make sure to update this enum accordingly whenever changes are made to it!
+    /// </remarks>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum CodeChannel : byte
     {
         /// <summary>
@@ -31,17 +35,17 @@
         /// <summary>
         /// Code channel for serial devices (e.g. PanelDue)
         /// </summary>
-        AUX = 4,
+        Aux = 4,
 
         /// <summary>
         /// Code channel for running triggers or config.g
         /// </summary>
-        Daemon = 5,
+        Trigger = 5,
 
         /// <summary>
         /// Code channel for the code queue that executes a couple of codes in-sync with moves
         /// </summary>
-        CodeQueue = 6,
+        Queue = 6,
 
         /// <summary>
         /// Code channel for auxiliary LCD devices (e.g. PanelOne)
@@ -51,11 +55,26 @@
         /// <summary>
         /// Default code channel for requests over SPI
         /// </summary>
-        SPI = 8,
+        SBC = 8,
+
+        /// <summary>
+        /// Code channel that executes the daemon process
+        /// </summary>
+        Daemon = 9,
+
+        /// <summary>
+        /// Code channel for the second UART port
+        /// </summary>
+        Aux2 = 10,
 
         /// <summary>
         /// Code channel that executes macros on power fail, heater faults and filament out
         /// </summary>
-        AutoPause = 9
+        Autopause = 11,
+
+        /// <summary>
+        /// Unknown code channel
+        /// </summary>
+        Unknown = 12
     }
 }

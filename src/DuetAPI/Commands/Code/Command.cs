@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -20,13 +21,12 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Create a new Code instance and attempt to parse the given code string
         /// </summary>
-        /// <param name="code">G/M/T-Code</param>
+        /// <param name="code">UTF8-encoded G/M/T-Code</param>
         public Code(string code)
         {
             using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(code));
             using StreamReader reader = new StreamReader(stream);
-            bool enforcingAbsolutePosition = false;
-            Parse(reader, this, ref enforcingAbsolutePosition);
+            Parse(reader, this);
         }
 
         /// <summary>
@@ -51,7 +51,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Code channel to send this code to
         /// </summary>
-        public CodeChannel Channel { get; set; } = Defaults.Channel;
+        public CodeChannel Channel { get; set; } = Defaults.InputChannel;
 
         /// <summary>
         /// Line number of this code
@@ -89,7 +89,7 @@ namespace DuetAPI.Commands
         public CodeFlags Flags { get; set; } = CodeFlags.None;
         
         /// <summary>
-        /// Comment of the G/M/T-code
+        /// Comment of the G/M/T-code. May be null if no comment is present
         /// </summary>
         /// <remarks>
         /// The parser combines different comment segments and concatenates them as a single value.
@@ -120,7 +120,7 @@ namespace DuetAPI.Commands
         {
             Result = null;
             Type = CodeType.Comment;
-            Channel = Defaults.Channel;
+            Channel = Defaults.InputChannel;
             LineNumber = null;
             Indent = 0;
             Keyword = KeywordType.None;
@@ -161,7 +161,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter p in Parameters)
             {
-                if (p.Letter == '\0')
+                if (p.Letter == '@')
                 {
                     return p;
                 }
@@ -194,6 +194,11 @@ namespace DuetAPI.Commands
         /// <returns>Reconstructed code string</returns>
         public override string ToString()
         {
+            if (Keyword != KeywordType.None)
+            {
+                return KeywordToString() + ((KeywordArgument == null) ? string.Empty : " " + KeywordArgument);
+            }
+
             if (Type == CodeType.Comment)
             {
                 return ";" + Comment;
@@ -207,9 +212,9 @@ namespace DuetAPI.Commands
             // After this append each parameter and encapsulate it in double quotes
             foreach(CodeParameter parameter in Parameters)
             {
-                if (parameter.Letter != '\0')
+                if (parameter.Letter != '@')
                 {
-                    if (parameter.Type == typeof(string))
+                    if (parameter.Type == typeof(string) && !parameter.IsExpression)
                     {
                         builder.Append($" {parameter.Letter}\"{((string)parameter).Replace("\"", "\"\"")}\"");
                     }
@@ -220,7 +225,7 @@ namespace DuetAPI.Commands
                 }
                 else
                 {
-                    if (parameter.Type == typeof(string))
+                    if (parameter.Type == typeof(string) && !parameter.IsExpression)
                     {
                         builder.Append($" \"{((string)parameter).Replace("\"", "\"\"")}\"");
                     }
@@ -234,6 +239,10 @@ namespace DuetAPI.Commands
             // Then the comment is appended (if applicable)
             if (!string.IsNullOrEmpty(Comment))
             {
+                if (builder.Length > 0)
+                {
+                    builder.Append(' ');
+                }
                 builder.Append(';');
                 builder.Append(Comment);
             }
@@ -254,20 +263,49 @@ namespace DuetAPI.Commands
         /// <returns>Command fraction of the code</returns>
         public string ToShortString()
         {
+            if (Keyword != KeywordType.None)
+            {
+                return KeywordToString();
+            }
+
             if (Type == CodeType.Comment)
             {
                 return "(comment)";
             }
 
-            if (MajorNumber.HasValue)
+            string prefix = Flags.HasFlag(CodeFlags.EnforceAbsolutePosition) ? "G53 " : string.Empty;
+            if (MajorNumber != null)
             {
-                if (MinorNumber.HasValue)
+                if (MinorNumber != null)
                 {
-                    return $"{(char)Type}{MajorNumber}.{MinorNumber}";
+                    return prefix + $"{(char)Type}{MajorNumber}.{MinorNumber}";
                 }
-                return $"{(char)Type}{MajorNumber}";
+                return prefix + $"{(char)Type}{MajorNumber}";
             }
-            return $"{(char)Type}";
+            return prefix + $"{(char)Type}";
+        }
+
+        /// <summary>
+        /// Convert the keyword to a string
+        /// </summary>
+        /// <returns></returns>
+        private string KeywordToString()
+        {
+            return Keyword switch
+            {
+                KeywordType.If => "if",
+                KeywordType.ElseIf => "elif",
+                KeywordType.Else => "else",
+                KeywordType.While => "while",
+                KeywordType.Break => "break",
+                KeywordType.Continue => "continue",
+                KeywordType.Return => "return",
+                KeywordType.Abort => "abort",
+                KeywordType.Var => "var",
+                KeywordType.Set => "set",
+                KeywordType.Echo => "echo",
+                _ => throw new NotImplementedException()
+            };
         }
     }
 }

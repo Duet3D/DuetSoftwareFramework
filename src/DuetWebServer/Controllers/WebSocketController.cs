@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using DuetAPI.Connection;
 using DuetAPI.Machine;
 using DuetAPIClient;
-using DuetAPIClient.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -94,16 +93,26 @@ namespace DuetWebServer.Controllers
                 // Subscribe to object model updates
                 await subscribeConnection.Connect(SubscriptionMode.Patch, null, socketPath);
             }
-            catch (AggregateException ae) when (ae.InnerException is IncompatibleVersionException)
+            catch (Exception e)
             {
-                _logger.LogError($"[{nameof(WebSocketController)}] Incompatible DCS version");
-                await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, "Incompatible DCS version");
-                return;
-            }
-            catch (SocketException)
-            {
-                _logger.LogError($"[{nameof(WebSocketController)}] DCS is unavailable");
-                await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "DCS is unavailable");
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is IncompatibleVersionException)
+                {
+                    _logger.LogError($"[{nameof(WebSocketController)}] Incompatible DCS version");
+                    await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, "Incompatible DCS version");
+                    return;
+                }
+                if (e is SocketException)
+                {
+                    _logger.LogError($"[{nameof(WebSocketController)}] DCS is not started");
+                    await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "DCS is not started");
+                    return;
+                }
+                _logger.LogError(e, $"[{nameof(WebSocketController)}] Failed to connect to DCS");
+                await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, e.Message);
                 return;
             }
 
@@ -113,6 +122,7 @@ namespace DuetWebServer.Controllers
             _logger.LogInformation("WebSocket connected from {0}:{1}", ipAddress, port);
 
             // 4. Register this client and keep it up-to-date
+            using CancellationTokenSource cts = new CancellationTokenSource();
             int sessionId = -1;
             try
             {
@@ -127,14 +137,12 @@ namespace DuetWebServer.Controllers
                 }
 
                 // 4c. Deal with this connection in full-duplex mode
-                using CancellationTokenSource cts = new CancellationTokenSource();
                 AsyncAutoResetEvent dataAcknowledged = new AsyncAutoResetEvent();
                 Task rxTask = ReadFromClient(webSocket, dataAcknowledged, cts.Token);
                 Task txTask = WriteToClient(webSocket, subscribeConnection, dataAcknowledged, cts.Token);
 
                 // 4d. Deal with the tasks' lifecycles
                 Task terminatedTask = await Task.WhenAny(rxTask, txTask);
-                cts.Cancel();
                 if (terminatedTask.IsFaulted)
                 {
                     throw terminatedTask.Exception;
@@ -142,11 +150,28 @@ namespace DuetWebServer.Controllers
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "WebSocket from {0}:{1} terminated with an exception", ipAddress, port);
-                await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, e.Message);
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is SocketException)
+                {
+                    _logger.LogError($"[{nameof(WebSocketController)}] DCS has been stopped");
+                    await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "DCS has been stopped");
+                }
+                else if (e is OperationCanceledException)
+                {
+                    await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "DWS is shutting down");
+                }
+                else
+                {
+                    _logger.LogError(e, $"[{nameof(WebSocketController)}] Connection from {ipAddress}:{port} terminated with an exception");
+                    await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, e.Message);
+                }
             }
             finally
             {
+                cts.Cancel();
                 _logger.LogInformation("WebSocket disconnected from {0}:{1}", ipAddress, port);
                 try
                 {

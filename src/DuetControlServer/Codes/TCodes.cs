@@ -23,7 +23,7 @@ namespace DuetControlServer.Codes
         /// <returns>Result to output</returns>
         public static async Task CodeExecuted(Code code)
         {
-            if (!code.MajorNumber.HasValue || !code.Result.IsSuccessful)
+            if (code.MajorNumber == null || !code.Result.IsSuccessful)
             {
                 return;
             }
@@ -31,7 +31,7 @@ namespace DuetControlServer.Codes
             // Set new tool number
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                if (Model.Provider.Get.Tools.Any(tool => tool.Number == code.MajorNumber))
+                if (Model.Provider.Get.Tools.Any(tool => tool != null && tool.Number == code.MajorNumber))
                 {
                     // Make sure the chosen tool actually exists
                     Model.Provider.Get.State.CurrentTool = code.MajorNumber.Value;

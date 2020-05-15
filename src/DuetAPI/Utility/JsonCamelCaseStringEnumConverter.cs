@@ -7,8 +7,11 @@ namespace DuetAPI.Utility
     /// <summary>
     /// Class for easier access to JsonStringEnumConverter with camel-case naming
     /// </summary>
-    public class JsonCamelCaseStringEnumConverter : JsonConverterFactory
+    public sealed class JsonCamelCaseStringEnumConverter : JsonConverterFactory
     {
+        /// <summary>
+        /// Converter factory for creating new camel-case converters
+        /// </summary>
         private readonly JsonStringEnumConverter _converter;
 
         /// <summary>

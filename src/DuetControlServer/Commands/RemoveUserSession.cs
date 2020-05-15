@@ -1,5 +1,4 @@
-﻿using DuetAPI.Utility;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
 {
@@ -20,7 +19,7 @@ namespace DuetControlServer.Commands
                 {
                     if (Model.Provider.Get.UserSessions[i].Id == Id)
                     {
-                        ListHelpers.RemoveItem(Model.Provider.Get.UserSessions, i);
+                        Model.Provider.Get.UserSessions.RemoveAt(i);
                         return true;
                     }
                 }

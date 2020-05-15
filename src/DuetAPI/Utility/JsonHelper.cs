@@ -1,7 +1,9 @@
-﻿using System;
+﻿using DuetAPI.Machine;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -107,7 +109,23 @@ namespace DuetAPI.Utility
         /// </summary>
         public static readonly JsonSerializerOptions DefaultJsonOptions = new JsonSerializerOptions
         {
+            Converters = {
+                new JsonPolymorphicWriteOnlyConverter<Kinematics>(),
+                new JsonPolymorphicWriteOnlyConverter<FilamentMonitor>()
+            },
             DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
+
+        /// <summary>
+        /// Default JSON (de-)serialization options without converters
+        /// </summary>
+        public static readonly JsonSerializerOptions DefaultJsonOptionsNoConverters = new JsonSerializerOptions
+        {
+            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true
         };

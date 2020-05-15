@@ -1,91 +1,69 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about a CNC spindle
     /// </summary>
-    public sealed class Spindle : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class Spindle : ModelObject
     {
-        /// <summary>
-        /// Event to trigger when a property has changed
-        /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
         /// <summary>
         /// Active RPM
         /// </summary>
         public float Active
         {
             get => _active;
-            set
-            {
-                if (_active != value)
-                {
-                    _active = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _active, value);
+
         }
         private float _active;
         
         /// <summary>
-        /// Current RPM
+        /// Current RPM, negative if anticlockwise direction
         /// </summary>
         public float Current
         {
             get => _current;
-            set
-            {
-                if (_current != value)
-                {
-                    _current = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _current, value);
         }
         private float _current;
 
         /// <summary>
-        /// Assigns every property of another instance of this one
+        /// Frequency (in Hz)
         /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
+        public int Frequency
         {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is Spindle other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            Active = other.Active;
-            Current = other.Current;
+            get => _frequency;
+			set => SetPropertyValue(ref _frequency, value);
         }
+        private int _frequency;
 
         /// <summary>
-        /// Creates a clone of this instance
+        /// Minimum RPM when turned on
         /// </summary>
-        /// <returns>A clone of this instance</returns>
-        public object Clone()
+        public float Min
         {
-            return new Spindle
-            {
-                Active = Active,
-                Current = Current
-            };
+            get => _min;
+			set => SetPropertyValue(ref _min, value);
         }
+        private float _min;
+
+        /// <summary>
+        /// Maximum RPM
+        /// </summary>
+        public float Max
+        {
+            get => _max;
+			set => SetPropertyValue(ref _max, value);
+        }
+        private float _max = 10000F;
+
+        /// <summary>
+        /// Mapped tool number or -1 if not assigned
+        /// </summary>
+        public int Tool
+        {
+            get => _tool;
+			set => SetPropertyValue(ref _tool, value);
+        }
+        private int _tool = -1;
     }
 }

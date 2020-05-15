@@ -1,14 +1,18 @@
-﻿namespace DuetAPI.Machine
+﻿using DuetAPI.Utility;
+using System.Text.Json.Serialization;
+
+namespace DuetAPI.Machine
 {
     /// <summary>
-    /// State of a heater (also see RepRapFirmware)
+    /// State of a heater
     /// </summary>
+    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
     public enum HeaterState
     {
         /// <summary>
         /// Heater is turned off
         /// </summary>
-        Off = 0,
+        Off,
 
         /// <summary>
         /// Heater is in standby mode
@@ -19,6 +23,11 @@
         /// Heater is active
         /// </summary>
         Active,
+
+        /// <summary>
+        /// Heater faulted
+        /// </summary>
+        Fault,
 
         /// <summary>
         /// Heater is being tuned

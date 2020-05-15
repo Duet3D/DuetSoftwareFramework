@@ -70,9 +70,8 @@ namespace DuetAPIClient
         /// <param name="channel">Code channel to wait for</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>True if all pending codes could be flushed</returns>
-        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
-        public Task<bool> Flush(CodeChannel channel = CodeChannel.SPI, CancellationToken cancellationToken = default)
+        public Task<bool> Flush(CodeChannel channel = CodeChannel.SBC, CancellationToken cancellationToken = default)
         {
             return PerformCommand<bool>(new Flush { Channel = channel }, cancellationToken);
         }
@@ -156,7 +155,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
         /// <seealso cref="SimpleCode"/>
-        public Task<string> PerformSimpleCode(string code, CodeChannel channel = Defaults.Channel, CancellationToken cancellationToken = default)
+        public Task<string> PerformSimpleCode(string code, CodeChannel channel = Defaults.InputChannel, CancellationToken cancellationToken = default)
         {
             return PerformCommand<string>(new SimpleCode { Code = code, Channel = channel }, cancellationToken);
         }

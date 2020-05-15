@@ -68,6 +68,7 @@ The following command-line arguments are available:
 - `-u`, `--update`: Update RepRapFirmware and exit. This works even if another instance is already started
 - `-l`, `--log-level`: Set the minimum log level. Valid options are: `trace`, `debug` , `info` , `warn`, `error`, `fatal`, `off` Default is `info`
 - `-c`, `--config`: Override the path to the JSON configuration file. Defaults to `/opt/dsf/conf/config.json`
+- `-r`, `--no-reset-stop`: Do not terminate this application when M999 has been processed
 - `-S`, `--socket-directory`: Override the path where DCS creates UNIX sockets. Defaults to `/var/run/dsf`
 - `-s`, `--socket-file`: Override the filename of DCS's UNIX socket. Defaults to `dcs.sock`
 - `-b`, `--base-directory`: Set the base directory of the virtual SD card directoy. This is used for RepRapFirmware compatibility. Defaults to `/opt/dsf/sd`
@@ -83,7 +84,7 @@ More technical documentation about this can be found [here](https://chrishamm.gi
 
 ### Inter-Process Communication
 
-DuetControlServer provides a UNIX socket for inter-process commmunication. This socket usually resides in `/var/log/dsf/dcs.sock` .
+DuetControlServer provides a UNIX socket for inter-process commmunication. This socket usually resides in `/var/run/dsf/dcs.sock` .
 For .NET Core, DSF provides the `DuetAPIClient` class library which is also used internally by the DSF core applications.
 
 Technical information about the way the communication over the UNIX socket works can be found in the [API description](#api).
@@ -357,18 +358,25 @@ sudo systemctl restart sshd
 sudo passwd
 ```
 
-After that, open a new console in one of the DSF application directories (where a .csproj file lies) and run 
+Then make sure to shut down all the DSF components before you continue, else you may get errors:
 
 ```
-dotnet publish-ssh -r linux-arm --ssh-host duet3 --ssh-user root --ssh-password raspberry --ssh-path /opt/dsf/bin
+sudo systemctl stop duetcontrolserver
+sudo systemctl stop duetwebserver
 ```
 
-This will replace the stock DSF component with your own compiled variant. Make sure to shut down all the DSF components before you do this, else you may get errors.
+After that, open a new local console in one of the DSF application directories (where a .csproj file lies) and run:
+
+```
+dotnet publish-ssh -r linux-arm --ssh-host duet3 --ssh-user root --ssh-password raspberry --ssh-path /opt/dsf/bin /p:DefineConstants=VERIFY_OBJECT_MODEL
+```
+
+This will replace the stock DSF component with your own compiled variant.
 If you do not wish to publish everything to your board at the time of compiling, have a look at the `dotnet publish` command.
 
 ### 3.2 Building on the SBC itself
 
-Of course you can compile the required components on the SBC itself. Once the .NET Core SDK has been installed, enter the directory of the DSF appliction you want to compile and run `dotnet build`. This will generate suitable binaries for you.
+Of course you can compile the required components on the SBC itself. Once the .NET Core SDK has been installed, enter the directory of the DSF application you want to compile and run `dotnet build`. This will generate suitable binaries for you.
 
 ## API
 
@@ -619,13 +627,10 @@ The following third-party bindings are available:
 
 To ensure flawless operation of the most critical components, Duet Software Framework relies on unit tests via the NUnit framework. These unit tests can be found in the [src/UnitTests](/src/UnitTests) directory.
 
-## Known issues
+## Known incompatibilities
 
 - `killall` may not be used to terminate DuetControlServer. Since it sends SIGTERM to all processes including worker threads of the .NET task scheduler, an abnormal program termination is the consequence. It is better to send SIGTERM only to the main PID
-- G-Code checksums and M998 are currently not supported
-- M291 S2/S3 are not working yet
-- Object model is only partially populated
-- Some G-codes behave differently when executed directly by RepRapFirmware instead of DCS
+- G-Code checksums and M998 are not supported
 
 ## Reporting issues
 
@@ -639,5 +644,5 @@ To launch DuetControlServer with this log level on DuetPi, you may run the follo
 
 ```
 sudo systemctl stop duetcontrolserver
-sudo /opt/dsf/bin/DuetControlServer --log-level debug
+sudo /opt/dsf/bin/DuetControlServer -l debug -r
 ```

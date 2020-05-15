@@ -7,8 +7,8 @@ using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
+using DuetAPI.Machine;
 using DuetAPI.Utility;
-using DuetAPIClient.Exceptions;
 
 namespace DuetAPIClient
 {
@@ -97,22 +97,24 @@ namespace DuetAPIClient
             UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(socketPath);
             _unixSocket.Connect(endPoint);
 
-            // Verify server init message
+            // Read the server init message
             ServerInitMessage ownMessage = new ServerInitMessage();
             ServerInitMessage serverMessage = await Receive<ServerInitMessage>(cancellationToken);
-            if (serverMessage.Version < ownMessage.Version)
-            {
-                throw new IncompatibleVersionException($"Incompatible API version (need {ownMessage.Version}, got {serverMessage.Version}");
-            }
             Id = serverMessage.Id;
 
             // Switch mode
+            initMessage.Version = Defaults.ProtocolVersion;
             await Send(initMessage, cancellationToken);
 
+            // Check the result
             BaseResponse response = await ReceiveResponse(cancellationToken);
             if (!response.Success)
             {
                 ErrorResponse errorResponse = (ErrorResponse)response;
+                if (errorResponse.ErrorType == nameof(IncompatibleVersionException))
+                {
+                    throw new IncompatibleVersionException(errorResponse.ErrorMessage);
+                }
                 throw new IOException($"Could not set connection type {_connectionMode} ({errorResponse.ErrorType}: {errorResponse.ErrorMessage})");
             }
         }
@@ -199,17 +201,16 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Connection has been closed</exception>
         protected async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
-            using JsonDocument jsonDoc = await ReceiveJson(cancellationToken);
-            if (typeof(T) == typeof(DuetAPI.Machine.MachineModel))
+            using JsonDocument jsonDocument = await ReceiveJson(cancellationToken);
+            if (typeof(T) == typeof(MachineModel))
             {
-                // FIXME: JsonSerializer does not populate readonly properties like ObservableCollections (yet)
-                T obj = (T)Activator.CreateInstance(typeof(T));
-                JsonPatch.Patch(obj, jsonDoc);
-                return obj;
+                MachineModel newModel = new MachineModel();
+                newModel.UpdateFromJson(jsonDocument.RootElement);
+                return (T)(object)newModel;
             }
             else
             {
-                return JsonSerializer.Deserialize<T>(jsonDoc.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
+                return JsonSerializer.Deserialize<T>(jsonDocument.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
             }
         }
 
@@ -248,12 +249,31 @@ namespace DuetAPIClient
         private async Task<BaseResponse> ReceiveResponse<T>(CancellationToken cancellationToken)
         {
             using JsonDocument jsonDoc = await ReceiveJson(cancellationToken);
-            foreach (var item in jsonDoc.RootElement.EnumerateObject())
+            foreach (JsonProperty property in jsonDoc.RootElement.EnumerateObject())
             {
-                if (item.Name.Equals(nameof(BaseResponse.Success), StringComparison.InvariantCultureIgnoreCase) &&
-                    item.Value.ValueKind == JsonValueKind.True)
+                if (property.Name.Equals(nameof(BaseResponse.Success), StringComparison.InvariantCultureIgnoreCase) &&
+                    property.Value.ValueKind == JsonValueKind.True)
                 {
-                    // Response OK
+                    // Response OK. Check for model objects because they require special deserialization
+                    if (typeof(T).IsSubclassOf(typeof(ModelObject)))
+                    {
+                        foreach (JsonProperty subProperty in jsonDoc.RootElement.EnumerateObject())
+                        {
+                            if (subProperty.Name.Equals(nameof(Response<T>.Result), StringComparison.InvariantCultureIgnoreCase) &&
+                                subProperty.Value.ValueKind != JsonValueKind.Null)
+                            {
+                                ModelObject result = (ModelObject)Activator.CreateInstance(typeof(T));
+                                result = result.UpdateFromJson(subProperty.Value);
+
+                                Response<T> response = (Response<T>)Activator.CreateInstance(typeof(Response<T>));
+                                response.Success = true;
+                                response.Result = (T)(object)result;
+                                return response;
+                            }
+                        }
+                    }
+
+                    // Standard response
                     return JsonSerializer.Deserialize<Response<T>>(jsonDoc.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
                 }
             }

@@ -1,61 +1,37 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about the machine state
     /// </summary>
-    public sealed class State : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class State : ModelObject
     {
-        /// <summary>
-        /// Event to trigger when a property has changed
-        /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
         /// <summary>
         /// State of the ATX power pin (if controlled)
         /// </summary>
         public bool? AtxPower
         {
             get => _atxPower;
-            set
-            {
-                if (_atxPower != value)
-                {
-                    _atxPower = value;
-                    NotifyPropertyChanged();
-                }
-            }
+            set => SetPropertyValue(ref _atxPower, value);
         }
         private bool? _atxPower;
 
         /// <summary>
-        /// Information about a requested beep
+        /// Information about a requested beep or null if none is requested
         /// </summary>
-        public BeepDetails Beep { get; private set; } = new BeepDetails();
-        
+        public BeepRequest Beep
+        {
+            get => _beep;
+            set => SetPropertyValue(ref _beep, value);
+        }
+        private BeepRequest _beep;
+
         /// <summary>
         /// Number of the currently selected tool or -1 if none is selected
         /// </summary>
         public int CurrentTool
         {
             get => _currentTool;
-            set
-            {
-                if (_currentTool != value)
-                {
-                    _currentTool = value;
-                    NotifyPropertyChanged();
-                }
-            }
+            set => SetPropertyValue(ref _currentTool, value);
         }
         private int _currentTool = -1;
 
@@ -65,16 +41,36 @@ namespace DuetAPI.Machine
         public string DisplayMessage
         {
             get => _displayMessage;
-            set
-            {
-                if (_displayMessage != value)
-                {
-                    _displayMessage = value;
-                    NotifyPropertyChanged();
-                }
-            }
+            set => SetPropertyValue(ref _displayMessage, value);
         }
-        private string _displayMessage;
+        private string _displayMessage = string.Empty;
+
+        /// <summary>
+        /// Version of the Duet Software Framework package
+        /// </summary>
+        [LinuxProperty]
+        public string DsfVersion
+        {
+            get => _dsfVersion;
+            set => SetPropertyValue(ref _dsfVersion, value);
+        }
+        private string _dsfVersion;
+
+        /// <summary>
+        /// List of general-purpose output ports
+        /// </summary>
+        /// <seealso cref="GpOutputPort"/>
+        public ModelCollection<GpOutputPort> GpOut { get; } = new ModelCollection<GpOutputPort>();
+
+        /// <summary>
+        /// Laser PWM of the next commanded move (0..1) or null if not applicable
+        /// </summary>
+        public float? LaserPwm
+        {
+            get => _laserPwm;
+            set => SetPropertyValue(ref _laserPwm, value);
+        }
+        private float? _laserPwm = null;
 
         /// <summary>
         /// Log file being written to or null if logging is disabled
@@ -82,93 +78,83 @@ namespace DuetAPI.Machine
         public string LogFile
         {
             get => _logFile;
-            set
-            {
-                if (_logFile != value)
-                {
-                    _logFile = value;
-                    NotifyPropertyChanged();
-                }
-            }
+            set => SetPropertyValue(ref _logFile, value);
         }
         private string _logFile;
 
         /// <summary>
+        /// Details about a requested message box or null if none is requested
+        /// </summary>
+        public MessageBox MessageBox
+        {
+            get => _messageBox;
+            set => SetPropertyValue(ref _messageBox, value);
+        }
+        private MessageBox _messageBox;
+
+        /// <summary>
         /// Current mode of operation
         /// </summary>
-        public MachineMode Mode
+        public MachineMode MachineMode
         {
-            get => _mode;
-            set
-            {
-                if (_mode != value)
-                {
-                    _mode = value;
-                    NotifyPropertyChanged();
-                }
-            }
+            get => _machineMode;
+			set => SetPropertyValue(ref _machineMode, value);
         }
-        private MachineMode _mode = MachineMode.FFF;
-        
+        private MachineMode _machineMode = MachineMode.FFF;
+
+        /// <summary>
+        /// Number of the next tool to be selected
+        /// </summary>
+        public int NextTool
+        {
+            get => _nextTool;
+			set => SetPropertyValue(ref _nextTool, value);
+        }
+        private int _nextTool = -1;
+
+        /// <summary>
+        /// Script to execute when the power fails
+        /// </summary>
+        public string PowerFailScript
+        {
+            get => _powerFailScript;
+			set => SetPropertyValue(ref _powerFailScript, value);
+        }
+        private string _powerFailScript = string.Empty;
+
+        /// <summary>
+        /// Number of the previous tool
+        /// </summary>
+        public int PreviousTool
+        {
+            get => _previousTool;
+			set => SetPropertyValue(ref _previousTool, value);
+        }
+        private int _previousTool = -1;
+
+        /// <summary>
+        /// List of restore points
+        /// </summary>
+        public ModelCollection<RestorePoint> RestorePoints { get; } = new ModelCollection<RestorePoint>();
+
         /// <summary>
         /// Current state of the machine
         /// </summary>
         public MachineStatus Status
         {
             get => _status;
-            set
-            {
-                if (_status != value)
-                {
-                    _status = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _status, value);
         }
         private MachineStatus _status = MachineStatus.Idle;
 
         /// <summary>
-        /// Assigns every property of another instance of this one
+        /// How long the machine has been running (in s)
         /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
+        public int UpTime
         {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is State other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            AtxPower = other.AtxPower;
-            Beep.Assign(other.Beep);
-            CurrentTool = other.CurrentTool;
-            DisplayMessage = other.DisplayMessage;
-            LogFile = other.LogFile;
-            Mode = other.Mode;
-            Status = other.Status;
+            get => _upTime;
+			set => SetPropertyValue(ref _upTime, value);
         }
-
-        /// <summary>
-        /// Creates a clone of this instance
-        /// </summary>
-        /// <returns>A clone of this instance</returns>
-        public object Clone()
-        {
-            return new State
-            {
-                AtxPower = AtxPower,
-                Beep = (BeepDetails)Beep.Clone(),
-                CurrentTool = CurrentTool,
-                DisplayMessage = DisplayMessage,
-                LogFile = LogFile,
-                Mode = Mode,
-                Status = Status
-            };
-        }
+        private int _upTime;
     }
 }

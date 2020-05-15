@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
-using DuetAPIClient.Exceptions;
 
 namespace DuetAPIClient
 {

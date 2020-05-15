@@ -10,5 +10,14 @@ namespace DuetAPI.Connection.InitMessages
         /// Desired mode of the new connection
         /// </summary>
         public ConnectionMode Mode { get; set; } = ConnectionMode.Unknown;
+
+        /// <summary>
+        /// Version number of the client-side API
+        /// </summary>
+        /// <seealso cref="Defaults.ProtocolVersion"/>
+        /// <remarks>
+        /// If this version is incompatible to DCS, a <see cref="IncompatibleVersionException"/> is returned when a connection is being established
+        /// </remarks>
+        public int Version { get; set; }
     }
 }

@@ -9,12 +9,15 @@ namespace DuetAPI.Connection.InitMessages
     /// In addition the interceptor may issue custom commands once a code has been received
     /// </summary>
     /// <remarks>
-    /// Do not attempt to perform commands before an intercepting code is received, else the order of
-    /// command execution cannot be guaranteed. Furthermore, avoid the usage of <see cref="Commands.SimpleCode"/>
-    /// if new movement codes (G0/G1) are supposed to be inserted before another one. It is better to send a full
-    /// <see cref="Commands.Code"/> object with the <see cref="Commands.CodeFlags.Asynchronous"/> flag set.
+    /// If this connection mode is used to implement new G/M/T-codes, always call the <see cref="Commands.Flush"/>
+    /// command before further actions are started and make sure it returns <c>true</c> before the code is further
+    /// processed. This step is mandatory to guarantee that the new code is executed when all other codes have finished
+    /// and not when a code is being fed for the internal G-code buffer. If the flush command returns <c>false</c>, it
+    /// is recommended to send <see cref="Commands.Cancel"/> to resolve the command. DCS follows the same pattern for
+    /// internally processed codes, too.
     /// If a code from a macro file is intercepted, make sure to set the <see cref="Commands.CodeFlags.IsFromMacro"/>
-    /// flag when you insert a new coe, else the code will be started when the macro file(s) have finished.
+    /// flag if new codes are inserted, else they will be started when the macro file(s) have finished. This step
+    /// is obsolete if a <see cref="Commands.SimpleCode"/> is inserted.
     /// </remarks>
     public class InterceptInitMessage : ClientInitMessage
     {

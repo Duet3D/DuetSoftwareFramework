@@ -56,7 +56,7 @@
             <param name="filename">Destination of the file to upload</param>
             <returns>HTTP status code: (201) File created (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
         </member>
-        <member name="M:DuetWebServer.Controllers.MachineController.GetFileinfo(System.String)">
+        <member name="M:DuetWebServer.Controllers.MachineController.GetFileInfo(System.String)">
             <summary>
             GET /machine/fileinfo/{filename}
             Parse a given G-code file and return information about this job file as a JSON object.

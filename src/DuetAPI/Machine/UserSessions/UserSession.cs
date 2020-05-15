@@ -1,39 +1,17 @@
-﻿using DuetAPI.Utility;
-using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace DuetAPI.Machine
+﻿namespace DuetAPI.Machine
 {
     /// <summary>
     /// Class representing a user session
     /// </summary>
-    public class UserSession : IAssignable, ICloneable, INotifyPropertyChanged
+    public sealed class UserSession : ModelObject
     {
-        /// <summary>
-        /// Event to trigger when a property has changed
-        /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
         /// <summary>
         /// Identifier of this session
         /// </summary>
         public int Id
         {
             get => _id;
-            set
-            {
-                if (_id != value)
-                {
-                    _id = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _id, value);
         }
         private int _id;
 
@@ -43,14 +21,7 @@ namespace DuetAPI.Machine
         public AccessLevel AccessLevel
         {
             get => _accessLevel;
-            set
-            {
-                if (_accessLevel != value)
-                {
-                    _accessLevel = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _accessLevel, value);
         }
         private AccessLevel _accessLevel;
 
@@ -60,14 +31,7 @@ namespace DuetAPI.Machine
         public SessionType SessionType
         {
             get => _sessionType;
-            set
-            {
-                if (_sessionType != value)
-                {
-                    _sessionType = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _sessionType, value);
         }
         private SessionType _sessionType;
 
@@ -77,14 +41,7 @@ namespace DuetAPI.Machine
         public string Origin
         {
             get => _origin;
-            set
-            {
-                if (_origin != value)
-                {
-                    _origin = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _origin, value);
         }
         private string _origin;
 
@@ -95,57 +52,8 @@ namespace DuetAPI.Machine
         public int OriginId
         {
             get => _originId;
-            set
-            {
-                if (_originId != value)
-                {
-                    _originId = value;
-                    NotifyPropertyChanged();
-                }
-            }
+			set => SetPropertyValue(ref _originId, value);
         }
         private int _originId = -1;
-
-        /// <summary>
-        /// Assigns every property from another instance
-        /// </summary>
-        /// <param name="from">Object to assign from</param>
-        /// <exception cref="ArgumentNullException">other is null</exception>
-        /// <exception cref="ArgumentException">Types do not match</exception>
-        public void Assign(object from)
-        {
-            if (from == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (!(from is UserSession other))
-            {
-                throw new ArgumentException("Invalid type");
-            }
-
-            Id = other.Id;
-            AccessLevel = other.AccessLevel;
-            SessionType = other.SessionType;
-            Origin = other.Origin;
-            OriginId = other.OriginId;
-        }
-
-        /// <summary>
-        /// Creates a clone of this instance
-        /// </summary>
-        /// <returns>Clone of this instance</returns>
-        public object Clone()
-        {
-            UserSession clone = new UserSession
-            {
-                Id = Id,
-                AccessLevel = AccessLevel,
-                SessionType = SessionType,
-                Origin = Origin,
-                OriginId = OriginId
-            };
-
-            return clone;
-        }
     }
 }
