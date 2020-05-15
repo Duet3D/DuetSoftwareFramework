@@ -3569,6 +3569,56 @@
             <param name="value">Value to serialize</param>
             <param name="options">Write options</param>
         </member>
+        <member name="T:DuetAPI.Machine.ScaraKinematics">
+            <summary>
+            Kinematics class for SCARA kinematics
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.TiltCorrection">
+            <summary>
+            Tilt correction parameters for Z leadscrew compensation
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.CorrectionFactor">
+            <summary>
+            Correction factor
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.LastCorrections">
+            <summary>
+            Last corrections (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.MaxCorrection">
+            <summary>
+            Maximum Z correction (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.ScrewPitch">
+            <summary>
+            Pitch of the Z leadscrews (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.ScrewX">
+            <summary>
+            X positions of the leadscrews (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.ScrewY">
+            <summary>
+            Y positions of the leadscrews (in mm)
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.ZLeadscrewKinematics">
+            <summary>
+            Base kinematics class that provides the ability to level the bed using Z leadscrews
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ZLeadscrewKinematics.TiltCorrection">
+            <summary>
+            Parameters describing the tilt correction
+            </summary>
+        </member>
         <member name="T:DuetAPI.Machine.Microstepping">
             <summary>
             Microstepping configuration

@@ -1,12 +1,12 @@
 Summary of important changes in recent versions
 ===============================================
 
-Version 2.2.1
+Version 3.1.0
 ==============
 
 Compatible files:
-- RepRapFirmware 3.01
-- DuetWebControl 2.1.8
+- RepRapFirmware 3.1.0
+- DuetWebControl 3.1.0
 
 Changed behaviour:
 - Duplicate code parameters are now ignored

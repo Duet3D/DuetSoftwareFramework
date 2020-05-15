@@ -5,10 +5,10 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Struct CodeBufferUpdateHeader
+    <title>Class ZLeadscrewKinematics
    </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Struct CodeBufferUpdateHeader
+    <meta name="title" content="Class ZLeadscrewKinematics
    ">
     <meta name="generator" content="docfx 2.51.0.0">
     
@@ -569,8 +569,8 @@
                           <li class="">
                             <a href="DuetAPI.Machine.Volume.html" title="Volume" class="">Volume</a>
                           </li>
-                          <li class="">
-                            <a href="DuetAPI.Machine.ZLeadscrewKinematics.html" title="ZLeadscrewKinematics" class="">ZLeadscrewKinematics</a>
+                          <li class="active">
+                            <a href="DuetAPI.Machine.ZLeadscrewKinematics.html" title="ZLeadscrewKinematics" class="active">ZLeadscrewKinematics</a>
                           </li>
                         </ul>  </li>
                     <li class="">
@@ -872,8 +872,8 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileHeader.html" title="AbortFileHeader" class="">AbortFileHeader</a>
                           </li>
-                          <li class="active">
-                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdateHeader.html" title="CodeBufferUpdateHeader" class="active">CodeBufferUpdateHeader</a>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdateHeader.html" title="CodeBufferUpdateHeader" class="">CodeBufferUpdateHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.FirmwareRequests.DoCodeHeader.html" title="DoCodeHeader" class="">DoCodeHeader</a>
@@ -1066,52 +1066,101 @@
         </div>
         <div class="article row grid-right">
           <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdateHeader">
+            <article class="content wrap" id="_content" data-uid="DuetAPI.Machine.ZLeadscrewKinematics">
   
   
-  <h1 id="DuetControlServer_SPI_Communication_FirmwareRequests_CodeBufferUpdateHeader" data-uid="DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdateHeader" class="text-break">Struct CodeBufferUpdateHeader
+  <h1 id="DuetAPI_Machine_ZLeadscrewKinematics" data-uid="DuetAPI.Machine.ZLeadscrewKinematics" class="text-break">Class ZLeadscrewKinematics
   </h1>
-  <div class="markdown level0 summary"><p>Request abort of the currently executing files</p>
+  <div class="markdown level0 summary"><p>Base kinematics class that provides the ability to level the bed using Z leadscrews</p>
 </div>
   <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><a class="xref" href="DuetAPI.Machine.ModelObject.html">ModelObject</a></div>
+    <div class="level2"><a class="xref" href="DuetAPI.Machine.Kinematics.html">Kinematics</a></div>
+    <div class="level3"><span class="xref">ZLeadscrewKinematics</span></div>
+      <div class="level4"><a class="xref" href="DuetAPI.Machine.CoreKinematics.html">CoreKinematics</a></div>
+      <div class="level4"><a class="xref" href="DuetAPI.Machine.ScaraKinematics.html">ScaraKinematics</a></div>
+  </div>
+  <div classs="implements">
+    <h5>Implements</h5>
+    <div><span class="xref">System.ICloneable</span></div>
+    <div><span class="xref">System.ComponentModel.INotifyPropertyChanging</span></div>
+    <div><span class="xref">System.ComponentModel.INotifyPropertyChanged</span></div>
+  </div>
   <div class="inheritedMembers">
     <h5>Inherited Members</h5>
     <div>
-      <span class="xref">System.ValueType.Equals(System.Object)</span>
+      <a class="xref" href="DuetAPI.Machine.Kinematics.html#DuetAPI_Machine_Kinematics_Name">Kinematics.Name</a>
     </div>
     <div>
-      <span class="xref">System.ValueType.GetHashCode()</span>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_JsonProperties">ModelObject.JsonProperties</a>
     </div>
     <div>
-      <span class="xref">System.ValueType.ToString()</span>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_PropertyChanging">ModelObject.PropertyChanging</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_PropertyChanged">ModelObject.PropertyChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_SetPropertyValue__1___0____0_System_String_">ModelObject.SetPropertyValue&lt;T&gt;(T, T, String)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_Assign_DuetAPI_Machine_ModelObject_">ModelObject.Assign(ModelObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_Clone">ModelObject.Clone()</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_UpdateFromJson_System_Text_Json_JsonElement_">ModelObject.UpdateFromJson(JsonElement)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_MakeUtf8Patch_DuetAPI_Machine_ModelObject_">ModelObject.MakeUtf8Patch(ModelObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.Machine.ModelObject.html#DuetAPI_Machine_ModelObject_MakeStringPatch_DuetAPI_Machine_ModelObject_">ModelObject.MakeStringPatch(ModelObject)</a>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object)</span>
     </div>
     <div>
       <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
     </div>
     <div>
+      <span class="xref">System.Object.GetHashCode()</span>
+    </div>
+    <div>
       <span class="xref">System.Object.GetType()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.MemberwiseClone()</span>
     </div>
     <div>
       <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
     </div>
+    <div>
+      <span class="xref">System.Object.ToString()</span>
+    </div>
   </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="DuetControlServer.SPI.Communication.FirmwareRequests.html">DuetControlServer.SPI.Communication.FirmwareRequests</a></h6>
-  <h6><strong>Assembly</strong>: DuetControlServer.dll</h6>
-  <h5 id="DuetControlServer_SPI_Communication_FirmwareRequests_CodeBufferUpdateHeader_syntax">Syntax</h5>
+  <h6><strong>Namespace</strong>: <a class="xref" href="DuetAPI.Machine.html">DuetAPI.Machine</a></h6>
+  <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
+  <h5 id="DuetAPI_Machine_ZLeadscrewKinematics_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public struct CodeBufferUpdateHeader</code></pre>
+    <pre><code class="lang-csharp hljs">public abstract class ZLeadscrewKinematics : Kinematics, ICloneable, INotifyPropertyChanging, INotifyPropertyChanged</code></pre>
   </div>
-  <h3 id="fields">Fields
+  <h3 id="properties">Properties
   </h3>
-  <h4 id="DuetControlServer_SPI_Communication_FirmwareRequests_CodeBufferUpdateHeader_BufferSpace" data-uid="DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdateHeader.BufferSpace">BufferSpace</h4>
-  <div class="markdown level1 summary"><p>Bytes available for storing buffered codes</p>
+  <a id="DuetAPI_Machine_ZLeadscrewKinematics_TiltCorrection_" data-uid="DuetAPI.Machine.ZLeadscrewKinematics.TiltCorrection*"></a>
+  <h4 id="DuetAPI_Machine_ZLeadscrewKinematics_TiltCorrection" data-uid="DuetAPI.Machine.ZLeadscrewKinematics.TiltCorrection">TiltCorrection</h4>
+  <div class="markdown level1 summary"><p>Parameters describing the tilt correction</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public ushort BufferSpace</code></pre>
+    <pre><code class="lang-csharp hljs">public TiltCorrection TiltCorrection { get; }</code></pre>
   </div>
-  <h5 class="fieldValue">Field Value</h5>
+  <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
@@ -1121,11 +1170,21 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.UInt16</span></td>
+        <td><a class="xref" href="DuetAPI.Machine.TiltCorrection.html">TiltCorrection</a></td>
         <td></td>
       </tr>
     </tbody>
   </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <span class="xref">System.ICloneable</span>
+  </div>
+  <div>
+      <span class="xref">System.ComponentModel.INotifyPropertyChanging</span>
+  </div>
+  <div>
+      <span class="xref">System.ComponentModel.INotifyPropertyChanged</span>
+  </div>
 </article>
           </div>
           
