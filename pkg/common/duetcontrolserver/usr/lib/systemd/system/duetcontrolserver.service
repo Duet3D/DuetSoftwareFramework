@@ -8,6 +8,9 @@ Restart=always
 RestartSec=5
 Type=simple
 CPUSchedulingPriority=20
+User=dsf
+Group=dsf
+UMask=0002
 
 [Install]
 WantedBy=basic.target

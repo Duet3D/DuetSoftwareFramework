@@ -1,4 +1,14 @@
 #!/bin/sh
+# Create gpio group and add dsf to it
+systemd-sysusers duetcontrolserver.conf
+
+# Create /var/run/dsf now
+systemd-tmpfiles --create duetcontrolserver.conf
+
+# Trigger assignment of gpio group to the existing devices
+udevadm trigger
+
+chown dsf:dsf /opt/dsf/conf/config.json
 
 # Update systemd services
 systemctl -q daemon-reload

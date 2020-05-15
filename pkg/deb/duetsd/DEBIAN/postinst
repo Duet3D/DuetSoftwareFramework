@@ -1,0 +1,3 @@
+#!/bin/sh
+
+chown -R dsf:dsf /opt/dsf/sd

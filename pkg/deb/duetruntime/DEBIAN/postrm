@@ -1,0 +1,3 @@
+#!/bin/sh
+
+echo "To delete the \"dsf\" user run as root: userdel --force dsf"
