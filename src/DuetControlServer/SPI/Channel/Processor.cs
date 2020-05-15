@@ -962,6 +962,9 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>Asynchronous task</returns>
         public async Task DoMacroFile(string fileName, bool reportMissing, bool fromCode)
         {
+            // Macro requests are not meant for comment codes, resolve them separately
+            ResolveCommentCodes();
+
             // Figure out which code started the macro file
             Code startCode = null;
             if (fromCode)
