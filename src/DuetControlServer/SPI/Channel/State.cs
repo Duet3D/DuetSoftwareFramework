@@ -39,9 +39,9 @@ namespace DuetControlServer.SPI.Channel
         public bool MacroCompleted { get; set; }
 
         /// <summary>
-        /// Code that started the macro file of this state
+        /// Code that started this state
         /// </summary>
-        public Code MacroStartCode { get; set; }
+        public Code StartCode { get; set; }
 
         /// <summary>
         /// Queue of pending G/M/T-codes that have not been buffered yet
