@@ -126,13 +126,6 @@ namespace DuetControlServer.SPI.Channel
             CurrentState = Stack.Peek();
             _isWaitingForAcknowledgement = CurrentState.WaitingForAcknowledgement;
 
-            // Remove potential event listeners
-            if (oldState.WaitingForAcknowledgement)
-            {
-                Model.Provider.Get.Inputs[Channel].PropertyChanged -= InputPropertyChanged;
-                _propertyChangedRegistered = false;
-            }
-
             // Invalidate obsolete lock requests and supended codes
             while (oldState.LockRequests.TryDequeue(out LockRequest lockRequest))
             {
@@ -850,7 +843,7 @@ namespace DuetControlServer.SPI.Channel
             // Unless this message comes from the file or code queue it is out-of-order...
             if (Channel != CodeChannel.Queue)
             {
-                if (!string.IsNullOrEmpty(reply) || !_suppressEmptyReply)
+                if (!_suppressEmptyReply)
                 {
                     _logger.Warn("Out-of-order reply: '{0}'", reply);
                 }
@@ -914,32 +907,6 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
-        /// Event that is called when a property of this input channel in the OM has changed while waiting for acknowledgement
-        /// </summary>
-        /// <param name="sender">Sender</param>
-        /// <param name="e">Event args</param>
-        private void InputPropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName.Equals(nameof(InputChannel.State)))
-            {
-                InputChannelState state = (InputChannelState)sender.GetType().GetProperty(e.PropertyName).GetValue(sender);
-                if (state != InputChannelState.Executing && state != InputChannelState.AwaitingAcknowledgement)
-                {
-                    using (_lock.Lock(Program.CancellationToken))
-                    {
-                        // Make sure the G-code flow is resumed even if the message box is closed from RRF
-                        MessageAcknowledged().Wait();
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Indicates if the event handler <see cref="InputPropertyChanged(object, PropertyChangedEventArgs)"/> is registered
-        /// </summary>
-        private bool _propertyChangedRegistered;
-
-        /// <summary>
         /// Wait for a message to be acknowledged
         /// </summary>
         public void WaitForAcknowledgement()
@@ -964,12 +931,6 @@ namespace DuetControlServer.SPI.Channel
                 newState.StartCode = startCode;
                 newState.WaitingForAcknowledgement = true;
                 _isWaitingForAcknowledgement = true;
-
-                if (!_propertyChangedRegistered)
-                {
-                    Model.Provider.Get.Inputs[Channel].PropertyChanged += InputPropertyChanged;
-                    _propertyChangedRegistered = true;
-                }
             }
         }
 
