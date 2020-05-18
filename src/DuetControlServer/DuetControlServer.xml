@@ -2875,6 +2875,7 @@
             <param name="code">Destination code</param>
             <param name="flags">Reply flags</param>
             <param name="reply">Reply</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Channel.Processor.InputPropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)">
             <summary>
@@ -2952,9 +2953,9 @@
             Indicates if the firmware has been notified about the macro completion
             </summary>
         </member>
-        <member name="P:DuetControlServer.SPI.Channel.State.MacroStartCode">
+        <member name="P:DuetControlServer.SPI.Channel.State.StartCode">
             <summary>
-            Code that started the macro file of this state
+            Code that started this state
             </summary>
         </member>
         <member name="P:DuetControlServer.SPI.Channel.State.PendingCodes">

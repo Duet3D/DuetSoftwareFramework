@@ -282,6 +282,9 @@
                             <a href="DuetAPI.Machine.Board.html" title="Board" class="">Board</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Machine.BoardState.html" title="BoardState" class="">BoardState</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Machine.Build.html" title="Build" class="">Build</a>
                           </li>
                           <li class="">
@@ -1210,30 +1213,6 @@
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_Channel_State_MacroStartCode_" data-uid="DuetControlServer.SPI.Channel.State.MacroStartCode*"></a>
-  <h4 id="DuetControlServer_SPI_Channel_State_MacroStartCode" data-uid="DuetControlServer.SPI.Channel.State.MacroStartCode">MacroStartCode</h4>
-  <div class="markdown level1 summary"><p>Code that started the macro file of this state</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Code MacroStartCode { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="DuetControlServer.Commands.Code.html">Code</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_SPI_Channel_State_PendingCodes_" data-uid="DuetControlServer.SPI.Channel.State.PendingCodes*"></a>
   <h4 id="DuetControlServer_SPI_Channel_State_PendingCodes" data-uid="DuetControlServer.SPI.Channel.State.PendingCodes">PendingCodes</h4>
   <div class="markdown level1 summary"><p>Queue of pending G/M/T-codes that have not been buffered yet</p>
@@ -1254,6 +1233,30 @@
     <tbody>
       <tr>
         <td><span class="xref">System.Collections.Generic.Queue</span>&lt;<a class="xref" href="DuetControlServer.Commands.Code.html">Code</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_SPI_Channel_State_StartCode_" data-uid="DuetControlServer.SPI.Channel.State.StartCode*"></a>
+  <h4 id="DuetControlServer_SPI_Channel_State_StartCode" data-uid="DuetControlServer.SPI.Channel.State.StartCode">StartCode</h4>
+  <div class="markdown level1 summary"><p>Code that started this state</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Code StartCode { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetControlServer.Commands.Code.html">Code</a></td>
         <td></td>
       </tr>
     </tbody>

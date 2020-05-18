@@ -1,6 +1,23 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.1.1
+==============
+
+Compatible files:
+- RepRapFirmware 3.1.1
+- DuetWebControl 3.1.1
+
+Changed behaviour:
+- Increased API level due to new object model fields
+- Code replies from the firmware are now trimmed at the end right after receipt
+
+Bug fixes:
+- Final replies from system macros were discarded
+- Substituted macro filenames were incorrect in the DCS log
+- Codes requesting message boxes could be executed twice
+- Message boxes could be closed internally in DCS when not supposed to
+
 Version 3.1.0
 ==============
 

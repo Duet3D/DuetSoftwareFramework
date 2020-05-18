@@ -5,10 +5,10 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Class SubscribeInitMessage
+    <title>Enum BoardState
    </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Class SubscribeInitMessage
+    <meta name="title" content="Enum BoardState
    ">
     <meta name="generator" content="docfx 2.51.0.0">
     
@@ -251,8 +251,8 @@
                           <li class="">
                             <a href="DuetAPI.Connection.InitMessages.ServerInitMessage.html" title="ServerInitMessage" class="">ServerInitMessage</a>
                           </li>
-                          <li class="active">
-                            <a href="DuetAPI.Connection.InitMessages.SubscribeInitMessage.html" title="SubscribeInitMessage" class="active">SubscribeInitMessage</a>
+                          <li class="">
+                            <a href="DuetAPI.Connection.InitMessages.SubscribeInitMessage.html" title="SubscribeInitMessage" class="">SubscribeInitMessage</a>
                           </li>
                         </ul>  </li>
                     <li class="">
@@ -281,8 +281,8 @@
                           <li class="">
                             <a href="DuetAPI.Machine.Board.html" title="Board" class="">Board</a>
                           </li>
-                          <li class="">
-                            <a href="DuetAPI.Machine.BoardState.html" title="BoardState" class="">BoardState</a>
+                          <li class="active">
+                            <a href="DuetAPI.Machine.BoardState.html" title="BoardState" class="active">BoardState</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Machine.Build.html" title="Build" class="">Build</a>
@@ -1069,124 +1069,58 @@
         </div>
         <div class="article row grid-right">
           <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="DuetAPI.Connection.InitMessages.SubscribeInitMessage">
+            <article class="content wrap" id="_content" data-uid="DuetAPI.Machine.BoardState">
   
   
-  <h1 id="DuetAPI_Connection_InitMessages_SubscribeInitMessage" data-uid="DuetAPI.Connection.InitMessages.SubscribeInitMessage" class="text-break">Class SubscribeInitMessage
+  <h1 id="DuetAPI_Machine_BoardState" data-uid="DuetAPI.Machine.BoardState" class="text-break">Enum BoardState
   </h1>
-  <div class="markdown level0 summary"><p>Enter subscription mode and receive either the full object model or parts of it after every update</p>
+  <div class="markdown level0 summary"><p>Enumeration of possible expansion board states</p>
 </div>
   <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><span class="xref">System.Object</span></div>
-    <div class="level1"><a class="xref" href="DuetAPI.Connection.InitMessages.ClientInitMessage.html">ClientInitMessage</a></div>
-    <div class="level2"><span class="xref">SubscribeInitMessage</span></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
-    <div>
-      <a class="xref" href="DuetAPI.Connection.InitMessages.ClientInitMessage.html#DuetAPI_Connection_InitMessages_ClientInitMessage_Mode">ClientInitMessage.Mode</a>
-    </div>
-    <div>
-      <a class="xref" href="DuetAPI.Connection.InitMessages.ClientInitMessage.html#DuetAPI_Connection_InitMessages_ClientInitMessage_Version">ClientInitMessage.Version</a>
-    </div>
-    <div>
-      <span class="xref">System.Object.Equals(System.Object)</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.GetHashCode()</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.GetType()</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.MemberwiseClone()</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.ToString()</span>
-    </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="DuetAPI.Connection.InitMessages.html">DuetAPI.Connection.InitMessages</a></h6>
+  <h6><strong>Namespace</strong>: <a class="xref" href="DuetAPI.Machine.html">DuetAPI.Machine</a></h6>
   <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
-  <h5 id="DuetAPI_Connection_InitMessages_SubscribeInitMessage_syntax">Syntax</h5>
+  <h5 id="DuetAPI_Machine_BoardState_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public class SubscribeInitMessage : ClientInitMessage</code></pre>
+    <pre><code class="lang-csharp hljs">[JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
+public enum BoardState</code></pre>
   </div>
-  <h3 id="constructors">Constructors
+  <h3 id="fields">Fields
   </h3>
-  <a id="DuetAPI_Connection_InitMessages_SubscribeInitMessage__ctor_" data-uid="DuetAPI.Connection.InitMessages.SubscribeInitMessage.#ctor*"></a>
-  <h4 id="DuetAPI_Connection_InitMessages_SubscribeInitMessage__ctor" data-uid="DuetAPI.Connection.InitMessages.SubscribeInitMessage.#ctor">SubscribeInitMessage()</h4>
-  <div class="markdown level1 summary"><p>Creates a new init message instance</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public SubscribeInitMessage()</code></pre>
-  </div>
-  <h3 id="properties">Properties
-  </h3>
-  <a id="DuetAPI_Connection_InitMessages_SubscribeInitMessage_Filter_" data-uid="DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter*"></a>
-  <h4 id="DuetAPI_Connection_InitMessages_SubscribeInitMessage_Filter" data-uid="DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter">Filter</h4>
-  <div class="markdown level1 summary"><p>Optional filter path for <a class="xref" href="DuetAPI.Connection.SubscriptionMode.html#DuetAPI_Connection_SubscriptionMode_Patch">Patch</a> mode</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public string Filter { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
       <tr>
-        <th>Type</th>
+        <th>Name</th>
         <th>Description</th>
       </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="DuetAPI_Connection_InitMessages_SubscribeInitMessage_Filter_remarks">Remarks</h5>
-  <div class="markdown level1 remarks"><p>The style of a filter is similar to XPath. For example, if you want to monitor only the current heater temperatures,
-you can use the filter expression &quot;heat/heaters[*]/current&quot;. Wildcards are supported either for full names or indices.
-To get updates for an entire namespace, the ** wildcard can be used (for example heat/** for everything heat-related),
-however it can be only used at the end of a filter expression. Multiple filters can be used on one connection and they
-have to be delimited by one of these charaters: ['|', ',', ' ', '\r', '\n']</p>
-</div>
-  <a id="DuetAPI_Connection_InitMessages_SubscribeInitMessage_SubscriptionMode_" data-uid="DuetAPI.Connection.InitMessages.SubscribeInitMessage.SubscriptionMode*"></a>
-  <h4 id="DuetAPI_Connection_InitMessages_SubscribeInitMessage_SubscriptionMode" data-uid="DuetAPI.Connection.InitMessages.SubscribeInitMessage.SubscriptionMode">SubscriptionMode</h4>
-  <div class="markdown level1 summary"><p>Type of the subscription</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public SubscriptionMode SubscriptionMode { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
     <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
     <tbody>
       <tr>
-        <td><a class="xref" href="DuetAPI.Connection.SubscriptionMode.html">SubscriptionMode</a></td>
-        <td></td>
+        <td id="DuetAPI_Machine_BoardState_FlashFailed">FlashFailed</td>
+        <td><p>Failed to flash new firmware</p>
+</td>
+      </tr>
+      <tr>
+        <td id="DuetAPI_Machine_BoardState_Flashing">Flashing</td>
+        <td><p>Flashing new firmware</p>
+</td>
+      </tr>
+      <tr>
+        <td id="DuetAPI_Machine_BoardState_Resetting">Resetting</td>
+        <td><p>Board is being reset</p>
+</td>
+      </tr>
+      <tr>
+        <td id="DuetAPI_Machine_BoardState_Running">Running</td>
+        <td><p>Board is up and running</p>
+</td>
+      </tr>
+      <tr>
+        <td id="DuetAPI_Machine_BoardState_Unknown">Unknown</td>
+        <td><p>Unknown state</p>
+</td>
       </tr>
     </tbody>
-  </table>
+  </thead></thead></table>
 </article>
           </div>
           

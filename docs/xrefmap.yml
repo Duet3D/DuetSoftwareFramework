@@ -2876,6 +2876,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Board.ShortName
   nameWithType: Board.ShortName
+- uid: DuetAPI.Machine.Board.State
+  name: State
+  href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_State
+  commentId: P:DuetAPI.Machine.Board.State
+  fullName: DuetAPI.Machine.Board.State
+  nameWithType: Board.State
+- uid: DuetAPI.Machine.Board.State*
+  name: State
+  href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_State_
+  commentId: Overload:DuetAPI.Machine.Board.State
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Board.State
+  nameWithType: Board.State
 - uid: DuetAPI.Machine.Board.Supports12864
   name: Supports12864
   href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_Supports12864
@@ -2928,6 +2941,42 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Board.VIn
   nameWithType: Board.VIn
+- uid: DuetAPI.Machine.BoardState
+  name: BoardState
+  href: api/DuetAPI.Machine.BoardState.html
+  commentId: T:DuetAPI.Machine.BoardState
+  fullName: DuetAPI.Machine.BoardState
+  nameWithType: BoardState
+- uid: DuetAPI.Machine.BoardState.FlashFailed
+  name: FlashFailed
+  href: api/DuetAPI.Machine.BoardState.html#DuetAPI_Machine_BoardState_FlashFailed
+  commentId: F:DuetAPI.Machine.BoardState.FlashFailed
+  fullName: DuetAPI.Machine.BoardState.FlashFailed
+  nameWithType: BoardState.FlashFailed
+- uid: DuetAPI.Machine.BoardState.Flashing
+  name: Flashing
+  href: api/DuetAPI.Machine.BoardState.html#DuetAPI_Machine_BoardState_Flashing
+  commentId: F:DuetAPI.Machine.BoardState.Flashing
+  fullName: DuetAPI.Machine.BoardState.Flashing
+  nameWithType: BoardState.Flashing
+- uid: DuetAPI.Machine.BoardState.Resetting
+  name: Resetting
+  href: api/DuetAPI.Machine.BoardState.html#DuetAPI_Machine_BoardState_Resetting
+  commentId: F:DuetAPI.Machine.BoardState.Resetting
+  fullName: DuetAPI.Machine.BoardState.Resetting
+  nameWithType: BoardState.Resetting
+- uid: DuetAPI.Machine.BoardState.Running
+  name: Running
+  href: api/DuetAPI.Machine.BoardState.html#DuetAPI_Machine_BoardState_Running
+  commentId: F:DuetAPI.Machine.BoardState.Running
+  fullName: DuetAPI.Machine.BoardState.Running
+  nameWithType: BoardState.Running
+- uid: DuetAPI.Machine.BoardState.Unknown
+  name: Unknown
+  href: api/DuetAPI.Machine.BoardState.html#DuetAPI_Machine_BoardState_Unknown
+  commentId: F:DuetAPI.Machine.BoardState.Unknown
+  fullName: DuetAPI.Machine.BoardState.Unknown
+  nameWithType: BoardState.Unknown
 - uid: DuetAPI.Machine.Build
   name: Build
   href: api/DuetAPI.Machine.Build.html
@@ -9234,6 +9283,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.State.Status
   nameWithType: State.Status
+- uid: DuetAPI.Machine.State.Time
+  name: Time
+  href: api/DuetAPI.Machine.State.html#DuetAPI_Machine_State_Time
+  commentId: P:DuetAPI.Machine.State.Time
+  fullName: DuetAPI.Machine.State.Time
+  nameWithType: State.Time
+- uid: DuetAPI.Machine.State.Time*
+  name: Time
+  href: api/DuetAPI.Machine.State.html#DuetAPI_Machine_State_Time_
+  commentId: Overload:DuetAPI.Machine.State.Time
+  isSpec: "True"
+  fullName: DuetAPI.Machine.State.Time
+  nameWithType: State.Time
 - uid: DuetAPI.Machine.State.UpTime
   name: UpTime
   href: api/DuetAPI.Machine.State.html#DuetAPI_Machine_State_UpTime
@@ -14918,19 +14980,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Channel.State.MacroCompleted
   nameWithType: State.MacroCompleted
-- uid: DuetControlServer.SPI.Channel.State.MacroStartCode
-  name: MacroStartCode
-  href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_MacroStartCode
-  commentId: P:DuetControlServer.SPI.Channel.State.MacroStartCode
-  fullName: DuetControlServer.SPI.Channel.State.MacroStartCode
-  nameWithType: State.MacroStartCode
-- uid: DuetControlServer.SPI.Channel.State.MacroStartCode*
-  name: MacroStartCode
-  href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_MacroStartCode_
-  commentId: Overload:DuetControlServer.SPI.Channel.State.MacroStartCode
-  isSpec: "True"
-  fullName: DuetControlServer.SPI.Channel.State.MacroStartCode
-  nameWithType: State.MacroStartCode
 - uid: DuetControlServer.SPI.Channel.State.PendingCodes
   name: PendingCodes
   href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_PendingCodes
@@ -14944,6 +14993,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Channel.State.PendingCodes
   nameWithType: State.PendingCodes
+- uid: DuetControlServer.SPI.Channel.State.StartCode
+  name: StartCode
+  href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_StartCode
+  commentId: P:DuetControlServer.SPI.Channel.State.StartCode
+  fullName: DuetControlServer.SPI.Channel.State.StartCode
+  nameWithType: State.StartCode
+- uid: DuetControlServer.SPI.Channel.State.StartCode*
+  name: StartCode
+  href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_StartCode_
+  commentId: Overload:DuetControlServer.SPI.Channel.State.StartCode
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.Channel.State.StartCode
+  nameWithType: State.StartCode
 - uid: DuetControlServer.SPI.Channel.State.SuspendedCodes
   name: SuspendedCodes
   href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_SuspendedCodes
