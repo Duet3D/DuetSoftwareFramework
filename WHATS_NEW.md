@@ -17,6 +17,7 @@ Bug fixes:
 - Substituted macro filenames were incorrect in the DCS log
 - Codes requesting message boxes could be executed twice
 - Message boxes could be closed internally in DCS when not supposed to
+- Codes from pause.g were cancelled under certain circumstances
 
 Version 3.1.0
 ==============
