@@ -2877,18 +2877,6 @@
             <param name="reply">Reply</param>
             <returns>Asynchronous task</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Channel.Processor.InputPropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)">
-            <summary>
-            Event that is called when a property of this input channel in the OM has changed while waiting for acknowledgement
-            </summary>
-            <param name="sender">Sender</param>
-            <param name="e">Event args</param>
-        </member>
-        <member name="F:DuetControlServer.SPI.Channel.Processor._propertyChangedRegistered">
-            <summary>
-            Indicates if the event handler <see cref="M:DuetControlServer.SPI.Channel.Processor.InputPropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)"/> is registered
-            </summary>
-        </member>
         <member name="M:DuetControlServer.SPI.Channel.Processor.WaitForAcknowledgement">
             <summary>
             Wait for a message to be acknowledged
