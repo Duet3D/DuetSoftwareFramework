@@ -8,7 +8,7 @@
         /// <summary>
         /// Current API protocol version number
         /// </summary>
-        public const int ProtocolVersion = 7;
+        public const int ProtocolVersion = 8;
 
         /// <summary>
         /// Default directory in which DSF-related UNIX sockets reside

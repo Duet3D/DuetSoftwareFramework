@@ -159,7 +159,7 @@ namespace DuetControlServer.SPI.Channel
                     }
                     else
                     {
-                        _logger.Trace("Finished macro file {0}",oldState.Macro.FileName);
+                        _logger.Trace("Finished macro file {0}", oldState.Macro.FileName);
                     }
                 }
             }
@@ -787,7 +787,7 @@ namespace DuetControlServer.SPI.Channel
             // Deal with codes being executed
             if (BufferedCodes.Count > 0)
             {
-                HandleCodeReply(BufferedCodes[0], flags, reply);
+                await HandleCodeReply(BufferedCodes[0], flags, reply);
                 if (BufferedCodes[0].FirmwareTask.IsCompleted)
                 {
                     BytesBuffered -= BufferedCodes[0].BinarySize;
@@ -801,6 +801,7 @@ namespace DuetControlServer.SPI.Channel
             {
                 if (CurrentState.StartCode != null)
                 {
+                    // Concatenate output from nested macro codes
                     using (await CurrentState.Macro.LockAsync())
                     {
                         if (CurrentState.StartCode.Result == null)
@@ -814,14 +815,14 @@ namespace DuetControlServer.SPI.Channel
                         CurrentState.Macro.Result = new CodeResult();
                     }
 
-                    HandleCodeReply(CurrentState.StartCode, flags, reply);
+                    // Append the final code reply
+                    Code startCode = CurrentState.StartCode;
+                    await HandleCodeReply(startCode, flags, reply);
                     if (!CurrentState.StartCode.FirmwareTask.IsCompleted)
                     {
                         // Last message must have been incomplete - wait for the full response
                         return true;
                     }
-
-                    Code startCode = CurrentState.StartCode;
                     CurrentState.StartCode = null;
 
                     await Pop();
@@ -833,6 +834,8 @@ namespace DuetControlServer.SPI.Channel
                     return true;
                 }
 
+                // System macro has finished, output the result
+                await HandleCodeReply(null, flags, reply);
                 await Pop();
                 return string.IsNullOrEmpty(reply);
             }
@@ -870,7 +873,8 @@ namespace DuetControlServer.SPI.Channel
         /// <param name="code">Destination code</param>
         /// <param name="flags">Reply flags</param>
         /// <param name="reply">Reply</param>
-        private void HandleCodeReply(Code code, MessageTypeFlags flags, string reply)
+        /// <returns>Asynchronous task</returns>
+        private async Task HandleCodeReply(Code code, MessageTypeFlags flags, string reply)
         {
             if (!string.IsNullOrEmpty(_lastPartialMessage))
             {
@@ -884,7 +888,7 @@ namespace DuetControlServer.SPI.Channel
                 // Code reply is not complete yet
                 _lastPartialMessage = reply;
             }
-            else
+            else if (code != null)
             {
                 // Make sure the code has a code reply...
                 if (code.Result == null)
@@ -899,6 +903,14 @@ namespace DuetControlServer.SPI.Channel
                 code.Result.Add(type, reply.TrimEnd());
                 code.FirmwareTCS.SetResult(null);
             }
+            else
+            {
+                // Final output from a system macro
+                MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                            : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                            : MessageType.Success;
+                await Logger.LogOutput(type, reply);
+            }
         }
 
         /// <summary>
@@ -906,20 +918,17 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         /// <param name="sender">Sender</param>
         /// <param name="e">Event args</param>
-        private async void InputPropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void InputPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName.Equals(nameof(InputChannel.State)))
             {
                 InputChannelState state = (InputChannelState)sender.GetType().GetProperty(e.PropertyName).GetValue(sender);
                 if (state != InputChannelState.Executing && state != InputChannelState.AwaitingAcknowledgement)
                 {
-                    using (await _lock.LockAsync(Program.CancellationToken))
+                    using (_lock.Lock(Program.CancellationToken))
                     {
                         // Make sure the G-code flow is resumed even if the message box is closed from RRF
-                        if (BufferedCodes.Count == 0)
-                        {
-                            await MessageAcknowledged();
-                        }
+                        MessageAcknowledged().Wait();
                     }
                 }
             }
@@ -1079,6 +1088,7 @@ namespace DuetControlServer.SPI.Channel
                     {
                         // Use config.b.bak if config.g cannot be found
                         _logger.Warn("Using fallback file {0} because {1} could not be found", FilePath.ConfigFileFallback, FilePath.ConfigFile);
+                        fileName = FilePath.ConfigFileFallback;
                     }
                     else
                     {
@@ -1097,6 +1107,7 @@ namespace DuetControlServer.SPI.Channel
                     if (File.Exists(physicalFile))
                     {
                         _logger.Info($"Using fallback file {FilePath.DeployProbeFallbackFile} because {fileName} could not be found");
+                        fileName = FilePath.DeployProbeFallbackFile;
                     }
                     else
                     {
@@ -1110,6 +1121,7 @@ namespace DuetControlServer.SPI.Channel
                     if (File.Exists(physicalFile))
                     {
                         _logger.Info($"Using fallback file {FilePath.RetractProbeFallbackFile} because {fileName} could not be found");
+                        fileName = FilePath.RetractProbeFallbackFile;
                     }
                     else
                     {
