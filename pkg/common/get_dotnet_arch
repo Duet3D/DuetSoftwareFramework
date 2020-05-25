@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -z "$1" ] ; then
+	echo "Usage: $0 <package_architecture>"
+	echo " Returns the equivalent dotnet runtime architecture"
+	exit 1
+fi
+
+DOTNET_ARCH=
+
+case $1 in
+	armhf|armhfp|armv7h|armv7hl) DOTNET_ARCH=linux-arm ;;
+	arm64|aarch64) DOTNET_ARCH=linux-arm64 ;;
+	amd64|x86_64) DOTNET_ARCH=linux-x64 ;;
+	i386|i686|x86_32)  DOTNET_ARCH=linux-x86 ;;
+	*) echo "Unknown package architecture: $1" ; exit 1 ;;
+esac
+
+echo $DOTNET_ARCH

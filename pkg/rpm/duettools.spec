@@ -10,27 +10,19 @@
 
 Name:    duettools
 Version: %{_tversion}
-Release: 901
+Release: %{_release}
 Summary: DSF Tools
 Group:   3D Printing
 Source0: duettools_%{_tversion}
 License: GPLv3
 URL:     https://github.com/chrishamm/DuetSoftwareFramework
 BuildRequires: rpm >= 4.7.2-2
-Requires: duetruntime
+Requires: duetcontrolserver = %{_tversion}
 
 AutoReq:  0
 
 %description
 DSF Tools
-
-%prep
-%setup -q -T -c -n %{name}-%{version}
-
-%build
-
-%install
-rsync -vaH %{S:0}/. %{buildroot}/
 
 %files
 %defattr(0664,root,root,-)
