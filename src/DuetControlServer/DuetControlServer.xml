@@ -561,6 +561,11 @@
             Job file being read from
             </summary>
         </member>
+        <member name="F:DuetControlServer.FileExecution.Job._cancellationTokenSource">
+            <summary>
+            Internal cancellation token source used to cancel pending codes when necessary
+            </summary>
+        </member>
         <member name="P:DuetControlServer.FileExecution.Job.IsFileSelected">
             <summary>
             Indicates if a file has been selected for printing
@@ -2457,6 +2462,17 @@
         <member name="P:DuetControlServer.Settings.SpiDevice">
             <summary>
             SPI device that is connected to RepRapFirmware
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.SpiBufferSize">
+            <summary>
+            SPI Tx and Rx buffer size
+            Should not be greater than the kernel spidev buffer size
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.SpiTransferMode">
+            <summary>
+            SPI Transfer Mode 0-3
             </summary>
         </member>
         <member name="P:DuetControlServer.Settings.SpiFrequency">

@@ -100,6 +100,17 @@ namespace DuetControlServer
         public static string SpiDevice { get; set; } = "/dev/spidev0.0";
 
         /// <summary>
+        /// SPI Tx and Rx buffer size
+        /// Should not be greater than the kernel spidev buffer size
+        /// </summary>
+        public static int SpiBufferSize { get; set; } = SPI.Communication.Consts.BufferSize;
+
+        /// <summary>
+        /// SPI Transfer Mode 0-3
+        /// </summary>
+        public static int SpiTransferMode { get; set; } = 0;
+
+        /// <summary>
         /// Frequency to use for SPI transfers (in Hz)
         /// </summary>
         public static int SpiFrequency { get; set; } = 8_000_000;
