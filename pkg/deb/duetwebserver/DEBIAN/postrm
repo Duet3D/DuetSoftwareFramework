@@ -2,4 +2,3 @@
 
 # Reload systemd services
 systemctl -q daemon-reload
-

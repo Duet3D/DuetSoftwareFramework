@@ -8,7 +8,9 @@ systemd-tmpfiles --create duetcontrolserver.conf
 # Trigger assignment of gpio group to the existing devices
 udevadm trigger
 
+# Set ownership and permissions
 chown dsf:dsf /opt/dsf/conf/config.json
+chmod 664 /opt/dsf/conf/config.json
 
 # Update systemd services
 systemctl -q daemon-reload
