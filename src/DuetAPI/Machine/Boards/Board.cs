@@ -131,6 +131,16 @@
 		private string _shortName = string.Empty;
 
 		/// <summary>
+		/// State of this board
+		/// </summary>
+		public BoardState State
+		{
+			get => _state;
+			set => SetPropertyValue(ref _state, value);
+		}
+		private BoardState _state;
+
+		/// <summary>
 		/// Indicates if this board supports external 12864 displays
 		/// </summary>
 		public bool Supports12864

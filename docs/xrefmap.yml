@@ -2876,6 +2876,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Board.ShortName
   nameWithType: Board.ShortName
+- uid: DuetAPI.Machine.Board.State
+  name: State
+  href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_State
+  commentId: P:DuetAPI.Machine.Board.State
+  fullName: DuetAPI.Machine.Board.State
+  nameWithType: Board.State
+- uid: DuetAPI.Machine.Board.State*
+  name: State
+  href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_State_
+  commentId: Overload:DuetAPI.Machine.Board.State
+  isSpec: "True"
+  fullName: DuetAPI.Machine.Board.State
+  nameWithType: Board.State
 - uid: DuetAPI.Machine.Board.Supports12864
   name: Supports12864
   href: api/DuetAPI.Machine.Board.html#DuetAPI_Machine_Board_Supports12864
@@ -2928,6 +2941,42 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Board.VIn
   nameWithType: Board.VIn
+- uid: DuetAPI.Machine.BoardState
+  name: BoardState
+  href: api/DuetAPI.Machine.BoardState.html
+  commentId: T:DuetAPI.Machine.BoardState
+  fullName: DuetAPI.Machine.BoardState
+  nameWithType: BoardState
+- uid: DuetAPI.Machine.BoardState.FlashFailed
+  name: FlashFailed
+  href: api/DuetAPI.Machine.BoardState.html#DuetAPI_Machine_BoardState_FlashFailed
+  commentId: F:DuetAPI.Machine.BoardState.FlashFailed
+  fullName: DuetAPI.Machine.BoardState.FlashFailed
+  nameWithType: BoardState.FlashFailed
+- uid: DuetAPI.Machine.BoardState.Flashing
+  name: Flashing
+  href: api/DuetAPI.Machine.BoardState.html#DuetAPI_Machine_BoardState_Flashing
+  commentId: F:DuetAPI.Machine.BoardState.Flashing
+  fullName: DuetAPI.Machine.BoardState.Flashing
+  nameWithType: BoardState.Flashing
+- uid: DuetAPI.Machine.BoardState.Resetting
+  name: Resetting
+  href: api/DuetAPI.Machine.BoardState.html#DuetAPI_Machine_BoardState_Resetting
+  commentId: F:DuetAPI.Machine.BoardState.Resetting
+  fullName: DuetAPI.Machine.BoardState.Resetting
+  nameWithType: BoardState.Resetting
+- uid: DuetAPI.Machine.BoardState.Running
+  name: Running
+  href: api/DuetAPI.Machine.BoardState.html#DuetAPI_Machine_BoardState_Running
+  commentId: F:DuetAPI.Machine.BoardState.Running
+  fullName: DuetAPI.Machine.BoardState.Running
+  nameWithType: BoardState.Running
+- uid: DuetAPI.Machine.BoardState.Unknown
+  name: Unknown
+  href: api/DuetAPI.Machine.BoardState.html#DuetAPI_Machine_BoardState_Unknown
+  commentId: F:DuetAPI.Machine.BoardState.Unknown
+  fullName: DuetAPI.Machine.BoardState.Unknown
+  nameWithType: BoardState.Unknown
 - uid: DuetAPI.Machine.Build
   name: Build
   href: api/DuetAPI.Machine.Build.html
@@ -8784,6 +8833,12 @@ references:
   commentId: F:DuetAPI.Machine.ScannerStatus.Uploading
   fullName: DuetAPI.Machine.ScannerStatus.Uploading
   nameWithType: ScannerStatus.Uploading
+- uid: DuetAPI.Machine.ScaraKinematics
+  name: ScaraKinematics
+  href: api/DuetAPI.Machine.ScaraKinematics.html
+  commentId: T:DuetAPI.Machine.ScaraKinematics
+  fullName: DuetAPI.Machine.ScaraKinematics
+  nameWithType: ScaraKinematics
 - uid: DuetAPI.Machine.Sensors
   name: Sensors
   href: api/DuetAPI.Machine.Sensors.html
@@ -9228,6 +9283,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.State.Status
   nameWithType: State.Status
+- uid: DuetAPI.Machine.State.Time
+  name: Time
+  href: api/DuetAPI.Machine.State.html#DuetAPI_Machine_State_Time
+  commentId: P:DuetAPI.Machine.State.Time
+  fullName: DuetAPI.Machine.State.Time
+  nameWithType: State.Time
+- uid: DuetAPI.Machine.State.Time*
+  name: Time
+  href: api/DuetAPI.Machine.State.html#DuetAPI_Machine_State_Time_
+  commentId: Overload:DuetAPI.Machine.State.Time
+  isSpec: "True"
+  fullName: DuetAPI.Machine.State.Time
+  nameWithType: State.Time
 - uid: DuetAPI.Machine.State.UpTime
   name: UpTime
   href: api/DuetAPI.Machine.State.html#DuetAPI_Machine_State_UpTime
@@ -9241,6 +9309,90 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.State.UpTime
   nameWithType: State.UpTime
+- uid: DuetAPI.Machine.TiltCorrection
+  name: TiltCorrection
+  href: api/DuetAPI.Machine.TiltCorrection.html
+  commentId: T:DuetAPI.Machine.TiltCorrection
+  fullName: DuetAPI.Machine.TiltCorrection
+  nameWithType: TiltCorrection
+- uid: DuetAPI.Machine.TiltCorrection.CorrectionFactor
+  name: CorrectionFactor
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_CorrectionFactor
+  commentId: P:DuetAPI.Machine.TiltCorrection.CorrectionFactor
+  fullName: DuetAPI.Machine.TiltCorrection.CorrectionFactor
+  nameWithType: TiltCorrection.CorrectionFactor
+- uid: DuetAPI.Machine.TiltCorrection.CorrectionFactor*
+  name: CorrectionFactor
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_CorrectionFactor_
+  commentId: Overload:DuetAPI.Machine.TiltCorrection.CorrectionFactor
+  isSpec: "True"
+  fullName: DuetAPI.Machine.TiltCorrection.CorrectionFactor
+  nameWithType: TiltCorrection.CorrectionFactor
+- uid: DuetAPI.Machine.TiltCorrection.LastCorrections
+  name: LastCorrections
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_LastCorrections
+  commentId: P:DuetAPI.Machine.TiltCorrection.LastCorrections
+  fullName: DuetAPI.Machine.TiltCorrection.LastCorrections
+  nameWithType: TiltCorrection.LastCorrections
+- uid: DuetAPI.Machine.TiltCorrection.LastCorrections*
+  name: LastCorrections
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_LastCorrections_
+  commentId: Overload:DuetAPI.Machine.TiltCorrection.LastCorrections
+  isSpec: "True"
+  fullName: DuetAPI.Machine.TiltCorrection.LastCorrections
+  nameWithType: TiltCorrection.LastCorrections
+- uid: DuetAPI.Machine.TiltCorrection.MaxCorrection
+  name: MaxCorrection
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_MaxCorrection
+  commentId: P:DuetAPI.Machine.TiltCorrection.MaxCorrection
+  fullName: DuetAPI.Machine.TiltCorrection.MaxCorrection
+  nameWithType: TiltCorrection.MaxCorrection
+- uid: DuetAPI.Machine.TiltCorrection.MaxCorrection*
+  name: MaxCorrection
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_MaxCorrection_
+  commentId: Overload:DuetAPI.Machine.TiltCorrection.MaxCorrection
+  isSpec: "True"
+  fullName: DuetAPI.Machine.TiltCorrection.MaxCorrection
+  nameWithType: TiltCorrection.MaxCorrection
+- uid: DuetAPI.Machine.TiltCorrection.ScrewPitch
+  name: ScrewPitch
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_ScrewPitch
+  commentId: P:DuetAPI.Machine.TiltCorrection.ScrewPitch
+  fullName: DuetAPI.Machine.TiltCorrection.ScrewPitch
+  nameWithType: TiltCorrection.ScrewPitch
+- uid: DuetAPI.Machine.TiltCorrection.ScrewPitch*
+  name: ScrewPitch
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_ScrewPitch_
+  commentId: Overload:DuetAPI.Machine.TiltCorrection.ScrewPitch
+  isSpec: "True"
+  fullName: DuetAPI.Machine.TiltCorrection.ScrewPitch
+  nameWithType: TiltCorrection.ScrewPitch
+- uid: DuetAPI.Machine.TiltCorrection.ScrewX
+  name: ScrewX
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_ScrewX
+  commentId: P:DuetAPI.Machine.TiltCorrection.ScrewX
+  fullName: DuetAPI.Machine.TiltCorrection.ScrewX
+  nameWithType: TiltCorrection.ScrewX
+- uid: DuetAPI.Machine.TiltCorrection.ScrewX*
+  name: ScrewX
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_ScrewX_
+  commentId: Overload:DuetAPI.Machine.TiltCorrection.ScrewX
+  isSpec: "True"
+  fullName: DuetAPI.Machine.TiltCorrection.ScrewX
+  nameWithType: TiltCorrection.ScrewX
+- uid: DuetAPI.Machine.TiltCorrection.ScrewY
+  name: ScrewY
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_ScrewY
+  commentId: P:DuetAPI.Machine.TiltCorrection.ScrewY
+  fullName: DuetAPI.Machine.TiltCorrection.ScrewY
+  nameWithType: TiltCorrection.ScrewY
+- uid: DuetAPI.Machine.TiltCorrection.ScrewY*
+  name: ScrewY
+  href: api/DuetAPI.Machine.TiltCorrection.html#DuetAPI_Machine_TiltCorrection_ScrewY_
+  commentId: Overload:DuetAPI.Machine.TiltCorrection.ScrewY
+  isSpec: "True"
+  fullName: DuetAPI.Machine.TiltCorrection.ScrewY
+  nameWithType: TiltCorrection.ScrewY
 - uid: DuetAPI.Machine.TimesLeft
   name: TimesLeft
   href: api/DuetAPI.Machine.TimesLeft.html
@@ -9769,6 +9921,25 @@ references:
   isSpec: "True"
   fullName: DuetAPI.Machine.Volume.Speed
   nameWithType: Volume.Speed
+- uid: DuetAPI.Machine.ZLeadscrewKinematics
+  name: ZLeadscrewKinematics
+  href: api/DuetAPI.Machine.ZLeadscrewKinematics.html
+  commentId: T:DuetAPI.Machine.ZLeadscrewKinematics
+  fullName: DuetAPI.Machine.ZLeadscrewKinematics
+  nameWithType: ZLeadscrewKinematics
+- uid: DuetAPI.Machine.ZLeadscrewKinematics.TiltCorrection
+  name: TiltCorrection
+  href: api/DuetAPI.Machine.ZLeadscrewKinematics.html#DuetAPI_Machine_ZLeadscrewKinematics_TiltCorrection
+  commentId: P:DuetAPI.Machine.ZLeadscrewKinematics.TiltCorrection
+  fullName: DuetAPI.Machine.ZLeadscrewKinematics.TiltCorrection
+  nameWithType: ZLeadscrewKinematics.TiltCorrection
+- uid: DuetAPI.Machine.ZLeadscrewKinematics.TiltCorrection*
+  name: TiltCorrection
+  href: api/DuetAPI.Machine.ZLeadscrewKinematics.html#DuetAPI_Machine_ZLeadscrewKinematics_TiltCorrection_
+  commentId: Overload:DuetAPI.Machine.ZLeadscrewKinematics.TiltCorrection
+  isSpec: "True"
+  fullName: DuetAPI.Machine.ZLeadscrewKinematics.TiltCorrection
+  nameWithType: ZLeadscrewKinematics.TiltCorrection
 - uid: DuetAPI.Utility
   name: DuetAPI.Utility
   href: api/DuetAPI.Utility.html
@@ -14809,19 +14980,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Channel.State.MacroCompleted
   nameWithType: State.MacroCompleted
-- uid: DuetControlServer.SPI.Channel.State.MacroStartCode
-  name: MacroStartCode
-  href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_MacroStartCode
-  commentId: P:DuetControlServer.SPI.Channel.State.MacroStartCode
-  fullName: DuetControlServer.SPI.Channel.State.MacroStartCode
-  nameWithType: State.MacroStartCode
-- uid: DuetControlServer.SPI.Channel.State.MacroStartCode*
-  name: MacroStartCode
-  href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_MacroStartCode_
-  commentId: Overload:DuetControlServer.SPI.Channel.State.MacroStartCode
-  isSpec: "True"
-  fullName: DuetControlServer.SPI.Channel.State.MacroStartCode
-  nameWithType: State.MacroStartCode
 - uid: DuetControlServer.SPI.Channel.State.PendingCodes
   name: PendingCodes
   href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_PendingCodes
@@ -14835,6 +14993,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Channel.State.PendingCodes
   nameWithType: State.PendingCodes
+- uid: DuetControlServer.SPI.Channel.State.StartCode
+  name: StartCode
+  href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_StartCode
+  commentId: P:DuetControlServer.SPI.Channel.State.StartCode
+  fullName: DuetControlServer.SPI.Channel.State.StartCode
+  nameWithType: State.StartCode
+- uid: DuetControlServer.SPI.Channel.State.StartCode*
+  name: StartCode
+  href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_StartCode_
+  commentId: Overload:DuetControlServer.SPI.Channel.State.StartCode
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.Channel.State.StartCode
+  nameWithType: State.StartCode
 - uid: DuetControlServer.SPI.Channel.State.SuspendedCodes
   name: SuspendedCodes
   href: api/DuetControlServer.SPI.Channel.State.html#DuetControlServer_SPI_Channel_State_SuspendedCodes
@@ -14933,6 +15104,12 @@ references:
   commentId: F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize
   fullName: DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize
   nameWithType: Consts.MaxCodeBufferSize
+- uid: DuetControlServer.SPI.Communication.Consts.MaxCommentLength
+  name: MaxCommentLength
+  href: api/DuetControlServer.SPI.Communication.Consts.html#DuetControlServer_SPI_Communication_Consts_MaxCommentLength
+  commentId: F:DuetControlServer.SPI.Communication.Consts.MaxCommentLength
+  fullName: DuetControlServer.SPI.Communication.Consts.MaxCommentLength
+  nameWithType: Consts.MaxCommentLength
 - uid: DuetControlServer.SPI.Communication.Consts.MaxEvaluationRequestsPerTransfer
   name: MaxEvaluationRequestsPerTransfer
   href: api/DuetControlServer.SPI.Communication.Consts.html#DuetControlServer_SPI_Communication_Consts_MaxEvaluationRequestsPerTransfer

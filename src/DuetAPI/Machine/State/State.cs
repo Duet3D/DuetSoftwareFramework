@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.Machine
+﻿using System;
+
+namespace DuetAPI.Machine
 {
     /// <summary>
     /// Information about the machine state
@@ -146,6 +148,16 @@
 			set => SetPropertyValue(ref _status, value);
         }
         private MachineStatus _status = MachineStatus.Idle;
+
+        /// <summary>
+        /// Internal date and time in RepRapFirmware or null if unknown
+        /// </summary>
+        public DateTime? Time
+        {
+            get => _time;
+            set => SetPropertyValue(ref _time, value);
+        }
+        private DateTime? _time;
 
         /// <summary>
         /// How long the machine has been running (in s)

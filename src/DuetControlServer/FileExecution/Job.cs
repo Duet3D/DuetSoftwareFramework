@@ -60,6 +60,11 @@ namespace DuetControlServer.FileExecution
         private static CodeFile _file;
 
         /// <summary>
+        /// Internal cancellation token source used to cancel pending codes when necessary
+        /// </summary>
+        private static CancellationTokenSource _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+
+        /// <summary>
         /// Indicates if a file has been selected for printing
         /// </summary>
         public static bool IsFileSelected { get => _file != null; }
@@ -191,11 +196,13 @@ namespace DuetControlServer.FileExecution
             do
             {
                 // Wait for the next print to start
+                CancellationToken cancellationToken;
                 bool startingNewPrint;
                 using (await _lock.LockAsync(Program.CancellationToken))
                 {
                     await _resume.WaitAsync(Program.CancellationToken);
                     startingNewPrint = !_file.IsClosed;
+                    cancellationToken = _cancellationTokenSource.Token;
                     IsProcessing = startingNewPrint;
                 }
 
@@ -232,6 +239,7 @@ namespace DuetControlServer.FileExecution
                                     break;
                                 }
 
+                                readCode.CancellationToken = cancellationToken;
                                 codes.Enqueue(readCode);
                                 codeTasks.Enqueue(readCode.Execute());
                             }
@@ -305,6 +313,7 @@ namespace DuetControlServer.FileExecution
                                     // Wait for the print to be resumed
                                     IsProcessing = false;
                                     await _resume.WaitAsync(Program.CancellationToken);
+                                    IsProcessing = !IsAborted && !IsCancelled;
                                 }
                                 else
                                 {
@@ -371,7 +380,10 @@ namespace DuetControlServer.FileExecution
         {
             if (IsFileSelected)
             {
-                Code.CancelPending(CodeChannel.File);
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+
                 IsPaused = true;
                 _pausePosition = filePosition;
                 _pauseReason = pauseReason;
@@ -415,6 +427,10 @@ namespace DuetControlServer.FileExecution
         {
             if (IsFileSelected)
             {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+
                 using (await _file.LockAsync())
                 {
                     _file.Close();

@@ -1796,6 +1796,11 @@
             Short name of this board
             </summary>
         </member>
+        <member name="P:DuetAPI.Machine.Board.State">
+            <summary>
+            State of this board
+            </summary>
+        </member>
         <member name="P:DuetAPI.Machine.Board.Supports12864">
             <summary>
             Indicates if this board supports external 12864 displays
@@ -1814,6 +1819,36 @@
         <member name="P:DuetAPI.Machine.Board.VIn">
             <summary>
             Minimum, maximum, and current voltages on the input rail
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.BoardState">
+            <summary>
+            Enumeration of possible expansion board states
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.BoardState.Unknown">
+            <summary>
+            Unknown state
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.BoardState.Flashing">
+            <summary>
+            Flashing new firmware
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.BoardState.FlashFailed">
+            <summary>
+            Failed to flash new firmware
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.BoardState.Resetting">
+            <summary>
+            Board is being reset
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Machine.BoardState.Running">
+            <summary>
+            Board is up and running
             </summary>
         </member>
         <member name="T:DuetAPI.Machine.MinMaxCurrent`1">
@@ -3569,6 +3604,56 @@
             <param name="value">Value to serialize</param>
             <param name="options">Write options</param>
         </member>
+        <member name="T:DuetAPI.Machine.ScaraKinematics">
+            <summary>
+            Kinematics class for SCARA kinematics
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.TiltCorrection">
+            <summary>
+            Tilt correction parameters for Z leadscrew compensation
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.CorrectionFactor">
+            <summary>
+            Correction factor
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.LastCorrections">
+            <summary>
+            Last corrections (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.MaxCorrection">
+            <summary>
+            Maximum Z correction (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.ScrewPitch">
+            <summary>
+            Pitch of the Z leadscrews (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.ScrewX">
+            <summary>
+            X positions of the leadscrews (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.TiltCorrection.ScrewY">
+            <summary>
+            Y positions of the leadscrews (in mm)
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Machine.ZLeadscrewKinematics">
+            <summary>
+            Base kinematics class that provides the ability to level the bed using Z leadscrews
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.ZLeadscrewKinematics.TiltCorrection">
+            <summary>
+            Parameters describing the tilt correction
+            </summary>
+        </member>
         <member name="T:DuetAPI.Machine.Microstepping">
             <summary>
             Microstepping configuration
@@ -4972,6 +5057,11 @@
         <member name="P:DuetAPI.Machine.State.Status">
             <summary>
             Current state of the machine
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Machine.State.Time">
+            <summary>
+            Internal date and time in RepRapFirmware or null if unknown
             </summary>
         </member>
         <member name="P:DuetAPI.Machine.State.UpTime">

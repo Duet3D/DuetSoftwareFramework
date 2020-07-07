@@ -2310,6 +2310,17 @@
             </summary>
             <returns>Asynchronous task</returns>
         </member>
+        <member name="F:DuetControlServer.Model.Updater._updatingFirmware">
+            <summary>
+            Indicates if the firmware is being updated
+            </summary>
+        </member>
+        <member name="M:DuetControlServer.Model.Updater.UpdateFirmware">
+            <summary>
+            Update the firmware internally
+            </summary>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="M:DuetControlServer.Model.Updater.UpdateLayers">
             <summary>
             Update the layers
@@ -2767,6 +2778,7 @@
             Write channel diagnostics to the given string builder
             </summary>
             <param name="builder">Target to write to</param>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="P:DuetControlServer.SPI.Channel.Processor.IsWaitingForAcknowledgement">
             <summary>
@@ -2863,18 +2875,7 @@
             <param name="code">Destination code</param>
             <param name="flags">Reply flags</param>
             <param name="reply">Reply</param>
-        </member>
-        <member name="M:DuetControlServer.SPI.Channel.Processor.InputPropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)">
-            <summary>
-            Event that is called when a property of this input channel in the OM has changed while waiting for acknowledgement
-            </summary>
-            <param name="sender">Sender</param>
-            <param name="e">Event args</param>
-        </member>
-        <member name="F:DuetControlServer.SPI.Channel.Processor._propertyChangedRegistered">
-            <summary>
-            Indicates if the event handler <see cref="M:DuetControlServer.SPI.Channel.Processor.InputPropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)"/> is registered
-            </summary>
+            <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Channel.Processor.WaitForAcknowledgement">
             <summary>
@@ -2940,9 +2941,9 @@
             Indicates if the firmware has been notified about the macro completion
             </summary>
         </member>
-        <member name="P:DuetControlServer.SPI.Channel.State.MacroStartCode">
+        <member name="P:DuetControlServer.SPI.Channel.State.StartCode">
             <summary>
-            Code that started the macro file of this state
+            Code that started this state
             </summary>
         </member>
         <member name="P:DuetControlServer.SPI.Channel.State.PendingCodes">
@@ -2984,6 +2985,11 @@
         <member name="F:DuetControlServer.SPI.Communication.Consts.MaxCodeBufferSize">
             <summary>
             Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.MaxCommentLength">
+            <summary>
+            Maximum length of a whole-line comment to send to RRF
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Consts.MaxMessageLength">
