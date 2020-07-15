@@ -10,7 +10,7 @@
 
 Name:    duetruntime
 Version: %{_tversion}
-Release: 901
+Release: %{_release}
 Summary: DSF Common Runtime Components
 Group:   3D Printing
 Source0: duetruntime_%{_tversion}
@@ -20,16 +20,10 @@ BuildRequires: rpm >= 4.7.2-2
 
 AutoReq:  0
 
+%global __os_install_post %{nil}
+
 %description
 DSF Common Runtime Components
-
-%prep
-%setup -q -T -c -n %{name}-%{version}
-
-%build
-
-%install
-rsync -vaH %{S:0}/. %{buildroot}/
 
 %files
 %defattr(0644,root,root,-)

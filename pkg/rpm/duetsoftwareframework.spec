@@ -10,7 +10,7 @@
 
 Name:    duetsoftwareframework
 Version: %{_tversion}
-Release: 901
+Release: %{_release}
 Summary: Duet Software Framework
 Group:   3D Printing
 License: GPLv3
@@ -27,12 +27,5 @@ Requires: duetwebcontrol
 
 %description
 Duet Software Framework
-
-%prep
-%setup -q -T -c -n %{name}-%{version}
-
-%build
-
-%install
 
 %files

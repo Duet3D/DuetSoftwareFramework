@@ -1,0 +1,61 @@
+
+
+# Passing V=1 on the make command line turns on verbose mode
+ifeq ($(V),1)
+    ECHO_PREFIX=@
+    CMD_PREFIX=
+    DOTNET_VERB=minimal
+    DOTNET_RETRY=
+else
+    ECHO_PREFIX=@
+    CMD_PREFIX=@>/dev/null
+    DOTNET_VERB=quiet
+# In quiet mode, if a dotnet command fails, it'll be re-run in verbose mode
+# so you can see the errors.
+    DOTNET_RETRY= || { echo "    dotnet $(DOTNET_ARGS)" ; dotnet $(DOTNET_ARGS) ; }
+endif
+
+.PHONY: $(TARGET) build publish clean info
+
+ARCH = armhf
+CONFIG = Debug
+
+TARGET_TITLE = printf " [%-9s] %-21s %-7s %-7s %-7s\n"
+
+-include ../../Makefile.local
+
+TARGET ?= $(shell basename `pwd`)
+RUNTIME := $(shell dotnet --version | sed -n -r -e "s/^([0-9]+[.][0-9]+).*/\1/gp")
+# The ARCH passed in is the package architecure so we translate it to
+# a dotnet runtime.
+DOTNET_ARCH = $(shell ../../pkg/common/get_dotnet_arch $(ARCH))
+SOURCES := $(shell find -name "*.cs")
+BIN = bin/$(CONFIG)/netcoreapp$(RUNTIME)/$(DOTNET_ARCH)/$(TARGET)
+DESTDIR = bin/$(CONFIG)/netcoreapp$(RUNTIME)/$(DOTNET_ARCH)/publish/
+
+build: $(BIN)
+
+$(BIN): DOTNET_ARGS = build --nologo -r $(DOTNET_ARCH) -c $(CONFIG) -o bin/$(CONFIG)/netcoreapp$(RUNTIME)/$(DOTNET_ARCH)/
+$(BIN): *.csproj $(SOURCES)
+	$(ECHO_PREFIX)$(TARGET_TITLE) build $(TARGET) "" $(CONFIG) $(DOTNET_ARCH)
+	$(CMD_PREFIX) dotnet $(DOTNET_ARGS) -v $(DOTNET_VERB) $(DOTNET_RETRY)
+
+
+$(DESTDIR)/$(TARGET): DOTNET_ARGS = publish --nologo -r $(DOTNET_ARCH) -c $(CONFIG) -o $(DESTDIR)
+$(DESTDIR)/$(TARGET): $(BIN)
+	$(ECHO_PREFIX)$(TARGET_TITLE) publish $(TARGET) "" $(CONFIG) $(DOTNET_ARCH)
+	$(CMD_PREFIX) dotnet $(DOTNET_ARGS) -v $(DOTNET_VERB) $(DOTNET_RETRY)
+
+publish: $(DESTDIR)/$(TARGET)
+
+clean:
+	$(ECHO_PREFIX)$(TARGET_TITLE) CLEAN $(TARGET) "" ""
+	$(CMD_PREFIX) rm -rf bin obj
+
+info:
+	@echo "ARCH:       $(ARCH)"
+	@echo "TARGET:     $(TARGET)"
+	@echo "RUNTIME:    $(RUNTIME)"
+	@echo "CONFIG:     $(CONFIG)"
+	@echo "BIN:        $(BIN)"
+	@echo "DESTDIR:    $(DESTDIR)"

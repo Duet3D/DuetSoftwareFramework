@@ -266,3 +266,4 @@ src/Documentation/api
 !src/Documentation/api/index.md
 !src/Documentation/api/toc.yml
 src/Documentation/obj
+Makefile.local
