@@ -1,5 +1,5 @@
 ﻿using DuetAPI;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using System;

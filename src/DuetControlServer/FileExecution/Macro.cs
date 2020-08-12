@@ -1,6 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using DuetControlServer.Utility;
 using Nito.AsyncEx;

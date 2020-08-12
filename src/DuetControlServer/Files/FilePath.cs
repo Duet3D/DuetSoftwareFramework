@@ -193,7 +193,7 @@ namespace DuetControlServer.Files
 
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                foreach (DuetAPI.Machine.Volume storage in Model.Provider.Get.Volumes)
+                foreach (DuetAPI.ObjectModel.Volume storage in Model.Provider.Get.Volumes)
                 {
                     if (filePath.StartsWith(storage.Path))
                     {

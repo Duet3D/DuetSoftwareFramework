@@ -1,5 +1,6 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.ObjectModel;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
@@ -120,17 +121,6 @@ namespace DuetAPI.Utility
         };
 
         /// <summary>
-        /// Default JSON (de-)serialization options without converters
-        /// </summary>
-        public static readonly JsonSerializerOptions DefaultJsonOptionsNoConverters = new JsonSerializerOptions
-        {
-            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
-        };
-
-        /// <summary>
         /// Receive a serialized JSON object from a socket in UTF-8 format
         /// </summary>
         /// <param name="socket">Socket to read from</param>
@@ -192,6 +182,47 @@ namespace DuetAPI.Utility
 
             jsonStream.Seek(0, SeekOrigin.Begin);
             return jsonStream;
+        }
+
+        /// <summary>
+        /// Convert a <see cref="JsonElement"/> to an object
+        /// </summary>
+        /// <typeparam name="T">Object type</typeparam>
+        /// <param name="element">Element to deserialize</param>
+        /// <param name="options">JSON serializer options</param>
+        /// <returns>Deserialized object</returns>
+        /// <remarks>
+        /// The original code is from https://stackoverflow.com/questions/58138793/system-text-json-jsonelement-toobject-workaround
+        /// and it will become obsolete when DSF is migrated to .NET Core 5.
+        /// </remarks>
+        public static T ToObject<T>(this JsonElement element, JsonSerializerOptions options = null)
+        {
+            ArrayBufferWriter<byte> bufferWriter = new ArrayBufferWriter<byte>();
+            using (Utf8JsonWriter writer = new Utf8JsonWriter(bufferWriter))
+            {
+                element.WriteTo(writer);
+            }
+            return JsonSerializer.Deserialize<T>(bufferWriter.WrittenSpan, options);
+        }
+
+        /// <summary>
+        /// Convert a <see cref="JsonDocument"/> to an object
+        /// </summary>
+        /// <typeparam name="T">Object type</typeparam>
+        /// <param name="document">Document to deserialize</param>
+        /// <param name="options">JSON serializer options</param>
+        /// <returns>Deserialized object</returns>
+        /// <remarks>
+        /// The original code is from https://stackoverflow.com/questions/58138793/system-text-json-jsonelement-toobject-workaround
+        /// and it will become obsolete when DSF is migrated to .NET Core 5.
+        /// </remarks>
+        public static T ToObject<T>(this JsonDocument document, JsonSerializerOptions options = null)
+        {
+            if (document == null)
+            {
+                throw new ArgumentNullException(nameof(document));
+            }
+            return document.RootElement.ToObject<T>(options);
         }
     }
 }

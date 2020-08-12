@@ -66,9 +66,9 @@ namespace UnitTests.Machine
             string filter = "sensors/analog[*]/lastReading";
             object[] parsedFilter = DuetControlServer.Model.Filter.ConvertFilter(filter, false);
 
-            Provider.Get.Sensors.Analog.Add(new DuetAPI.Machine.AnalogSensor { LastReading = 123F });
+            Provider.Get.Sensors.Analog.Add(new DuetAPI.ObjectModel.AnalogSensor { LastReading = 123F });
             Provider.Get.Sensors.Analog.Add(null);
-            Provider.Get.Sensors.Analog.Add(new DuetAPI.Machine.AnalogSensor { LastReading = 456F });
+            Provider.Get.Sensors.Analog.Add(new DuetAPI.ObjectModel.AnalogSensor { LastReading = 456F });
 
             Dictionary<string, object> partialModel = DuetControlServer.Model.Filter.GetFiltered(parsedFilter);
 
@@ -96,16 +96,16 @@ namespace UnitTests.Machine
             string filterC = "tools[*]";
             object[] parsedFilterC = DuetControlServer.Model.Filter.ConvertFilter(filterC, false);
 
-            DuetAPI.Machine.Tool toolA = new DuetAPI.Machine.Tool();
+            DuetAPI.ObjectModel.Tool toolA = new DuetAPI.ObjectModel.Tool();
             toolA.Active.Add(123F);
             toolA.Standby.Add(456F);
-            toolA.State = DuetAPI.Machine.ToolState.Active;
+            toolA.State = DuetAPI.ObjectModel.ToolState.Active;
             Provider.Get.Tools.Add(toolA);
 
-            DuetAPI.Machine.Tool toolB = new DuetAPI.Machine.Tool();
+            DuetAPI.ObjectModel.Tool toolB = new DuetAPI.ObjectModel.Tool();
             toolB.Active.Add(10F);
             toolB.Standby.Add(20F);
-            toolB.State = DuetAPI.Machine.ToolState.Standby;
+            toolB.State = DuetAPI.ObjectModel.ToolState.Standby;
             Provider.Get.Tools.Add(toolB);
 
             // Query filter A
@@ -132,8 +132,8 @@ namespace UnitTests.Machine
             Dictionary<string, object> partialModelC = DuetControlServer.Model.Filter.GetFiltered(parsedFilterC);
             IList toolsKeyC = (IList)partialModelC["tools"];
             Assert.AreEqual(2, toolsKeyC.Count);
-            Assert.IsTrue(toolsKeyC[0] is DuetAPI.Machine.Tool);
-            Assert.IsTrue(toolsKeyC[1] is DuetAPI.Machine.Tool);
+            Assert.IsTrue(toolsKeyC[0] is DuetAPI.ObjectModel.Tool);
+            Assert.IsTrue(toolsKeyC[1] is DuetAPI.ObjectModel.Tool);
 
             // Merge A+B
             Dictionary<string, object> merged = new Dictionary<string, object>();
@@ -152,18 +152,18 @@ namespace UnitTests.Machine
             // Merge A+C
             DuetControlServer.Model.Filter.MergeFiltered(merged, partialModelC);
             mergedTools = (List<object>)merged["tools"];
-            Assert.IsTrue(mergedTools[0] is DuetAPI.Machine.Tool);
-            Assert.IsTrue(mergedTools[1] is DuetAPI.Machine.Tool);
+            Assert.IsTrue(mergedTools[0] is DuetAPI.ObjectModel.Tool);
+            Assert.IsTrue(mergedTools[1] is DuetAPI.ObjectModel.Tool);
         }
 
         [Test]
         public void GetSpecific()
         {
-            Provider.Get.State.Status = DuetAPI.Machine.MachineStatus.Processing;
+            Provider.Get.State.Status = DuetAPI.ObjectModel.MachineStatus.Processing;
             Assert.IsTrue(DuetControlServer.Model.Filter.GetSpecific("state.status", false, out object status));
-            Assert.AreEqual(DuetAPI.Machine.MachineStatus.Processing, status);
+            Assert.AreEqual(DuetAPI.ObjectModel.MachineStatus.Processing, status);
 
-            Provider.Get.Fans.Add(new DuetAPI.Machine.Fan() { ActualValue = 0.53F });
+            Provider.Get.Fans.Add(new DuetAPI.ObjectModel.Fan() { ActualValue = 0.53F });
             Assert.IsTrue(DuetControlServer.Model.Filter.GetSpecific("fans[0].actualValue", false, out object actualValue));
             Assert.AreEqual(0.53F, actualValue);
         }

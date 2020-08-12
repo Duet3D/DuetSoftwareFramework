@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Web;
 using DuetAPI;
 using DuetAPI.Connection;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
 using Microsoft.AspNetCore.Mvc;
@@ -55,12 +56,8 @@ namespace DuetWebServer.Controllers
             try
             {
                 using CommandConnection connection = await BuildConnection();
-                MemoryStream json = await connection.GetSerializedMachineModel();
-                if (json != null)
-                {
-                    return new FileStreamResult(json, "application/json");
-                }
-                return new NoContentResult();
+                string machineModel = await connection.GetSerializedObjectModel();
+                return Content(machineModel, "application/json");
             }
             catch (Exception e)
             {
@@ -484,6 +481,261 @@ namespace DuetWebServer.Controllers
                     return StatusCode(503, "DCS is not started");
                 }
                 _logger.LogWarning(e, $"[{nameof(CreateDirectory)}] Failed to create directory {directory} (resolved to {resolvedPath})");
+                return StatusCode(500, e.Message);
+            }
+        }
+        #endregion
+
+        #region Plugins
+        /// <summary>
+        /// PUT /machine/plugin
+        /// Install or upgrade a plugin ZIP file
+        /// </summary>
+        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [DisableRequestSizeLimit]
+        [HttpPut("plugin")]
+        public async Task<IActionResult> InstallPlugin()
+        {
+            string zipFile = Path.GetTempFileName();
+            try
+            {
+                // Write ZIP file
+                using (FileStream stream = new FileStream(zipFile, FileMode.Create, FileAccess.Write))
+                {
+                    await Request.Body.CopyToAsync(stream);
+                }
+
+                // Install it
+                using CommandConnection connection = await BuildConnection();
+                await connection.InstallPlugin(zipFile);
+
+                return NoContent();
+            }
+            catch (Exception e)
+            {
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is IncompatibleVersionException)
+                {
+                    _logger.LogError($"[{nameof(InstallPlugin)}] Incompatible DCS version");
+                    return StatusCode(502, "Incompatible DCS version");
+                }
+                if (e is SocketException)
+                {
+                    _logger.LogError($"[{nameof(InstallPlugin)}] DCS is not started");
+                    return StatusCode(503, "DCS is not started");
+                }
+                _logger.LogWarning(e, $"[{nameof(InstallPlugin)} Failed to upload file to {zipFile} ({Request.Body.Length} bytes)");
+                return StatusCode(500, e.Message);
+            }
+        }
+
+        /// <summary>
+        /// DELETE /machine/plugin
+        /// Uninstall a plugin
+        /// </summary>
+        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [HttpDelete("plugin")]
+        public async Task<IActionResult> UninstallPlugin()
+        {
+            try
+            {
+                // Get the plugin name
+                string pluginName;
+                using (StreamReader reader = new StreamReader(HttpContext.Request.Body))
+                {
+                    pluginName = await reader.ReadToEndAsync();
+                }
+
+                // Uninstall it
+                using CommandConnection connection = await BuildConnection();
+                await connection.UninstallPlugin(pluginName);
+
+                return NoContent();
+            }
+            catch (Exception e)
+            {
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is IncompatibleVersionException)
+                {
+                    _logger.LogError($"[{nameof(UninstallPlugin)}] Incompatible DCS version");
+                    return StatusCode(502, "Incompatible DCS version");
+                }
+                if (e is SocketException)
+                {
+                    _logger.LogError($"[{nameof(UninstallPlugin)}] DCS is not started");
+                    return StatusCode(503, "DCS is not started");
+                }
+                _logger.LogWarning(e, $"[{nameof(UninstallPlugin)} Failed to uninstall plugin");
+                return StatusCode(500, e.Message);
+            }
+        }
+
+#pragma warning disable IDE1006 // Naming Styles
+        /// <summary>
+        /// Private class for wrapping plugin data patch instructions
+        /// </summary>
+        private class PluginPatchInstruction
+        {
+            /// <summary>
+            /// Plugin to change
+            /// </summary>
+            public string plugin { get; set; }
+
+            /// <summary>
+            /// Key to change
+            /// </summary>
+            public string key { get; set; }
+
+            /// <summary>
+            /// Target value
+            /// </summary>
+            public JsonElement value { get; set; }
+        }
+#pragma warning restore IDE1006 // Naming Styles
+
+        /// <summary>
+        /// PATCH /machine/plugin
+        /// Set plugin data in the object model if there is no SBC executable.
+        /// </summary>
+        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [DisableRequestSizeLimit]
+        [HttpPatch("plugin")]
+        public async Task<IActionResult> SetPluginData()
+        {
+            try
+            {
+                PluginPatchInstruction instruction = await JsonSerializer.DeserializeAsync<PluginPatchInstruction>(HttpContext.Request.Body);
+
+                using CommandConnection connection = await BuildConnection();
+                ObjectModel model = await connection.GetObjectModel();
+                foreach (Plugin plugin in model.Plugins)
+                {
+                    if (plugin.Name == instruction.plugin)
+                    {
+                        if (!string.IsNullOrEmpty(plugin.SbcExecutable))
+                        {
+                            _logger.LogWarning("Tried to set plugin data for {0} but it has an SBC executable set");
+                            return Forbid();
+                        }
+
+                        await connection.SetPluginData(instruction.key, instruction.value, instruction.plugin);
+                        return NoContent();
+                    }
+                }
+
+                return NotFound();
+            }
+            catch (Exception e)
+            {
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is IncompatibleVersionException)
+                {
+                    _logger.LogError($"[{nameof(SetPluginData)}] Incompatible DCS version");
+                    return StatusCode(502, "Incompatible DCS version");
+                }
+                if (e is SocketException)
+                {
+                    _logger.LogError($"[{nameof(SetPluginData)}] DCS is not started");
+                    return StatusCode(503, "DCS is not started");
+                }
+                _logger.LogWarning(e, $"[{nameof(SetPluginData)} Failed to set plugin data");
+                return StatusCode(500, e.Message);
+            }
+        }
+
+        /// <summary>
+        /// POST /machine/startPlugin
+        /// Start a plugin on the SBC
+        /// </summary>
+        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [HttpPost]
+        public async Task<IActionResult> StartPlugin()
+        {
+            try
+            {
+                // Get the plugin name
+                string pluginName;
+                using (StreamReader reader = new StreamReader(HttpContext.Request.Body))
+                {
+                    pluginName = await reader.ReadToEndAsync();
+                }
+
+                // Start it
+                using CommandConnection connection = await BuildConnection();
+                await connection.StartPlugin(pluginName);
+
+                return NoContent();
+            }
+            catch (Exception e)
+            {
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is IncompatibleVersionException)
+                {
+                    _logger.LogError($"[{nameof(StartPlugin)}] Incompatible DCS version");
+                    return StatusCode(502, "Incompatible DCS version");
+                }
+                if (e is SocketException)
+                {
+                    _logger.LogError($"[{nameof(StartPlugin)}] DCS is not started");
+                    return StatusCode(503, "DCS is not started");
+                }
+                _logger.LogWarning(e, $"[{nameof(StartPlugin)} Failed to start plugin");
+                return StatusCode(500, e.Message);
+            }
+        }
+
+        /// <summary>
+        /// POST /machine/stopPlugin
+        /// Stop a plugin on the SBC
+        /// </summary>
+        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [HttpPost]
+        public async Task<IActionResult> StopPlugin()
+        {
+            try
+            {
+                // Get the plugin name
+                string pluginName;
+                using (StreamReader reader = new StreamReader(HttpContext.Request.Body))
+                {
+                    pluginName = await reader.ReadToEndAsync();
+                }
+
+                // Stop it
+                using CommandConnection connection = await BuildConnection();
+                await connection.StopPlugin(pluginName);
+
+                return NoContent();
+            }
+            catch (Exception e)
+            {
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is IncompatibleVersionException)
+                {
+                    _logger.LogError($"[{nameof(StopPlugin)}] Incompatible DCS version");
+                    return StatusCode(502, "Incompatible DCS version");
+                }
+                if (e is SocketException)
+                {
+                    _logger.LogError($"[{nameof(StopPlugin)}] DCS is not started");
+                    return StatusCode(503, "DCS is not started");
+                }
+                _logger.LogWarning(e, $"[{nameof(StopPlugin)} Failed to stop plugin");
                 return StatusCode(500, e.Message);
             }
         }

@@ -19,6 +19,7 @@ namespace DuetControlServer
     public static class Settings
     {
         private const string DefaultConfigFile = "/opt/dsf/conf/config.json";
+        private const string DefaultPluginsFile = "/opt/dsf/conf/plugins.txt";
         private const RegexOptions RegexFlags = RegexOptions.IgnoreCase | RegexOptions.Singleline;
 
         /// <summary>
@@ -31,13 +32,18 @@ namespace DuetControlServer
         /// Do NOT start the SPI task. This is meant entirely for development purposes and should not be used!
         /// </summary>
         [JsonIgnore]
-        public static bool NoSpiTask { get; set; }
+        public static bool NoSpi { get; set; }
 
         /// <summary>
         /// Path to the configuration file
         /// </summary>
         [JsonIgnore]
         public static string ConfigFilename { get; set; } = DefaultConfigFile;
+
+        /// <summary>
+        /// Path to the file holding a list of loaded plugins
+        /// </summary>
+        public static string PluginsFilename { get; set; } = DefaultPluginsFile;
 
         /// <summary>
         /// Minimum log level for console output
@@ -76,6 +82,11 @@ namespace DuetControlServer
         /// Paths starting with 0:/ are mapped to this directory
         /// </summary>
         public static string BaseDirectory { get; set; } = "/opt/dsf/sd";
+
+        /// <summary>
+        /// Directory holding DSF plugins
+        /// </summary>
+        public static string PluginDirectory { get; set; } = "/opt/dsf/plugins";
 
         /// <summary>
         /// Set this to true to prevent M999 from stopping this application
@@ -206,7 +217,7 @@ namespace DuetControlServer
             new Regex(@"filament used\D+(((?<mm>\d+\.?\d*)mm)(\D+)?)+", RegexFlags),        // Slic3r (mm)
             new Regex(@"filament used\D+(((?<m>\d+\.?\d*)m([^m]|$))(\D+)?)+", RegexFlags),  // Cura (m)
             new Regex(@"filament length\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+", RegexFlags),   // Simplify3D (mm)
-            new Regex(@"filament used \[mm\]\D+((?<mm>\d+\.?\d*)(\D+)?)+", RegexFlags),       // Prusa Slicer (mm)
+            new Regex(@"filament used \[mm\]\D+((?<mm>\d+\.?\d*)(\D+)?)+", RegexFlags),     // Prusa Slicer (mm)
             new Regex(@"material\#\d+\D+(?<mm>\d+\.?\d*)", RegexFlags),                     // IdeaMaker (mm)
             new Regex(@"Filament used per extruder:\r\n;\s*(?<name>.+)\s+=\s*(?<mm>[0-9.]+)", RegexFlags)   // Canvas
         };
@@ -228,10 +239,10 @@ namespace DuetControlServer
         /// </summary>
         public static List<Regex> PrintTimeFilters { get; set; } = new List<Regex>
         {
-            new Regex(@"estimated printing time .*= ((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                                     // Slic3r PE
-            new Regex(@"TIME:(?<s>(\d+\.?\d*))", RegexFlags),                                                                                           // Cura
-            new Regex(@"Build time: ((?<h>\d+) hour(s)?\s*)?((?<m>\d+) minute(s)?\s*)?((?<s>(\d+) second(s)?))?", RegexFlags),                                    // Simplify3D
-            new Regex(@"Estimated Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?", RegexFlags)   // KISSlicer and Canvas
+            new Regex(@"estimated printing time .*= ((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                                              // Slic3r PE
+            new Regex(@"TIME:(?<s>(\d+\.?\d*))", RegexFlags),                                                                                                       // Cura
+            new Regex(@"Build time: ((?<h>\d+) hour(s)?\s*)?((?<m>\d+) minute(s)?\s*)?((?<s>(\d+) second(s)?))?", RegexFlags),                                      // Simplify3D
+            new Regex(@"Estimated Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?", RegexFlags)     // KISSlicer and Canvas
         };
 
         /// <summary>
@@ -265,10 +276,8 @@ namespace DuetControlServer
                     Console.WriteLine("-r, --no-reset-stop: Do not terminate this application when M999 has been processed");
                     Console.WriteLine("-S, --socket-directory: Specify the UNIX socket directory");
                     Console.WriteLine("-s, --socket-file: Specify the UNIX socket file");
-                    Console.WriteLine("-u, --socket-user <user>: Specify the owning user of the UNIX socket file");
-                    Console.WriteLine("-g, --socket-group <group>: Specify the owning group of the UNIX socket file");
                     Console.WriteLine("-b, --base-directory: Set the virtual SD card base directory");
-                    // Console.WriteLine("--no-spi-task: Do NOT start the SPI task. This is only intended for development purposes!");
+                    Console.WriteLine("-D, --no-spi: Do NOT connect over SPI. Not recommended, use at your own risk!");
                     Console.WriteLine("-h, --help: Display this text");
                     return false;
                 }
@@ -352,9 +361,9 @@ namespace DuetControlServer
                 {
                     NoTerminateOnReset = true;
                 }
-                else if (arg == "--no-spi-task")
+                else if (arg == "-D" || arg == "--no-spi")
                 {
-                    NoSpiTask = true;
+                    NoSpi = true;
                 }
                 lastArg = arg;
             }
@@ -461,6 +470,12 @@ namespace DuetControlServer
                         }
                         break;
                 }
+            }
+
+            if (!NoSpi && (SpiDevice == "/dev/null" || GpioChipDevice == "/dev/null"))
+            {
+                // Do NOT start the SPI subsystem if one of the used devices is disabled
+                NoSpi = true;
             }
         }
 

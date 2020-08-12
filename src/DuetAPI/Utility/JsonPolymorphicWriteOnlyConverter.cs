@@ -1,4 +1,7 @@
-﻿using System;
+﻿using DuetAPI.ObjectModel;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -8,7 +11,7 @@ namespace DuetAPI.Utility
     /// JSON converter for converting inherited class types to JSON
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public class JsonPolymorphicWriteOnlyConverter<T> : JsonConverter<T>
+    public class JsonPolymorphicWriteOnlyConverter<T> : JsonConverter<T> where T : ModelObject
     {
         /// <summary>
         /// Read from JSON
@@ -30,7 +33,20 @@ namespace DuetAPI.Utility
         /// <param name="options">Write options</param>
         public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
         {
-            JsonSerializer.Serialize(writer, value, value.GetType(), JsonHelper.DefaultJsonOptionsNoConverters);
+            if (value == null)
+            {
+                writer.WriteNullValue();
+            }
+            else
+            {
+                writer.WriteStartObject();
+                foreach (KeyValuePair<string, PropertyInfo> jsonProperty in value.JsonProperties)
+                {
+                    writer.WritePropertyName(jsonProperty.Key);
+                    JsonSerializer.Serialize(writer, jsonProperty.Value.GetValue(value), jsonProperty.Value.PropertyType, options);
+                }
+                writer.WriteEndObject();
+            }
         }
     }
 }

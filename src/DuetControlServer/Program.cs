@@ -1,8 +1,13 @@
-﻿using System;
+﻿using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
+using DuetAPI.Utility;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -85,7 +90,7 @@ namespace DuetControlServer
             {
                 Model.Provider.Init();
                 Model.Observer.Init();
-                Utility.FilamentManager.Init();
+                await Utility.FilamentManager.Init();
                 _logger.Info("Environment initialized");
             }
             catch (Exception e)
@@ -95,9 +100,9 @@ namespace DuetControlServer
             }
 
             // Set up SPI subsystem and connect to RRF controller
-            if (Settings.NoSpiTask)
+            if (Settings.NoSpi)
             {
-                _logger.Warn("Connection to Duet is NOT established, things may not work as expected");
+                _logger.Warn("SPI connection to Duet is disabled");
             }
             else
             {
@@ -155,7 +160,49 @@ namespace DuetControlServer
                     CancelSource.Cancel();
                 }
             };
-            
+
+            // Load plugin manifests
+            foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
+            {
+                if (file.EndsWith(".json"))
+                {
+                    try
+                    {
+                        using FileStream manifestStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        Plugin plugin = await JsonSerializer.DeserializeAsync<Plugin>(manifestStream, JsonHelper.DefaultJsonOptions);
+                        plugin.PID = -1;
+                        using (await Model.Provider.AccessReadWriteAsync())
+                        {
+                            Model.Provider.Get.Plugins.Add(plugin);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Error(e, "Failed to load plugin manifest {0}", Path.GetFileName(file));
+                    }
+                }
+            }
+
+            // Start plugins that were started when DCS quit last time
+            if (File.Exists(Settings.PluginsFilename))
+            {
+                List<Task> startTasks = new List<Task>();
+                using FileStream pluginsFile = new FileStream(Settings.PluginsFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using StreamReader reader = new StreamReader(pluginsFile);
+
+                string plugin;
+                while ((plugin = await reader.ReadLineAsync()) != null)
+                {
+                    StartPlugin startPlugin = new StartPlugin
+                    {
+                        Plugin = plugin
+                    };
+                    startTasks.Add(Task.Run(startPlugin.Execute));
+                }
+
+                await Task.WhenAll(startTasks);
+            }
+
             // Wait for the first task to terminate.
             // In case this is an unusual shutdown, log this event and shut down the application
             Task terminatedTask = await Task.WhenAny(mainTasks.Keys);
@@ -193,6 +240,35 @@ namespace DuetControlServer
                 }
             }
             while (mainTasks.Count > 0);
+
+            // Stop the plugins again
+            _logger.Debug("Stopping plugins");
+            List<string> startedPlugins = new List<string>();
+            List<Task> stopTasks = new List<Task>();
+            foreach (Plugin plugin in Model.Provider.Get.Plugins)
+            {
+                if (plugin.PID > 0)
+                {
+                    startedPlugins.Add(plugin.Name);
+                    Commands.StopPlugin stopPlugin = new Commands.StopPlugin()
+                    {
+                        Plugin = plugin.Name
+                    };
+                    stopTasks.Add(Task.Run(stopPlugin.Execute));
+                }
+            }
+            await Task.WhenAll(stopTasks);
+
+            // Keep track of the started plugins
+            _logger.Debug("Saving list of started plugins");
+            using (FileStream pluginsFile = new FileStream(Settings.PluginsFilename, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                using StreamWriter writer = new StreamWriter(pluginsFile);
+                foreach (string plugin in startedPlugins)
+                {
+                    await writer.WriteLineAsync(plugin);
+                }
+            }
 
             // End
             _logger.Info("Application has shut down");

@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.FileExecution;
 using DuetControlServer.Files;
@@ -92,9 +92,12 @@ namespace DuetControlServer.SPI
         /// <param name="flags">Object model flags</param>
         public static void RequestObjectModel(string key, string flags)
         {
-            lock (_pendingModelQueries)
+            if (!Settings.NoSpi)
             {
-                _pendingModelQueries.Enqueue(new Tuple<string, string>(key, flags));
+                lock (_pendingModelQueries)
+                {
+                    _pendingModelQueries.Enqueue(new Tuple<string, string>(key, flags));
+                }
             }
         }
 
@@ -105,9 +108,13 @@ namespace DuetControlServer.SPI
         /// <param name="expression">Expression to evaluate</param>
         /// <returns>Result of the evaluated expression</returns>
         /// <exception cref="CodeParserException">Failed to evaluate expression</exception>
-        /// <exception cref="InvalidOperationException">Incompatible firmware version</exception>
+        /// <exception cref="InvalidOperationException">Incompatible firmware version or not connected over SPI</exception>
         public static Task<object> EvaluateExpression(CodeChannel channel, string expression)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
             if (DataTransfer.ProtocolVersion == 1)
             {
                 throw new InvalidOperationException("Incompatible firmware version");
@@ -136,8 +143,14 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <returns>Heightmap in use</returns>
         /// <exception cref="OperationCanceledException">Operation could not finish</exception>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         public static Task<Heightmap> GetHeightmap()
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             TaskCompletionSource<Heightmap> tcs;
             using (_heightmapLock.Lock(Program.CancellationToken))
             {
@@ -161,15 +174,20 @@ namespace DuetControlServer.SPI
         /// <param name="map">Heightmap to set</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation could not finish</exception>
-        /// <exception cref="InvalidOperationException">Heightmap is already being set</exception>
+        /// <exception cref="InvalidOperationException">Heightmap is already being set or not connected over SPI</exception>
         public static Task SetHeightmap(Heightmap map)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             TaskCompletionSource<object> tcs;
             using (_heightmapLock.Lock(Program.CancellationToken))
             {
                 if (_setHeightmapRequest != null)
                 {
-                    throw new InvalidProgramException("Heightmap is already being set");
+                    throw new InvalidOperationException("Heightmap is already being set");
                 }
 
                 tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -197,8 +215,14 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="code">Code to execute</param>
         /// <returns>Asynchronous task</returns>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         public static async Task ProcessCode(Code code)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             if (code.Type == CodeType.MCode && code.MajorNumber == 703)
             {
                 // It is safe to assume that the tools and extruders have been configured at this point.
@@ -219,6 +243,11 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static Task<bool> Flush(CodeChannel channel)
         {
+            if (Settings.NoSpi)
+            {
+                return Task.FromResult(true);
+            }
+
             using (_channels[channel].Lock())
             {
                 return _channels[channel].Flush();
@@ -232,6 +261,11 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static Task<bool> Flush(Code code)
         {
+            if (Settings.NoSpi)
+            {
+                return Task.FromResult(true);
+            }
+
             using (_channels[code.Channel].Lock())
             {
                 return _channels[code.Channel].Flush(code);
@@ -246,16 +280,19 @@ namespace DuetControlServer.SPI
         {
             await Invalidate("Firmware halted");
 
-            Task onFirmwareHalted;
-            using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
+            if (!Settings.NoSpi)
             {
-                if (_firmwareHaltRequest == null)
+                Task onFirmwareHalted;
+                using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
                 {
-                    _firmwareHaltRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    if (_firmwareHaltRequest == null)
+                    {
+                        _firmwareHaltRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    }
+                    onFirmwareHalted = _firmwareHaltRequest.Task;
                 }
-                onFirmwareHalted = _firmwareHaltRequest.Task;
+                await onFirmwareHalted;
             }
-            await onFirmwareHalted;
         }
 
         /// <summary>
@@ -266,30 +303,48 @@ namespace DuetControlServer.SPI
         {
             await Invalidate("Firmware reset imminent");
 
-            Task onFirmwareReset;
-            using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
+            if (!Settings.NoSpi)
             {
-                if (_firmwareResetRequest == null)
+                Task onFirmwareReset;
+                using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
                 {
-                    _firmwareResetRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    if (_firmwareResetRequest == null)
+                    {
+                        _firmwareResetRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    }
+                    onFirmwareReset = _firmwareResetRequest.Task;
                 }
-                onFirmwareReset = _firmwareResetRequest.Task;
+                await onFirmwareReset;
             }
-            await onFirmwareReset;
         }
 
         /// <summary>
         /// Notify the firmware that a file print has started
         /// </summary>
-        public static void SetPrintStarted() => _printStarted = true;
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
+        public static void SetPrintStarted()
+        {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
+            _printStarted = true;
+        }
 
         /// <summary>
         /// Notify the firmware that the file print has been stopped
         /// </summary>
         /// <param name="stopReason">Reason why the print has stopped</param>
         /// <returns>Asynchronous task</returns>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         public static async Task SetPrintStopped(PrintStoppedReason stopReason)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             using (await _printStopppedReasonLock.LockAsync(Program.CancellationToken))
             {
                 _printStoppedReason = stopReason;
@@ -306,8 +361,14 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Code channel acquiring the lock</param>
         /// <returns>Whether the resource could be locked</returns>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         public static Task<bool> LockMovementAndWaitForStandstill(CodeChannel channel)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             using (_channels[channel].Lock())
             {
                 return _channels[channel].LockMovementAndWaitForStandstill();
@@ -319,8 +380,14 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Channel holding the resources</param>
         /// <returns>Asynchronous task</returns>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         public static Task UnlockAll(CodeChannel channel)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             using (_channels[channel].Lock())
             {
                 return _channels[channel].UnlockAll();
@@ -332,10 +399,15 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="iapStream">IAP binary</param>
         /// <param name="firmwareStream">Firmware binary</param>
-        /// <exception cref="InvalidOperationException">Firmware is already being updated</exception>
+        /// <exception cref="InvalidOperationException">Firmware is already being updated or not connected over SPI</exception>
         /// <returns>Asynchronous task</returns>
         public static async Task UpdateFirmware(Stream iapStream, Stream firmwareStream)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             TaskCompletionSource<object> tcs;
             using (await _firmwareUpdateLock.LockAsync(Program.CancellationToken))
             {
@@ -444,8 +516,14 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="extruder">Extruder drive</param>
         /// <param name="filament">Loaded filament</param>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         public static void AssignFilament(int extruder, string filament)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             lock (_extruderFilamentUpdates)
             {
                 _extruderFilamentUpdates.Enqueue(new Tuple<int, string>(extruder, filament));
@@ -457,9 +535,13 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="flags">Message flags</param>
         /// <param name="message">Message content</param>
-        /// <exception cref="InvalidOperationException">Incompatible firmware</exception>
+        /// <exception cref="InvalidOperationException">Incompatible firmware or not connected over SPI</exception>
         public static void SendMessage(MessageTypeFlags flags, string message)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
             if (DataTransfer.ProtocolVersion == 1)
             {
                 throw new InvalidOperationException("Incompatible firmware version");
@@ -476,12 +558,12 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Perform communication with the RepRapFirmware controller
+        /// Perform communication with the RepRapFirmware controller over SPI
         /// </summary>
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
-            if (Settings.NoSpiTask)
+            if (Settings.NoSpi)
             {
                 await Task.Delay(-1, Program.CancellationToken);
                 return;

@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using Nito.AsyncEx;
 
 namespace DuetControlServer.Model
@@ -85,7 +85,7 @@ namespace DuetControlServer.Model
                     }
 
                     // Clear the messages again if anyone is connected
-                    if (IPC.Processors.Subscription.AreClientsConnected && Get.Messages.Count > 0)
+                    if (IPC.Processors.ModelSubscription.AreClientsConnected && Get.Messages.Count > 0)
                     {
                         Get.Messages.Clear();
                     }
@@ -125,7 +125,7 @@ namespace DuetControlServer.Model
         /// <seealso cref="AccessReadWriteAsync()"/>
         /// <seealso cref="WaitForUpdate(CancellationToken)"/>
         /// <seealso cref="Updater.WaitForFullUpdate(CancellationToken)"/>
-        public static MachineModel Get { get; } = new MachineModel();
+        public static ObjectModel Get { get; } = new ObjectModel();
 
         /// <summary>
         /// Initialize the object model provider with values that are not expected to change

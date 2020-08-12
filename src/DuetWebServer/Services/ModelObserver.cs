@@ -1,4 +1,4 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -118,7 +118,7 @@ namespace DuetWebServer.Services
             string unixSocket = _configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.FullSocketPath);
             int retryDelay = _configuration.GetValue("ModelRetryDelay", 5000);
 
-            MachineModel model;
+            ObjectModel model;
             try
             {
                 do

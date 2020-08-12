@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;

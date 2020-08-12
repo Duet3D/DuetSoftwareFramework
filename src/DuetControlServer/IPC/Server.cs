@@ -77,7 +77,6 @@ namespace DuetControlServer.IPC
                 do
                 {
                     Socket socket = await _unixSocket.AcceptAsync();
-
                     Task connectionTask = Task.Run(async () => await ProcessConnection(socket));
                     lock (connectionTasks)
                     {
@@ -116,23 +115,32 @@ namespace DuetControlServer.IPC
             using Connection connection = new Connection(socket);
             try
             {
-                // Send server-side init message to the client
-                connection.Logger.Debug("Got new UNIX connection, checking mode...");
-                await connection.Send(new ServerInitMessage { Id = connection.Id });
-
-                // Read client-side init message and switch mode
-                Base processor = await GetConnectionProcessor(connection);
-                if (processor != null)
+                // Check if this connection is permitted
+                connection.Logger.Debug("Got new UNIX connection, checking permissions...");
+                if (await connection.AssignPermissions())
                 {
-                    // Send success message
-                    await connection.SendResponse();
+                    // Send server-side init message to the client
+                    await connection.Send(new ServerInitMessage { Id = connection.Id });
 
-                    // Let the processor deal with the connection
-                    await processor.Process();
+                    // Read client-side init message and switch mode
+                    Base processor = await GetConnectionProcessor(connection);
+                    if (processor != null)
+                    {
+                        // Send success message
+                        await connection.SendResponse();
+
+                        // Let the processor deal with the connection
+                        await processor.Process();
+                    }
+                    else
+                    {
+                        connection.Logger.Debug("Failed to find processor");
+                    }
                 }
                 else
                 {
-                    connection.Logger.Debug("Failed to find processor");
+                    connection.Logger.Warn("Terminating connection due to insufficient permissions");
+                    await connection.Send(new UnauthorizedAccessException("Insufficient permissions"));
                 }
             }
             catch (Exception e)
@@ -140,7 +148,7 @@ namespace DuetControlServer.IPC
                 if (!(e is OperationCanceledException) && !(e is SocketException))
                 {
                     // Log unexpected errors
-                    connection.Logger.Error(e, "Terminating connection because an unexpected exception was thrown");
+                    connection.Logger.Error(e, "Terminating connection due to unexpected exception");
                 }
             }
             finally
@@ -148,7 +156,7 @@ namespace DuetControlServer.IPC
                 connection.Logger.Debug("Connection closed");
 
                 // Unlock the machine model again in case the client application crashed
-                LockManager.UnlockMachineModel(connection.Id);
+                LockManager.UnlockMachineModel(connection);
             }
         }
 
@@ -161,13 +169,15 @@ namespace DuetControlServer.IPC
         {
             try
             {
+                // Read the init message from the client
                 string response = await conn.ReceivePlainJson();
                 ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response, JsonHelper.DefaultJsonOptions);
+                conn.ApiVersion = initMessage.Version;
 
                 // Check the version number
-                if (initMessage.Version < MinimumProtocolVersion)
+                if (initMessage.Version < MinimumProtocolVersion || initMessage.Version > Defaults.ProtocolVersion)
                 {
-                    string message = $"Incompatible protocol version (got {initMessage.Version}, need {MinimumProtocolVersion} or higher)";
+                    string message = $"Incompatible protocol version (got {initMessage.Version}, need {MinimumProtocolVersion} to {Defaults.ProtocolVersion})";
                     conn.Logger.Warn(message);
                     await conn.SendResponse(new IncompatibleVersionException(message));
                     return null;
@@ -178,19 +188,32 @@ namespace DuetControlServer.IPC
                 }
 
                 // Check the requested mode
+                // TODO check permissions here
                 switch (initMessage.Mode)
                 {
                     case ConnectionMode.Command:
+                        if (!conn.CheckCommandPermissions(Command.SupportedCommands))
+                        {
+                            throw new UnauthorizedAccessException("Insufficient permissions");
+                        }
                         initMessage = JsonSerializer.Deserialize<CommandInitMessage>(response, JsonHelper.DefaultJsonOptions);
                         return new Command(conn);
 
                     case ConnectionMode.Intercept:
+                        if (!conn.CheckCommandPermissions(CodeInterception.SupportedCommands))
+                        {
+                            throw new UnauthorizedAccessException("Insufficient permissions");
+                        }
                         initMessage = JsonSerializer.Deserialize<InterceptInitMessage>(response, JsonHelper.DefaultJsonOptions);
-                        return new Interception(conn, initMessage);
+                        return new CodeInterception(conn, initMessage);
 
                     case ConnectionMode.Subscribe:
+                        if (!conn.CheckCommandPermissions(ModelSubscription.SupportedCommands))
+                        {
+                            throw new UnauthorizedAccessException("Insufficient permissions");
+                        }
                         initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response, JsonHelper.DefaultJsonOptions);
-                        return new Subscription(conn, initMessage);
+                        return new ModelSubscription(conn, initMessage);
 
                     default:
                         throw new ArgumentException("Invalid connection mode");
@@ -198,7 +221,7 @@ namespace DuetControlServer.IPC
             }
             catch (Exception e)
             {
-                conn.Logger.Error(e, "Failed to get connection processor");
+                conn.Logger.Error(e, "Failed to assign connection processor");
                 await conn.SendResponse(e);
             }
 
