@@ -82,8 +82,8 @@ namespace DuetAPI.ObjectModel
         /// List of loaded SBC plugins
         /// </summary>
         [LinuxProperty]
-        public ModelCollection<Plugin> Plugins = new ModelCollection<Plugin>();
-        
+        public ModelCollection<Plugin> Plugins { get; } = new ModelCollection<Plugin>();
+
         /// <summary>
         /// Information about the 3D scanner subsystem
         /// </summary>

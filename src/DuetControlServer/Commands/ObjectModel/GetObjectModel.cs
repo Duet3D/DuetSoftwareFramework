@@ -6,7 +6,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.Command"/> command
     /// </summary>
-    public class GetMachineModel : DuetAPI.Commands.GetObjectModel
+    public sealed class GetObjectModel : DuetAPI.Commands.GetObjectModel
     {
         /// <summary>
         /// Retrieve a copy of the current machine model

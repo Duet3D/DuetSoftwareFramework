@@ -3723,9 +3723,9 @@
             Virtual total extruder position
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.Move.WorkspaceNumber">
+        <member name="P:DuetAPI.ObjectModel.Move.WorkplaceNumber">
             <summary>
-            Index of the currently selected workspace
+            Index of the currently selected workplace
             </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.MoveCalibration">
@@ -4076,7 +4076,7 @@
             Information about connected network adapters
             </summary>
         </member>
-        <member name="F:DuetAPI.ObjectModel.ObjectModel.Plugins">
+        <member name="P:DuetAPI.ObjectModel.ObjectModel.Plugins">
             <summary>
             List of loaded SBC plugins
             </summary>
@@ -4189,16 +4189,28 @@
             Class representing a loaded plugin
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.Plugin.PID">
+        <member name="P:DuetAPI.ObjectModel.Plugin.DwcFiles">
+            <summary>
+            List of files for DWC
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Plugin.SbcFiles">
+            <summary>
+            List of installed SBC Files in the plugin directory
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Plugin.RrfFiles">
+            <summary>
+            List of RRF files on the (virtual) SD excluding web files
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Plugin.Pid">
             <summary>
             Process ID if the plugin or -1 if not started
             </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Plugin.Data">
-            <summary>
-            Dictionary holding key value pairs during the runtime of a plugin.
-            May be used to share data between plugins or between the SBC and web interface
-            </summary>
+            <remarks>
+            This may become 0 when the plugin has been stopped and the application is being shut down
+            </remarks>
         </member>
         <member name="T:DuetAPI.ObjectModel.PluginManifest">
             <summary>
@@ -4252,17 +4264,32 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcApiVersion">
             <summary>
-            DSF API version of the plugin running on the SBC
+            DSF API version of the plugin running on the SBC (ignored if there is no SBC executable)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcData">
+            <summary>
+            Object holding key value pairs of a plugin running on the SBC.
+            May be used to share data between plugins or between the SBC and web interface
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcExecutable">
             <summary>
             Filename in the bin directory used to start the plugin
             </summary>
+            <remarks>
+            A plugin may provide different binaries in subdirectories per architecture.
+            Supported architectures are: arm, arm64, x86, x86_64
+            </remarks>
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcExecutableArguments">
             <summary>
             Command-line arguments for the executable
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcOutputRedirected">
+            <summary>
+            Defines if messages from stdout/stderr are output as generic messages
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcPermissions">
@@ -4270,24 +4297,19 @@
             List of permissions required by the plugin executable running on the SBC
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcDependencies">
+        <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcPackageDependencies">
             <summary>
-            List of SBC plugins this plugin depends on. Circular dependencies are not supported 
+            List of packages this plugin depends on (apt packages in the case of DuetPi)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcPluginDependencies">
+            <summary>
+            List of SBC plugins this plugin depends on. Circular dependencies are not supported
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.RrfVersion">
             <summary>
-            Major/minor 
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.PluginManifest.RrfFiles">
-            <summary>
-            List of RRF files on the (virtual) SD excluding web files
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcFiles">
-            <summary>
-            List of installed SBC Files in the plugin directory
+            Major/minor supported RRF version (optional)
             </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.Scanner">
@@ -5148,7 +5170,7 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.MessageBox.Mode">
             <summary>
-            Mode of the message box to display or null if none is shown
+            Mode of the message box to display
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.MessageBox.Seq">
@@ -5906,6 +5928,19 @@
             and it will become obsolete when DSF is migrated to .NET Core 5.
             </remarks>
         </member>
+        <member name="M:DuetAPI.Utility.JsonHelper.ToObject(System.Text.Json.JsonElement,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Convert a <see cref="T:System.Text.Json.JsonElement"/> to an object
+            </summary>
+            <param name="element">Element to deserialize</param>
+            <param name="type">Object type</param>
+            <param name="options">JSON serializer options</param>
+            <returns>Deserialized object</returns>
+            <remarks>
+            The original code is from https://stackoverflow.com/questions/58138793/system-text-json-jsonelement-toobject-workaround
+            and it will become obsolete when DSF is migrated to .NET Core 5.
+            </remarks>
+        </member>
         <member name="M:DuetAPI.Utility.JsonHelper.ToObject``1(System.Text.Json.JsonDocument,System.Text.Json.JsonSerializerOptions)">
             <summary>
             Convert a <see cref="T:System.Text.Json.JsonDocument"/> to an object
@@ -6069,121 +6104,76 @@
             <summary>
             Read files in 0:/filaments
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.WriteFilaments">
             <summary>
-            Read and write files in 0:/filaments
+            Write files in 0:/filaments
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.ReadFirmware">
             <summary>
             Read files in 0:/firmware
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.WriteFirmware">
             <summary>
-            Read and write files in 0:/firmware
+            Write files in 0:/firmware
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.ReadGCodes">
             <summary>
             Read files in 0:/gcodes
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.WriteGCodes">
             <summary>
-            Read and write files in 0:/gcodes
+            Write files in 0:/gcodes
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.ReadMacros">
             <summary>
             Read files in 0:/macros
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.WriteMacros">
             <summary>
-            Read and write files in 0:/macros
+            Write files in 0:/macros
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.ReadSystem">
             <summary>
             Read files in 0:/sys
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.WriteSystem">
             <summary>
-            Read and write files in 0:/sys
+            Write files in 0:/sys
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.ReadWeb">
             <summary>
             Read files in 0:/www
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.WriteWeb">
             <summary>
-            Read and write files in 0:/www
+            Write files in 0:/www
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.FileSystemAccess">
             <summary>
             Access files outside the virtual SD directory (as DSF user)
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.LaunchProcesses">
             <summary>
             Launch new processes
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.NetworkAccess">
             <summary>
             Communicate over the network (stand-alone)
             </summary>
-            <remarks>
-            Reserved; not implemented in DSF 3.2.0
-            </remarks>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.SuperUser">
             <summary>

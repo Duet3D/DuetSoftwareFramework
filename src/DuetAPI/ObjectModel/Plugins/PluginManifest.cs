@@ -1,5 +1,6 @@
-﻿using DuetAPI.Connection;
-using DuetAPI.Utility;
+﻿using DuetAPI.Utility;
+using System.Collections.Generic;
+using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
 {
@@ -56,11 +57,21 @@ namespace DuetAPI.ObjectModel
 		/// <summary>
 		/// DSF API version of the plugin running on the SBC (ignored if there is no SBC executable)
 		/// </summary>
-		public int SbcApiVersion { get; set; }
+		public int? SbcApiVersion { get; set; }
+
+		/// <summary>
+		/// Object holding key value pairs of a plugin running on the SBC.
+		/// May be used to share data between plugins or between the SBC and web interface
+		/// </summary>
+		public Dictionary<string, JsonElement> SbcData { get; set; } = new Dictionary<string, JsonElement>();
 
 		/// <summary>
 		/// Filename in the bin directory used to start the plugin
 		/// </summary>
+		/// <remarks>
+		/// A plugin may provide different binaries in subdirectories per architecture.
+		/// Supported architectures are: arm, arm64, x86, x86_64
+		/// </remarks>
 		public string SbcExecutable { get; set; }
 
 		/// <summary>
@@ -69,28 +80,28 @@ namespace DuetAPI.ObjectModel
 		public string SbcExecutableArguments { get; set; }
 
 		/// <summary>
+		/// Defines if messages from stdout/stderr are output as generic messages
+		/// </summary>
+		public bool SbcOutputRedirected { get; set; } = true;
+
+		/// <summary>
 		/// List of permissions required by the plugin executable running on the SBC
 		/// </summary>
 		public SbcPermissions SbcPermissions { get; set; }
 
 		/// <summary>
+		/// List of packages this plugin depends on (apt packages in the case of DuetPi)
+		/// </summary>
+		public ModelCollection<string> SbcPackageDependencies { get; } = new ModelCollection<string>();
+
+		/// <summary>
 		/// List of SBC plugins this plugin depends on. Circular dependencies are not supported
 		/// </summary>
-		public ModelCollection<string> SbcDependencies { get; } = new ModelCollection<string>();
+		public ModelCollection<string> SbcPluginDependencies { get; } = new ModelCollection<string>();
 
 		/// <summary>
 		/// Major/minor supported RRF version (optional)
 		/// </summary>
 		public string RrfVersion { get; set; }
-
-		/// <summary>
-		/// List of RRF files on the (virtual) SD excluding web files
-		/// </summary>
-		public ModelCollection<string> RrfFiles { get; } = new ModelCollection<string>();
-
-		/// <summary>
-		/// List of installed SBC Files in the plugin directory
-		/// </summary>
-		public ModelCollection<string> SbcFiles { get; } = new ModelCollection<string>();
 	}
 }

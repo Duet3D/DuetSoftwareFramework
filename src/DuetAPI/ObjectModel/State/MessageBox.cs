@@ -26,7 +26,7 @@
         private string _message = string.Empty;
 
         /// <summary>
-        /// Mode of the message box to display or null if none is shown
+        /// Mode of the message box to display
         /// </summary>
         public MessageBoxMode Mode
         {

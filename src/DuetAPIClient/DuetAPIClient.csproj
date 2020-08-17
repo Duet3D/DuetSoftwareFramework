@@ -11,16 +11,17 @@
     <FileVersion>3.2.0.0</FileVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Description>Official client API library for Duet Software Framework (Duet 3) by Duet3D</Description>
-    <PackageProjectUrl>https://github.com/chrishamm/DuetSoftwareFramework</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
     <PackageIcon>duet_teardrop_wifi_large.png</PackageIcon>
     <PackageIconUrl />
-    <RepositoryUrl>https://github.com/chrishamm/DuetSoftwareFramework.git</RepositoryUrl>
+    <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <PropertyGroup>
     <DocumentationFile>DuetAPIClient.xml</DocumentationFile>
     <PackageTags>Duet Duet3 DSF DuetSoftwareFramework</PackageTags>
+    <Copyright>Duet3D Ltd</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

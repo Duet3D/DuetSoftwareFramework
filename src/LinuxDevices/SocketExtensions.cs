@@ -2,7 +2,7 @@
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 
-namespace LinuxDevices
+namespace LinuxApi
 {
     /// <summary>
     /// Extension methods for UNIX sockets

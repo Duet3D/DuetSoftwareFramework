@@ -13,7 +13,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.SimpleCode"/> command
     /// </summary>
-    public class SimpleCode : DuetAPI.Commands.SimpleCode, IConnectionCommand
+    public sealed class SimpleCode : DuetAPI.Commands.SimpleCode, IConnectionCommand
     {
         /// <summary>
         /// Locks to avoid race conditions when executing multiple text-based codes via the same channel

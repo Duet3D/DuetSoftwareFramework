@@ -5,7 +5,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.RemoveUserSession"/> command
     /// </summary>
-    public class RemoveUserSession : DuetAPI.Commands.RemoveUserSession
+    public sealed class RemoveUserSession : DuetAPI.Commands.RemoveUserSession
     {
         /// <summary>
         /// Remove an existing user session

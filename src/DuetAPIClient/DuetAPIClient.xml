@@ -330,13 +330,34 @@
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ManagePlugins"/>
         </member>
+        <member name="T:DuetAPIClient.BaseCommandConnection.ObjectModelLock">
+            <summary>
+            Internal class representing an object model lock
+            </summary>
+        </member>
+        <member name="F:DuetAPIClient.BaseCommandConnection.ObjectModelLock._connection">
+            <summary>
+            Connection that locked the object model
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.ObjectModelLock.#ctor(DuetAPIClient.BaseCommandConnection)">
+            <summary>
+            Constructor of this class
+            </summary>
+            <param name="connection">Connection that acquired the lock</param>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.ObjectModelLock.DisposeAsync">
+            <summary>
+            Dispose the lock again
+            </summary>
+            <returns>Asynchronous task</returns>
+        </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.LockObjectModel(System.Threading.CancellationToken)">
             <summary>
             Lock the machine model for read/write access.
-            It is MANDATORY to call <see cref="M:DuetAPIClient.BaseCommandConnection.UnlockMachineModel(System.Threading.CancellationToken)"/> when write access has finished
             </summary>
             <param name="cancellationToken">Optional cancellation token</param>
-            <returns>Asynchronous task</returns>
+            <returns>Asynchronous object model lock</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
@@ -488,22 +509,26 @@
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ManagePlugins"/>
         </member>
-        <member name="M:DuetAPIClient.BaseCommandConnection.UnlockMachineModel(System.Threading.CancellationToken)">
-            <summary>
-            Unlock the machine model again
-            </summary>
-            <param name="cancellationToken">Optional cancellation token</param>
-            <returns>Asynchronous task</returns>
-            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
-            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
-            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
-        </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.MessageType,System.String,System.Boolean,System.Boolean,System.Threading.CancellationToken)">
             <summary>
             Write an arbitrary generic message
             </summary>
             <param name="type">Message type</param>
             <param name="message">Message content</param>
+            <param name="outputMessage">Whether to output the message</param>
+            <param name="logMessage">Whether to log the message</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.CommandExecution"/>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.Message,System.Boolean,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Write an arbitrary generic message
+            </summary>
+            <param name="message">Message</param>
             <param name="outputMessage">Whether to output the message</param>
             <param name="logMessage">Whether to log the message</param>
             <param name="cancellationToken">Optional cancellation token</param>

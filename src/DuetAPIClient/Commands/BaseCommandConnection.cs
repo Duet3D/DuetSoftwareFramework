@@ -143,17 +143,49 @@ namespace DuetAPIClient
         }
 
         /// <summary>
+        /// Internal class representing an object model lock
+        /// </summary>
+        private sealed class ObjectModelLock : IAsyncDisposable
+        {
+            /// <summary>
+            /// Connection that locked the object model
+            /// </summary>
+            private readonly BaseCommandConnection _connection;
+
+            /// <summary>
+            /// Constructor of this class
+            /// </summary>
+            /// <param name="connection">Connection that acquired the lock</param>
+            public ObjectModelLock(BaseCommandConnection connection)
+            {
+                _connection = connection;
+            }
+
+            /// <summary>
+            /// Dispose the lock again
+            /// </summary>
+            /// <returns>Asynchronous task</returns>
+            public async ValueTask DisposeAsync()
+            {
+                if (_connection.IsConnected)
+                {
+                    await _connection.PerformCommand(new UnlockObjectModel(), default);
+                }
+            }
+        }
+
+        /// <summary>
         /// Lock the machine model for read/write access.
-        /// It is MANDATORY to call <see cref="UnlockMachineModel"/> when write access has finished
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
+        /// <returns>Asynchronous object model lock</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        public Task LockObjectModel(CancellationToken cancellationToken = default)
+        public async Task<IAsyncDisposable> LockObjectModel(CancellationToken cancellationToken = default)
         {
-            return PerformCommand(new LockObjectModel(), cancellationToken);
+            await PerformCommand(new LockObjectModel(), cancellationToken);
+            return new ObjectModelLock(this);
         }
 
         /// <summary>
@@ -343,19 +375,6 @@ namespace DuetAPIClient
         }
 
         /// <summary>
-        /// Unlock the machine model again
-        /// </summary>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        /// <exception cref="SocketException">Command could not be processed</exception>
-        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        public Task UnlockMachineModel(CancellationToken cancellationToken = default)
-        {
-            return PerformCommand(new UnlockObjectModel(), cancellationToken);
-        }
-
-        /// <summary>
         /// Write an arbitrary generic message
         /// </summary>
         /// <param name="type">Message type</param>
@@ -371,6 +390,23 @@ namespace DuetAPIClient
         public Task WriteMessage(MessageType type, string message, bool outputMessage = true, bool logMessage = false, CancellationToken cancellationToken = default)
         {
             return PerformCommand(new WriteMessage() { Type = type, Content = message, OutputMessage = outputMessage, LogMessage = logMessage }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Write an arbitrary generic message
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="outputMessage">Whether to output the message</param>
+        /// <param name="logMessage">Whether to log the message</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        public Task WriteMessage(Message message, bool outputMessage = true, bool logMessage = false, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new WriteMessage() { Type = message.Type, Content = message.Content, OutputMessage = outputMessage, LogMessage = logMessage }, cancellationToken);
         }
     }
 }

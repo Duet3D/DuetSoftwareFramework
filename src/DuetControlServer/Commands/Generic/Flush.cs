@@ -7,7 +7,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.Flush"/> command
     /// </summary>
-    public class Flush : DuetAPI.Commands.Flush, IConnectionCommand
+    public sealed class Flush : DuetAPI.Commands.Flush, IConnectionCommand
     {
         /// <summary>
         /// Source connection of this command

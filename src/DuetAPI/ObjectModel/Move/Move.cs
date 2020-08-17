@@ -93,13 +93,13 @@
         private float _virtualEPos;
 
         /// <summary>
-        /// Index of the currently selected workspace
+        /// Index of the currently selected workplace
         /// </summary>
-        public int WorkspaceNumber
+        public int WorkplaceNumber
         {
-            get => _workspaceNumber;
-			set => SetPropertyValue(ref _workspaceNumber, value);
+            get => _workplaceNumber;
+            set => SetPropertyValue(ref _workplaceNumber, value);
         }
-        private int _workspaceNumber;
+        private int _workplaceNumber;
     }
 }

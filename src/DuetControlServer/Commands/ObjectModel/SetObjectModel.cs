@@ -10,7 +10,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.SetObjectModel"/> command
     /// </summary>
-    public class SetMachineModel : DuetAPI.Commands.SetObjectModel
+    public sealed class SetObjectModel : DuetAPI.Commands.SetObjectModel
     {
         /// <summary>
         /// Set an atomic property in the object model

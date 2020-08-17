@@ -46,6 +46,16 @@ namespace DuetControlServer
         public static string PluginsFilename { get; set; } = DefaultPluginsFile;
 
         /// <summary>
+        /// Command to install third-party packages
+        /// </summary>
+        public static string InstallPackageCommand { get; set; } = "/usr/bin/apt-get";
+
+        /// <summary>
+        /// Command-line arguments to install third-party packages
+        /// </summary>
+        public static string InstallPackageArguments { get; set; } = "install -y {package}";
+
+        /// <summary>
         /// Minimum log level for console output
         /// </summary>
         public static LogLevel LogLevel { get; set; } = LogLevel.Info;

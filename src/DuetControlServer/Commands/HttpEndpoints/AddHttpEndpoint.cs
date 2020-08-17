@@ -9,7 +9,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.AddHttpEndpoint"/> command
     /// </summary>
-    public class AddHttpEndpoint : DuetAPI.Commands.AddHttpEndpoint
+    public sealed class AddHttpEndpoint : DuetAPI.Commands.AddHttpEndpoint
     {
         /// <summary>
         /// Logger instance

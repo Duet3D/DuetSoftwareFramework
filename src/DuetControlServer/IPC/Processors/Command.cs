@@ -16,22 +16,28 @@ namespace DuetControlServer.IPC.Processors
         /// </summary>
         public static readonly Type[] SupportedCommands =
         {
-            typeof(AddHttpEndpoint),
-            typeof(AddUserSession),
-            typeof(Code),
             typeof(GetFileInfo),
-            typeof(GetMachineModel),
-            typeof(Flush),
-            typeof(LockMachineModel),
-            typeof(PatchMachineModel),
-            typeof(RemoveHttpEndpoint),
-            typeof(RemoveUserSession),
             typeof(ResolvePath),
-            typeof(SetMachineModel),
+            typeof(Code),
+            typeof(EvaluateExpression),
+            typeof(Flush),
             typeof(SimpleCode),
-            typeof(SyncMachineModel),
-            typeof(UnlockMachineModel),
-            typeof(WriteMessage)
+            typeof(WriteMessage),
+            typeof(AddHttpEndpoint),
+            typeof(RemoveHttpEndpoint),
+            typeof(GetObjectModel),
+            typeof(LockObjectModel),
+            typeof(PatchObjectModel),
+            typeof(SetObjectModel),
+            typeof(SyncObjectModel),
+            typeof(UnlockObjectModel),
+            typeof(InstallPlugin),
+            typeof(SetPluginData),
+            typeof(StartPlugin),
+            typeof(StopPlugin),
+            typeof(UninstallPlugin),
+            typeof(AddUserSession),
+            typeof(RemoveUserSession)
         };
         
         /// <summary>
@@ -82,9 +88,13 @@ namespace DuetControlServer.IPC.Processors
                         {
                             Connection.Logger.Error("Insufficient permissions to execute {0}", command.Command);
                         }
-                        else
+                        else if (command != null)
                         {
                             Connection.Logger.Error(e, "Failed to execute {0}", command.Command);
+                        }
+                        else
+                        {
+                            Connection.Logger.Error(e, "Failed to execute command");
                         }
                     }
                     await Connection.SendResponse(e);

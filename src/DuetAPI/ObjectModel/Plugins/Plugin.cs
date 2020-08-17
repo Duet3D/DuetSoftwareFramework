@@ -1,22 +1,31 @@
-﻿using System.Collections.Generic;
-using System.Text.Json;
-
-namespace DuetAPI.ObjectModel
+﻿namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Class representing a loaded plugin
     /// </summary>
     public sealed class Plugin : PluginManifest
     {
+		/// <summary>
+		/// List of files for DWC
+		/// </summary>
+		public ModelCollection<string> DwcFiles { get; } = new ModelCollection<string>();
+
+		/// <summary>
+		/// List of installed SBC Files in the plugin directory
+		/// </summary>
+		public ModelCollection<string> SbcFiles { get; } = new ModelCollection<string>();
+
+		/// <summary>
+		/// List of RRF files on the (virtual) SD excluding web files
+		/// </summary>
+		public ModelCollection<string> RrfFiles { get; } = new ModelCollection<string>();
+
         /// <summary>
         /// Process ID if the plugin or -1 if not started
         /// </summary>
-        public int PID { get; set; } = -1;
-
-        /// <summary>
-        /// Dictionary holding key value pairs during the runtime of a plugin.
-        /// May be used to share data between plugins or between the SBC and web interface
-        /// </summary>
-        public Dictionary<string, JsonElement> Data { get; set; } = new Dictionary<string, JsonElement>();
+		/// <remarks>
+		/// This may become 0 when the plugin has been stopped and the application is being shut down
+		/// </remarks>
+        public int Pid { get; set; } = -1;
     }
 }

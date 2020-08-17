@@ -55,125 +55,80 @@ namespace DuetAPI.Utility
 		/// </summary>
 		RegisterHttpEndpoints,
 
-        #region Reserved permissions - will require AppArmor and/or elevation process
+        #region Reserved permissions - will require AppArmor and elevation process
         /// <summary>
         /// Read files in 0:/filaments
         /// </summary>
-        /// <remarks>
-        /// Reserved; not implemented in DSF 3.2.0
-        /// </remarks>
         ReadFilaments,
 
         /// <summary>
-        /// Read and write files in 0:/filaments
+        /// Write files in 0:/filaments
         /// </summary>
-        /// <remarks>
-        /// Reserved; not implemented in DSF 3.2.0
-        /// </remarks>
         WriteFilaments,
 
 		/// <summary>
 		/// Read files in 0:/firmware
 		/// </summary>
-        /// <remarks>
-        /// Reserved; not implemented in DSF 3.2.0
-        /// </remarks>
 		ReadFirmware,
 
 		/// <summary>
-		/// Read and write files in 0:/firmware
+		/// Write files in 0:/firmware
 		/// </summary>
-        /// <remarks>
-        /// Reserved; not implemented in DSF 3.2.0
-        /// </remarks>
 		WriteFirmware,
 
 		/// <summary>
 		/// Read files in 0:/gcodes
 		/// </summary>
-		/// <remarks>
-		/// Reserved; not implemented in DSF 3.2.0
-		/// </remarks>
 		ReadGCodes,
 
 		/// <summary>
-		/// Read and write files in 0:/gcodes
+		/// Write files in 0:/gcodes
 		/// </summary>
-		/// <remarks>
-		/// Reserved; not implemented in DSF 3.2.0
-		/// </remarks>
 		WriteGCodes,
 
 		/// <summary>
 		/// Read files in 0:/macros
 		/// </summary>
-		/// <remarks>
-		/// Reserved; not implemented in DSF 3.2.0
-		/// </remarks>
 		ReadMacros,
 
 		/// <summary>
-		/// Read and write files in 0:/macros
+		/// Write files in 0:/macros
 		/// </summary>
-		/// <remarks>
-		/// Reserved; not implemented in DSF 3.2.0
-		/// </remarks>
 		WriteMacros,
 
 		/// <summary>
 		/// Read files in 0:/sys
 		/// </summary>
-		/// <remarks>
-		/// Reserved; not implemented in DSF 3.2.0
-		/// </remarks>
 		ReadSystem,
 
 		/// <summary>
-		/// Read and write files in 0:/sys
+		/// Write files in 0:/sys
 		/// </summary>
-		/// <remarks>
-		/// Reserved; not implemented in DSF 3.2.0
-		/// </remarks>
 		WriteSystem,
 
 		/// <summary>
 		/// Read files in 0:/www
 		/// </summary>
-		/// <remarks>
-		/// Reserved; not implemented in DSF 3.2.0
-		/// </remarks>
 		ReadWeb,
 
 		/// <summary>
-		/// Read and write files in 0:/www
+		/// Write files in 0:/www
 		/// </summary>
-		/// <remarks>
-		/// Reserved; not implemented in DSF 3.2.0
-		/// </remarks>
 		WriteWeb,
 
 		/// <summary>
 		/// Access files outside the virtual SD directory (as DSF user)
 		/// </summary>
-		/// <remarks>
-		/// Reserved; not implemented in DSF 3.2.0
-		/// </remarks>
 		FileSystemAccess,
 
         /// <summary>
         /// Launch new processes
         /// </summary>
-        /// <remarks>
-        /// Reserved; not implemented in DSF 3.2.0
-        /// </remarks>
         LaunchProcesses,
 
 		/// <summary>
 		/// Communicate over the network (stand-alone)
 		/// </summary>
-        /// <remarks>
-        /// Reserved; not implemented in DSF 3.2.0
-        /// </remarks>
 		NetworkAccess,
 
         /// <summary>
@@ -209,7 +164,7 @@ namespace DuetAPI.Utility
             {
 				while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
 				{
-					SbcPermissions readValue = (SbcPermissions)Enum.Parse(typeof(SbcPermissions), reader.GetString());
+					SbcPermissions readValue = (SbcPermissions)Enum.Parse(typeof(SbcPermissions), reader.GetString(), true);
 					result |= readValue;
                 }
             }
@@ -227,7 +182,7 @@ namespace DuetAPI.Utility
 			writer.WriteStartArray();
 			foreach (Enum permission in Enum.GetValues(typeof(SbcPermissions)))
             {
-				if (value.HasFlag(permission))
+				if (value.HasFlag(permission) && !permission.Equals(SbcPermissions.None))
                 {
 					string permissionString = JsonNamingPolicy.CamelCase.ConvertName(permission.ToString());
 					writer.WriteStringValue(permissionString);

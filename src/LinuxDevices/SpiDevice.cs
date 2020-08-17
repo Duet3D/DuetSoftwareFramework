@@ -2,7 +2,7 @@
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace LinuxDevices
+namespace LinuxApi
 {
     /// <summary>
     /// Driver class for SPI transfers. Most of this is copied from the System.Device.Gpio library

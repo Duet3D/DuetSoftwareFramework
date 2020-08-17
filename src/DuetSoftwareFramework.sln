@@ -11,7 +11,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetWebServer", "DuetWebSer
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetAPIClient", "DuetAPIClient\DuetAPIClient.csproj", "{229CADA4-5980-4130-9079-06B4173B982C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LinuxDevices", "LinuxDevices\LinuxDevices.csproj", "{E943A486-FC12-4D9C-8335-26C94AB96325}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LinuxApi", "LinuxDevices\LinuxApi.csproj", "{E943A486-FC12-4D9C-8335-26C94AB96325}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeLogger", "CodeLogger\CodeLogger.csproj", "{40C30CBB-53BF-47C5-8DCA-0468AB593E90}"
 EndProject
@@ -32,7 +32,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		..\WHATS_NEW.md = ..\WHATS_NEW.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PluginManager", "PluginManager\PluginManager.csproj", "{BCC22B04-E9F6-4DD5-AA95-24F02C7AC311}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PluginManager", "PluginManager\PluginManager.csproj", "{BCC22B04-E9F6-4DD5-AA95-24F02C7AC311}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

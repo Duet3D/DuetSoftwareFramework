@@ -1,5 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
-using LinuxDevices;
+using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 
@@ -8,14 +8,16 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.StopPlugin"/> command
     /// </summary>
-    public class StopPlugin : DuetAPI.Commands.StopPlugin
+    public sealed class StopPlugin : DuetAPI.Commands.StopPlugin
     {
         /// <summary>
         /// Stop a plugin
         /// </summary>
         /// <returns>Asynchronous task</returns>
+        /// <exception cref="ArgumentException">Plugin is invalid</exception>
         public override async Task Execute()
         {
+            bool pluginFound = false;
             int pid = -1;
             using (await Model.Provider.AccessReadWriteAsync())
             {
@@ -23,10 +25,16 @@ namespace DuetControlServer.Commands
                 {
                     if (item.Name == Plugin)
                     {
-                        pid = item.PID;
+                        pid = item.Pid;
+                        pluginFound = true;
                         break;
                     }
                 }
+            }
+
+            if (!pluginFound)
+            {
+                throw new ArgumentException($"Plugin {Plugin} not found");
             }
 
             if (pid > 0)
@@ -37,7 +45,7 @@ namespace DuetControlServer.Commands
                 if (process != null)
                 {
                     // Ask process to terminate and wait a moment
-                    Signal.Kill(pid, Signal.SIGTERM);
+                    LinuxApi.Commands.Kill(pid, LinuxApi.Signal.SIGTERM);
                     process.WaitForExit(4000);
 
                     // Kill it and any potential child processes

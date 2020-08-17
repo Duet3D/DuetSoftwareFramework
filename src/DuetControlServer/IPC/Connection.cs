@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -13,7 +14,7 @@ using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.Utility;
-using LinuxDevices;
+using LinuxApi;
 using Command = DuetControlServer.IPC.Processors.Command;
 
 namespace DuetControlServer.IPC
@@ -289,7 +290,7 @@ namespace DuetControlServer.IPC
                     Type commandType = GetCommandType(commandName);
                     if (!typeof(BaseCommand).IsAssignableFrom(commandType))
                     {
-                        throw new ArgumentException("Command is not of type BaseCommand");
+                        throw new ArgumentException($"Command {commandName} is not of type BaseCommand");
                     }
 
                     // Log this
@@ -303,7 +304,7 @@ namespace DuetControlServer.IPC
                     }
 
                     // Perform final deserialization and assign source identifier to this command
-                    BaseCommand command = jsonDocument.RootElement.ToObject<BaseCommand>(JsonHelper.DefaultJsonOptions);
+                    BaseCommand command = (BaseCommand)jsonDocument.RootElement.ToObject(commandType, JsonHelper.DefaultJsonOptions);
                     if (command is Commands.IConnectionCommand commandWithSourceConnection)
                     {
                         commandWithSourceConnection.Connection = this;

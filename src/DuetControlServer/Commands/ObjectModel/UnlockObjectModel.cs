@@ -6,7 +6,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.UnlockObjectModel"/> command
     /// </summary>
-    public class UnlockMachineModel : DuetAPI.Commands.UnlockObjectModel, IConnectionCommand
+    public sealed class UnlockObjectModel : DuetAPI.Commands.UnlockObjectModel, IConnectionCommand
     {
         /// <summary>
         /// Source connection of this command. Needed to register the owner of the lock
@@ -19,7 +19,7 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override Task Execute()
         {
-            IPC.LockManager.UnlockMachineModel(Connection);
+            LockManager.UnlockMachineModel(Connection);
             return Task.CompletedTask;
         }
     }

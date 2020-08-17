@@ -7,7 +7,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.GetFileInfo"/> command
     /// </summary>
-    public class GetFileInfo : DuetAPI.Commands.GetFileInfo
+    public sealed class GetFileInfo : DuetAPI.Commands.GetFileInfo
     {
         /// <summary>
         /// Retrieves file information from the given filename

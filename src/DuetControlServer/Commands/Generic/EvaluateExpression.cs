@@ -5,7 +5,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.EvaluateExpression"/> command
     /// </summary>
-    public class EvaluateExpression : DuetAPI.Commands.EvaluateExpression
+    public sealed class EvaluateExpression : DuetAPI.Commands.EvaluateExpression
     {
         /// <summary>
         /// Evaluate an arbitrary expression in RepRapFirmware

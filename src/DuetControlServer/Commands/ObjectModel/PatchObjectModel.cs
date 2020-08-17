@@ -6,7 +6,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.PatchObjectModel"/> command
     /// </summary>
-    public class PatchMachineModel : DuetAPI.Commands.PatchObjectModel
+    public sealed class PatchObjectModel : DuetAPI.Commands.PatchObjectModel
     {
         /// <summary>
         /// Apply a full patch to the object model. May be used only in non-SPI mode

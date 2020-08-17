@@ -91,32 +91,67 @@ namespace PluginManager
             {
                 case PluginOperation.List:
                     model = await connection.GetObjectModel();
-                    Console.WriteLine("{0,16} {1,8} {2,12} {3,10}", "Plugin", "Version", "Author", "License", "Status");
-                    foreach (Plugin item in model.Plugins)
+                    if (model.Plugins.Count > 0)
                     {
-                        Console.WriteLine("{0,16} {1,8} {2,12} {3,10}", item.Name, item.Version, item.Author, item.License, (item.PID > 0) ? "started" : "stopped");
+                        Console.WriteLine("{0,-24} {1,-16} {2,-24} {3,-12} {4,-12}", "Plugin", "Version", "Author", "License", "Status");
+                        foreach (Plugin item in model.Plugins)
+                        {
+                            string pluginState = "n/a";
+                            if (!string.IsNullOrEmpty(item.SbcExecutable))
+                            {
+                                pluginState = (item.Pid > 0) ? "Started" : "Stopped";
+                            }
+                            Console.WriteLine("{0,-24} {1,-16} {2,-24} {3,-12} {4,-12}", item.Name, item.Version, item.Author, item.License, pluginState);
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("No plugins installed");
                     }
                     break;
 
                 case PluginOperation.ListData:
                     model = await connection.GetObjectModel();
-                    foreach (Plugin item in model.Plugins)
+                    if (model.Plugins.Count > 0)
                     {
-                        Console.WriteLine("Plugin {0}:", item.Name);
-                        foreach (var kv in item.Data)
+                        foreach (Plugin item in model.Plugins)
                         {
-                            Console.WriteLine("{0} = {1}", kv.Key, JsonSerializer.Serialize(kv.Value, DuetAPI.Utility.JsonHelper.DefaultJsonOptions));
+                            Console.WriteLine("Plugin {0}:", item.Name);
+                            foreach (var kv in item.SbcData)
+                            {
+                                Console.WriteLine("{0} = {1}", kv.Key, JsonSerializer.Serialize(kv.Value, DuetAPI.Utility.JsonHelper.DefaultJsonOptions));
+                            }
+                            Console.WriteLine();
                         }
-                        Console.WriteLine();
+                    }
+                    else
+                    {
+                        Console.WriteLine("No plugins installed");
                     }
                     break;
 
                 case PluginOperation.Install:
-                    await connection.InstallPlugin(plugin);
+                    try
+                    {
+                        await connection.InstallPlugin(plugin);
+                        Console.WriteLine("Plugin installed");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Failed to install plugin: {0}", e.Message);
+                    }
                     break;
 
                 case PluginOperation.Start:
-                    await connection.StartPlugin(plugin);
+                    try
+                    {
+                        await connection.StartPlugin(plugin);
+                        Console.WriteLine("Plugin started");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Failed to start plugin: {0}", e.Message);
+                    }
                     break;
 
                 case PluginOperation.SetData:
@@ -157,21 +192,44 @@ namespace PluginManager
                     // Try to set the data
                     try
                     {
-                        using JsonDocument json = JsonDocument.Parse(value);
-                        await connection.SetPluginData(key, json.RootElement, pluginName);
+                        try
+                        {
+                            using JsonDocument json = JsonDocument.Parse(value);
+                            await connection.SetPluginData(key, json.RootElement, pluginName);
+                        }
+                        catch (JsonException)
+                        {
+                            await connection.SetPluginData(key, value, pluginName);
+                        }
+                        Console.WriteLine("Plugin data set");
                     }
-                    catch (JsonException)
+                    catch (Exception e)
                     {
-                        await connection.SetPluginData(key, value, pluginName);
+                        Console.WriteLine("Failed to set plugin data: {0}", e.Message);
                     }
                     break;
 
                 case PluginOperation.Stop:
-                    await connection.StopPlugin(plugin);
+                    try
+                    {
+                        await connection.StopPlugin(plugin);
+                        Console.WriteLine("Plugin stopped");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Failed to stop plugin: {0}", e.Message);
+                    }
                     break;
 
                 case PluginOperation.Uninstall:
-                    await connection.UninstallPlugin(plugin);
+                    try
+                    {
+                        await connection.UninstallPlugin(plugin);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Failed to uninstall plugin: {0}", e.Message);
+                    }
                     break;
             }
         }

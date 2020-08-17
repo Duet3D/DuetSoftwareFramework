@@ -6,7 +6,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.AddUserSession"/> command
     /// </summary>
-    public class AddUserSession : DuetAPI.Commands.AddUserSession
+    public sealed class AddUserSession : DuetAPI.Commands.AddUserSession
     {
         /// <summary>
         /// Counter for new user sessions

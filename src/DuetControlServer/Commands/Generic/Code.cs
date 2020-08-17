@@ -21,7 +21,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.Code"/> command
     /// </summary>
-    public class Code : DuetAPI.Commands.Code, IConnectionCommand
+    public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     {
         /// <summary>
         /// Logger instance

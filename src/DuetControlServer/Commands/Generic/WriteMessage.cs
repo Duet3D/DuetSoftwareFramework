@@ -6,7 +6,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.WriteMessage"/> command
     /// </summary>
-    public class WriteMessage : DuetAPI.Commands.WriteMessage
+    public sealed class WriteMessage : DuetAPI.Commands.WriteMessage
     {
         /// <summary>
         /// Logger instance

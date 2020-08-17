@@ -6,7 +6,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.RemoveHttpEndpoint"/> command
     /// </summary>
-    public class RemoveHttpEndpoint : DuetAPI.Commands.RemoveHttpEndpoint
+    public sealed class RemoveHttpEndpoint : DuetAPI.Commands.RemoveHttpEndpoint
     {
         /// <summary>
         /// Logger instance

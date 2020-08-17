@@ -9,7 +9,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.SetPluginData"/> command
     /// </summary>
-    public class SetPluginData : DuetAPI.Commands.SetPluginData, IConnectionCommand
+    public sealed class SetPluginData : DuetAPI.Commands.SetPluginData, IConnectionCommand
     {
         /// <summary>
         /// Set custom plugin data in the object model
@@ -36,7 +36,7 @@ namespace DuetControlServer.Commands
                 {
                     if (plugin.Name == Plugin)
                     {
-                        plugin.Data[Key] = Value;
+                        plugin.SbcData[Key] = Value;
                         return;
                     }
                 }

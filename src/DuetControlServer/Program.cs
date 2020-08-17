@@ -1,6 +1,6 @@
-﻿using DuetAPI.Commands;
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
+using DuetControlServer.Commands;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -170,7 +170,7 @@ namespace DuetControlServer
                     {
                         using FileStream manifestStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
                         Plugin plugin = await JsonSerializer.DeserializeAsync<Plugin>(manifestStream, JsonHelper.DefaultJsonOptions);
-                        plugin.PID = -1;
+                        plugin.Pid = -1;
                         using (await Model.Provider.AccessReadWriteAsync())
                         {
                             Model.Provider.Get.Plugins.Add(plugin);
@@ -186,21 +186,26 @@ namespace DuetControlServer
             // Start plugins that were started when DCS quit last time
             if (File.Exists(Settings.PluginsFilename))
             {
-                List<Task> startTasks = new List<Task>();
                 using FileStream pluginsFile = new FileStream(Settings.PluginsFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
                 using StreamReader reader = new StreamReader(pluginsFile);
 
                 string plugin;
                 while ((plugin = await reader.ReadLineAsync()) != null)
                 {
-                    StartPlugin startPlugin = new StartPlugin
+                    _logger.Info("Starting plugin {0}", plugin);
+                    try
                     {
-                        Plugin = plugin
-                    };
-                    startTasks.Add(Task.Run(startPlugin.Execute));
+                        StartPlugin startPlugin = new StartPlugin
+                        {
+                            Plugin = plugin
+                        };
+                        await startPlugin.Execute();
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Error(e, "Failed to start plugin {0}", plugin);
+                    }
                 }
-
-                await Task.WhenAll(startTasks);
             }
 
             // Wait for the first task to terminate.
@@ -242,25 +247,33 @@ namespace DuetControlServer
             while (mainTasks.Count > 0);
 
             // Stop the plugins again
-            _logger.Debug("Stopping plugins");
             List<string> startedPlugins = new List<string>();
-            List<Task> stopTasks = new List<Task>();
             foreach (Plugin plugin in Model.Provider.Get.Plugins)
             {
-                if (plugin.PID > 0)
+                if (plugin.Pid >= 0)
                 {
                     startedPlugins.Add(plugin.Name);
-                    Commands.StopPlugin stopPlugin = new Commands.StopPlugin()
+                    if (plugin.Pid > 0)
                     {
-                        Plugin = plugin.Name
-                    };
-                    stopTasks.Add(Task.Run(stopPlugin.Execute));
+                        _logger.Debug("Stopping plugin {0}", plugin.Name);
+                        try
+                        {
+                            StopPlugin stopPlugin = new StopPlugin()
+                            {
+                                Plugin = plugin.Name
+                            };
+                            await stopPlugin.Execute();
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.Error(e, "Failed to stop plugin {0}", plugin.Name);
+                        }
+                    }
                 }
             }
-            await Task.WhenAll(stopTasks);
 
             // Keep track of the started plugins
-            _logger.Debug("Saving list of started plugins");
+            _logger.Debug("Saving list of previously started plugins");
             using (FileStream pluginsFile = new FileStream(Settings.PluginsFilename, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 using StreamWriter writer = new StreamWriter(pluginsFile);
@@ -297,7 +310,7 @@ namespace DuetControlServer
                 Console.Write("Sending update request to DCS... ");
                 try
                 {
-                    await connection.PerformCode(new DuetAPI.Commands.Code
+                    await connection.PerformCode(new Code
                     {
                         Type = DuetAPI.Commands.CodeType.MCode,
                         MajorNumber = 997,

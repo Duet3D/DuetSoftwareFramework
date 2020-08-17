@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using Code = DuetControlServer.Commands.Code;
 using Nito.AsyncEx;
-using LinuxDevices;
+using LinuxApi;
 using System.Collections.Generic;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.Shared;
