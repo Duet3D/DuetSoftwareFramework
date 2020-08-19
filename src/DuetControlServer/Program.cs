@@ -161,50 +161,36 @@ namespace DuetControlServer
                 }
             };
 
-            // Load plugin manifests
-            foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
+            // Load plugin manifests and start them again
+            if (!Settings.UpdateOnly)
             {
-                if (file.EndsWith(".json"))
+                foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
                 {
-                    try
+                    if (file.EndsWith(".json"))
                     {
-                        using FileStream manifestStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
-                        Plugin plugin = await JsonSerializer.DeserializeAsync<Plugin>(manifestStream, JsonHelper.DefaultJsonOptions);
-                        plugin.Pid = -1;
-                        using (await Model.Provider.AccessReadWriteAsync())
+                        try
                         {
-                            Model.Provider.Get.Plugins.Add(plugin);
+                            using FileStream manifestStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                            using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
+                            Plugin plugin = new Plugin();
+                            plugin.UpdateFromJson(manifestJson.RootElement);
+                            plugin.Pid = -1;
+                            using (await Model.Provider.AccessReadWriteAsync())
+                            {
+                                Model.Provider.Get.Plugins.Add(plugin);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.Error(e, "Failed to load plugin manifest {0}", Path.GetFileName(file));
                         }
                     }
-                    catch (Exception e)
-                    {
-                        _logger.Error(e, "Failed to load plugin manifest {0}", Path.GetFileName(file));
-                    }
                 }
-            }
 
-            // Start plugins that were started when DCS quit last time
-            if (File.Exists(Settings.PluginsFilename))
-            {
-                using FileStream pluginsFile = new FileStream(Settings.PluginsFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
-                using StreamReader reader = new StreamReader(pluginsFile);
-
-                string plugin;
-                while ((plugin = await reader.ReadLineAsync()) != null)
+                if (File.Exists(Settings.PluginsFilename))
                 {
-                    _logger.Info("Starting plugin {0}", plugin);
-                    try
-                    {
-                        StartPlugin startPlugin = new StartPlugin
-                        {
-                            Plugin = plugin
-                        };
-                        await startPlugin.Execute();
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.Error(e, "Failed to start plugin {0}", plugin);
-                    }
+                    string[] pluginsToStart = await File.ReadAllLinesAsync(Settings.PluginsFilename);
+                    await Utility.Plugins.StartPlugins(pluginsToStart);
                 }
             }
 
@@ -246,41 +232,12 @@ namespace DuetControlServer
             }
             while (mainTasks.Count > 0);
 
-            // Stop the plugins again
-            List<string> startedPlugins = new List<string>();
-            foreach (Plugin plugin in Model.Provider.Get.Plugins)
+            // Stop the plugins again and save the state
+            if (!Settings.UpdateOnly)
             {
-                if (plugin.Pid >= 0)
-                {
-                    startedPlugins.Add(plugin.Name);
-                    if (plugin.Pid > 0)
-                    {
-                        _logger.Debug("Stopping plugin {0}", plugin.Name);
-                        try
-                        {
-                            StopPlugin stopPlugin = new StopPlugin()
-                            {
-                                Plugin = plugin.Name
-                            };
-                            await stopPlugin.Execute();
-                        }
-                        catch (Exception e)
-                        {
-                            _logger.Error(e, "Failed to stop plugin {0}", plugin.Name);
-                        }
-                    }
-                }
-            }
-
-            // Keep track of the started plugins
-            _logger.Debug("Saving list of previously started plugins");
-            using (FileStream pluginsFile = new FileStream(Settings.PluginsFilename, FileMode.Create, FileAccess.Write, FileShare.None))
-            {
-                using StreamWriter writer = new StreamWriter(pluginsFile);
-                foreach (string plugin in startedPlugins)
-                {
-                    await writer.WriteLineAsync(plugin);
-                }
+                _logger.Debug("Stopping plugins and saving their execution state");
+                IEnumerable<string> startedPlugins = await Utility.Plugins.StopPlugins();
+                await File.WriteAllLinesAsync(Settings.PluginsFilename, startedPlugins);
             }
 
             // End

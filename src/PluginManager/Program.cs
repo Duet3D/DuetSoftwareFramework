@@ -93,7 +93,7 @@ namespace PluginManager
                     model = await connection.GetObjectModel();
                     if (model.Plugins.Count > 0)
                     {
-                        Console.WriteLine("{0,-24} {1,-16} {2,-24} {3,-12} {4,-12}", "Plugin", "Version", "Author", "License", "Status");
+                        Console.WriteLine("{0,-24} {1,-16} {2,-24} {3,-24} {4,-12}", "Plugin", "Version", "Author", "License", "Status");
                         foreach (Plugin item in model.Plugins)
                         {
                             string pluginState = "n/a";
@@ -101,7 +101,7 @@ namespace PluginManager
                             {
                                 pluginState = (item.Pid > 0) ? "Started" : "Stopped";
                             }
-                            Console.WriteLine("{0,-24} {1,-16} {2,-24} {3,-12} {4,-12}", item.Name, item.Version, item.Author, item.License, pluginState);
+                            Console.WriteLine("{0,-24} {1,-16} {2,-24} {3,-24} {4,-12}", item.Name, item.Version, item.Author, item.License, pluginState);
                         }
                     }
                     else

@@ -16,6 +16,11 @@ namespace DuetControlServer.Commands
     public sealed class InstallPlugin : DuetAPI.Commands.InstallPlugin
     {
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private NLog.Logger _logger;
+
+        /// <summary>
         /// Install or upgrade a plugin
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -26,8 +31,8 @@ namespace DuetControlServer.Commands
             Plugin plugin = await GetManifest(zipArchive);
 
             // Run preflight check to make sure no malicious files are installed
-            NLog.Logger logger = NLog.LogManager.GetLogger($"InstallPlugin#{plugin.Name}");
-            logger.Debug("Checking files");
+            _logger = NLog.LogManager.GetLogger($"InstallPlugin#{plugin.Name}");
+            _logger.Debug("Checking files");
             foreach (ZipArchiveEntry entry in zipArchive.Entries)
             {
                 if (entry.FullName.Contains("..") ||
@@ -56,7 +61,7 @@ namespace DuetControlServer.Commands
 
             if (pluginFound)
             {
-                logger.Debug("Uninstalling old files for upgrade");
+                _logger.Debug("Uninstalling old files for upgrade");
                 UninstallPlugin uninstallPlugin = new UninstallPlugin()
                 {
                     Plugin = plugin.Name,
@@ -73,7 +78,7 @@ namespace DuetControlServer.Commands
             // Install plugin dependencies
             foreach (string package in plugin.SbcPackageDependencies)
             {
-                logger.Debug("Installing dependency package {0}", package);
+                _logger.Debug("Installing dependency package {0}", package);
                 await InstallPackage(package);
             }
 
@@ -81,7 +86,7 @@ namespace DuetControlServer.Commands
             string pluginBase = Path.Combine(Settings.PluginDirectory, plugin.Name);
             if (!Directory.Exists(pluginBase))
             {
-                logger.Debug("Creating plugin base directory {0}", pluginBase);
+                _logger.Debug("Creating plugin base directory {0}", pluginBase);
                 Directory.CreateDirectory(pluginBase);
             }
 
@@ -118,12 +123,12 @@ namespace DuetControlServer.Commands
                 string parentDirectory = Path.GetDirectoryName(fileName);
                 if (!Directory.Exists(parentDirectory))
                 {
-                    logger.Debug("Creating new directory {0}", parentDirectory);
+                    _logger.Debug("Creating new directory {0}", parentDirectory);
                     Directory.CreateDirectory(parentDirectory);
                 }
 
                 // Extract the file
-                logger.Debug("Extracting {0} to {1}", entry.FullName, fileName);
+                _logger.Debug("Extracting {0} to {1}", entry.FullName, fileName);
                 using FileStream fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
                 using Stream zipFileStream = entry.Open();
                 await zipFileStream.CopyToAsync(fileStream);
@@ -149,7 +154,7 @@ namespace DuetControlServer.Commands
 
                 if (File.Exists(sbcExecutable))
                 {
-                    logger.Debug("Changing mode of {0} to 750", sbcExecutable);
+                    _logger.Debug("Changing mode of {0} to 750", sbcExecutable);
                     LinuxApi.Commands.Chmod(sbcExecutable,
                         LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
                         LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
@@ -172,27 +177,27 @@ namespace DuetControlServer.Commands
                 {
                     try
                     {
-                        logger.Debug("Trying to create symlink {0} -> {1}", pluginWwwPath, installWwwPath);
+                        _logger.Debug("Trying to create symlink {0} -> {1}", pluginWwwPath, installWwwPath);
                         LinuxApi.Commands.Symlink(pluginWwwPath, installWwwPath);
                     }
                     catch (IOException e)
                     {
-                        logger.Debug(e);
-                        logger.Warn("Failed to create symlink to web directory, trying to copy web files instead...");
+                        _logger.Debug(e);
+                        _logger.Warn("Failed to create symlink to web directory, trying to copy web files instead...");
                         createDirectory = true;
                     }
                 }
 
                 if (createDirectory)
                 {
-                    logger.Debug("Copying web files from {0} to {1}", pluginWwwPath, installWwwPath);
+                    _logger.Debug("Copying web files from {0} to {1}", pluginWwwPath, installWwwPath);
                     DirectoryCopy(pluginWwwPath, installWwwPath, true);
                 }
             }
 
             // Install refreshed plugin manifest
             string manifestFilename = Path.Combine(Settings.PluginDirectory, $"{plugin.Name}.json");
-            logger.Debug("Installing plugin manifest {0}", manifestFilename);
+            _logger.Debug("Installing plugin manifest {0}", manifestFilename);
             using FileStream manifestFile = new FileStream(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None);
             await JsonSerializer.SerializeAsync(manifestFile, plugin, JsonHelper.DefaultJsonOptions);
 
@@ -201,13 +206,13 @@ namespace DuetControlServer.Commands
             {
                 Model.Provider.Get.Plugins.Add(plugin);
             }
-            logger.Info("Plugin successfully installed");
+            _logger.Info("Plugin successfully installed");
         }
 
         /// <summary>
         /// Install a Linux package
         /// </summary>
-        /// <param name="package"></param>
+        /// <param name="package">Name of the package to install</param>
         private Task InstallPackage(string package)
         {
             // TODO Ask elevation service to install this package
@@ -222,7 +227,7 @@ namespace DuetControlServer.Commands
         /// <exception cref="ArgumentException">Plugin is incompatible</exception>
         private async Task<Plugin> GetManifest(ZipArchive zipArchive)
         {
-            // Extract the file
+            // Extract the plugin manifest
             ZipArchiveEntry manifestFile = zipArchive.GetEntry("plugin.json");
             if (manifestFile == null)
             {
@@ -233,18 +238,6 @@ namespace DuetControlServer.Commands
             Plugin plugin = await JsonSerializer.DeserializeAsync<Plugin>(manifestStream, JsonHelper.DefaultJsonOptions);
             plugin.Pid = -1;
 
-            // Does it contain SBC files?
-            if (!string.IsNullOrEmpty(plugin.SbcExecutable))
-            {
-                // Check the API version
-                if (plugin.SbcApiVersion < IPC.Server.MinimumProtocolVersion || plugin.SbcApiVersion > Defaults.ProtocolVersion)
-                {
-                    throw new ArgumentException("Incompatible API version");
-                }
-            }
-
-#warning Optional RRF version isn't checked here
-
             // Check the plugin name
             if (string.IsNullOrWhiteSpace(plugin.Name) || plugin.Name.Length > 64)
             {
@@ -253,7 +246,7 @@ namespace DuetControlServer.Commands
 
             foreach (char c in plugin.Name)
             {
-                if (!char.IsLetterOrDigit(c) && !char.IsWhiteSpace(c))
+                if (!char.IsLetterOrDigit(c) && c != ' ' && c != '.' && c != '-' && c != '_')
                 {
                     throw new ArgumentException("Illegal plugin name");
                 }

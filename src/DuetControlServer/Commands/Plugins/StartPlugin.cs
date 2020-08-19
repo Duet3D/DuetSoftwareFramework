@@ -40,13 +40,19 @@ namespace DuetControlServer.Commands
         /// </summary>
         /// <param name="name">Plugin name</param>
         /// <param name="requiredBy">Plugin that requires this plugin</param>
-        /// <returns></returns>
+        /// <returns>Whether the plugin could be found</returns>
         private async Task<bool> Start(string name, string requiredBy = null)
         {
             foreach (Plugin item in Model.Provider.Get.Plugins)
             {
-                if (item.Name == Plugin && item.Pid < 0)
+                if (item.Name == Plugin)
                 {
+                    // Don't do anything if the plugin is already running
+                    if (item.Pid > 0)
+                    {
+                        return true;
+                    }
+
                     // Start plugin dependencies
                     foreach (string dependency in item.SbcPluginDependencies)
                     {
@@ -57,6 +63,29 @@ namespace DuetControlServer.Commands
                         if (!await Start(dependency, name))
                         {
                             throw new ArgumentException($"Dependency {dependency} of plugin {name} not found");
+                        }
+                    }
+
+                    // Check the required DSF version
+                    if (!string.IsNullOrEmpty(item.SbcExecutable) && !Utility.Plugins.CheckVersion(Program.Version, item.SbcDsfVersion))
+                    {
+                        throw new ArgumentException($"Incompatible DSF version (requires {item.SbcDsfVersion}, got {Program.Version})");
+                    }
+
+                    // Check the required RRF version
+                    if (!string.IsNullOrEmpty(item.RrfVersion))
+                    {
+                        if (Model.Provider.Get.Boards.Count > 0)
+                        {
+                            string rrfVersion = Model.Provider.Get.Boards[0].FirmwareVersion;
+                            if (!Utility.Plugins.CheckVersion(rrfVersion, item.RrfVersion))
+                            {
+                                throw new ArgumentException($"Incompatible RRF version (requires {item.RrfVersion}, got {rrfVersion})");
+                            }
+                        }
+                        else
+                        {
+                            _logger.Warn("Failed to check RRF version");
                         }
                     }
 
@@ -109,16 +138,10 @@ namespace DuetControlServer.Commands
             process.ErrorDataReceived += errorHandler;
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-            _logger.Info("Process has been started (pid {0})", process.Id);
 
             // Update the PID
-            foreach (Plugin item in Model.Provider.Get.Plugins)
-            {
-                if (item.Name == Plugin)
-                {
-                    item.Pid = process.Id;
-                }
-            }
+            plugin.Pid = process.Id;
+            _logger.Info("Process has been started (pid {0})", process.Id);
 
             // Wait for the plugin to terminate in the background
             _ = Task.Run(async delegate

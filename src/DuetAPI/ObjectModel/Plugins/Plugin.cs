@@ -26,6 +26,11 @@
 		/// <remarks>
 		/// This may become 0 when the plugin has been stopped and the application is being shut down
 		/// </remarks>
-        public int Pid { get; set; } = -1;
-    }
+		public int Pid
+		{
+			get => _pid;
+			set => SetPropertyValue(ref _pid, value);
+		}
+		private int _pid = -1;
+	}
 }

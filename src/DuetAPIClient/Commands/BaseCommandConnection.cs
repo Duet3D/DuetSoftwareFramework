@@ -124,8 +124,8 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         public async Task<string> GetSerializedObjectModel(CancellationToken cancellationToken = default)
         {
-            JsonElement element = await PerformCommand<JsonElement>(new GetObjectModel(), cancellationToken);
-            return element.GetRawText();
+            using JsonDocument jsonDocument = await PerformCommand<JsonDocument>(new GetObjectModel(), cancellationToken);
+            return jsonDocument.RootElement.GetRawText();
         }
 
         /// <summary>

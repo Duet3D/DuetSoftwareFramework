@@ -36,7 +36,7 @@ namespace DuetControlServer.Commands
                 {
                     if (plugin.Name == Plugin)
                     {
-                        plugin.SbcData[Key] = Value;
+                        plugin.SbcData[Key] = Value.Clone();        // create a clone so that the instance can be used even after the JsonDocument is disposed
                         return;
                     }
                 }

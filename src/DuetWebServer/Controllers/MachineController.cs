@@ -217,7 +217,7 @@ namespace DuetWebServer.Controllers
                     _logger.LogError($"[{nameof(UploadFile)}] DCS is not started");
                     return StatusCode(503, "DCS is not started");
                 }
-                _logger.LogWarning(e, $"[{nameof(UploadFile)} Failed upload file {filename} ({Request.Body.Length} bytes, resolved to {resolvedPath})");
+                _logger.LogWarning(e, $"[{nameof(UploadFile)} Failed upload file {filename} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
             }
         }
@@ -499,36 +499,43 @@ namespace DuetWebServer.Controllers
             string zipFile = Path.GetTempFileName();
             try
             {
-                // Write ZIP file
-                using (FileStream stream = new FileStream(zipFile, FileMode.Create, FileAccess.Write))
+                try
                 {
-                    await Request.Body.CopyToAsync(stream);
+                    // Write ZIP file
+                    using (FileStream stream = new FileStream(zipFile, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await Request.Body.CopyToAsync(stream);
+                    }
+
+                    // Install it
+                    using CommandConnection connection = await BuildConnection();
+                    await connection.InstallPlugin(zipFile);
+
+                    return NoContent();
                 }
-
-                // Install it
-                using CommandConnection connection = await BuildConnection();
-                await connection.InstallPlugin(zipFile);
-
-                return NoContent();
+                catch (Exception e)
+                {
+                    if (e is AggregateException ae)
+                    {
+                        e = ae.InnerException;
+                    }
+                    if (e is IncompatibleVersionException)
+                    {
+                        _logger.LogError($"[{nameof(InstallPlugin)}] Incompatible DCS version");
+                        return StatusCode(502, "Incompatible DCS version");
+                    }
+                    if (e is SocketException)
+                    {
+                        _logger.LogError($"[{nameof(InstallPlugin)}] DCS is not started");
+                        return StatusCode(503, "DCS is not started");
+                    }
+                    _logger.LogWarning(e, $"[{nameof(InstallPlugin)} Failed to upload ZIP file to {zipFile}");
+                    return StatusCode(500, e.Message);
+                }
             }
-            catch (Exception e)
+            finally
             {
-                if (e is AggregateException ae)
-                {
-                    e = ae.InnerException;
-                }
-                if (e is IncompatibleVersionException)
-                {
-                    _logger.LogError($"[{nameof(InstallPlugin)}] Incompatible DCS version");
-                    return StatusCode(502, "Incompatible DCS version");
-                }
-                if (e is SocketException)
-                {
-                    _logger.LogError($"[{nameof(InstallPlugin)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
-                }
-                _logger.LogWarning(e, $"[{nameof(InstallPlugin)} Failed to upload file to {zipFile} ({Request.Body.Length} bytes)");
-                return StatusCode(500, e.Message);
+                System.IO.File.Delete(zipFile);
             }
         }
 
@@ -657,7 +664,7 @@ namespace DuetWebServer.Controllers
         /// Start a plugin on the SBC
         /// </summary>
         /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
-        [HttpPost]
+        [HttpPost("startPlugin")]
         public async Task<IActionResult> StartPlugin()
         {
             try
@@ -701,7 +708,7 @@ namespace DuetWebServer.Controllers
         /// Stop a plugin on the SBC
         /// </summary>
         /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
-        [HttpPost]
+        [HttpPost("stopPlugin")]
         public async Task<IActionResult> StopPlugin()
         {
             try

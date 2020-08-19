@@ -1655,6 +1655,133 @@
             <param name="itemType">Item type</param>
             <returns>Differences of the lists or null if they are equal</returns>
         </member>
+        <member name="T:DuetAPI.ObjectModel.ModelDictionary`1">
+            <summary>
+            Class for holding dynamic properties. Properties may not be deleted again
+            </summary>
+            <typeparam name="TValue"></typeparam>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.ModelDictionary`1._dictionary">
+            <summary>
+            Internal storage for key/value pairs
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ModelDictionary`1.Item(System.String)">
+            <summary>
+            Index operator
+            </summary>
+            <param name="key">Key</param>
+            <returns>Value</returns>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ModelDictionary`1.Keys">
+            <summary>
+            List of keys
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ModelDictionary`1.Values">
+            <summary>
+            List of values
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ModelDictionary`1.Count">
+            <summary>
+            Number of added items
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ModelDictionary`1.IsReadOnly">
+            <summary>
+            Whether the dictionary is read-only
+            </summary>
+        </member>
+        <member name="E:DuetAPI.ObjectModel.ModelDictionary`1.PropertyChanged">
+            <summary>
+            Event to call when a value is set
+            </summary>
+        </member>
+        <member name="E:DuetAPI.ObjectModel.ModelDictionary`1.PropertyChanging">
+            <summary>
+            Event to call when a value is being changed
+            </summary>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.Add(System.String,`0)">
+            <summary>
+            Add a new item
+            </summary>
+            <param name="key">Key to add</param>
+            <param name="value">Value to add</param>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.Add(System.Collections.Generic.KeyValuePair{System.String,`0})">
+            <summary>
+            Add a new key-value pair
+            </summary>
+            <param name="item">Item to add</param>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.Clear">
+            <summary>
+            Clear the items
+            </summary>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.Clone">
+            <summary>
+            Create a clone of this instance
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.Contains(System.Collections.Generic.KeyValuePair{System.String,`0})">
+            <summary>
+            Check if a key-value pair is present
+            </summary>
+            <param name="item"></param>
+            <returns>Whether the key-value pair is present</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.ContainsKey(System.String)">
+            <summary>
+            Check if a key is present
+            </summary>
+            <param name="key">Key to check</param>
+            <returns>Whether the key is present</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.CopyTo(System.Collections.Generic.KeyValuePair{System.String,`0}[],System.Int32)">
+            <summary>
+            Copy the collection to another array
+            </summary>
+            <param name="array">Destination array</param>
+            <param name="arrayIndex">Start index</param>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.GetEnumerator">
+            <summary>
+            Get an enumerator
+            </summary>
+            <returns>Enumerator</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.Remove(System.String)">
+            <summary>
+            Remove a key
+            </summary>
+            <param name="key">Key to remove</param>
+            <returns>Whether the key could be found</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.Remove(System.Collections.Generic.KeyValuePair{System.String,`0})">
+            <summary>
+            Remove a key-value pair
+            </summary>
+            <param name="item">Key-value pair</param>
+            <returns>Whether the key-value pair could be found</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.TryGetValue(System.String,`0@)">
+            <summary>
+            Try to get a value
+            </summary>
+            <param name="key">Key to look up</param>
+            <param name="value">Retrieved value</param>
+            <returns>Whether the key could be found</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ModelDictionary`1.System#Collections#IEnumerable#GetEnumerator">
+            <summary>
+            Get an enumerator
+            </summary>
+            <returns>Enumerator</returns>
+        </member>
         <member name="T:DuetAPI.ObjectModel.ModelGrowingCollection">
             <summary>
             Helper class to keep track of individual model collection subtypes
@@ -4234,7 +4361,7 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.License">
             <summary>
-            License of the plugin
+            License of the plugin. Should follow the SPDX format (see https://spdx.org/licenses/)
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.SourceRepository">
@@ -4262,9 +4389,9 @@
             Set to true if a SBC is absolutely required for this plugin
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcApiVersion">
+        <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcDsfVersion">
             <summary>
-            DSF API version of the plugin running on the SBC (ignored if there is no SBC executable)
+            Required DSF version for the plugin running on the SBC (ignored if there is no SBC executable)
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcData">
