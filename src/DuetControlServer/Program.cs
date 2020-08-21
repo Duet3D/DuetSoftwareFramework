@@ -1,5 +1,4 @@
 ﻿using DuetAPI.ObjectModel;
-using DuetAPI.Utility;
 using DuetControlServer.Commands;
 using System;
 using System.Collections.Generic;

@@ -34,6 +34,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
     <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
+    <ProjectReference Include="..\LinuxDevices\LinuxApi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

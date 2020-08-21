@@ -241,7 +241,7 @@
             </summary>
             <param name="mode">Connection type</param>
         </member>
-        <member name="M:DuetAPIClient.BaseCommandConnection.AddHttpEndpoint(DuetAPI.ObjectModel.HttpEndpointType,System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:DuetAPIClient.BaseCommandConnection.AddHttpEndpoint(DuetAPI.ObjectModel.HttpEndpointType,System.String,System.String,System.Boolean,System.Int32,System.Threading.CancellationToken)">
             <summary>
             Add a new third-party HTTP endpoint in the format /machine/{ns}/{path}
             </summary>
@@ -249,6 +249,7 @@
             <param name="ns">Namespace of the plugin</param>
             <param name="path">Endpoint path</param>
             <param name="backlog">Number of simultaneously pending connections</param>
+            <param name="isUploadRequest">Whether this is an upload request</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Wrapper around the UNIX socket for accepting HTTP endpoint requests</returns>
             <exception cref="T:System.ArgumentException">Endpoint namespace is reserved</exception>

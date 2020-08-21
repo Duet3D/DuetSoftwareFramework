@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using DuetAPI.ObjectModel;
+using System.Collections.Generic;
 
 namespace DuetAPI.Commands
 {
@@ -29,7 +30,7 @@ namespace DuetAPI.Commands
         public string ContentType { get; set; }
 
         /// <summary>
-        /// Body content as plain text
+        /// Body content as plain text or the filename where the body payload was saved if <see cref="HttpEndpoint.IsUploadRequest"/> is true
         /// </summary>
         public string Body { get; set; }
     }

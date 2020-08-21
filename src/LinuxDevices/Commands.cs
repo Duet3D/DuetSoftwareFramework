@@ -75,6 +75,23 @@ namespace LinuxApi
         }
 
         /// <summary>
+        /// Get the owner user and group IDs
+        /// </summary>
+        /// <param name="pathname">Name of the file</param>
+        /// <param name="uid">User ID</param>
+        /// <param name="gid">Group ID</param>
+        public static void Stat(string pathname, out int uid, out int gid)
+        {
+            statbuf buffer = new statbuf();
+            if (Interop.stat(Interop.STATVER, pathname, ref buffer) < 0)
+            {
+                throw new ArgumentException($"Failed to get file info (error {Marshal.GetLastWin32Error()})");
+            }
+            uid = buffer.st_uid;
+            gid = buffer.st_gid;
+        }
+
+        /// <summary>
         /// Create a new symlink
         /// </summary>
         /// <param name="name1">Source file</param>

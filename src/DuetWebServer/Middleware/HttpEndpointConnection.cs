@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Utility;
+using LinuxApi;
 
 namespace DuetWebServer.Middleware
 {
@@ -89,6 +90,17 @@ namespace DuetWebServer.Middleware
         public Task<SendHttpResponse> GetHttpResponse(CancellationToken cancellationToken = default)
         {
             return Receive<SendHttpResponse>(cancellationToken);
+        }
+
+        /// <summary>
+        /// Get the peer credentials of the UNIX socket
+        /// </summary>
+        /// <param name="pid">Process ID</param>
+        /// <param name="uid">User ID</param>
+        /// <param name="gid">Group ID</param>
+        public void GetPeerCredentials(out int pid, out int uid, out int gid)
+        {
+            _unixSocket.GetPeerCredentials(out pid, out uid, out gid);
         }
 
         /// <summary>

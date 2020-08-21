@@ -39,7 +39,7 @@ namespace DuetAPI.ObjectModel
         DELETE,
 
         /// <summary>
-        /// HTTP DELETE request
+        /// HTTP OPTIONS request
         /// </summary>
         OPTIONS,
 

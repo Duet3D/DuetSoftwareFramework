@@ -57,6 +57,7 @@ namespace DuetControlServer.Commands
                 endpoint.EndpointType = EndpointType;
                 endpoint.Namespace = Namespace;
                 endpoint.Path = Path;
+                endpoint.IsUploadRequest = IsUploadRequest;
                 endpoint.UnixSocket = socketPath;
             }
 

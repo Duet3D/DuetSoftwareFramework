@@ -8,6 +8,11 @@
     public sealed class HttpEndpoint : ModelObject
     {
         /// <summary>
+        /// Namespace used for rr_ requests
+        /// </summary>
+        public const string RepRapFirmwareNamespace = "rr_";
+
+        /// <summary>
         /// HTTP type of this endpoint
         /// </summary>
         public HttpEndpointType EndpointType
@@ -20,6 +25,9 @@
         /// <summary>
         /// Namespace of the endpoint
         /// </summary>
+        /// <remarks>
+        /// May be <see cref="RepRapFirmwareNamespace"/> to register root-level rr_ requests (to emulate RRF poll requests)
+        /// </remarks>
         public string Namespace
         {
             get => _namespace;
@@ -36,6 +44,19 @@
 			set => SetPropertyValue(ref _path, value);
         }
         private string _path;
+
+        /// <summary>
+        /// Whether this is a upload request
+        /// </summary>
+        /// <remarks>
+        /// If set to true, the whole body payload is written to a temporary file and the file path is passed as in the body field
+        /// </remarks>
+        public bool IsUploadRequest
+        {
+            get => _isUploadRequest;
+            set => SetPropertyValue(ref _isUploadRequest, value);
+        }
+        private bool _isUploadRequest;
 
         /// <summary>
         /// Path to the UNIX socket

@@ -995,6 +995,12 @@
             Path to the endpoint to register
             </summary>
         </member>
+        <member name="P:DuetAPI.Commands.AddHttpEndpoint.IsUploadRequest">
+            <summary>
+            Whether this is an upload request
+            </summary>
+            <seealso cref="P:DuetAPI.ObjectModel.HttpEndpoint.IsUploadRequest"/>
+        </member>
         <member name="T:DuetAPI.Commands.ReceivedHttpRequest">
             <summary>
             Notification sent by the webserver when a new HTTP request is received
@@ -1023,7 +1029,7 @@
         </member>
         <member name="P:DuetAPI.Commands.ReceivedHttpRequest.Body">
             <summary>
-            Body content as plain text
+            Body content as plain text or the filename where the body payload was saved if <see cref="P:DuetAPI.ObjectModel.HttpEndpoint.IsUploadRequest"/> is true
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.RemoveHttpEndpoint">
@@ -2488,6 +2494,11 @@
             <seealso cref="T:DuetAPI.Commands.AddHttpEndpoint"/>
             <seealso cref="T:DuetAPI.Commands.RemoveHttpEndpoint"/>
         </member>
+        <member name="F:DuetAPI.ObjectModel.HttpEndpoint.RepRapFirmwareNamespace">
+            <summary>
+            Namespace used for rr_ requests
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.HttpEndpoint.EndpointType">
             <summary>
             HTTP type of this endpoint
@@ -2497,11 +2508,22 @@
             <summary>
             Namespace of the endpoint
             </summary>
+            <remarks>
+            May be <see cref="F:DuetAPI.ObjectModel.HttpEndpoint.RepRapFirmwareNamespace"/> to register root-level rr_ requests (to emulate RRF poll requests)
+            </remarks>
         </member>
         <member name="P:DuetAPI.ObjectModel.HttpEndpoint.Path">
             <summary>
             Path to the endpoint
             </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.HttpEndpoint.IsUploadRequest">
+            <summary>
+            Whether this is a upload request
+            </summary>
+            <remarks>
+            If set to true, the whole body payload is written to a temporary file and the file path is passed as in the body field
+            </remarks>
         </member>
         <member name="P:DuetAPI.ObjectModel.HttpEndpoint.UnixSocket">
             <summary>
@@ -2545,7 +2567,7 @@
         </member>
         <member name="F:DuetAPI.ObjectModel.HttpEndpointType.OPTIONS">
             <summary>
-            HTTP DELETE request
+            HTTP OPTIONS request
             </summary>
         </member>
         <member name="F:DuetAPI.ObjectModel.HttpEndpointType.WebSocket">

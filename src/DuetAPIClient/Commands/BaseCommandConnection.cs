@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
@@ -33,6 +32,7 @@ namespace DuetAPIClient
         /// <param name="ns">Namespace of the plugin</param>
         /// <param name="path">Endpoint path</param>
         /// <param name="backlog">Number of simultaneously pending connections</param>
+        /// <param name="isUploadRequest">Whether this is an upload request</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Wrapper around the UNIX socket for accepting HTTP endpoint requests</returns>
         /// <exception cref="ArgumentException">Endpoint namespace is reserved</exception>
@@ -41,9 +41,9 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.RegisterHttpEndpoints"/>
-        public async Task<HttpEndpointUnixSocket> AddHttpEndpoint(HttpEndpointType endpointType, string ns, string path, int backlog = HttpEndpointUnixSocket.DefaultBacklog, CancellationToken cancellationToken = default)
+        public async Task<HttpEndpointUnixSocket> AddHttpEndpoint(HttpEndpointType endpointType, string ns, string path, bool isUploadRequest = false, int backlog = HttpEndpointUnixSocket.DefaultBacklog, CancellationToken cancellationToken = default)
         {
-            string socketPath = await PerformCommand<string>(new AddHttpEndpoint { EndpointType = endpointType, Namespace = ns, Path = path }, cancellationToken);
+            string socketPath = await PerformCommand<string>(new AddHttpEndpoint { EndpointType = endpointType, Namespace = ns, Path = path, IsUploadRequest = isUploadRequest }, cancellationToken);
             return new HttpEndpointUnixSocket(endpointType, ns, path, socketPath, backlog);
         }
 

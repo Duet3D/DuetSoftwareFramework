@@ -27,5 +27,11 @@ namespace DuetAPI.Commands
         /// Path to the endpoint to register
         /// </summary>
         public string Path { get; set; }
+
+        /// <summary>
+        /// Whether this is an upload request
+        /// </summary>
+        /// <seealso cref="HttpEndpoint.IsUploadRequest"/>
+        public bool IsUploadRequest { get; set; }
     }
 }

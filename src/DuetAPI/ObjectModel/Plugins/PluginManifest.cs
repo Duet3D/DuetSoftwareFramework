@@ -1,5 +1,4 @@
 ﻿using DuetAPI.Utility;
-using System.Collections.Generic;
 using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
