@@ -6176,6 +6176,28 @@
             <param name="value">Value to serialize</param>
             <param name="options">Write options</param>
         </member>
+        <member name="T:DuetAPI.Utility.JsonShortDateTimeConverter">
+            <summary>
+            JSON converter for short DateTime values
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonShortDateTimeConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Read a short DateTime from JSON
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="typeToConvert">Target type</param>
+            <param name="options">Serializer options</param>
+            <returns>Deserialized DateTime or null</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonShortDateTimeConverter.Write(System.Text.Json.Utf8JsonWriter,System.Nullable{System.DateTime},System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Write a short DateTime to JSON
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="value">Value to write</param>
+            <param name="options">Serializer options</param>
+        </member>
         <member name="T:DuetAPI.Utility.RequiredPermissionsAttribute">
             <summary>
             Attribute to define the permissions of each command

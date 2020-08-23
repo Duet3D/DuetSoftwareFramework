@@ -108,7 +108,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(WebSocketController)}] DCS is not started");
-                    await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "DCS is not started");
+                    await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "Failed to connect to Duet, please check your connection (DCS is not started)");
                     return;
                 }
                 _logger.LogError(e, $"[{nameof(WebSocketController)}] Failed to connect to DCS");

@@ -73,7 +73,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(Status)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(Status)}] Failed to retrieve status");
                 return StatusCode(500, e.Message);
@@ -116,7 +116,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(DoCode)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(DoCode)}] Failed to perform code");
                 return StatusCode(500, e.Message);
@@ -163,7 +163,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(DownloadFile)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(DownloadFile)}] Failed download file {filename} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
@@ -215,7 +215,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(UploadFile)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(UploadFile)} Failed upload file {filename} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
@@ -263,7 +263,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(GetFileInfo)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(GetFileInfo)}] Failed to retrieve file info for {filename} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
@@ -317,7 +317,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(DeleteFileOrDirectory)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(DeleteFileOrDirectory)} Failed to delete file {filename} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
@@ -394,7 +394,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(MoveFileOrDirectory)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(MoveFileOrDirectory)} Failed to move file {from} to {to} (resolved to {source} and {destination})");
                 return StatusCode(500, e.Message);
@@ -439,7 +439,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(GetFileList)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(GetFileList)}] Failed to retrieve file list for {directory} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
@@ -478,7 +478,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(CreateDirectory)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(CreateDirectory)}] Failed to create directory {directory} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
@@ -527,7 +527,7 @@ namespace DuetWebServer.Controllers
                     if (e is SocketException)
                     {
                         _logger.LogError($"[{nameof(InstallPlugin)}] DCS is not started");
-                        return StatusCode(503, "DCS is not started");
+                        return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                     }
                     _logger.LogWarning(e, $"[{nameof(InstallPlugin)} Failed to upload ZIP file to {zipFile}");
                     return StatusCode(500, e.Message);
@@ -576,7 +576,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(UninstallPlugin)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(UninstallPlugin)} Failed to uninstall plugin");
                 return StatusCode(500, e.Message);
@@ -652,7 +652,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(SetPluginData)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(SetPluginData)} Failed to set plugin data");
                 return StatusCode(500, e.Message);
@@ -696,7 +696,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(StartPlugin)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(StartPlugin)} Failed to start plugin");
                 return StatusCode(500, e.Message);
@@ -740,7 +740,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(StopPlugin)}] DCS is not started");
-                    return StatusCode(503, "DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
                 _logger.LogWarning(e, $"[{nameof(StopPlugin)} Failed to stop plugin");
                 return StatusCode(500, e.Message);

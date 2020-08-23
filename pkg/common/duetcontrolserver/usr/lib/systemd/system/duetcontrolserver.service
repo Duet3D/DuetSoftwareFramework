@@ -7,7 +7,6 @@ TimeoutStopSec=15
 Restart=always
 RestartSec=5
 Type=simple
-CPUSchedulingPriority=20
 
 [Install]
 WantedBy=basic.target

@@ -650,6 +650,7 @@ namespace DuetControlServer.Codes
                 case 500:
                     if (await SPI.Interface.Flush(code))
                     {
+                        await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
                         await ConfigOverride.Save(code);
                         return new CodeResult();
                     }

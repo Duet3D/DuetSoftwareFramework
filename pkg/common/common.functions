@@ -128,6 +128,7 @@ build_progs() {
 	rm -rf $DEST_DIR/duetcontrolserver_$dcsver
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/DuetControlServer/DuetControlServer.csproj
 	mkdir -p $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
+	mkdir -p $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/plugins
 	[ -d $COMMON_DIR/duetcontrolserver/ ] && $RSYNC $COMMON_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
 	[ -d $PACKAGER_DIR/duetcontrolserver/ ] && $RSYNC $PACKAGER_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
 	mv $DEST_DIR/files/DuetControlServer* $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
@@ -146,6 +147,7 @@ build_progs() {
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CodeLogger/CodeLogger.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CustomHttpEndpoint/CustomHttpEndpoint.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/ModelObserver/ModelObserver.csproj
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/PluginManager/PluginManager.csproj
 	mkdir -p $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	[ -d $COMMON_DIR/duettools/ ] && $RSYNC $COMMON_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
 	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
@@ -153,6 +155,7 @@ build_progs() {
 	mv $DEST_DIR/files/CodeLogger* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	mv $DEST_DIR/files/CustomHttpEndpoint* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	mv $DEST_DIR/files/ModelObserver* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
+	mv $DEST_DIR/files/PluginManager* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duetruntime_$dcsver
 	mkdir -p $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin

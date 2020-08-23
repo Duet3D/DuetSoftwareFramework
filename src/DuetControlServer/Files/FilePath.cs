@@ -56,6 +56,11 @@ namespace DuetControlServer.Files
         public static Regex RetractProbePattern = new Regex(@"retractprobe\d+\.g");
 
         /// <summary>
+        /// File to run once after start if it exists, then deleted again
+        /// </summary>
+        public const string RunOnceFile = "runonce.g";
+
+        /// <summary>
         /// File holding the filaments mapping
         /// </summary>
         public const string FilamentsFile = "filaments.csv";

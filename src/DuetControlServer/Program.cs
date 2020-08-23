@@ -1,5 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetControlServer.Commands;
+using DuetControlServer.FileExecution;
+using DuetControlServer.Files;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -190,6 +192,25 @@ namespace DuetControlServer
                 {
                     string[] pluginsToStart = await File.ReadAllLinesAsync(Settings.PluginsFilename);
                     await Utility.Plugins.StartPlugins(pluginsToStart);
+                }
+            }
+
+            // Execute runonce.g if it is present
+            string runOnceFile = await FilePath.ToPhysicalAsync(FilePath.RunOnceFile, FileDirectory.System);
+            if (File.Exists(runOnceFile))
+            {
+                using (Macro macro = new Macro(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger))
+                {
+                    await macro.FinishAsync();
+                }
+
+                try
+                {
+                    File.Delete(runOnceFile);
+                }
+                catch (Exception e)
+                {
+                    await Model.Provider.Output(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
                 }
             }
 
