@@ -867,7 +867,15 @@ namespace DuetControlServer.Codes
 
                             using FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
                             using FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
-                            await SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
+                            if (Path.GetExtension(firmwareFile) == ".uf2")
+                            {
+                                using MemoryStream unpackedFirmwareStream = await Utility.UF2.Unpack(firmwareStream);
+                                await SPI.Interface.UpdateFirmware(iapStream, unpackedFirmwareStream);
+                            }
+                            else
+                            {
+                                await SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
+                            }
 
                             if (!Settings.UpdateOnly)
                             {
