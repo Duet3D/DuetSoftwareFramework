@@ -9,8 +9,9 @@ systemd-tmpfiles --create duetcontrolserver.conf
 udevadm trigger
 
 # Set ownership and permissions
-chown dsf:dsf /opt/dsf/conf/config.json
-chmod 664 /opt/dsf/conf/config.json
+chown -R dsf:dsf /opt/dsf/conf /opt/dsf/plugins
+chmod -R g+wX /opt/dsf/conf
+chmod 755 /opt/dsf/plugins
 
 # Update systemd services
 systemctl -q daemon-reload
