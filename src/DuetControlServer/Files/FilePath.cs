@@ -56,6 +56,11 @@ namespace DuetControlServer.Files
         public static Regex RetractProbePattern = new Regex(@"retractprobe\d+\.g");
 
         /// <summary>
+        /// File to run once after start if it exists, then deleted again
+        /// </summary>
+        public const string RunOnceFile = "runonce.g";
+
+        /// <summary>
         /// File holding the filaments mapping
         /// </summary>
         public const string FilamentsFile = "filaments.csv";
@@ -193,7 +198,7 @@ namespace DuetControlServer.Files
 
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                foreach (DuetAPI.Machine.Volume storage in Model.Provider.Get.Volumes)
+                foreach (DuetAPI.ObjectModel.Volume storage in Model.Provider.Get.Volumes)
                 {
                     if (filePath.StartsWith(storage.Path))
                     {

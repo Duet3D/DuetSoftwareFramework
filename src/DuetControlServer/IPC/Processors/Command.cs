@@ -16,21 +16,28 @@ namespace DuetControlServer.IPC.Processors
         /// </summary>
         public static readonly Type[] SupportedCommands =
         {
-            typeof(AddHttpEndpoint),
-            typeof(AddUserSession),
-            typeof(Code),
             typeof(GetFileInfo),
-            typeof(GetMachineModel),
-            typeof(Flush),
-            typeof(LockMachineModel),
-            typeof(RemoveHttpEndpoint),
-            typeof(RemoveUserSession),
             typeof(ResolvePath),
-            typeof(SetMachineModel),
+            typeof(Code),
+            typeof(EvaluateExpression),
+            typeof(Flush),
             typeof(SimpleCode),
-            typeof(SyncMachineModel),
-            typeof(UnlockMachineModel),
-            typeof(WriteMessage)
+            typeof(WriteMessage),
+            typeof(AddHttpEndpoint),
+            typeof(RemoveHttpEndpoint),
+            typeof(GetObjectModel),
+            typeof(LockObjectModel),
+            typeof(PatchObjectModel),
+            typeof(SetObjectModel),
+            typeof(SyncObjectModel),
+            typeof(UnlockObjectModel),
+            typeof(InstallPlugin),
+            typeof(SetPluginData),
+            typeof(StartPlugin),
+            typeof(StopPlugin),
+            typeof(UninstallPlugin),
+            typeof(AddUserSession),
+            typeof(RemoveUserSession)
         };
         
         /// <summary>
@@ -47,17 +54,21 @@ namespace DuetControlServer.IPC.Processors
         public override async Task Process()
         {
             DuetAPI.Commands.BaseCommand command = null;
+            Type commandType;
             do
             {
                 try
                 {
                     // Read another command from the IPC connection
                     command = await Connection.ReceiveCommand();
-                    if (!SupportedCommands.Contains(command.GetType()))
+                    commandType = command.GetType();
+
+                    // Make sure it is actually supported and permitted
+                    if (!SupportedCommands.Contains(commandType))
                     {
-                        // Take care of unsupported commands
                         throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
                     }
+                    Connection.CheckPermissions(commandType);
 
                     // Execute it and send back the result
                     object result = await command.Invoke();
@@ -73,7 +84,18 @@ namespace DuetControlServer.IPC.Processors
                     // Send errors back to the client
                     if (!(e is OperationCanceledException))
                     {
-                        Connection.Logger.Error(e, "Failed to execute {0}", command.Command);
+                        if (e is UnauthorizedAccessException)
+                        {
+                            Connection.Logger.Error("Insufficient permissions to execute {0}", command.Command);
+                        }
+                        else if (command != null)
+                        {
+                            Connection.Logger.Error(e, "Failed to execute {0}", command.Command);
+                        }
+                        else
+                        {
+                            Connection.Logger.Error(e, "Failed to execute command");
+                        }
                     }
                     await Connection.SendResponse(e);
                 }

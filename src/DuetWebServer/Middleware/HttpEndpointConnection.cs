@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Utility;
+using LinuxApi;
 
 namespace DuetWebServer.Middleware
 {
@@ -92,6 +93,17 @@ namespace DuetWebServer.Middleware
         }
 
         /// <summary>
+        /// Get the peer credentials of the UNIX socket
+        /// </summary>
+        /// <param name="pid">Process ID</param>
+        /// <param name="uid">User ID</param>
+        /// <param name="gid">Group ID</param>
+        public void GetPeerCredentials(out int pid, out int uid, out int gid)
+        {
+            _unixSocket.GetPeerCredentials(out pid, out uid, out gid);
+        }
+
+        /// <summary>
         /// Receive a deserialized object from the server
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
@@ -101,21 +113,8 @@ namespace DuetWebServer.Middleware
         /// <exception cref="SocketException">Connection has been closed</exception>
         private async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
-            using JsonDocument jsonDoc = await ReceiveJson(cancellationToken);
-            return JsonSerializer.Deserialize<T>(jsonDoc.RootElement.GetRawText(), JsonHelper.DefaultJsonOptions);
-        }
-
-        /// <summary>
-        /// Receive partially deserialized object from the server
-        /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Partially deserialized data</returns>
-        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        /// <exception cref="SocketException">Connection has been closed</exception>
-        private async Task<JsonDocument> ReceiveJson(CancellationToken cancellationToken)
-        {
             using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
-            return await JsonDocument.ParseAsync(json);
+            return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions);
         }
 
         /// <summary>

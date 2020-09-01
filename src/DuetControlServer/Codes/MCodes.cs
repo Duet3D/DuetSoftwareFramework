@@ -1,9 +1,10 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Files;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -649,6 +650,7 @@ namespace DuetControlServer.Codes
                 case 500:
                     if (await SPI.Interface.Flush(code))
                     {
+                        await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
                         await ConfigOverride.Save(code);
                         return new CodeResult();
                     }
@@ -861,9 +863,25 @@ namespace DuetControlServer.Codes
                                 return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
                             }
 
+                            IEnumerable<string> stoppedPlugins = await Utility.Plugins.StopPlugins();
+
                             using FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
                             using FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
-                            await SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
+                            if (Path.GetExtension(firmwareFile) == ".uf2")
+                            {
+                                using MemoryStream unpackedFirmwareStream = await Utility.UF2.Unpack(firmwareStream);
+                                await SPI.Interface.UpdateFirmware(iapStream, unpackedFirmwareStream);
+                            }
+                            else
+                            {
+                                await SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
+                            }
+
+                            if (!Settings.UpdateOnly)
+                            {
+                                await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
+                                await Utility.Plugins.StartPlugins(stoppedPlugins);
+                            }
                             return new CodeResult();
                         }
                         throw new OperationCanceledException();

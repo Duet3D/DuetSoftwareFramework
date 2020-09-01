@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Files;
 

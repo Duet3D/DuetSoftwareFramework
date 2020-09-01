@@ -10,7 +10,7 @@
 
 Name:    duetsd
 Version: %{_tversion}
-Release: 901
+Release: %{_release}
 Summary: DSF SD Card
 Group:   3D Printing
 Source0: duetsd_%{_tversion}
@@ -23,19 +23,10 @@ AutoReq:  0
 %description
 DSF SD Card
 
-%prep
-%setup -q -T -c -n %{name}-%{version}
-
-%build
-
-%install
-rsync -vaH %{S:0}/. %{buildroot}/
-
 %files
 %defattr(0664,root,root,0775)
 %dir %{dsfoptdir}/sd/sys
 %config(noreplace) %{dsfoptdir}/sd/sys/config.g
-%{dsfoptdir}/sd/sys/*.bin
 %dir %{dsfoptdir}/sd/filaments
 %dir %{dsfoptdir}/sd/gcodes
 %dir %{dsfoptdir}/sd/macros

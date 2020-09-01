@@ -1,5 +1,5 @@
 ﻿using DuetAPI;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using System;
@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using Code = DuetControlServer.Commands.Code;
 using Nito.AsyncEx;
-using LinuxDevices;
+using LinuxApi;
 using System.Collections.Generic;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.Shared;
@@ -47,8 +47,9 @@ namespace DuetControlServer.SPI
         private static byte _packetId;
 
         // Transfer data. Keep three TX buffers so resend requests can be processed
+        private static readonly int bufferSize = Settings.SpiBufferSize;
         private const int NumTxBuffers = 3;
-        private static readonly Memory<byte> _rxBuffer = new byte[Communication.Consts.BufferSize];
+        private static readonly Memory<byte> _rxBuffer = new byte[bufferSize];
         private static readonly LinkedList<Memory<byte>> _txBuffers = new LinkedList<Memory<byte>>();
         private static LinkedListNode<Memory<byte>> _txBuffer;
         private static int _rxPointer, _txPointer;
@@ -72,7 +73,7 @@ namespace DuetControlServer.SPI
             // Initialize TX buffers
             for (int i = 0; i < NumTxBuffers; i++)
             {
-                _txBuffers.AddLast(new byte[Communication.Consts.BufferSize]);
+                _txBuffers.AddLast(new byte[bufferSize]);
             }
             _txBuffer = _txBuffers.First;
 
@@ -82,13 +83,13 @@ namespace DuetControlServer.SPI
             MonitorTransferReadyPin();
 
             // Initialize SPI device
-            _spiDevice = new SpiDevice(Settings.SpiDevice, Settings.SpiFrequency);
+            _spiDevice = new SpiDevice(Settings.SpiDevice, Settings.SpiFrequency, Settings.SpiTransferMode);
 
             // Check if large transfers can be performed
             try
             {
                 int maxSpiBufferSize = int.Parse(File.ReadAllText("/sys/module/spidev/parameters/bufsiz"));
-                if (maxSpiBufferSize < Consts.BufferSize)
+                if (maxSpiBufferSize < bufferSize)
                 {
                     _logger.Warn("Kernel SPI buffer size is smaller than RepRapFirmware buffer size ({0} configured vs {1} required)", maxSpiBufferSize, Consts.BufferSize);
                 }
@@ -589,7 +590,7 @@ namespace DuetControlServer.SPI
         public static bool WriteGetObjectModel(string key, string flags)
         {
             // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[Consts.BufferSize - Marshal.SizeOf<PacketHeader>()];
+            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteGetObjectModel(span, key, flags);
 
             // See if the request fits into the buffer
@@ -613,7 +614,7 @@ namespace DuetControlServer.SPI
         public static bool WriteSetObjectModel(string field, object value)
         {
             // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[Consts.BufferSize - Marshal.SizeOf<PacketHeader>()];
+            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteSetObjectModel(span, field, value);
 
             // See if the request fits into the buffer
@@ -636,7 +637,7 @@ namespace DuetControlServer.SPI
         public static bool WritePrintStarted(ParsedFileInfo info)
         {
             // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[Consts.BufferSize - Marshal.SizeOf<PacketHeader>()];
+            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WritePrintStarted(span, info);
 
             // See if the request fits into the buffer
@@ -712,7 +713,7 @@ namespace DuetControlServer.SPI
         public static bool WriteHeightMap(Heightmap map)
         {
             // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[Consts.BufferSize - Marshal.SizeOf<PacketHeader>()];
+            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteHeightMap(span, map);
 
             // See if the request fits into the buffer
@@ -875,7 +876,7 @@ namespace DuetControlServer.SPI
         public static bool WriteAssignFilament(int extruder, string filamentName)
         {
             // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[Consts.BufferSize - Marshal.SizeOf<PacketHeader>()];
+            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteAssignFilament(span, extruder, filamentName);
 
             // See if the request fits into the buffer
@@ -899,7 +900,7 @@ namespace DuetControlServer.SPI
         public static bool WriteFileChunk(Span<byte> data, long fileLength)
         {
             // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[Consts.BufferSize - Marshal.SizeOf<PacketHeader>()];
+            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteFileChunk(span, data, fileLength);
 
             // See if the request fits into the buffer
@@ -923,7 +924,7 @@ namespace DuetControlServer.SPI
         public static bool WriteEvaluateExpression(CodeChannel channel, string expression)
         {
             // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[Consts.BufferSize - Marshal.SizeOf<PacketHeader>()];
+            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteEvaluateExpression(span, channel, expression);
 
             // See if the request fits into the buffer
@@ -947,7 +948,7 @@ namespace DuetControlServer.SPI
         public static bool WriteMessage(MessageTypeFlags flags, string message)
         {
             // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[Consts.BufferSize - Marshal.SizeOf<PacketHeader>()];
+            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteMessage(span, flags, message);
 
             // See if the request fits into the buffer
@@ -969,7 +970,7 @@ namespace DuetControlServer.SPI
         /// <returns>True if there is enough space</returns>
         private static bool CanWritePacket(int dataLength = 0)
         {
-            return _txPointer + Marshal.SizeOf<PacketHeader>() + dataLength <= Consts.BufferSize;
+            return _txPointer + Marshal.SizeOf<PacketHeader>() + dataLength <= bufferSize;
         }
         #endregion
 
@@ -1132,7 +1133,7 @@ namespace DuetControlServer.SPI
                     ExchangeResponse(TransferResponse.BadProtocolVersion);
                     throw new Exception($"Invalid protocol version {_rxHeader.ProtocolVersion}");
                 }
-                if (_rxHeader.DataLength > Consts.BufferSize)
+                if (_rxHeader.DataLength > bufferSize)
                 {
                     ExchangeResponse(TransferResponse.BadDataLength);
                     throw new Exception($"Data too long ({_rxHeader.DataLength} bytes)");

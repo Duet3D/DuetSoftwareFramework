@@ -1,4 +1,4 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.ObjectModel;
 using DuetControlServer.Commands;
 using System;
 using System.Collections.Generic;

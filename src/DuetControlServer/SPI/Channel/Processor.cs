@@ -1,6 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetControlServer.FileExecution;
 using DuetControlServer.Files;
 using DuetControlServer.SPI.Communication.Shared;
@@ -8,7 +8,6 @@ using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text;

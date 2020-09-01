@@ -39,10 +39,7 @@ namespace DuetAPI.Utility
             /// </summary>
             /// <param name="typeToConvert">Type to convert</param>
             /// <returns>True if the type can be converted</returns>
-            public override bool CanConvert(Type typeToConvert)
-            {
-                return typeToConvert == typeof(T);
-            }
+            public override bool CanConvert(Type typeToConvert) => typeToConvert == typeof(T);
 
             /// <summary>
             /// Read an enum value from JSON

@@ -67,7 +67,7 @@
             Driver class for SPI transfers. Most of this is copied from the System.Device.Gpio library
             </summary>
         </member>
-        <member name="M:LinuxDevices.SpiDevice.#ctor(System.String,System.Int32)">
+        <member name="M:LinuxDevices.SpiDevice.#ctor(System.String,System.Int32,System.Int32)">
             <summary>
             Initialize an SPI device
             </summary>

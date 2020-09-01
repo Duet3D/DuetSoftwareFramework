@@ -53,7 +53,7 @@ namespace CodeConsole
                 }
 
                 // Register an (interactive) user session
-                int sessionId = await connection.AddUserSession(DuetAPI.Machine.AccessLevel.ReadWrite, DuetAPI.Machine.SessionType.Local, "console");
+                int sessionId = await connection.AddUserSession(DuetAPI.ObjectModel.AccessLevel.ReadWrite, DuetAPI.ObjectModel.SessionType.Local, "console");
 
                 // Start reading lines from stdin and send them to DCS as simple codes.
                 // When the code has finished, the result is printed to stdout

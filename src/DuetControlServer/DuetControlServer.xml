@@ -561,6 +561,11 @@
             Job file being read from
             </summary>
         </member>
+        <member name="F:DuetControlServer.FileExecution.Job._cancellationTokenSource">
+            <summary>
+            Internal cancellation token source used to cancel pending codes when necessary
+            </summary>
+        </member>
         <member name="P:DuetControlServer.FileExecution.Job.IsFileSelected">
             <summary>
             Indicates if a file has been selected for printing
@@ -2390,7 +2395,7 @@
             Indicates if this program is only launched to update the Duet 3 firmware
             </summary>
         </member>
-        <member name="P:DuetControlServer.Settings.NoSpiTask">
+        <member name="P:DuetControlServer.Settings.NoSpi">
             <summary>
             Do NOT start the SPI task. This is meant entirely for development purposes and should not be used!
             </summary>
@@ -2457,6 +2462,17 @@
         <member name="P:DuetControlServer.Settings.SpiDevice">
             <summary>
             SPI device that is connected to RepRapFirmware
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.SpiBufferSize">
+            <summary>
+            SPI Tx and Rx buffer size
+            Should not be greater than the kernel spidev buffer size
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Settings.SpiTransferMode">
+            <summary>
+            SPI Transfer Mode 0-3
             </summary>
         </member>
         <member name="P:DuetControlServer.Settings.SpiFrequency">
@@ -4562,7 +4578,7 @@
             <param name="expression">Expression to evaluate</param>
             <returns>Result of the evaluated expression</returns>
             <exception cref="T:DuetAPI.Commands.CodeParserException">Failed to evaluate expression</exception>
-            <exception cref="T:System.InvalidOperationException">Incompatible firmware version</exception>
+            <exception cref="T:System.InvalidOperationException">Incompatible firmware version or not connected over SPI</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.GetHeightmap">
             <summary>
@@ -4570,6 +4586,7 @@
             </summary>
             <returns>Heightmap in use</returns>
             <exception cref="T:System.OperationCanceledException">Operation could not finish</exception>
+            <exception cref="T:System.InvalidOperationException">Not connected over SPI</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.SetHeightmap(DuetAPI.Utility.Heightmap)">
             <summary>
@@ -4578,7 +4595,7 @@
             <param name="map">Heightmap to set</param>
             <returns>Asynchronous task</returns>
             <exception cref="T:System.OperationCanceledException">Operation could not finish</exception>
-            <exception cref="T:System.InvalidOperationException">Heightmap is already being set</exception>
+            <exception cref="T:System.InvalidOperationException">Heightmap is already being set or not connected over SPI</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.GetIdleChannel">
             <summary>
@@ -4599,6 +4616,7 @@
             </summary>
             <param name="code">Code to execute</param>
             <returns>Asynchronous task</returns>
+            <exception cref="T:System.InvalidOperationException">Not connected over SPI</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.Flush(DuetAPI.CodeChannel)">
             <summary>
@@ -4630,6 +4648,7 @@
             <summary>
             Notify the firmware that a file print has started
             </summary>
+            <exception cref="T:System.InvalidOperationException">Not connected over SPI</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.SetPrintStopped(DuetControlServer.SPI.Communication.Shared.PrintStoppedReason)">
             <summary>
@@ -4637,6 +4656,7 @@
             </summary>
             <param name="stopReason">Reason why the print has stopped</param>
             <returns>Asynchronous task</returns>
+            <exception cref="T:System.InvalidOperationException">Not connected over SPI</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.LockMovementAndWaitForStandstill(DuetAPI.CodeChannel)">
             <summary>
@@ -4644,6 +4664,7 @@
             </summary>
             <param name="channel">Code channel acquiring the lock</param>
             <returns>Whether the resource could be locked</returns>
+            <exception cref="T:System.InvalidOperationException">Not connected over SPI</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.UnlockAll(DuetAPI.CodeChannel)">
             <summary>
@@ -4651,6 +4672,7 @@
             </summary>
             <param name="channel">Channel holding the resources</param>
             <returns>Asynchronous task</returns>
+            <exception cref="T:System.InvalidOperationException">Not connected over SPI</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.UpdateFirmware(System.IO.Stream,System.IO.Stream)">
             <summary>
@@ -4658,7 +4680,7 @@
             </summary>
             <param name="iapStream">IAP binary</param>
             <param name="firmwareStream">Firmware binary</param>
-            <exception cref="T:System.InvalidOperationException">Firmware is already being updated</exception>
+            <exception cref="T:System.InvalidOperationException">Firmware is already being updated or not connected over SPI</exception>
             <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.PerformFirmwareUpdate">
@@ -4673,6 +4695,7 @@
             </summary>
             <param name="extruder">Extruder drive</param>
             <param name="filament">Loaded filament</param>
+            <exception cref="T:System.InvalidOperationException">Not connected over SPI</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.SendMessage(DuetControlServer.SPI.Communication.Shared.MessageTypeFlags,System.String)">
             <summary>
@@ -4680,11 +4703,11 @@
             </summary>
             <param name="flags">Message flags</param>
             <param name="message">Message content</param>
-            <exception cref="T:System.InvalidOperationException">Incompatible firmware</exception>
+            <exception cref="T:System.InvalidOperationException">Incompatible firmware or not connected over SPI</exception>
         </member>
         <member name="M:DuetControlServer.SPI.Interface.Run">
             <summary>
-            Perform communication with the RepRapFirmware controller
+            Perform communication with the RepRapFirmware controller over SPI
             </summary>
             <returns>Asynchronous task</returns>
         </member>

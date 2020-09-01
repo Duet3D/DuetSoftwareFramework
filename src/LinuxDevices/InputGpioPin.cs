@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace LinuxDevices
+namespace LinuxApi
 {
     /// <summary>
     /// Class for event-based polling of pin level changes

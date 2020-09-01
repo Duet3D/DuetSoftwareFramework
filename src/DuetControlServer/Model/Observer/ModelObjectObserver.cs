@@ -1,4 +1,4 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.ObjectModel;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -89,6 +89,10 @@ namespace DuetControlServer.Model
                         SubscribeToModelCollection(value, itemType, propertyName, path);
                     }
                 }
+                else if (property.PropertyType.IsGenericType && typeof(ModelDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
+                {
+                    SubscribeToModelDictionary(value, AddToPath(path, propertyName));
+                }
             }
 
             PropertyChangedEventHandler changeHandler = PropertyChanged(hasVariableModelObjects, path);
@@ -145,6 +149,10 @@ namespace DuetControlServer.Model
                     {
                         UnsubscribeFromModelCollection(value, property.PropertyType.GetGenericArguments()[0]);
                     }
+                }
+                else if (property.PropertyType.IsGenericType && typeof(ModelDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
+                {
+                    UnsubscribeFromModelDictionary(value);
                 }
             }
 

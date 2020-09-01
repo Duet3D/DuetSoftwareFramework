@@ -80,22 +80,11 @@ namespace DuetWebServer
                 app.UseCors(CorsPolicy);
             }
 
-            // Use static files from 0:/www if applicable
-            if (_configuration.GetValue("UseStaticFiles", true))
-            {
-                app.UseStaticFiles();
-                app.UseFileServer(new FileServerOptions
-                {
-                    FileProvider = new FileProviders.DuetFileProvider()
-                });
-            }
-
             // Define a keep-alive interval for operation as a reverse proxy
             app.UseWebSockets(new WebSocketOptions
             {
                 KeepAliveInterval = TimeSpan.FromSeconds(_configuration.GetValue("KeepAliveInterval", 30))
             }); ;
-
 
             // Define endpoints
             app.UseEndpoints(endpoints =>
@@ -113,6 +102,16 @@ namespace DuetWebServer
 
             // Use fallback middlware
             app.UseMiddleware(typeof(Middleware.FallbackMiddleware));
+
+            // Use static files from 0:/www if applicable
+            if (_configuration.GetValue("UseStaticFiles", true))
+            {
+                app.UseStaticFiles();
+                app.UseFileServer(new FileServerOptions
+                {
+                    FileProvider = new FileProviders.DuetFileProvider()
+                });
+            }
         }
     }
 }

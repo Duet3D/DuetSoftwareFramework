@@ -42,7 +42,7 @@ namespace UnitTests.Machine
         public async Task EvaluateLinuxOnly()
         {
             DuetControlServer.Model.Provider.Get.Volumes.Clear();
-            DuetControlServer.Model.Provider.Get.Volumes.Add(new DuetAPI.Machine.Volume { FreeSpace = 12345 });
+            DuetControlServer.Model.Provider.Get.Volumes.Add(new DuetAPI.ObjectModel.Volume { FreeSpace = 12345 });
 
             DuetControlServer.Commands.Code code = new DuetControlServer.Commands.Code("echo volumes[0].freeSpace");
             object result = await DuetControlServer.Model.Expressions.Evaluate(code, true);

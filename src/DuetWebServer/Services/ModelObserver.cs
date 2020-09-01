@@ -1,4 +1,4 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -118,7 +118,7 @@ namespace DuetWebServer.Services
             string unixSocket = _configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.FullSocketPath);
             int retryDelay = _configuration.GetValue("ModelRetryDelay", 5000);
 
-            MachineModel model;
+            ObjectModel model;
             try
             {
                 do
@@ -139,9 +139,9 @@ namespace DuetWebServer.Services
                             Endpoints.Clear();
                             foreach (HttpEndpoint ep in model.HttpEndpoints)
                             {
-                                string fullPath = $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
+                                string fullPath = (ep.Namespace == HttpEndpoint.RepRapFirmwareNamespace) ? $"{ep.EndpointType}/rr_{ep.Path}" : $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
                                 Endpoints[fullPath] = ep;
-                                _logger.LogInformation("Registered HTTP {0} endpoint via /machine/{1}/{2}", ep.EndpointType, ep.Namespace, ep.Path);
+                                _logger.LogInformation("Registered HTTP endpoint {0}", fullPath);
                             }
                         }
 

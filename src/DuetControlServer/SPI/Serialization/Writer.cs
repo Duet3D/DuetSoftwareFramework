@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.LinuxRequests;

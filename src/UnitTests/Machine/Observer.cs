@@ -1,4 +1,4 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.ObjectModel;
 using DuetControlServer.Model;
 using NUnit.Framework;
 using System;

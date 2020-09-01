@@ -2,7 +2,7 @@
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace LinuxDevices
+namespace LinuxApi
 {
     /// <summary>
     /// Driver class for SPI transfers. Most of this is copied from the System.Device.Gpio library
@@ -18,7 +18,7 @@ namespace LinuxDevices
         /// </summary>
         /// <param name="devNode">Path to the /dev node</param>
         /// <param name="speed">Transfer speed in Hz</param>
-        public unsafe SpiDevice(string devNode, int speed)
+        public unsafe SpiDevice(string devNode, int speed, int transferMode)
         {
             _speed = (uint)speed;
 
@@ -28,7 +28,24 @@ namespace LinuxDevices
                 throw new IOException($"Error {Marshal.GetLastWin32Error()}. Can not open SPI device file '{devNode}'.");
             }
 
-            UnixSpiMode mode = UnixSpiMode.SPI_MODE_0;
+            UnixSpiMode mode;
+            switch (transferMode)
+            {
+                case 0:
+                    mode = UnixSpiMode.SPI_MODE_0;
+                    break;
+                case 1:
+                    mode = UnixSpiMode.SPI_MODE_1;
+                    break;
+                case 2:
+                    mode = UnixSpiMode.SPI_MODE_2;
+                    break;
+                case 3:
+                    mode = UnixSpiMode.SPI_MODE_3;
+                    break;
+                default:
+                    throw new ArgumentException($"Transfer mode '{transferMode}' not regignized. Must be between 0 and 3.");
+            }
             IntPtr nativePtr = new IntPtr(&mode);
 
             int result = Interop.ioctl(_deviceFileDescriptor, (uint)SpiSettings.SPI_IOC_WR_MODE, nativePtr);

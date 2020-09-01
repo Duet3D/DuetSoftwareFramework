@@ -1,6 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using DuetControlServer.Utility;
 using Nito.AsyncEx;
@@ -172,7 +172,7 @@ namespace DuetControlServer.FileExecution
         /// <param name="channel">Code requesting the macro</param>
         /// <param name="isNested">Whether the code was started from a G/M/T-code</param>
         /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
-        public Macro(string fileName, string physicalFile, CodeChannel channel, bool isNested, int sourceConnection)
+        public Macro(string fileName, string physicalFile, CodeChannel channel, bool isNested = false, int sourceConnection = 0)
         {
             FileName = fileName;
             Channel = channel;
