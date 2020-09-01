@@ -7,6 +7,9 @@ TimeoutStopSec=15
 Restart=always
 RestartSec=5
 Type=simple
+User=dsf
+Group=dsf
+UMask=0002
 
 [Install]
 WantedBy=basic.target

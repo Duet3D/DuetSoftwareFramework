@@ -1,5 +1,8 @@
 #!/bin/sh
 
+chown dsf:dsf /opt/dsf/conf/http.json
+chmod 664 /opt/dsf/conf/http.json
+
 # Update systemd services
 systemctl -q daemon-reload
 

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Add dsf user and group
+systemd-sysusers duetruntime.conf
+
+echo "To modify config files consider adding yourself to the dsf groupd: # usermod -a -G dsf <username>"
