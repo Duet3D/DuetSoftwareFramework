@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DuetAPI.ObjectModel;
+using System;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -19,10 +20,18 @@ namespace DuetControlServer.Commands
                 throw new InvalidOperationException("Command is only supported in non-SPI mode");
             }
 
-            if (!Model.Provider.Get.UpdateFromModel(Key, Patch))
+            if (Model.Provider.Get.UpdateFromModel(Key, Patch))
+            {
+                if (Model.Provider.IsUpdating && Model.Provider.Get.State.Status != MachineStatus.Updating)
+                {
+                    Model.Provider.Get.State.Status = MachineStatus.Updating;
+                }
+            }
+            else
             {
                 throw new ArgumentException("Property not found", nameof(Key));
             }
+
             return Task.CompletedTask;
         }
     }

@@ -1,7 +1,9 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPIClient;
 using System;
+using System.Linq;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
@@ -11,14 +13,33 @@ namespace CodeLogger
     {
         public static async Task Main(string[] args)
         {
+            bool quiet = false, priorityCodes = false;
+            CodeChannel[] channels = null;
+            string[] filters = null, types = new string[] { "pre", "post", "executed" };
+
             // Parse the command line arguments
             string lastArg = null, socketPath = Defaults.FullSocketPath;
-            bool quiet = false;
             foreach (string arg in args)
             {
-                if (lastArg == "-s" || lastArg == "--socket")
+                if (lastArg == "-t" || lastArg == "--types")
+                {
+                    types = arg.Split(',');
+                }
+                else if (lastArg == "-c" || lastArg == "--channels")
+                {
+                    channels = arg.Split(',').Select(item => (CodeChannel)Enum.Parse(typeof(CodeChannel), item, true)).ToArray();
+                }
+                else if (lastArg == "-f" || lastArg == "--filters")
+                {
+                    filters = arg.Split(',');
+                }
+                else if (lastArg == "-s" || lastArg == "--socket")
                 {
                     socketPath = arg;
+                }
+                else if (arg == "-p" || arg == "--priority-codes")
+                {
+                    priorityCodes = true;
                 }
                 else if (arg == "-q" || lastArg == "--quiet")
                 {
@@ -27,6 +48,10 @@ namespace CodeLogger
                 else if (arg == "-h" || arg == "--help")
                 {
                     Console.WriteLine("Available command line arguments:");
+                    Console.WriteLine("-t, --types <types>: Comma-delimited interception types (pre, post, or executed)");
+                    Console.WriteLine("-c, --channels <channels>: Comma-delimited input channels where codes may be intercepted");
+                    Console.WriteLine("-f, --filters <filters>: Comma-delimited code types that may be intercepted (main codes, keywords, or Q0 for comments)");
+                    Console.WriteLine("-p, --priority-codes: Intercept priorty codes instead of regular codes (not recommended)");
                     Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
                     Console.WriteLine("-q, --quiet: Do not display when a connection has been established");
                     Console.WriteLine("-h, --help: Display this help text");
@@ -35,30 +60,48 @@ namespace CodeLogger
                 lastArg = arg;
             }
 
-            // Connect to DCS
-            using InterceptConnection preConnection = new InterceptConnection();
-            using InterceptConnection postConnection = new InterceptConnection();
-            using InterceptConnection executedConnection = new InterceptConnection();
-
-            await preConnection.Connect(InterceptionMode.Pre, socketPath);
-            await postConnection.Connect(InterceptionMode.Post, socketPath);
-            await executedConnection.Connect(InterceptionMode.Executed, socketPath);
-
-            if (!quiet)
+            InterceptConnection preConnection = null, postConnection = null, executedConnection = null;
+            try
             {
-                Console.WriteLine("Connected!");
+                // Connect to DCS
+                if (types.Contains("pre"))
+                {
+                    preConnection = new InterceptConnection();
+                    await preConnection.Connect(InterceptionMode.Pre, channels, filters, priorityCodes, socketPath);
+                }
+                if (types.Contains("post"))
+                {
+                    postConnection = new InterceptConnection();
+                    await postConnection.Connect(InterceptionMode.Post, channels, filters, priorityCodes, socketPath);
+                }
+                if (types.Contains("executed"))
+                {
+                    executedConnection = new InterceptConnection();
+                    await executedConnection.Connect(InterceptionMode.Executed, channels, filters, priorityCodes, socketPath);
+                }
+
+                if (!quiet)
+                {
+                    Console.WriteLine("Connected!");
+                }
+
+                // Start waiting for incoming codes
+                Task[] tasks = new Task[]
+                {
+                    (preConnection != null) ? PrintIncomingCodes(preConnection) : Task.CompletedTask,
+                    (postConnection != null) ? PrintIncomingCodes(postConnection) : Task.CompletedTask,
+                    (executedConnection != null) ? PrintIncomingCodes(executedConnection) : Task.CompletedTask
+                };
+
+                // Wait for all tasks to finish
+                await Task.WhenAll(tasks);
             }
-
-            // Start waiting for incoming codes
-            Task[] tasks = new Task[]
+            finally
             {
-                PrintIncomingCodes(preConnection),
-                PrintIncomingCodes(postConnection),
-                PrintIncomingCodes(executedConnection)
-            };
-
-            // Wait for all tasks to finish
-            await Task.WhenAll(tasks);
+                preConnection?.Dispose();
+                postConnection?.Dispose();
+                executedConnection?.Dispose();
+            }
         }
 
         private static async Task PrintIncomingCodes(InterceptConnection connection)

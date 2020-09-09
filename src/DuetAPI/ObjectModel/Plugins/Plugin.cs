@@ -21,7 +21,7 @@
 		public ModelCollection<string> RrfFiles { get; } = new ModelCollection<string>();
 
         /// <summary>
-        /// Process ID if the plugin or -1 if not started
+        /// Process ID of the plugin or -1 if not started
         /// </summary>
 		/// <remarks>
 		/// This may become 0 when the plugin has been stopped and the application is being shut down

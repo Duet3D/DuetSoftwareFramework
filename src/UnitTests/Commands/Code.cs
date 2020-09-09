@@ -642,5 +642,42 @@ namespace UnitTests.Commands
                 Assert.AreEqual(0, (int)code.Parameter('T'));
             }
         }
+
+        [Test]
+        public void ParseDynamicT()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("T{my.expression} P0");
+
+            Assert.AreEqual(CodeType.TCode, code.Type);
+            Assert.IsNull(code.MajorNumber);
+            Assert.IsNull(code.MinorNumber);
+            Assert.AreEqual(2, code.Parameters.Count);
+            Assert.AreEqual('T', code.Parameters[0].Letter);
+            Assert.AreEqual("{my.expression}", (string)code.Parameters[0]);
+            Assert.AreEqual('P', code.Parameters[1].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[1]);
+        }
+
+        [Test]
+        public async Task ParseDynamicTAsync()
+        {
+            string codeString = "T{my.expression} P0";
+            byte[] codeBytes = Encoding.UTF8.GetBytes(codeString);
+            using MemoryStream memoryStream = new MemoryStream(codeBytes);
+            using StreamReader reader = new StreamReader(memoryStream);
+            CodeParserBuffer buffer = new CodeParserBuffer(128, true);
+
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code();
+            await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+
+            Assert.AreEqual(CodeType.TCode, code.Type);
+            Assert.IsNull(code.MajorNumber);
+            Assert.IsNull(code.MinorNumber);
+            Assert.AreEqual(2, code.Parameters.Count);
+            Assert.AreEqual('T', code.Parameters[0].Letter);
+            Assert.AreEqual("{my.expression}", (string)code.Parameters[0]);
+            Assert.AreEqual('P', code.Parameters[1].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[1]);
+        }
     }
 }

@@ -318,6 +318,20 @@ namespace DuetAPIClient
         }
 
         /// <summary>
+        /// Override the current machine status if a software update is in progress
+        /// </summary>
+        /// <param name="isUpdating">If the machine status is supposed to be overrridden</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <remarks>
+        /// The object model may not be locked when this is called
+        /// </remarks>
+        public Task SetUpdateStatus(bool isUpdating, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new SetUpdateStatus { Updating = isUpdating }, cancellationToken);
+        }
+
+        /// <summary>
         /// Start a plugin
         /// </summary>
         /// <param name="plugin">Name of the plugin</param>

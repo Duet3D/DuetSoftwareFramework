@@ -9,7 +9,7 @@ namespace DuetControlServer.IPC.Processors
     /// <summary>
     /// Command interpreter for client requests
     /// </summary>
-    public class Command : Base
+    public sealed class Command : Base
     {
         /// <summary>
         /// List of supported commands in this mode
@@ -29,6 +29,7 @@ namespace DuetControlServer.IPC.Processors
             typeof(LockObjectModel),
             typeof(PatchObjectModel),
             typeof(SetObjectModel),
+            typeof(SetUpdateStatus),
             typeof(SyncObjectModel),
             typeof(UnlockObjectModel),
             typeof(InstallPlugin),
@@ -39,7 +40,12 @@ namespace DuetControlServer.IPC.Processors
             typeof(AddUserSession),
             typeof(RemoveUserSession)
         };
-        
+
+        /// <summary>
+        /// Static constructor of this class
+        /// </summary>
+        static Command() => AddSupportedCommands(SupportedCommands);
+
         /// <summary>
         /// Constructor of the command interpreter
         /// </summary>

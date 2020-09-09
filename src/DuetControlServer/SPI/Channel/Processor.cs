@@ -536,8 +536,8 @@ namespace DuetControlServer.SPI.Channel
                 {
                     if (BufferedCodes[i] != lastStartCode)
                     {
-                        BufferedCodes[i].FirmwareTCS.SetCanceled();
                         BytesBuffered -= BufferedCodes[i].BinarySize;
+                        BufferedCodes[i].FirmwareTCS.SetCanceled();
                         BufferedCodes.RemoveAt(i);
                     }
                 }
@@ -567,9 +567,9 @@ namespace DuetControlServer.SPI.Channel
         {
             while (BufferedCodes.Count > 0 && BufferedCodes[0].Type == CodeType.Comment)
             {
+                BytesBuffered -= BufferedCodes[0].BinarySize;
                 BufferedCodes[0].Result = new CodeResult();
                 BufferedCodes[0].FirmwareTCS.SetResult(null);
-                BytesBuffered -= BufferedCodes[0].BinarySize;
                 BufferedCodes.RemoveAt(0);
             }
         }
@@ -779,10 +779,10 @@ namespace DuetControlServer.SPI.Channel
             // Deal with codes being executed
             if (BufferedCodes.Count > 0)
             {
-                await HandleCodeReply(BufferedCodes[0], flags, reply);
-                if (BufferedCodes[0].FirmwareTask.IsCompleted)
+                int codeSize = BufferedCodes[0].BinarySize;
+                if (await HandleCodeReply(BufferedCodes[0], flags, reply))
                 {
-                    BytesBuffered -= BufferedCodes[0].BinarySize;
+                    BytesBuffered -= codeSize;
                     BufferedCodes.RemoveAt(0);
                 }
                 return true;
@@ -865,8 +865,8 @@ namespace DuetControlServer.SPI.Channel
         /// <param name="code">Destination code</param>
         /// <param name="flags">Reply flags</param>
         /// <param name="reply">Reply</param>
-        /// <returns>Asynchronous task</returns>
-        private async Task HandleCodeReply(Code code, MessageTypeFlags flags, string reply)
+        /// <returns>Whether the code has finished</returns>
+        private async Task<bool> HandleCodeReply(Code code, MessageTypeFlags flags, string reply)
         {
             if (!string.IsNullOrEmpty(_lastPartialMessage))
             {
@@ -879,8 +879,10 @@ namespace DuetControlServer.SPI.Channel
             {
                 // Code reply is not complete yet
                 _lastPartialMessage = reply;
+                return false;
             }
-            else if (code != null)
+
+            if (code != null)
             {
                 // Make sure the code has a code reply...
                 if (code.Result == null)
@@ -903,6 +905,7 @@ namespace DuetControlServer.SPI.Channel
                             : MessageType.Success;
                 await Logger.LogOutput(type, reply);
             }
+            return true;
         }
 
         /// <summary>

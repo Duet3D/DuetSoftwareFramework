@@ -118,8 +118,9 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Reset this instance
         /// </summary>
-        public void Reset()
+        public virtual void Reset()
         {
+            SourceConnection = 0;
             Result = null;
             Type = CodeType.Comment;
             Channel = Defaults.InputChannel;
@@ -131,6 +132,7 @@ namespace DuetAPI.Commands
             Flags = CodeFlags.None;
             Comment = null;
             FilePosition = Length = null;
+            Length = null;
             Parameters.Clear();
         }
 

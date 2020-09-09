@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
@@ -454,6 +455,62 @@ namespace DuetControlServer.Files
                 }
             }
             return false;
+        }
+
+        /// <summary>
+        /// Marker used by RepRapFirmware for simulation times at the end of a file
+        /// </summary>
+        private const string SimulatedTimeString = "\n; Simulated print time";
+
+        /// <summary>
+        /// Update the last simulation time in a job file
+        /// </summary>
+        /// <param name="filename">Path to the job file</param>
+        /// <param name="totalSeconds">Total print or simulated time</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task UpdateSimulatedTime(string filename, int totalSeconds)
+        {
+            // Get the last modified datetime
+            DateTime lastWriteTime = File.GetLastWriteTime(filename);
+
+            // Update the simulated time in the file
+            using (FileStream fileStream = new FileStream(filename, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+            {
+                // Check if we need to truncate the file before the last simulated time
+                bool truncate = false;
+                Memory<byte> buffer = new byte[64];
+                if (fileStream.Length >= buffer.Length)
+                {
+                    fileStream.Seek(-buffer.Length, SeekOrigin.End);
+                    int bytesRead = await fileStream.ReadAsync(buffer), offset = 0;
+                    if (bytesRead > 0)
+                    {
+                        string bufferString = Encoding.UTF8.GetString(buffer.Slice(0, bytesRead).Span);
+                        int simulationMarkerPosition = bufferString.IndexOf(SimulatedTimeString);
+                        if (simulationMarkerPosition >= 0)
+                        {
+                            offset = bytesRead - simulationMarkerPosition;
+                            truncate = true;
+                        }
+                    }
+                    fileStream.Seek(-offset, SeekOrigin.End);
+                }
+
+                // Write the simulated time
+                using (StreamWriter writer = new StreamWriter(fileStream, leaveOpen: true))
+                {
+                    await writer.WriteLineAsync(SimulatedTimeString + ": " + totalSeconds.ToString());
+                }
+
+                // Truncate the file if necessary
+                if (truncate)
+                {
+                    fileStream.SetLength(fileStream.Position);
+                }
+            }
+
+            // Restore the last modified datetime
+            File.SetLastWriteTime(filename, lastWriteTime);
         }
     }
 }

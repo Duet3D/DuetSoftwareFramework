@@ -133,10 +133,13 @@ namespace DuetControlServer.Commands
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         private Task<IDisposable> WaitForExecution()
         {
-            // Get a cancellation token
-            lock (_cancellationTokenSources)
+            // Assign a cancellation token if required
+            if (CancellationToken == null)
             {
-                CancellationToken = _cancellationTokenSources[(int)Channel].Token;
+                lock (_cancellationTokenSources)
+                {
+                    CancellationToken = _cancellationTokenSources[(int)Channel].Token;
+                }
             }
 
             // Codes from interceptors do not have any order control to avoid deadlocks
@@ -332,21 +335,23 @@ namespace DuetControlServer.Commands
 
             try
             {
-                // Check if this code is supposed to be written to a file
-                int numChannel = (int)Channel;
-                using (await FileLocks[numChannel].LockAsync(CancellationToken))
-                {
-                    if (FilesBeingWritten[numChannel] != null && (Type != CodeType.MCode || MajorNumber != 29))
-                    {
-                        _logger.Debug("Writing {0}{1}", this, logSuffix);
-                        FilesBeingWritten[numChannel].WriteLine(this);
-                        return new CodeResult();
-                    }
-                }
-
-                // Execute this code
                 try
                 {
+                    CancellationToken.ThrowIfCancellationRequested();
+
+                    // Check if this code is supposed to be written to a file
+                    int numChannel = (int)Channel;
+                    using (await FileLocks[numChannel].LockAsync(Program.CancellationToken))
+                    {
+                        if (FilesBeingWritten[numChannel] != null && (Type != CodeType.MCode || MajorNumber != 29))
+                        {
+                            _logger.Debug("Writing {0}{1}", this, logSuffix);
+                            FilesBeingWritten[numChannel].WriteLine(this);
+                            return new CodeResult();
+                        }
+                    }
+
+                    // Execute this code
                     _logger.Debug("Processing {0}{1}", this, logSuffix);
                     await Process();
                     _logger.Debug("Completed {0}{1}", this, logSuffix);
@@ -662,6 +667,23 @@ namespace DuetControlServer.Commands
 
             // Done
             await CodeInterception.Intercept(this, InterceptionMode.Executed);
+        }
+
+        /// <summary>
+        /// Resets more <see cref="Code"/> fields
+        /// </summary>
+        public override void Reset()
+        {
+            base.Reset();
+            Connection = null;
+            CancellingPrint = false;
+            InternallyProcessed = false;
+            File = null;
+            Macro = null;
+            ResolvedByInterceptor = false;
+            FirmwareTCS = null;
+            BinarySize = 0;
+            IsExecuted = false;
         }
     }
 }

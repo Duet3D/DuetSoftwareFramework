@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -14,7 +13,6 @@ using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.Utility;
 using LinuxApi;
-using Command = DuetControlServer.IPC.Processors.Command;
 
 namespace DuetControlServer.IPC
 {
@@ -286,10 +284,10 @@ namespace DuetControlServer.IPC
                     }
 
                     // Check if the received command is valid
-                    Type commandType = GetCommandType(commandName);
+                    Type commandType = Base.GetCommandType(commandName);
                     if (!typeof(BaseCommand).IsAssignableFrom(commandType))
                     {
-                        throw new ArgumentException($"Command {commandName} is not of type BaseCommand");
+                        throw new ArgumentException($"Unsupported command {commandName}");
                     }
 
                     // Log this
@@ -312,25 +310,6 @@ namespace DuetControlServer.IPC
                 }
             }
             throw new ArgumentException("Command type not found");
-        }
-
-        /// <summary>
-        /// Retrieve the type of a supported command
-        /// </summary>
-        /// <param name="name">Name of the command</param>
-        /// <returns>Type of the command or null if none found</returns>
-        private Type GetCommandType(string name)
-        {
-            Type result = Command.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
-            if (result == null)
-            {
-                result = CodeInterception.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
-            }
-            if (result == null)
-            {
-                result = ModelSubscription.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
-            }
-            return result;
         }
 
         /// <summary>

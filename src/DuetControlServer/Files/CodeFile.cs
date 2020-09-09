@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using Nito.AsyncEx;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -247,26 +248,26 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Read the next available code and interpret conditional codes except for echo
         /// </summary>
+        /// <param name="sharedCode">Code that may be reused</param>
         /// <returns>Read code or null if none found</returns>
         /// <exception cref="CodeParserException">Failed to read the next code</exception>
         /// <exception cref="OperationCanceledException">Failed to flush the pending codes</exception>
         /// <remarks>
         /// This instance must NOT be locked when this is called
         /// </remarks>
-        public async Task<Code> ReadCodeAsync()
+        public async Task<Code> ReadCodeAsync(Code sharedCode = null)
         {
             while (true)
             {
+                // Prepare the result
+                Code code = sharedCode ?? new Code();
+                code.Channel = Channel;
+                code.File = this;
+                code.LineNumber = LineNumber;
+                code.FilePosition = Position;
+
                 // Read the next available code
                 bool codeRead;
-                Code code = new Code
-                {
-                    Channel = Channel,
-                    File = this,
-                    LineNumber = LineNumber,
-                    FilePosition = Position
-                };
-
                 using (await _lock.LockAsync(Program.CancellationToken))
                 {
                     if (IsClosed)

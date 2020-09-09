@@ -1,6 +1,23 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.2.0-b1
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-b1
+- DuetWebControl 3.2.0-b1
+
+Changed behaviour:
+- Permissions are now required for DSF commands for executables running in `/opt/dsf/plugins`
+- Simulation times are automatically written to G-code files
+- Increased API level due to object model changes
+- Renamed namespace `DuetAPI.Machine` to `DuetAPI.ObjectModel` and `MachineModel` to `ObjectModel`
+
+Bug fixes:
+- DCS service file contained an invalid CPU priority
+- Event logging via M929 was not working
+
 Version 3.1.1
 ==============
 

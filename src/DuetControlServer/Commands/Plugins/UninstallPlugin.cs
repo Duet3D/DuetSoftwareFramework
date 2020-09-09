@@ -103,7 +103,7 @@ namespace DuetControlServer.Commands
                 string pluginDirectory = Path.Combine(Settings.PluginDirectory, Plugin);
                 if (Directory.Exists(pluginDirectory))
                 {
-                    logger.Debug("Removing plugin directory {0}", pluginDirectory); 
+                    logger.Debug("Removing plugin directory {0}", pluginDirectory);
                     Directory.Delete(pluginDirectory, true);
                 }
             }

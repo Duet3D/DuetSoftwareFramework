@@ -93,7 +93,8 @@ namespace DuetControlServer.Commands
             foreach (ZipArchiveEntry entry in zipArchive.Entries)
             {
                 // Ignore plugin.json, it will be written when this archive has been extracted
-                if (entry.FullName == "plugin.json")
+                // Also ignore directories, they are automatically created below
+                if (entry.FullName == "plugin.json" || entry.FullName.EndsWith('/'))
                 {
                     continue;
                 }
@@ -109,12 +110,15 @@ namespace DuetControlServer.Commands
                 {
                     // Put other files into <PluginDirectory>/<PluginName>/
                     fileName = Path.Combine(pluginBase, entry.FullName);
-                    plugin.SbcFiles.Add(entry.FullName);
 
-                    // Check if this is a web file
+                    // Check what type of file this is
                     if (entry.FullName.StartsWith("www/"))
                     {
                         plugin.DwcFiles.Add(entry.FullName.Substring(4));
+                    }
+                    else
+                    {
+                        plugin.SbcFiles.Add(entry.FullName);
                     }
                 }
 
@@ -233,8 +237,12 @@ namespace DuetControlServer.Commands
                 throw new ArgumentException("plugin.json not found in the ZIP file");
             }
 
-            using Stream manifestStream = manifestFile.Open();
-            Plugin plugin = await JsonSerializer.DeserializeAsync<Plugin>(manifestStream, JsonHelper.DefaultJsonOptions);
+            Plugin plugin = new Plugin();
+            using (Stream manifestStream = manifestFile.Open())
+            {
+                using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
+                plugin.UpdateFromJson(manifestJson.RootElement);
+            }
             plugin.Pid = -1;
 
             // Check the plugin name

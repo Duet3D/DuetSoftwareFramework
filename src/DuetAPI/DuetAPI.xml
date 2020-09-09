@@ -923,6 +923,16 @@
             This value is ignored if this request is processed while a code is being intercepted
             </remarks>
         </member>
+        <member name="T:DuetAPI.Commands.SetUpdateStatus">
+            <summary>
+            Override the current status as reported by the object model when performing a software update
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.SetUpdateStatus.Updating">
+            <summary>
+            Whether an update is now in progress
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.SimpleCode">
             <summary>
             Perform a simple G/M/T-code
@@ -1477,6 +1487,31 @@
             Defines in what mode commands are supposed to be intercepted
             </summary>
         </member>
+        <member name="P:DuetAPI.Connection.InitMessages.InterceptInitMessage.Channels">
+            <summary>
+            List of channel where codes may be intercepted. If the list is empty, all available channels are used
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Connection.InitMessages.InterceptInitMessage.Filters">
+            <summary>
+            List of G/M/T-codes to filter or Q for comments
+            </summary>
+            <remarks>
+            This may only specify the code type and major/minor number (e.g. G1 or M105).
+            Alternatively keyword types may be specified (e.g. if or elif).
+            Asterisks are supported, too (e.g. T*)
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.Connection.InitMessages.InterceptInitMessage.PriortyCodes">
+            <summary>
+            Defines if priority codes may be intercepted (e.g. M122 or M999)
+            </summary>
+            <remarks>
+            This may specify only if *only* priority codes or *only* regular codes are
+            supposed to be intercepted. No regular interceptor should intercept priority codes.
+            </remarks>
+            <seealso cref="F:DuetAPI.Commands.CodeFlags.IsPrioritized"/>
+        </member>
         <member name="T:DuetAPI.Connection.InitMessages.ServerInitMessage">
             <summary>
             An instance of this class is sent by the server to the client in JSON format once a connection has been established.
@@ -1510,6 +1545,15 @@
         <member name="P:DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter">
             <summary>
             Optional filter path for <see cref="F:DuetAPI.Connection.SubscriptionMode.Patch"/> mode
+            </summary>
+            <remarks>
+            Multiple filters can be used on one connection and they have to be delimited by one of these charaters: ['|', ',', ' ', '\r', '\n']
+            </remarks>
+            <seealso cref="P:DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filters"/>
+        </member>
+        <member name="P:DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filters">
+            <summary>
+            Optional list of filter paths for <see cref="F:DuetAPI.Connection.SubscriptionMode.Patch"/> mode
             </summary>
             <remarks>
             The style of a filter is similar to XPath. For example, if you want to monitor only the current heater temperatures,
@@ -2522,7 +2566,7 @@
             Whether this is a upload request
             </summary>
             <remarks>
-            If set to true, the whole body payload is written to a temporary file and the file path is passed as in the body field
+            If set to true, the whole body payload is written to a temporary file and the file path is passed via the <see cref="P:DuetAPI.Commands.ReceivedHttpRequest.Body"/> property
             </remarks>
         </member>
         <member name="P:DuetAPI.ObjectModel.HttpEndpoint.UnixSocket">
@@ -4355,7 +4399,7 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.Plugin.Pid">
             <summary>
-            Process ID if the plugin or -1 if not started
+            Process ID of the plugin or -1 if not started
             </summary>
             <remarks>
             This may become 0 when the plugin has been stopped and the application is being shut down
@@ -4401,9 +4445,9 @@
             List of DWC plugins this plugin depends on. Circular dependencies are not supported
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.PluginManifest.DwcResources">
+        <member name="P:DuetAPI.ObjectModel.PluginManifest.DwcWebpackChunk">
             <summary>
-            List of CSS and JS files to load in DWC
+            Name of the generated webpack chunk
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.SbcRequired">
@@ -6309,6 +6353,16 @@
         <member name="F:DuetAPI.Utility.SbcPermissions.WriteMacros">
             <summary>
             Write files in 0:/macros
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Utility.SbcPermissions.ReadMenu">
+            <summary>
+            Read files in 0:/menu
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Utility.SbcPermissions.WriteMenu">
+            <summary>
+            Write files in 0:/menu
             </summary>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.ReadSystem">

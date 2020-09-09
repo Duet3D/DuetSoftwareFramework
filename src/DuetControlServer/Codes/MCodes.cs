@@ -259,7 +259,7 @@ namespace DuetControlServer.Codes
                     if (await SPI.Interface.Flush(code))
                     {
                         int numChannel = (int)code.Channel;
-                        using (await Commands.Code.FileLocks[numChannel].LockAsync(code.CancellationToken))
+                        using (await Commands.Code.FileLocks[numChannel].LockAsync(Program.CancellationToken))
                         {
                             if (Commands.Code.FilesBeingWritten[numChannel] != null)
                             {
@@ -295,7 +295,7 @@ namespace DuetControlServer.Codes
                     if (await SPI.Interface.Flush(code))
                     {
                         int numChannel = (int)code.Channel;
-                        using (await Commands.Code.FileLocks[numChannel].LockAsync(code.CancellationToken))
+                        using (await Commands.Code.FileLocks[numChannel].LockAsync(Program.CancellationToken))
                         {
                             if (Commands.Code.FilesBeingWritten[numChannel] != null)
                             {

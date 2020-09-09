@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -22,11 +21,10 @@ namespace DuetControlServer.Utility
             public uint BlockNo;
             public uint NumBlocks;
             public uint FileSize;  // or FamilyID
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 476)]
-            public byte[] Data;
-            public uint MagicEnd;
         }
+        private const int UF2DataOffset = 32;
         private const int UF2DataMaxLength = 476;
+        private const int UF2MagicEndOffset = 508;
 
         private const uint MagicStart0 = 0x0A324655;
         private const uint MagicStart1 = 0x9E5D5157;
@@ -65,7 +63,8 @@ namespace DuetControlServer.Utility
                     throw new IOException("Invalid magic start in UF2 block");
                 }
 
-                if (block.MagicEnd != MagicEnd)
+                uint magicEnd = MemoryMarshal.Read<uint>(blockBuffer.Slice(UF2MagicEndOffset, Marshal.SizeOf<uint>()).Span);
+                if (magicEnd != MagicEnd)
                 {
                     throw new IOException("Invalid magic end in UF2 block");
                 }
@@ -78,11 +77,12 @@ namespace DuetControlServer.Utility
                 // Write the block payload to the result
                 if (block.Flags != FlagNoFlash)
                 {
-                    await result.WriteAsync(block.Data.AsMemory().Slice(0, (int)block.PayloadSize));
+                    await result.WriteAsync(blockBuffer.Slice(UF2DataOffset, (int)block.PayloadSize));
                 }
             }
             while (block.BlockNo + 1 < block.NumBlocks);
 
+            result.Seek(0, SeekOrigin.Begin);
             return result;
         }
     }

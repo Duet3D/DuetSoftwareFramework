@@ -439,9 +439,7 @@ namespace DuetControlServer.SPI
             try
             {
                 // Get the CRC16 checksum of the firmware binary
-                byte[] firmwareBlob = new byte[_firmwareStream.Length];
-                await _firmwareStream.ReadAsync(firmwareBlob, 0, (int)_firmwareStream.Length);
-                ushort crc16 = CRC16.Calculate(firmwareBlob);
+                ushort crc16 = CRC16.Calculate(_firmwareStream);
 
                 // Send the IAP binary to the firmware
                 _logger.Info("Flashing IAP binary");
@@ -475,16 +473,26 @@ namespace DuetControlServer.SPI
 
                     _logger.Info("Flashing RepRapFirmware");
                     _firmwareStream.Seek(0, SeekOrigin.Begin);
-                    while (DataTransfer.FlashFirmwareSegment(_firmwareStream))
+
+                    try
                     {
+                        while (DataTransfer.FlashFirmwareSegment(_firmwareStream))
+                        {
+                            if (_logger.IsDebugEnabled)
+                            {
+                                Console.Write('.');
+                            }
+                        }
                         if (_logger.IsDebugEnabled)
                         {
-                            Console.Write('.');
+                            Console.WriteLine();
                         }
                     }
-                    if (_logger.IsDebugEnabled)
+                    catch
                     {
-                        Console.WriteLine();
+                        await Logger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
+                        Program.CancelSource.Cancel();
+                        return;
                     }
 
                     _logger.Info("Verifying checksum");
@@ -494,7 +502,7 @@ namespace DuetControlServer.SPI
                 if (numRetries == 3)
                 {
                     // Failed to flash the firmware
-                    await Logger.LogOutput(MessageType.Error, "Could not flash the firmware binary after 3 attempts. Please install it manually via bossac.");
+                    await Logger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
                     Program.CancelSource.Cancel();
                 }
                 else
@@ -981,7 +989,7 @@ namespace DuetControlServer.SPI
                     MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                                         : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                             : MessageType.Success;
-                    await Logger.LogOutput(type, _partialGenericMessage.TrimEnd());
+                    await Model.Provider.Output(type, _partialGenericMessage.TrimEnd());
                 }
                 _partialGenericMessage = null;
             }

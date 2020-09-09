@@ -807,8 +807,10 @@ namespace DuetControlServer.SPI
         /// <returns>Whether another segment could be sent</returns>
         public static bool FlashFirmwareSegment(Stream stream)
         {
-            byte[] segment = new byte[Consts.FirmwareSegmentSize];
-            int bytesRead = stream.Read(segment);
+            Span<byte> readBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
+            Span<byte> writeBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
+
+            int bytesRead = stream.Read(writeBuffer);
             if (bytesRead <= 0)
             {
                 return false;
@@ -817,11 +819,16 @@ namespace DuetControlServer.SPI
             if (bytesRead != Consts.FirmwareSegmentSize)
             {
                 // Fill up the remaining space with 0xFF. The IAP program does the same once complete
-                segment.AsSpan(bytesRead).Fill(0xFF);
+                writeBuffer.Slice(bytesRead).Fill(0xFF);
             }
 
             WaitForTransfer();
-            _spiDevice.TransferFullDuplex(segment, segment);
+            _spiDevice.TransferFullDuplex(writeBuffer, readBuffer);
+
+            if (readBuffer[bytesRead - 1] != 0x1A)
+            {
+                throw new Exception("Received invalid response from IAP");
+            }
             return true;
         }
 
@@ -972,9 +979,9 @@ namespace DuetControlServer.SPI
         {
             return _txPointer + Marshal.SizeOf<PacketHeader>() + dataLength <= bufferSize;
         }
-        #endregion
+#endregion
 
-        #region Functions for data transfers
+#region Functions for data transfers
         /// <summary>
         /// Internal function to monitor the transfer ready pin
         /// </summary>
@@ -1251,6 +1258,6 @@ namespace DuetControlServer.SPI
             ExchangeResponse(TransferResponse.BadResponse);
             return false;
         }
-        #endregion
+#endregion
     }
 }

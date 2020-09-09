@@ -128,6 +128,23 @@ namespace DuetControlServer.Model
         public static ObjectModel Get { get; } = new ObjectModel();
 
         /// <summary>
+        /// Whether the current machine status is overridden because an update is in progress
+        /// </summary>
+        public static bool IsUpdating
+        {
+            get => _isUpdating;
+            set
+            {
+                if (value)
+                {
+                    Get.State.Status = MachineStatus.Updating;
+                }
+                _isUpdating = value;
+            }
+        }
+        private static bool _isUpdating;
+
+        /// <summary>
         /// Initialize the object model provider with values that are not expected to change
         /// </summary>
         public static void Init()

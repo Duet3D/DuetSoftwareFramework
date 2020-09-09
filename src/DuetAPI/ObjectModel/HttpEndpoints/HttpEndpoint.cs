@@ -49,7 +49,7 @@
         /// Whether this is a upload request
         /// </summary>
         /// <remarks>
-        /// If set to true, the whole body payload is written to a temporary file and the file path is passed as in the body field
+        /// If set to true, the whole body payload is written to a temporary file and the file path is passed via the <see cref="Commands.ReceivedHttpRequest.Body"/> property
         /// </remarks>
         public bool IsUploadRequest
         {

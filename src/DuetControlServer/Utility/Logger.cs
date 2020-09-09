@@ -57,7 +57,7 @@ namespace DuetControlServer.Utility
                 // Initialize access to the log file
                 _fileStream = new FileStream(filename, FileMode.Append, FileAccess.Write);
                 _writer = new StreamWriter(_fileStream) { AutoFlush = true };
-                _logCloseEvent = Program.CancellationToken.Register(Stop().Wait);
+                _logCloseEvent = Program.CancellationToken.Register(() => Stop().Wait());
 
                 // Write the first line
                 await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging started");
@@ -67,6 +67,9 @@ namespace DuetControlServer.Utility
                 {
                     Model.Provider.Get.State.LogFile = filename;
                 }
+
+                // Write event
+                _logger.Info("Event logging to {0} started", filename);
             }
         }
 
@@ -93,6 +96,8 @@ namespace DuetControlServer.Utility
                 await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging stopped");
                 _writer.Close();
                 _writer = null;
+
+                _logger.Info("Event logging stopped");
             }
 
             if (_fileStream != null)
@@ -101,15 +106,18 @@ namespace DuetControlServer.Utility
                 _fileStream = null;
             }
 
-            if (_logCloseEvent != null)
+            if (!Program.CancellationToken.IsCancellationRequested)
             {
-                _logCloseEvent.Dispose();
-                _logCloseEvent = null;
-            }
+                if (_logCloseEvent != null)
+                {
+                    _logCloseEvent.Dispose();
+                    _logCloseEvent = null;
+                }
 
-            using (await Model.Provider.AccessReadWriteAsync())
-            {
-                Model.Provider.Get.State.LogFile = null;
+                using (await Model.Provider.AccessReadWriteAsync())
+                {
+                    Model.Provider.Get.State.LogFile = null;
+                }
             }
         }
 
@@ -126,7 +134,7 @@ namespace DuetControlServer.Utility
                     try
                     {
                         await _writer.WriteAsync(msg.Time.ToString("yyyy-MM-dd HH:mm:ss "));
-                        await _writer.WriteLineAsync(msg.ToString());
+                        await _writer.WriteLineAsync(msg.ToString().TrimEnd());
                     }
                     catch (Exception e)
                     {

@@ -8,23 +8,22 @@
         /// <summary>
         /// Active RPM
         /// </summary>
-        public float Active
+        public int Active
         {
             get => _active;
 			set => SetPropertyValue(ref _active, value);
-
         }
-        private float _active;
+        private int _active;
         
         /// <summary>
         /// Current RPM, negative if anticlockwise direction
         /// </summary>
-        public float Current
+        public int Current
         {
             get => _current;
 			set => SetPropertyValue(ref _current, value);
         }
-        private float _current;
+        private int _current;
 
         /// <summary>
         /// Frequency (in Hz)
@@ -39,22 +38,22 @@
         /// <summary>
         /// Minimum RPM when turned on
         /// </summary>
-        public float Min
+        public int Min
         {
             get => _min;
 			set => SetPropertyValue(ref _min, value);
         }
-        private float _min;
+        private int _min = 60;
 
         /// <summary>
         /// Maximum RPM
         /// </summary>
-        public float Max
+        public int Max
         {
             get => _max;
 			set => SetPropertyValue(ref _max, value);
         }
-        private float _max = 10000F;
+        private int _max = 10000;
 
         /// <summary>
         /// Mapped tool number or -1 if not assigned

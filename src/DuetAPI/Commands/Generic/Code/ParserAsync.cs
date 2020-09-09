@@ -330,7 +330,18 @@ namespace DuetAPI.Commands
                             }
 
                             result.Type = (CodeType)upperLetter;
-                            if (value.Contains('.'))
+                            if (wasExpression)
+                            {
+                                if (result.Type == CodeType.TCode)
+                                {
+                                    AddParameter(result, 'T', value, false, true);
+                                }
+                                else
+                                {
+                                    throw new CodeParserException("Dynamic command numbers are only supported for T-codes");
+                                }
+                            }
+                            else if (value.Contains('.'))
                             {
                                 string[] args = value.Split('.');
                                 if (int.TryParse(args[0], out int majorNumber))
@@ -361,7 +372,7 @@ namespace DuetAPI.Commands
                                 throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
                             }
                         }
-                        else if (result.MajorNumber == null && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
+                        else if (result.Type == CodeType.Comment && result.MajorNumber == null && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
                         {
                             // Check for conditional G-code
                             if (letter == 'i' && value == "f")

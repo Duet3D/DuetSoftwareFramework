@@ -19,7 +19,7 @@ namespace DuetControlServer.IPC.Processors
     /// Subscription processor that notifies clients about object model changes.
     /// There is no point in deserializing the object model here so only the JSON representation is kept here.
     /// </summary>
-    public class ModelSubscription : Base
+    public sealed class ModelSubscription : Base
     {
         /// <summary>
         /// List of supported commands in this mode
@@ -28,7 +28,12 @@ namespace DuetControlServer.IPC.Processors
         {
             typeof(Acknowledge)
         };
-        
+
+        /// <summary>
+        /// Static constructor of this class
+        /// </summary>
+        static ModelSubscription() => AddSupportedCommands(SupportedCommands);
+
         /// <summary>
         /// List of active subscribers
         /// </summary>
@@ -73,10 +78,16 @@ namespace DuetControlServer.IPC.Processors
         {
             SubscribeInitMessage subscribeInitMessage = (SubscribeInitMessage)initMessage;
             _mode = subscribeInitMessage.SubscriptionMode;
-            if (!string.IsNullOrEmpty(subscribeInitMessage.Filter))
+            if (subscribeInitMessage.Filters != null)
+            {
+                _filters = Filter.ConvertFilters(subscribeInitMessage.Filters);
+            }
+#pragma warning disable CS0612 // Type or member is obsolete
+            else if (!string.IsNullOrEmpty(subscribeInitMessage.Filter))
             {
                 _filters = Filter.ConvertFilters(subscribeInitMessage.Filter);
             }
+#pragma warning restore CS0612 // Type or member is obsolete
 
             lock (_subscriptions)
             {

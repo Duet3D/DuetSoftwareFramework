@@ -147,6 +147,10 @@ namespace DuetControlServer.Model
                                 using (await Provider.AccessReadWriteAsync())
                                 {
                                     Provider.Get.UpdateFromFirmwareModel(string.Empty, result);
+                                    if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
+                                    {
+                                        Provider.Get.State.Status = MachineStatus.Updating;
+                                    }
                                 }
 
                                 // Request limits if no sequence numbers have been set yet
@@ -205,6 +209,11 @@ namespace DuetControlServer.Model
                                     else
                                     {
                                         _logger.Warn($"Invalid key {key.GetString()} in the object model");
+                                    }
+
+                                    if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
+                                    {
+                                        Provider.Get.State.Status = MachineStatus.Updating;
                                     }
                                 }
                             }

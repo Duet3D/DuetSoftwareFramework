@@ -172,13 +172,14 @@ build_sd() {
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/firmware
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/gcodes
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/macros
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/menu
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/sys
 	[ -d $COMMON_DIR/duetsd/ ] && $RSYNC $COMMON_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
 	[ -d $PACKAGER_DIR/duetsd/ ] && $RSYNC $PACKAGER_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
 }
 
 build_dwc() {
-	echo "Building DWC2..."
+	echo "Building DWC..."
 
 	if [ ! -d $DEST_DIR/DuetWebControl ] ; then
 		echo "- Cloning repository..."
@@ -199,14 +200,14 @@ build_dwc() {
 	>/dev/null popd
 
 	rm -rf $DEST_DIR/duetwebcontrol_$dwcver
-	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc2
+	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc
 	[ -d $COMMON_DIR/duetwebcontrol/ ] && $RSYNC $COMMON_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
 	[ -d $PACKAGER_DIR/duetwebcontrol/ ] && $RSYNC $PACKAGER_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
 
-	unzip -q $DEST_DIR/DuetWebControl/dist/DuetWebControl-SBC.zip -d $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc2
+	unzip -q $DEST_DIR/DuetWebControl/dist/DuetWebControl-SBC.zip -d $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc
 	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/sd
 	>/dev/null pushd $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/sd
-	ln -s ../dwc2 www
+	ln -s ../dwc www
 	>/dev/null popd
 
 }

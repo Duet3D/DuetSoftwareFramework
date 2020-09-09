@@ -47,8 +47,8 @@ namespace DuetControlServer.Commands
             {
                 if (item.Name == Plugin)
                 {
-                    // Don't do anything if the plugin is already running
-                    if (item.Pid > 0)
+                    // Don't do anything if the plugin is already running or if it cannot be started on the SBC
+                    if (item.Pid > 0 || string.IsNullOrEmpty(item.SbcExecutable))
                     {
                         return true;
                     }
@@ -67,7 +67,7 @@ namespace DuetControlServer.Commands
                     }
 
                     // Check the required DSF version
-                    if (!string.IsNullOrEmpty(item.SbcExecutable) && !Utility.Plugins.CheckVersion(Program.Version, item.SbcDsfVersion))
+                    if (!Utility.Plugins.CheckVersion(Program.Version, item.SbcDsfVersion))
                     {
                         throw new ArgumentException($"Incompatible DSF version (requires {item.SbcDsfVersion}, got {Program.Version})");
                     }
@@ -101,9 +101,14 @@ namespace DuetControlServer.Commands
         /// Start a plugin process
         /// </summary>
         /// <param name="plugin">Plugin to start</param>
+        /// <exception cref="ArgumentException">Invalid executable path</exception>
         private void StartProcess(Plugin plugin)
         {
-            // TODO Start the process via the elevation service if it requires super user permissions
+            // Verify the SBC executable path
+            if (plugin.SbcExecutable.Contains(".."))
+            {
+                throw new ArgumentException("Invalid characters in SBC executable path");
+            }
 
             // Get the actual executable
             string architecture = RuntimeInformation.OSArchitecture switch
@@ -120,6 +125,8 @@ namespace DuetControlServer.Commands
             {
                 sbcExecutable = Path.Combine(Settings.PluginDirectory, plugin.Name, "bin", plugin.SbcExecutable);
             }
+
+            // TODO Start the process via the elevation service if it requires super user permissions
 
             // Start the plugin process
             ProcessStartInfo startInfo = new ProcessStartInfo

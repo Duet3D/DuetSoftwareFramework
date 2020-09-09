@@ -30,3 +30,4 @@ DSF SD Card
 %dir %{dsfoptdir}/sd/filaments
 %dir %{dsfoptdir}/sd/gcodes
 %dir %{dsfoptdir}/sd/macros
+%dir %{dsfoptdir}/sd/menu

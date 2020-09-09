@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -29,16 +30,23 @@ namespace DuetAPIClient
         public SubscriptionMode Mode { get; private set; }
 
         /// <summary>
-        /// Filter expression
+        /// Delimited filter expression
+        /// </summary>
+        /// <seealso cref="Filters"/>
+        [Obsolete]
+        public string Filter { get; private set; }
+
+        /// <summary>
+        /// Filter expressions
         /// </summary>
         /// <seealso cref="SubscribeInitMessage.Filter"/>
-        public string Filter { get; private set; }
+        public List<string> Filters { get; } = new List<string>();
 
         /// <summary>
         /// Establishes a connection to the given UNIX socket file
         /// </summary>
         /// <param name="mode">Subscription mode</param>
-        /// <param name="filter">Optional filter string</param>
+        /// <param name="filter">Optional delimited filter string</param>
         /// <param name="socketPath">Path to the UNIX socket file</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
@@ -46,12 +54,39 @@ namespace DuetAPIClient
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Init message could not be processed</exception>
+        [Obsolete]
         public Task Connect(SubscriptionMode mode, string filter = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
             Mode = mode;
             Filter = filter;
+            Filters.Clear();
 
-            SubscribeInitMessage initMessage = new SubscribeInitMessage { SubscriptionMode = mode, Filter = filter };
+            SubscribeInitMessage initMessage = new SubscribeInitMessage { SubscriptionMode = mode, Filter = Filter };
+            return Connect(initMessage, socketPath, cancellationToken);
+        }
+
+        /// <summary>
+        /// Establishes a connection to the given UNIX socket file
+        /// </summary>
+        /// <param name="mode">Subscription mode</param>
+        /// <param name="filters">Optional filter strings</param>
+        /// <param name="socketPath">Path to the UNIX socket file</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
+        /// <exception cref="IOException">Connection mode is unavailable</exception>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Init message could not be processed</exception>
+        public Task Connect(SubscriptionMode mode, IEnumerable<string> filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+        {
+            Mode = mode;
+            Filters.Clear();
+            if (filters != null)
+            {
+                Filters.AddRange(filters);
+            }
+
+            SubscribeInitMessage initMessage = new SubscribeInitMessage { SubscriptionMode = mode, Filters = Filters };
             return Connect(initMessage, socketPath, cancellationToken);
         }
         

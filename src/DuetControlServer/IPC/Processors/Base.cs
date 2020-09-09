@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
@@ -11,6 +13,24 @@ namespace DuetControlServer.IPC.Processors
     /// <seealso cref="ConnectionMode"/>
     public class Base
     {
+        /// <summary>
+        /// List of supported command types
+        /// </summary>
+        private static readonly List<Type> SupportedCommands = new List<Type>();
+
+        /// <summary>
+        /// Add a list of supported commands
+        /// </summary>
+        /// <param name="supportedCommands"></param>
+        protected static void AddSupportedCommands(IEnumerable<Type> supportedCommands) => SupportedCommands.AddRange(supportedCommands.Where(item => !SupportedCommands.Contains(item)));
+
+        /// <summary>
+        /// Get the corresponding command type
+        /// </summary>
+        /// <param name="name">Name of the command</param>
+        /// <returns>Command type or null if not found</returns>
+        public static Type GetCommandType(string name) => SupportedCommands.FirstOrDefault(item => item.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
+
         /// <summary>
         /// Connection to the IPC client served by this processor
         /// </summary>

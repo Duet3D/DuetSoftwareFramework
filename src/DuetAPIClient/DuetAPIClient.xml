@@ -168,11 +168,46 @@
             Mode of the interceptor
             </summary>
         </member>
+        <member name="P:DuetAPIClient.InterceptConnection.Channels">
+            <summary>
+            List of input channels where codes may be intercepted. If the list is empty, all available channels are used
+            </summary>
+        </member>
+        <member name="P:DuetAPIClient.InterceptConnection.Filters">
+            <summary>
+            List of G/M/T-codes to filter or Q0 for comments
+            </summary>
+            <remarks>
+            This may only specify the code type and major/minor number (e.g. G1)
+            </remarks>
+        </member>
+        <member name="P:DuetAPIClient.InterceptConnection.PriortyCodes">
+            <summary>
+            Defines if priority codes may be intercepted (e.g. M122 or M999)
+            </summary>
+            <seealso cref="F:DuetAPI.Commands.CodeFlags.IsPrioritized"/>
+        </member>
         <member name="M:DuetAPIClient.InterceptConnection.Connect(DuetAPI.Connection.InterceptionMode,System.String,System.Threading.CancellationToken)">
             <summary>
             Establishes a connection to the given UNIX socket file
             </summary>
             <param name="mode">Interception mode</param>
+            <param name="socketPath">Path to the UNIX socket file</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:DuetAPI.Connection.IncompatibleVersionException">API level is incompatible</exception>
+            <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Init message could not be processed</exception>
+        </member>
+        <member name="M:DuetAPIClient.InterceptConnection.Connect(DuetAPI.Connection.InterceptionMode,System.Collections.Generic.IEnumerable{DuetAPI.CodeChannel},System.Collections.Generic.IEnumerable{System.String},System.Boolean,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Establishes a connection to the given UNIX socket file
+            </summary>
+            <param name="mode">Interception mode</param>
+            <param name="channels">Optional list of input channels where codes may be intercepted</param>
+            <param name="filters">Optional list of codes that may be intercepted</param>
+            <param name="priortyCodes">Define if priorty codes may be intercepted</param>
             <param name="socketPath">Path to the UNIX socket file</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
@@ -465,6 +500,17 @@
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ManagePlugins"/>
         </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.SetUpdateStatus(System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Override the current machine status if a software update is in progress
+            </summary>
+            <param name="isUpdating">If the machine status is supposed to be overrridden</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <remarks>
+            The object model may not be locked when this is called
+            </remarks>
+        </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.StartPlugin(System.String,System.Threading.CancellationToken)">
             <summary>
             Start a plugin
@@ -752,7 +798,13 @@
         </member>
         <member name="P:DuetAPIClient.SubscribeConnection.Filter">
             <summary>
-            Filter expression
+            Delimited filter expression
+            </summary>
+            <seealso cref="P:DuetAPIClient.SubscribeConnection.Filters"/>
+        </member>
+        <member name="P:DuetAPIClient.SubscribeConnection.Filters">
+            <summary>
+            Filter expressions
             </summary>
             <seealso cref="P:DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter"/>
         </member>
@@ -761,7 +813,21 @@
             Establishes a connection to the given UNIX socket file
             </summary>
             <param name="mode">Subscription mode</param>
-            <param name="filter">Optional filter string</param>
+            <param name="filter">Optional delimited filter string</param>
+            <param name="socketPath">Path to the UNIX socket file</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:DuetAPI.Connection.IncompatibleVersionException">API level is incompatible</exception>
+            <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Init message could not be processed</exception>
+        </member>
+        <member name="M:DuetAPIClient.SubscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode,System.Collections.Generic.IEnumerable{System.String},System.String,System.Threading.CancellationToken)">
+            <summary>
+            Establishes a connection to the given UNIX socket file
+            </summary>
+            <param name="mode">Subscription mode</param>
+            <param name="filters">Optional filter strings</param>
             <param name="socketPath">Path to the UNIX socket file</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>

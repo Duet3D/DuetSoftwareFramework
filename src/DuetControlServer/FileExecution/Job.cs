@@ -2,6 +2,7 @@
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
+using DuetControlServer.Model;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
 using Nito.AsyncEx;
@@ -53,6 +54,11 @@ namespace DuetControlServer.FileExecution
         /// Condition to trigger when the print has finished
         /// </summary>
         private static readonly AsyncConditionVariable _finished = new AsyncConditionVariable(_lock);
+
+        /// <summary>
+        /// Name of the job file
+        /// </summary>
+        private static string _filename;
 
         /// <summary>
         /// Job file being read from
@@ -174,14 +180,15 @@ namespace DuetControlServer.FileExecution
             // Update the state
             IsCancelled = IsAborted = false;
             IsSimulating = simulating;
+            _filename = fileName;
             _file = file;
             _pausePosition = null;
 
             // Update the object model
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (await Provider.AccessReadWriteAsync())
             {
-                Model.Provider.Get.Inputs.File.Volumetric = false;
-                Model.Provider.Get.Job.File.Assign(info);
+                Provider.Get.Inputs.File.Volumetric = false;
+                Provider.Get.Job.File.Assign(info);
             }
 
             // Notify RepRapFirmware and start processing the file in the background
@@ -193,6 +200,14 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         public static async Task Run()
         {
+            // Use a code pool for print files. This is possible for regular codes but should be avoided
+            // for macro codes, because those codes may be referenced even after they finish
+            Queue<Code> codePool = new Queue<Code>();
+            for (int i = 0; i < Math.Max(Settings.BufferedPrintCodes, 1); i++)
+            {
+                codePool.Enqueue(new Code());
+            }
+
             do
             {
                 // Wait for the next print to start
@@ -220,28 +235,41 @@ namespace DuetControlServer.FileExecution
                     long nextFilePosition = 0;
                     do
                     {
-                        // Fill up the code buffer unless the print is paused
-                        while (true)
+                        // Fill up the code buffer
+                        while (codePool.TryDequeue(out Code sharedCode))
                         {
+                            sharedCode.Reset();
+
+                            // Stop reading codes if the print has been paused or aborted
                             using (await _lock.LockAsync(Program.CancellationToken))
                             {
-                                if (IsPaused || codeTasks.Count >= Math.Max(1, Settings.BufferedPrintCodes))
+                                if (IsPaused)
                                 {
+                                    codePool.Enqueue(sharedCode);
                                     break;
                                 }
                             }
 
+                            // Read the next code
                             try
                             {
-                                Code readCode = await _file.ReadCodeAsync();
-                                if (readCode == null)
+                                try
                                 {
-                                    break;
+                                    if (await _file.ReadCodeAsync(sharedCode) == null)
+                                    {
+                                        codePool.Enqueue(sharedCode);
+                                        break;
+                                    }
+                                    sharedCode.CancellationToken = cancellationToken;
+                                }
+                                catch
+                                {
+                                    codePool.Enqueue(sharedCode);
+                                    throw;
                                 }
 
-                                readCode.CancellationToken = cancellationToken;
-                                codes.Enqueue(readCode);
-                                codeTasks.Enqueue(readCode.Execute());
+                                codes.Enqueue(sharedCode);
+                                codeTasks.Enqueue(sharedCode.Execute());
                             }
                             catch (OperationCanceledException)
                             {
@@ -277,26 +305,33 @@ namespace DuetControlServer.FileExecution
                         {
                             try
                             {
-                                CodeResult result = await codeTasks.Dequeue();
-                                nextFilePosition = code.FilePosition.Value + code.Length.Value;
-                                await Utility.Logger.LogOutput(result);
+                                try
+                                {
+                                    CodeResult result = await codeTasks.Dequeue();
+                                    nextFilePosition = code.FilePosition.Value + code.Length.Value;
+                                    await Utility.Logger.LogOutput(result);
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    // Code has been cancelled, don't log this. In the future this may terminate the job file
+                                    // Note this can happen as well when the file being printed is exchanged
+                                }
+                                catch (CodeParserException cpe)
+                                {
+                                    await Utility.Logger.LogOutput(MessageType.Error, cpe.Message);
+                                }
+                                catch (AggregateException ae)
+                                {
+                                    await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                                }
+                                catch (Exception e)
+                                {
+                                    await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
+                                }
                             }
-                            catch (OperationCanceledException)
+                            finally
                             {
-                                // Code has been cancelled, don't log this. In the future this may terminate the job file
-                                // Note this can happen as well when the file being printed is exchanged
-                            }
-                            catch (CodeParserException cpe)
-                            {
-                                await Utility.Logger.LogOutput(MessageType.Error, cpe.Message);
-                            }
-                            catch (AggregateException ae)
-                            {
-                                await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
-                            }
-                            catch (Exception e)
-                            {
-                                await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
+                                codePool.Enqueue(code);
                             }
                         }
                         else
@@ -345,12 +380,28 @@ namespace DuetControlServer.FileExecution
                         }
 
                         // Update the object model again
-                        using (await Model.Provider.AccessReadWriteAsync())
+                        using (await Provider.AccessReadWriteAsync())
                         {
-                            Model.Provider.Get.Job.LastFileAborted = IsAborted;
-                            Model.Provider.Get.Job.LastFileCancelled = IsCancelled;
-                            Model.Provider.Get.Job.LastFileSimulated = IsSimulating;
-                            Model.Provider.Get.Job.LastFileName = Model.Provider.Get.Job.File.FileName;
+                            Provider.Get.Job.LastFileAborted = IsAborted;
+                            Provider.Get.Job.LastFileCancelled = IsCancelled;
+                            Provider.Get.Job.LastFileSimulated = IsSimulating;
+                            Provider.Get.Job.LastFileName = Provider.Get.Job.File.FileName;
+                        }
+
+                        // Update the last simulated time
+                        if (IsSimulating && !IsAborted && !IsCancelled)
+                        {
+                            await Updater.WaitForFullUpdate(Program.CancellationToken);
+
+                            int? lastDuration;
+                            using (await Provider.AccessReadOnlyAsync())
+                            {
+                                lastDuration = Provider.Get.Job.LastDuration;
+                            }
+                            if (lastDuration > 0)
+                            {
+                                await InfoParser.UpdateSimulatedTime(_filename, lastDuration.Value);
+                            }
                         }
                     }
                 }
@@ -363,6 +414,7 @@ namespace DuetControlServer.FileExecution
                     // Dispose the file
                     _file.Dispose();
                     _file = null;
+                    _filename = null;
 
                     // End
                     IsProcessing = IsSimulating = IsPaused = false;
