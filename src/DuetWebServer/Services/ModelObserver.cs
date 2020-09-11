@@ -128,7 +128,7 @@ namespace DuetWebServer.Services
                         // Establish connections to DCS
                         using SubscribeConnection subscribeConnection = new SubscribeConnection();
                         using CommandConnection commandConnection = new CommandConnection();
-                        await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, "directories/www|httpEndpoints/**|userSessions/**", unixSocket);
+                        await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, new string[] { "directories/www", "httpEndpoints/**", "userSessions/**" }, unixSocket);
                         await commandConnection.Connect(unixSocket);
                         _logger.LogInformation("Connections to DuetControlServer established");
 

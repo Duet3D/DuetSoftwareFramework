@@ -91,7 +91,7 @@ namespace DuetWebServer.Controllers
             try
             {
                 // Subscribe to object model updates
-                await subscribeConnection.Connect(SubscriptionMode.Patch, null, socketPath);
+                await subscribeConnection.Connect(SubscriptionMode.Patch, Array.Empty<string>(), socketPath);
             }
             catch (Exception e)
             {
