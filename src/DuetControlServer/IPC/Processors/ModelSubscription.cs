@@ -88,6 +88,10 @@ namespace DuetControlServer.IPC.Processors
                 _filters = Filter.ConvertFilters(subscribeInitMessage.Filter);
             }
 #pragma warning restore CS0612 // Type or member is obsolete
+            else
+            {
+                _filters = Array.Empty<object[]>();
+            }
 
             lock (_subscriptions)
             {
@@ -114,7 +118,7 @@ namespace DuetControlServer.IPC.Processors
                 byte[] jsonData;
                 using (await Provider.AccessReadOnlyAsync())
                 {
-                    if (_mode == SubscriptionMode.Full || _filters == null)
+                    if (_mode == SubscriptionMode.Full || _filters.Length == 0)
                     {
                         jsonData = JsonSerializer.SerializeToUtf8Bytes(Provider.Get, JsonHelper.DefaultJsonOptions);
                     }
@@ -223,7 +227,7 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>True if a filter applies</returns>
         private bool CheckFilters(object[] path)
         {
-            if (_filters == null || path.Length == 0)
+            if (_filters.Length == 0 || path.Length == 0)
             {
                 return true;
             }
