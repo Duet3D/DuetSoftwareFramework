@@ -15,7 +15,7 @@ Summary: DSF Tools
 Group:   3D Printing
 Source0: duettools_%{_tversion}
 License: GPLv3
-URL:     https://github.com/chrishamm/DuetSoftwareFramework
+URL:     https://github.com/Duet3D/DuetSoftwareFramework
 BuildRequires: rpm >= 4.7.2-2
 Requires: duetcontrolserver = %{_tversion}
 

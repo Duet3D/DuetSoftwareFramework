@@ -7,5 +7,5 @@ Depends: duetcontrolserver (= DCSVER)
 Conflicts: duettools (<< 1.1.0.0)
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
-Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git
+Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git
 Description: Optional tools (code examples)

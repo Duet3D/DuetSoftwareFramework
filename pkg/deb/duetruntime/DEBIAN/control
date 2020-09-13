@@ -6,5 +6,5 @@ Architecture: TARGET_ARCH
 Depends: curl, libunwind8, gettext
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
-Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git
+Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git
 Description: .NET Core runtime libraries for the Duet software framework

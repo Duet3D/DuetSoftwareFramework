@@ -1,4 +1,4 @@
 #!/bin/sh
 
-chown -R dsf:dsf /opt/dsf/dwc2
+chown -R dsf:dsf /opt/dsf/dwc
 chmod -R g+wX /opt/dsf/sd

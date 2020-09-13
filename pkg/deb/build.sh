@@ -45,7 +45,7 @@ pkg_sd() {
 }
 
 pkg_dwc() {
-	echo "- Packaging DWC2..."
+	echo "- Packaging DWC..."
 
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetwebcontrol_$dwcver/DEBIAN/control
 	sed -i "s/DWCVER/$dwcver/g" $DEST_DIR/duetwebcontrol_$dwcver/DEBIAN/control

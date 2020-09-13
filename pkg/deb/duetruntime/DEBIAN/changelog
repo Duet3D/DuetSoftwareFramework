@@ -1,6 +1,6 @@
 duetruntime (DCSVER) unstable; urgency=medium
 
-  * See https://github.com/chrishamm/DuetSoftwareFramework for a full list of changes
+  * See https://github.com/Duet3D/DuetSoftwareFramework for a full list of changes
 
  -- Duet3D Packaging Authority <pkg@duet3d.com>  Thu, 23 May 2019 15:06:55 +0200
 

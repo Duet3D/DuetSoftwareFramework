@@ -15,7 +15,7 @@ Summary: Official web interface for Duet electronics
 Group:   3D Printing
 Source0: duetwebcontrol_%{_tversion}
 License: GPLv3
-URL:     https://github.com/chrishamm/DuetWebControl
+URL:     https://github.com/Duet3D/DuetWebControl
 BuildRequires: rpm >= 4.7.2-2
 
 AutoReq:  0
@@ -25,5 +25,5 @@ Official web interface for Duet electronics
 
 %files
 %defattr(-,root,root,-)
-%{dsfoptdir}/dwc2
+%{dsfoptdir}/dwc
 %{dsfoptdir}/sd/www
