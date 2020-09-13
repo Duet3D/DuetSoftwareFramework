@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a configured probe
@@ -46,6 +48,16 @@
         private float _diveHeight;
 
         /// <summary>
+        /// Height of the probe where it stopped last time (in mm)
+        /// </summary>
+        public float LastStopHeight
+        {
+            get => _lastStopHeight;
+            set => SetPropertyValue(ref _lastStopHeight, value);
+        }
+        private float _lastStopHeight;
+
+        /// <summary>
         /// Maximum number of times to probe after a bad reading was determined
         /// </summary>
         public int MaxProbeCount
@@ -81,14 +93,29 @@
         private float _speed = 2F;
 
         /// <summary>
-        /// Temperature coefficient
+        /// First temperature coefficient
         /// </summary>
+        [Obsolete]
         public float TemperatureCoefficient
         {
-            get => _temperatureCoefficient;
-			set => SetPropertyValue(ref _temperatureCoefficient, value);
+            get => (TemperatureCoefficients.Count > 0) ? TemperatureCoefficients[0] : 0F;
+            set
+            {
+                if (TemperatureCoefficients.Count == 0)
+                {
+                    TemperatureCoefficients.Add(value);
+                }
+                else
+                {
+                    TemperatureCoefficients[0] = value;
+                }
+            }
         }
-        private float _temperatureCoefficient;
+
+        /// <summary>
+        /// List of temperature coefficients
+        /// </summary>
+        public ModelCollection<float> TemperatureCoefficients { get; } = new ModelCollection<float>();
 
         /// <summary>
         /// Configured trigger threshold (0..1023)

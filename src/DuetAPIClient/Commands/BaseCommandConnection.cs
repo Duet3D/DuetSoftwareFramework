@@ -324,7 +324,7 @@ namespace DuetAPIClient
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <remarks>
-        /// The object model may not be locked when this is called
+        /// The object model must not be locked when this is called
         /// </remarks>
         public Task SetUpdateStatus(bool isUpdating, CancellationToken cancellationToken = default)
         {

@@ -36,10 +36,7 @@ namespace DuetControlServer.Model
                 using (await Provider.AccessReadWriteAsync())
                 {
                     UpdateNetwork();
-                    if (!Settings.NoSpi)
-                    {
-                        UpdateVolumes();
-                    }
+                    UpdateVolumes();
                     CleanMessages();
                 }
 

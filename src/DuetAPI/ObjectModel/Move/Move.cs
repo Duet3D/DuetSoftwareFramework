@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about the move subsystem
@@ -101,5 +103,16 @@
             set => SetPropertyValue(ref _workplaceNumber, value);
         }
         private int _workplaceNumber;
+
+        /// <summary>
+        /// Index of the currently selected workspace
+        /// </summary>
+        /// <seealso cref="WorkplaceNumber"/>
+        [Obsolete]
+        public int WorkspaceNumber
+        {
+            get => _workplaceNumber + 1;
+            set => _workplaceNumber = value - 1;
+        }
     }
 }

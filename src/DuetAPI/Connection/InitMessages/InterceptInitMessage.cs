@@ -50,12 +50,8 @@ namespace DuetAPI.Connection.InitMessages
         public List<string> Filters { get; set; }
 
         /// <summary>
-        /// Defines if priority codes may be intercepted (e.g. M122 or M999)
+        /// Defines if either regular or priority codes are supposed to be intercepted
         /// </summary>
-        /// <remarks>
-        /// This may specify only if *only* priority codes or *only* regular codes are
-        /// supposed to be intercepted. No regular interceptor should intercept priority codes.
-        /// </remarks>
         /// <seealso cref="DuetAPI.Commands.CodeFlags.IsPrioritized"/>
         public bool PriortyCodes { get; set; }
     }

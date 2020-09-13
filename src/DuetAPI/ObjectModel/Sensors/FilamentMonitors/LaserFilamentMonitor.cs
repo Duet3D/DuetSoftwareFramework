@@ -4,52 +4,62 @@
     /// Calibrated properties of a laser filament monitor
     /// </summary>
     public sealed class LaserFilamentMonitorCalibrated : ModelObject
-	{
-		/// <summary>
-		/// Maximum percentage (0..1 or greater)
-		/// </summary>
-		public float PercentMax
-		{
-			get => _percentMax;
-			set => SetPropertyValue(ref _percentMax, value);
-		}
-		private float _percentMax;
+    {
+        /// <summary>
+        /// Calibration factor of this sensor
+        /// </summary>
+        public float CalibrationFactor
+        {
+            get => _calibrationFactor;
+            set => SetPropertyValue(ref _calibrationFactor, value);
+        }
+        private float _calibrationFactor;
 
-		/// <summary>
-		/// Minimum percentage (0..1)
-		/// </summary>
-		public float PercentMin
-		{
-			get => _percentMin;
-			set => SetPropertyValue(ref _percentMin, value);
-		}
-		private float _percentMin;
+        /// <summary>
+        /// Maximum percentage (0..1 or greater)
+        /// </summary>
+        public float PercentMax
+        {
+            get => _percentMax;
+            set => SetPropertyValue(ref _percentMax, value);
+        }
+        private float _percentMax;
 
-		/// <summary>
-		/// Calibrated sensivity
-		/// </summary>
-		public float Sensivity
-		{
-			get => _sensivity;
-			set => SetPropertyValue(ref _sensivity, value);
-		}
-		private float _sensivity;
+        /// <summary>
+        /// Minimum percentage (0..1)
+        /// </summary>
+        public float PercentMin
+        {
+            get => _percentMin;
+            set => SetPropertyValue(ref _percentMin, value);
+        }
+        private float _percentMin;
 
-		/// <summary>
-		/// Total extruded distance (in mm)
-		/// </summary>
-		public float TotalDistance
-		{
-			get => _totalDistance;
-			set => SetPropertyValue(ref _totalDistance, value);
-		}
-		private float _totalDistance;
-	}
+        /// <summary>
+        /// Calibrated sensivity
+        /// </summary>
+        public float Sensivity
+        {
+            get => _sensivity;
+            set => SetPropertyValue(ref _sensivity, value);
+        }
+        private float _sensivity;
 
-	/// <summary>
-	/// Configured properties of a laser filament monitor
-	/// </summary>
-	public class LaserFilamentMonitorConfigured : ModelObject
+        /// <summary>
+        /// Total extruded distance (in mm)
+        /// </summary>
+        public float TotalDistance
+        {
+            get => _totalDistance;
+            set => SetPropertyValue(ref _totalDistance, value);
+        }
+        private float _totalDistance;
+    }
+
+    /// <summary>
+    /// Configured properties of a laser filament monitor
+    /// </summary>
+    public class LaserFilamentMonitorConfigured : ModelObject
 	{
 		/// <summary>
 		/// Maximum percentage (0..1 or greater)
