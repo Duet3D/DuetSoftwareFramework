@@ -178,6 +178,16 @@ namespace DuetControlServer.Codes
 
                 // Save heightmap
                 case 29:
+                    // If no S parameter is present, check for /sys/mesh.g and continue only if it does not exist
+                    if (code.Parameter('S') == null)
+                    {
+                        string meshMacroFile = await FilePath.ToPhysicalAsync(FilePath.MeshFile, FileDirectory.System);
+                        if (System.IO.File.Exists(meshMacroFile))
+                        {
+                            break;
+                        }
+                    }
+
                     if (code.Parameter('S', 0) == 0)
                     {
                         string file = code.Parameter('P', FilePath.DefaultHeightmapFile);

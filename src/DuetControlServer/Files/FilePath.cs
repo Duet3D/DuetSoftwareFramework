@@ -36,6 +36,11 @@ namespace DuetControlServer.Files
         public const string DefaultHeightmapFile = "heightmap.csv";
 
         /// <summary>
+        /// Macro to be called when G29 is invoked without an S parameter
+        /// </summary>
+        public const string MeshFile = "mesh.g";
+
+        /// <summary>
         /// Fallback file if the probe-specific deploy probe file could not be found
         /// </summary>
         public const string DeployProbeFallbackFile = "deployprobe.g";
