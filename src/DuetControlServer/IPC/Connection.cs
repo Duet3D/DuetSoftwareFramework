@@ -84,7 +84,7 @@ namespace DuetControlServer.IPC
                 string processName = peerProcess?.MainModule?.FileName;
                 if (processName == null)
                 {
-                    Logger.Error("Failed to get process details from pid {0}. Cannot assign any permissions");
+                    Logger.Error("Failed to get process details from pid {0} (uid {1}, gid {2}). Cannot assign any permissions", pid, uid, gid);
                     return false;
                 }
 
