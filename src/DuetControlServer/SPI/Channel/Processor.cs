@@ -482,45 +482,40 @@ namespace DuetControlServer.SPI.Channel
             }
             else
             {
-                // Invalidate the last stack level if a macro file is running
-                Code lastStartCode = CurrentState.StartCode;
+                Code startCode = CurrentState.StartCode;
+
+                // Cancel the last macro file and propagate its results to the code that started it or to the host
                 if (CurrentState.Macro != null)
                 {
-                    Code startCode = null;
-                    if (CurrentState.StartCode != null)
+                    using (await CurrentState.Macro.LockAsync())
                     {
-                        // Propagate final macro results to the code that started the macro
-                        using (await CurrentState.Macro.LockAsync())
+                        await CurrentState.Macro.Abort();
+                        _ = CurrentState.Macro.FinishAsync().ContinueWith(async task =>
                         {
-                            Code macroStartCode = CurrentState.StartCode;
-                            await CurrentState.Macro.Abort();
-                            _ = CurrentState.Macro.FinishAsync().ContinueWith(async task =>
+                            CodeResult result = await task;
+                            if (startCode != null && !startCode.FirmwareTask.IsCompleted)
                             {
-                                CodeResult result = await task;
-                                if (!macroStartCode.FirmwareTask.IsCompleted)
+                                if (startCode.Result == null)
                                 {
-                                    if (macroStartCode.Result == null)
-                                    {
-                                        macroStartCode.Result = result;
-                                    }
-                                    else if (!result.IsEmpty)
-                                    {
-                                        macroStartCode.Result.AddRange(result);
-                                    }
-                                    // Code has not finished yet
+                                    startCode.Result = result;
                                 }
-                                else
+                                else if (!result.IsEmpty)
                                 {
-                                    await Logger.LogOutput(result);
+                                    startCode.Result.AddRange(result);
                                 }
-                            }, TaskContinuationOptions.RunContinuationsAsynchronously);
-                        }
+                            }
+                            else
+                            {
+                                await Logger.LogOutput(result);
+                            }
+                        }, TaskContinuationOptions.RunContinuationsAsynchronously);
+                    }
 
-                        // Codes requesting only one file to be closed are M99 or M291 P1 which are not finished at this point
-                        BufferedCodes.Insert(0, CurrentState.StartCode);
+                    // The code that requested the macro file (if known) is not finished at this point
+                    if (startCode != null)
+                    {
+                        BufferedCodes.Insert(0, startCode);
                         BytesBuffered += CurrentState.StartCode.BinarySize;
-
-                        startCode = CurrentState.StartCode;
                         CurrentState.StartCode = null;
                     }
 
@@ -531,10 +526,10 @@ namespace DuetControlServer.SPI.Channel
                     }
                 }
 
-                // Invalidate all the buffered codes except for the one that invoked the last macro file
-                for (int i = BufferedCodes.Count - 1; i > 0; i--)
+                // Invalidate all the buffered codes except the one that invoked the last macro file
+                for (int i = BufferedCodes.Count - 1; i >= 0; i--)
                 {
-                    if (BufferedCodes[i] != lastStartCode)
+                    if (BufferedCodes[i] != startCode)
                     {
                         BytesBuffered -= BufferedCodes[i].BinarySize;
                         BufferedCodes[i].FirmwareTCS.SetCanceled();

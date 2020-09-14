@@ -17,6 +17,7 @@ Changed behaviour:
 Bug fixes:
 - DCS service file contained an invalid CPU priority
 - Event logging via M929 was not working
+- Macro files with an unknown start code were not properly cancelled by M99/M292 P1
 
 Version 3.1.1
 ==============
