@@ -19,6 +19,10 @@ Bug fixes:
 - Event logging via M929 was not working
 - Macro files with an unknown start code were not properly cancelled by M99/M292 P1
 
+Known issues:
+- Security permissions are not enforced via AppArmor yet (and they are still subject to change)
+- Package dependencies are not yet installed when a plugin is installed
+
 Version 3.1.1
 ==============
 
