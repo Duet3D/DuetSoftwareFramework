@@ -508,7 +508,7 @@
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
             <remarks>
-            The object model may not be locked when this is called
+            The object model must not be locked when this is called
             </remarks>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.StartPlugin(System.String,System.Threading.CancellationToken)">

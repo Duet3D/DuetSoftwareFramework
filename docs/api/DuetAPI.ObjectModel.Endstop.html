@@ -1,0 +1,1342 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Class Endstop
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Class Endstop
+   ">
+    <meta name="generator" content="docfx 2.56.2.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc">
+    <meta property="docfx:tocrel" content="toc">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+                
+                <ul class="nav level1 navbar-nav">
+                      <li>
+                          <a href="../api/DuetAPI.html" title="DuetAPI">DuetAPI</a>
+                      </li>
+                      <li>
+                          <a href="../api/DuetAPIClient.html" title="DuetAPIClient">DuetAPIClient</a>
+                      </li>
+                      <li>
+                          <a href="../api/DuetControlServer.html" title="DuetControlServer">DuetControlServer</a>
+                      </li>
+                      <li>
+                          <a href="../api/DuetWebServer.html" title="DuetWebServer">DuetWebServer</a>
+                      </li>
+                </ul>    </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div>
+              <div class="sidefilter">
+                <form class="toc-filter">
+                  <span class="glyphicon glyphicon-filter filter-icon"></span>
+                  <input type="text" id="toc_filter_input" placeholder="Enter here to filter..." onkeypress="if(event.keyCode==13) {return false;}">
+                </form>
+              </div>
+              <div class="sidetoc">
+                <div class="toc" id="toc">
+                  
+                  <ul class="nav level1">
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetAPI.html" title="DuetAPI" class="">DuetAPI</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetAPI.CodeChannel.html" title="CodeChannel" class="">CodeChannel</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetAPI.Commands.html" title="DuetAPI.Commands" class="">DuetAPI.Commands</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetAPI.Commands.Acknowledge.html" title="Acknowledge" class="">Acknowledge</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.AddHttpEndpoint.html" title="AddHttpEndpoint" class="">AddHttpEndpoint</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.AddUserSession.html" title="AddUserSession" class="">AddUserSession</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.BaseCommand.html" title="BaseCommand" class="">BaseCommand</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.BaseResponse.html" title="BaseResponse" class="">BaseResponse</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.Cancel.html" title="Cancel" class="">Cancel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.Code.html" title="Code" class="">Code</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeFlags.html" title="CodeFlags" class="">CodeFlags</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeParameterConverter.html" title="CodeParameterConverter" class="">CodeParameterConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeParserBuffer.html" title="CodeParserBuffer" class="">CodeParserBuffer</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeResult.html" title="CodeResult" class="">CodeResult</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeType.html" title="CodeType" class="">CodeType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.Command.html" title="Command" class="">Command</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.Command-1.html" title="Command&lt;T&gt;" class="">Command&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.ErrorResponse.html" title="ErrorResponse" class="">ErrorResponse</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.EvaluateExpression.html" title="EvaluateExpression" class="">EvaluateExpression</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.Flush.html" title="Flush" class="">Flush</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.GetFileInfo.html" title="GetFileInfo" class="">GetFileInfo</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.GetObjectModel.html" title="GetObjectModel" class="">GetObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.HttpResponseType.html" title="HttpResponseType" class="">HttpResponseType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.Ignore.html" title="Ignore" class="">Ignore</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.InstallPlugin.html" title="InstallPlugin" class="">InstallPlugin</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.KeywordType.html" title="KeywordType" class="">KeywordType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.LockObjectModel.html" title="LockObjectModel" class="">LockObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.PatchObjectModel.html" title="PatchObjectModel" class="">PatchObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.ReceivedHttpRequest.html" title="ReceivedHttpRequest" class="">ReceivedHttpRequest</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.RemoveHttpEndpoint.html" title="RemoveHttpEndpoint" class="">RemoveHttpEndpoint</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.RemoveUserSession.html" title="RemoveUserSession" class="">RemoveUserSession</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.Resolve.html" title="Resolve" class="">Resolve</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.ResolvePath.html" title="ResolvePath" class="">ResolvePath</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.Response-1.html" title="Response&lt;T&gt;" class="">Response&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.SendHttpResponse.html" title="SendHttpResponse" class="">SendHttpResponse</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.SetObjectModel.html" title="SetObjectModel" class="">SetObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.SetPluginData.html" title="SetPluginData" class="">SetPluginData</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.SetUpdateStatus.html" title="SetUpdateStatus" class="">SetUpdateStatus</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.SimpleCode.html" title="SimpleCode" class="">SimpleCode</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.StartPlugin.html" title="StartPlugin" class="">StartPlugin</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.StopPlugin.html" title="StopPlugin" class="">StopPlugin</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.SyncObjectModel.html" title="SyncObjectModel" class="">SyncObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.UninstallPlugin.html" title="UninstallPlugin" class="">UninstallPlugin</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.UnlockObjectModel.html" title="UnlockObjectModel" class="">UnlockObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.WriteMessage.html" title="WriteMessage" class="">WriteMessage</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetAPI.Connection.html" title="DuetAPI.Connection" class="">DuetAPI.Connection</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetAPI.Connection.ConnectionMode.html" title="ConnectionMode" class="">ConnectionMode</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Connection.Defaults.html" title="Defaults" class="">Defaults</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Connection.IncompatibleVersionException.html" title="IncompatibleVersionException" class="">IncompatibleVersionException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Connection.InterceptionMode.html" title="InterceptionMode" class="">InterceptionMode</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Connection.SubscriptionMode.html" title="SubscriptionMode" class="">SubscriptionMode</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetAPI.Connection.InitMessages.html" title="DuetAPI.Connection.InitMessages" class="">DuetAPI.Connection.InitMessages</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetAPI.Connection.InitMessages.ClientInitMessage.html" title="ClientInitMessage" class="">ClientInitMessage</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Connection.InitMessages.CommandInitMessage.html" title="CommandInitMessage" class="">CommandInitMessage</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Connection.InitMessages.InterceptInitMessage.html" title="InterceptInitMessage" class="">InterceptInitMessage</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Connection.InitMessages.ServerInitMessage.html" title="ServerInitMessage" class="">ServerInitMessage</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Connection.InitMessages.SubscribeInitMessage.html" title="SubscribeInitMessage" class="">SubscribeInitMessage</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetAPI.ObjectModel.html" title="DuetAPI.ObjectModel" class="">DuetAPI.ObjectModel</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.AccessLevel.html" title="AccessLevel" class="">AccessLevel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.AnalogSensor.html" title="AnalogSensor" class="">AnalogSensor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.AnalogSensorType.html" title="AnalogSensorType" class="">AnalogSensorType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.AnalogSensorTypeConverter.html" title="AnalogSensorTypeConverter" class="">AnalogSensorTypeConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Axis.html" title="Axis" class="">Axis</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.BeepRequest.html" title="BeepRequest" class="">BeepRequest</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Board.html" title="Board" class="">Board</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.BoardState.html" title="BoardState" class="">BoardState</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Build.html" title="Build" class="">Build</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.BuildObject.html" title="BuildObject" class="">BuildObject</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Compatibility.html" title="Compatibility" class="">Compatibility</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.CoreKinematics.html" title="CoreKinematics" class="">CoreKinematics</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.CurrentMove.html" title="CurrentMove" class="">CurrentMove</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DAA.html" title="DAA" class="">DAA</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DeltaKinematics.html" title="DeltaKinematics" class="">DeltaKinematics</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DeltaTower.html" title="DeltaTower" class="">DeltaTower</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Directories.html" title="Directories" class="">Directories</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DistanceUnit.html" title="DistanceUnit" class="">DistanceUnit</a>
+                          </li>
+                          <li class="active">
+                            <a href="DuetAPI.ObjectModel.Endstop.html" title="Endstop" class="active">Endstop</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.EndstopType.html" title="EndstopType" class="">EndstopType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Extruder.html" title="Extruder" class="">Extruder</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ExtruderNonlinear.html" title="ExtruderNonlinear" class="">ExtruderNonlinear</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Fan.html" title="Fan" class="">Fan</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FanThermostaticControl.html" title="FanThermostaticControl" class="">FanThermostaticControl</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FilamentMonitor.html" title="FilamentMonitor" class="">FilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FilamentMonitorType.html" title="FilamentMonitorType" class="">FilamentMonitorType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.GpInputPort.html" title="GpInputPort" class="">GpInputPort</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.GpOutputPort.html" title="GpOutputPort" class="">GpOutputPort</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.HangprinterKinematics.html" title="HangprinterKinematics" class="">HangprinterKinematics</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Heat.html" title="Heat" class="">Heat</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Heater.html" title="Heater" class="">Heater</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.HeaterModel.html" title="HeaterModel" class="">HeaterModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.HeaterModelPID.html" title="HeaterModelPID" class="">HeaterModelPID</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.HeaterMonitor.html" title="HeaterMonitor" class="">HeaterMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.HeaterMonitorAction.html" title="HeaterMonitorAction" class="">HeaterMonitorAction</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.HeaterMonitorCondition.html" title="HeaterMonitorCondition" class="">HeaterMonitorCondition</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.HeaterState.html" title="HeaterState" class="">HeaterState</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.HttpEndpoint.html" title="HttpEndpoint" class="">HttpEndpoint</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.HttpEndpointType.html" title="HttpEndpointType" class="">HttpEndpointType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.InputChannel.html" title="InputChannel" class="">InputChannel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.InputChannelState.html" title="InputChannelState" class="">InputChannelState</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Inputs.html" title="Inputs" class="">Inputs</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.InterfaceType.html" title="InterfaceType" class="">InterfaceType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Job.html" title="Job" class="">Job</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Kinematics.html" title="Kinematics" class="">Kinematics</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.KinematicsName.html" title="KinematicsName" class="">KinematicsName</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.KinematicsNameConverter.html" title="KinematicsNameConverter" class="">KinematicsNameConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.LaserFilamentMonitor.html" title="LaserFilamentMonitor" class="">LaserFilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.LaserFilamentMonitorCalibrated.html" title="LaserFilamentMonitorCalibrated" class="">LaserFilamentMonitorCalibrated</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.LaserFilamentMonitorConfigured.html" title="LaserFilamentMonitorConfigured" class="">LaserFilamentMonitorConfigured</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Layer.html" title="Layer" class="">Layer</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Limits.html" title="Limits" class="">Limits</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.LinuxPropertyAttribute.html" title="LinuxPropertyAttribute" class="">LinuxPropertyAttribute</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MachineMode.html" title="MachineMode" class="">MachineMode</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MachineStatus.html" title="MachineStatus" class="">MachineStatus</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Message.html" title="Message" class="">Message</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MessageBox.html" title="MessageBox" class="">MessageBox</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MessageBoxMode.html" title="MessageBoxMode" class="">MessageBoxMode</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MessageType.html" title="MessageType" class="">MessageType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Microstepping.html" title="Microstepping" class="">Microstepping</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MinMaxCurrent-1.html" title="MinMaxCurrent&lt;T&gt;" class="">MinMaxCurrent&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ModelCollection.html" title="ModelCollection" class="">ModelCollection</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ModelDictionary-1.html" title="ModelDictionary&lt;TValue&gt;" class="">ModelDictionary&lt;TValue&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ModelGrowingCollection.html" title="ModelGrowingCollection" class="">ModelGrowingCollection</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ModelObject.html" title="ModelObject" class="">ModelObject</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MotorsIdleControl.html" title="MotorsIdleControl" class="">MotorsIdleControl</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Move.html" title="Move" class="">Move</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MoveCalibration.html" title="MoveCalibration" class="">MoveCalibration</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MoveCompensation.html" title="MoveCompensation" class="">MoveCompensation</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MoveCompensationType.html" title="MoveCompensationType" class="">MoveCompensationType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.MoveDeviations.html" title="MoveDeviations" class="">MoveDeviations</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Network.html" title="Network" class="">Network</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.NetworkInterface.html" title="NetworkInterface" class="">NetworkInterface</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.NetworkProtocol.html" title="NetworkProtocol" class="">NetworkProtocol</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ObjectModel.html" title="ObjectModel" class="">ObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ObjectModelConverter.html" title="ObjectModelConverter" class="">ObjectModelConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ParsedFileInfo.html" title="ParsedFileInfo" class="">ParsedFileInfo</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ParsedFileInfoConverter.html" title="ParsedFileInfoConverter" class="">ParsedFileInfoConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Plugin.html" title="Plugin" class="">Plugin</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.PluginManifest.html" title="PluginManifest" class="">PluginManifest</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Probe.html" title="Probe" class="">Probe</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ProbeGrid.html" title="ProbeGrid" class="">ProbeGrid</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ProbeType.html" title="ProbeType" class="">ProbeType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.PulsedFilamentMonitor.html" title="PulsedFilamentMonitor" class="">PulsedFilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.PulsedFilamentMonitorCalibrated.html" title="PulsedFilamentMonitorCalibrated" class="">PulsedFilamentMonitorCalibrated</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.PulsedFilamentMonitorConfigured.html" title="PulsedFilamentMonitorConfigured" class="">PulsedFilamentMonitorConfigured</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.RestorePoint.html" title="RestorePoint" class="">RestorePoint</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.RotatingMagnetFilamentMonitor.html" title="RotatingMagnetFilamentMonitor" class="">RotatingMagnetFilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.RotatingMagnetFilamentMonitorCalibrated.html" title="RotatingMagnetFilamentMonitorCalibrated" class="">RotatingMagnetFilamentMonitorCalibrated</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.RotatingMagnetFilamentMonitorConfigured.html" title="RotatingMagnetFilamentMonitorConfigured" class="">RotatingMagnetFilamentMonitorConfigured</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Scanner.html" title="Scanner" class="">Scanner</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ScannerStatus.html" title="ScannerStatus" class="">ScannerStatus</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ScaraKinematics.html" title="ScaraKinematics" class="">ScaraKinematics</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Sensors.html" title="Sensors" class="">Sensors</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.SessionType.html" title="SessionType" class="">SessionType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.SimpleFilamentMonitor.html" title="SimpleFilamentMonitor" class="">SimpleFilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Skew.html" title="Skew" class="">Skew</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Spindle.html" title="Spindle" class="">Spindle</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.State.html" title="State" class="">State</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.TiltCorrection.html" title="TiltCorrection" class="">TiltCorrection</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.TimesLeft.html" title="TimesLeft" class="">TimesLeft</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Tool.html" title="Tool" class="">Tool</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ToolRetraction.html" title="ToolRetraction" class="">ToolRetraction</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ToolState.html" title="ToolState" class="">ToolState</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.UserSession.html" title="UserSession" class="">UserSession</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.UserVariable.html" title="UserVariable" class="">UserVariable</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Volume.html" title="Volume" class="">Volume</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ZLeadscrewKinematics.html" title="ZLeadscrewKinematics" class="">ZLeadscrewKinematics</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetAPI.Utility.html" title="DuetAPI.Utility" class="">DuetAPI.Utility</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetAPI.Utility.DriverId.html" title="DriverId" class="">DriverId</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.FileLists.html" title="FileLists" class="">FileLists</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.Heightmap.html" title="Heightmap" class="">Heightmap</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.JsonCamelCaseStringEnumConverter.html" title="JsonCamelCaseStringEnumConverter" class="">JsonCamelCaseStringEnumConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.JsonCharEnumConverter.html" title="JsonCharEnumConverter" class="">JsonCharEnumConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.JsonHelper.html" title="JsonHelper" class="">JsonHelper</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html" title="JsonLowerCaseStringEnumConverter" class="">JsonLowerCaseStringEnumConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter-1.html" title="JsonPolymorphicWriteOnlyConverter&lt;T&gt;" class="">JsonPolymorphicWriteOnlyConverter&lt;T&gt;</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.JsonRegexListConverter.html" title="JsonRegexListConverter" class="">JsonRegexListConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.JsonShortDateTimeConverter.html" title="JsonShortDateTimeConverter" class="">JsonShortDateTimeConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.RequiredPermissionsAttribute.html" title="RequiredPermissionsAttribute" class="">RequiredPermissionsAttribute</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.SbcPermissions.html" title="SbcPermissions" class="">SbcPermissions</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Utility.SbcPermissionsConverter.html" title="SbcPermissionsConverter" class="">SbcPermissionsConverter</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetAPIClient.html" title="DuetAPIClient" class="">DuetAPIClient</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetAPIClient.BaseCommandConnection.html" title="BaseCommandConnection" class="">BaseCommandConnection</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPIClient.BaseConnection.html" title="BaseConnection" class="">BaseConnection</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPIClient.CommandConnection.html" title="CommandConnection" class="">CommandConnection</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPIClient.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPIClient.HttpEndpointUnixSocket.html" title="HttpEndpointUnixSocket" class="">HttpEndpointUnixSocket</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPIClient.HttpEndpointUnixSocket.EndpointRequestReceived.html" title="HttpEndpointUnixSocket.EndpointRequestReceived" class="">HttpEndpointUnixSocket.EndpointRequestReceived</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPIClient.InterceptConnection.html" title="InterceptConnection" class="">InterceptConnection</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPIClient.InternalServerException.html" title="InternalServerException" class="">InternalServerException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPIClient.SubscribeConnection.html" title="SubscribeConnection" class="">SubscribeConnection</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.html" title="DuetControlServer" class="">DuetControlServer</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Program.html" title="Program" class="">Program</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Settings.html" title="Settings" class="">Settings</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.Codes.html" title="DuetControlServer.Codes" class="">DuetControlServer.Codes</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Codes.GCodes.html" title="GCodes" class="">GCodes</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.MCodes.html" title="MCodes" class="">MCodes</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.TCodes.html" title="TCodes" class="">TCodes</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.Commands.html" title="DuetControlServer.Commands" class="">DuetControlServer.Commands</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Commands.AddHttpEndpoint.html" title="AddHttpEndpoint" class="">AddHttpEndpoint</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.AddUserSession.html" title="AddUserSession" class="">AddUserSession</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.Code.html" title="Code" class="">Code</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.EvaluateExpression.html" title="EvaluateExpression" class="">EvaluateExpression</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.Flush.html" title="Flush" class="">Flush</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.GetFileInfo.html" title="GetFileInfo" class="">GetFileInfo</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.GetObjectModel.html" title="GetObjectModel" class="">GetObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.IConnectionCommand.html" title="IConnectionCommand" class="">IConnectionCommand</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.InstallPlugin.html" title="InstallPlugin" class="">InstallPlugin</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.LockObjectModel.html" title="LockObjectModel" class="">LockObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.PatchObjectModel.html" title="PatchObjectModel" class="">PatchObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.RemoveHttpEndpoint.html" title="RemoveHttpEndpoint" class="">RemoveHttpEndpoint</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.RemoveUserSession.html" title="RemoveUserSession" class="">RemoveUserSession</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.ResolvePath.html" title="ResolvePath" class="">ResolvePath</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.SetObjectModel.html" title="SetObjectModel" class="">SetObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.SetPluginData.html" title="SetPluginData" class="">SetPluginData</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.SetUpdateStatus.html" title="SetUpdateStatus" class="">SetUpdateStatus</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.SimpleCode.html" title="SimpleCode" class="">SimpleCode</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.StartPlugin.html" title="StartPlugin" class="">StartPlugin</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.StopPlugin.html" title="StopPlugin" class="">StopPlugin</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.SyncObjectModel.html" title="SyncObjectModel" class="">SyncObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.UninstallPlugin.html" title="UninstallPlugin" class="">UninstallPlugin</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.UnlockObjectModel.html" title="UnlockObjectModel" class="">UnlockObjectModel</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Commands.WriteMessage.html" title="WriteMessage" class="">WriteMessage</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.FileExecution.html" title="DuetControlServer.FileExecution" class="">DuetControlServer.FileExecution</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.FileExecution.Job.html" title="Job" class="">Job</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.FileExecution.Macro.html" title="Macro" class="">Macro</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.Files.html" title="DuetControlServer.Files" class="">DuetControlServer.Files</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Files.CodeBlock.html" title="CodeBlock" class="">CodeBlock</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Files.CodeFile.html" title="CodeFile" class="">CodeFile</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Files.ConfigOverride.html" title="ConfigOverride" class="">ConfigOverride</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Files.FileDirectory.html" title="FileDirectory" class="">FileDirectory</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Files.FilePath.html" title="FilePath" class="">FilePath</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Files.InfoParser.html" title="InfoParser" class="">InfoParser</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.IPC.html" title="DuetControlServer.IPC" class="">DuetControlServer.IPC</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.IPC.Connection.html" title="Connection" class="">Connection</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.IPC.LockManager.html" title="LockManager" class="">LockManager</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.IPC.Server.html" title="Server" class="">Server</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.IPC.Processors.html" title="DuetControlServer.IPC.Processors" class="">DuetControlServer.IPC.Processors</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.IPC.Processors.Base.html" title="Base" class="">Base</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.IPC.Processors.CodeInterception.html" title="CodeInterception" class="">CodeInterception</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.IPC.Processors.Command.html" title="Command" class="">Command</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.IPC.Processors.ModelSubscription.html" title="ModelSubscription" class="">ModelSubscription</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.Model.html" title="DuetControlServer.Model" class="">DuetControlServer.Model</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Model.Expressions.html" title="Expressions" class="">Expressions</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Model.Filter.html" title="Filter" class="">Filter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Model.ItemPathNode.html" title="ItemPathNode" class="">ItemPathNode</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Model.Observer.html" title="Observer" class="">Observer</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Model.Observer.PropertyPathChanged.html" title="Observer.PropertyPathChanged" class="">Observer.PropertyPathChanged</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Model.PeriodicUpdater.html" title="PeriodicUpdater" class="">PeriodicUpdater</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Model.PropertyChangeType.html" title="PropertyChangeType" class="">PropertyChangeType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Model.Provider.html" title="Provider" class="">Provider</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Model.Updater.html" title="Updater" class="">Updater</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.SPI.html" title="DuetControlServer.SPI" class="">DuetControlServer.SPI</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.SPI.DataTransfer.html" title="DataTransfer" class="">DataTransfer</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.EvaluateExpressionRequest.html" title="EvaluateExpressionRequest" class="">EvaluateExpressionRequest</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Interface.html" title="Interface" class="">Interface</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.SPI.Channel.html" title="DuetControlServer.SPI.Channel" class="">DuetControlServer.SPI.Channel</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Channel.LockRequest.html" title="LockRequest" class="">LockRequest</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Channel.Manager.html" title="Manager" class="">Manager</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Channel.Processor.html" title="Processor" class="">Processor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Channel.State.html" title="State" class="">State</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.SPI.Communication.html" title="DuetControlServer.SPI.Communication" class="">DuetControlServer.SPI.Communication</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Consts.html" title="Consts" class="">Consts</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.SPI.Communication.FirmwareRequests.html" title="DuetControlServer.SPI.Communication.FirmwareRequests" class="">DuetControlServer.SPI.Communication.FirmwareRequests</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileHeader.html" title="AbortFileHeader" class="">AbortFileHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdateHeader.html" title="CodeBufferUpdateHeader" class="">CodeBufferUpdateHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.DoCodeHeader.html" title="DoCodeHeader" class="">DoCodeHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.EvaluationResultHeader.html" title="EvaluationResultHeader" class="">EvaluationResultHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.html" title="ExecuteMacroHeader" class="">ExecuteMacroHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkHeader.html" title="FileChunkHeader" class="">FileChunkHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.PrintPausedHeader.html" title="PrintPausedHeader" class="">PrintPausedHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.PrintPausedReason.html" title="PrintPausedReason" class="">PrintPausedReason</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.FirmwareRequests.Request.html" title="Request" class="">Request</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.SPI.Communication.LinuxRequests.html" title="DuetControlServer.SPI.Communication.LinuxRequests" class="">DuetControlServer.SPI.Communication.LinuxRequests</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.AssignFilamentHeader.html" title="AssignFilamentHeader" class="">AssignFilamentHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags.html" title="CodeFlags" class="">CodeFlags</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeHeader.html" title="CodeHeader" class="">CodeHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModelHeader.html" title="GetObjectModelHeader" class="">GetObjectModelHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.MacroCompleteHeader.html" title="MacroCompleteHeader" class="">MacroCompleteHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.PrintStartedHeader.html" title="PrintStartedHeader" class="">PrintStartedHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.PrintStoppedHeader.html" title="PrintStoppedHeader" class="">PrintStoppedHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.Request.html" title="Request" class="">Request</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.SetObjectModelHeader.html" title="SetObjectModelHeader" class="">SetObjectModelHeader</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.SPI.Communication.Shared.html" title="DuetControlServer.SPI.Communication.Shared" class="">DuetControlServer.SPI.Communication.Shared</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.DataType.html" title="DataType" class="">DataType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html" title="HeightMapHeader" class="">HeightMapHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.MessageHeader.html" title="MessageHeader" class="">MessageHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.html" title="MessageTypeFlags" class="">MessageTypeFlags</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.PacketHeader.html" title="PacketHeader" class="">PacketHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.PrintStoppedReason.html" title="PrintStoppedReason" class="">PrintStoppedReason</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.StringHeader.html" title="StringHeader" class="">StringHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.TransferHeader.html" title="TransferHeader" class="">TransferHeader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Communication.Shared.TransferResponse.html" title="TransferResponse" class="">TransferResponse</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.SPI.Serialization.html" title="DuetControlServer.SPI.Serialization" class="">DuetControlServer.SPI.Serialization</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Serialization.Reader.html" title="Reader" class="">Reader</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Serialization.Writer.html" title="Writer" class="">Writer</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.Utility.html" title="DuetControlServer.Utility" class="">DuetControlServer.Utility</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Utility.CRC16.html" title="CRC16" class="">CRC16</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Utility.FilamentManager.html" title="FilamentManager" class="">FilamentManager</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Utility.Logger.html" title="Logger" class="">Logger</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Utility.Plugins.html" title="Plugins" class="">Plugins</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Utility.UF2.html" title="UF2" class="">UF2</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.html" title="DuetWebServer" class="">DuetWebServer</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Program.html" title="Program" class="">Program</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Startup.html" title="Startup" class="">Startup</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Controllers.html" title="DuetWebServer.Controllers" class="">DuetWebServer.Controllers</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Controllers.MachineController.html" title="MachineController" class="">MachineController</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Controllers.WebSocketController.html" title="WebSocketController" class="">WebSocketController</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.FileProviders.html" title="DuetWebServer.FileProviders" class="">DuetWebServer.FileProviders</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.FileProviders.DuetFileProvider.html" title="DuetFileProvider" class="">DuetFileProvider</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Middleware.html" title="DuetWebServer.Middleware" class="">DuetWebServer.Middleware</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Middleware.CustomEndpointMiddleware.html" title="CustomEndpointMiddleware" class="">CustomEndpointMiddleware</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Middleware.FallbackMiddleware.html" title="FallbackMiddleware" class="">FallbackMiddleware</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Middleware.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
+                          </li>
+                        </ul>  </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Services.html" title="DuetWebServer.Services" class="">DuetWebServer.Services</a>
+                        
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.html" title="ModelObserver" class="">ModelObserver</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetWebServer.Services.ModelObserver.WebDirectoryChanged.html" title="ModelObserver.WebDirectoryChanged" class="">ModelObserver.WebDirectoryChanged</a>
+                          </li>
+                        </ul>  </li>
+                  </ul>        </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="DuetAPI.ObjectModel.Endstop">
+  
+  
+  <h1 id="DuetAPI_ObjectModel_Endstop" data-uid="DuetAPI.ObjectModel.Endstop" class="text-break">Class Endstop
+  </h1>
+  <div class="markdown level0 summary"><p>Information about an endstop</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><a class="xref" href="DuetAPI.ObjectModel.ModelObject.html">ModelObject</a></div>
+    <div class="level2"><span class="xref">Endstop</span></div>
+  </div>
+  <div classs="implements">
+    <h5>Implements</h5>
+    <div><span class="xref">System.ICloneable</span></div>
+    <div><span class="xref">System.ComponentModel.INotifyPropertyChanging</span></div>
+    <div><span class="xref">System.ComponentModel.INotifyPropertyChanged</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_JsonProperties">ModelObject.JsonProperties</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_PropertyChanging">ModelObject.PropertyChanging</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_PropertyChanged">ModelObject.PropertyChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_SetPropertyValue__1___0____0_System_String_">ModelObject.SetPropertyValue&lt;T&gt;(T, T, String)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_Assign_DuetAPI_ObjectModel_ModelObject_">ModelObject.Assign(ModelObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_Clone">ModelObject.Clone()</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_UpdateFromJson_System_Text_Json_JsonElement_">ModelObject.UpdateFromJson(JsonElement)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_MakeUtf8Patch_DuetAPI_ObjectModel_ModelObject_">ModelObject.MakeUtf8Patch(ModelObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_MakeStringPatch_DuetAPI_ObjectModel_ModelObject_">ModelObject.MakeStringPatch(ModelObject)</a>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetHashCode()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetType()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.MemberwiseClone()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ToString()</span>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="DuetAPI.ObjectModel.html">DuetAPI.ObjectModel</a></h6>
+  <h6><strong>Assembly</strong>: DuetAPI.dll</h6>
+  <h5 id="DuetAPI_ObjectModel_Endstop_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class Endstop : ModelObject, ICloneable, INotifyPropertyChanging, INotifyPropertyChanged</code></pre>
+  </div>
+  <h3 id="properties">Properties
+  </h3>
+  <a id="DuetAPI_ObjectModel_Endstop_ProbeNumber_" data-uid="DuetAPI.ObjectModel.Endstop.ProbeNumber*"></a>
+  <h4 id="DuetAPI_ObjectModel_Endstop_ProbeNumber" data-uid="DuetAPI.ObjectModel.Endstop.ProbeNumber">ProbeNumber</h4>
+  <div class="markdown level1 summary"><p>Index of the used probe (if <a class="xref" href="DuetAPI.ObjectModel.Endstop.html#DuetAPI_ObjectModel_Endstop_Type">Type</a> is <a class="xref" href="DuetAPI.ObjectModel.EndstopType.html#DuetAPI_ObjectModel_EndstopType_ZProbeAsEndstop">ZProbeAsEndstop</a>)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int? ProbeNumber { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Nullable</span>&lt;<span class="xref">System.Int32</span>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetAPI_ObjectModel_Endstop_Triggered_" data-uid="DuetAPI.ObjectModel.Endstop.Triggered*"></a>
+  <h4 id="DuetAPI_ObjectModel_Endstop_Triggered" data-uid="DuetAPI.ObjectModel.Endstop.Triggered">Triggered</h4>
+  <div class="markdown level1 summary"><p>Whether or not the endstop is hit</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Triggered { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetAPI_ObjectModel_Endstop_Type_" data-uid="DuetAPI.ObjectModel.Endstop.Type*"></a>
+  <h4 id="DuetAPI_ObjectModel_Endstop_Type" data-uid="DuetAPI.ObjectModel.Endstop.Type">Type</h4>
+  <div class="markdown level1 summary"><p>Type of the endstop</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EndstopType Type { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.ObjectModel.EndstopType.html">EndstopType</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <span class="xref">System.ICloneable</span>
+  </div>
+  <div>
+      <span class="xref">System.ComponentModel.INotifyPropertyChanging</span>
+  </div>
+  <div>
+      <span class="xref">System.ComponentModel.INotifyPropertyChanged</span>
+  </div>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

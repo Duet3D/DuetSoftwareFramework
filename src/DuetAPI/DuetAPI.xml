@@ -1504,12 +1504,8 @@
         </member>
         <member name="P:DuetAPI.Connection.InitMessages.InterceptInitMessage.PriortyCodes">
             <summary>
-            Defines if priority codes may be intercepted (e.g. M122 or M999)
+            Defines if either regular or priority codes are supposed to be intercepted
             </summary>
-            <remarks>
-            This may specify only if *only* priority codes or *only* regular codes are
-            supposed to be intercepted. No regular interceptor should intercept priority codes.
-            </remarks>
             <seealso cref="F:DuetAPI.Commands.CodeFlags.IsPrioritized"/>
         </member>
         <member name="T:DuetAPI.Connection.InitMessages.ServerInitMessage">
@@ -1559,8 +1555,7 @@
             The style of a filter is similar to XPath. For example, if you want to monitor only the current heater temperatures,
             you can use the filter expression "heat/heaters[*]/current". Wildcards are supported either for full names or indices.
             To get updates for an entire namespace, the ** wildcard can be used (for example heat/** for everything heat-related),
-            however it can be only used at the end of a filter expression. Multiple filters can be used on one connection and they
-            have to be delimited by one of these charaters: ['|', ',', ' ', '\r', '\n']
+            however it can be only used at the end of a filter expression
             </remarks>
         </member>
         <member name="T:DuetAPI.Connection.InterceptionMode">
@@ -3921,6 +3916,12 @@
             Index of the currently selected workplace
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Move.WorkspaceNumber">
+            <summary>
+            Index of the currently selected workspace
+            </summary>
+            <seealso cref="P:DuetAPI.ObjectModel.Move.WorkplaceNumber"/>
+        </member>
         <member name="T:DuetAPI.ObjectModel.MoveCalibration">
             <summary>
             Information about configured calibration options
@@ -4797,6 +4798,11 @@
             Calibrated properties of a laser filament monitor
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.LaserFilamentMonitorCalibrated.CalibrationFactor">
+            <summary>
+            Calibration factor of this sensor
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.LaserFilamentMonitorCalibrated.PercentMax">
             <summary>
             Maximum percentage (0..1 or greater)
@@ -5052,6 +5058,11 @@
             Dive height (in mm)
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Probe.LastStopHeight">
+            <summary>
+            Height of the probe where it stopped last time (in mm)
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Probe.MaxProbeCount">
             <summary>
             Maximum number of times to probe after a bad reading was determined
@@ -5074,7 +5085,12 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.Probe.TemperatureCoefficient">
             <summary>
-            Temperature coefficient
+            First temperature coefficient
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Probe.TemperatureCoefficients">
+            <summary>
+            List of temperature coefficients
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Probe.Threshold">
