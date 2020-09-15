@@ -13,6 +13,7 @@ Changed behaviour:
 - Simulation times are automatically written to G-code files
 - Increased API level due to object model changes
 - Renamed namespace `DuetAPI.Machine` to `DuetAPI.ObjectModel` and `MachineModel` to `ObjectModel`
+- DSF processes are now running as their own `dsf` user
 
 Bug fixes:
 - DCS service file contained an invalid CPU priority
