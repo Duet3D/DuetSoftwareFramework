@@ -10,7 +10,8 @@ Type=simple
 User=dsf
 Group=dsf
 UMask=0002
-AmbientCapabilities=CAP_SYS_PTRACE
+CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
+AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
 
 [Install]
 WantedBy=basic.target
