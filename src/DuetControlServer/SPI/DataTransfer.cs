@@ -309,12 +309,11 @@ namespace DuetControlServer.SPI
         /// Read the content of a <see cref="ExecuteMacroHeader"/> packet
         /// </summary>
         /// <param name="channel">Channel requesting a macro file</param>
-        /// <param name="reportMissing">Write an error message if the macro is not found</param>
         /// <param name="isSystemMacro">Indicates if this code is not bound to a code being executed (e.g. when a trigger macro is requested)</param>
         /// <param name="filename">Filename of the requested macro</param>
-        public static void ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out bool isSystemMacro, out string filename)
+        public static void ReadMacroRequest(out CodeChannel channel, out bool isSystemMacro, out string filename)
         {
-            Serialization.Reader.ReadMacroRequest(_packetData.Span, out channel, out reportMissing, out isSystemMacro, out filename);
+            Serialization.Reader.ReadMacroRequest(_packetData.Span, out channel, out isSystemMacro, out filename);
         }
 
         /// <summary>
@@ -1118,18 +1117,28 @@ namespace DuetControlServer.SPI
                     continue;
                 }
 
-                if (_rxHeader.FormatCode != Consts.FormatCode)
+                switch (_rxHeader.FormatCode)
                 {
-                    ExchangeResponse(TransferResponse.BadFormat);
-                    throw new Exception($"Invalid format code {_rxHeader.FormatCode:x2}");
+                    case Consts.FormatCode:
+                        // Format code OK
+                        break;
+
+                    case Consts.FormatCodeStandalone:
+                        // RRF is operating in stand-alone mode
+                        throw new Exception("RepRapFirmware is operating in stand-alone mode");
+
+                    default:
+                        ExchangeResponse(TransferResponse.BadFormat);
+                        throw new Exception($"Invalid format code {_rxHeader.FormatCode:x2}");
                 }
+
+                // Change the protocol version if necessary
                 if (_rxHeader.ProtocolVersion != _txHeader.ProtocolVersion)
                 {
-                    // Downgrade the protocol version if necessary
-                    if (_rxHeader.ProtocolVersion == 1)
+                    if (_rxHeader.ProtocolVersion == 1 || _rxHeader.ProtocolVersion == 2)
                     {
                         _logger.Warn("Downgrading protocol version {0} to {1}", _txHeader.ProtocolVersion, _rxHeader.ProtocolVersion);
-                        _txHeader.ProtocolVersion = 1;
+                        _txHeader.ProtocolVersion = _rxHeader.ProtocolVersion;
                         MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
                         _txHeader.ChecksumHeader = Utility.CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf<ushort>()).Span);
                         MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
@@ -1137,9 +1146,18 @@ namespace DuetControlServer.SPI
                         ExchangeResponse(TransferResponse.BadResponse);
                         continue;
                     }
-                    ExchangeResponse(TransferResponse.BadProtocolVersion);
-                    throw new Exception($"Invalid protocol version {_rxHeader.ProtocolVersion}");
+                    else if (_rxHeader.ProtocolVersion == Consts.ProtocolVersion)
+                    {
+                        _logger.Warn("Upgrading protocol version {0} to {1}", _txHeader.ProtocolVersion, Consts.ProtocolVersion);
+                        _txHeader.ProtocolVersion = Consts.ProtocolVersion;
+                    }
+                    else
+                    {
+                        ExchangeResponse(TransferResponse.BadProtocolVersion);
+                        throw new Exception($"Invalid protocol version {_rxHeader.ProtocolVersion}");
+                    }
                 }
+
                 if (_rxHeader.DataLength > bufferSize)
                 {
                     ExchangeResponse(TransferResponse.BadDataLength);

@@ -195,22 +195,37 @@ namespace DuetControlServer
                 }
             }
 
-            // Execute runonce.g if it is present
+            // Execute runonce.g after config.g if it is present
             string runOnceFile = await FilePath.ToPhysicalAsync(FilePath.RunOnceFile, FileDirectory.System);
             if (File.Exists(runOnceFile))
             {
-                using (Macro macro = new Macro(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger))
+                do
                 {
-                    await macro.FinishAsync();
+                    using (await Model.Provider.AccessReadOnlyAsync())
+                    {
+                        if (Model.Provider.Get.State.Status != MachineStatus.Starting)
+                        {
+                            break;
+                        }
+                    }
                 }
+                while (!CancellationToken.IsCancellationRequested);
 
-                try
+                if (!CancellationToken.IsCancellationRequested)
                 {
-                    File.Delete(runOnceFile);
-                }
-                catch (Exception e)
-                {
-                    await Model.Provider.Output(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
+                    using (Macro macro = new Macro(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger))
+                    {
+                        await macro.FinishAsync();
+                    }
+
+                    try
+                    {
+                        File.Delete(runOnceFile);
+                    }
+                    catch (Exception e)
+                    {
+                        await Model.Provider.Output(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
+                    }
                 }
             }
 

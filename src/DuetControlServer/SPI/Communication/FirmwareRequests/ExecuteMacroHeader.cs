@@ -15,9 +15,9 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         public CodeChannel Channel;
 
         /// <summary>
-        /// Output a warning message if the file could not be found
+        /// Used to be ReportMissing but this is no longer needed
         /// </summary>
-        public byte ReportMissing;
+        public byte Dummy;
 
         /// <summary>
         /// Whether the code was requested from a G/M/T-code

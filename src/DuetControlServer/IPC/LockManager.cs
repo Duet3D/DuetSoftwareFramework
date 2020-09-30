@@ -26,7 +26,6 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Function to create a read/write lock to the object model
         /// </summary>
-        /// <param name="sourceConnection">Source connection acquiring the lock</param>
         /// <returns>Asynchronous task</returns>
         public static async Task LockMachineModel(Connection connection)
         {
@@ -37,7 +36,6 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Unlock the machine model again
         /// </summary>
-        /// <param name="sourceConnection">Source connection</param>
         public static void UnlockMachineModel(Connection connection)
         {
             if (_lockConnection == connection)

@@ -125,12 +125,11 @@ namespace UnitTests.SPI
         {
             Span<byte> blob = GetBlob("macroRequest.bin");
             
-            int bytesRead = Reader.ReadMacroRequest(blob, out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename);
+            int bytesRead = Reader.ReadMacroRequest(blob, out CodeChannel channel, out bool fromCode, out string filename);
             Assert.AreEqual(16, bytesRead);
             
             // Header
             Assert.AreEqual(DuetAPI.CodeChannel.USB, channel);
-            Assert.IsFalse(reportMissing);
             Assert.IsTrue(fromCode);
             
             // Message

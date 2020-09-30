@@ -27,7 +27,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Subscribe to changes of the given model dictionary
         /// </summary>
-        /// <param name="model">Dictionary to subscribe to</param>
+        /// <param name="dictionary">Dictionary to subscribe to</param>
         /// <param name="path">Dictionary path</param>
         private static void SubscribeToModelDictionary(object dictionary, object[] path)
         {

@@ -54,7 +54,6 @@ namespace DuetControlServer.Codes
                                 {
                                     return new CodeResult(MessageType.Error, "Pause the print before attempting to cancel it");
                                 }
-                                code.CancellingPrint = true;
                             }
                         }
                         break;
@@ -465,14 +464,18 @@ namespace DuetControlServer.Codes
                     }
                     throw new OperationCanceledException();
 
-                // Emergency Stop - unconditional and interpreteted immediately when read
+                // Emergency Stop
                 case 112:
-                    await SPI.Interface.EmergencyStop();
-                    using (await Model.Provider.AccessReadWriteAsync())
+                    if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await SPI.Interface.Flush(code))
                     {
-                        Model.Provider.Get.State.Status = MachineStatus.Halted;
+                        await SPI.Interface.EmergencyStop();
+                        using (await Model.Provider.AccessReadWriteAsync())
+                        {
+                            Model.Provider.Get.State.Status = MachineStatus.Halted;
+                        }
+                        return new CodeResult();
                     }
-                    return new CodeResult();
+                    throw new OperationCanceledException();
 
                 // Immediate DSF diagnostics
                 case 122:
@@ -892,12 +895,16 @@ namespace DuetControlServer.Codes
                 case 998:
                     throw new NotSupportedException();
 
-                // Reset controller - unconditional and interpreteted immediately when read
+                // Reset controller
                 case 999:
                     if (code.Parameters.Count == 0)
                     {
-                        await SPI.Interface.Reset();
-                        return new CodeResult();
+                        if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await SPI.Interface.Flush(code))
+                        {
+                            await SPI.Interface.Reset();
+                            return new CodeResult();
+                        }
+                        throw new OperationCanceledException();
                     }
                     break;
             }

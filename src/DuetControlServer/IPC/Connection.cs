@@ -246,7 +246,7 @@ namespace DuetControlServer.IPC
         }
 
         /// <summary>
-        /// Command name mapping for API version <= 8
+        /// Command name mapping for API version 8 or lower
         /// </summary>
         private static readonly Dictionary<string, string> _legacyCommandMapping = new Dictionary<string, string>
         {

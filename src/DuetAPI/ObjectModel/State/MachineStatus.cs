@@ -10,6 +10,11 @@ namespace DuetAPI.ObjectModel
     public enum MachineStatus
     {
         /// <summary>
+        /// Processing config.g
+        /// </summary>
+        Starting,
+
+        /// <summary>
         /// The firmware is being updated
         /// </summary>
         Updating,

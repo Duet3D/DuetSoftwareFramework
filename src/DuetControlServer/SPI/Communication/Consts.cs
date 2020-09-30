@@ -12,14 +12,19 @@ namespace DuetControlServer.SPI.Communication
         public const byte FormatCode = 0x5F;
 
         /// <summary>
+        /// Format code indicating that RRF is generally available but has not processed the last transfer yet
+        /// </summary>
+        public const byte FormatCodeStandalone = 0x60;
+
+        /// <summary>
         /// Unique format code that is not used anywhere else
         /// </summary>
         public const byte InvalidFormatCode = 0xC9;
-        
+
         /// <summary>
         /// Used protocol version. This is incremented whenever the protocol details change
         /// </summary>
-        public const ushort ProtocolVersion = 2;
+        public const ushort ProtocolVersion = 3;
 
         /// <summary>
         /// Size of a packet transfer buffer

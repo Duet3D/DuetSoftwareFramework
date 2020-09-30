@@ -1001,12 +1001,12 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         private static async Task HandleMacroRequest()
         {
-            DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename);
+            DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool fromCode, out string filename);
             _logger.Trace("Received macro request for file {0} on channel {1}", filename, channel);
 
             using (await _channels[channel].LockAsync())
             {
-                await _channels[channel].DoMacroFile(filename, reportMissing, fromCode);
+                await _channels[channel].DoMacroFile(filename, fromCode);
             }
         }
 

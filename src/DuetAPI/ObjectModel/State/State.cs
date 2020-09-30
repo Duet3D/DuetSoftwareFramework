@@ -105,6 +105,16 @@ namespace DuetAPI.ObjectModel
         private MachineMode _machineMode = MachineMode.FFF;
 
         /// <summary>
+        /// Millisecond fraction of <see cref="UpTime"/>
+        /// </summary>
+        public int MsUpTime
+        {
+            get => _msUpTime;
+            set => SetPropertyValue(ref _msUpTime, value);
+        }
+        private int _msUpTime;
+
+        /// <summary>
         /// Number of the next tool to be selected
         /// </summary>
         public int NextTool
@@ -147,7 +157,7 @@ namespace DuetAPI.ObjectModel
             get => _status;
 			set => SetPropertyValue(ref _status, value);
         }
-        private MachineStatus _status = MachineStatus.Idle;
+        private MachineStatus _status = MachineStatus.Starting;
 
         /// <summary>
         /// Internal date and time in RepRapFirmware or null if unknown

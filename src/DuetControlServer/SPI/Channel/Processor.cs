@@ -8,7 +8,6 @@ using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -145,19 +144,23 @@ namespace DuetControlServer.SPI.Channel
                     {
                         await oldState.Macro.Abort();
                     }
-                    else if (Channel != CodeChannel.Daemon)
-                    {
-                        _logger.Debug("Finished macro file {0}", oldState.Macro.FileName);
-                    }
                     else
                     {
-                        _logger.Trace("Finished macro file {0}", oldState.Macro.FileName);
+                        if (Channel != CodeChannel.Daemon)
+                        {
+                            _logger.Debug("Finished macro file {0}", oldState.Macro.FileName);
+                        }
+                        else
+                        {
+                            _logger.Trace("Finished macro file {0}", oldState.Macro.FileName);
+                        }
+                        oldState.Macro.Dispose();
                     }
                 }
             }
 
             // Invalidate macro start codes, pending codes, and flush requests
-            if (oldState.StartCode != null && !oldState.StartCode.FirmwareTask.IsCompleted)
+            if (oldState.StartCode != null)
             {
                 _logger.Warn("==> Cancelling unfinished starting code: {0}", oldState.StartCode);
                 oldState.StartCode.FirmwareTCS.SetCanceled();
@@ -416,116 +419,86 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>Asynchronous task</returns>
         public async Task AbortFile(bool abortAll, bool printStopped)
         {
-            // Kill the pending message(s)
-            while (CurrentState.WaitingForAcknowledgement)
-            {
-                await MessageAcknowledged();
-            }
+            bool macroAborted = false;
 
-            // Stop the file print if necessary
-            if (Channel == CodeChannel.File && !printStopped && (abortAll || CurrentState.Macro == null))
+            // Clean up the stack
+            Code startCode = null;
+            while (CurrentState.WaitingForAcknowledgement || CurrentState.Macro != null)
             {
-                using (await FileExecution.Job.LockAsync())
+                if (CurrentState.StartCode != null)
                 {
-                    await FileExecution.Job.Abort();
+                    startCode = CurrentState.StartCode;
+                    CurrentState.StartCode = null;
+
+                    if (CurrentState.Macro != null)
+                    {
+                        // Abort the macro file
+                        CodeResult macroResult;
+                        using (await CurrentState.Macro.LockAsync())
+                        {
+                            await CurrentState.Macro.Abort();
+                            macroResult = CurrentState.Macro.Result;
+                            macroAborted = true;
+                        }
+
+                        // Propagate its result to the code that started it or log it
+                        if (startCode != null)
+                        {
+                            if (startCode.Result == null)
+                            {
+                                startCode.Result = macroResult;
+                            }
+                            else if (macroResult != null && !macroResult.IsEmpty)
+                            {
+                                startCode.Result.AddRange(macroResult);
+                            }
+
+                            if (abortAll)
+                            {
+                                startCode.FirmwareTCS.SetResult(null);
+                            }
+                        }
+                        else
+                        {
+                            await Logger.LogOutput(macroResult);
+                        }
+                    }
+                    else
+                    {
+                        // Cancel the code that started the blocking message prompt
+                        startCode.FirmwareTCS.SetCanceled();
+                        startCode = null;
+                    }
+
+                    // The code that requested the macro file (if known) is not finished at this point
+                    if (!abortAll)
+                    {
+                        BufferedCodes.Insert(0, startCode);
+                        BytesBuffered += startCode.BinarySize;
+                    }
+                }
+
+                // Pop the stack
+                await Pop();
+                if (startCode != null)
+                {
+                    _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                }
+
+                // Stop if only a single file is supposed to be aborted
+                if (!abortAll && macroAborted)
+                {
+                    break;
                 }
             }
 
             if (abortAll)
             {
-                // Invalidate stack levels running macro files and resolve their start codes
-                while (CurrentState.WaitingForAcknowledgement || CurrentState.Macro != null)
-                {
-                    Code startCode = null;
-                    if (CurrentState.StartCode != null)
-                    {
-                        // Propagate final macro results to the code that started the macro
-                        using (await CurrentState.Macro.LockAsync())
-                        {
-                            Code macroStartCode = CurrentState.StartCode;
-                            await CurrentState.Macro.Abort();
-                            _ = CurrentState.Macro.FinishAsync().ContinueWith(async task =>
-                            {
-                                CodeResult result = await task;
-                                if (!macroStartCode.FirmwareTask.IsCompleted)
-                                {
-                                    if (macroStartCode.Result == null)
-                                    {
-                                        macroStartCode.Result = result;
-                                    }
-                                    else if (!result.IsEmpty)
-                                    {
-                                        macroStartCode.Result.AddRange(result);
-                                    }
-                                    macroStartCode.FirmwareTCS.SetResult(null);
-                                }
-                                else
-                                {
-                                    await Logger.LogOutput(result);
-                                }
-                            }, TaskContinuationOptions.RunContinuationsAsynchronously);
-                        }
-
-                        startCode = CurrentState.StartCode;
-                        CurrentState.StartCode = null;
-                    }
-
-                    await Pop();
-                    if (startCode != null)
-                    {
-                        _logger.Debug("==> Unfinished starting code: {0}", startCode);
-                    }
-                }
-
                 // Cancel all other buffered and regular codes
                 InvalidateRegular();
             }
             else
             {
-                Code startCode = CurrentState.StartCode;
-
-                // Cancel the last macro file and propagate its results to the code that started it or to the host
-                if (CurrentState.Macro != null)
-                {
-                    using (await CurrentState.Macro.LockAsync())
-                    {
-                        await CurrentState.Macro.Abort();
-                        _ = CurrentState.Macro.FinishAsync().ContinueWith(async task =>
-                        {
-                            CodeResult result = await task;
-                            if (startCode != null && !startCode.FirmwareTask.IsCompleted)
-                            {
-                                if (startCode.Result == null)
-                                {
-                                    startCode.Result = result;
-                                }
-                                else if (!result.IsEmpty)
-                                {
-                                    startCode.Result.AddRange(result);
-                                }
-                            }
-                            else
-                            {
-                                await Logger.LogOutput(result);
-                            }
-                        }, TaskContinuationOptions.RunContinuationsAsynchronously);
-                    }
-
-                    // The code that requested the macro file (if known) is not finished at this point
-                    if (startCode != null)
-                    {
-                        BufferedCodes.Insert(0, startCode);
-                        BytesBuffered += CurrentState.StartCode.BinarySize;
-                        CurrentState.StartCode = null;
-                    }
-
-                    await Pop();
-                    if (startCode != null)
-                    {
-                        _logger.Debug("==> Unfinished starting code: {0}", startCode);
-                    }
-                }
-
                 // Invalidate all the buffered codes except the one that invoked the last macro file
                 for (int i = BufferedCodes.Count - 1; i >= 0; i--)
                 {
@@ -535,6 +508,15 @@ namespace DuetControlServer.SPI.Channel
                         BufferedCodes[i].FirmwareTCS.SetCanceled();
                         BufferedCodes.RemoveAt(i);
                     }
+                }
+            }
+
+            // Stop the file print if necessary
+            if (Channel == CodeChannel.File && !printStopped && (abortAll || !macroAborted))
+            {
+                using (await FileExecution.Job.LockAsync())
+                {
+                    await FileExecution.Job.Abort();
                 }
             }
         }
@@ -622,16 +604,47 @@ namespace DuetControlServer.SPI.Channel
             // 5. Macro files
             if (CurrentState.Macro != null)
             {
+                bool busy = false, popStack = false;
                 using (await CurrentState.Macro.LockAsync())
                 {
                     if (!CurrentState.Macro.IsExecuting)
                     {
-                        if (!CurrentState.MacroCompleted)
+                        if (!CurrentState.MacroCompleted && DataTransfer.WriteMacroCompleted(Channel, !CurrentState.Macro.FileOpened))
                         {
-                            CurrentState.MacroCompleted = DataTransfer.WriteMacroCompleted(Channel, !CurrentState.Macro.FileOpened);
+                            if (CurrentState.Macro.FileOpened || DataTransfer.ProtocolVersion < 3)
+                            {
+                                // We expect a confirmation from (open) macro files being closed
+                                CurrentState.MacroCompleted = true;
+                            }
+                            else
+                            {
+                                // In newer protocol versions we don't expect a response...
+                                popStack = true;
+                            }
                         }
-                        return false;
+                        busy = true;
                     }
+                }
+
+                if (busy)
+                {
+                    if (popStack)
+                    {
+                        Code startCode = CurrentState.StartCode;
+                        if (startCode != null)
+                        {
+                            BytesBuffered += startCode.BinarySize;
+                            BufferedCodes.Insert(0, startCode);
+                            CurrentState.StartCode = null;
+                        }
+
+                        await Pop();
+                        if (startCode != null)
+                        {
+                            _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                        }
+                    }
+                    return false;
                 }
             }
 
@@ -783,11 +796,14 @@ namespace DuetControlServer.SPI.Channel
                 return true;
             }
 
-            // Check for final empty replies to macro files being closed
-            if (CurrentState.MacroCompleted)
+            // Check for a final empty reply for the current macro file being closed
+            if (CurrentState.MacroCompleted && string.IsNullOrEmpty(reply))
             {
-                if (CurrentState.StartCode != null)
+                Code startCode = CurrentState.StartCode;
+                if (startCode != null)
                 {
+                    _logger.Debug("==> Unfinished starting code: {0}", startCode);
+
                     // Concatenate output from nested macro codes
                     using (await CurrentState.Macro.LockAsync())
                     {
@@ -802,29 +818,14 @@ namespace DuetControlServer.SPI.Channel
                         CurrentState.Macro.Result = new CodeResult();
                     }
 
-                    // Append the final code reply
-                    Code startCode = CurrentState.StartCode;
-                    await HandleCodeReply(startCode, flags, reply);
-                    if (!CurrentState.StartCode.FirmwareTask.IsCompleted)
-                    {
-                        // Last message must have been incomplete - wait for the full response
-                        return true;
-                    }
-                    CurrentState.StartCode = null;
-
-                    await Pop();
-                    if (startCode.FirmwareTask.IsCompleted)
-                    {
-                        IsBlocked = true;   // don't send more codes until the next transfer because an abort file request may be pending
-                        _logger.Debug("==> Finished starting code: {0}", startCode);
-                    }
-                    return true;
+                    // Code has not finished yet, need a separate response for it
+                    BytesBuffered += startCode.BinarySize;
+                    BufferedCodes.Insert(0, startCode);
                 }
+                CurrentState.StartCode = null;
 
-                // System macro has finished, output the result
-                await HandleCodeReply(null, flags, reply);
                 await Pop();
-                return string.IsNullOrEmpty(reply);
+                return true;
             }
 
             // Check for message boxes being closed
@@ -950,7 +951,6 @@ namespace DuetControlServer.SPI.Channel
                 }
 
                 await Pop();
-
                 if (startCode != null)
                 {
                     _logger.Debug("==> Unfinished starting code: {0}", startCode);
@@ -966,10 +966,9 @@ namespace DuetControlServer.SPI.Channel
         /// Attempt to start a file macro
         /// </summary>
         /// <param name="fileName">Name of the macro file</param>
-        /// <param name="reportMissing">Report an error if the file could not be found</param>
         /// <param name="fromCode">Request comes from a real G/M/T-code</param>
         /// <returns>Asynchronous task</returns>
-        public async Task DoMacroFile(string fileName, bool reportMissing, bool fromCode)
+        public async Task DoMacroFile(string fileName, bool fromCode)
         {
             // Macro requests are not meant for comment codes, resolve them separately
             ResolveCommentCodes();
@@ -1009,98 +1008,15 @@ namespace DuetControlServer.SPI.Channel
                 return;
             }
 
-            // FIXME Check if the actual macro filename has to be adjusted - will become obsolete when RRF gets its own task for the Linux interface
-            if (startCode != null && startCode.CancellingPrint)
-            {
-                string cancelFile = await FilePath.ToPhysicalAsync("cancel.g", FileDirectory.System);
-                if (File.Exists(cancelFile))
-                {
-                    fileName = "cancel.g";
-                }
-                else if (startCode.MajorNumber == 0)
-                {
-                    string stopFile = await FilePath.ToPhysicalAsync("stop.g", FileDirectory.System);
-                    if (File.Exists(stopFile))
-                    {
-                        fileName = "stop.g";
-                    }
-                }
-                else if (startCode.MajorNumber == 1)
-                {
-                    string sleepFile = await FilePath.ToPhysicalAsync("sleep.g", FileDirectory.System);
-                    if (File.Exists(sleepFile))
-                    {
-                        fileName = "sleep.g";
-                    }
-                }
-            }
-
-            // Try to locate the macro file
+            // Try to locate the macro file and start it
             string physicalFile = await FilePath.ToPhysicalAsync(fileName, FileDirectory.System);
-            if (!File.Exists(physicalFile))
-            {
-                if (fileName == FilePath.ConfigFile)
-                {
-                    physicalFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFileFallback, FileDirectory.System);
-                    if (File.Exists(physicalFile))
-                    {
-                        // Use config.b.bak if config.g cannot be found
-                        _logger.Warn("Using fallback file {0} because {1} could not be found", FilePath.ConfigFileFallback, FilePath.ConfigFile);
-                        fileName = FilePath.ConfigFileFallback;
-                    }
-                    else
-                    {
-                        // No configuration file found
-                        await Logger.LogOutput(MessageType.Error, $"Macro files {FilePath.ConfigFile} and {FilePath.ConfigFileFallback} not found");
-                    }
-                }
-                else if (reportMissing)
-                {
-                    // Send a warning message back to RRF
-                    Interface.SendMessage(MessageTypeFlags.GenericMessage | MessageTypeFlags.WarningMessageFlag, $"Macro file {fileName} not found\n");
-                }
-                else if (FilePath.DeployProbePattern.IsMatch(fileName))
-                {
-                    physicalFile = await FilePath.ToPhysicalAsync(FilePath.DeployProbeFallbackFile, FileDirectory.System);
-                    if (File.Exists(physicalFile))
-                    {
-                        _logger.Info($"Using fallback file {FilePath.DeployProbeFallbackFile} because {fileName} could not be found");
-                        fileName = FilePath.DeployProbeFallbackFile;
-                    }
-                    else
-                    {
-                        // No deployprobe file found
-                        _logger.Info($"Optional macro files {fileName} and {FilePath.DeployProbeFallbackFile} not found");
-                    }
-                }
-                else if (FilePath.RetractProbePattern.IsMatch(fileName))
-                {
-                    physicalFile = await FilePath.ToPhysicalAsync(FilePath.RetractProbeFallbackFile, FileDirectory.System);
-                    if (File.Exists(physicalFile))
-                    {
-                        _logger.Info($"Using fallback file {FilePath.RetractProbeFallbackFile} because {fileName} could not be found");
-                        fileName = FilePath.RetractProbeFallbackFile;
-                    }
-                    else
-                    {
-                        // No retractprobe file found
-                        _logger.Info($"Optional macro files {fileName} and {FilePath.RetractProbeFallbackFile} not found");
-                    }
-                }
-                else if (fileName != FilePath.DaemonFile)
-                {
-                    _logger.Info("Optional macro file {0} not found", fileName);
-                }
-                else
-                {
-                    _logger.Trace("Optional macro file {0} not found", fileName);
-                }
-            }
-
-            // Push the stack and try to start the macro file
             State newState = Push();
             newState.StartCode = startCode;
             newState.Macro = new Macro(fileName, physicalFile, Channel, startCode != null, (startCode != null) ? startCode.SourceConnection : 0);
+            if (startCode != null)
+            {
+                _logger.Debug("==> Starting code {0}", startCode);
+            }
         }
 
         /// <summary>

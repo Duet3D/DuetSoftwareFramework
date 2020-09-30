@@ -41,26 +41,6 @@ namespace DuetControlServer.Files
         public const string MeshFile = "mesh.g";
 
         /// <summary>
-        /// Fallback file if the probe-specific deploy probe file could not be found
-        /// </summary>
-        public const string DeployProbeFallbackFile = "deployprobe.g";
-
-        /// <summary>
-        /// Fallback file if the probe-specific retract probe file could not be found
-        /// </summary>
-        public const string RetractProbeFallbackFile = "retractprobe.g";
-
-        /// <summary>
-        /// Probe-specific deploy file name pattern
-        /// </summary>
-        public static Regex DeployProbePattern = new Regex(@"deployprobe\d+\.g");
-
-        /// <summary>
-        /// Probe-specific retract file name pattern
-        /// </summary>
-        public static Regex RetractProbePattern = new Regex(@"retractprobe\d+\.g");
-
-        /// <summary>
         /// File to run once after start if it exists, then deleted again
         /// </summary>
         public const string RunOnceFile = "runonce.g";

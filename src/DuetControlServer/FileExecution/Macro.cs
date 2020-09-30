@@ -63,22 +63,12 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Internal cancellation token source used for codes
         /// </summary>
-        private CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+        private readonly CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
         /// <summary>
         /// Cancellation token that is triggered when the file is cancelled/aborted
         /// </summary>
         public CancellationToken CancellationToken { get => _cts.Token; }
-
-        /// <summary>
-        /// Cancel pending codes
-        /// </summary>
-        public void CancelPendingCodes()
-        {
-            _cts.Cancel();
-            _cts.Dispose();
-            _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-        }
 
         /// <summary>
         /// Internal lock used for starting codes in the right order
@@ -197,12 +187,20 @@ namespace DuetControlServer.FileExecution
                 _file = new CodeFile(physicalFile, channel);
                 _logger.Info("Starting macro file {0} on channel {1}", fileName, channel);
             }
+            catch (FileNotFoundException)
+            {
+                if (channel != CodeChannel.Daemon)
+                {
+                    _logger.Debug("Macro file {0} not found", fileName);
+                }
+                else
+                {
+                    _logger.Trace("Macro file {0} not found", fileName);
+                }
+            }
             catch (Exception e)
             {
-                if (!(e is FileNotFoundException))
-                {
-                    _logger.Error(e, "Failed to start macro file {0}: {1}", fileName, e.Message);
-                }
+                _logger.Error(e, "Failed to start macro file {0}: {1}", fileName, e.Message);
             }
             finally
             {
@@ -225,6 +223,7 @@ namespace DuetControlServer.FileExecution
                 return;
             }
             IsAborted = true;
+            _cts.Cancel();
 
             if (_file != null)
             {
@@ -255,7 +254,6 @@ namespace DuetControlServer.FileExecution
             {
                 return Task.FromResult(Result);
             }
-            _cts.Cancel();
 
             if (_finishTCS != null)
             {

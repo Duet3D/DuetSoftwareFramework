@@ -273,12 +273,6 @@ namespace DuetControlServer.Commands
         internal bool IsForAcknowledgement { get => _codeType == InternalCodeType.Acknowledgement; }
 
         /// <summary>
-        /// This indicates if this code is cancelling a print.
-        /// FIXME Remove this again when the SBC interface has got its own task in RRF
-        /// </summary>
-        internal bool CancellingPrint { get; set; }
-
-        /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish
         /// </summary>
         /// <returns>Result of the code</returns>
@@ -437,7 +431,7 @@ namespace DuetControlServer.Commands
                 _logger.Debug("Waiting for finish of {0}", this);
                 using (await WaitForFinish())
                 {
-                    await FirmwareTask;
+                    await FirmwareTCS.Task;
                     await CodeExecuted();
                 }
             }
@@ -543,19 +537,14 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
-        /// TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
-        /// </summary>
-        internal TaskCompletionSource<object> FirmwareTCS { get; private set; }
-
-        /// <summary>
-        /// Task to complete when the code has finished
-        /// </summary>
-        internal Task FirmwareTask { get => FirmwareTCS.Task; }
-
-        /// <summary>
         /// Size of this code in binary representation
         /// </summary>
         internal int BinarySize { get; set; }
+
+        /// <summary>
+        /// TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
+        /// </summary>
+        internal TaskCompletionSource<object> FirmwareTCS { get; private set; }
 
         /// <summary>
         /// Indicates if the code has been fully executed (including the Executed interceptor if applicable)
@@ -676,7 +665,6 @@ namespace DuetControlServer.Commands
         {
             base.Reset();
             Connection = null;
-            CancellingPrint = false;
             InternallyProcessed = false;
             File = null;
             Macro = null;

@@ -36,12 +36,12 @@ namespace DuetControlServer.SPI.Communication.Shared
         public ushort DataLength;
         
         /// <summary>
-        /// CRC16 checksum of the transfer data (reserved)
+        /// CRC16 checksum of the transfer data
         /// </summary>
         public ushort ChecksumData;
 
         /// <summary>
-        /// CRC16 checksum of the transfer header (reserved)
+        /// CRC16 checksum of the transfer header
         /// </summary>
         public ushort ChecksumHeader;
     }
