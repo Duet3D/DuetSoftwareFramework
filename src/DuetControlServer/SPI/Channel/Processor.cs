@@ -429,53 +429,40 @@ namespace DuetControlServer.SPI.Channel
                 {
                     startCode = CurrentState.StartCode;
                     CurrentState.StartCode = null;
+                }
 
-                    if (CurrentState.Macro != null)
+                if (CurrentState.Macro != null)
+                {
+                    using (await CurrentState.Macro.LockAsync())
                     {
-                        // Abort the macro file
-                        CodeResult macroResult;
-                        using (await CurrentState.Macro.LockAsync())
-                        {
-                            await CurrentState.Macro.Abort();
-                            macroResult = CurrentState.Macro.Result;
-                            macroAborted = true;
-                        }
-
-                        // Propagate its result to the code that started it or log it
+                        // Propagate the macro result to the code that started it
                         if (startCode != null)
                         {
-                            if (startCode.Result == null)
+                            _ = CurrentState.Macro.FinishAsync().ContinueWith(async task =>
                             {
-                                startCode.Result = macroResult;
-                            }
-                            else if (macroResult != null && !macroResult.IsEmpty)
-                            {
-                                startCode.Result.AddRange(macroResult);
-                            }
-
-                            if (abortAll)
-                            {
+                                CodeResult macroResult = await task;
+                                if (startCode.Result == null)
+                                {
+                                    startCode.Result = macroResult;
+                                }
+                                else if (macroResult != null && !macroResult.IsEmpty)
+                                {
+                                    startCode.Result.AddRange(macroResult);
+                                }
                                 startCode.FirmwareTCS.SetResult(null);
-                            }
+                            }, TaskContinuationOptions.RunContinuationsAsynchronously);
                         }
-                        else
-                        {
-                            await Logger.LogOutput(macroResult);
-                        }
-                    }
-                    else
-                    {
-                        // Cancel the code that started the blocking message prompt
-                        startCode.FirmwareTCS.SetCanceled();
-                        startCode = null;
-                    }
 
-                    // The code that requested the macro file (if known) is not finished at this point
-                    if (!abortAll)
-                    {
-                        BufferedCodes.Insert(0, startCode);
-                        BytesBuffered += startCode.BinarySize;
+                        // Abort the macro file
+                        await CurrentState.Macro.Abort();
                     }
+                    macroAborted = true;
+                }
+                else if (startCode != null)
+                {
+                    // Cancel the code that started the blocking message prompt
+                    startCode.FirmwareTCS.SetCanceled();
+                    startCode = null;
                 }
 
                 // Pop the stack
@@ -494,21 +481,18 @@ namespace DuetControlServer.SPI.Channel
 
             if (abortAll)
             {
-                // Cancel all other buffered and regular codes
+                // Cancel pending codes and requests
                 InvalidateRegular();
             }
             else
             {
-                // Invalidate all the buffered codes except the one that invoked the last macro file
-                for (int i = BufferedCodes.Count - 1; i >= 0; i--)
+                // Invalidate remaining buffered codes from the last macro file
+                foreach (Code bufferedCode in BufferedCodes)
                 {
-                    if (BufferedCodes[i] != startCode)
-                    {
-                        BytesBuffered -= BufferedCodes[i].BinarySize;
-                        BufferedCodes[i].FirmwareTCS.SetCanceled();
-                        BufferedCodes.RemoveAt(i);
-                    }
+                    bufferedCode.FirmwareTCS.SetCanceled();
                 }
+                BufferedCodes.Clear();
+                BytesBuffered = 0;
             }
 
             // Stop the file print if necessary
