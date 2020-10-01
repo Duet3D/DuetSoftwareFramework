@@ -245,6 +245,7 @@ namespace DuetControlServer.FileExecution
                             {
                                 if (IsPaused)
                                 {
+                                    cancellationToken = _cancellationTokenSource.Token;
                                     codePool.Enqueue(sharedCode);
                                     break;
                                 }

@@ -1028,8 +1028,8 @@ namespace DuetControlServer.SPI.Channel
             {
                 bufferedCode.FirmwareTCS.SetCanceled();
             }
-            BytesBuffered = 0;
             BufferedCodes.Clear();
+            BytesBuffered = 0;
 
             foreach (State state in Stack)
             {
