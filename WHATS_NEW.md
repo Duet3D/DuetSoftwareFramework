@@ -1,6 +1,24 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.2.0-b2
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-b2
+- DuetWebControl 3.2.0-b2
+
+Changed behaviour:
+- runonce.g is no longer processed before config.g to match RRF's behaviour
+- Increased SPI protocol version due to slight changes for the new Linux task in RRF
+
+Bug fixes:
+- Added missing "Starting" item to the MachineStatus enumeration
+- M112/M999 were executed out-of-order when read from files
+- Sometimes in print files codes invoking macro files could crash DCS
+- Aborted macro files did not cancel codes properly
+- Comments following codes directly without a whitespace could cause parsing errors
+
 Version 3.2.0-b1
 ================
 

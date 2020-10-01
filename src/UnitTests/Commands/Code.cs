@@ -679,5 +679,48 @@ namespace UnitTests.Commands
             Assert.AreEqual('P', code.Parameters[1].Letter);
             Assert.AreEqual(0, (int)code.Parameters[1]);
         }
+
+        [Test]
+        public void ParseNoSpaceComment()
+        {
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M84 XYE; disable motors");
+
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(84, code.MajorNumber);
+            Assert.IsNull(code.MinorNumber);
+            Assert.AreEqual(3, code.Parameters.Count);
+            Assert.AreEqual('X', code.Parameters[0].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[0]);
+            Assert.AreEqual('Y', code.Parameters[1].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[1]);
+            Assert.AreEqual('E', code.Parameters[2].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[2]);
+            Assert.AreEqual(" disable motors", code.Comment);
+        }
+
+        [Test]
+        public async Task ParseNoSpaceCommentAsync()
+        {
+            string codeString = "M84 XYE; disable motors";
+            byte[] codeBytes = Encoding.UTF8.GetBytes(codeString);
+            using MemoryStream memoryStream = new MemoryStream(codeBytes);
+            using StreamReader reader = new StreamReader(memoryStream);
+            CodeParserBuffer buffer = new CodeParserBuffer(128, true);
+
+            DuetAPI.Commands.Code code = new DuetAPI.Commands.Code();
+            await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+
+            Assert.AreEqual(CodeType.MCode, code.Type);
+            Assert.AreEqual(84, code.MajorNumber);
+            Assert.IsNull(code.MinorNumber);
+            Assert.AreEqual(3, code.Parameters.Count);
+            Assert.AreEqual('X', code.Parameters[0].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[0]);
+            Assert.AreEqual('Y', code.Parameters[1].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[1]);
+            Assert.AreEqual('E', code.Parameters[2].Letter);
+            Assert.AreEqual(0, (int)code.Parameters[2]);
+            Assert.AreEqual(" disable motors", code.Comment);
+        }
     }
 }

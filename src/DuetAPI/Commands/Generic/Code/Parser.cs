@@ -208,6 +208,16 @@ namespace DuetAPI.Commands
                         }
                         value += c;
                     }
+                    else if (c == ';')
+                    {
+                        inFinalComment = true;
+                        inChunk = endingChunk = false;
+                    }
+                    else if (c == '(')
+                    {
+                        inEncapsulatedComment = true;
+                        inChunk = endingChunk = false;
+                    }
                     else if (!endingChunk && string.IsNullOrEmpty(value))
                     {
                         if (char.IsWhiteSpace(c))
