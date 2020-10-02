@@ -1,6 +1,8 @@
 Package: duetwebcontrol
 Version: DWCVER
 Architecture: all
+Depends: duetsoftwareframework (>= 3.2.0)
+Suggests: duetwebserver
 Priority: optional
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
