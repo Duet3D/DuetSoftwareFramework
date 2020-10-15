@@ -135,7 +135,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Information about the code channel</returns>
         public InputChannel this[CodeChannel channel]
         {
-            get => this.FirstOrDefault(inputChannel => inputChannel.Name == channel);
+            get => this.FirstOrDefault(inputChannel => inputChannel != null && inputChannel.Name == channel);
         }
     }
 }
