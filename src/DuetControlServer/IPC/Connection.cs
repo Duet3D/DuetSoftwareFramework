@@ -76,47 +76,46 @@ namespace DuetControlServer.IPC
         {
             _unixSocket.GetPeerCredentials(out int pid, out int uid, out int gid);
 
-            // Make sure this is no root process...
-            if (uid != 0 && gid != 0)
+            // Try to figure out what process this is
+            Process peerProcess = Process.GetProcessById(pid);
+            string processName = peerProcess?.MainModule?.FileName;
+            if (processName == null && uid != 0 && gid != 0)
             {
-                // Check what process we are dealing with
-                Process peerProcess = Process.GetProcessById(pid);
-                string processName = peerProcess?.MainModule?.FileName;
-                if (processName == null)
+                Logger.Error("Failed to get process details from pid {0} (uid {1}, gid {2}). Cannot assign any permissions", pid, uid, gid);
+                return false;
+            }
+
+            // Check if this is an installed plugin
+            string pluginPath = Path.GetFullPath(processName ?? string.Empty);
+            if (pluginPath.StartsWith(Settings.PluginDirectory))
+            {
+                pluginPath = processName.Substring(Settings.PluginDirectory.Length);
+                if (pluginPath.StartsWith('/'))
                 {
-                    Logger.Error("Failed to get process details from pid {0} (uid {1}, gid {2}). Cannot assign any permissions", pid, uid, gid);
-                    return false;
+                    pluginPath = pluginPath.Substring(1);
                 }
 
-                // Check if this is an installed plugin
-                string pluginPath = Path.GetFullPath(processName);
-                if (pluginPath.StartsWith(Settings.PluginDirectory))
+                // Retrieve the corresponding plugin permissions
+                if (pluginPath.Contains('/'))
                 {
-                    pluginPath = processName.Substring(Settings.PluginDirectory.Length);
-                    if (pluginPath.StartsWith('/'))
+                    string pluginName = pluginPath.Substring(0, pluginPath.IndexOf('/'));
+                    using (await Model.Provider.AccessReadOnlyAsync())
                     {
-                        pluginPath = pluginPath.Substring(1);
-                    }
-
-                    // Retrieve the corresponding plugin permissions
-                    if (pluginPath.Contains('/'))
-                    {
-                        string pluginName = pluginPath.Substring(0, pluginPath.IndexOf('/'));
-                        using (await Model.Provider.AccessReadOnlyAsync())
+                        foreach (PluginManifest plugin in Model.Provider.Get.Plugins)
                         {
-                            foreach (PluginManifest plugin in Model.Provider.Get.Plugins)
+                            if (plugin.Name == pluginName)
                             {
-                                if (plugin.Name == pluginName)
-                                {
-                                    PluginName = plugin.Name;
-                                    Permissions = plugin.SbcPermissions;
-                                    return true;
-                                }
+                                PluginName = plugin.Name;
+                                Permissions = plugin.SbcPermissions;
+                                return true;
                             }
                         }
                     }
+                }
 
-                    // Failed to find plugin
+                if (uid != 0 && gid != 0)
+                {
+                    // Failed to find plugin and it isn't running as root
                     Logger.Error("Failed to find corresponding plugin for peer application {0}", processName);
                     return false;
                 }

@@ -1,5 +1,6 @@
 ﻿using DuetControlServer.IPC;
 using DuetControlServer.SPI;
+using System;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -18,10 +19,20 @@ namespace DuetControlServer.Commands
         /// Wait for all pending codes of the given channel to finish
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public override Task<bool> Execute()
+        public override async Task<bool> Execute()
         {
+            // Check if the corresponding code channel has been disabled
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                if (Model.Provider.Get.Inputs[Channel] == null)
+                {
+                    throw new InvalidOperationException("Requested code channel has been disabled");
+                }
+            }
+
+            // Wait for it to be flushed
             Code codeBeingIntercepted = IPC.Processors.CodeInterception.GetCodeBeingIntercepted(Connection);
-            return (codeBeingIntercepted != null) ? Interface.Flush(codeBeingIntercepted) : Interface.Flush(Channel);
+            return await ((codeBeingIntercepted != null) ? Interface.Flush(codeBeingIntercepted) : Interface.Flush(Channel));
         }
     }
 }

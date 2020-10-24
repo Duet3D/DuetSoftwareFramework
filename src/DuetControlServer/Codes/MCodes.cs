@@ -854,6 +854,11 @@ namespace DuetControlServer.Codes
                                 firmwareFile = Model.Provider.Get.Boards[0].FirmwareFileName;
                             }
 
+                            if (string.IsNullOrEmpty(iapFile) || string.IsNullOrEmpty(firmwareFile))
+                            {
+                                return new CodeResult(MessageType.Error, "Cannot update firmware because IAP and firmware filenames are unknown");
+                            }
+
                             iapFile = await FilePath.ToPhysicalAsync(iapFile, FileDirectory.Firmware);
                             if (!File.Exists(iapFile))
                             {
@@ -971,7 +976,7 @@ namespace DuetControlServer.Codes
 
                 // Diagnostics
                 case 122:
-                    if (code.Parameter('B', 0) == 0 && code.GetUnprecedentedString() != "DSF")
+                    if (code.Parameter('B', 0) == 0 && code.GetUnprecedentedString() != "DSF" && !code.Result.IsEmpty)
                     {
                         await Diagnostics(code.Result);
                     }

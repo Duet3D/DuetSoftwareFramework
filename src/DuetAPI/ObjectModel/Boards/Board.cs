@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a connected board
@@ -24,6 +26,16 @@
             set => SetPropertyValue(ref _canAddress, value);
         }
         private int? _canAddress;
+
+        /// <summary>
+        /// Details about a connected display or null if none is connected
+        /// </summary>
+        public DirectDisplay DirectDisplay
+        {
+            get => _directDisplay;
+            set => SetPropertyValue(ref _directDisplay, value);
+        }
+        private DirectDisplay _directDisplay;
 
         /// <summary>
         /// Date of the firmware build
@@ -148,12 +160,22 @@
         /// <summary>
         /// Indicates if this board supports external 12864 displays
         /// </summary>
+        [Obsolete]
         public bool Supports12864
         {
-            get => _supports12864;
-            set => SetPropertyValue(ref _supports12864, value);
+            get => _supportsDirectDisplay;
+            set => SetPropertyValue(ref _supportsDirectDisplay, value);
         }
-        private bool _supports12864;
+
+        /// <summary>
+        /// Indicates if this board supports external displays
+        /// </summary>
+        public bool SupportsDirectDisplay
+        {
+            get => _supportsDirectDisplay;
+            set => SetPropertyValue(ref _supportsDirectDisplay, value);
+        }
+        private bool _supportsDirectDisplay;
 
         /// <summary>
         /// Unique identifier of the board

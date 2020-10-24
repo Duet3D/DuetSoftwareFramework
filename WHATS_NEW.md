@@ -1,6 +1,21 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.2.0-b3
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-b3
+- DuetWebControl 3.2.0-b3
+
+Changed behaviour:
+- DCS is now explicitly notified about closed messages and files (hence no longer compatible with 3.2-b2)
+- CodeConsole utility allows evaluation of expressions using `eval <expression>`
+
+Bug fixes:
+- When certain G-code inputs were disabled, the DSF API threw NullReferenceExceptions
+- When the heaters contained null items, no config-override.g could be writen
+
 Version 3.2.0-b2
 ================
 

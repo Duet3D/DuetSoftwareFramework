@@ -2,6 +2,8 @@
 using DuetAPIClient;
 using System;
 using System.Net.Sockets;
+using System.Runtime.InteropServices.ComTypes;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace CodeConsole
@@ -71,6 +73,11 @@ namespace CodeConsole
                         {
                             await connection.SetUpdateStatus(false);
                             Console.WriteLine("DSF is no longer in update mode");
+                        }
+                        else if (input.StartsWith("eval ", StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            JsonElement result = await connection.EvaluateExpression<JsonElement>(input.Substring(5).Trim());
+                            Console.WriteLine("Evaluation result: {0}", result.GetRawText());
                         }
                         else
                         {

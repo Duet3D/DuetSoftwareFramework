@@ -55,7 +55,7 @@ namespace DuetControlServer.Files
             CodeParserBuffer codeParserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
 
             bool inRelativeMode = false, lastCodeHadInfo = false, gotNewInfo = false;
-            long fileReadLimit = Math.Min(Settings.FileInfoReadLimitHeader + Settings.FileBufferSize, reader.BaseStream.Length);
+            long fileReadLimit = Math.Min(Settings.FileInfoReadLimitHeader, reader.BaseStream.Length);
             while (codeParserBuffer.GetPosition(reader) < fileReadLimit)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();

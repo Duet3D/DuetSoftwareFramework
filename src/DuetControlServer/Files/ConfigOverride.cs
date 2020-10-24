@@ -72,16 +72,18 @@ namespace DuetControlServer.Files
             for (int heater = 0; heater < Model.Provider.Get.Heat.Heaters.Count; heater++)
             {
                 Heater item = Model.Provider.Get.Heat.Heaters[heater];
-
-                // Heater model
-                await writer.WriteLineAsync("M307 " +
-                    $"H{heater} A{item.Model.Gain} C{item.Model.TimeConstant:F1} D{item.Model.DeadTime:F1} S{item.Model.MaxPwm:F1} " +
-                    $"V{item.Model.StandardVoltage:F1} B{(item.Model.PID.Used ? 0 : 1)}");
-
-                // Custom PID parameters
-                if (item.Model.PID.Overridden)
+                if (item != null)
                 {
-                    await writer.WriteLineAsync($"M301 H{heater} P{item.Model.PID.P:F1} I{item.Model.PID.I} D{item.Model.PID.D:F1}");
+                    // Heater model
+                    await writer.WriteLineAsync("M307 " +
+                        $"H{heater} A{item.Model.Gain} C{item.Model.TimeConstant:F1} D{item.Model.DeadTime:F1} S{item.Model.MaxPwm:F1} " +
+                        $"V{item.Model.StandardVoltage:F1} B{(item.Model.PID.Used ? 0 : 1)}");
+
+                    // Custom PID parameters
+                    if (item.Model.PID.Overridden)
+                    {
+                        await writer.WriteLineAsync($"M301 H{heater} P{item.Model.PID.P:F1} I{item.Model.PID.I} D{item.Model.PID.D:F1}");
+                    }
                 }
             }
         }

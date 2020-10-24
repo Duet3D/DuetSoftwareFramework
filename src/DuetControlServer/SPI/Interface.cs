@@ -887,6 +887,10 @@ namespace DuetControlServer.SPI
                     return HandleDoCode();
                 case Request.WaitForAcknowledgement:
                     return HandleWaitForAcknowledgement();
+                case Request.MacroFileClosed:
+                    return HandleMacroFileClosed();
+                case Request.MessageAcknowledged:
+                    return HandleMessageAcknowledgement();
             }
             return Task.CompletedTask;
         }
@@ -1157,6 +1161,10 @@ namespace DuetControlServer.SPI
             }
         }
 
+        /// <summary>
+        /// Handle a firmware request to wait for a message to be acknowledged
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task HandleWaitForAcknowledgement()
         {
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
@@ -1165,6 +1173,36 @@ namespace DuetControlServer.SPI
             using (await _channels[channel].LockAsync())
             {
                 _channels[channel].WaitForAcknowledgement();
+            }
+        }
+
+        /// <summary>
+        /// Handle a firmwre request that is sent when RRF has internally closed a macro file
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private static async Task HandleMacroFileClosed()
+        {
+            DataTransfer.ReadCodeChannel(out CodeChannel channel);
+            _logger.Trace("Received file closal on channel {0}", channel);
+
+            using (await _channels[channel].LockAsync())
+            {
+                await _channels[channel].MacroFileClosed();
+            }
+        }
+
+        /// <summary>
+        /// Handle a firmwre request that is sent when RRF has succesfully acknowledged a blocking message
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private static async Task HandleMessageAcknowledgement()
+        {
+            DataTransfer.ReadCodeChannel(out CodeChannel channel);
+            _logger.Trace("Received message acknowledgement on channel {0}", channel);
+
+            using (await _channels[channel].LockAsync())
+            {
+                await _channels[channel].MessageAcknowledged();
             }
         }
 

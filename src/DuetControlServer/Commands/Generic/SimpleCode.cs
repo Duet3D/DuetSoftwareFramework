@@ -68,6 +68,15 @@ namespace DuetControlServer.Commands
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         public override async Task<string> Execute()
         {
+            // Check if the corresponding code channel has been disabled
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                if (Model.Provider.Get.Inputs[Channel] == null)
+                {
+                    throw new InvalidOperationException("Requested code channel has been disabled");
+                }
+            }
+
             // Parse the input string
             List<Code> codes = new List<Code>(), priorityCodes = new List<Code>();
             try

@@ -195,6 +195,7 @@ namespace DuetControlServer.Model
                             else
                             {
                                 // Specific request - still updating the OM
+                                bool outputBoards = false;
                                 using (await Provider.AccessReadWriteAsync())
                                 {
                                     string keyName = key.GetString();
@@ -204,6 +205,11 @@ namespace DuetControlServer.Model
                                         if (_logger.IsTraceEnabled)
                                         {
                                             _logger.Trace("Key JSON: {0}", Encoding.UTF8.GetString(_json, 0, _jsonLength));
+                                        }
+
+                                        if (keyName == "boards" && Provider.Get.Boards.Count > 0 && string.IsNullOrEmpty(Provider.Get.Boards[0].IapFileNameSBC))
+                                        {
+                                            outputBoards = true;
                                         }
                                     }
                                     else
@@ -215,6 +221,12 @@ namespace DuetControlServer.Model
                                     {
                                         Provider.Get.State.Status = MachineStatus.Updating;
                                     }
+                                }
+
+                                if (outputBoards)
+                                {
+#warning This should never be triggered but both dc42 and I had an issue (at least once) where boards[0].*File was not set
+                                    await Provider.Output(MessageType.Warning, $"Received malformed boards key: '{Encoding.UTF8.GetString(_json, 0, _jsonLength)}'");
                                 }
                             }
                         }

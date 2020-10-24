@@ -363,6 +363,12 @@ namespace DuetControlServer.Commands
                     }
                     throw;
                 }
+                catch (InvalidOperationException)
+                {
+                    // Some inputs may be disabled in a custom build
+                    Result = new CodeResult(MessageType.Error, $"Code channel {Channel} is disabled");
+                    _logger.Debug("{0} cannot be executed{1} because its code channel {1} is disabled", this, logSuffix, Channel);
+                }
                 catch (NotSupportedException)
                 {
                     // Some codes may not be supported yet
@@ -410,6 +416,15 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         private async Task Process()
         {
+            // Check if the corresponding code channel has been disabled
+            using (await Provider.AccessReadOnlyAsync())
+            {
+                if (Provider.Get.Inputs[Channel] == null)
+                {
+                    throw new InvalidOperationException("Requested code channel has been disabled");
+                }
+            }
+
             // Attempt to process the code internally first
             if (!InternallyProcessed && await ProcessInternally())
             {

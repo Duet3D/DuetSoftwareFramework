@@ -237,12 +237,6 @@
             Indicates if this code is supposed to deal with a message box awaiting acknowledgement
             </summary>
         </member>
-        <member name="P:DuetControlServer.Commands.Code.CancellingPrint">
-            <summary>
-            This indicates if this code is cancelling a print.
-            FIXME Remove this again when the SBC interface has got its own task in RRF
-            </summary>
-        </member>
         <member name="M:DuetControlServer.Commands.Code.Execute">
             <summary>
             Run an arbitrary G/M/T-code and wait for it to finish
@@ -288,19 +282,14 @@
             </summary>
             <returns>Whether the code could be processed internally</returns>
         </member>
-        <member name="P:DuetControlServer.Commands.Code.FirmwareTCS">
-            <summary>
-            TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
-            </summary>
-        </member>
-        <member name="P:DuetControlServer.Commands.Code.FirmwareTask">
-            <summary>
-            Task to complete when the code has finished
-            </summary>
-        </member>
         <member name="P:DuetControlServer.Commands.Code.BinarySize">
             <summary>
             Size of this code in binary representation
+            </summary>
+        </member>
+        <member name="P:DuetControlServer.Commands.Code.FirmwareTCS">
+            <summary>
+            TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
             </summary>
         </member>
         <member name="P:DuetControlServer.Commands.Code.IsExecuted">
@@ -906,11 +895,6 @@
             Cancellation token that is triggered when the file is cancelled/aborted
             </summary>
         </member>
-        <member name="M:DuetControlServer.FileExecution.Macro.CancelPendingCodes">
-            <summary>
-            Cancel pending codes
-            </summary>
-        </member>
         <member name="F:DuetControlServer.FileExecution.Macro._codeStartLock">
             <summary>
             Internal lock used for starting codes in the right order
@@ -1342,26 +1326,6 @@
             Macro to be called when G29 is invoked without an S parameter
             </summary>
         </member>
-        <member name="F:DuetControlServer.Files.FilePath.DeployProbeFallbackFile">
-            <summary>
-            Fallback file if the probe-specific deploy probe file could not be found
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Files.FilePath.RetractProbeFallbackFile">
-            <summary>
-            Fallback file if the probe-specific retract probe file could not be found
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Files.FilePath.DeployProbePattern">
-            <summary>
-            Probe-specific deploy file name pattern
-            </summary>
-        </member>
-        <member name="F:DuetControlServer.Files.FilePath.RetractProbePattern">
-            <summary>
-            Probe-specific retract file name pattern
-            </summary>
-        </member>
         <member name="F:DuetControlServer.Files.FilePath.RunOnceFile">
             <summary>
             File to run once after start if it exists, then deleted again
@@ -1607,7 +1571,11 @@
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
         </member>
-        <!-- Badly formed XML comment ignored for member "F:DuetControlServer.IPC.Connection._legacyCommandMapping" -->
+        <member name="F:DuetControlServer.IPC.Connection._legacyCommandMapping">
+            <summary>
+            Command name mapping for API version 8 or lower
+            </summary>
+        </member>
         <member name="M:DuetControlServer.IPC.Connection.ReceiveCommand">
             <summary>
             Receive a fully-populated instance of a BaseCommand from the client
@@ -1662,14 +1630,12 @@
             <summary>
             Function to create a read/write lock to the object model
             </summary>
-            <param name="sourceConnection">Source connection acquiring the lock</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.IPC.LockManager.UnlockMachineModel(DuetControlServer.IPC.Connection)">
             <summary>
             Unlock the machine model again
             </summary>
-            <param name="sourceConnection">Source connection</param>
         </member>
         <member name="T:DuetControlServer.IPC.Processors.Base">
             <summary>
@@ -2265,7 +2231,7 @@
             <summary>
             Subscribe to changes of the given model dictionary
             </summary>
-            <param name="model">Dictionary to subscribe to</param>
+            <param name="dictionary">Dictionary to subscribe to</param>
             <param name="path">Dictionary path</param>
         </member>
         <member name="M:DuetControlServer.Model.Observer.UnsubscribeFromModelDictionary(System.Object)">
@@ -3219,12 +3185,11 @@
             </summary>
             <returns>Asynchronous task</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Channel.Processor.DoMacroFile(System.String,System.Boolean,System.Boolean)">
+        <member name="M:DuetControlServer.SPI.Channel.Processor.DoMacroFile(System.String,System.Boolean)">
             <summary>
             Attempt to start a file macro
             </summary>
             <param name="fileName">Name of the macro file</param>
-            <param name="reportMissing">Report an error if the file could not be found</param>
             <param name="fromCode">Request comes from a real G/M/T-code</param>
             <returns>Asynchronous task</returns>
         </member>
@@ -3297,6 +3262,11 @@
             Unique format code for binary SPI transfers
             </summary>
             <remarks>Must be different from any other used format code (0x3E = DuetWiFiServer)</remarks>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Consts.FormatCodeStandalone">
+            <summary>
+            Format code indicating that RRF is generally available but has not processed the last transfer yet
+            </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Consts.InvalidFormatCode">
             <summary>
@@ -3448,9 +3418,9 @@
             Channel to pipe the macro content into
             </summary>
         </member>
-        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.ReportMissing">
+        <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.Dummy">
             <summary>
-            Output a warning message if the file could not be found
+            Used to be ReportMissing but this is no longer needed
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.FromCode">
@@ -4374,12 +4344,12 @@
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Shared.TransferHeader.ChecksumData">
             <summary>
-            CRC16 checksum of the transfer data (reserved)
+            CRC16 checksum of the transfer data
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Shared.TransferHeader.ChecksumHeader">
             <summary>
-            CRC16 checksum of the transfer header (reserved)
+            CRC16 checksum of the transfer header
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.Shared.TransferResponse">
@@ -4521,12 +4491,11 @@
             <param name="messageType">Message type flags of the reply</param>
             <param name="reply">Code reply</param>
         </member>
-        <member name="M:DuetControlServer.SPI.DataTransfer.ReadMacroRequest(DuetAPI.CodeChannel@,System.Boolean@,System.Boolean@,System.String@)">
+        <member name="M:DuetControlServer.SPI.DataTransfer.ReadMacroRequest(DuetAPI.CodeChannel@,System.Boolean@,System.String@)">
             <summary>
             Read the content of a <see cref="T:DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader"/> packet
             </summary>
             <param name="channel">Channel requesting a macro file</param>
-            <param name="reportMissing">Write an error message if the macro is not found</param>
             <param name="isSystemMacro">Indicates if this code is not bound to a code being executed (e.g. when a trigger macro is requested)</param>
             <param name="filename">Filename of the requested macro</param>
         </member>
@@ -5163,13 +5132,12 @@
             <param name="reply">Raw message</param>
             <returns>Number of bytes read</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadMacroRequest(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.Boolean@,System.Boolean@,System.String@)">
+        <member name="M:DuetControlServer.SPI.Serialization.Reader.ReadMacroRequest(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.Boolean@,System.String@)">
             <summary>
             Read a macro file request from a memory span
             </summary>
             <param name="from">Origin</param>
             <param name="channel">Code channel that requested the execution</param>
-            <param name="reportMissing">Output a message if the macro cannot be found</param>
             <param name="fromCode">Whether the macro request came from the G/M/T-code being executed</param>
             <param name="filename">Filename of the macro to execute</param>
             <returns>Number of bytes read</returns>

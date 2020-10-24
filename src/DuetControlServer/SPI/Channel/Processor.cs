@@ -142,17 +142,18 @@ namespace DuetControlServer.SPI.Channel
                 {
                     if (oldState.Macro.IsExecuting)
                     {
+                        _logger.Warn("Aborting macro file {0}", oldState.Macro.FileName);
                         await oldState.Macro.Abort();
                     }
                     else
                     {
                         if (Channel != CodeChannel.Daemon)
                         {
-                            _logger.Debug("Finished macro file {0}", oldState.Macro.FileName);
+                            _logger.Debug("Disposing macro file {0}", oldState.Macro.FileName);
                         }
                         else
                         {
-                            _logger.Trace("Finished macro file {0}", oldState.Macro.FileName);
+                            _logger.Trace("Disposing macro file {0}", oldState.Macro.FileName);
                         }
                         oldState.Macro.Dispose();
                     }
@@ -186,6 +187,11 @@ namespace DuetControlServer.SPI.Channel
         /// Occupied space for buffered codes in bytes
         /// </summary>
         public int BytesBuffered { get; private set; }
+
+        /// <summary>
+        /// Stack of code replies for codes that pushed the stack (e.g. macro files or blocking messages)
+        /// </summary>
+        public Stack<Tuple<MessageTypeFlags, string>> PendingReplies { get; } = new Stack<Tuple<MessageTypeFlags, string>>();
 
         /// <summary>
         /// Write channel diagnostics to the given string builder
@@ -541,6 +547,12 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>If anything more can be done on this channel</returns>
         public async Task<bool> Run()
         {
+            // Process code replies that could not be interpreted immediately
+            while (BufferedCodes.Count > 0 && PendingReplies.TryPop(out Tuple<MessageTypeFlags, string> reply))
+            {
+                await HandleReply(reply.Item1, reply.Item2);
+            }
+
             // 1. Whole line comments
             ResolveCommentCodes();
 
@@ -595,14 +607,10 @@ namespace DuetControlServer.SPI.Channel
                     {
                         if (!CurrentState.MacroCompleted && DataTransfer.WriteMacroCompleted(Channel, !CurrentState.Macro.FileOpened))
                         {
-                            if (CurrentState.Macro.FileOpened || DataTransfer.ProtocolVersion < 3)
+                            CurrentState.MacroCompleted = true;
+                            if (!CurrentState.Macro.FileOpened && DataTransfer.ProtocolVersion >= 3)
                             {
-                                // We expect a confirmation from (open) macro files being closed
-                                CurrentState.MacroCompleted = true;
-                            }
-                            else
-                            {
-                                // In newer protocol versions we don't expect a response...
+                                // In newer protocol versions we don't expect a response because RRF will be waiting in a semaphore
                                 popStack = true;
                             }
                         }
@@ -648,6 +656,12 @@ namespace DuetControlServer.SPI.Channel
             {
                 flushRequest.SetResult(true);
                 return false;
+            }
+
+            // Log untracked code replies
+            while (PendingReplies.TryPop(out Tuple<MessageTypeFlags, string> reply))
+            {
+                _logger.Warn("Out-of-order reply: '{0}'", reply.Item2);
             }
 
             // End
@@ -781,42 +795,33 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // Check for a final empty reply for the current macro file being closed
-            if (CurrentState.MacroCompleted && string.IsNullOrEmpty(reply))
+            if (CurrentState.MacroCompleted)
             {
-                Code startCode = CurrentState.StartCode;
-                if (startCode != null)
+                if (DataTransfer.ProtocolVersion < 3 && string.IsNullOrEmpty(reply))
                 {
-                    _logger.Debug("==> Unfinished starting code: {0}", startCode);
-
-                    // Concatenate output from nested macro codes
-                    using (await CurrentState.Macro.LockAsync())
-                    {
-                        if (CurrentState.StartCode.Result == null)
-                        {
-                            CurrentState.StartCode.Result = CurrentState.Macro.Result;
-                        }
-                        else if (!CurrentState.Macro.Result.IsEmpty)
-                        {
-                            CurrentState.StartCode.Result.AddRange(CurrentState.Macro.Result);
-                        }
-                        CurrentState.Macro.Result = new CodeResult();
-                    }
-
-                    // Code has not finished yet, need a separate response for it
-                    BytesBuffered += startCode.BinarySize;
-                    BufferedCodes.Insert(0, startCode);
+                    await MacroFileClosed();
+                    return true;
                 }
-                CurrentState.StartCode = null;
-
-                await Pop();
-                return true;
+                else if (DataTransfer.ProtocolVersion >= 3)
+                {
+                    PendingReplies.Push(new Tuple<MessageTypeFlags, string>(flags, reply));
+                    return true;
+                }
             }
 
             // Check for message boxes being closed
-            if (CurrentState.WaitingForAcknowledgement && string.IsNullOrEmpty(reply))
+            if (CurrentState.WaitingForAcknowledgement)
             {
-                await MessageAcknowledged();
-                return true;
+                if (DataTransfer.ProtocolVersion < 3 && string.IsNullOrEmpty(reply))
+                {
+                    await MessageAcknowledged();
+                    return true;
+                }
+                else if (DataTransfer.ProtocolVersion >= 3)
+                {
+                    PendingReplies.Push(new Tuple<MessageTypeFlags, string>(flags, reply));
+                    return true;
+                }
             }
 
             // Unless this message comes from the file or code queue it is out-of-order...
@@ -914,6 +919,44 @@ namespace DuetControlServer.SPI.Channel
                 newState.WaitingForAcknowledgement = true;
                 _isWaitingForAcknowledgement = true;
             }
+        }
+
+        /// <summary>
+        /// Called when RepRapFirmware has closed the last macro file internally
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public async Task MacroFileClosed()
+        {
+            Code startCode = CurrentState.StartCode;
+            if (startCode != null)
+            {
+                _logger.Debug("==> Unfinished starting code: {0}", startCode);
+
+                // Concatenate output from nested macro codes
+                using (await CurrentState.Macro.LockAsync())
+                {
+                    if (CurrentState.StartCode.Result == null)
+                    {
+                        CurrentState.StartCode.Result = CurrentState.Macro.Result;
+                    }
+                    else if (!CurrentState.Macro.Result.IsEmpty)
+                    {
+                        CurrentState.StartCode.Result.AddRange(CurrentState.Macro.Result);
+                    }
+                    CurrentState.Macro.Result = new CodeResult();
+                }
+
+                // Code has not finished yet, need a separate response for it
+                BytesBuffered += startCode.BinarySize;
+                BufferedCodes.Insert(0, startCode);
+            }
+            else
+            {
+                _logger.Debug("RRF closed the last macro file");
+            }
+            CurrentState.StartCode = null;
+
+            await Pop();
         }
 
         /// <summary>

@@ -15,6 +15,7 @@ using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Model;
 using System.Threading.Tasks;
+using DuetControlServer.Utility;
 
 namespace DuetControlServer.SPI
 {
@@ -799,6 +800,7 @@ namespace DuetControlServer.SPI
             _waitingForFirstTransfer = true;
         }
 
+            static int blockIndex = 0;
         /// <summary>
         /// Flash another segment of the firmware via the IAP binary
         /// </summary>

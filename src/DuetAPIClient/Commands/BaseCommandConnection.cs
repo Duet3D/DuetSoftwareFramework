@@ -69,11 +69,30 @@ namespace DuetAPIClient
         }
 
         /// <summary>
+        /// Evaluate an arbitrary expression
+        /// </summary>
+        /// <param name="channel">Context of the evaluation</param>
+        /// <param name="expression">Expression to evaluate</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Evaluation result</returns>
+        /// <typeparam name="T">Type of the evaluation result</typeparam>
+        /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
+        /// <exception cref="JsonException">Expected and returned data type do not match</exception>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        public Task<T> EvaluateExpression<T>(string expression, CodeChannel channel = CodeChannel.SBC, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand<T>(new EvaluateExpression { Channel = channel, Expression = expression }, cancellationToken);
+        }
+
+        /// <summary>
         /// Wait for all pending codes of the given channel to finish
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>True if all pending codes could be flushed</returns>
+        /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
         public Task<bool> Flush(CodeChannel channel = CodeChannel.SBC, CancellationToken cancellationToken = default)
@@ -210,6 +229,7 @@ namespace DuetAPIClient
         /// <param name="code">The code to execute</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Result of the given code</returns>
+        /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
         /// <exception cref="OperationCanceledException">Code or operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
@@ -227,6 +247,7 @@ namespace DuetAPIClient
         /// <param name="channel">Optional destination channel of this code</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Result of the given code converted to a string</returns>
+        /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
         /// <exception cref="OperationCanceledException">Code or operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
