@@ -800,7 +800,6 @@ namespace DuetControlServer.SPI
             _waitingForFirstTransfer = true;
         }
 
-            static int blockIndex = 0;
         /// <summary>
         /// Flash another segment of the firmware via the IAP binary
         /// </summary>
