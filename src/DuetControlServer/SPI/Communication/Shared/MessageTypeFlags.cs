@@ -95,25 +95,32 @@ namespace DuetControlServer.SPI.Communication.Shared
         /// </summary>
         WarningMessageFlag = 0x2000000,
 
-        /// <summary>
-        /// A message to be written to the log file
-        /// </summary>
-        LogMessage = 0x4000000,
+        // 0x4000000 is now unused
 
         /// <summary>
         /// Do not encapsulate this message
         /// </summary>
-        RawMessageFlag = 0x8000000,
+        RawMessageFlag = 0x8000000, // Do not encapsulate this message
 
         /// <summary>
         /// This message comes from a binary G-Code buffer
         /// </summary>
-        BinaryCodeReplyFlag = 0x10000000,
+        BinaryCodeReplyFlag = 0x10000000,   // This message comes from a binary G-Code buffer
 
         /// <summary>
         /// There is more to come; the message has been truncated
         /// </summary>
-        PushFlag = 0x20000000,
+        PushFlag = 0x20000000,  // There is more to come; the message has been truncated
+
+        /// <summary>
+        /// Log level consists of two bits. This is the low bit
+        /// </summary>
+        LogMessageLowBit = 0x40000000,
+
+        /// <summary>
+        /// Log level consists of two bits. This is the high bit
+        /// </summary>
+        LogMessageHighBit = 0x80000000,
         #endregion
 
         #region Common combination
@@ -123,9 +130,24 @@ namespace DuetControlServer.SPI.Communication.Shared
         GenericMessage = UsbMessage | AuxMessage | HttpMessage | TelnetMessage,
 
         /// <summary>
+        /// Log level "off (3): do not log this message
+        /// </summary>
+        LogOff = LogMessageLowBit | LogMessageHighBit,
+
+        /// <summary>
+        /// Log level "warn" (2): all messages of type Error and Warning are logged
+        /// </summary>
+        LogWarn = LogMessageHighBit,
+
+        /// <summary>
+        /// Log level "info" (1): all messages of level "warn" plus info messages
+        /// </summary>
+        LogInfo = LogMessageLowBit,
+
+        /// <summary>
         /// A GenericMessage that is also logged
         /// </summary>
-        LoggedGenericMessage = GenericMessage | LogMessage,
+        LoggedGenericMessage = GenericMessage | LogWarn,
         #endregion
     }
 }

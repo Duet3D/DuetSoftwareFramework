@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
+using System;
 
 namespace DuetAPI.Commands
 {
@@ -28,6 +29,12 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Write the message to the log file (if applicable)
         /// </summary>
+        [Obsolete]
         public bool LogMessage { get; set; }
+
+        /// <summary>
+        /// Log level of this message
+        /// </summary>
+        public LogLevel LogLevel { get; set; } = LogLevel.Off;
     }
 }

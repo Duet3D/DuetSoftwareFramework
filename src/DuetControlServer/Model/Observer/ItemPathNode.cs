@@ -42,8 +42,8 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Check if this instance equals another
         /// </summary>
-        /// <param name="obj"></param>
-        /// <returns></returns>
+        /// <param name="obj">Other instance</param>
+        /// <returns>If this instance equals obj</returns>
         public override bool Equals(object obj)
         {
             return (obj != null &&
@@ -56,7 +56,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Compute a hash code for this instance
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Hash code</returns>
         public override int GetHashCode() => HashCode.Combine(Name.GetHashCode(), Index.GetHashCode(), List.Count.GetHashCode());
 
         /// <summary>

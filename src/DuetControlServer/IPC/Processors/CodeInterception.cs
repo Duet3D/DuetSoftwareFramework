@@ -238,8 +238,8 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Check if the connection may intercept the given code
         /// </summary>
-        /// <param name="code"></param>
-        /// <returns></returns>
+        /// <param name="code">Code to check</param>
+        /// <returns>Whether the code may be intercepted</returns>
         private bool CanIntercept(Code code)
         {
             if (!Connection.IsConnected || code.Flags.HasFlag(CodeFlags.IsPrioritized) != _priorityCodes)

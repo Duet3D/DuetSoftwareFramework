@@ -43,7 +43,7 @@ namespace DuetControlServer.Utility
         /// Start the plugins
         /// </summary>
         /// <param name="plugins">List of plugins to start</param>
-        /// <returns></returns>
+        /// <returns>Asynchronous task</returns>
         public static async Task StartPlugins(IEnumerable<string> plugins)
         {
             foreach (string plugin in plugins)

@@ -151,9 +151,9 @@ namespace DuetControlServer.SPI
             _txHeader.NumPackets = _packetId;
             _txHeader.SequenceNumber++;
             _txHeader.DataLength = (ushort)_txPointer;
-            _txHeader.ChecksumData = Utility.CRC16.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
+            _txHeader.ChecksumData = CRC16.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-            _txHeader.ChecksumHeader = Utility.CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf<ushort>()).Span);
+            _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf<ushort>()).Span);
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
 
             do
@@ -175,13 +175,13 @@ namespace DuetControlServer.SPI
                     // Verify the protocol version
                     if ((_hadTimeout || !_started) && !Updating && ProtocolVersion != Consts.ProtocolVersion)
                     {
-                        _ = Utility.Logger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
+                        _ = Logger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
                     }
 
                     // Deal with timeouts
                     if (_hadTimeout)
                     {
-                        _ = Utility.Logger.LogOutput(MessageType.Success, "Connection to Duet established");
+                        _ = Logger.LogOutput(MessageType.Success, "Connection to Duet established");
                         _hadTimeout = _resetting = false;
                     }
 
@@ -1101,7 +1101,7 @@ namespace DuetControlServer.SPI
                     throw new OperationCanceledException("Board is not available (no header)");
                 }
 
-                ushort checksum = Utility.CRC16.Calculate(_rxHeaderBuffer.Slice(0, Marshal.SizeOf(_rxHeader) - Marshal.SizeOf<ushort>()).Span);
+                ushort checksum = CRC16.Calculate(_rxHeaderBuffer.Slice(0, Marshal.SizeOf(_rxHeader) - Marshal.SizeOf<ushort>()).Span);
                 if (_rxHeader.ChecksumHeader != checksum)
                 {
                     _logger.Warn("Bad header checksum (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader.ToString("x4"), checksum.ToString("x4"));
@@ -1141,7 +1141,7 @@ namespace DuetControlServer.SPI
                         _logger.Warn("Downgrading protocol version {0} to {1}", _txHeader.ProtocolVersion, _rxHeader.ProtocolVersion);
                         _txHeader.ProtocolVersion = _rxHeader.ProtocolVersion;
                         MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-                        _txHeader.ChecksumHeader = Utility.CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf<ushort>()).Span);
+                        _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf<ushort>()).Span);
                         MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
 
                         ExchangeResponse(TransferResponse.BadResponse);
@@ -1235,7 +1235,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Inspect received data
-                ushort checksum = Utility.CRC16.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+                ushort checksum = CRC16.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
                 if (_rxHeader.ChecksumData != checksum)
                 {
                     _logger.Warn("Bad data checksum (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData.ToString("x4"), checksum.ToString("x4"));

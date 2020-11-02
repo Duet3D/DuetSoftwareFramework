@@ -225,7 +225,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Extract, parse, and verify the plugin manifest
         /// </summary>
-        /// <param name="zipArchive"></param>
+        /// <param name="zipArchive">ZIP archive containing the plugin files</param>
         /// <returns>Plugin manifest</returns>
         /// <exception cref="ArgumentException">Plugin is incompatible</exception>
         private async Task<Plugin> GetManifest(ZipArchive zipArchive)

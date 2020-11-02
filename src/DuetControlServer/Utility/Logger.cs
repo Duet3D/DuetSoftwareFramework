@@ -125,12 +125,21 @@ namespace DuetControlServer.Utility
         /// Write a message including timestamp to the log file
         /// </summary>
         /// <param name="msg">Message to log</param>
-        public static async Task Log(Message msg)
+        /// <returns>Asynchronous task</returns>
+        public static async Task Log(LogLevel level, Message msg)
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
-                if (_writer != null && !string.IsNullOrWhiteSpace(msg.Content))
+                if (level != LogLevel.Off && _writer != null && !string.IsNullOrWhiteSpace(msg.Content))
                 {
+                    using (await Model.Provider.AccessReadOnlyAsync())
+                    {
+                        if (Model.Provider.Get.State.LogLevel == LogLevel.Off || level < Model.Provider.Get.State.LogLevel)
+                        {
+                            return;
+                        }
+                    }
+
                     try
                     {
                         await _writer.WriteAsync(msg.Time.ToString("yyyy-MM-dd HH:mm:ss "));
@@ -148,9 +157,21 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Write a message including timestamp to the log file
         /// </summary>
+        /// <param name="level">Log level</param>
         /// <param name="type">Message type</param>
         /// <param name="content">Message content</param>
-        public static Task Log(MessageType type, string content) => Log(new Message(type, content));
+        public static Task Log(LogLevel level, MessageType type, string content) => Log(level, new Message(type, content));
+
+        /// <summary>
+        /// Write a message including timestamp to the log file
+        /// </summary>
+        /// <param name="type">Message type</param>
+        /// <param name="content">Message content</param>
+        public static Task Log(MessageType type, string content)
+        {
+            LogLevel level = (type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
+            return Log(level, new Message(type, content));
+        }
 
         /// <summary>
         /// Write messages including timestamp to the log file
@@ -162,7 +183,8 @@ namespace DuetControlServer.Utility
             {
                 foreach (Message msg in result)
                 {
-                    await Log(msg);
+                    LogLevel level = (msg.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
+                    await Log(level, msg);
                 }
             }
         }
@@ -175,7 +197,7 @@ namespace DuetControlServer.Utility
         public static async Task LogOutput(Message msg)
         {
             await Model.Provider.Output(msg);
-            await Log(msg);
+            await Log((msg.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, msg);
         }
 
         /// <summary>

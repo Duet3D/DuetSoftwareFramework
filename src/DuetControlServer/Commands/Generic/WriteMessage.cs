@@ -19,16 +19,20 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
-            Message msg = new Message(Type, Content);
+#pragma warning disable CS0612 // Type or member is obsolete
             if (LogMessage)
             {
-                await Utility.Logger.Log(msg);
+                LogLevel = LogLevel.Warn;
             }
+#pragma warning restore CS0612 // Type or member is obsolete
+
+            Message msg = new Message(Type, Content);
+            await Utility.Logger.Log(LogLevel, msg);
             if (OutputMessage)
             {
                 await Model.Provider.Output(msg);
             }
-            if (!LogMessage && !OutputMessage)
+            if (LogLevel == LogLevel.Off && !OutputMessage)
             {
                 // If the message is supposed to be written neither to the object model nor to the log file, send it to the DCS log
                 _logger.Info(msg.ToString());

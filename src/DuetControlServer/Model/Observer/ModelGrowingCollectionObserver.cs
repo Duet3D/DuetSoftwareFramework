@@ -48,7 +48,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Unsubscribe from changes of the given growing model collection
         /// </summary>
-        /// <param name="growingModelCollecion"></param>
+        /// <param name="growingModelCollecion">Growing model collection to unsubscribe from</param>
         private static void UnsubscribeFromGrowingModelCollection(object growingModelCollecion)
         {
             NotifyCollectionChangedEventHandler changeHandler = _growingCollectionChangeHandlers[growingModelCollecion];

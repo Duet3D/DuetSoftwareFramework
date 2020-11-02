@@ -663,7 +663,7 @@ namespace DuetControlServer.Commands
                         if (msg.Type != MessageType.Success)
                         {
                             // When a file is being printed, every message is automatically output and logged
-                            await Utility.Logger.Log(msg);
+                            await Utility.Logger.Log(LogLevel.Warn, msg);
                         }
                     }
                 }

@@ -200,7 +200,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Get a channel that is currently idle in order to process a priority code
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Idle channel</returns>
         public static Task<CodeChannel> GetIdleChannel() => _channels.GetIdleChannel();
 
         /// <summary>
@@ -357,12 +357,39 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Class representing an acquired movement lock
+        /// </summary>
+        public class MovementLock : IAsyncDisposable
+        {
+            /// <summary>
+            /// Constructor of this class
+            /// </summary>
+            /// <param name="channel">Locked code channel</param>
+            public MovementLock(CodeChannel channel) => _channel = channel;
+
+            /// <summary>
+            /// Locked code channel
+            /// </summary>
+            private readonly CodeChannel _channel;
+
+            /// <summary>
+            /// Called when this instance is being disposed
+            /// </summary>
+            /// <returns>Asynchronous task</returns>
+            public async ValueTask DisposeAsync()
+            {
+                await UnlockAll(_channel);
+            }
+        }
+
+        /// <summary>
         /// Lock the move module and wait for standstill
         /// </summary>
         /// <param name="channel">Code channel acquiring the lock</param>
         /// <returns>Whether the resource could be locked</returns>
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-        public static Task<bool> LockMovementAndWaitForStandstill(CodeChannel channel)
+        /// <exception cref="OperationCanceledException">Failed to get movement lock</exception>
+        public static Task<IAsyncDisposable> LockMovementAndWaitForStandstill(CodeChannel channel)
         {
             if (Settings.NoSpi)
             {
@@ -371,7 +398,17 @@ namespace DuetControlServer.SPI
 
             using (_channels[channel].Lock())
             {
-                return _channels[channel].LockMovementAndWaitForStandstill();
+                return _channels[channel]
+                    .LockMovementAndWaitForStandstill()
+                    .ContinueWith(async task =>
+                    {
+                        if (await task)
+                        {
+                            return (IAsyncDisposable)(new MovementLock(channel));
+                        }
+                        throw new OperationCanceledException();
+                    }, TaskContinuationOptions.RunContinuationsAsynchronously)
+                    .Unwrap();
             }
         }
 
@@ -381,7 +418,7 @@ namespace DuetControlServer.SPI
         /// <param name="channel">Channel holding the resources</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-        public static Task UnlockAll(CodeChannel channel)
+        private static Task UnlockAll(CodeChannel channel)
         {
             if (Settings.NoSpi)
             {
@@ -939,7 +976,7 @@ namespace DuetControlServer.SPI
             _logger.Trace("Received message [{0}] {1}", flags, reply);
 
             // Deal with log messages
-            if (flags.HasFlag(MessageTypeFlags.LogMessage))
+            if ((flags & MessageTypeFlags.LogOff) != MessageTypeFlags.LogOff)
             {
                 _partialLogMessage += reply;
                 if (!flags.HasFlag(MessageTypeFlags.PushFlag))
@@ -949,15 +986,17 @@ namespace DuetControlServer.SPI
                         MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                                             : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                                 : MessageType.Success;
-                        await Logger.Log(type, _partialLogMessage);
+                        LogLevel level = flags.HasFlag(MessageTypeFlags.LogWarn) ? LogLevel.Warn
+                                            : flags.HasFlag(MessageTypeFlags.LogInfo) ? LogLevel.Info
+                                                : LogLevel.Off;
+                        await Logger.Log(level, type, _partialLogMessage);
                     }
                     _partialLogMessage = null;
                 }
             }
 
             // Deal with generic replies
-            if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage ||
-                flags == MessageTypeFlags.LogMessage || flags == (MessageTypeFlags.LogMessage | MessageTypeFlags.PushFlag))
+            if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage)
             {
                 await OutputGenericMessage(flags, reply);
                 return;

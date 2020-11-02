@@ -207,6 +207,46 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Output a generic message
         /// </summary>
+        /// <param name="level">Log level</param>
+        /// <param name="message">Message to output</param>
+        /// <returns>Whether the message has been written</returns>
+        public static async Task<bool> Output(LogLevel level, Message message)
+        {
+            if (!string.IsNullOrWhiteSpace(message?.Content))
+            {
+                using (await AccessReadWriteAsync())
+                {
+                    // Can we output this message?
+                    if (Get.State.LogLevel == LogLevel.Off || (byte)Get.State.LogLevel + (byte)level < 3)
+                    {
+                        return false;
+                    }
+
+                    // Print the message to the DCS log
+                    switch (message.Type)
+                    {
+                        case MessageType.Error:
+                            _logger.Error(message.Content);
+                            break;
+                        case MessageType.Warning:
+                            _logger.Warn(message.Content);
+                            break;
+                        default:
+                            _logger.Info(message.Content);
+                            break;
+                    }
+
+                    // Send it to the object model
+                    Get.Messages.Add(message);
+                }
+
+                return true;
+            }
+            return false;
+        }
+        /// <summary>
+        /// Output a generic message
+        /// </summary>
         /// <param name="message">Message to output</param>
         /// <returns>Asynchronous task</returns>
         public static async Task Output(Message message)

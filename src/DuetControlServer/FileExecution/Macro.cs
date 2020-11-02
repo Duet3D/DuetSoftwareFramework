@@ -333,7 +333,8 @@ namespace DuetControlServer.FileExecution
 
                             if (!IsNested)
                             {
-                                await Logger.LogOutput(result);
+                                // When we get here log messages were already handled by the channel processor
+                                await Model.Provider.Output(result);
                             }
                         }
                     }

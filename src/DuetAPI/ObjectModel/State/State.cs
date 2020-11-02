@@ -85,6 +85,16 @@ namespace DuetAPI.ObjectModel
         private string _logFile;
 
         /// <summary>
+        /// Current log level
+        /// </summary>
+        public LogLevel LogLevel
+        {
+            get => _logLevel;
+            set => SetPropertyValue(ref _logLevel, value);
+        }
+        private LogLevel _logLevel = LogLevel.Off;
+
+        /// <summary>
         /// Details about a requested message box or null if none is requested
         /// </summary>
         public MessageBox MessageBox

@@ -422,9 +422,28 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        [Obsolete]
         public Task WriteMessage(MessageType type, string message, bool outputMessage = true, bool logMessage = false, CancellationToken cancellationToken = default)
         {
-            return PerformCommand(new WriteMessage() { Type = type, Content = message, OutputMessage = outputMessage, LogMessage = logMessage }, cancellationToken);
+            return PerformCommand(new WriteMessage { Type = type, Content = message, OutputMessage = outputMessage, LogMessage = logMessage }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Write an arbitrary generic message
+        /// </summary>
+        /// <param name="type">Message type</param>
+        /// <param name="message">Message content</param>
+        /// <param name="outputMessage">Whether to output the message</param>
+        /// <param name="logLevel">Target log level</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        public Task WriteMessage(MessageType type, string message, bool outputMessage = true, LogLevel logLevel = LogLevel.Off, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new WriteMessage { Type = type, Content = message, OutputMessage = outputMessage, LogLevel = logLevel }, cancellationToken);
         }
 
         /// <summary>
@@ -439,9 +458,27 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        [Obsolete]
         public Task WriteMessage(Message message, bool outputMessage = true, bool logMessage = false, CancellationToken cancellationToken = default)
         {
-            return PerformCommand(new WriteMessage() { Type = message.Type, Content = message.Content, OutputMessage = outputMessage, LogMessage = logMessage }, cancellationToken);
+            return PerformCommand(new WriteMessage { Type = message.Type, Content = message.Content, OutputMessage = outputMessage, LogMessage = logMessage }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Write an arbitrary generic message
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="outputMessage">Whether to output the message</param>
+        /// <param name="logLevel">Target log level</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        public Task WriteMessage(Message message, bool outputMessage = true, LogLevel logLevel = LogLevel.Off, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new WriteMessage { Type = message.Type, Content = message.Content, OutputMessage = outputMessage, LogLevel = logLevel }, cancellationToken);
         }
     }
 }

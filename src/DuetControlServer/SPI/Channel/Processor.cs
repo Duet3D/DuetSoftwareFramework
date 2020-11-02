@@ -888,7 +888,7 @@ namespace DuetControlServer.SPI.Channel
                 MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                             : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                             : MessageType.Success;
-                await Logger.LogOutput(type, reply);
+                await Model.Provider.Output(type, reply);
             }
             return true;
         }
