@@ -142,7 +142,7 @@ namespace DuetControlServer.SPI.Channel
                 {
                     if (oldState.Macro.IsExecuting)
                     {
-                        _logger.Warn("Aborting macro file {0}", oldState.Macro.FileName);
+                        _logger.Warn("Aborting orphaned macro file {0}", oldState.Macro.FileName);
                         await oldState.Macro.Abort();
                     }
                     else
