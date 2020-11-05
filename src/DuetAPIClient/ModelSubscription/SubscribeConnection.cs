@@ -89,7 +89,25 @@ namespace DuetAPIClient
             SubscribeInitMessage initMessage = new SubscribeInitMessage { SubscriptionMode = mode, Filters = Filters };
             return Connect(initMessage, socketPath, cancellationToken);
         }
-        
+
+        /// <summary>
+        /// Retrieves the full machine model of the machine
+        /// In subscription mode this is the first command that has to be called once a connection has been established.
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>The current machine model</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
+        /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        [Obsolete]
+        public async Task<ObjectModel> GetMachineModel(CancellationToken cancellationToken = default)
+        {
+            ObjectModel model = await Receive<ObjectModel>(cancellationToken);
+            await Send(new Acknowledge(), cancellationToken);
+            return model;
+        }
+
         /// <summary>
         /// Retrieves the full object model of the machine
         /// In subscription mode this is the first command that has to be called once a connection has been established.
@@ -100,7 +118,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
         /// <seealso cref="SbcPermissions.ObjectModelRead"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        public async Task<ObjectModel> GetMachineModel(CancellationToken cancellationToken = default)
+        public async Task<ObjectModel> GetObjectModel(CancellationToken cancellationToken = default)
         {
             ObjectModel model = await Receive<ObjectModel>(cancellationToken);
             await Send(new Acknowledge(), cancellationToken);
@@ -117,13 +135,31 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
         /// <seealso cref="SbcPermissions.ObjectModelRead"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        [Obsolete]
         public async Task<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
         {
             MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
             await Send(new Acknowledge(), cancellationToken);
             return json;
         }
-        
+
+        /// <summary>
+        /// Optimized method to query the object model UTF-8 JSON in any mode.
+        /// May be used to get machine model patches as well.
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Machine model JSON</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
+        /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>g
+        public async Task<MemoryStream> GetSerializedObjectModel(CancellationToken cancellationToken = default)
+        {
+            MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            await Send(new Acknowledge(), cancellationToken);
+            return json;
+        }
+
         /// <summary>
         /// Receive a (partial) machine model update.
         /// If the subscription mode is set to <see cref="SubscriptionMode.Patch"/>, new update patches of the object model
@@ -133,10 +169,30 @@ namespace DuetAPIClient
         /// <returns>The partial update JSON</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
-        /// <seealso cref="GetMachineModel"/>
+        /// <seealso cref="GetObjectModel"/>
         /// <seealso cref="SbcPermissions.ObjectModelRead"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        [Obsolete]
         public async Task<JsonDocument> GetMachineModelPatch(CancellationToken cancellationToken = default)
+        {
+            JsonDocument patch = await ReceiveJson(cancellationToken);
+            await Send(new Acknowledge(), cancellationToken);
+            return patch;
+        }
+
+        /// <summary>
+        /// Receive a (partial) object model update.
+        /// If the subscription mode is set to <see cref="SubscriptionMode.Patch"/>, new update patches of the object model
+        /// need to be applied manually. This method is intended to receive such fragments.
+        /// </summary>
+        /// <param name="cancellationToken">An optional cancellation token</param>
+        /// <returns>The partial update JSON</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
+        /// <seealso cref="GetObjectModel"/>
+        /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        public async Task<JsonDocument> GetObjectModelPatch(CancellationToken cancellationToken = default)
         {
             JsonDocument patch = await ReceiveJson(cancellationToken);
             await Send(new Acknowledge(), cancellationToken);

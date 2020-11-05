@@ -131,7 +131,7 @@ namespace DuetWebServer.Controllers
                 sessionId = await commandConnection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, ipAddress, port);
 
                 // 4b. Fetch full model copy and send it over initially
-                using (MemoryStream json = await subscribeConnection.GetSerializedMachineModel())
+                using (MemoryStream json = await subscribeConnection.GetSerializedObjectModel())
                 {
                     await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, default);
                 }
@@ -263,7 +263,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Wait for another object model update and send it to the client
-                using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedMachineModel(cancellationToken);
+                using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedObjectModel(cancellationToken);
                 await webSocket.SendAsync(objectModelPatch.ToArray(), WebSocketMessageType.Text, true, cancellationToken);
             }
             while (webSocket.State == WebSocketState.Open);

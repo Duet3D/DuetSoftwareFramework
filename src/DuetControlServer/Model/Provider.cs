@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -149,9 +150,23 @@ namespace DuetControlServer.Model
         /// </summary>
         public static void Init()
         {
+            Get.Move.Compensation.PropertyChanged += Compensation_PropertyChanged;
             Get.State.DsfVersion = Program.Version;
             Get.Network.Hostname = Environment.MachineName;
             Get.Network.Name = Environment.MachineName;
+        }
+
+        /// <summary>
+        /// Change handler for move.compensation
+        /// </summary>
+        /// <param name="sender">Sender object</param>
+        /// <param name="e">Event arguments</param>
+        private static void Compensation_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MoveCompensation.Type) && Get.Move.Compensation.Type == MoveCompensationType.None)
+            {
+                Get.Move.Compensation.File = null;
+            }
         }
 
         /// <summary>

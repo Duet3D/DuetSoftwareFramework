@@ -125,11 +125,39 @@ namespace DuetAPIClient
         /// <returns>The current machine model</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
+        [Obsolete]
+        public Task<ObjectModel> GetMachineModel(CancellationToken cancellationToken = default)
+        {
+            return PerformCommand<ObjectModel>(new GetObjectModel(), cancellationToken);
+        }
+
+        /// <summary>
+        /// Retrieve the full object model of the machine.
+        /// In subscription mode this is the first command that has to be called once a connection has been established
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>The current machine model</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ObjectModelRead"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         public Task<ObjectModel> GetObjectModel(CancellationToken cancellationToken = default)
         {
             return PerformCommand<ObjectModel>(new GetObjectModel(), cancellationToken);
+        }
+
+        /// <summary>
+        /// Optimized method to directly query the machine model UTF-8 JSON
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Machine model JSON</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        [Obsolete]
+        public async Task<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
+        {
+            await Send(new GetObjectModel(), cancellationToken);
+            return await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
         }
 
         /// <summary>
@@ -195,6 +223,20 @@ namespace DuetAPIClient
 
         /// <summary>
         /// Lock the machine model for read/write access.
+        /// It is MANDATORY to call <see cref="UnlockMachineModel"/> when write access has finished
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        [Obsolete]
+        public Task LockMachineModel(CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new LockObjectModel(), cancellationToken);
+        }
+
+        /// <summary>
+        /// Lock the machine model for read/write access.
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous object model lock</returns>
@@ -217,7 +259,7 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        public async Task PatchMachineModel(string key, object patch, CancellationToken cancellationToken = default)
+        public async Task PatchObjectModel(string key, object patch, CancellationToken cancellationToken = default)
         {
             using JsonDocument jsonDocument = JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(patch, JsonHelper.DefaultJsonOptions));
             await PerformCommand(new PatchObjectModel() { Key = key, Patch = jsonDocument.RootElement }, cancellationToken);
@@ -312,8 +354,23 @@ namespace DuetAPIClient
         /// <returns>True if the property could be updated</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
-        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        [Obsolete]
         public Task<bool> SetMachineModel(string path, string value, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand<bool>(new SetObjectModel { PropertyPath = path, Value = value }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Set a given property to a certain value. Make sure to lock the object model before calling this
+        /// </summary>
+        /// <param name="path">Path to the property</param>
+        /// <param name="value">New value as string</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>True if the property could be updated</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        public Task<bool> SetObjectModel(string path, string value, CancellationToken cancellationToken = default)
         {
             return PerformCommand<bool>(new SetObjectModel { PropertyPath = path, Value = value }, cancellationToken);
         }
@@ -387,10 +444,23 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
+        [Obsolete]
+        public Task SyncMachineModel(CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new SyncObjectModel(), cancellationToken);
+        }
+
+        /// <summary>
+        /// Wait for the full object model to be updated from RepRapFirmware
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
         /// <seealso cref="SbcPermissions.ObjectModelRead"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        public Task SyncMachineModel(CancellationToken cancellationToken = default)
+        public Task SyncObjectModel(CancellationToken cancellationToken = default)
         {
             return PerformCommand(new SyncObjectModel(), cancellationToken);
         }
@@ -407,6 +477,19 @@ namespace DuetAPIClient
         public Task UninstallPlugin(string plugin, CancellationToken cancellationToken = default)
         {
             return PerformCommand(new UninstallPlugin { Plugin = plugin }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Unlock the machine model again
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        [Obsolete]
+        public Task UnlockMachineModel(CancellationToken cancellationToken)
+        {
+            return PerformCommand(new UnlockObjectModel(), cancellationToken);
         }
 
         /// <summary>

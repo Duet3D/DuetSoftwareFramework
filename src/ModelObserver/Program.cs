@@ -64,7 +64,7 @@ namespace ModelObserver
             {
                 try
                 {
-                    using JsonDocument patch = await connection.GetMachineModelPatch();
+                    using JsonDocument patch = await connection.GetObjectModelPatch();
                     Console.WriteLine(GetIndentedJson(patch));
                 }
                 catch (SocketException)

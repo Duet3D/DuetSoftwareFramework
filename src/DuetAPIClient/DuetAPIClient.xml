@@ -308,6 +308,21 @@
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ManageUserSessions"/>
         </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.EvaluateExpression``1(System.String,DuetAPI.CodeChannel,System.Threading.CancellationToken)">
+            <summary>
+            Evaluate an arbitrary expression
+            </summary>
+            <param name="channel">Context of the evaluation</param>
+            <param name="expression">Expression to evaluate</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Evaluation result</returns>
+            <typeparam name="T">Type of the evaluation result</typeparam>
+            <exception cref="T:System.InvalidOperationException">Requested code channel is disabled</exception>
+            <exception cref="T:System.Text.Json.JsonException">Expected and returned data type do not match</exception>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.CommandExecution"/>
+        </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.Flush(DuetAPI.CodeChannel,System.Threading.CancellationToken)">
             <summary>
             Wait for all pending codes of the given channel to finish
@@ -315,6 +330,7 @@
             <param name="channel">Code channel to wait for</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>True if all pending codes could be flushed</returns>
+            <exception cref="T:System.InvalidOperationException">Requested code channel is disabled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.CommandExecution"/>
         </member>
@@ -332,6 +348,16 @@
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.FileSystemAccess"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ReadGCodes"/>
         </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.GetMachineModel(System.Threading.CancellationToken)">
+            <summary>
+            Retrieve the full object model of the machine.
+            In subscription mode this is the first command that has to be called once a connection has been established
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>The current machine model</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+        </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.GetObjectModel(System.Threading.CancellationToken)">
             <summary>
             Retrieve the full object model of the machine.
@@ -343,6 +369,15 @@
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelRead"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.GetSerializedMachineModel(System.Threading.CancellationToken)">
+            <summary>
+            Optimized method to directly query the machine model UTF-8 JSON
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Machine model JSON</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.GetSerializedObjectModel(System.Threading.CancellationToken)">
             <summary>
@@ -388,6 +423,16 @@
             </summary>
             <returns>Asynchronous task</returns>
         </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.LockMachineModel(System.Threading.CancellationToken)">
+            <summary>
+            Lock the machine model for read/write access.
+            It is MANDATORY to call <see cref="M:DuetAPIClient.BaseCommandConnection.UnlockMachineModel(System.Threading.CancellationToken)"/> when write access has finished
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+        </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.LockObjectModel(System.Threading.CancellationToken)">
             <summary>
             Lock the machine model for read/write access.
@@ -398,7 +443,7 @@
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
         </member>
-        <member name="M:DuetAPIClient.BaseCommandConnection.PatchMachineModel(System.String,System.Object,System.Threading.CancellationToken)">
+        <member name="M:DuetAPIClient.BaseCommandConnection.PatchObjectModel(System.String,System.Object,System.Threading.CancellationToken)">
             <summary>
             Apply a full patch to the object model. Use with care!
             </summary>
@@ -417,6 +462,7 @@
             <param name="code">The code to execute</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Result of the given code</returns>
+            <exception cref="T:System.InvalidOperationException">Requested code channel is disabled</exception>
             <exception cref="T:System.OperationCanceledException">Code or operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <remarks>Cancelling the read operation does not cancel the code execution</remarks>
@@ -431,6 +477,7 @@
             <param name="channel">Optional destination channel of this code</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Result of the given code converted to a string</returns>
+            <exception cref="T:System.InvalidOperationException">Requested code channel is disabled</exception>
             <exception cref="T:System.OperationCanceledException">Code or operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <remarks>Cancelling the read operation does not cancel the code execution</remarks>
@@ -474,6 +521,17 @@
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.FileSystemAccess"/>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.SetMachineModel(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Set a given property to a certain value. Make sure to lock the object model before calling this
+            </summary>
+            <param name="path">Path to the property</param>
+            <param name="value">New value as string</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>True if the property could be updated</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.SetObjectModel(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Set a given property to a certain value. Make sure to lock the object model before calling this
             </summary>
@@ -541,6 +599,15 @@
             <returns>Asynchronous task</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.SyncObjectModel(System.Threading.CancellationToken)">
+            <summary>
+            Wait for the full object model to be updated from RepRapFirmware
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.CommandExecution"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelRead"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
@@ -555,6 +622,15 @@
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ManagePlugins"/>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.UnlockMachineModel(System.Threading.CancellationToken)">
+            <summary>
+            Unlock the machine model again
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.MessageType,System.String,System.Boolean,System.Boolean,System.Threading.CancellationToken)">
             <summary>
@@ -571,6 +647,21 @@
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.CommandExecution"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
         </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.MessageType,System.String,System.Boolean,DuetAPI.ObjectModel.LogLevel,System.Threading.CancellationToken)">
+            <summary>
+            Write an arbitrary generic message
+            </summary>
+            <param name="type">Message type</param>
+            <param name="message">Message content</param>
+            <param name="outputMessage">Whether to output the message</param>
+            <param name="logLevel">Target log level</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.CommandExecution"/>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
+        </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.Message,System.Boolean,System.Boolean,System.Threading.CancellationToken)">
             <summary>
             Write an arbitrary generic message
@@ -578,6 +669,20 @@
             <param name="message">Message</param>
             <param name="outputMessage">Whether to output the message</param>
             <param name="logMessage">Whether to log the message</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.CommandExecution"/>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.Message,System.Boolean,DuetAPI.ObjectModel.LogLevel,System.Threading.CancellationToken)">
+            <summary>
+            Write an arbitrary generic message
+            </summary>
+            <param name="message">Message</param>
+            <param name="outputMessage">Whether to output the message</param>
+            <param name="logLevel">Target log level</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
@@ -838,6 +943,18 @@
         </member>
         <member name="M:DuetAPIClient.SubscribeConnection.GetMachineModel(System.Threading.CancellationToken)">
             <summary>
+            Retrieves the full machine model of the machine
+            In subscription mode this is the first command that has to be called once a connection has been established.
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>The current machine model</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Receipt could not be acknowledged</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelRead"/>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
+        </member>
+        <member name="M:DuetAPIClient.SubscribeConnection.GetObjectModel(System.Threading.CancellationToken)">
+            <summary>
             Retrieves the full object model of the machine
             In subscription mode this is the first command that has to be called once a connection has been established.
             </summary>
@@ -860,6 +977,18 @@
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelRead"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
         </member>
+        <member name="M:DuetAPIClient.SubscribeConnection.GetSerializedObjectModel(System.Threading.CancellationToken)">
+            <summary>
+            Optimized method to query the object model UTF-8 JSON in any mode.
+            May be used to get machine model patches as well.
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Machine model JSON</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Receipt could not be acknowledged</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelRead"/>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>g
+        </member>
         <member name="M:DuetAPIClient.SubscribeConnection.GetMachineModelPatch(System.Threading.CancellationToken)">
             <summary>
             Receive a (partial) machine model update.
@@ -870,7 +999,21 @@
             <returns>The partial update JSON</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Receipt could not be acknowledged</exception>
-            <seealso cref="M:DuetAPIClient.SubscribeConnection.GetMachineModel(System.Threading.CancellationToken)"/>
+            <seealso cref="M:DuetAPIClient.SubscribeConnection.GetObjectModel(System.Threading.CancellationToken)"/>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelRead"/>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
+        </member>
+        <member name="M:DuetAPIClient.SubscribeConnection.GetObjectModelPatch(System.Threading.CancellationToken)">
+            <summary>
+            Receive a (partial) object model update.
+            If the subscription mode is set to <see cref="F:DuetAPI.Connection.SubscriptionMode.Patch"/>, new update patches of the object model
+            need to be applied manually. This method is intended to receive such fragments.
+            </summary>
+            <param name="cancellationToken">An optional cancellation token</param>
+            <returns>The partial update JSON</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Receipt could not be acknowledged</exception>
+            <seealso cref="M:DuetAPIClient.SubscribeConnection.GetObjectModel(System.Threading.CancellationToken)"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelRead"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
         </member>

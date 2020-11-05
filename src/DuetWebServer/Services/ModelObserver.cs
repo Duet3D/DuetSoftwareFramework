@@ -133,7 +133,7 @@ namespace DuetWebServer.Services
                         _logger.LogInformation("Connections to DuetControlServer established");
 
                         // Get the machine model and keep it up-to-date
-                        model = await subscribeConnection.GetMachineModel(_stopRequest.Token);
+                        model = await subscribeConnection.GetObjectModel(_stopRequest.Token);
                         lock (Endpoints)
                         {
                             Endpoints.Clear();
@@ -154,7 +154,7 @@ namespace DuetWebServer.Services
                         do
                         {
                             // Wait for more updates
-                            using JsonDocument jsonPatch = await subscribeConnection.GetMachineModelPatch(_stopRequest.Token);
+                            using JsonDocument jsonPatch = await subscribeConnection.GetObjectModelPatch(_stopRequest.Token);
                             model.UpdateFromJson(jsonPatch.RootElement);
 
                             // Check if the HTTP sessions have changed and rebuild them on demand
