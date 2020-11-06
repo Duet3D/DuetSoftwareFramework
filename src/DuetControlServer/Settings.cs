@@ -495,7 +495,7 @@ namespace DuetControlServer
                         else if (property.PropertyType == typeof(List<string>))
                         {
                             List<string> list = new List<string>();
-                            while (reader.TokenType != JsonTokenType.EndArray)
+                            while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                             {
                                 list.Add(reader.GetString());
                             }
