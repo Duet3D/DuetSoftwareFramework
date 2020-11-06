@@ -24,6 +24,16 @@
   "BufferedPrintCodes": 32,
   "BufferedMacroCodes": 16,
   "MaxBufferSpacePerChannel": 1536,
+  "FirmwareComments": [
+    "printing object",
+    "MESH",
+    "process",
+    "stop printing object",
+    "layer",
+    "LAYER",
+    "BEGIN_LAYER_OBJECT z=",
+    "HEIGHT"
+  ],
   "ModelUpdateInterval": 250,
   "MaxMachineModelLockTime": -1,
   "FileBufferSize": 8192,
