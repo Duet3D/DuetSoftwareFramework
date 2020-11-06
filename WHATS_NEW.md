@@ -16,6 +16,7 @@ Bug fixes:
 - When certain G-code inputs were disabled, the DSF API threw NullReferenceExceptions
 - When the heaters contained null items, no config-override.g could be writen
 - When the move compensation type was set to none, the heightmap file was not reset
+- Starting macro files could cause out-of-order execution and stack underruns
 
 Version 3.2.0-b2
 ================
