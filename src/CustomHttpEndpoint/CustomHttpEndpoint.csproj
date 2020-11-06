@@ -18,7 +18,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CodeConsole\CodeConsole.csproj" />
     <ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
     <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
   </ItemGroup>
