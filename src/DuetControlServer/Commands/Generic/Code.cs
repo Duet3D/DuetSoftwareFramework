@@ -547,6 +547,14 @@ namespace DuetControlServer.Commands
                 return true;
             }
 
+            // Do not send comments that may not be interpreted by RRF
+            if (Type == CodeType.Comment &&
+                (string.IsNullOrWhiteSpace(Comment) || !Settings.FirmwareComments.Any(chunk => Comment.Contains(chunk))))
+            {
+                Result = new CodeResult();
+                return true;
+            }
+
             // Code has not been interpreted yet - let RRF deal with it
             return false;
         }

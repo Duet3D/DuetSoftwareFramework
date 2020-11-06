@@ -177,6 +177,24 @@ namespace DuetControlServer
         public static int MaxBufferSpacePerChannel { get; set; } = 1536;
 
         /// <summary>
+        /// List of string chunks that are identified by RepRapFirmware
+        /// </summary>
+        /// <remarks>
+        /// Only if a comment contains one of these identifiers they will be sent to the firmware
+        /// </remarks>
+        public static List<string> FirmwareComments { get; set; } = new List<string>
+        {
+            "printing object",			// slic3r
+            "MESH",						// Cura
+            "process",					// S3D
+            "stop printing object",		// slic3r
+            "layer",					// S3D "; layer 1, z=0.200"
+            "LAYER",					// Ideamaker, Cura (followed by layer number starting at zero)
+            "BEGIN_LAYER_OBJECT z=",	// KISSlicer (followed by Z height)
+            "HEIGHT"					// Ideamaker
+        };
+
+        /// <summary>
         /// Interval of object model updates (in ms)
         /// </summary>
         public static int ModelUpdateInterval { get; set; } = 250;
@@ -474,6 +492,15 @@ namespace DuetControlServer
                             JsonRegexListConverter regexListConverter = new JsonRegexListConverter();
                             property.SetValue(null, regexListConverter.Read(ref reader, typeof(List<Regex>), null));
                         }
+                        else if (property.PropertyType == typeof(List<string>))
+                        {
+                            List<string> list = new List<string>();
+                            while (reader.TokenType != JsonTokenType.EndArray)
+                            {
+                                list.Add(reader.GetString());
+                            }
+                            property.SetValue(null, list);
+                        }
                         else
                         {
                             throw new JsonException($"Bad list type: {property.PropertyType.Name}");
@@ -538,6 +565,16 @@ namespace DuetControlServer
 
                         JsonRegexListConverter regexListConverter = new JsonRegexListConverter();
                         regexListConverter.Write(writer, regexList, null);
+                    }
+                    else if (value is List<string> stringList)
+                    {
+                        writer.WritePropertyName(property.Name);
+                        writer.WriteStartArray();
+                        foreach (string item in stringList)
+                        {
+                            writer.WriteStringValue(item);
+                        }
+                        writer.WriteEndArray();
                     }
                     else if (value is LogLevel logLevelValue)
                     {

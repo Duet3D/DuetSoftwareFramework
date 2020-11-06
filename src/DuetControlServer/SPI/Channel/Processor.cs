@@ -116,7 +116,7 @@ namespace DuetControlServer.SPI.Channel
             // There must be at least one item on the stack...
             if (Stack.Count == 1)
             {
-                throw new InvalidOperationException("Stack underrun");
+                throw new InvalidOperationException($"Stack underrun on channel {Channel}");
             }
 
             // Pop the stack
@@ -142,8 +142,11 @@ namespace DuetControlServer.SPI.Channel
                 {
                     if (oldState.Macro.IsExecuting)
                     {
-                        _logger.Warn("Aborting orphaned macro file {0}", oldState.Macro.FileName);
-                        await oldState.Macro.Abort();
+                        if (!oldState.Macro.IsAborted)
+                        {
+                            _logger.Warn("Aborting orphaned macro file {0}", oldState.Macro.FileName);
+                            await oldState.Macro.Abort();
+                        }
                     }
                     else
                     {
@@ -574,30 +577,7 @@ namespace DuetControlServer.SPI.Channel
                 return false;
             }
 
-            // 3. Suspended codes being resumed (may include priority and macro codes)
-            if (CurrentState.SuspendedCodes.TryPeek(out Code suspendedCode))
-            {
-                if (BufferCode(suspendedCode))
-                {
-                    _logger.Debug("-> Resumed suspended code");
-                    CurrentState.SuspendedCodes.Dequeue();
-                    return true;
-                }
-                return false;
-            }
-
-            // 4. Priority codes
-            if (PriorityCodes.TryPeek(out Code queuedCode))
-            {
-                if (BufferCode(queuedCode))
-                {
-                    PriorityCodes.Dequeue();
-                    return true;
-                }
-                return false;
-            }
-
-            // 5. Macro files
+            // 3. Macro files (must come before any other code)
             if (CurrentState.Macro != null)
             {
                 bool busy = false, popStack = false;
@@ -639,6 +619,30 @@ namespace DuetControlServer.SPI.Channel
                     return false;
                 }
             }
+
+            // 4. Suspended codes being resumed (may include priority and macro codes)
+            if (CurrentState.SuspendedCodes.TryPeek(out Code suspendedCode))
+            {
+                if (BufferCode(suspendedCode))
+                {
+                    _logger.Debug("-> Resumed suspended code");
+                    CurrentState.SuspendedCodes.Dequeue();
+                    return true;
+                }
+                return false;
+            }
+
+            // 5. Priority codes
+            if (PriorityCodes.TryPeek(out Code queuedCode))
+            {
+                if (BufferCode(queuedCode))
+                {
+                    PriorityCodes.Dequeue();
+                    return true;
+                }
+                return false;
+            }
+
 
             // 6. Pending codes
             if (CurrentState.PendingCodes.TryPeek(out queuedCode))
