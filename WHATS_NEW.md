@@ -17,6 +17,7 @@ Bug fixes:
 - When the heaters contained null items, no config-override.g could be writen
 - When the move compensation type was set to none, the heightmap file was not reset
 - Starting macro files could cause out-of-order execution and stack underruns
+- Sometimes the object model wasn't fully updated after a disconnect
 
 Version 3.2.0-b2
 ================
