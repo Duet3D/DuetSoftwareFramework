@@ -75,6 +75,7 @@ namespace DuetControlServer.Files
                 if (item != null)
                 {
                     // Heater model
+#warning FIXME This has to be adjusted if we move to the new heater tuning
                     await writer.WriteLineAsync("M307 " +
                         $"H{heater} A{item.Model.Gain} C{item.Model.TimeConstant:F1} D{item.Model.DeadTime:F1} S{item.Model.MaxPwm:F1} " +
                         $"V{item.Model.StandardVoltage:F1} B{(item.Model.PID.Used ? 0 : 1)}");

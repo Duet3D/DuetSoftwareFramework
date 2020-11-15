@@ -254,14 +254,11 @@ namespace DuetControlServer.FileExecution
                             // Read the next code
                             try
                             {
+                                Code readCode;
                                 try
                                 {
-                                    if (await _file.ReadCodeAsync(sharedCode) == null)
-                                    {
-                                        codePool.Enqueue(sharedCode);
-                                        break;
-                                    }
-                                    sharedCode.CancellationToken = cancellationToken;
+                                    readCode = await _file.ReadCodeAsync(sharedCode);
+                                    readCode.CancellationToken = cancellationToken;
                                 }
                                 catch
                                 {
@@ -269,8 +266,8 @@ namespace DuetControlServer.FileExecution
                                     throw;
                                 }
 
-                                codes.Enqueue(sharedCode);
-                                codeTasks.Enqueue(sharedCode.Execute());
+                                codes.Enqueue(readCode);
+                                codeTasks.Enqueue(readCode.Execute());
                             }
                             catch (OperationCanceledException)
                             {

@@ -543,6 +543,11 @@ namespace DuetControlServer.Commands
                 string result = await Expressions.Evaluate(this, false);
                 Result = new CodeResult(MessageType.Success, result);
 
+                if (Keyword == KeywordType.Abort)
+                {
+                    CancelPending(Channel);
+                }
+
                 InternallyProcessed = true;
                 return true;
             }

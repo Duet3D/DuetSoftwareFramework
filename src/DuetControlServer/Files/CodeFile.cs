@@ -427,7 +427,7 @@ namespace DuetControlServer.Files
                             {
                                 throw new CodeParserException($"invalid conditional result '{evaluationResult}', must be either true or false", code);
                             }
-                            _logger.Debug("Evaluation result: {0} = {1}", code.KeywordArgument, evaluationResult);
+                            _logger.Debug("Evaluation result: ({0}) = {1}", code.KeywordArgument, evaluationResult);
                             codeBlock.ProcessBlock = (evaluationResult == "true");
                             codeBlock.ExpectingElse = (code.Keyword != KeywordType.While && evaluationResult == "false");
                             break;
@@ -498,6 +498,12 @@ namespace DuetControlServer.Files
                         default:
                             throw new CodeParserException($"Keyword {code.Keyword} is not supported", code);
                     }
+                }
+
+                // Make a new shared code so it isn't reused in code blocks
+                if (sharedCode != null)
+                {
+                    sharedCode = new Code();
                 }
             }
         }

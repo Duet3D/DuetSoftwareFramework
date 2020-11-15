@@ -67,24 +67,19 @@ namespace DuetControlServer.IPC.Processors
         private readonly bool _priorityCodes;
 
         /// <summary>
+        /// Monitor for exchanging data during interceptions
+        /// </summary>
+        private readonly AsyncMonitor _codeMonitor = new AsyncMonitor();
+
+        /// <summary>
         /// Current code being intercepted
         /// </summary>
-        private Code _codeBeingIntercepted;
+        private volatile Code _codeBeingIntercepted;
 
         /// <summary>
-        /// Condition variable to be set when a new code is available for interception
-        /// </summary>
-        private readonly AsyncMonitor _codeAvailableMutex = new AsyncMonitor();
-
-        /// <summary>
-        /// Command used to continue with the code being intercepted
+        /// Interception command to resolve the code being intercepted
         /// </summary>
         private BaseCommand _interceptionResult;
-
-        /// <summary>
-        /// Condition variable to be set when a code may be resolved
-        /// </summary>
-        private readonly AsyncLock _codeResultLock = new AsyncLock();
 
         /// <summary>
         /// Constructor of the interception processor
@@ -113,125 +108,98 @@ namespace DuetControlServer.IPC.Processors
             }
             Connection.Logger.Debug("Interception processor registered");
 
-            try
+            using (await _codeMonitor.EnterAsync(Program.CancellationToken))
             {
-                do
+                try
                 {
-                    Code codeBeingIntercepted;
-                    AwaitableDisposable<IDisposable> codeResultLockTask;
-
-                    // Wait for the next code to be intercepted
-                    using (await _codeAvailableMutex.EnterAsync(Program.CancellationToken))
+                    do
                     {
-                        codeResultLockTask = _codeResultLock.LockAsync(Program.CancellationToken);
+                        // Wait for the next code to be intercepted
+                        do
+                        {
+                            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+                            cts.CancelAfter(Settings.SocketPollInterval);
+
+                            try
+                            {
+                                await _codeMonitor.WaitAsync(Program.CancellationToken);
+                                break;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                if (Program.CancellationToken.IsCancellationRequested)
+                                {
+                                    throw;
+                                }
+                                Connection.Poll();
+                            }
+                        }
+                        while (true);
 
                         try
                         {
+                            // Send it to the client
+                            await Connection.Send(_codeBeingIntercepted);
+
+                            // Keep processing incoming commands until a final action for the code has been received
+                            BaseCommand command;
+                            Type commandType;
                             do
                             {
-                                using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                                cts.CancelAfter(Settings.SocketPollInterval);
-
-                                try
+                                // Read another command from the IPC connection
+                                command = await Connection.ReceiveCommand();
+                                commandType = command.GetType();
+                                if (Command.SupportedCommands.Contains(commandType))
                                 {
-                                    await _codeAvailableMutex.WaitAsync(Program.CancellationToken);
+                                    // Make sure it is permitted
+                                    Connection.CheckPermissions(commandType);
+
+                                    // Execute regular commands here
+                                    object result = await command.Invoke();
+                                    await Connection.SendResponse(result);
+                                }
+                                else if (SupportedCommands.Contains(commandType))
+                                {
+                                    // Make sure it is permitted
+                                    Connection.CheckPermissions(commandType);
+
+                                    // Send other commands to the task intercepting the code
+                                    _interceptionResult = command;
+                                    _codeMonitor.Pulse();
                                     break;
                                 }
-                                catch (OperationCanceledException)
+                                else
                                 {
-                                    if (Program.CancellationToken.IsCancellationRequested)
-                                    {
-                                        throw;
-                                    }
-                                    Connection.Poll();
+                                    // Take care of unsupported commands
+                                    throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
                                 }
                             }
-                            while (true);
-                        }
-                        catch
-                        {
-                            using (await codeResultLockTask) { }
-                            throw;
-                        }
+                            while (!Program.CancellationToken.IsCancellationRequested);
 
-                        lock (this)
-                        {
-                            codeBeingIntercepted = _codeBeingIntercepted;
-                        }
-                    }
-
-                    // Deal with it
-                    using (await codeResultLockTask)
-                    {
-                        _interceptionResult = null;
-
-                        // Send it to the client
-                        await Connection.Send(codeBeingIntercepted);
-
-                        // Keep processing incoming commands until a final action for the code has been received
-                        BaseCommand command;
-                        Type commandType;
-                        do
-                        {
-                            // Read another command from the IPC connection
-                            command = await Connection.ReceiveCommand();
-                            commandType = command.GetType();
-                            if (Command.SupportedCommands.Contains(commandType))
+                            // Stop if the connection has been terminated
+                            if (command == null)
                             {
-                                // Make sure it is permitted
-                                Connection.CheckPermissions(commandType);
-
-                                // Execute regular commands here
-                                object result = await command.Invoke();
-                                await Connection.SendResponse(result);
-                            }
-                            else if (SupportedCommands.Contains(commandType))
-                            {
-                                // Make sure it is permitted
-                                Connection.CheckPermissions(commandType);
-
-                                // Reset the code being intercepted
-                                lock (this)
-                                {
-                                    _codeBeingIntercepted = null;
-                                }
-
-                                // Send other commands to the task intercepting the code
-                                _interceptionResult = command;
                                 break;
                             }
-                            else
-                            {
-                                // Take care of unsupported commands
-                                throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
-                            }
                         }
-                        while (!Program.CancellationToken.IsCancellationRequested);
-
-                        // Stop if the connection has been terminated
-                        if (command == null)
+                        catch (SocketException)
                         {
-                            break;
+                            // Client has closed the connection while we're waiting for a result. Carry on...
+                            _interceptionResult = null;
+                            _codeMonitor.Pulse();
+                            throw;
                         }
                     }
+                    while (!Program.CancellationToken.IsCancellationRequested);
                 }
-                while (!Program.CancellationToken.IsCancellationRequested);
-            }
-            catch (SocketException)
-            {
-                // IPC client has closed the connection
-            }
-            finally
-            {
-                lock (this)
+                finally
                 {
-                    _codeBeingIntercepted = null;
+                    lock (_connections[_mode])
+                    {
+                        _connections[_mode].Remove(this);
+                    }
+                    Connection.Logger.Debug("Interception processor unregistered");
                 }
-                lock (_connections[_mode])
-                {
-                    _connections[_mode].Remove(this);
-                }
-                Connection.Logger.Debug("Interception processor unregistered");
             }
         }
 
@@ -282,23 +250,14 @@ namespace DuetControlServer.IPC.Processors
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         private async Task<bool> Intercept(Code code)
         {
-            AwaitableDisposable<IDisposable> codeResultLockTask;
-
-            // Send it to the IPC client
-            using (await _codeAvailableMutex.EnterAsync(Program.CancellationToken))
+            using (await _codeMonitor.EnterAsync(Program.CancellationToken))
             {
-                codeResultLockTask = _codeResultLock.LockAsync(Program.CancellationToken);
+                // Send it to the IPC client
+                _codeBeingIntercepted = code;
+                _codeMonitor.Pulse();
 
-                lock (this)
-                {
-                    _codeBeingIntercepted = code;
-                }
-                _codeAvailableMutex.PulseAll();
-            }
-
-            // Wait for a code result to be set by the interceptor
-            using (await codeResultLockTask)
-            {
+                // Wait for a code result to be set by the interceptor
+                await _codeMonitor.WaitAsync(Program.CancellationToken);
                 try
                 {
                     // Code is cancelled. This invokes an OperationCanceledException on the code's task.
@@ -382,10 +341,7 @@ namespace DuetControlServer.IPC.Processors
                             continue;
                         }
 
-                        lock (processor)
-                        {
-                            return (processor._codeBeingIntercepted != null);
-                        }
+                        return (processor._codeBeingIntercepted != null);
                     }
                 }
             }
@@ -410,10 +366,7 @@ namespace DuetControlServer.IPC.Processors
                             continue;
                         }
 
-                        lock (processor)
-                        {
-                            return processor._codeBeingIntercepted;
-                        }
+                        return processor._codeBeingIntercepted;
                     }
                 }
             }
