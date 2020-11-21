@@ -35,6 +35,8 @@ namespace DuetControlServer.Files
             {
                 await ParseHeader(reader, result);
                 await ParseFooter(reader, result);
+                await ParseThumbnails(reader, result);
+
                 if (result.FirstLayerHeight + result.LayerHeight > 0F && result.Height > 0F)
                 {
                     result.NumLayers = (int)Math.Round((result.Height - result.FirstLayerHeight) / result.LayerHeight) + 1;
@@ -511,6 +513,85 @@ namespace DuetControlServer.Files
 
             // Restore the last modified datetime
             File.SetLastWriteTime(filename, lastWriteTime);
+        }
+        /// Parse the file for thumbnails.
+        /// </summary>
+        /// <param name="reader">Stream reader</param>
+        /// <param name="partialFileInfo">G-code file information</param>
+        /// <returns>Asynchronous task</returns>
+        private static async Task ParseThumbnails(StreamReader reader, ParsedFileInfo parsedFileInfo)
+        {
+            Code code = new Code();
+            CodeParserBuffer codeParserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
+            bool imageFound = false;
+            int encodedLength = 0;
+            StringBuilder encodedImage = new StringBuilder();
+            reader.BaseStream.Seek(0, SeekOrigin.Begin);
+            ParsedThumbnailInfo thumbnailInfo = null;
+            while (codeParserBuffer.GetPosition(reader) < reader.BaseStream.Length)
+            {
+                Program.CancellationToken.ThrowIfCancellationRequested();
+                if (!await DuetAPI.Commands.Code.ParseAsync(reader, code, codeParserBuffer))
+                {
+                    continue;
+                }
+
+                if (code.Type != CodeType.Comment)
+                {
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(code.Comment))
+                {
+                    code.Reset();
+                    continue;
+                }
+
+                if (code.Comment.Contains("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    //Exit if we find another start tag before ending the previous image
+                    if (imageFound)
+                    {
+                        return;
+                    }
+                    var thumbnailTokens = code.Comment.Trim().Split(' ');
+                    //Stop processing since the thumbnail may be corrupt.
+                    if (thumbnailTokens.Length != 4)
+                    {
+                        return;
+                    }
+                    var dimensions = thumbnailTokens[2].Split('x');
+                    if (dimensions.Length != 2)
+                    {
+                        continue;
+                    }
+                    imageFound = true;
+
+                    thumbnailInfo = new ParsedThumbnailInfo();
+                    thumbnailInfo.Width = int.Parse(dimensions[0]);
+                    thumbnailInfo.Height = int.Parse(dimensions[1]);
+
+                    encodedLength = int.Parse(thumbnailTokens[3]);
+                    encodedImage.Clear();
+                    code.Reset();
+                    continue;
+                }
+                else if (code.Comment.Contains("thumbnail end", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    if (encodedImage.Length == encodedLength)
+                    {
+                        thumbnailInfo.EncodedImage = encodedImage.ToString();
+                        parsedFileInfo.Thumbnails.Add(thumbnailInfo);
+                    }
+                    thumbnailInfo = null;
+                    imageFound = false;
+                }
+                else if (imageFound)
+                {
+                    encodedImage.Append(code.Comment.Trim());
+                }
+                code.Reset();
+            }
         }
     }
 }
