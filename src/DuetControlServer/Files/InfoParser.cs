@@ -580,7 +580,7 @@ namespace DuetControlServer.Files
                 {
                     if (encodedImage.Length == encodedLength)
                     {
-                        thumbnailInfo.EncodedImage = "data:image / png; base64," + encodedImage.ToString();
+                        thumbnailInfo.EncodedImage = "data:image / png; base64, " + encodedImage.ToString();
                         parsedFileInfo.Thumbnails.Add(thumbnailInfo);
                     }
                     thumbnailInfo = null;
