@@ -117,7 +117,14 @@ namespace DuetAPI.ObjectModel
 			set => SetPropertyValue(ref _size, value);
         }
         private long _size;
+
+        /// <summary>
+        /// Collection of thumbnails parsed from Gcode
+        /// </summary>
+        public ModelCollection<ParsedThumbnailInfo> Thumbnails { get; } = new ModelCollection<ParsedThumbnailInfo>();
+
     }
+
 
     /// <summary>
     /// Class used to convert parsed file info to and from JSON

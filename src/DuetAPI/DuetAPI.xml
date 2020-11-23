@@ -981,6 +981,11 @@
             Write the message to the log file (if applicable)
             </summary>
         </member>
+        <member name="P:DuetAPI.Commands.WriteMessage.LogLevel">
+            <summary>
+            Log level of this message
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.AddHttpEndpoint">
             <summary>
             Register a new HTTP endpoint via DuetWebServer. This will create a new HTTP endpoint under /machine/{Namespace}/{EndpointPath}.
@@ -1997,6 +2002,11 @@
             CAN address of this board or null if not applicable
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Board.DirectDisplay">
+            <summary>
+            Details about a connected display or null if none is connected
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Board.FirmwareDate">
             <summary>
             Date of the firmware build
@@ -2062,6 +2072,11 @@
             Indicates if this board supports external 12864 displays
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Board.SupportsDirectDisplay">
+            <summary>
+            Indicates if this board supports external displays
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Board.UniqueId">
             <summary>
             Unique identifier of the board
@@ -2105,6 +2120,26 @@
         <member name="F:DuetAPI.ObjectModel.BoardState.Running">
             <summary>
             Board is up and running
+            </summary>
+        </member>
+        <member name="T:DuetAPI.ObjectModel.DirectDisplay">
+            <summary>
+            Class providing information about a connected display
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.DirectDisplay.PulsesPerClick">
+            <summary>
+            Number of pulses per click of the rotary encoder
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.DirectDisplay.SpiFreq">
+            <summary>
+            SPI frequency of the display (in Hz)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.DirectDisplay.TypeName">
+            <summary>
+            Name of the attached display type
             </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.MinMaxCurrent`1">
@@ -3057,6 +3092,11 @@
             Size of the file
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.ParsedFileInfo.Thumbnails">
+            <summary>
+            Collection of thumbnails parsed from Gcode
+            </summary>
+        </member>
         <member name="T:DuetAPI.ObjectModel.ParsedFileInfoConverter">
             <summary>
             Class used to convert parsed file info to and from JSON
@@ -3078,6 +3118,26 @@
             <param name="writer">JSON writer</param>
             <param name="value">Machine model</param>
             <param name="options">JSON options</param>
+        </member>
+        <member name="T:DuetAPI.ObjectModel.ParsedThumbnailInfo">
+            <summary>
+            Holds image parsed out of G-code files
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ParsedThumbnailInfo.Width">
+            <summary>
+            Width of thumbnail
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ParsedThumbnailInfo.Height">
+            <summary>
+            Height of thumbnail
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ParsedThumbnailInfo.EncodedImage">
+            <summary>
+            base64 encoded thumbnail
+            </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.TimesLeft">
             <summary>
@@ -5282,6 +5342,31 @@
             PWM value of this port (0..1)
             </summary>
         </member>
+        <member name="T:DuetAPI.ObjectModel.LogLevel">
+            <summary>
+            Class representing the configured log level
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.LogLevel.Debug">
+            <summary>
+            Log everything including debug messages
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.LogLevel.Info">
+            <summary>
+            Log information and warning messages
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.LogLevel.Warn">
+            <summary>
+            Log warning messages only
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.LogLevel.Off">
+            <summary>
+            Logging is disabled
+            </summary>
+        </member>
         <member name="T:DuetAPI.ObjectModel.MachineMode">
             <summary>
             Possible operation modes of the machine
@@ -5305,6 +5390,11 @@
         <member name="T:DuetAPI.ObjectModel.MachineStatus">
             <summary>
             Possible states of the firmware
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.MachineStatus.Starting">
+            <summary>
+            Processing config.g
             </summary>
         </member>
         <member name="F:DuetAPI.ObjectModel.MachineStatus.Updating">
@@ -5511,6 +5601,11 @@
             Log file being written to or null if logging is disabled
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.State.LogLevel">
+            <summary>
+            Current log level
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.State.MessageBox">
             <summary>
             Details about a requested message box or null if none is requested
@@ -5519,6 +5614,11 @@
         <member name="P:DuetAPI.ObjectModel.State.MachineMode">
             <summary>
             Current mode of operation
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.State.MsUpTime">
+            <summary>
+            Millisecond fraction of <see cref="P:DuetAPI.ObjectModel.State.UpTime"/>
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.State.NextTool">
