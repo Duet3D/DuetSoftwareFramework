@@ -14,4 +14,4 @@ CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_SYS_TIME
 AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_SYS_TIME
 
 [Install]
-WantedBy=basic.target
+WantedBy=sysinit.target
