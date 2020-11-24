@@ -104,7 +104,7 @@ namespace DuetControlServer.Commands
                 {
                     // Put RRF files into 0:/
                     fileName = Path.Combine(Settings.BaseDirectory, entry.FullName);
-                    plugin.RrfFiles.Add(entry.FullName.Substring(4));
+                    plugin.RrfFiles.Add(entry.FullName[4..]);
                 }
                 else
                 {
@@ -114,7 +114,7 @@ namespace DuetControlServer.Commands
                     // Check what type of file this is
                     if (entry.FullName.StartsWith("www/"))
                     {
-                        plugin.DwcFiles.Add(entry.FullName.Substring(4));
+                        plugin.DwcFiles.Add(entry.FullName[4..]);
                     }
                     else
                     {

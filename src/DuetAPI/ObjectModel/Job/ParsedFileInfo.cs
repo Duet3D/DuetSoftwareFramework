@@ -121,10 +121,8 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Collection of thumbnails parsed from Gcode
         /// </summary>
-        public ModelCollection<ParsedThumbnailInfo> Thumbnails { get; } = new ModelCollection<ParsedThumbnailInfo>();
-
+        public ModelCollection<ParsedThumbnail> Thumbnails { get; } = new ModelCollection<ParsedThumbnail>();
     }
-
 
     /// <summary>
     /// Class used to convert parsed file info to and from JSON

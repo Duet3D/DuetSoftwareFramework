@@ -39,7 +39,8 @@ namespace UnitTests.SPI
         {
             Span<byte> blob = GetBlob("packetHeader.bin");
             
-            PacketHeader header = Reader.ReadPacketHeader(blob);
+            int bytesRead = Reader.ReadPacketHeader(blob, out PacketHeader header);
+            Assert.AreEqual(8, bytesRead);
             
             // Header
             Assert.AreEqual((ushort)Request.ObjectModel, header.Request);
@@ -52,7 +53,8 @@ namespace UnitTests.SPI
         {
             Span<byte> blob = GetBlob("packetHeaderResend.bin");
 
-            PacketHeader header = Reader.ReadPacketHeader(blob);
+            int bytesRead = Reader.ReadPacketHeader(blob, out PacketHeader header);
+            Assert.AreEqual(8, bytesRead);
 
             // Header
             Assert.AreEqual((ushort)Request.ResendPacket, header.Request);

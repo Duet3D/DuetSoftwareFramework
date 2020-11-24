@@ -208,6 +208,7 @@ namespace DuetControlServer
                             break;
                         }
                     }
+                    await Task.Delay(250);
                 }
                 while (!CancellationToken.IsCancellationRequested);
 

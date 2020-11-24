@@ -443,6 +443,18 @@
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
         </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.PatchMachineModel(System.String,System.Object,System.Threading.CancellationToken)">
+            <summary>
+            Apply a full patch to the object model. Use with care!
+            </summary>
+            <param name="key">Key to update</param>
+            <param name="patch">Patch to apply</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
+        </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.PatchObjectModel(System.String,System.Object,System.Threading.CancellationToken)">
             <summary>
             Apply a full patch to the object model. Use with care!

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -33,7 +34,29 @@ namespace DuetControlServer.SPI
         private static int _bytesReserved = 0, _bufferSpace = 0;
 
         // Object model queries
-        private static readonly Queue<Tuple<string, string>> _pendingModelQueries = new Queue<Tuple<string, string>>();
+        private sealed class PendingModelQuery
+        {
+            /// <summary>
+            /// Key to query
+            /// </summary>
+            public string Key { get; set; }
+
+            /// <summary>
+            /// Flags to query
+            /// </summary>
+            public string Flags { get; set; }
+
+            /// <summary>
+            /// Whether the model query has been sent
+            /// </summary>
+            public bool QuerySent { get; set; }
+
+            /// <summary>
+            /// Task to complete when the query has finished
+            /// </summary>
+            public TaskCompletionSource<byte[]> TCS { get; } = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+        private static readonly Queue<PendingModelQuery> _pendingModelQueries = new Queue<PendingModelQuery>();
         private static DateTime _lastQueryTime = DateTime.Now;
 
         // Expression evaluation requests
@@ -90,15 +113,20 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="key">Key to request</param>
         /// <param name="flags">Object model flags</param>
-        public static void RequestObjectModel(string key, string flags)
+        /// <returns>Deserialized JSON document</returns>
+        public static Task<byte[]> RequestObjectModel(string key, string flags)
         {
-            if (!Settings.NoSpi)
+            if (Settings.NoSpi)
             {
-                lock (_pendingModelQueries)
-                {
-                    _pendingModelQueries.Enqueue(new Tuple<string, string>(key, flags));
-                }
+                throw new InvalidOperationException("Not connected over SPI");
             }
+
+            PendingModelQuery query = new PendingModelQuery { Key = key, Flags = flags };
+            lock (_pendingModelQueries)
+            {
+                _pendingModelQueries.Enqueue(query);
+            }
+            return query.TCS.Task;
         }
 
         /// <summary>
@@ -278,8 +306,6 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         public static async Task EmergencyStop()
         {
-            await Invalidate("Firmware halted");
-
             if (!Settings.NoSpi)
             {
                 Task onFirmwareHalted;
@@ -301,8 +327,6 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         public static async Task Reset()
         {
-            await Invalidate("Firmware reset imminent");
-
             if (!Settings.NoSpi)
             {
                 Task onFirmwareReset;
@@ -376,10 +400,7 @@ namespace DuetControlServer.SPI
             /// Called when this instance is being disposed
             /// </summary>
             /// <returns>Asynchronous task</returns>
-            public async ValueTask DisposeAsync()
-            {
-                await UnlockAll(_channel);
-            }
+            public async ValueTask DisposeAsync() => await UnlockAll(_channel);
         }
 
         /// <summary>
@@ -471,88 +492,79 @@ namespace DuetControlServer.SPI
             {
                 Model.Provider.Get.State.Status = MachineStatus.Updating;
             }
-            DataTransfer.Updating = true;
 
-            try
+            // Get the CRC16 checksum of the firmware binary
+            ushort crc16 = CRC16.Calculate(_firmwareStream);
+
+            // Send the IAP binary to the firmware
+            _logger.Info("Flashing IAP binary");
+            bool dataSent;
+            do
             {
-                // Get the CRC16 checksum of the firmware binary
-                ushort crc16 = CRC16.Calculate(_firmwareStream);
-
-                // Send the IAP binary to the firmware
-                _logger.Info("Flashing IAP binary");
-                bool dataSent;
-                do
-                {
-                    dataSent = DataTransfer.WriteIapSegment(_iapStream);
-                    DataTransfer.PerformFullTransfer();
-                    if (_logger.IsDebugEnabled)
-                    {
-                        Console.Write('.');
-                    }
-                }
-                while (dataSent);
+                dataSent = DataTransfer.WriteIapSegment(_iapStream);
+                DataTransfer.PerformFullTransfer();
                 if (_logger.IsDebugEnabled)
                 {
-                    Console.WriteLine();
-                }
-
-                // Start the IAP binary
-                DataTransfer.StartIap();
-
-                // Send the firmware binary to the IAP program
-                int numRetries = 0;
-                do
-                {
-                    if (numRetries != 0)
-                    {
-                        _logger.Error("Firmware checksum verification failed");
-                    }
-
-                    _logger.Info("Flashing RepRapFirmware");
-                    _firmwareStream.Seek(0, SeekOrigin.Begin);
-
-                    try
-                    {
-                        while (DataTransfer.FlashFirmwareSegment(_firmwareStream))
-                        {
-                            if (_logger.IsDebugEnabled)
-                            {
-                                Console.Write('.');
-                            }
-                        }
-                        if (_logger.IsDebugEnabled)
-                        {
-                            Console.WriteLine();
-                        }
-                    }
-                    catch
-                    {
-                        await Logger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
-                        Program.CancelSource.Cancel();
-                        return;
-                    }
-
-                    _logger.Info("Verifying checksum");
-                }
-                while (++numRetries < 3 && !DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
-
-                if (numRetries == 3)
-                {
-                    // Failed to flash the firmware
-                    await Logger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
-                    Program.CancelSource.Cancel();
-                }
-                else
-                {
-                    // Wait for the IAP binary to restart the controller
-                    await DataTransfer.WaitForIapReset();
-                    _logger.Info("Firmware update successful");
+                    Console.Write('.');
                 }
             }
-            finally
+            while (dataSent);
+            if (_logger.IsDebugEnabled)
             {
-                DataTransfer.Updating = false;
-                // Machine state is reset when the next status response is processed
+                Console.WriteLine();
+            }
+
+            // Start the IAP binary
+            DataTransfer.StartIap();
+
+            // Send the firmware binary to the IAP program
+            int numRetries = 0;
+            do
+            {
+                if (numRetries != 0)
+                {
+                    _logger.Error("Firmware checksum verification failed");
+                }
+
+                _logger.Info("Flashing RepRapFirmware");
+                _firmwareStream.Seek(0, SeekOrigin.Begin);
+
+                try
+                {
+                    while (DataTransfer.FlashFirmwareSegment(_firmwareStream))
+                    {
+                        if (_logger.IsDebugEnabled)
+                        {
+                            Console.Write('.');
+                        }
+                    }
+                    if (_logger.IsDebugEnabled)
+                    {
+                        Console.WriteLine();
+                    }
+                }
+                catch
+                {
+                    await Logger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
+                    Program.CancelSource.Cancel();
+                    return;
+                }
+
+                _logger.Info("Verifying checksum");
+            }
+            while (++numRetries < 3 && !DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
+
+            if (numRetries == 3)
+            {
+                // Failed to flash the firmware
+                await Logger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
+                Program.CancelSource.Cancel();
+            }
+            else
+            {
+                // Wait for the IAP binary to restart the controller
+                await DataTransfer.WaitForIapReset();
+                _logger.Info("Firmware update successful");
             }
         }
 
@@ -603,6 +615,28 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Abort all files in RRF on the given channel
+        /// </summary>
+        /// <param name="channel">Channel where all the files have been aborted</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
+        public static async Task AbortAll(CodeChannel channel)
+        {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
+            if (DataTransfer.ProtocolVersion >= 3)
+            {
+                using (await _channels[channel].LockAsync())
+                {
+                    _channels[channel].AllFilesAborted = true;
+                }
+            }
+        }
+
+        /// <summary>
         /// Perform communication with the RepRapFirmware controller over SPI
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -611,37 +645,44 @@ namespace DuetControlServer.SPI
             if (Settings.NoSpi)
             {
                 await Task.Delay(-1, Program.CancellationToken);
-                return;
             }
 
             do
             {
+                bool skipChannels = false;
                 using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
                 {
                     // Check if an emergency stop has been requested
-                    if (_firmwareHaltRequest != null && DataTransfer.WriteEmergencyStop())
+                    if (_firmwareHaltRequest != null)
                     {
-                        _logger.Warn("Emergency stop");
-                        DataTransfer.PerformFullTransfer();
-
-                        _firmwareHaltRequest.SetResult(null);
-                        _firmwareHaltRequest = null;
+                        await Invalidate("Firmware halted");
+                        if (DataTransfer.WriteEmergencyStop())
+                        {
+                            _logger.Warn("Emergency stop");
+                            _firmwareHaltRequest.SetResult(null);
+                            _firmwareHaltRequest = null;
+                        }
+                        skipChannels = true;
                     }
 
                     // Check if a firmware reset has been requested
-                    if (_firmwareResetRequest != null && DataTransfer.WriteReset())
+                    if (_firmwareResetRequest != null)
                     {
-                        _logger.Warn("Resetting controller");
-                        DataTransfer.PerformFullTransfer();
-
-                        _firmwareResetRequest.SetResult(null);
-                        _firmwareResetRequest = null;
-
-                        if (!Settings.NoTerminateOnReset)
+                        await Invalidate("Firmware reset imminent");
+                        if (DataTransfer.WriteReset())
                         {
-                            // Wait for the program to terminate and don't perform any extra transfers
-                            await Task.Delay(-1, Program.CancellationToken);
+                            _logger.Warn("Resetting controller");
+                            _firmwareResetRequest.SetResult(null);
+                            _firmwareResetRequest = null;
+
+                            if (!Settings.NoTerminateOnReset)
+                            {
+                                // Wait for the program to terminate and don't perform any extra transfers
+                                DataTransfer.PerformFullTransfer();
+                                await Task.Delay(-1, Program.CancellationToken);
+                            }
                         }
+                        skipChannels = true;
                     }
                 }
 
@@ -728,7 +769,7 @@ namespace DuetControlServer.SPI
 
                     try
                     {
-                        packet = DataTransfer.ReadPacket();
+                        packet = DataTransfer.ReadNextPacket();
                         if (packet == null)
                         {
                             _logger.Error("Read invalid packet");
@@ -745,12 +786,12 @@ namespace DuetControlServer.SPI
                 _bytesReserved = 0;
 
                 // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
-                await _channels.Run();
+                bool skipDelay = skipChannels || await _channels.Run();
 
                 // Request object model updates
-                if (DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
+                if (DataTransfer.ProtocolVersion == 1)
                 {
-                    if (DataTransfer.ProtocolVersion == 1)
+                    if (DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
                     {
                         using (await Model.Provider.AccessReadOnlyAsync())
                         {
@@ -761,24 +802,15 @@ namespace DuetControlServer.SPI
                             }
                         }
                     }
-                    else
+                }
+                else
+                {
+                    lock (_pendingModelQueries)
                     {
-                        bool objectModelQueried = false;
-                        lock (_pendingModelQueries)
+                        if (_pendingModelQueries.TryPeek(out PendingModelQuery query) &&
+                            !query.QuerySent && DataTransfer.WriteGetObjectModel(query.Key, query.Flags))
                         {
-                            // Query specific object model values on demand
-                            if (_pendingModelQueries.TryPeek(out Tuple<string, string> modelQuery) &&
-                                DataTransfer.WriteGetObjectModel(modelQuery.Item1, modelQuery.Item2))
-                            {
-                                objectModelQueried = true;
-                                _pendingModelQueries.Dequeue();
-                            }
-                        }
-
-                        if (!objectModelQueried && DataTransfer.WriteGetObjectModel(string.Empty, "d99fn"))
-                        {
-                            // Query live values in regular intervals
-                            _lastQueryTime = DateTime.Now;
+                            skipDelay = query.QuerySent = true;
                         }
                     }
                 }
@@ -793,7 +825,7 @@ namespace DuetControlServer.SPI
                         {
                             if (DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression))
                             {
-                                request.Written = true;
+                                skipDelay = request.Written = true;
 
                                 numEvaluationsSent++;
                                 if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
@@ -843,14 +875,8 @@ namespace DuetControlServer.SPI
 
                 // Do another full SPI transfe
                 DataTransfer.PerformFullTransfer();
-                _channels.ResetBlockedChannels();
 
                 // Wait a moment unless instructions are being sent rapidly to RRF
-                bool skipDelay;
-                using (await Model.Provider.AccessReadOnlyAsync())
-                {
-                    skipDelay = Model.Provider.Get.State.Status == MachineStatus.Updating;
-                }
                 if (!skipDelay)
                 {
                     await Task.Delay(Settings.SpiPollDelay, Program.CancellationToken);
@@ -894,7 +920,8 @@ namespace DuetControlServer.SPI
             switch (request)
             {
                 case Request.ResendPacket:
-                    DataTransfer.ResendPacket(packet);
+                    DataTransfer.ResendPacket(packet, out Communication.LinuxRequests.Request linuxRequest);
+                    _logger.Warn("Resending packet type #{0} (request {1})", packet.Id, linuxRequest);
                     break;
                 case Request.ObjectModel:
                     HandleObjectModel();
@@ -908,7 +935,6 @@ namespace DuetControlServer.SPI
                     return HandleMacroRequest();
                 case Request.AbortFile:
                     return HandleAbortFileRequest();
-                // StackEvent is no longer supported
                 case Request.PrintPaused:
                     return HandlePrintPaused();
                 case Request.HeightMap:
@@ -942,12 +968,22 @@ namespace DuetControlServer.SPI
             if (DataTransfer.ProtocolVersion == 1)
             {
                 DataTransfer.ReadLegacyConfigResponse(out ReadOnlySpan<byte> json);
-                Model.Updater.ProcessResponse(json);
+                _ = Model.Updater.ProcessLegacyConfigResponse(json.ToArray());
             }
             else
             {
                 DataTransfer.ReadObjectModel(out ReadOnlySpan<byte> json);
-                Model.Updater.ProcessResponse(json);
+                lock (_pendingModelQueries)
+                {
+                    if (_pendingModelQueries.TryDequeue(out PendingModelQuery query))
+                    {
+                        query.TCS.SetResult(json.ToArray());
+                    }
+                    else
+                    {
+                        _logger.Error("Failed to find query for object model response");
+                    }
+                }
             }
         }
 
@@ -1270,9 +1306,13 @@ namespace DuetControlServer.SPI
             }
             _bytesReserved = _bufferSpace = 0;
 
-            // Clear object model requests
+            // Resolve pending object model requests
             lock (_pendingModelQueries)
             {
+                foreach (PendingModelQuery query in _pendingModelQueries)
+                {
+                    query.TCS.SetCanceled();
+                }
                 _pendingModelQueries.Clear();
             }
 
@@ -1315,6 +1355,9 @@ namespace DuetControlServer.SPI
             {
                 while (_extruderFilamentUpdates.TryDequeue(out _)) { }
             }
+
+            // Notify the updater task
+            Model.Updater.ConnectionLost();
 
             // Keep this event in the log...
             if (!string.IsNullOrWhiteSpace(message))

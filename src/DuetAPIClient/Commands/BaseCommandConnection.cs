@@ -259,6 +259,23 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        [Obsolete]
+        public async Task PatchMachineModel(string key, object patch, CancellationToken cancellationToken = default)
+        {
+            using JsonDocument jsonDocument = JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(patch, JsonHelper.DefaultJsonOptions));
+            await PerformCommand(new PatchObjectModel() { Key = key, Patch = jsonDocument.RootElement }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Apply a full patch to the object model. Use with care!
+        /// </summary>
+        /// <param name="key">Key to update</param>
+        /// <param name="patch">Patch to apply</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         public async Task PatchObjectModel(string key, object patch, CancellationToken cancellationToken = default)
         {
             using JsonDocument jsonDocument = JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(patch, JsonHelper.DefaultJsonOptions));
@@ -506,7 +523,7 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.CommandExecution"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         [Obsolete]
-        public Task WriteMessage(MessageType type, string message, bool outputMessage = true, bool logMessage = false, CancellationToken cancellationToken = default)
+        public Task WriteMessage(MessageType type, string message, bool outputMessage, bool logMessage, CancellationToken cancellationToken = default)
         {
             return PerformCommand(new WriteMessage { Type = type, Content = message, OutputMessage = outputMessage, LogMessage = logMessage }, cancellationToken);
         }

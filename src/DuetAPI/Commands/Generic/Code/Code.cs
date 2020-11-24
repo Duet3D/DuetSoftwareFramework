@@ -11,7 +11,6 @@ namespace DuetAPI.Commands
     /// <summary>
     /// A parsed representation of a generic G/M/T-code
     /// </summary>
-    /// <seealso cref="CodeResult"/>
     [RequiredPermissions(SbcPermissions.CommandExecution)]
     public partial class Code : Command<CodeResult>
     {

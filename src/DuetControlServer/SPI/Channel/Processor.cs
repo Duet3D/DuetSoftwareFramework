@@ -62,9 +62,9 @@ namespace DuetControlServer.SPI.Channel
         public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
 
         /// <summary>
-        /// Indicates if this channel is blocked until the next full transfer
+        /// This is set to true if all the files have been aborted and RRF has to be notified
         /// </summary>
-        public bool IsBlocked { get; set; }
+        public bool AllFilesAborted { get; set; }
 
         /// <summary>
         /// Prioritised codes that override every other code
@@ -97,9 +97,6 @@ namespace DuetControlServer.SPI.Channel
             }
             BytesBuffered = 0;
             BufferedCodes.Clear();
-
-            // Do not send codes to RRF until it has cleared its internal buffer
-            IsBlocked = true;
 
             // Done
             Stack.Push(state);
@@ -547,9 +544,11 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Process pending requests on this channel
         /// </summary>
-        /// <returns>If anything more can be done on this channel</returns>
+        /// <returns>Whether a response can be expected from RRF in the next transmission</returns>
         public async Task<bool> Run()
         {
+            bool responseExpected = false;
+
             // Process code replies that could not be interpreted immediately
             while (BufferedCodes.Count > 0 && PendingReplies.TryPop(out Tuple<MessageTypeFlags, string> reply))
             {
@@ -564,112 +563,146 @@ namespace DuetControlServer.SPI.Channel
             {
                 if (lockRequest.IsLockRequest)
                 {
-                    if (!lockRequest.IsLockRequested)
+                    if (!lockRequest.IsLockRequested && DataTransfer.WriteLockMovementAndWaitForStandstill(Channel))
                     {
-                        lockRequest.IsLockRequested = DataTransfer.WriteLockMovementAndWaitForStandstill(Channel);
+                        lockRequest.IsLockRequested = true;
+                        return true;
                     }
+                    return responseExpected;
                 }
-                else if (DataTransfer.WriteUnlock(Channel))
+
+                if (DataTransfer.WriteUnlock(Channel))
                 {
                     lockRequest.Resolve(true);
                     CurrentState.LockRequests.Dequeue();
+                    // Resources unlocked; carry on
                 }
-                return false;
+                else
+                {
+                    return responseExpected;
+                }
             }
 
-            // 3. Macro files (must come before any other code)
+            // 3. Abort requests
+            if (AllFilesAborted)
+            {
+                if (DataTransfer.WriteFilesAborted(Channel))
+                {
+                    await AbortFile(true, Channel == CodeChannel.File);
+                    AllFilesAborted = false;
+                }
+                return responseExpected;
+            }
+
+            // 4. Macro files (must come before any other code)
             if (CurrentState.Macro != null)
             {
-                bool busy = false, popStack = false;
-                using (await CurrentState.Macro.LockAsync())
+                // Tell RRF as quickly as possible about the new macro being started
+                if (CurrentState.Macro.JustStarted)
                 {
-                    if (!CurrentState.Macro.IsExecuting)
-                    {
-                        if (!CurrentState.MacroCompleted && DataTransfer.WriteMacroCompleted(Channel, !CurrentState.Macro.FileOpened))
-                        {
-                            CurrentState.MacroCompleted = true;
-                            if (!CurrentState.Macro.FileOpened && DataTransfer.ProtocolVersion >= 3)
-                            {
-                                // In newer protocol versions we don't expect a response because RRF will be waiting in a semaphore
-                                popStack = true;
-                            }
-                        }
-                        busy = true;
-                    }
+                    CurrentState.Macro.JustStarted = (DataTransfer.ProtocolVersion < 3) || !DataTransfer.WriteMacroStarted(Channel);
+                    return true;
                 }
 
-                if (busy)
+                // Check if the macro file has finished
+                if (!CurrentState.Macro.IsExecuting)
                 {
-                    if (popStack)
+                    if (!CurrentState.MacroCompleted && DataTransfer.WriteMacroCompleted(Channel, !CurrentState.Macro.FileOpened))
                     {
-                        Code startCode = CurrentState.StartCode;
-                        if (startCode != null)
+                        CurrentState.MacroCompleted = true;
+                        if (DataTransfer.ProtocolVersion >= 3)
                         {
-                            BytesBuffered += startCode.BinarySize;
-                            BufferedCodes.Insert(0, startCode);
-                            CurrentState.StartCode = null;
-                        }
+                            if (!CurrentState.Macro.FileOpened)
+                            {
+                                // In newer protocol versions we don't expect a response because RRF will be waiting in a semaphore
+                                Code startCode = CurrentState.StartCode;
+                                if (startCode != null)
+                                {
+                                    BytesBuffered += startCode.BinarySize;
+                                    BufferedCodes.Insert(0, startCode);
+                                    CurrentState.StartCode = null;
+                                }
 
-                        await Pop();
-                        if (startCode != null)
+                                // Macro has finished, pop the stack
+                                await Pop();
+                                if (startCode != null)
+                                {
+                                    _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                                }
+                            }
+                        }
+                        else
                         {
-                            _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                            // Wait for a response first if an older firmware version is used, then pop the stack
+                            return true;
                         }
                     }
-                    return false;
+                    else
+                    {
+                        // Still waiting for acknowledgement or failed to write macro complete message, try again ASAP
+                        return true;
+                    }
                 }
             }
 
-            // 4. Suspended codes being resumed (may include priority and macro codes)
-            if (CurrentState.SuspendedCodes.TryPeek(out Code suspendedCode))
+            // 5. Suspended codes being resumed (may include priority and macro codes)
+            while (CurrentState.SuspendedCodes.TryPeek(out Code suspendedCode))
             {
                 if (BufferCode(suspendedCode))
                 {
+                    responseExpected = true;
                     _logger.Debug("-> Resumed suspended code");
                     CurrentState.SuspendedCodes.Dequeue();
-                    return true;
                 }
-                return false;
+                else
+                {
+                    return responseExpected;
+                }
             }
 
-            // 5. Priority codes
-            if (PriorityCodes.TryPeek(out Code queuedCode))
+            // 6. Priority codes
+            while (PriorityCodes.TryPeek(out Code priorityCode))
             {
-                if (BufferCode(queuedCode))
+                if (BufferCode(priorityCode))
                 {
+                    responseExpected = true;
                     PriorityCodes.Dequeue();
-                    return true;
                 }
-                return false;
-            }
-
-
-            // 6. Pending codes
-            if (CurrentState.PendingCodes.TryPeek(out queuedCode))
-            {
-                if (BufferCode(queuedCode))
+                else
                 {
-                    CurrentState.PendingCodes.Dequeue();
-                    return true;
+                    return responseExpected;
                 }
-                return false;
             }
 
-            // 7. Flush requests
+            // 7. Pending codes
+            while (CurrentState.PendingCodes.TryPeek(out Code pendingCode))
+            {
+                if (BufferCode(pendingCode))
+                {
+                    responseExpected = true;
+                    CurrentState.PendingCodes.Dequeue();
+                }
+                else
+                {
+                    return responseExpected;
+                }
+            }
+
+            // 8. Flush requests
             if (BufferedCodes.Count == 0 && CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> flushRequest))
             {
                 flushRequest.SetResult(true);
-                return false;
+                return responseExpected;
             }
 
             // Log untracked code replies
             while (PendingReplies.TryPop(out Tuple<MessageTypeFlags, string> reply))
             {
-                _logger.Warn("Out-of-order reply: '{0}'", reply.Item2);
+                _logger.Warn("Pending out-of-order reply: '{0}'", reply.Item2);
             }
 
             // End
-            return false;
+            return responseExpected;
         }
 
         /// <summary>
@@ -702,7 +735,7 @@ namespace DuetControlServer.SPI.Channel
                             {
                                 if (i + Communication.Consts.MaxMessageLength >= encodedMessage.Length)
                                 {
-                                    Memory<byte> partialMessage = encodedMessage.Slice(i);
+                                    Memory<byte> partialMessage = encodedMessage[i..];
                                     Interface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
                                 }
                                 else
@@ -1150,7 +1183,6 @@ namespace DuetControlServer.SPI.Channel
             Code.CancelPending(Channel);
 
             // Done
-            IsBlocked = true;
             return resourceInvalidated;
         }
     }

@@ -251,13 +251,18 @@ namespace DuetControlServer.FileExecution
                                 }
                             }
 
-                            // Read the next code
+                            // Try to read the next code
                             try
                             {
                                 Code readCode;
                                 try
                                 {
                                     readCode = await _file.ReadCodeAsync(sharedCode);
+                                    if (readCode == null)
+                                    {
+                                        codePool.Enqueue(sharedCode);
+                                        break;
+                                    }
                                     readCode.CancellationToken = cancellationToken;
                                 }
                                 catch

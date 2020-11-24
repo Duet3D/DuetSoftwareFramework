@@ -7,7 +7,7 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
     /// This is followed by the payload if Length is greater than 0
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Size = 8)]
-    public struct FileChunk
+    public struct FileChunkHeader
     {
         /// <summary>
         /// Length of the file chunk or -1 if an error occurred

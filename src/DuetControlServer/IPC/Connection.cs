@@ -89,10 +89,10 @@ namespace DuetControlServer.IPC
             string pluginPath = Path.GetFullPath(processName ?? string.Empty);
             if (pluginPath.StartsWith(Settings.PluginDirectory))
             {
-                pluginPath = processName.Substring(Settings.PluginDirectory.Length);
+                pluginPath = processName[Settings.PluginDirectory.Length..];
                 if (pluginPath.StartsWith('/'))
                 {
-                    pluginPath = pluginPath.Substring(1);
+                    pluginPath = pluginPath[1..];
                 }
 
                 // Retrieve the corresponding plugin permissions

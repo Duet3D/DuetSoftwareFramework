@@ -2,6 +2,7 @@
 using DuetAPI.ObjectModel;
 using Nito.AsyncEx;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -24,37 +25,12 @@ namespace DuetControlServer.Model
         /// <summary>
         /// General-purpose lock for this class
         /// </summary>
-        private static readonly AsyncLock _lock = new AsyncLock();
-
-        /// <summary>
-        /// Condition variable to trigger when new JSON data is available
-        /// </summary>
-        private static readonly AsyncConditionVariable _dataAvailable = new AsyncConditionVariable(_lock);
-
-        /// <summary>
-        /// Condition variable to trigger when the machine model has been fully updated
-        /// </summary>
-        private static readonly AsyncConditionVariable _fullyUpdated = new AsyncConditionVariable(_lock);
+        private static readonly AsyncMonitor _monitor = new AsyncMonitor();
 
         /// <summary>
         /// Dictionary of main keys vs last sequence numbers
         /// </summary>
-        private static readonly Dictionary<string, int> _lastSeqs = new Dictionary<string, int>();
-
-        /// <summary>
-        /// UTF-8 representation of the received object model data
-        /// </summary>
-        private static readonly byte[] _json = new byte[SPI.Communication.Consts.BufferSize];
-
-        /// <summary>
-        /// Length of the received object model data
-        /// </summary>
-        private static int _jsonLength = 0;
-
-        /// <summary>
-        /// Whether the sequence numbers may be cleared and the full OM is supposed to be queried again
-        /// </summary>
-        private static volatile bool _reloadObjectModel;
+        private static readonly ConcurrentDictionary<string, int> _lastSeqs = new ConcurrentDictionary<string, int>();
 
         /// <summary>
         /// Wait for the model to be fully updated from RepRapFirmware
@@ -63,24 +39,58 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task WaitForFullUpdate(CancellationToken cancellationToken)
         {
-            using (await _lock.LockAsync(cancellationToken))
+            using (await _monitor.EnterAsync(cancellationToken))
             {
-                await _fullyUpdated.WaitAsync(cancellationToken);
+                await _monitor.WaitAsync(cancellationToken);
                 Program.CancelSource.Token.ThrowIfCancellationRequested();
             }
         }
 
         /// <summary>
-        /// Merge a received object model response
+        /// Process a config response (no longer supported or encouraged; for backwards-compatibility)
         /// </summary>
-        /// <param name="json">JSON data</param>
-        public static void ProcessResponse(ReadOnlySpan<byte> json)
+        /// <param name="response">Legacy config response</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task ProcessLegacyConfigResponse(byte[] response)
         {
-            using (_lock.Lock(Program.CancellationToken))
+            using JsonDocument jsonDocument = JsonDocument.Parse(response);
+            using (await _monitor.EnterAsync(Program.CancellationToken))
             {
-                json.CopyTo(_json);
-                _jsonLength = json.Length;
-                _dataAvailable.NotifyAll();
+                if (jsonDocument.RootElement.TryGetProperty("boardName", out JsonElement boardName))
+                {
+                    using (await Provider.AccessReadWriteAsync())
+                    {
+                        Provider.Get.Boards.Add(new Board
+                        {
+                            IapFileNameSBC = $"Duet3_SBCiap_{boardName.GetString()}.bin",
+                            FirmwareFileName = $"Duet3Firmware_{boardName.GetString()}.bin"
+                        });
+                    }
+                    _logger.Warn("Deprecated firmware detected, please update it in order to use DSF");
+                }
+                else
+                {
+                    // boardName field is not present - this must be a really old firmware version
+                    using (await Provider.AccessReadWriteAsync())
+                    {
+                        Provider.Get.Boards.Add(new Board
+                        {
+                            IapFileNameSBC = $"Duet3_SDiap_MB6HC.bin",
+                            FirmwareFileName = "Duet3Firmware_MB6HC.bin"
+                        });
+                    }
+                    _logger.Warn("Deprecated firmware detected, assuming legacy firmware files. You may have to use bossa to update it");
+                }
+
+                // Cannot perform any further updates...
+                _monitor.PulseAll();
+
+                // Check if the firmware is supposed to be updated
+                if (Settings.UpdateOnly && !_updatingFirmware)
+                {
+                    _updatingFirmware = true;
+                    _ = Task.Run(UpdateFirmware);
+                }
             }
         }
 
@@ -90,161 +100,139 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
+            if (Settings.NoSpi)
+            {
+                // Don't start if no SPI connection is available
+                await Task.Delay(-1, Program.CancellationToken);
+            }
+
+            byte[] jsonData = Array.Empty<byte>();
             do
             {
-                using (await _lock.LockAsync(Program.CancellationToken))
+                try
                 {
-                    // Wait for the next object model update
-                    await _dataAvailable.WaitAsync(Program.CancellationToken);
-                    Program.CancellationToken.ThrowIfCancellationRequested();
-
-                    // Process it
-                    try
+                    // Request the limits if no sequence numbers have been set yet
+                    using (await _monitor.EnterAsync(Program.CancellationToken))
                     {
-                        ReadOnlyMemory<byte> json = new ReadOnlyMemory<byte>(_json, 0, _jsonLength);
-                        using JsonDocument jsonDocument = JsonDocument.Parse(json);
-                        if (SPI.DataTransfer.ProtocolVersion == 1)
+                        if (_lastSeqs.Count == 0)
                         {
-                            // This must be a legacy config response used to get the board names
-                            if (jsonDocument.RootElement.TryGetProperty("boardName", out JsonElement boardName))
+                            jsonData = await SPI.Interface.RequestObjectModel("limits", "d99vn");
+                            using JsonDocument limitsDocument = JsonDocument.Parse(jsonData);
+                            if (limitsDocument.RootElement.TryGetProperty("key", out JsonElement limitsKey) && limitsKey.GetString().Equals("limits", StringComparison.InvariantCultureIgnoreCase) &&
+                                limitsDocument.RootElement.TryGetProperty("result", out JsonElement limitsResult))
                             {
                                 using (await Provider.AccessReadWriteAsync())
                                 {
-                                    Provider.Get.Boards.Add(new Board
-                                    {
-                                        IapFileNameSBC = $"Duet3_SBCiap_{boardName.GetString()}.bin",
-                                        FirmwareFileName = $"Duet3Firmware_{boardName.GetString()}.bin"
-                                    });
+                                    Provider.Get.UpdateFromFirmwareModel("limits", limitsResult);
+                                    _logger.Debug("Updated key limits");
                                 }
-                                _logger.Warn("Deprecated firmware detected, please update it in order to use DSF");
                             }
                             else
                             {
-                                // boardName field is not present - this must be a really old firmware version
-                                using (await Provider.AccessReadWriteAsync())
-                                {
-                                    Provider.Get.Boards.Add(new Board
-                                    {
-                                        IapFileNameSBC = $"Duet3_SDiap_MB6HC.bin",
-                                        FirmwareFileName = "Duet3Firmware_MB6HC.bin"
-                                    });
-                                }
-                                _logger.Warn("Deprecated firmware detected, assuming legacy firmware files. You may have to use bossa to update it");
-                            }
-
-                            // Cannot perform any further updates...
-                            _fullyUpdated.NotifyAll();
-
-                            // Check if the firmware is supposed to be updated
-                            if (Settings.UpdateOnly && !_updatingFirmware)
-                            {
-                                _updatingFirmware = true;
-                                _ = Task.Run(UpdateFirmware);
+                                _logger.Warn("Received invalid object model limits response without key and/or result field(s)");
                             }
                         }
-                        else if (jsonDocument.RootElement.TryGetProperty("key", out JsonElement key) &&
-                                 jsonDocument.RootElement.TryGetProperty("result", out JsonElement result))
+                    }
+
+                    // Request the next status update
+                    jsonData = await SPI.Interface.RequestObjectModel(string.Empty, "d99fn");
+                    using JsonDocument statusDocument = JsonDocument.Parse(jsonData);
+                    if (statusDocument.RootElement.TryGetProperty("key", out JsonElement statusKey) && string.IsNullOrEmpty(statusKey.GetString()) &&
+                        statusDocument.RootElement.TryGetProperty("result", out JsonElement statusResult))
+                    {
+                        // Update frequently changing properties
+                        using (await Provider.AccessReadWriteAsync())
                         {
-                            // This is a new object model result
-                            if (string.IsNullOrWhiteSpace(key.GetString()))
+                            Provider.Get.UpdateFromFirmwareModel(string.Empty, statusResult);
+                            if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
                             {
-                                // Standard request to update frequently changing fields
-                                using (await Provider.AccessReadWriteAsync())
-                                {
-                                    Provider.Get.UpdateFromFirmwareModel(string.Empty, result);
-                                    if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
-                                    {
-                                        Provider.Get.State.Status = MachineStatus.Updating;
-                                    }
-                                }
-
-                                // Request limits if no sequence numbers have been set yet
-                                if (_lastSeqs.Count == 0)
-                                {
-                                    SPI.Interface.RequestObjectModel("limits", "d99vn");
-                                }
-
-                                // Request object model updates wherever needed
-                                if (_reloadObjectModel)
-                                {
-                                    _lastSeqs.Clear();
-                                    _reloadObjectModel = false;
-                                }
-
-                                bool objectModelSynchronized = true;
-                                foreach (JsonProperty seqProperty in result.GetProperty("seqs").EnumerateObject())
-                                {
-                                    if (seqProperty.Name != "reply" && (!Settings.UpdateOnly || seqProperty.Name == "boards"))
-                                    {
-                                        int newSeq = seqProperty.Value.GetInt32();
-                                        if (!_lastSeqs.TryGetValue(seqProperty.Name, out int lastSeq) || lastSeq != newSeq)
-                                        {
-                                            _logger.Debug("Requesting update of key {0}, seq {1} -> {2}", seqProperty.Name, lastSeq, newSeq);
-                                            _lastSeqs[seqProperty.Name] = newSeq;
-                                            SPI.Interface.RequestObjectModel(seqProperty.Name, "d99vn");
-                                            objectModelSynchronized = false;
-                                        }
-                                    }
-                                }
-
-                                // Update the layers
-                                UpdateLayers();
-
-                                if (objectModelSynchronized)
-                                {
-                                    // Notify clients waiting for the machine model to be synchronized
-                                    _fullyUpdated.NotifyAll();
-
-                                    // Check if the firmware is supposed to be updated
-                                    if (Settings.UpdateOnly && !_updatingFirmware)
-                                    {
-                                        _updatingFirmware = true;
-                                        _ = Task.Run(UpdateFirmware);
-                                    }
-                                }
+                                Provider.Get.State.Status = MachineStatus.Updating;
                             }
-                            else
+                        }
+
+                        // Update object model keys depending on the sequence numbers
+                        foreach (JsonProperty seqProperty in statusResult.GetProperty("seqs").EnumerateObject())
+                        {
+                            if (seqProperty.Name != "reply" && (!Settings.UpdateOnly || seqProperty.Name == "boards"))
                             {
-                                // Specific request - still updating the OM
-                                using (await Provider.AccessReadWriteAsync())
+                                int newSeq = seqProperty.Value.GetInt32();
+                                if (!_lastSeqs.TryGetValue(seqProperty.Name, out int lastSeq) || lastSeq != newSeq)
                                 {
-                                    string keyName = key.GetString();
-                                    if (Provider.Get.UpdateFromFirmwareModel(key.GetString(), result))
+                                    _logger.Debug("Requesting update of key {0}, seq {1} -> {2}", seqProperty.Name, lastSeq, newSeq);
+
+                                    jsonData = await SPI.Interface.RequestObjectModel(seqProperty.Name, "d99vn");
+                                    using JsonDocument keyDocument = JsonDocument.Parse(jsonData);
+                                    if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
+                                        keyDocument.RootElement.TryGetProperty("result", out JsonElement keyResult))
                                     {
-                                        _logger.Debug("Updated key {0}", keyName);
-                                        if (_logger.IsTraceEnabled)
+                                        using (await Provider.AccessReadWriteAsync())
                                         {
-                                            _logger.Trace("Key JSON: {0}", Encoding.UTF8.GetString(_json, 0, _jsonLength));
+                                            if (Provider.Get.UpdateFromFirmwareModel(keyName.GetString(), keyResult))
+                                            {
+                                                _logger.Debug("Updated key {0}", keyName.GetString());
+                                                if (_logger.IsTraceEnabled)
+                                                {
+                                                    _logger.Trace("Key JSON: {0}", keyResult.ToString());
+                                                }
+                                            }
+                                            else
+                                            {
+                                                _logger.Warn($"Invalid key {keyName.GetString()} in the object model");
+                                            }
+
+                                            if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
+                                            {
+                                                Provider.Get.State.Status = MachineStatus.Updating;
+                                            }
                                         }
+                                        _lastSeqs[seqProperty.Name] = newSeq;
                                     }
                                     else
                                     {
-                                        _logger.Warn($"Invalid key {key.GetString()} in the object model");
-                                    }
-
-                                    if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
-                                    {
-                                        Provider.Get.State.Status = MachineStatus.Updating;
+                                        _logger.Warn("Received invalid object model key response without key and/or result field(s)");
                                     }
                                 }
                             }
                         }
-                        else
+
+                        // Update the layers
+                        UpdateLayers();
+
+                        // Object model is now up-to-date, notify waiting clients
+                        using (await _monitor.EnterAsync(Program.CancellationToken))
                         {
-                            _logger.Warn("Received invalid object model response without key and/or result field(s)");
+                            _monitor.PulseAll();
+                        }
+
+                        // Check if the firmware is supposed to be updated
+                        if (Settings.UpdateOnly && !_updatingFirmware)
+                        {
+                            _updatingFirmware = true;
+                            _ = Task.Run(UpdateFirmware);
                         }
                     }
-                    catch (InvalidOperationException e)
+                    else
                     {
-                        _logger.Error(e, "Failed to merge JSON due to internal error: {0}", Encoding.UTF8.GetString(_json, 0, _jsonLength));
-                    }
-                    catch (JsonException e)
-                    {
-                        _logger.Error(e, "Failed to merge JSON: {0}", Encoding.UTF8.GetString(_json, 0, _jsonLength));
+                        _logger.Warn("Received invalid object model response without key and/or result field(s)");
                     }
                 }
+                catch (InvalidOperationException e)
+                {
+                    _logger.Error(e, "Failed to merge JSON due to internal error: {0}", Encoding.UTF8.GetString(jsonData));
+                }
+                catch (JsonException e)
+                {
+                    _logger.Error(e, "Failed to merge JSON: {0}", Encoding.UTF8.GetString(jsonData));
+                }
+                catch (OperationCanceledException)
+                {
+                    // RRF has disconnected, try again later
+                }
+
+                // Wait a moment
+                await Task.Delay(Settings.ModelUpdateInterval);
             }
-            while (true);
+            while (!Program.CancelSource.IsCancellationRequested);
         }
 
         /// <summary>
@@ -344,8 +332,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Called by the SPI subsystem when the connection to the Duet has been lost
         /// </summary>
-        /// <param name="errorMessage">Optional error that led to this event</param>
-        public static void ConnectionLost(string errorMessage = null)
+        public static void ConnectionLost()
         {
             using (Provider.AccessReadWrite())
             {
@@ -355,12 +342,8 @@ namespace DuetControlServer.Model
                     Provider.Get.State.Status = MachineStatus.Off;
                 }
             }
-            _reloadObjectModel = true;
 
-            if (!string.IsNullOrEmpty(errorMessage))
-            {
-                _ = Utility.Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({errorMessage})");
-            }
+            _lastSeqs.Clear();
         }
     }
 }

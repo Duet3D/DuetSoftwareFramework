@@ -449,7 +449,7 @@ namespace UnitTests.SPI
             Assert.AreEqual(4, numY);
 
             // Points
-            Span<float> zCoordinates = MemoryMarshal.Cast<byte, float>(span.Slice(32));
+            Span<float> zCoordinates = MemoryMarshal.Cast<byte, float>(span[32..]);
             for (int i = 0; i < map.ZCoordinates.Length; i++)
             {
                 Assert.AreEqual(zCoordinates[i], 10 * i + 10, 0.0001);
@@ -529,7 +529,7 @@ namespace UnitTests.SPI
             // Header
             uint messageFlags = MemoryMarshal.Read<uint>(span);
             Assert.AreEqual((MessageTypeFlags)(1 << (int)DuetAPI.CodeChannel.USB), (MessageTypeFlags)messageFlags);
-            uint messageLength = MemoryMarshal.Read<uint>(span.Slice(4));
+            uint messageLength = MemoryMarshal.Read<uint>(span[4..]);
             Assert.AreEqual(5, messageLength);
 
             // Message

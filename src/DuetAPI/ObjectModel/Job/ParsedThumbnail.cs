@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace DuetAPI.ObjectModel
+﻿namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Holds image parsed out of G-code files
     /// </summary>
-    public sealed class ParsedThumbnailInfo : ModelObject
+    public sealed class ParsedThumbnail : ModelObject
     {
         /// <summary>
         /// Width of thumbnail
@@ -38,7 +34,5 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _encodedImage, value);
         }
         private string _encodedImage;
-
-
     }
 }

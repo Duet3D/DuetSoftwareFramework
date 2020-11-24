@@ -140,9 +140,19 @@ namespace DuetControlServer.FileExecution
         public bool IsConfigOverride { get; }
 
         /// <summary>
+        /// Indicates if the macro file has just started
+        /// </summary>
+        public bool JustStarted { get; set; }
+
+        /// <summary>
         /// Indicates if the macro file is being executed
         /// </summary>
-        public bool IsExecuting { get; private set; }
+        public bool IsExecuting
+        {
+            get => _isExecuting;
+            set => _isExecuting = value;
+        }
+        private volatile bool _isExecuting;
 
         /// <summary>
         /// Indicates if the macro file has been aborted
@@ -206,7 +216,7 @@ namespace DuetControlServer.FileExecution
             {
                 if (_file != null || (name == FilePath.ConfigFile && _file != null) || name == FilePath.ConfigOverrideFile)
                 {
-                    IsExecuting = true;
+                    IsExecuting = JustStarted = true;
                     _ = Task.Run(Run);
                 }
             }

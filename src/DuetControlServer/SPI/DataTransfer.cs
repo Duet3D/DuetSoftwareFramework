@@ -34,7 +34,7 @@ namespace DuetControlServer.SPI
         private static volatile bool _transferReadyPinMonitored;
         private static SpiDevice _spiDevice;
         private static readonly AsyncManualResetEvent _transferReadyEvent = new AsyncManualResetEvent();
-        private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting;
+        private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting, _updating;
         private static ushort _lastTransferNumber;
 
         private static DateTime _lastMeasureTime = DateTime.Now;
@@ -153,7 +153,7 @@ namespace DuetControlServer.SPI
             _txHeader.DataLength = (ushort)_txPointer;
             _txHeader.ChecksumData = CRC16.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-            _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf<ushort>()).Span);
+            _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer[0..(Marshal.SizeOf<TransferHeader>() - Marshal.SizeOf<ushort>())].Span);
             MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
 
             do
@@ -173,7 +173,7 @@ namespace DuetControlServer.SPI
                     }
 
                     // Verify the protocol version
-                    if ((_hadTimeout || !_started) && !Updating && ProtocolVersion != Consts.ProtocolVersion)
+                    if ((_hadTimeout || !_started) && ProtocolVersion != Consts.ProtocolVersion)
                     {
                         _ = Logger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
                     }
@@ -201,8 +201,9 @@ namespace DuetControlServer.SPI
                     // Deal with reset requests
                     if (_resetting)
                     {
-                        Updater.ConnectionLost();
-                        _waitingForFirstTransfer = _hadTimeout = true;
+                        _started = false;
+                        _waitingForFirstTransfer = true;
+                        _rxHeader.SequenceNumber = _txHeader.SequenceNumber = 0;
                         PerformFullTransfer(connecting);
                     }
                     break;
@@ -216,10 +217,11 @@ namespace DuetControlServer.SPI
 
                     _logger.Debug(e, "Lost connection to Duet");
                     _txHeader.ProtocolVersion = Consts.ProtocolVersion;
-                    if (!_hadTimeout && _started && !Updating)
+                    if (!_hadTimeout && _started)
                     {
                         _waitingForFirstTransfer = _hadTimeout = true;
-                        Updater.ConnectionLost(e.Message);
+                        Updater.ConnectionLost();
+                        _ = Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
                     }
                 }
             }
@@ -235,11 +237,6 @@ namespace DuetControlServer.SPI
             return _started && ((ushort)(_lastTransferNumber + 1) != _rxHeader.SequenceNumber);
         }
 
-        /// <summary>
-        /// Indicates if an update is in progress
-        /// </summary>
-        public static bool Updating { get; set; }
-
         #region Read functions
         /// <summary>
         /// Returns the number of packets to read
@@ -250,7 +247,7 @@ namespace DuetControlServer.SPI
         /// Read the next packet
         /// </summary>
         /// <returns>The next packet or null if none is available</returns>
-        public static PacketHeader? ReadPacket()
+        public static PacketHeader? ReadNextPacket()
         {
             if (_rxPointer >= _rxHeader.DataLength)
             {
@@ -258,8 +255,7 @@ namespace DuetControlServer.SPI
             }
 
             // Header
-            _lastPacket = Serialization.Reader.ReadPacketHeader(_rxBuffer.Slice(_rxPointer).Span);
-            _rxPointer += Marshal.SizeOf(_lastPacket);
+            _rxPointer += Serialization.Reader.ReadPacketHeader(_rxBuffer[_rxPointer..].Span, out _lastPacket);
 
             // Packet data
             _packetData = _rxBuffer.Slice(_rxPointer, _lastPacket.Length);
@@ -431,7 +427,7 @@ namespace DuetControlServer.SPI
                 ResendPacketId = 0
             };
 
-            Span<byte> span = _txBuffer.Value.Slice(_txPointer).Span;
+            Span<byte> span = _txBuffer.Value[_txPointer..].Span;
             MemoryMarshal.Write(span, ref header);
             _txPointer += Marshal.SizeOf<PacketHeader>();
         }
@@ -453,7 +449,7 @@ namespace DuetControlServer.SPI
         /// Resend a packet back to the firmware
         /// </summary>
         /// <param name="packet">Packet holding the resend request</param>
-        public static void ResendPacket(PacketHeader packet)
+        public static void ResendPacket(PacketHeader packet, out Communication.LinuxRequests.Request linuxRequest)
         {
             Span<byte> buffer = (_txBuffer.Next ?? _txBuffers.First).Value.Span;
 
@@ -466,14 +462,15 @@ namespace DuetControlServer.SPI
                 if (header.Id == packet.ResendPacketId)
                 {
                     // Resend it but use a new identifier
-                    WritePacket((Communication.LinuxRequests.Request)header.Request, header.Length);
+                    linuxRequest = (Communication.LinuxRequests.Request)header.Request;
+                    WritePacket(linuxRequest, header.Length);
                     buffer.Slice(headerSize, header.Length).CopyTo(GetWriteBuffer(header.Length));
                     return;
                 }
 
                 // Move on to the next one
                 int padding = 4 - (header.Length % 4);
-                buffer = buffer.Slice(headerSize + header.Length + ((padding == 4) ? 0 : padding));
+                buffer = buffer[(headerSize + header.Length + ((padding == 4) ? 0 : padding))..];
             }
             while (header.Id < packet.ResendPacketId && buffer.Length > 0);
 
@@ -792,12 +789,9 @@ namespace DuetControlServer.SPI
             WritePacket(Communication.LinuxRequests.Request.StartIap);
             PerformFullTransfer();
 
-            // No longer connected...
-            Updater.ConnectionLost();
-
             // Wait for the first transfer.
             // The IAP firmware will pull the transfer ready pin to high when it is ready to receive data
-            _waitingForFirstTransfer = true;
+            _waitingForFirstTransfer = _updating = true;
         }
 
         /// <summary>
@@ -819,7 +813,7 @@ namespace DuetControlServer.SPI
             if (bytesRead != Consts.FirmwareSegmentSize)
             {
                 // Fill up the remaining space with 0xFF. The IAP program does the same once complete
-                writeBuffer.Slice(bytesRead).Fill(0xFF);
+                writeBuffer[bytesRead..].Fill(0xFF);
             }
 
             WaitForTransfer();
@@ -871,9 +865,12 @@ namespace DuetControlServer.SPI
             await Task.Delay(Consts.IapRebootDelay);
 
             // Wait for the first data transfer from the firmware
+            _updating = _started = false;
             _waitingForFirstTransfer = true;
+            _rxHeader.SequenceNumber = 1;
+            _lastTransferNumber = _txHeader.SequenceNumber = 0;
         }
-        
+
         /// <summary>
         /// Assign a filament name to the given extruder drive
         /// </summary>
@@ -971,6 +968,42 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Notify RepRapFirmware that a macro file could be started
+        /// </summary>
+        /// <param name="channel">Code channel that requires the lock</param>
+        /// <returns>True if the packet could be written</returns>
+        public static bool WriteMacroStarted(CodeChannel channel)
+        {
+            int dataLength = Marshal.SizeOf<CodeChannelHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.LinuxRequests.Request.MacroStarted, dataLength);
+            Serialization.Writer.WriteCodeChannel(GetWriteBuffer(dataLength), channel);
+            return true;
+        }
+
+        /// <summary>
+        /// Called when all the files have been aborted by DSF (e.g. via abort keyword)
+        /// </summary>
+        /// <param name="channel">Code channel that requires the lock</param>
+        /// <returns>True if the packet could be written</returns>
+        public static bool WriteFilesAborted(CodeChannel channel)
+        {
+            int dataLength = Marshal.SizeOf<CodeChannelHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.LinuxRequests.Request.FilesAborted, dataLength);
+            Serialization.Writer.WriteCodeChannel(GetWriteBuffer(dataLength), channel);
+            return true;
+        }
+
+        /// <summary>
         /// Checks if there is enough remaining space to accomodate a packet header plus payload data
         /// </summary>
         /// <param name="dataLength">Payload data length</param>
@@ -1022,7 +1055,7 @@ namespace DuetControlServer.SPI
                 _transferReadyEvent.Reset();
                 if (!_transferReadyPin.Value)
                 {
-                    if (Updating)
+                    if (_updating)
                     {
                         // Ignore shutdown requests and timeouts when an update is in progress
                         _transferReadyEvent.Wait();
@@ -1048,7 +1081,7 @@ namespace DuetControlServer.SPI
                 }
                 _waitingForFirstTransfer = false;
             }
-            else if (Updating)
+            else if (_updating)
             {
                 // Ignore shutdown requests and timeouts when an update is in progress
                 _transferReadyEvent.Wait();
@@ -1101,7 +1134,7 @@ namespace DuetControlServer.SPI
                     throw new OperationCanceledException("Board is not available (no header)");
                 }
 
-                ushort checksum = CRC16.Calculate(_rxHeaderBuffer.Slice(0, Marshal.SizeOf(_rxHeader) - Marshal.SizeOf<ushort>()).Span);
+                ushort checksum = CRC16.Calculate(_rxHeaderBuffer[..(Marshal.SizeOf<TransferHeader>() - Marshal.SizeOf<ushort>())].Span);
                 if (_rxHeader.ChecksumHeader != checksum)
                 {
                     _logger.Warn("Bad header checksum (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader.ToString("x4"), checksum.ToString("x4"));
@@ -1141,7 +1174,7 @@ namespace DuetControlServer.SPI
                         _logger.Warn("Downgrading protocol version {0} to {1}", _txHeader.ProtocolVersion, _rxHeader.ProtocolVersion);
                         _txHeader.ProtocolVersion = _rxHeader.ProtocolVersion;
                         MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-                        _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer.Slice(0, Marshal.SizeOf(_txHeader) - Marshal.SizeOf<ushort>()).Span);
+                        _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer[..(Marshal.SizeOf<TransferHeader>() - Marshal.SizeOf<ushort>())].Span);
                         MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
 
                         ExchangeResponse(TransferResponse.BadResponse);

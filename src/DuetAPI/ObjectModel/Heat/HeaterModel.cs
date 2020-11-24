@@ -36,6 +36,16 @@
         private float _gain = 340F;
 
         /// <summary>
+        /// Heating rate (in K/s)
+        /// </summary>
+        public float HeatingRate
+        {
+            get => _heatingRate;
+            set => SetPropertyValue(ref _heatingRate, value);
+        }
+        private float _heatingRate;
+
+        /// <summary>
         /// Indicates if the heater PWM signal is inverted
         /// </summary>
         public bool Inverted
@@ -79,5 +89,15 @@
 			set => SetPropertyValue(ref _timeConstant, value);
         }
         private float _timeConstant = 140F;
+
+        /// <summary>
+        /// Time constant with the fans on
+        /// </summary>
+        public float TimeConstantFansOn
+        {
+            get => _timeConstantFanOn;
+            set => SetPropertyValue(ref _timeConstantFanOn, value);
+        }
+        private float _timeConstantFanOn = 140F;
     }
 }

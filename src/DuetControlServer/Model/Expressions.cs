@@ -499,7 +499,7 @@ namespace DuetControlServer.Model
                         bool wantsCount = subExpression.StartsWith('#');
                         if (wantsCount)
                         {
-                            subFilter = subExpression.Substring(1);
+                            subFilter = subExpression[1..];
                         }
                         if (Filter.GetSpecific(subFilter, true, out object linuxField))
                         {
@@ -561,7 +561,7 @@ namespace DuetControlServer.Model
             bool wantsFinalCount = finalExpression.StartsWith('#');
             if (wantsFinalCount)
             {
-                finalFilter = finalExpression.Substring(1);
+                finalFilter = finalExpression[1..];
             }
             if (Filter.GetSpecific(finalFilter, true, out object finalLinuxField))
             {

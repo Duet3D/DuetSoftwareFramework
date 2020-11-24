@@ -151,7 +151,16 @@ namespace DuetControlServer.Codes
 
                 // Initialize SD card
                 case 21:
-                    throw new NotSupportedException();
+                    if (await SPI.Interface.Flush(code))
+                    {
+                        if (code.Parameter('P', 0) == 0)
+                        {
+                            // M21 (P0) will always work because it's always mounted
+                            return new CodeResult();
+                        }
+                        throw new NotSupportedException();
+                    }
+                    throw new OperationCanceledException();
 
                 // Release SD card
                 case 22:
@@ -347,7 +356,7 @@ namespace DuetControlServer.Codes
                                 ParsedFileInfo info = await InfoParser.Parse(file);
 
                                 string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
-                                return new CodeResult(MessageType.Success, "{\"err\":0," + json.Substring(1));
+                                return new CodeResult(MessageType.Success, "{\"err\":0," + json[1..]);
                             }
                             catch (Exception e)
                             {

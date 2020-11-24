@@ -112,7 +112,7 @@ namespace DuetControlServer.Files
                 }
                 return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directoryPath, filePath);
             }
-            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath.Substring(1) : filePath);
+            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
         }
 
         /// <summary>
@@ -164,7 +164,7 @@ namespace DuetControlServer.Files
 
                 return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directory, filePath);
             }
-            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath.Substring(1) : filePath);
+            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
         }
 
         /// <summary>
@@ -177,7 +177,7 @@ namespace DuetControlServer.Files
         {
             if (filePath.StartsWith(Settings.BaseDirectory))
             {
-                filePath = filePath.Substring(Settings.BaseDirectory.EndsWith('/') ? Settings.BaseDirectory.Length : (Settings.BaseDirectory.Length + 1));
+                filePath = filePath[(Settings.BaseDirectory.EndsWith('/') ? Settings.BaseDirectory.Length : (Settings.BaseDirectory.Length + 1))..];
                 return Path.Combine("0:/", filePath);
             }
 
@@ -187,7 +187,7 @@ namespace DuetControlServer.Files
                 {
                     if (filePath.StartsWith(storage.Path))
                     {
-                        return Path.Combine("0:/", filePath.Substring(storage.Path.Length));
+                        return Path.Combine("0:/", filePath[storage.Path.Length..]);
                     }
                 }
             }

@@ -1,6 +1,23 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.2.0-b4
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-b4
+- DuetWebControl 3.2.0-b4
+
+Changed behaviour:
+- Thumbnails from PrusaSlicer are now parsed (thanks Sindarius)
+- M500 writes new heater tuning parameters to config-override.g
+
+Bug fixes:
+- Codes could be sent to code interceptors in the wrong order
+- M21 (P0) returned an error message breaking Octoprint support
+- Under certain circumstances some object model keys were not updated on initialisation
+- DCS service didn't have permission to change the datetime
+
 Version 3.2.0-b3
 ================
 

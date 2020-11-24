@@ -6,7 +6,17 @@
     public sealed class Skew : ModelObject
     {
         /// <summary>
-        /// Tangent of the skew angle for the XY axes
+        /// Indicates if the <see cref="TanXY"/> value is applied to the X or Y axis value
+        /// </summary>
+        public bool CompensateXY
+        {
+            get => _compensateXY;
+            set => SetPropertyValue(ref _compensateXY, value);
+        }
+        private bool _compensateXY;
+
+        /// <summary>
+        /// Tangent of the skew angle for the XY or YX axes
         /// </summary>
         public float TanXY
         {
