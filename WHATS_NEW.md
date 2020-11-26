@@ -19,7 +19,7 @@ Bug fixes:
 - Under certain circumstances some object model keys were not updated on initialisation
 - DCS service didn't have permission to change the datetime
 - Print times with decimal places were incorrectly parsed
-- When the controller is reset an extra data transfer was performed
+- When the controller was reset or updated, an extra data transfer was performed
 
 Version 3.2.0-b3
 ================
