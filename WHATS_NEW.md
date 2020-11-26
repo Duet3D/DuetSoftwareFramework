@@ -11,12 +11,15 @@ Compatible files:
 Changed behaviour:
 - Thumbnails from PrusaSlicer are now parsed (thanks Sindarius)
 - M500 writes new heater tuning parameters to config-override.g
+- In Marlin emulation "ok" responses are only sent when the line is complete
 
 Bug fixes:
 - Codes could be sent to code interceptors in the wrong order
 - M21 (P0) returned an error message breaking Octoprint support
 - Under certain circumstances some object model keys were not updated on initialisation
 - DCS service didn't have permission to change the datetime
+- Print times with decimal places were incorrectly parsed
+- When the controller is reset an extra data transfer was performed
 
 Version 3.2.0-b3
 ================

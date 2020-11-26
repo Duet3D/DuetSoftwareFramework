@@ -491,6 +491,13 @@ namespace DuetAPI.Commands
                 }
             } while (c != '\n');
 
+
+            // Check if this was the last code on the line
+            if (c == '\n')
+            {
+                result.Flags |= CodeFlags.IsLastCode;
+            }
+
             // Do not allow malformed codes
             if (inEncapsulatedComment)
             {

@@ -199,11 +199,12 @@ namespace DuetControlServer.SPI
                     _packetId = 0;
 
                     // Deal with reset requests
-                    if (_resetting)
+                    if (_resetting && Settings.NoTerminateOnReset)
                     {
-                        _started = false;
+                        _started = _resetting = false;
                         _waitingForFirstTransfer = true;
-                        _rxHeader.SequenceNumber = _txHeader.SequenceNumber = 0;
+                        _rxHeader.SequenceNumber = 1;
+                        _txHeader.SequenceNumber = 0;
                         PerformFullTransfer(connecting);
                     }
                     break;
@@ -503,6 +504,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
+            _txPointer = 0;
             _resetting = true;
             WritePacket(Communication.LinuxRequests.Request.Reset);
             return true;
@@ -777,6 +779,7 @@ namespace DuetControlServer.SPI
 
             WritePacket(Communication.LinuxRequests.Request.WriteIap, bytesRead);
             data.Slice(0, bytesRead).CopyTo(GetWriteBuffer(bytesRead));
+            PerformFullTransfer();
             return true;
         }
 
@@ -868,7 +871,7 @@ namespace DuetControlServer.SPI
             _updating = _started = false;
             _waitingForFirstTransfer = true;
             _rxHeader.SequenceNumber = 1;
-            _lastTransferNumber = _txHeader.SequenceNumber = 0;
+            _txHeader.SequenceNumber = 0;
         }
 
         /// <summary>

@@ -391,18 +391,19 @@ namespace DuetControlServer.Files
                     long seconds = 0;
                     foreach (Group grp in match.Groups)
                     {
-                        if (long.TryParse(grp.Value, out long printTime))
+                        if (float.TryParse(grp.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float printTime) &&
+                            float.IsFinite(printTime))
                         {
                             switch (grp.Name)
                             {
                                 case "h":
-                                    seconds += printTime * 3600;
+                                    seconds += (long)Math.Round(printTime) * 3600L;
                                     break;
                                 case "m":
-                                    seconds += printTime * 60;
+                                    seconds += (long)Math.Round(printTime)* 60L;
                                     break;
                                 case "s":
-                                    seconds += printTime;
+                                    seconds += (long)Math.Round(printTime);
                                     break;
                             }
                         }

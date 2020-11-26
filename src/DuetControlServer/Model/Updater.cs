@@ -165,6 +165,7 @@ namespace DuetControlServer.Model
                                     if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
                                         keyDocument.RootElement.TryGetProperty("result", out JsonElement keyResult))
                                     {
+                                        _lastSeqs[seqProperty.Name] = newSeq;
                                         using (await Provider.AccessReadWriteAsync())
                                         {
                                             if (Provider.Get.UpdateFromFirmwareModel(keyName.GetString(), keyResult))
@@ -185,7 +186,6 @@ namespace DuetControlServer.Model
                                                 Provider.Get.State.Status = MachineStatus.Updating;
                                             }
                                         }
-                                        _lastSeqs[seqProperty.Name] = newSeq;
                                     }
                                     else
                                     {

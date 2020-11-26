@@ -508,9 +508,10 @@ namespace DuetAPI.Commands
                 }
             } while (c != '\n');
 
-            // Check if the state can be reset
+            // Check if this was the last code on the line and if the state can be reset
             if (c == '\n')
             {
+                result.Flags |= CodeFlags.IsLastCode;
                 buffer.InvalidateData();
             }
 

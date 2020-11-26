@@ -227,7 +227,7 @@ namespace DuetControlServer.SPI.Serialization
                         {
                             uint value = val;
                             MemoryMarshal.Write(to[bytesWritten..], ref value);
-                            bytesWritten += Marshal.SizeOf<DriverId>();
+                            bytesWritten += Marshal.SizeOf<uint>();
                         }
                     }
                     else if (parameter is float[] floatArray)
@@ -694,7 +694,7 @@ namespace DuetControlServer.SPI.Serialization
             int bytesTotal = ((bytesWritten + 3) / 4) * 4;
             if (bytesWritten != bytesTotal)
             {
-                to.Slice(bytesWritten, bytesTotal - bytesWritten).Fill(0);
+                to[bytesWritten..bytesTotal].Fill(0);
             }
             return bytesTotal;
         }

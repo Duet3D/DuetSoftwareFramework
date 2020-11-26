@@ -6,15 +6,15 @@
     public sealed class ParsedThumbnail : ModelObject
     {
         /// <summary>
-        /// Width of thumbnail
+        /// base64 encoded thumbnail
         /// </summary>
-        public int Width
+        public string EncodedImage
         {
-            get => _width;
-            set => SetPropertyValue(ref _width, value);
+            get => _encodedImage;
+            set => SetPropertyValue(ref _encodedImage, value);
         }
-        private int _width;
-        
+        private string _encodedImage;
+
         /// <summary>
         /// Height of thumbnail
         /// </summary>
@@ -24,15 +24,15 @@
             set => SetPropertyValue(ref _height, value);
         }
         private int _height;
-        
+
         /// <summary>
-        /// base64 encoded thumbnail
+        /// Width of thumbnail
         /// </summary>
-        public string EncodedImage
+        public int Width
         {
-            get => _encodedImage;
-            set => SetPropertyValue(ref _encodedImage, value);
+            get => _width;
+            set => SetPropertyValue(ref _width, value);
         }
-        private string _encodedImage;
+        private int _width;
     }
 }

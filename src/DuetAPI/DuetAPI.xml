@@ -521,6 +521,11 @@
             Indicates if this code was requested from the firmware
             </summary>
         </member>
+        <member name="F:DuetAPI.Commands.CodeFlags.IsLastCode">
+            <summary>
+            Indicates if this is the last code on the line
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.CodeParameter">
             <summary>
             Represents a parsed parameter of a G/M/T-code
@@ -3158,9 +3163,9 @@
             Holds image parsed out of G-code files
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.ParsedThumbnail.Width">
+        <member name="P:DuetAPI.ObjectModel.ParsedThumbnail.EncodedImage">
             <summary>
-            Width of thumbnail
+            base64 encoded thumbnail
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.ParsedThumbnail.Height">
@@ -3168,9 +3173,9 @@
             Height of thumbnail
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.ParsedThumbnail.EncodedImage">
+        <member name="P:DuetAPI.ObjectModel.ParsedThumbnail.Width">
             <summary>
-            base64 encoded thumbnail
+            Width of thumbnail
             </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.TimesLeft">

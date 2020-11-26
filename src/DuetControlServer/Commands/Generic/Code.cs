@@ -624,7 +624,7 @@ namespace DuetControlServer.Commands
                     }
 
                     // Deal with firmware emulation
-                    if (!Flags.HasFlag(CodeFlags.IsFromMacro))
+                    if (Flags.HasFlag(CodeFlags.IsLastCode) && !Flags.HasFlag(CodeFlags.IsFromMacro))
                     {
                         if (await EmulatingMarlin())
                         {

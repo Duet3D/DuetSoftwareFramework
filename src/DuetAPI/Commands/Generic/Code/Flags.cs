@@ -76,6 +76,11 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Indicates if this code was requested from the firmware
         /// </summary>
-        IsFromFirmware = 1024
+        IsFromFirmware = 1024,
+
+        /// <summary>
+        /// Indicates if this is the last code on the line
+        /// </summary>
+        IsLastCode = 2048
     }
 }

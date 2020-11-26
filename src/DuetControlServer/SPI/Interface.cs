@@ -502,7 +502,6 @@ namespace DuetControlServer.SPI
             do
             {
                 dataSent = DataTransfer.WriteIapSegment(_iapStream);
-                DataTransfer.PerformFullTransfer();
                 if (_logger.IsDebugEnabled)
                 {
                     Console.Write('.');
@@ -672,13 +671,13 @@ namespace DuetControlServer.SPI
                         if (DataTransfer.WriteReset())
                         {
                             _logger.Warn("Resetting controller");
+                            DataTransfer.PerformFullTransfer();
                             _firmwareResetRequest.SetResult(null);
                             _firmwareResetRequest = null;
 
                             if (!Settings.NoTerminateOnReset)
                             {
                                 // Wait for the program to terminate and don't perform any extra transfers
-                                DataTransfer.PerformFullTransfer();
                                 await Task.Delay(-1, Program.CancellationToken);
                             }
                         }
