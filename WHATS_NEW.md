@@ -9,6 +9,7 @@ Compatible files:
 - DuetWebControl 3.2.0-b4
 
 Changed behaviour:
+- DCS service is now started via sysinit.target instead of basic.target so that config.g is processed faster on boot
 - Thumbnails from PrusaSlicer are now parsed (thanks Sindarius)
 - M500 writes new heater tuning parameters to config-override.g
 - In Marlin emulation "ok" responses are only sent when the line is complete
