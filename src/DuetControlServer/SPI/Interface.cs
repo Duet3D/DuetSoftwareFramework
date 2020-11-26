@@ -695,16 +695,21 @@ namespace DuetControlServer.SPI
                         try
                         {
                             await PerformFirmwareUpdate();
-
                             _firmwareUpdateRequest?.SetResult(null);
                             _firmwareUpdateRequest = null;
+
+                            if (Settings.UpdateOnly)
+                            {
+                                // Wait for the requesting task to complete, it will terminate DCS next
+                                await Task.Delay(-1, Program.CancellationToken);
+                            }
                         }
                         catch (Exception e)
                         {
                             _firmwareUpdateRequest?.SetException(e);
                             _firmwareUpdateRequest = null;
 
-                            if (e is OperationCanceledException)
+                            if (!Settings.UpdateOnly && e is OperationCanceledException)
                             {
                                 _logger.Debug(e, "Firmware update cancelled");
                             }
