@@ -10,10 +10,10 @@
 
 Name:    duetwebcontrol
 Version: %{_tversion}
-Release: %{_release}
+Release: %{_tag:%{_tag}-}%{_release}
 Summary: Official web interface for Duet electronics
 Group:   3D Printing
-Source0: duetwebcontrol_%{_tversion}
+Source0: duetwebcontrol_%{_tversion}%{_tag:-%{_tag}}
 License: GPLv3
 URL:     https://github.com/Duet3D/DuetWebControl
 BuildRequires: rpm >= 4.7.2-2
