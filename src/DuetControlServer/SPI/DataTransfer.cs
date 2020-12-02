@@ -1172,21 +1172,22 @@ namespace DuetControlServer.SPI
                 // Change the protocol version if necessary
                 if (_rxHeader.ProtocolVersion != _txHeader.ProtocolVersion)
                 {
-                    if (_rxHeader.ProtocolVersion == 1 || _rxHeader.ProtocolVersion == 2)
+                    if (_rxHeader.ProtocolVersion <= Consts.ProtocolVersion || Settings.UpdateOnly)
                     {
-                        _logger.Warn("Downgrading protocol version {0} to {1}", _txHeader.ProtocolVersion, _rxHeader.ProtocolVersion);
+                        if (_rxHeader.ProtocolVersion < Consts.ProtocolVersion)
+                        {
+                            _logger.Warn("Downgrading protocol version {0} to {1}", _txHeader.ProtocolVersion, _rxHeader.ProtocolVersion);
+                        }
+                        else
+                        {
+                            _logger.Warn("Upgrading protocol version {0} to {1}", _txHeader.ProtocolVersion, _rxHeader.ProtocolVersion);
+                        }
                         _txHeader.ProtocolVersion = _rxHeader.ProtocolVersion;
                         MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
                         _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer[..(Marshal.SizeOf<TransferHeader>() - Marshal.SizeOf<ushort>())].Span);
                         MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-
                         ExchangeResponse(TransferResponse.BadResponse);
                         continue;
-                    }
-                    else if (_rxHeader.ProtocolVersion == Consts.ProtocolVersion)
-                    {
-                        _logger.Warn("Upgrading protocol version {0} to {1}", _txHeader.ProtocolVersion, Consts.ProtocolVersion);
-                        _txHeader.ProtocolVersion = Consts.ProtocolVersion;
                     }
                     else
                     {

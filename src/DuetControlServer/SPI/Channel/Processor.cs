@@ -600,7 +600,7 @@ namespace DuetControlServer.SPI.Channel
                 // Tell RRF as quickly as possible about the new macro being started
                 if (CurrentState.Macro.JustStarted)
                 {
-                    CurrentState.Macro.JustStarted = (DataTransfer.ProtocolVersion < 3) || !DataTransfer.WriteMacroStarted(Channel);
+                    CurrentState.Macro.JustStarted = (DataTransfer.ProtocolVersion >= 3) && !DataTransfer.WriteMacroStarted(Channel);
                     return true;
                 }
 

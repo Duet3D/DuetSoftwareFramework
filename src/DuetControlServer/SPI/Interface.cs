@@ -767,6 +767,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Process incoming packets
+                bool skipDelay = false;
                 for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
                     PacketHeader? packet;
@@ -779,7 +780,7 @@ namespace DuetControlServer.SPI
                             _logger.Error("Read invalid packet");
                             break;
                         }
-                        await ProcessPacket(packet.Value);
+                        skipDelay |= await ProcessPacket(packet.Value);
                     }
                     catch (ArgumentOutOfRangeException)
                     {
@@ -790,7 +791,10 @@ namespace DuetControlServer.SPI
                 _bytesReserved = 0;
 
                 // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
-                bool skipDelay = skipChannels || await _channels.Run();
+                if (!skipChannels)
+                {
+                    skipDelay |= await _channels.Run();
+                }
 
                 // Request object model updates
                 if (DataTransfer.ProtocolVersion == 1)
@@ -910,15 +914,15 @@ namespace DuetControlServer.SPI
         /// Process a packet from RepRapFirmware
         /// </summary>
         /// <param name="packet">Received packet</param>
-        /// <returns>Asynchronous task</returns>
-        private static Task ProcessPacket(PacketHeader packet)
+        /// <returns>Whether a response can be expected that is not channel-related</returns>
+        private static async Task<bool> ProcessPacket(PacketHeader packet)
         {
             Request request = (Request)packet.Request;
 
             if (Settings.UpdateOnly && request != Request.ObjectModel)
             {
                 // Don't process any requests except for object model responses if only the firmware is supposed to be updated
-                return Task.CompletedTask;
+                return false;
             }
 
             switch (request)
@@ -926,7 +930,7 @@ namespace DuetControlServer.SPI
                 case Request.ResendPacket:
                     DataTransfer.ResendPacket(packet, out Communication.LinuxRequests.Request linuxRequest);
                     _logger.Warn("Resending packet type #{0} (request {1})", packet.Id, linuxRequest);
-                    break;
+                    return true;
                 case Request.ObjectModel:
                     HandleObjectModel();
                     break;
@@ -934,32 +938,43 @@ namespace DuetControlServer.SPI
                     HandleCodeBufferUpdate();
                     break;
                 case Request.Message:
-                    return HandleMessage();
+                    await HandleMessage();
+                    break;
                 case Request.ExecuteMacro:
-                    return HandleMacroRequest();
+                    await HandleMacroRequest();
+                    break;
                 case Request.AbortFile:
-                    return HandleAbortFileRequest();
+                    await HandleAbortFileRequest();
+                    break;
                 case Request.PrintPaused:
-                    return HandlePrintPaused();
+                    await HandlePrintPaused();
+                    break;
                 case Request.HeightMap:
-                    return HandleHeightMap();
+                    await HandleHeightMap();
+                    break;
                 case Request.Locked:
-                    return HandleResourceLocked();
+                    await HandleResourceLocked();
+                    break;
                 case Request.FileChunk:
-                    return HandleFileChunkRequest();
+                    await HandleFileChunkRequest();
+                    return true;
                 case Request.EvaluationResult:
                     HandleEvaluationResult();
                     break;
                 case Request.DoCode:
-                    return HandleDoCode();
+                    await HandleDoCode();
+                    break;
                 case Request.WaitForAcknowledgement:
-                    return HandleWaitForAcknowledgement();
+                    await HandleWaitForAcknowledgement();
+                    break;
                 case Request.MacroFileClosed:
-                    return HandleMacroFileClosed();
+                    await HandleMacroFileClosed();
+                    break;
                 case Request.MessageAcknowledged:
-                    return HandleMessageAcknowledgement();
+                    await HandleMessageAcknowledgement();
+                    break;
             }
-            return Task.CompletedTask;
+            return false;
         }
 
         /// <summary>
@@ -1176,7 +1191,7 @@ namespace DuetControlServer.SPI
         private static async Task HandleFileChunkRequest()
         {
             DataTransfer.ReadFileChunkRequest(out string filename, out uint offset, out uint maxLength);
-            _logger.Trace("Received file chunk request for {0}, offset {1}, maxLength {2}", filename, offset, maxLength);
+            _logger.Debug("Received file chunk request for {0}, offset {1}, maxLength {2}", filename, offset, maxLength);
 
             try
             {

@@ -1,6 +1,19 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.2.0-b5
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-b5
+- DuetWebControl 3.2.0-b5
+
+Changed behaviour:
+- RRF downgrades from later protocol versions are now possible
+
+Bug fixes:
+- Fixed incompatibilities when updating RRF from older firmware versions
+
 Version 3.2.0-b4
 ================
 
