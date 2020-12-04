@@ -747,6 +747,31 @@ namespace DuetControlServer.Codes
                     }
                     throw new OperationCanceledException();
 
+                // Configure network protocols
+                case 586:
+                    if (await SPI.Interface.Flush(code))
+                    {
+                        string corsSite = code.Parameter('C');
+                        if (corsSite != null)
+                        {
+                            using (await Model.Provider.AccessReadWriteAsync())
+                            {
+                                Model.Provider.Get.Network.CorsSite = string.IsNullOrWhiteSpace(corsSite) ? null : corsSite;
+                            }
+                            return new CodeResult();
+                        }
+
+                        using (await Model.Provider.AccessReadOnlyAsync())
+                        {
+                            if (string.IsNullOrEmpty(Model.Provider.Get.Network.CorsSite))
+                            {
+                                return new CodeResult(MessageType.Success, "CORS disabled");
+                            }
+                            return new CodeResult(MessageType.Success, $"CORS enabled for site '{Model.Provider.Get.Network.CorsSite}'");
+                        }
+                    }
+                    throw new OperationCanceledException();
+
                 // Configure filament
                 case 703:
                     if (await SPI.Interface.Flush(code))

@@ -2,7 +2,6 @@
 using DuetAPIClient;
 using System;
 using System.Net.Sockets;
-using System.Runtime.InteropServices.ComTypes;
 using System.Text.Json;
 using System.Threading.Tasks;
 

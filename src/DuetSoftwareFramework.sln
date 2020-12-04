@@ -34,6 +34,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PluginManager", "PluginManager\PluginManager.csproj", "{BCC22B04-E9F6-4DD5-AA95-24F02C7AC311}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DuetPluginService", "DuetPluginService\DuetPluginService.csproj", "{F95EB40C-00F0-4841-9A1A-10891B47768D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DuetPluginManager", "DuetPluginManager\DuetPluginManager.csproj", "{444A802F-DC41-417B-BBCD-E6B3FF2F15AF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -87,6 +91,14 @@ Global
 		{BCC22B04-E9F6-4DD5-AA95-24F02C7AC311}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BCC22B04-E9F6-4DD5-AA95-24F02C7AC311}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BCC22B04-E9F6-4DD5-AA95-24F02C7AC311}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F95EB40C-00F0-4841-9A1A-10891B47768D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F95EB40C-00F0-4841-9A1A-10891B47768D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F95EB40C-00F0-4841-9A1A-10891B47768D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F95EB40C-00F0-4841-9A1A-10891B47768D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{444A802F-DC41-417B-BBCD-E6B3FF2F15AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{444A802F-DC41-417B-BBCD-E6B3FF2F15AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{444A802F-DC41-417B-BBCD-E6B3FF2F15AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{444A802F-DC41-417B-BBCD-E6B3FF2F15AF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

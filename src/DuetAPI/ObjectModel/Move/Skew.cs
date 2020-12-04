@@ -13,7 +13,7 @@
             get => _compensateXY;
             set => SetPropertyValue(ref _compensateXY, value);
         }
-        private bool _compensateXY;
+        private bool _compensateXY = true;
 
         /// <summary>
         /// Tangent of the skew angle for the XY or YX axes

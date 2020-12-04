@@ -86,14 +86,17 @@ namespace DuetWebServer.Middleware
                 // See what to do with this request
                 if (httpEndpoint.EndpointType == HttpEndpointType.WebSocket)
                 {
-                    using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                    if (Services.ModelObserver.CheckWebSocketOrigin(context))
+                    {
+                        using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
-                    using CancellationTokenSource cts = new CancellationTokenSource();
-                    Task webSocketTask = ReadFromWebSocket(webSocket, endpointConnection, sessionId, cts.Token);
-                    Task unixSocketTask = ReadFromUnixSocket(webSocket, endpointConnection, cts.Token);
+                        using CancellationTokenSource cts = new CancellationTokenSource();
+                        Task webSocketTask = ReadFromWebSocket(webSocket, endpointConnection, sessionId, cts.Token);
+                        Task unixSocketTask = ReadFromUnixSocket(webSocket, endpointConnection, cts.Token);
 
-                    await Task.WhenAny(webSocketTask, unixSocketTask);
-                    cts.Cancel();
+                        await Task.WhenAny(webSocketTask, unixSocketTask);
+                        cts.Cancel();
+                    }
                 }
                 else
                 {

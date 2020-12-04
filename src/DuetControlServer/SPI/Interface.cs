@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -929,8 +928,12 @@ namespace DuetControlServer.SPI
             {
                 case Request.ResendPacket:
                     DataTransfer.ResendPacket(packet, out Communication.LinuxRequests.Request linuxRequest);
-                    _logger.Warn("Resending packet type #{0} (request {1})", packet.Id, linuxRequest);
-                    return true;
+                    if (linuxRequest != Communication.LinuxRequests.Request.LockMovementAndWaitForStandstill)
+                    {
+                        // It's expected that RRF will need a moment to lock the movement but report other resend requests
+                        _logger.Warn("Resending packet #{0} (request {1})", packet.Id, linuxRequest);
+                    }
+                    break;
                 case Request.ObjectModel:
                     HandleObjectModel();
                     break;
@@ -984,12 +987,7 @@ namespace DuetControlServer.SPI
         private static void HandleObjectModel()
         {
             _logger.Trace("Received object model");
-            if (DataTransfer.ProtocolVersion == 1)
-            {
-                DataTransfer.ReadLegacyConfigResponse(out ReadOnlySpan<byte> json);
-                _ = Model.Updater.ProcessLegacyConfigResponse(json.ToArray());
-            }
-            else
+            if (DataTransfer.ProtocolVersion > 1)
             {
                 DataTransfer.ReadObjectModel(out ReadOnlySpan<byte> json);
                 lock (_pendingModelQueries)
@@ -1003,6 +1001,11 @@ namespace DuetControlServer.SPI
                         _logger.Error("Failed to find query for object model response");
                     }
                 }
+            }
+            else
+            {
+                DataTransfer.ReadLegacyConfigResponse(out ReadOnlySpan<byte> json);
+                _ = Model.Updater.ProcessLegacyConfigResponse(json.ToArray());
             }
         }
 

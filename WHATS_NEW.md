@@ -10,9 +10,11 @@ Compatible files:
 
 Changed behaviour:
 - RRF downgrades from later protocol versions are now possible
+- CORS headers are only sent if explictly configured via M586
 
 Bug fixes:
 - Fixed incompatibilities when updating RRF from older firmware versions
+- LockMovementAndWaitForStandstill retransmissions were logged
 
 Version 3.2.0-b4
 ================

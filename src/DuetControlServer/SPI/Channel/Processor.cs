@@ -987,12 +987,8 @@ namespace DuetControlServer.SPI.Channel
                 BytesBuffered += startCode.BinarySize;
                 BufferedCodes.Insert(0, startCode);
             }
-            else
-            {
-                _logger.Debug("RRF closed the last macro file");
-            }
-            CurrentState.StartCode = null;
 
+            CurrentState.StartCode = null;
             await Pop();
         }
 

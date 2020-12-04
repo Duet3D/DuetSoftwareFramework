@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPIClient;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -63,12 +64,15 @@ namespace DuetWebServer.Controllers
         {
             if (HttpContext.WebSockets.IsWebSocketRequest)
             {
-                using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-                await Process(webSocket);
+                if (Services.ModelObserver.CheckWebSocketOrigin(HttpContext))
+                {
+                    using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+                    await Process(webSocket);
+                }
             }
             else
             {
-                HttpContext.Response.StatusCode = 400;
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
             }
         }
 

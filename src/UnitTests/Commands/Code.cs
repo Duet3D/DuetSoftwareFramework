@@ -205,7 +205,7 @@ namespace UnitTests.Commands
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(569, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
-            Assert.AreEqual(CodeFlags.None, code.Flags);
+            Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
             Assert.AreEqual(3, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
             Assert.AreEqual(new DriverId(1, 2), (DriverId)code.Parameters[0]);
@@ -222,7 +222,7 @@ namespace UnitTests.Commands
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(574, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
-            Assert.AreEqual(CodeFlags.None, code.Flags);
+            Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
             Assert.AreEqual(3, code.Parameters.Count);
             Assert.AreEqual('Y', code.Parameters[0].Letter);
             Assert.AreEqual(2, (int)code.Parameters[0]);
@@ -240,7 +240,7 @@ namespace UnitTests.Commands
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(915, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
-            Assert.AreEqual(CodeFlags.None, code.Flags);
+            Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
             DriverId[] driverIds = new DriverId[] { new DriverId(2), new DriverId(3), new DriverId(1, 4) };
@@ -256,7 +256,7 @@ namespace UnitTests.Commands
             Assert.AreEqual(CodeType.TCode, code.Type);
             Assert.AreEqual(3, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
-            Assert.AreEqual(CodeFlags.None, code.Flags);
+            Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
             Assert.AreEqual(2, code.Parameters.Count);
             Assert.AreEqual('P', code.Parameters[0].Letter);
             Assert.AreEqual(4, (int)code.Parameters[0]);
@@ -269,7 +269,7 @@ namespace UnitTests.Commands
         public void ParseAbsoluteG1()
         {
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("G53 G1 X3 Y1.25");
-            Assert.AreEqual(CodeFlags.EnforceAbsolutePosition, code.Flags);
+            Assert.AreEqual(CodeFlags.EnforceAbsolutePosition | CodeFlags.IsLastCode, code.Flags);
             Assert.AreEqual(1, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
             Assert.AreEqual(2, code.Parameters.Count);
@@ -553,7 +553,7 @@ namespace UnitTests.Commands
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
                 Assert.AreEqual(CodeType.GCode, code.Type);
                 Assert.AreEqual(0, code.MajorNumber);
-                Assert.AreEqual(CodeFlags.EnforceAbsolutePosition, code.Flags);
+                Assert.AreEqual(CodeFlags.EnforceAbsolutePosition | CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(1, code.LineNumber);
                 Assert.AreEqual(2, code.Parameters.Count);
                 Assert.AreEqual(5, (int)code.Parameter('X'));
@@ -590,13 +590,13 @@ namespace UnitTests.Commands
 
                 DuetAPI.Commands.Code code = new DuetAPI.Commands.Code() { LineNumber = 0 };
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
-                Assert.AreEqual(CodeFlags.None, code.Flags);
+                Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(0, code.Indent);
                 Assert.AreEqual(1, code.LineNumber);
 
                 code.Reset();
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
-                Assert.AreEqual(CodeFlags.EnforceAbsolutePosition, code.Flags);
+                Assert.AreEqual(CodeFlags.EnforceAbsolutePosition | CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(2, code.Indent);
                 Assert.AreEqual(2, code.LineNumber);
 
@@ -608,19 +608,19 @@ namespace UnitTests.Commands
 
                 code.Reset();
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
-                Assert.AreEqual(CodeFlags.EnforceAbsolutePosition, code.Flags);
+                Assert.AreEqual(CodeFlags.EnforceAbsolutePosition | CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(4, code.Indent);
                 Assert.AreEqual(3, code.LineNumber);
 
                 code.Reset();
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
-                Assert.AreEqual(CodeFlags.None, code.Flags);
+                Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(2, code.Indent);
                 Assert.AreEqual(4, code.LineNumber);
 
                 code.Reset();
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
-                Assert.AreEqual(CodeFlags.None, code.Flags);
+                Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(0, code.Indent);
                 Assert.AreEqual(5, code.LineNumber);
             }
@@ -648,6 +648,7 @@ namespace UnitTests.Commands
         {
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("T{my.expression} P0");
 
+            Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
             Assert.AreEqual(CodeType.TCode, code.Type);
             Assert.IsNull(code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
@@ -670,6 +671,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code();
             await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
 
+            Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
             Assert.AreEqual(CodeType.TCode, code.Type);
             Assert.IsNull(code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
@@ -685,6 +687,7 @@ namespace UnitTests.Commands
         {
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code("M84 XYE; disable motors");
 
+            Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(84, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);
@@ -710,6 +713,7 @@ namespace UnitTests.Commands
             DuetAPI.Commands.Code code = new DuetAPI.Commands.Code();
             await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
 
+            Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
             Assert.AreEqual(CodeType.MCode, code.Type);
             Assert.AreEqual(84, code.MajorNumber);
             Assert.IsNull(code.MinorNumber);

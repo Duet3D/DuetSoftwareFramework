@@ -1,11 +1,16 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPIClient;
+using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,6 +21,14 @@ namespace DuetWebServer.Services
     /// </summary>
     public sealed class ModelObserver : IHostedService, IDisposable
     {
+        /// <summary>
+        /// Configured CORS policy for cross-origin requests
+        /// </summary>
+        public static readonly CorsPolicy CorsPolicy = (new CorsPolicyBuilder())
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .Build();
+
         /// <summary>
         /// Dictionary of registered third-party paths vs third-party HTTP endpoints
         /// </summary>
@@ -53,6 +66,37 @@ namespace DuetWebServer.Services
         private readonly IConfiguration _configuration;
 
         /// <summary>
+        /// Check the origin of an incoming WebSocket request and set the status on error
+        /// </summary>
+        /// <param name="httpContext">HTTP context to check</param>
+        /// <returns>True if the origin is allowed</returns>
+        public static bool CheckWebSocketOrigin(HttpContext httpContext)
+        {
+            if (httpContext.Request.Headers.ContainsKey(CorsConstants.Origin))
+            {
+                if (httpContext.Request.Headers.ContainsKey(HeaderNames.Host) &&
+                    Uri.TryCreate(httpContext.Request.Headers[CorsConstants.Origin], UriKind.Absolute, out Uri uri) &&
+                    string.Equals(uri.Host, httpContext.Request.Headers[HeaderNames.Host], StringComparison.InvariantCultureIgnoreCase))
+                {
+                    // Origin matches Host, request is legit
+                    return true;
+                }
+
+                if (!CorsPolicy.Origins.Any(origin =>
+                    {
+                        Regex corsRegex = new Regex('^' + Regex.Escape(origin).Replace("\\*", ".*").Replace("\\?", ".") + '$', RegexOptions.IgnoreCase);
+                        return corsRegex.IsMatch(httpContext.Request.Headers[CorsConstants.Origin]);
+                    }))
+                {
+                    // Origin does not match Host (if applicable) and no CORS policy allows the specified Origin
+                    httpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Logger instance
         /// </summary>
         private readonly ILogger _logger;
@@ -71,6 +115,7 @@ namespace DuetWebServer.Services
         /// Constructor of this service class
         /// </summary>
         /// <param name="configuration">App configuration</param>
+        /// <param name="corsService">Default CORS service</param>
         /// <param name="logger">Logger instance</param>
         public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger)
         {
@@ -128,12 +173,21 @@ namespace DuetWebServer.Services
                         // Establish connections to DCS
                         using SubscribeConnection subscribeConnection = new SubscribeConnection();
                         using CommandConnection commandConnection = new CommandConnection();
-                        await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, new string[] { "directories/www", "httpEndpoints/**", "userSessions/**" }, unixSocket);
+                        await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, new string[] {
+                            "directories/www",
+                            "httpEndpoints/**",
+                            "network/corsSite",
+                            "userSessions/**"
+                        }, unixSocket);
                         await commandConnection.Connect(unixSocket);
                         _logger.LogInformation("Connections to DuetControlServer established");
 
                         // Get the machine model and keep it up-to-date
                         model = await subscribeConnection.GetObjectModel(_stopRequest.Token);
+                        if (!string.IsNullOrEmpty(model.Network.CorsSite))
+                        {
+                            CorsPolicy.Origins.Add(model.Network.CorsSite);
+                        }
                         lock (Endpoints)
                         {
                             Endpoints.Clear();
@@ -156,6 +210,16 @@ namespace DuetWebServer.Services
                             // Wait for more updates
                             using JsonDocument jsonPatch = await subscribeConnection.GetObjectModelPatch(_stopRequest.Token);
                             model.UpdateFromJson(jsonPatch.RootElement);
+
+                            // Check for updated CORS site
+                            if (jsonPatch.RootElement.TryGetProperty("network", out _))
+                            {
+                                CorsPolicy.Origins.Clear();
+                                if (!string.IsNullOrEmpty(model.Network.CorsSite))
+                                {
+                                    CorsPolicy.Origins.Add(model.Network.CorsSite);
+                                }
+                            }
 
                             // Check if the HTTP sessions have changed and rebuild them on demand
                             if (jsonPatch.RootElement.TryGetProperty("httpEndpoints", out _))

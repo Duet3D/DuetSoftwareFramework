@@ -1,4 +1,3 @@
-using DuetAPI.ObjectModel;
 using System.Collections.Generic;
 
 namespace DuetAPI.Connection.InitMessages

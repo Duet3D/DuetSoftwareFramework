@@ -4207,6 +4207,11 @@
             Default network password of the machine
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Network.CorsSite">
+            <summary>
+            If this is set, the web server will allow cross-origin requests via the Access-Control-Allow-Origin header
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Network.Hostname">
             <summary>
             Hostname of the machine

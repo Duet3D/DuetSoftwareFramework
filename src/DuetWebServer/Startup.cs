@@ -14,11 +14,6 @@ namespace DuetWebServer
     public class Startup
     {
         /// <summary>
-        /// Name of the CORS policy to use
-        /// </summary>
-        private const string CorsPolicy = "cors-policy";
-
-        /// <summary>
         /// Copy of the app configuration
         /// </summary>
         private readonly IConfiguration _configuration;
@@ -38,20 +33,7 @@ namespace DuetWebServer
         /// <param name="services">Service collection</param>
         public static void ConfigureServices(IServiceCollection services)
         {
-            // Register CORS policy (may or may not be used)
-            services.AddCors(options =>
-            {
-                options.AddPolicy(CorsPolicy,
-                builder =>
-                {
-                    // Create a rule for very unrestrictive CORS requests
-                    builder
-                        .AllowAnyOrigin()
-                        .AllowAnyHeader()
-                        .AllowAnyMethod();
-                });
-            });
-
+            services.AddCors(options => options.AddDefaultPolicy(Services.ModelObserver.CorsPolicy));
             services.AddControllers();
         }
 
@@ -74,27 +56,20 @@ namespace DuetWebServer
             });
             app.UseRouting();
 
-            // Set CORS flags if applicable
-            if (_configuration.GetValue("UseCors", true))
-            {
-                app.UseCors(CorsPolicy);
-            }
+            // Enable CORS policy
+            app.UseCors();
 
             // Define a keep-alive interval for operation as a reverse proxy
             app.UseWebSockets(new WebSocketOptions
             {
-                KeepAliveInterval = TimeSpan.FromSeconds(_configuration.GetValue("KeepAliveInterval", 30))
-            }); ;
+                KeepAliveInterval = TimeSpan.FromSeconds(_configuration.GetValue("KeepAliveInterval", 30)),
+            });
 
             // Define endpoints
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllerRoute("WebSocket", "{controller=WebSocket}");
                 endpoints.MapControllerRoute("default", "{controller=Machine}");
-                if (_configuration.GetValue("UseCors", false))
-                {
-                    endpoints.MapControllers().RequireCors(CorsPolicy);
-                }
             });
 
             // Use middleware for third-pary HTTP requests
