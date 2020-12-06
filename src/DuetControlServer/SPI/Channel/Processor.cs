@@ -731,16 +731,16 @@ namespace DuetControlServer.SPI.Channel
 
                             // Split the message into multiple chunks so RRF can output it
                             Memory<byte> encodedMessage = Encoding.UTF8.GetBytes(result.ToString());
-                            for (int i = 0; i < encodedMessage.Length; i += Communication.Consts.MaxMessageLength)
+                            for (int i = 0; i < encodedMessage.Length; i += Settings.MaxMessageLength)
                             {
-                                if (i + Communication.Consts.MaxMessageLength >= encodedMessage.Length)
+                                if (i + Settings.MaxMessageLength >= encodedMessage.Length)
                                 {
                                     Memory<byte> partialMessage = encodedMessage[i..];
                                     Interface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
                                 }
                                 else
                                 {
-                                    Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, Communication.Consts.MaxMessageLength));
+                                    Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, Settings.MaxMessageLength));
                                     Interface.SendMessage(flags | MessageTypeFlags.PushFlag, Encoding.UTF8.GetString(partialMessage.ToArray()));
                                 }
                             }
