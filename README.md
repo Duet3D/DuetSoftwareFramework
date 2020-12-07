@@ -114,7 +114,6 @@ Apart from these two sections, you can also customize the following settings:
 - `KeepAliveInterval`: Default keep-alive interval for WebSocket connections. This is useful if DWS is operating as a reverse proxy
 - `ModelRetryDelay`: If DuetControlServer is not running, this specifies the delay between reconnect attempts in milliseconds
 - `ObjectModelUpdateTimeout`: When a WebSocket is connected and waiting for object model changes, this specifies the timeout after which DWS stops waiting and polls the WebSocket again
-- `UseCors`: This defines if CORS requests are allowed. This is useful for DWC development (when DWC is running on localhost) or for running a print farm
 - `UseStaticFiles`: Whether to provide web files from the virtual `www` directory. This is required for DWC if DWS is not running as a reverse proxy
 - `WebSocketBufferSize`: This defines the maximum buffer size per third-party WebSocket connection
 
