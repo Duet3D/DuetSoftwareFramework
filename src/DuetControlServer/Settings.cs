@@ -179,12 +179,12 @@ namespace DuetControlServer
         /// <summary>
         /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
         /// </summary>
-        public static int MaxCodeBufferSize { get; set; } = SPI.Communication.Consts.MaxCodeBufferSize;
+        public static int MaxCodeBufferSize { get; set; } = 256;
 
         /// <summary>
         /// Maximum supported length of messages to be sent to RepRapFirmware
         /// </summary>
-        public static int MaxMessageLength { get; set; } = SPI.Communication.Consts.MaxMessageLength;
+        public static int MaxMessageLength { get; set; } = 4096;
 
         /// <summary>
         /// List of string chunks that are identified by RepRapFirmware
