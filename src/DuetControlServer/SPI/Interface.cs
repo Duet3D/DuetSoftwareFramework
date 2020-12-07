@@ -282,11 +282,14 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Wait for all pending codes on the same stack level as the given code to finish
+        /// Wait for all pending codes on the same stack level as the given code to finish.
+        /// By default this replaces all expressions as well for convinient parsing by the code processors.
         /// </summary>
         /// <param name="code">Code waiting for the flush</param>
+        /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
+        /// <param name="evaluateAll">Evaluate the expressions or only Linux fields if evaluateExpressions is set to true</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static Task<bool> Flush(Code code)
+        public static Task<bool> Flush(Code code, bool evaluateExpressions = true, bool evaluateAll = true)
         {
             if (Settings.NoSpi)
             {
@@ -295,7 +298,22 @@ namespace DuetControlServer.SPI
 
             using (_channels[code.Channel].Lock())
             {
-                return _channels[code.Channel].Flush(code);
+                return _channels[code.Channel]
+                    .Flush(code)
+                    .ContinueWith(async task =>
+                    {
+                        if (await task)
+                        {
+                            if (evaluateExpressions)
+                            {
+                                // Code is about to be processed internally, evaluate potential expressions
+                                await Model.Expressions.Evaluate(code, evaluateAll);
+                            }
+                            return true;
+                        }
+                        return false;
+                    }, TaskContinuationOptions.RunContinuationsAsynchronously)
+                    .Unwrap();
             }
         }
 

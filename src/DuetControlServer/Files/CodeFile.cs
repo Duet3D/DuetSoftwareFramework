@@ -421,14 +421,17 @@ namespace DuetControlServer.Files
                             }
 
                             // Evaluate the condition
-                            string evaluationResult = await Model.Expressions.Evaluate(code, false);
-                            if (evaluationResult != "true" && evaluationResult != "false")
+                            string stringEvaluationResult = await Model.Expressions.Evaluate(code, true);
+                            if (bool.TryParse(stringEvaluationResult, out bool evaluationResult))
                             {
-                                throw new CodeParserException($"invalid conditional result '{evaluationResult}', must be either true or false", code);
+                                _logger.Debug("Evaluation result: ({0}) = {1}", code.KeywordArgument, evaluationResult);
+                                codeBlock.ProcessBlock = evaluationResult;
+                                codeBlock.ExpectingElse = (code.Keyword != KeywordType.While) && !evaluationResult;
                             }
-                            _logger.Debug("Evaluation result: ({0}) = {1}", code.KeywordArgument, evaluationResult);
-                            codeBlock.ProcessBlock = (evaluationResult == "true");
-                            codeBlock.ExpectingElse = (code.Keyword != KeywordType.While && evaluationResult == "false");
+                            else
+                            {
+                                throw new CodeParserException($"invalid conditional result '{stringEvaluationResult}', must be either true or false", code);
+                            }
                             break;
 
                         case KeywordType.Else:

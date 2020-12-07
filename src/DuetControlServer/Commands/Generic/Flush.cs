@@ -32,7 +32,7 @@ namespace DuetControlServer.Commands
 
             // Wait for it to be flushed
             Code codeBeingIntercepted = IPC.Processors.CodeInterception.GetCodeBeingIntercepted(Connection);
-            return await ((codeBeingIntercepted != null) ? Interface.Flush(codeBeingIntercepted) : Interface.Flush(Channel));
+            return await ((codeBeingIntercepted != null) ? Interface.Flush(codeBeingIntercepted, false) : Interface.Flush(Channel));
         }
     }
 }

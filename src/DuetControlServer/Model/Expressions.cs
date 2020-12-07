@@ -254,9 +254,9 @@ namespace DuetControlServer.Model
         /// Evaluate a conditional code
         /// </summary>
         /// <param name="code">Code holding expressions</param>
-        /// <param name="replaceOnlyLinuxFields">Whether to evaluate only Linux attributes (not applicable for echo)</param>
+        /// <param name="evaluateAll">Whether all or only Linux fields are supposed to be evaluated</param>
         /// <returns>Evaluation result or null</returns>
-        public static async Task<string> Evaluate(Code code, bool replaceOnlyLinuxFields)
+        public static async Task<string> Evaluate(Code code, bool evaluateAll)
         {
             if (code.KeywordArgument != null)
             {
@@ -267,7 +267,7 @@ namespace DuetControlServer.Model
                     {
                         try
                         {
-                            string result = await EvaluateExpression(code, expression, replaceOnlyLinuxFields, false);
+                            string result = await EvaluateExpression(code, expression, !evaluateAll, false);
                             if (builder.Length != 0)
                             {
                                 builder.Append(' ');
@@ -285,7 +285,7 @@ namespace DuetControlServer.Model
                 string keywordArgument = code.KeywordArgument.Trim();
                 try
                 {
-                    string result = await EvaluateExpression(code, keywordArgument, replaceOnlyLinuxFields, false);
+                    string result = await EvaluateExpression(code, keywordArgument, !evaluateAll, false);
                     return result;
                 }
                 catch (CodeParserException cpe)
@@ -301,10 +301,10 @@ namespace DuetControlServer.Model
                     string trimmedExpression = ((string)code.Parameters[i]).Trim();
                     try
                     {
-                        string parameterValue = await EvaluateExpression(code, trimmedExpression, replaceOnlyLinuxFields, true);
-                        if (!parameterValue.StartsWith('{') && !parameterValue.EndsWith('}'))
+                        string parameterValue = await EvaluateExpression(code, trimmedExpression, !evaluateAll, !evaluateAll);
+                        if (!evaluateAll && !parameterValue.StartsWith('{') && !parameterValue.EndsWith('}'))
                         {
-                            // Encapsulate even fully expanded parameters so that plugins and RRF know it was an expression
+                            // Encapsulate fully expanded parameters so that plugins and RRF know it was an expression
                             parameterValue = '{' + parameterValue + '}';
                         }
                         code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue);

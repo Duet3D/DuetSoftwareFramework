@@ -11,10 +11,13 @@ Compatible files:
 Changed behaviour:
 - RRF downgrades from later protocol versions are now possible
 - CORS headers are only sent if explictly configured via M586
+- SPI transfers use CRC32 checksums with newer RRF versions
 
 Bug fixes:
 - Fixed incompatibilities when updating RRF from older firmware versions
 - LockMovementAndWaitForStandstill retransmissions were logged
+- Expressions were not automatically evaluated in the code processors
+- Internally processed codes were only logged if they resulted in a warning or error
 
 Version 3.2.0-b4
 ================

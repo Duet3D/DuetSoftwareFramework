@@ -32,8 +32,8 @@ namespace DuetControlServer.SPI.Serialization
             header.ProtocolVersion = Consts.ProtocolVersion;
             header.SequenceNumber = 0;
             header.DataLength = 0;
-            header.ChecksumData = 0;
-            header.ChecksumHeader = 0;
+            header.ChecksumData32 = 0;
+            header.ChecksumHeader32 = 0;
         }
 
         /// <summary>

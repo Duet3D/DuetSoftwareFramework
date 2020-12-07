@@ -45,19 +45,19 @@ namespace UnitTests.Machine
             DuetControlServer.Model.Provider.Get.Volumes.Add(new DuetAPI.ObjectModel.Volume { FreeSpace = 12345 });
 
             DuetControlServer.Commands.Code code = new DuetControlServer.Commands.Code("echo volumes[0].freeSpace");
-            object result = await DuetControlServer.Model.Expressions.Evaluate(code, true);
+            object result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("12345", result);
 
             code = new DuetControlServer.Commands.Code("echo move.axes[0].userPosition");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, true);
+            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("move.axes[0].userPosition", result);
 
             code = new DuetControlServer.Commands.Code("echo move.axes[{1 + 1}].userPosition");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, true);
+            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("move.axes[{1 + 1}].userPosition", result);
 
             code = new DuetControlServer.Commands.Code("echo #volumes");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, true);
+            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("1", result);
 
             code = new DuetControlServer.Commands.Code("echo volumes");
@@ -68,15 +68,15 @@ namespace UnitTests.Machine
             Assert.AreEqual("{object}", result);
 
             code = new DuetControlServer.Commands.Code("echo move.axes[0].userPosition + volumes[0].freeSpace");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, true);
+            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("move.axes[0].userPosition + 12345", result);
 
             code = new DuetControlServer.Commands.Code("echo \"hello\"");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, true);
+            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("\"hello\"", result);
 
             code = new DuetControlServer.Commands.Code("echo {\"hello\" ^ (\"there\" + volumes[0].freeSpace)}");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, true);
+            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("{\"hello\" ^ (\"there\" + 12345)}", result);
         }
     }

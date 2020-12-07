@@ -144,17 +144,14 @@ namespace DuetControlServer.SPI
             _rxHeader.NumPackets = 0;
             _rxHeader.ProtocolVersion = 0;
             _rxHeader.DataLength = 0;
-            _rxHeader.ChecksumData = 0;
-            _rxHeader.ChecksumHeader = 0;
+            _rxHeader.ChecksumData32 = 0;
+            _rxHeader.ChecksumHeader32 = 0;
 
             // Set up TX transfer header
             _txHeader.NumPackets = _packetId;
             _txHeader.SequenceNumber++;
             _txHeader.DataLength = (ushort)_txPointer;
-            _txHeader.ChecksumData = CRC16.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
-            MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-            _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer[0..(Marshal.SizeOf<TransferHeader>() - Marshal.SizeOf<ushort>())].Span);
-            MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+            WriteCRC();
 
             do
             {
@@ -1111,6 +1108,27 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Write the CRC16 or CRC32 checksums
+        /// </summary>
+        private static void WriteCRC()
+        {
+            if (_txHeader.ProtocolVersion >= 4)
+            {
+                _txHeader.ChecksumData32 = CRC32.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
+                MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+                _txHeader.ChecksumHeader32 = CRC32.Calculate(_txHeaderBuffer.Slice(0, 12).Span);
+                MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+            }
+            else
+            {
+                _txHeader.ChecksumData16 = CRC16.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
+                MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+                _txHeader.ChecksumHeader16 = CRC16.Calculate(_txHeaderBuffer.Slice(0, 10).Span);
+                MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+            }
+        }
+
+        /// <summary>
         /// Exchange the transfer header
         /// </summary>
         /// <returns>True on success</returns>
@@ -1120,7 +1138,14 @@ namespace DuetControlServer.SPI
             {
                 // Perform SPI header exchange
                 WaitForTransfer();
-                _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
+                if (_txHeader.ProtocolVersion >= 4)
+                {
+                    _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
+                }
+                else
+                {
+                    _spiDevice.TransferFullDuplex(_txHeaderBuffer.Slice(0, 12).Span, _rxHeaderBuffer.Slice(0, 12).Span);
+                }
 
                 // Check for possible response code
                 uint responseCode = MemoryMarshal.Read<uint>(_rxHeaderBuffer.Span);
@@ -1130,30 +1155,66 @@ namespace DuetControlServer.SPI
                     return false;
                 }
 
-                // Inspect received header
-                _rxHeader = MemoryMarshal.Cast<byte, TransferHeader>(_rxHeaderBuffer.Span)[0];
+                // Read received header
+                _rxHeader = MemoryMarshal.Read<TransferHeader>(_rxHeaderBuffer.Span);
                 if (_rxHeader.FormatCode == 0 || _rxHeader.FormatCode == 0xFF)
                 {
                     throw new OperationCanceledException("Board is not available (no header)");
                 }
 
-                ushort checksum = CRC16.Calculate(_rxHeaderBuffer[..(Marshal.SizeOf<TransferHeader>() - Marshal.SizeOf<ushort>())].Span);
-                if (_rxHeader.ChecksumHeader != checksum)
+                // Change the protocol version if necessary
+                ushort lastProtocolVersion = _txHeader.ProtocolVersion;
+                if (_rxHeader.ProtocolVersion != lastProtocolVersion &&
+                    (_rxHeader.ProtocolVersion <= Consts.ProtocolVersion || Settings.UpdateOnly))
                 {
-                    _logger.Warn("Bad header checksum (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader.ToString("x4"), checksum.ToString("x4"));
-                    responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
-                    if (responseCode == TransferResponse.BadResponse)
-                    {
-                        _logger.Warn("Restarting transfer because the Duet received a bad response (header response)");
-                        return false;
-                    }
-                    if (responseCode != TransferResponse.Success)
-                    {
-                        _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
-                    }
+                    _txHeader.ProtocolVersion = _rxHeader.ProtocolVersion;
+                    WriteCRC();
+
+                    ExchangeResponse(TransferResponse.BadResponse);
                     continue;
                 }
 
+                // Verify header checksum
+                if (_rxHeader.ProtocolVersion >= 4)
+                {
+                    uint crc32 = CRC32.Calculate(_rxHeaderBuffer.Slice(0, 12).Span);
+                    if (_rxHeader.ChecksumHeader32 != crc32)
+                    {
+                        _logger.Warn("Bad header CRC32 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader32.ToString("x8"), crc32.ToString("x8"));
+                        responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
+                        if (responseCode == TransferResponse.BadResponse)
+                        {
+                            _logger.Warn("Restarting transfer because the Duet received a bad response (header response)");
+                            return false;
+                        }
+                        if (responseCode != TransferResponse.Success)
+                        {
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                        }
+                        continue;
+                    }
+                }
+                else
+                {
+                    ushort crc16 = CRC16.Calculate(_rxHeaderBuffer.Slice(0, 10).Span);
+                    if (_rxHeader.ChecksumHeader16 != crc16)
+                    {
+                        _logger.Warn("Bad header CRC16 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader16.ToString("x4"), crc16.ToString("x4"));
+                        responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
+                        if (responseCode == TransferResponse.BadResponse)
+                        {
+                            _logger.Warn("Restarting transfer because the Duet received a bad response (header response)");
+                            return false;
+                        }
+                        if (responseCode != TransferResponse.Success)
+                        {
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                        }
+                        continue;
+                    }
+                }
+
+                // Check format code
                 switch (_rxHeader.FormatCode)
                 {
                     case Consts.FormatCode:
@@ -1169,33 +1230,26 @@ namespace DuetControlServer.SPI
                         throw new Exception($"Invalid format code {_rxHeader.FormatCode:x2}");
                 }
 
-                // Change the protocol version if necessary
-                if (_rxHeader.ProtocolVersion != _txHeader.ProtocolVersion)
+                // Check for changed protocol version
+                if (_rxHeader.ProtocolVersion > Consts.ProtocolVersion && !Settings.UpdateOnly)
                 {
-                    if (_rxHeader.ProtocolVersion <= Consts.ProtocolVersion || Settings.UpdateOnly)
+                    ExchangeResponse(TransferResponse.BadProtocolVersion);
+                    throw new Exception($"Invalid protocol version {_rxHeader.ProtocolVersion}");
+                }
+
+                if (lastProtocolVersion != _txHeader.ProtocolVersion)
+                {
+                    if (_txHeader.ProtocolVersion < Consts.ProtocolVersion)
                     {
-                        if (_rxHeader.ProtocolVersion < Consts.ProtocolVersion)
-                        {
-                            _logger.Warn("Downgrading protocol version {0} to {1}", _txHeader.ProtocolVersion, _rxHeader.ProtocolVersion);
-                        }
-                        else
-                        {
-                            _logger.Warn("Upgrading protocol version {0} to {1}", _txHeader.ProtocolVersion, _rxHeader.ProtocolVersion);
-                        }
-                        _txHeader.ProtocolVersion = _rxHeader.ProtocolVersion;
-                        MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-                        _txHeader.ChecksumHeader = CRC16.Calculate(_txHeaderBuffer[..(Marshal.SizeOf<TransferHeader>() - Marshal.SizeOf<ushort>())].Span);
-                        MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-                        ExchangeResponse(TransferResponse.BadResponse);
-                        continue;
+                        _logger.Warn("Downgrading protocol version {0} to {1}", lastProtocolVersion, _txHeader.ProtocolVersion);
                     }
                     else
                     {
-                        ExchangeResponse(TransferResponse.BadProtocolVersion);
-                        throw new Exception($"Invalid protocol version {_rxHeader.ProtocolVersion}");
+                        _logger.Warn("Upgrading protocol version {0} to {1}", lastProtocolVersion, _txHeader.ProtocolVersion);
                     }
                 }
 
+                // Check the data length
                 if (_rxHeader.DataLength > bufferSize)
                 {
                     ExchangeResponse(TransferResponse.BadDataLength);
@@ -1272,23 +1326,46 @@ namespace DuetControlServer.SPI
                 }
 
                 // Inspect received data
-                ushort checksum = CRC16.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
-                if (_rxHeader.ChecksumData != checksum)
+                if (_rxHeader.ProtocolVersion >= 4)
                 {
-                    _logger.Warn("Bad data checksum (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData.ToString("x4"), checksum.ToString("x4"));
-                    responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
-                    if (responseCode == TransferResponse.BadResponse)
+                    uint crc32 = CRC32.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+                    if (crc32 != _rxHeader.ChecksumData32)
                     {
-                        _logger.Warn("Restarting transfer because the Duet received a bad response (data response)");
-                        return false;
+                        _logger.Warn("Bad data CRC32 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData32.ToString("x8"), crc32.ToString("x8"));
+                        responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
+                        if (responseCode == TransferResponse.BadResponse)
+                        {
+                            _logger.Warn("Restarting transfer because the Duet received a bad response (data response)");
+                            return false;
+                        }
+                        if (responseCode != TransferResponse.Success)
+                        {
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                        }
+                        continue;
                     }
-                    if (responseCode != TransferResponse.Success)
+                }
+                else
+                {
+                    ushort crc16 = CRC16.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+                    if (crc16 != _rxHeader.ChecksumData16)
                     {
-                        _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                        _logger.Warn("Bad data CRC16 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData16.ToString("x4"), crc16.ToString("x4"));
+                        responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
+                        if (responseCode == TransferResponse.BadResponse)
+                        {
+                            _logger.Warn("Restarting transfer because the Duet received a bad response (data response)");
+                            return false;
+                        }
+                        if (responseCode != TransferResponse.Success)
+                        {
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                        }
+                        continue;
                     }
-                    continue;
                 }
 
+                // Check response
                 uint response = ExchangeResponse(TransferResponse.Success);
                 switch (response)
                 {

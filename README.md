@@ -99,11 +99,11 @@ DuetControlServer provides several functions for synchronized access along with 
 ## DuetWebServer
 
 This application provides Duet Web Control along with a RESTful API and possibly custom HTTP endpoints.
-It is implemented using ASP.NET Core and uses Kestrel internally. The coniguration file defaults to `/opt/dsf/conf/http.conf`.
+It is implemented using ASP.NET Core and uses Kestrel internally. The coniguration file defaults to `/opt/dsf/conf/http.json`.
 
 ### Configuration
 
-The configuration file of DuetWebServer can be found in `/opt/dsf/conf/http.conf`. In this file various settings can be tuned.
+The configuration file of DuetWebServer can be found in `/opt/dsf/conf/http.json`. In this file various settings can be tuned.
 
 In the `Logging` section, the default minimum `LogLevel` can be changed to one of `Trace`, `Debug`, `Information`, `Warning`, `Error`, or`Critical`. It defaults to `Information`.
 

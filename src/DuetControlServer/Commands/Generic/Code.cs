@@ -487,14 +487,10 @@ namespace DuetControlServer.Commands
                 }
             }
 
-            // Populate Linux expressions in G/M/T-codes
-            if (Keyword == KeywordType.None && Expressions.ContainsLinuxFields(this))
+            // Flush the code channel and populate Linux fields where applicable
+            if (Keyword == KeywordType.None && Expressions.ContainsLinuxFields(this) && !await Interface.Flush(this, true, false))
             {
-                if (!await Interface.Flush(this))
-                {
-                    throw new OperationCanceledException();
-                }
-                await Expressions.Evaluate(this, true);
+                throw new OperationCanceledException();
             }
 
             // Attempt to process the code internally
@@ -535,12 +531,12 @@ namespace DuetControlServer.Commands
             // Evaluate echo, abort, and return
             if (Keyword == KeywordType.Echo || Keyword == KeywordType.Abort || Keyword == KeywordType.Return)
             {
-                if (!await Interface.Flush(this))
+                if (!await Interface.Flush(this, false))
                 {
                     throw new OperationCanceledException();
                 }
 
-                string result = await Expressions.Evaluate(this, false);
+                string result = await Expressions.Evaluate(this, true);
                 Result = new CodeResult(MessageType.Success, result);
 
                 if (Keyword == KeywordType.Abort)
@@ -611,9 +607,9 @@ namespace DuetControlServer.Commands
                             break;
                     }
 
-                    // RepRapFirmware generally prefixes error messages with the code itself
                     if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
                     {
+                        // RepRapFirmware generally prefixes error messages with the code itself, mimic this behavior
                         foreach (Message msg in Result)
                         {
                             if (msg.Type == MessageType.Error)
@@ -621,24 +617,34 @@ namespace DuetControlServer.Commands
                                 msg.Content = ToShortString() + ": " + msg.Content;
                             }
                         }
+
+                        // Messages from RRF and replies to file print codes are logged somewhere else,
+                        // so we only need to log internal code replies that are not part of file prints
+                        if (File == null || Channel != CodeChannel.File)
+                        {
+                            await Utility.Logger.Log(Result);
+                        }
                     }
 
                     // Deal with firmware emulation
-                    if (Flags.HasFlag(CodeFlags.IsLastCode) && !Flags.HasFlag(CodeFlags.IsFromMacro))
+                    if (!Flags.HasFlag(CodeFlags.IsFromMacro))
                     {
                         if (await EmulatingMarlin())
                         {
-                            if (Result.Count != 0 && Type == CodeType.MCode && MajorNumber == 105)
+                            if (Flags.HasFlag(CodeFlags.IsLastCode))
                             {
-                                Result[0].Content = "ok " + Result[0].Content;
-                            }
-                            else if (Result.IsEmpty)
-                            {
-                                Result.Add(MessageType.Success, "ok\n");
-                            }
-                            else
-                            {
-                                Result[^1].Content += "\nok\n";
+                                if (Result.Count != 0 && Type == CodeType.MCode && MajorNumber == 105)
+                                {
+                                    Result[0].Content = "ok " + Result[0].Content;
+                                }
+                                else if (Result.IsEmpty)
+                                {
+                                    Result.Add(MessageType.Success, "ok\n");
+                                }
+                                else
+                                {
+                                    Result[^1].Content += "\nok\n";
+                                }
                             }
                         }
                         else if (!Result.IsEmpty)
@@ -666,19 +672,6 @@ namespace DuetControlServer.Commands
                     else
                     {
                         File.LastResult = 0;
-                    }
-                }
-
-                // Log our own warnings and errors
-                if (!Flags.HasFlag(CodeFlags.IsPostProcessed) && Channel != CodeChannel.File)
-                {
-                    foreach (Message msg in Result)
-                    {
-                        if (msg.Type != MessageType.Success)
-                        {
-                            // When a file is being printed, every message is automatically output and logged
-                            await Utility.Logger.Log(LogLevel.Warn, msg);
-                        }
                     }
                 }
             }

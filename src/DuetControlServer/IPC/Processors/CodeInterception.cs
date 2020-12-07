@@ -91,7 +91,7 @@ namespace DuetControlServer.IPC.Processors
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
             _channels = (interceptInitMessage.Channels != null) ? interceptInitMessage.Channels.ToList() : new List<CodeChannel>(Enum.GetValues(typeof(CodeChannel)).Cast<CodeChannel>());
-            _filters = (interceptInitMessage.Filters != null) ? interceptInitMessage.Filters : new List<string>();
+            _filters = interceptInitMessage.Filters ?? new List<string>();
             _priorityCodes = interceptInitMessage.PriortyCodes;
         }
 
