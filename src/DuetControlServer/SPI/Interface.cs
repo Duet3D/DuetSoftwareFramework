@@ -619,7 +619,7 @@ namespace DuetControlServer.SPI
             {
                 throw new InvalidOperationException("Incompatible firmware version");
             }
-            if (message.Length > Consts.MaxMessageLength)
+            if (message.Length > Settings.MaxMessageLength)
             {
                 throw new ArgumentException($"{nameof(message)} too long");
             }

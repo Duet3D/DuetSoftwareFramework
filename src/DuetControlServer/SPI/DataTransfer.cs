@@ -514,7 +514,7 @@ namespace DuetControlServer.SPI
         /// <returns>Code size in bytes</returns>
         public static int GetCodeSize(Code code)
         {
-            Span<byte> span = stackalloc byte[Consts.MaxCodeBufferSize];
+            Span<byte> span = stackalloc byte[Settings.MaxCodeBufferSize];
             try
             {
                 return Serialization.Writer.WriteCode(span, code);
@@ -533,7 +533,7 @@ namespace DuetControlServer.SPI
         public static bool WriteCode(Code code)
         {
             // Attempt to serialize the code first
-            Span<byte> span = stackalloc byte[Consts.MaxCodeBufferSize];
+            Span<byte> span = stackalloc byte[Settings.MaxCodeBufferSize];
             int codeLength;
             try
             {

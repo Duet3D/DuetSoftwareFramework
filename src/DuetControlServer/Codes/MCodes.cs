@@ -79,7 +79,7 @@ namespace DuetControlServer.Codes
                         int maxSize = -1;
                         if (code.Flags.HasFlag(CodeFlags.IsFromFirmware))
                         {
-                            maxSize = SPI.Communication.Consts.MaxMessageLength;
+                            maxSize = Settings.MaxMessageLength;
                         }
 
                         // Check if JSON file lists were requested
