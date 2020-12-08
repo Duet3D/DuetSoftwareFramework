@@ -76,7 +76,7 @@ namespace DuetControlServer.Files
                 {
                     // Heater model
                     await writer.WriteLineAsync("M307 " +
-                        $"H{heater} R{item.Model.HeatingRate:F3} C{item.Model.TimeConstant:F3}:{item.Model.TimeConstantFansOn:F3}" +
+                        $"H{heater} R{item.Model.HeatingRate:F3} C{item.Model.TimeConstant:F3}:{item.Model.TimeConstantFansOn:F3} " +
                         $"D{item.Model.DeadTime:F2} S{item.Model.MaxPwm:F2} V{item.Model.StandardVoltage:F1} B{(item.Model.PID.Used ? 0 : 1)}");
 
                     // Custom PID parameters
