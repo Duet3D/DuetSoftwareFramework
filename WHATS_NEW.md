@@ -10,8 +10,10 @@ Compatible files:
 
 Changed behaviour:
 - RRF downgrades from later protocol versions are now possible
-- CORS headers are only sent if explictly configured via M586
+- CORS headers are only sent if explictly configured by M586 C-parameter
 - SPI transfers use CRC32 checksums with newer RRF versions
+- DCS service notifies systemd when it is up and running
+- `runonce.g` is no longer processed if DCS starts in update-only mode (i.e. with `-u` parameter)
 
 Bug fixes:
 - Fixed incompatibilities when updating RRF from older firmware versions

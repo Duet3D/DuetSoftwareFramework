@@ -28,8 +28,8 @@ namespace UnitTests.SPI
             Assert.AreEqual(Consts.ProtocolVersion, header.ProtocolVersion);
             Assert.AreEqual(12345, header.SequenceNumber);
             Assert.AreEqual(1436, header.DataLength);
-            Assert.AreEqual(0, header.ChecksumData);
-            Assert.AreEqual(0, header.ChecksumHeader);
+            Assert.AreEqual(0, header.ChecksumData32);
+            Assert.AreEqual(0, header.ChecksumHeader32);
             
             // No padding
         }

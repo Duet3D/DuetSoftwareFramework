@@ -81,7 +81,14 @@ namespace DuetWebServer
             // Use static files from 0:/www if applicable
             if (_configuration.GetValue("UseStaticFiles", true))
             {
-                app.UseStaticFiles();
+                app.UseStaticFiles(new StaticFileOptions()
+                {
+                    OnPrepareResponse = context =>
+                    {
+                        context.Context.Response.Headers.Add("Cache-Control", "no-cache, no-store");
+                        context.Context.Response.Headers.Add("Expires", "-1");
+                    }
+                });
                 app.UseFileServer(new FileServerOptions
                 {
                     FileProvider = new FileProviders.DuetFileProvider()

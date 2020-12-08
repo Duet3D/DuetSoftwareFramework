@@ -162,9 +162,9 @@ namespace DuetControlServer
                 }
             };
 
-            // Load plugin manifests and start them again
             if (!Settings.UpdateOnly)
             {
+                // Load plugin manifests and start them again
                 foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
                 {
                     if (file.EndsWith(".json"))
@@ -193,39 +193,55 @@ namespace DuetControlServer
                     string[] pluginsToStart = await File.ReadAllLinesAsync(Settings.PluginsFilename);
                     await Utility.Plugins.StartPlugins(pluginsToStart);
                 }
-            }
 
-            // Execute runonce.g after config.g if it is present
-            string runOnceFile = await FilePath.ToPhysicalAsync(FilePath.RunOnceFile, FileDirectory.System);
-            if (File.Exists(runOnceFile))
-            {
-                do
+                // Execute runonce.g after config.g if it is present
+                string runOnceFile = await FilePath.ToPhysicalAsync(FilePath.RunOnceFile, FileDirectory.System);
+                if (File.Exists(runOnceFile))
                 {
-                    using (await Model.Provider.AccessReadOnlyAsync())
+                    do
                     {
-                        if (Model.Provider.Get.State.Status != MachineStatus.Starting)
+                        using (await Model.Provider.AccessReadOnlyAsync())
                         {
-                            break;
+                            if (Model.Provider.Get.State.Status != MachineStatus.Starting)
+                            {
+                                break;
+                            }
+                        }
+                        await Task.Delay(250);
+                    }
+                    while (!CancellationToken.IsCancellationRequested);
+
+                    if (!CancellationToken.IsCancellationRequested)
+                    {
+                        using (Macro macro = new Macro(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger))
+                        {
+                            await macro.FinishAsync();
+                        }
+
+                        try
+                        {
+                            File.Delete(runOnceFile);
+                        }
+                        catch (Exception e)
+                        {
+                            await Model.Provider.Output(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
                         }
                     }
-                    await Task.Delay(250);
                 }
-                while (!CancellationToken.IsCancellationRequested);
 
-                if (!CancellationToken.IsCancellationRequested)
+                // Notify the service manager that we're up and running
+                string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
+                if (!string.IsNullOrEmpty(notifySocket))
                 {
-                    using (Macro macro = new Macro(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger))
-                    {
-                        await macro.FinishAsync();
-                    }
-
                     try
                     {
-                        File.Delete(runOnceFile);
+                        using Socket socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
+                        socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
+                        socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
                     }
                     catch (Exception e)
                     {
-                        await Model.Provider.Output(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
+                        _logger.Warn(e, "Failed to notify systmed about process start");
                     }
                 }
             }
