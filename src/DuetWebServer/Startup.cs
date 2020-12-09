@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Net.Http.Headers;
 using System;
 
 namespace DuetWebServer
@@ -81,12 +82,12 @@ namespace DuetWebServer
             // Use static files from 0:/www if applicable
             if (_configuration.GetValue("UseStaticFiles", true))
             {
-                app.UseStaticFiles(new StaticFileOptions()
+                app.UseStaticFiles(new StaticFileOptions
                 {
-                    OnPrepareResponse = context =>
+                    OnPrepareResponse = ctx =>
                     {
-                        context.Context.Response.Headers.Add("Cache-Control", "no-cache, no-store");
-                        context.Context.Response.Headers.Add("Expires", "-1");
+                        ctx.Context.Response.Headers[HeaderNames.CacheControl] = $"public,max-age={_configuration.GetValue("MaxAge", 3600)},must-revalidate";
+                        ctx.Context.Response.Headers[HeaderNames.Expires] = "0";
                     }
                 });
                 app.UseFileServer(new FileServerOptions

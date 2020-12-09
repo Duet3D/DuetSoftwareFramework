@@ -20,6 +20,7 @@ Bug fixes:
 - LockMovementAndWaitForStandstill retransmissions were logged
 - Expressions were not automatically evaluated in the code processors
 - Internally processed codes were only logged if they resulted in a warning or error
+- DWS didn't send correct Cache-Control header which could result in DuetPi using outdated DWC versions
 
 Version 3.2.0-b4
 ================

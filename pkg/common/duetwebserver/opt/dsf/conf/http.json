@@ -14,6 +14,8 @@
   "KeepAliveInterval": 30,
   "ModelRetryDelay": 5000,
   "UseStaticFiles": true,
+  "DefaultWebDirectory": "/opt/dsf/sd/www",
+  "MaxAge": 3600,
   "SocketPath": "/var/run/dsf/dcs.sock",
   "WebSocketBufferSize": 8192
 }

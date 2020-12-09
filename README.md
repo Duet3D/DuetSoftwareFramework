@@ -116,6 +116,7 @@ Apart from these two sections, you can also customize the following settings:
 - `ObjectModelUpdateTimeout`: When a WebSocket is connected and waiting for object model changes, this specifies the timeout after which DWS stops waiting and polls the WebSocket again
 - `UseStaticFiles`: Whether to provide web files from the virtual `www` directory. This is required for DWC if DWS is not running as a reverse proxy
 - `DefaultWebDirectory`: Default web directory to fall back to if DCS could not be contacted (requires `UseStaticFiles` to be set)
+- `MaxAge`: Maximum cache time for static files (requires `UseStaticFiles` to be true)
 - `WebSocketBufferSize`: This defines the maximum buffer size per third-party WebSocket connection
 
 It is possible to override these settings using command-line arguments, too.
