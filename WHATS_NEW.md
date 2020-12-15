@@ -10,17 +10,20 @@ Compatible files:
 
 Changed behaviour:
 - RRF downgrades from later protocol versions are now possible
-- CORS headers are only sent if explictly configured by M586 C-parameter
-- SPI transfers use CRC32 checksums with newer RRF versions
+- CORS headers are only sent if explictly configured by `M586 C`-parameter
+- SPI transfers use CRC32 instead of CRC16 with new protocol version
 - DCS service notifies systemd when it is up and running
+- DCS terminates when a firmware update of the main board is complete (unless `NoTerminateOnReset` is set)
 - `runonce.g` is no longer processed if DCS starts in update-only mode (i.e. with `-u` parameter)
+- Third-party DSF plugins cannot be installed any more (TBD for v3.3)
 
 Bug fixes:
 - Fixed incompatibilities when updating RRF from older firmware versions
 - LockMovementAndWaitForStandstill retransmissions were logged
 - Expressions were not automatically evaluated in the code processors
 - Internally processed codes were only logged if they resulted in a warning or error
-- DWS didn't send correct Cache-Control header which could result in DuetPi using outdated DWC versions
+- DWS didn't send correct `Cache-Control` header which could result in DuetPi using outdated DWC versions
+- Sometimes the filament mapping was not fully restored if the `NoTerminateOnReset` option was enabled
 
 Version 3.2.0-b4
 ================

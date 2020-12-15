@@ -14,6 +14,16 @@ namespace DuetControlServer.Commands
     /// </summary>
     public sealed class InstallPlugin : DuetAPI.Commands.InstallPlugin
     {
+#if true
+        /// <summary>
+        /// Stub for plugin installation (to be implemented in v3.3)
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public override Task Execute()
+        {
+            throw new InvalidOperationException("This feature has been disabled. It will be fully available in software version 3.3 and later");
+        }
+#else
         /// <summary>
         /// Logger instance
         /// </summary>
@@ -55,7 +65,6 @@ namespace DuetControlServer.Commands
                         break;
                     }
                 }
-
             }
 
             if (pluginFound)
@@ -309,5 +318,6 @@ namespace DuetControlServer.Commands
                 }
             }
         }
+#endif
     }
 }

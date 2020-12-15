@@ -156,6 +156,20 @@ namespace DuetControlServer.Utility
         }
 
         /// <summary>
+        /// Send the current filament mapping to RRF
+        /// </summary>
+        public static void RefreshMapping()
+        {
+            lock (_filamentMapping)
+            {
+                foreach (int extruder in _filamentMapping.Keys)
+                {
+                    SPI.Interface.AssignFilament(extruder, _filamentMapping[extruder]);
+                }
+            }
+        }
+
+        /// <summary>
         /// Save the filament mapping to a file
         /// </summary>
         private static async void SaveMapping()

@@ -261,10 +261,6 @@ namespace DuetControlServer.Model
                 Console.WriteLine("Error: {0}", e.Message);
                 _logger.Debug(e);
             }
-            finally
-            {
-                Program.CancelSource.Cancel();
-            }
         }
 
         /// <summary>

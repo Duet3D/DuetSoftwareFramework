@@ -38,7 +38,7 @@ namespace DuetControlServer.SPI
         private static ushort _lastTransferNumber;
 
         private static DateTime _lastMeasureTime = DateTime.Now;
-        private static int _numMeasuredTransfers;
+        private static volatile int _numMeasuredTransfers, _maxRxSize, _maxTxSize;
 
         // Transfer headers
         private static readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf<TransferHeader>()];
@@ -117,7 +117,7 @@ namespace DuetControlServer.SPI
 
             decimal result = _numMeasuredTransfers / (decimal)(DateTime.Now - _lastMeasureTime).TotalSeconds;
             _lastMeasureTime = DateTime.Now;
-            Interlocked.Exchange(ref _numMeasuredTransfers, 0);
+            _numMeasuredTransfers = 0;
             return result;
         }
 
@@ -129,6 +129,7 @@ namespace DuetControlServer.SPI
         {
             builder.AppendLine($"Configured SPI speed: {Settings.SpiFrequency} Hz");
             builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}");
+            builder.AppendLine($"Maximum length of RX/TX data transfers: {_maxRxSize}/{_maxTxSize}");
         }
 
         /// <summary>
@@ -190,7 +191,15 @@ namespace DuetControlServer.SPI
                     }
 
                     // Transfer OK
-                    Interlocked.Increment(ref _numMeasuredTransfers);
+                    _numMeasuredTransfers++;
+                    if (_maxRxSize < _rxHeader.DataLength)
+                    {
+                        _maxRxSize = _rxHeader.DataLength;
+                    }
+                    if (_maxTxSize < _txHeader.DataLength)
+                    {
+                        _maxTxSize = _txHeader.DataLength;
+                    }
                     _txBuffer = _txBuffer.Next ?? _txBuffers.First;
                     _rxPointer = _txPointer = 0;
                     _packetId = 0;
@@ -1012,9 +1021,9 @@ namespace DuetControlServer.SPI
         {
             return _txPointer + Marshal.SizeOf<PacketHeader>() + dataLength <= bufferSize;
         }
-#endregion
+        #endregion
 
-#region Functions for data transfers
+        #region Functions for data transfers
         /// <summary>
         /// Internal function to monitor the transfer ready pin
         /// </summary>
@@ -1391,6 +1400,6 @@ namespace DuetControlServer.SPI
             ExchangeResponse(TransferResponse.BadResponse);
             return false;
         }
-#endregion
+        #endregion
     }
 }

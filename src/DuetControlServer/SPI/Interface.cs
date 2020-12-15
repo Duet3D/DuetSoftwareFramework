@@ -79,7 +79,7 @@ namespace DuetControlServer.SPI
         private static TaskCompletionSource<object> _firmwareResetRequest;
 
         // Miscellaneous requests
-        private static readonly Queue<Tuple<int, string>> _extruderFilamentUpdates = new Queue<Tuple<int, string>>();
+        private static readonly Dictionary<int, string> _extruderFilamentMapping = new Dictionary<int, string>();
         private static readonly AsyncLock _printStopppedReasonLock = new AsyncLock();
         private static PrintStoppedReason? _printStoppedReason;
         private static volatile bool _printStarted, _assignFilaments;
@@ -559,11 +559,11 @@ namespace DuetControlServer.SPI
                         Console.WriteLine();
                     }
                 }
-                catch
+                catch (Exception e)
                 {
                     await Logger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
                     Program.CancelSource.Cancel();
-                    return;
+                    throw;
                 }
 
                 _logger.Info("Verifying checksum");
@@ -597,9 +597,9 @@ namespace DuetControlServer.SPI
                 throw new InvalidOperationException("Not connected over SPI");
             }
 
-            lock (_extruderFilamentUpdates)
+            lock (_extruderFilamentMapping)
             {
-                _extruderFilamentUpdates.Enqueue(new Tuple<int, string>(extruder, filament));
+                _extruderFilamentMapping[extruder] = filament;
             }
         }
 
@@ -715,7 +715,7 @@ namespace DuetControlServer.SPI
                             _firmwareUpdateRequest?.SetResult(null);
                             _firmwareUpdateRequest = null;
 
-                            if (Settings.UpdateOnly)
+                            if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
                             {
                                 // Wait for the requesting task to complete, it will terminate DCS next
                                 await Task.Delay(-1, Program.CancellationToken);
@@ -726,14 +726,11 @@ namespace DuetControlServer.SPI
                             _firmwareUpdateRequest?.SetException(e);
                             _firmwareUpdateRequest = null;
 
-                            if (!Settings.UpdateOnly && e is OperationCanceledException)
+                            if (!Settings.UpdateOnly && Settings.NoTerminateOnReset && e is OperationCanceledException)
                             {
                                 _logger.Debug(e, "Firmware update cancelled");
                             }
-                            else
-                            {
-                                throw;
-                            }
+                            throw;
                         }
 
                         _iapStream = _firmwareStream = null;
@@ -881,13 +878,13 @@ namespace DuetControlServer.SPI
                 // Update filament assignment per extruder drive. This must happen when config.g has finished or M701 is requested
                 if (!Macro.RunningConfig || _assignFilaments)
                 {
-                    lock (_extruderFilamentUpdates)
+                    lock (_extruderFilamentMapping)
                     {
-                        while (_extruderFilamentUpdates.TryPeek(out Tuple<int, string> filamentMapping))
+                        foreach (int extruder in _extruderFilamentMapping.Keys)
                         {
-                            if (DataTransfer.WriteAssignFilament(filamentMapping.Item1, filamentMapping.Item2))
+                            if (DataTransfer.WriteAssignFilament(extruder, _extruderFilamentMapping[extruder]))
                             {
-                                _extruderFilamentUpdates.Dequeue();
+                                _extruderFilamentMapping.Remove(extruder);
                             }
                             else
                             {
@@ -1391,9 +1388,9 @@ namespace DuetControlServer.SPI
             }
 
             // Clear filament assign requests
-            lock (_extruderFilamentUpdates)
+            lock (_extruderFilamentMapping)
             {
-                while (_extruderFilamentUpdates.TryDequeue(out _)) { }
+                _extruderFilamentMapping.Clear();
             }
 
             // Notify the updater task

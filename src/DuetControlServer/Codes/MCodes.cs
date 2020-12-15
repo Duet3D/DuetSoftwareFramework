@@ -905,7 +905,11 @@ namespace DuetControlServer.Codes
                                 await SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
                             }
 
-                            if (!Settings.UpdateOnly)
+                            if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
+                            {
+                                Program.CancelSource.Cancel();
+                            }
+                            else
                             {
                                 await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
                                 await Utility.Plugins.StartPlugins(stoppedPlugins);
