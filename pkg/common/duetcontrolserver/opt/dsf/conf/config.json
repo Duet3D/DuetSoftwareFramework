@@ -16,7 +16,8 @@
   "SpiBufferSize": 8192,
   "SpiTransferMode": 0,
   "SpiFrequency": 8000000,
-  "SpiTransferTimeout": 500,
+  "SpiConnectTimeout": 500,
+  "SpiTransferTimeout": 2500,
   "MaxSpiRetries": 3,
   "SpiPollDelay": 25,
   "GpioChipDevice": "/dev/gpiochip0",
@@ -24,6 +25,8 @@
   "BufferedPrintCodes": 32,
   "BufferedMacroCodes": 16,
   "MaxBufferSpacePerChannel": 1536,
+  "MaxCodeBufferSize": 256,
+  "MaxMessageLength": 4096,
   "FirmwareComments": [
     "printing object",
     "MESH",
