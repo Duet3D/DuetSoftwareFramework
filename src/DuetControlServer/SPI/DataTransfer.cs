@@ -1073,7 +1073,7 @@ namespace DuetControlServer.SPI
                     {
                         // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
                         using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                        cts.CancelAfter(Settings.SpiTransferTimeout);
+                        cts.CancelAfter(Settings.SpiConnectTimeout);
                         try
                         {
                             _transferReadyEvent.Wait(cts.Token);

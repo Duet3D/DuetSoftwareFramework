@@ -559,7 +559,7 @@ namespace DuetControlServer.SPI
                         Console.WriteLine();
                     }
                 }
-                catch (Exception e)
+                catch
                 {
                     await Logger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
                     Program.CancelSource.Cancel();

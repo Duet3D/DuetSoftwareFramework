@@ -137,9 +137,14 @@ namespace DuetControlServer
         public static int SpiFrequency { get; set; } = 8_000_000;
 
         /// <summary>
+        /// Maximum allowed time when waiting for the first SPI transfer (in ms)
+        /// </summary>
+        public static int SpiConnectTimeout { get; set; } = 500;
+
+        /// <summary>
         /// Maximum allowed delay between data exchanges during a full transfer (in ms)
         /// </summary>
-        public static int SpiTransferTimeout { get; set; } = 500;
+        public static int SpiTransferTimeout { get; set; } = 2500;
 
         /// <summary>
         /// Maximum number of sequential transfer retries

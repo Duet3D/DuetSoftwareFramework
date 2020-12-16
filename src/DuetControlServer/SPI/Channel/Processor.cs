@@ -1065,6 +1065,7 @@ namespace DuetControlServer.SPI.Channel
             else if (Stack.Count > 1)
             {
                 _logger.Warn("System macro {0} is requested but the stack is not empty. Discarding request.", fileName);
+                DataTransfer.WriteMacroCompleted(Channel, true);
                 return;
             }
 
