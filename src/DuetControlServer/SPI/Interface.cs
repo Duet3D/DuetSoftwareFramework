@@ -1077,13 +1077,7 @@ namespace DuetControlServer.SPI
             }
 
             // Check if this is a code reply
-            bool replyHandled = false;
-            if (!replyHandled && flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
-            {
-                replyHandled = await _channels.HandleReply(flags, reply);
-            }
-
-            if (!replyHandled)
+            if (flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag) && !await _channels.HandleReply(flags, reply))
             {
                 // Must be a left-over error message...
                 await OutputGenericMessage(flags, reply);
