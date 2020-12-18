@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Files;
 using Nito.AsyncEx;
 using System;
 using System.IO;
@@ -46,8 +47,9 @@ namespace DuetControlServer.Utility
         /// Start logging to a file
         /// </summary>
         /// <param name="filename">Filename to write to</param>
+        /// <param name="level">Requested log level</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Start(string filename)
+        public static async Task Start(string filename, LogLevel level)
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
@@ -55,7 +57,8 @@ namespace DuetControlServer.Utility
                 await StopInternal();
 
                 // Initialize access to the log file
-                _fileStream = new FileStream(filename, FileMode.Append, FileAccess.Write);
+                string physicalFile = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
+                _fileStream = new FileStream(physicalFile, FileMode.Append, FileAccess.Write);
                 _writer = new StreamWriter(_fileStream) { AutoFlush = true };
                 _logCloseEvent = Program.CancellationToken.Register(() => Stop().Wait());
 
@@ -66,6 +69,7 @@ namespace DuetControlServer.Utility
                 using (await Model.Provider.AccessReadWriteAsync())
                 {
                     Model.Provider.Get.State.LogFile = filename;
+                    Model.Provider.Get.State.LogLevel = level;
                 }
 
                 // Write event

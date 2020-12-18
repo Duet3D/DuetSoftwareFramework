@@ -1,6 +1,6 @@
 # DSF Plugins
 
-Starting from version 3.2, DSF allows the usage of third-party plugins.
+Starting from version 3.3, DSF will allow the usage of third-party plugins.
 They may contain files for execution on a SBC, in DWC, and/or configuration files for RepRapFirmware.
 
 ## ZIP File Structure
@@ -34,7 +34,7 @@ Every plugin must provide a `plugin.json` in the root of its ZIP bundle. It may 
   "dwcDependencies": [],
   "dwcResources": [],
   "sbcRequired": true,
-  "sbcDsfVersion": "3.2",
+  "sbcDsfVersion": "3.3",
   "sbcData": {},
   "sbcExecutable": "Plugin Executable"
   "sbcExecutableArguments": null,
@@ -49,7 +49,7 @@ The name may consist of only alphanumeric characters and whitespaces. It must no
 
 ## Permissions
 
-Starting from DSF 3.2, third-party plugins may be installed from the web interface.
+Starting from DSF 3.3, third-party plugins may be installed from the web interface.
 In order to maintain security, a user installing new plugins is asked for the required permissions before
 the plugin may be installed. This must be considered when designing a new external plugin.
 

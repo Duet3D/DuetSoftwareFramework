@@ -1059,9 +1059,10 @@ namespace DuetControlServer.SPI
                         MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                                             : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                                 : MessageType.Success;
-                        LogLevel level = flags.HasFlag(MessageTypeFlags.LogWarn) ? LogLevel.Warn
-                                            : flags.HasFlag(MessageTypeFlags.LogInfo) ? LogLevel.Info
-                                                : LogLevel.Off;
+                        LogLevel level = flags.HasFlag(MessageTypeFlags.LogOff) ? LogLevel.Off
+                                            : flags.HasFlag(MessageTypeFlags.LogWarn) ? LogLevel.Warn
+                                                : flags.HasFlag(MessageTypeFlags.LogInfo) ? LogLevel.Info
+                                                    : LogLevel.Debug;
                         await Logger.Log(level, type, _partialLogMessage);
                     }
                     _partialLogMessage = null;

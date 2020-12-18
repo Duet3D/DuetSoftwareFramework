@@ -1,12 +1,12 @@
 Summary of important changes in recent versions
 ===============================================
 
-Version 3.2.0-b5
+Version 3.2.0-RC1
 ================
 
 Compatible files:
-- RepRapFirmware 3.2.0-b5
-- DuetWebControl 3.2.0-b5
+- RepRapFirmware 3.2.0-RC1
+- DuetWebControl 3.2.0-RC1
 
 Changed behaviour:
 - RRF downgrades from later protocol versions are now possible
@@ -24,6 +24,7 @@ Bug fixes:
 - Internally processed codes were only logged if they resulted in a warning or error
 - DWS didn't send correct `Cache-Control` header which could result in DuetPi using outdated DWC versions
 - Sometimes the filament mapping was not fully restored if the `NoTerminateOnReset` option was enabled
+- M929 was not fully implemented for new log levels
 
 Version 3.2.0-b4
 ================

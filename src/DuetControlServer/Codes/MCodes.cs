@@ -831,26 +831,38 @@ namespace DuetControlServer.Codes
                         {
                             using (await Model.Provider.AccessReadOnlyAsync())
                             {
-                                return new CodeResult(MessageType.Success, $"Event logging is {(Model.Provider.Get.State.LogFile != null ? "enabled" : "disabled")}");
+                                if (Model.Provider.Get.State.LogLevel == LogLevel.Off)
+                                {
+                                    return new CodeResult(MessageType.Success, "Event logging is disabled");
+                                }
+                                return new CodeResult(MessageType.Success, $"Event logging is enabled at log level {Model.Provider.Get.State.LogLevel.ToString().ToLowerInvariant()}");
                             }
                         }
 
                         if (sParam > 0)
                         {
-                            string file = code.Parameter('P', Utility.Logger.DefaultLogFile);
-                            if (string.IsNullOrWhiteSpace(file))
+                            LogLevel logLevel = (LogLevel)(int)sParam;
+
+                            string defaultLogFile = Utility.Logger.DefaultLogFile;
+                            using (await Model.Provider.AccessReadOnlyAsync())
+                            {
+                                if (!string.IsNullOrEmpty(Model.Provider.Get.State.LogFile))
+                                {
+                                    defaultLogFile = Model.Provider.Get.State.LogFile;
+                                }
+                            }
+                            string logFile = code.Parameter('P', defaultLogFile);
+                            if (string.IsNullOrWhiteSpace(logFile))
                             {
                                 return new CodeResult(MessageType.Error, "Missing filename in M929 command");
                             }
 
-                            string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.System);
-                            await Utility.Logger.Start(physicalFile);
+                            await Utility.Logger.Start(logFile, logLevel);
                         }
                         else
                         {
                             await Utility.Logger.Stop();
                         }
-
                         return new CodeResult();
                     }
                     throw new OperationCanceledException();

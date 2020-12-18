@@ -148,6 +148,6 @@ namespace DuetControlServer.SPI.Communication.Shared
         /// A GenericMessage that is also logged
         /// </summary>
         LoggedGenericMessage = GenericMessage | LogWarn,
-        #endregion
+#endregion
     }
 }

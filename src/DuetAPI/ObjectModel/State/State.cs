@@ -77,6 +77,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Log file being written to or null if logging is disabled
         /// </summary>
+        [LinuxProperty]
         public string LogFile
         {
             get => _logFile;
@@ -87,6 +88,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Current log level
         /// </summary>
+        [LinuxProperty]
         public LogLevel LogLevel
         {
             get => _logLevel;
