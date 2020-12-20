@@ -1,12 +1,12 @@
 Summary of important changes in recent versions
 ===============================================
 
-Version 3.2.0-RC1
+Version 3.2.0-rc1
 ================
 
 Compatible files:
-- RepRapFirmware 3.2.0-RC1
-- DuetWebControl 3.2.0-RC1
+- RepRapFirmware 3.2.0-rc1
+- DuetWebControl 3.2.0-rc1
 
 Changed behaviour:
 - RRF downgrades from later protocol versions are now possible
