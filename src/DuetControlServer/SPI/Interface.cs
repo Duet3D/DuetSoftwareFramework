@@ -714,12 +714,6 @@ namespace DuetControlServer.SPI
                             await PerformFirmwareUpdate();
                             _firmwareUpdateRequest?.SetResult(null);
                             _firmwareUpdateRequest = null;
-
-                            if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
-                            {
-                                // Wait for the requesting task to complete, it will terminate DCS next
-                                await Task.Delay(-1, Program.CancellationToken);
-                            }
                         }
                         catch (Exception e)
                         {
@@ -734,6 +728,12 @@ namespace DuetControlServer.SPI
                         }
 
                         _iapStream = _firmwareStream = null;
+
+                        if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
+                        {
+                            // Wait for the requesting task to complete, it will terminate DCS next
+                            await Task.Delay(-1, Program.CancellationToken);
+                        }
                     }
                 }
 
@@ -1077,10 +1077,18 @@ namespace DuetControlServer.SPI
             }
 
             // Check if this is a code reply
-            if (flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag) && !await _channels.HandleReply(flags, reply))
+            if (flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
             {
-                // Must be a left-over error message...
-                await OutputGenericMessage(flags, reply);
+                if (!await _channels.HandleReply(flags, reply))
+                {
+                    // Must be a left-over error message...
+                    await OutputGenericMessage(flags, reply);
+                }
+            }
+            else
+            {
+                // Unhandled?
+                _logger.Debug(reply);
             }
         }
 
