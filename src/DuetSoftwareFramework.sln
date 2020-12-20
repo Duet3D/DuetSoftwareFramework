@@ -11,7 +11,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetWebServer", "DuetWebSer
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetAPIClient", "DuetAPIClient\DuetAPIClient.csproj", "{229CADA4-5980-4130-9079-06B4173B982C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LinuxApi", "LinuxDevices\LinuxApi.csproj", "{E943A486-FC12-4D9C-8335-26C94AB96325}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LinuxApi", "LinuxApi\LinuxApi.csproj", "{E943A486-FC12-4D9C-8335-26C94AB96325}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeLogger", "CodeLogger\CodeLogger.csproj", "{40C30CBB-53BF-47C5-8DCA-0468AB593E90}"
 EndProject

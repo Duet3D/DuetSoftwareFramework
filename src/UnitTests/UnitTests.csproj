@@ -5,7 +5,7 @@
     <IsPackable>false</IsPackable>
     <LangVersion>default</LangVersion>
     <Authors>Christian Hammacher</Authors>
-    <Company>Duet3D</Company>
+    <Company>Duet3D Ltd</Company>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
   </PropertyGroup>
