@@ -144,7 +144,12 @@ namespace DuetControlServer
         /// <summary>
         /// Maximum allowed delay between data exchanges during a full transfer (in ms)
         /// </summary>
-        public static int SpiTransferTimeout { get; set; } = 2500;
+        public static int SpiTransferTimeout { get; set; } = 500;
+
+        /// <summary>
+        /// Maximum allowed delay between full transfers (in ms)
+        /// </summary>
+        public static int SpiConnectionTimeout { get; set; } = 4000;
 
         /// <summary>
         /// Maximum number of sequential transfer retries

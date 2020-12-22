@@ -1,6 +1,22 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.2.0-rc2
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-rc2
+- DuetWebControl 3.2.0-rc2
+
+Changed behaviour:
+- Increased SPI connection timeout from 2.5s to 4s (same value as in RRF)
+- Partial SPI transmissions may not take longer than 500ms (same value as in RRF)
+
+Bug fixes:
+- M997 and M999 could generate "Operation has been cancelled" errors
+- When DCS terminated sockets of command connections were not correctly shut down
+- Object model write locks were not correctly disposed of when DCS terminated
+
 Version 3.2.0-rc1
 ================
 

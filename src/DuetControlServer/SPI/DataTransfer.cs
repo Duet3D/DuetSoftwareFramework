@@ -184,7 +184,7 @@ namespace DuetControlServer.SPI
                     }
 
                     // Deal with the first transmission
-                    if (!_started)
+                    if (!_started || _resetting)
                     {
                         _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
                         _started = true;
@@ -209,8 +209,6 @@ namespace DuetControlServer.SPI
                     {
                         _started = _resetting = false;
                         _waitingForFirstTransfer = true;
-                        _rxHeader.SequenceNumber = 1;
-                        _txHeader.SequenceNumber = 0;
                         PerformFullTransfer(connecting);
                     }
                     break;
@@ -1052,7 +1050,8 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Wait for the Duet to flag when it is ready to transfer data
         /// </summary>
-        private static void WaitForTransfer()
+        /// <param name="inTransfer">Whether a full transfer is being performed</param>
+        private static void WaitForTransfer(bool inTransfer = true)
         {
             if (!_transferReadyPinMonitored)
             {
@@ -1099,7 +1098,7 @@ namespace DuetControlServer.SPI
             {
                 // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
                 using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                cts.CancelAfter(Settings.SpiTransferTimeout);
+                cts.CancelAfter(inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout);
                 try
                 {
                     _transferReadyEvent.Wait(cts.Token);
@@ -1146,7 +1145,7 @@ namespace DuetControlServer.SPI
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
                 // Perform SPI header exchange
-                WaitForTransfer();
+                WaitForTransfer(false);
                 if (_txHeader.ProtocolVersion >= 4)
                 {
                     _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);

@@ -188,7 +188,6 @@ namespace DuetControlServer.IPC
                 }
 
                 // Check the requested mode
-                // TODO check permissions here
                 switch (initMessage.Mode)
                 {
                     case ConnectionMode.Command:

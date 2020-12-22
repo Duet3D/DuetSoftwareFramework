@@ -293,6 +293,12 @@ namespace DuetControlServer.IPC.Processors
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         public static async Task<bool> Intercept(Code code, InterceptionMode type)
         {
+            if (Program.CancellationToken.IsCancellationRequested)
+            {
+                // Don't intercept any more codes if the application is being shut down
+                return false;
+            }
+
             List<CodeInterception> processors = new List<CodeInterception>();
             lock (_connections[type])
             {

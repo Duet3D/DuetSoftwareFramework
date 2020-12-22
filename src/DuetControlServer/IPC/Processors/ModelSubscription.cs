@@ -384,23 +384,24 @@ namespace DuetControlServer.IPC.Processors
 
                         case PropertyChangeType.ObjectCollection:
                             // Update an object collection
-                            Dictionary<string, object> objectCollectionNode = (Dictionary<string, object>)node;
                             ItemPathNode pathNode = (ItemPathNode)path[^1];
-
-                            List<object> objectCollectionList;
-                            if (objectCollectionNode.TryGetValue(pathNode.Name, out object objectCollection))
+                            if (node is not List<object> objectCollectionList)
                             {
-                                objectCollectionList = (List<object>)objectCollection;
-
-                                for (int k = objectCollectionList.Count; k > pathNode.List.Count; k--)
+                                Dictionary<string, object> objectCollectionNode = (Dictionary<string, object>)node;
+                                if (objectCollectionNode.TryGetValue(pathNode.Name, out object objectCollection))
                                 {
-                                    objectCollectionList.RemoveAt(k - 1);
+                                    objectCollectionList = (List<object>)objectCollection;
+
+                                    for (int k = objectCollectionList.Count; k > pathNode.List.Count; k--)
+                                    {
+                                        objectCollectionList.RemoveAt(k - 1);
+                                    }
                                 }
-                            }
-                            else
-                            {
-                                objectCollectionList = new List<object>(pathNode.List.Count);
-                                objectCollectionNode.Add(pathNode.Name, objectCollectionList);
+                                else
+                                {
+                                    objectCollectionList = new List<object>(pathNode.List.Count);
+                                    objectCollectionNode.Add(pathNode.Name, objectCollectionList);
+                                }
                             }
 
                             Type itemType = (value is IList) ? typeof(List<object>) : typeof(Dictionary<string, object>);

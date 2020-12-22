@@ -79,6 +79,12 @@ namespace DuetControlServer.IPC.Processors
                     // Execute it and send back the result
                     object result = await command.Invoke();
                     await Connection.SendResponse(result);
+
+                    // Shut down the socket if this was the last command
+                    if (Program.CancellationToken.IsCancellationRequested)
+                    {
+                        Connection.Close();
+                    }
                 }
                 catch (SocketException)
                 {

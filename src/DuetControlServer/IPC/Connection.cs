@@ -356,5 +356,10 @@ namespace DuetControlServer.IPC
         /// </summary>
         /// <exception cref="SocketException">Connection is no longer available</exception>
         public void Poll() => _unixSocket.Send(Array.Empty<byte>());
+
+        /// <summary>
+        /// Close the socket before shutting down
+        /// </summary>
+        public void Close() => _unixSocket.Shutdown(SocketShutdown.Send);
     }
 }

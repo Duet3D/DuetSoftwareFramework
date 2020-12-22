@@ -691,11 +691,14 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Aligned number of bytes</returns>
         private static int AddPadding(Span<byte> to, int bytesWritten)
         {
-            int bytesTotal = ((bytesWritten + 3) / 4) * 4;
-            if (bytesWritten != bytesTotal)
+            int extraBytes = bytesWritten & 3;
+            if (extraBytes == 0)
             {
-                to[bytesWritten..bytesTotal].Fill(0);
+                return bytesWritten;
             }
+
+            int bytesTotal = bytesWritten + 4 - extraBytes;
+            to[bytesWritten..bytesTotal].Fill(0);
             return bytesTotal;
         }
     }

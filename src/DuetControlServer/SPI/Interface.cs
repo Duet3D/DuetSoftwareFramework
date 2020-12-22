@@ -1013,7 +1013,7 @@ namespace DuetControlServer.SPI
                     }
                     else
                     {
-                        _logger.Error("Failed to find query for object model response");
+                        _logger.Warn("Failed to find query for object model response");
                     }
                 }
             }
@@ -1063,7 +1063,7 @@ namespace DuetControlServer.SPI
                                             : flags.HasFlag(MessageTypeFlags.LogWarn) ? LogLevel.Warn
                                                 : flags.HasFlag(MessageTypeFlags.LogInfo) ? LogLevel.Info
                                                     : LogLevel.Debug;
-                        await Logger.Log(level, type, _partialLogMessage);
+                        await Logger.Log(level, type, _partialLogMessage.TrimEnd());
                     }
                     _partialLogMessage = null;
                 }

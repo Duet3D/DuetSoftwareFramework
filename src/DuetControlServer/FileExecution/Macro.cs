@@ -228,7 +228,7 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public async Task Abort()
         {
-            if (IsAborted)
+            if (IsAborted || disposed)
             {
                 return;
             }

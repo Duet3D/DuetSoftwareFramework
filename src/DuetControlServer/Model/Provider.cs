@@ -46,6 +46,7 @@ namespace DuetControlServer.Model
             /// </summary>
             /// <param name="lockItem">Actual lock</param>
             /// <param name="isWriteLock">Whether the lock is a read/write lock</param>
+            /// <param name="cancellationToken">Internal cancellation token</param>
             internal LockWrapper(IDisposable lockItem, bool isWriteLock)
             {
                 _lock = lockItem;
@@ -77,29 +78,34 @@ namespace DuetControlServer.Model
             /// </summary>
             public void Dispose()
             {
-                if (_isWriteLock)
+                try
                 {
-                    // It is safe to assume that the object model has been updated
-                    using (_updateLock.Lock(Program.CancellationToken))
+                    if (_isWriteLock)
                     {
-                        _updateEvent.NotifyAll();
-                    }
+                        // It is safe to assume that the object model has been updated
+                        using (_updateLock.Lock(Program.CancellationToken))
+                        {
+                            _updateEvent.NotifyAll();
+                        }
 
-                    // Clear the messages again if anyone is connected
-                    if (IPC.Processors.ModelSubscription.AreClientsConnected && Get.Messages.Count > 0)
-                    {
-                        Get.Messages.Clear();
+                        // Clear the messages again if anyone is connected
+                        if (IPC.Processors.ModelSubscription.AreClientsConnected && Get.Messages.Count > 0)
+                        {
+                            Get.Messages.Clear();
+                        }
                     }
                 }
-
-                // Stop the deadlock detection task
-                if (!Program.CancelSource.IsCancellationRequested)
+                finally
                 {
-                    _releaseCts?.Cancel();
-                }
+                    // Dispose the lock again
+                    _lock.Dispose();
 
-                // Dispose the lock again 
-                _lock.Dispose();
+                    // Stop the deadlock detection task if applicable
+                    if (!Program.CancelSource.IsCancellationRequested)
+                    {
+                        _releaseCts?.Cancel();
+                    }
+                }
             }
         }
 
@@ -173,37 +179,61 @@ namespace DuetControlServer.Model
         /// Access the machine model for read operations only
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static IDisposable AccessReadOnly()
+        public static IDisposable AccessReadOnly(CancellationToken cancellationToken)
         {
-            return new LockWrapper(_readWriteLock.ReaderLock(Program.CancellationToken), false);
+            return new LockWrapper(_readWriteLock.ReaderLock(cancellationToken), false);
+        }
+
+        /// <summary>
+        /// Access the machine model for read operations only
+        /// </summary>
+        /// <returns>Disposable lock object to be used with a using directive</returns>
+        public static IDisposable AccessReadOnly() => AccessReadOnly(Program.CancellationToken);
+
+        /// <summary>
+        /// Access the machine model for read/write operations
+        /// </summary>
+        /// <returns>Disposable lock object to be used with a using directive</returns>
+        public static IDisposable AccessReadWrite(CancellationToken cancellationToken)
+        {
+            return new LockWrapper(_readWriteLock.WriterLock(cancellationToken), true);
         }
 
         /// <summary>
         /// Access the machine model for read/write operations
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static IDisposable AccessReadWrite()
+        public static IDisposable AccessReadWrite() => AccessReadWrite(Program.CancellationToken);
+
+        /// <summary>
+        /// Access the machine model asynchronously for read operations only
+        /// </summary>
+        /// <returns>Disposable lock object to be used with a using directive</returns>
+        public static async Task<IDisposable> AccessReadOnlyAsync(CancellationToken cancellationToken)
         {
-            return new LockWrapper(_readWriteLock.WriterLock(Program.CancellationToken), true);
+            return new LockWrapper(await _readWriteLock.ReaderLockAsync(cancellationToken), false);
         }
 
         /// <summary>
         /// Access the machine model asynchronously for read operations only
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static async Task<IDisposable> AccessReadOnlyAsync()
+        public static Task<IDisposable> AccessReadOnlyAsync() => AccessReadOnlyAsync(Program.CancellationToken);
+
+        /// <summary>
+        /// Access the machine model asynchronously for read/write operations
+        /// </summary>
+        /// <returns>Disposable lock object to be used with a using directive</returns>
+        public static async Task<IDisposable> AccessReadWriteAsync(CancellationToken cancellationToken)
         {
-            return new LockWrapper(await _readWriteLock.ReaderLockAsync(Program.CancellationToken), false);
+            return new LockWrapper(await _readWriteLock.WriterLockAsync(cancellationToken), true);
         }
 
         /// <summary>
         /// Access the machine model asynchronously for read/write operations
         /// </summary>
         /// <returns>Disposable lock object to be used with a using directive</returns>
-        public static async Task<IDisposable> AccessReadWriteAsync()
-        {
-            return new LockWrapper(await _readWriteLock.WriterLockAsync(Program.CancellationToken), true);
-        }
+        public static Task<IDisposable> AccessReadWriteAsync() => AccessReadWriteAsync(Program.CancellationToken);
 
         /// <summary>
         /// Wait for an update to occur
@@ -218,6 +248,13 @@ namespace DuetControlServer.Model
                 Program.CancelSource.Token.ThrowIfCancellationRequested();
             }
         }
+
+        /// <summary>
+        /// Wait for an update to occur
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        public static Task WaitForUpdate() => WaitForUpdate(Program.CancellationToken);
 
         /// <summary>
         /// Output a generic message
