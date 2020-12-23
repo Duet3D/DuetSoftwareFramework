@@ -16,6 +16,7 @@ Bug fixes:
 - M997 and M999 could generate "Operation has been cancelled" errors
 - When DCS terminated sockets of command connections were not correctly shut down
 - Object model write locks were not correctly disposed of when DCS terminated
+- Calling abort in macro files could cause an exception
 
 Version 3.2.0-rc1
 ================
