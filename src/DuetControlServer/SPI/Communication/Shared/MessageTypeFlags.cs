@@ -125,6 +125,11 @@ namespace DuetControlServer.SPI.Communication.Shared
 
         #region Common combination
         /// <summary>
+        /// A message that is going nowhere
+        /// </summary>
+        NoDestinationMessage = 0,
+
+        /// <summary>
         /// A message that is to be sent to the web, Telnet, USB and panel
         /// </summary>
         GenericMessage = UsbMessage | AuxMessage | HttpMessage | TelnetMessage,

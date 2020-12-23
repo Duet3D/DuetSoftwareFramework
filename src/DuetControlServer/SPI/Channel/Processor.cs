@@ -877,6 +877,11 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
+        /// Hold the flags of the last incomplete code reply
+        /// </summary>
+        private MessageTypeFlags _lastPartialMessageType = MessageTypeFlags.NoDestinationMessage;
+
+        /// <summary>
         /// Holds the last incomplete code reply
         /// </summary>
         private string _lastPartialMessage;
@@ -894,12 +899,15 @@ namespace DuetControlServer.SPI.Channel
             {
                 // Deal with incomplete replies
                 reply = _lastPartialMessage + reply;
+                flags |= _lastPartialMessageType & ~MessageTypeFlags.PushFlag;
+                _lastPartialMessageType = MessageTypeFlags.NoDestinationMessage;
                 _lastPartialMessage = null;
             }
 
             if (flags.HasFlag(MessageTypeFlags.PushFlag))
             {
                 // Code reply is not complete yet
+                _lastPartialMessageType |= flags;
                 _lastPartialMessage = reply;
                 return false;
             }

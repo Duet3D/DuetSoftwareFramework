@@ -19,6 +19,16 @@ namespace DuetAPI.ObjectModel
         private bool _enabled;
 
         /// <summary>
+        /// Last reported status of this filament monitor
+        /// </summary>
+        public FilamentMonitorStatus Status
+        {
+            get => _status;
+            set => SetPropertyValue(ref _status, value);
+        }
+        private FilamentMonitorStatus _status = FilamentMonitorStatus.NoDataReceived;
+
+        /// <summary>
         /// Type of this filament monitor
         /// </summary>
         public FilamentMonitorType Type

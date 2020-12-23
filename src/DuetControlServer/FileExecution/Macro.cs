@@ -214,7 +214,7 @@ namespace DuetControlServer.FileExecution
             }
             finally
             {
-                if (_file != null || (name == FilePath.ConfigFile && _file != null) || name == FilePath.ConfigOverrideFile)
+                if (_file != null || (name == FilePath.ConfigFile && _file != null) || name == FilePath.ConfigFileFallback)
                 {
                     IsExecuting = JustStarted = true;
                     _ = Task.Run(Run);

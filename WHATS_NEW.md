@@ -17,6 +17,8 @@ Bug fixes:
 - When DCS terminated sockets of command connections were not correctly shut down
 - Object model write locks were not correctly disposed of when DCS terminated
 - Calling abort in macro files could cause an exception
+- M501 could freeze if no config-override.g was found
+- "Macro not found" warning messages were not output as part of code results
 
 Version 3.2.0-rc1
 ================
