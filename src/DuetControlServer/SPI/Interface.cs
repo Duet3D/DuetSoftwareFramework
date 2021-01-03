@@ -393,7 +393,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[CodeChannel.File].LockAsync())
             {
-                await _channels[CodeChannel.File].AbortFile(true, true);
+                await _channels[CodeChannel.File].AbortFiles(true, true, false);
             }
         }
 
@@ -643,12 +643,9 @@ namespace DuetControlServer.SPI
                 throw new InvalidOperationException("Not connected over SPI");
             }
 
-            if (DataTransfer.ProtocolVersion >= 3)
+            using (await _channels[channel].LockAsync())
             {
-                using (await _channels[channel].LockAsync())
-                {
-                    _channels[channel].AllFilesAborted = true;
-                }
+                await _channels[channel].AbortFiles(true, channel == CodeChannel.File, false);
             }
         }
 
@@ -1140,7 +1137,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[channel].LockAsync())
             {
-                await _channels[channel].AbortFile(abortAll, false);
+                await _channels[channel].AbortFiles(abortAll, false, true);
             }
         }
 

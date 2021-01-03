@@ -1,6 +1,5 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.ObjectModel;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -20,47 +19,6 @@ namespace DuetControlServer.Files
         /// Logger instance
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-        /// <summary>
-        /// Dictionary holding the currently open code files
-        /// </summary>
-        private static readonly List<CodeFile>[] _openFiles = new List<CodeFile>[Inputs.Total];
-
-        /// <summary>
-        /// Lock for accessing the list of open files
-        /// </summary>
-        private static readonly AsyncLock _openFilesLock = new AsyncLock();
-
-        /// <summary>
-        /// Static constructor of this class
-        /// </summary>
-        static CodeFile()
-        {
-            for (int i = 0; i < Inputs.Total; i++)
-            {
-                _openFiles[i] = new List<CodeFile>();
-            }
-        }
-
-        /// <summary>
-        /// Abort all running macro files on a given code channel
-        /// </summary>
-        /// <param name="channel">Code channel</param>
-        /// <returns>Asynchronous task</returns>
-        private static async Task AbortAll(CodeChannel channel)
-        {
-            int numChannel = (int)channel;
-            using (await _openFilesLock.LockAsync(Program.CancellationToken))
-            {
-                foreach (CodeFile file in _openFiles[numChannel])
-                {
-                    using (await file.LockAsync())
-                    {
-                        file.Close();
-                    }
-                }
-            }
-        }
 
         /// <summary>
         /// Internal lock
@@ -189,11 +147,6 @@ namespace DuetControlServer.Files
 
             _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
             _reader = new StreamReader(_fileStream);
-
-            lock (_openFiles)
-            {
-                _openFiles[(int)channel].Add(this);
-            }
         }
 
         /// <summary>
@@ -224,11 +177,6 @@ namespace DuetControlServer.Files
             if (disposed)
             {
                 return;
-            }
-
-            lock (_openFiles)
-            {
-                _openFiles[(int)Channel].Remove(this);
             }
 
             if (disposing)
@@ -473,10 +421,6 @@ namespace DuetControlServer.Files
                             break;
 
                         case KeywordType.Abort:
-                            _logger.Debug("Doing {0}", code.Keyword);
-                            await AbortAll(Channel);
-                            return code;
-
                         case KeywordType.Return:
                             _logger.Debug("Doing {0}", code.Keyword);
                             using (await _lock.LockAsync(Program.CancellationToken))

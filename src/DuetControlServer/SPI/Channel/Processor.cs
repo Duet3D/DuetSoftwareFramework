@@ -19,7 +19,7 @@ namespace DuetControlServer.SPI.Channel
     /// <summary>
     /// Class used to process data on a single code channel
     /// </summary>
-    public class Processor
+    public sealed class Processor
     {
         /// <summary>
         /// Logger instance
@@ -64,7 +64,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// This is set to true if all the files have been aborted and RRF has to be notified
         /// </summary>
-        public bool AllFilesAborted { get; set; }
+        private bool _allFilesAborted { get; set; }
 
         /// <summary>
         /// Prioritised codes that override every other code
@@ -89,7 +89,14 @@ namespace DuetControlServer.SPI.Channel
         {
             State state = new State();
 
-            // Suspend the remaining buffered codes
+            // Dequeue already suspended codes first so the correct order is maintained
+            Queue<Code> alreadySuspendedCodes = new Queue<Code>(CurrentState.SuspendedCodes.Count);
+            while (CurrentState.SuspendedCodes.TryDequeue(out Code suspendedCode))
+            {
+                alreadySuspendedCodes.Enqueue(suspendedCode);
+            }
+
+            // Suspend the already buffered codes
             foreach (Code bufferedCode in BufferedCodes)
             {
                 _logger.Debug("Suspending code {0}", bufferedCode);
@@ -97,6 +104,12 @@ namespace DuetControlServer.SPI.Channel
             }
             BytesBuffered = 0;
             BufferedCodes.Clear();
+
+            // Add back any codes that were previously suspended
+            while (alreadySuspendedCodes.TryDequeue(out Code suspendedCode))
+            {
+                CurrentState.SuspendedCodes.Enqueue(suspendedCode);
+            }
 
             // Done
             Stack.Push(state);
@@ -422,8 +435,9 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         /// <param name="abortAll">Whether to abort all files</param>
         /// <param name="printStopped">Whether the print has been stopped</param>
+        /// <param name="fromFirmware">Whether the request came from the firmware</param>
         /// <returns>Asynchronous task</returns>
-        public async Task AbortFile(bool abortAll, bool printStopped)
+        public async Task AbortFiles(bool abortAll, bool printStopped, bool fromFirmware)
         {
             bool macroAborted = false;
 
@@ -488,6 +502,7 @@ namespace DuetControlServer.SPI.Channel
             if (abortAll)
             {
                 // Cancel pending codes and requests
+                _allFilesAborted = !fromFirmware && (DataTransfer.ProtocolVersion >= 3);
                 InvalidateRegular();
             }
             else
@@ -584,13 +599,9 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // 3. Abort requests
-            if (AllFilesAborted)
+            if (_allFilesAborted)
             {
-                if (DataTransfer.WriteFilesAborted(Channel))
-                {
-                    await AbortFile(true, Channel == CodeChannel.File);
-                    AllFilesAborted = false;
-                }
+                _allFilesAborted = !DataTransfer.WriteFilesAborted(Channel);
                 return responseExpected;
             }
 
@@ -1186,6 +1197,7 @@ namespace DuetControlServer.SPI.Channel
 
             // Clear codes that are still pending but have not been fed into the SPI interface yet
             Code.CancelPending(Channel);
+            _allFilesAborted = false;
 
             // Done
             return resourceInvalidated;

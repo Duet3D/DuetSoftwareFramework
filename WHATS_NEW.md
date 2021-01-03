@@ -1,6 +1,19 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.2.0
+=============
+
+Compatible versions:
+- RepRapFirmware 3.2.0
+- DuetWebControl 3.2.0
+
+Bug fixes:
+- M929 didn't set the correct log level
+- `return` and `abort` tried to evaluate expressions even if not specified
+- `abort` keyword did not always cancel all the internal codes in time
+- Suspended codes could be re-suspended in the wrong order
+
 Version 3.2.0-rc2
 ================
 

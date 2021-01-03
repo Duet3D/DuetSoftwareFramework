@@ -536,7 +536,7 @@ namespace DuetControlServer.Commands
                     throw new OperationCanceledException();
                 }
 
-                string result = await Expressions.Evaluate(this, true);
+                string result = string.IsNullOrEmpty(KeywordArgument) ? string.Empty : await Expressions.Evaluate(this, true);
                 Result = new CodeResult(MessageType.Success, result);
 
                 if (Keyword == KeywordType.Abort)

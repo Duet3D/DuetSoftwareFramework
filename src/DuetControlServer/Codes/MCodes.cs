@@ -839,9 +839,15 @@ namespace DuetControlServer.Codes
                             }
                         }
 
-                        if (sParam > 0)
+                        if (sParam > 0 && sParam < 4)
                         {
-                            LogLevel logLevel = (LogLevel)(int)sParam;
+                            LogLevel logLevel = (int)sParam switch
+                            {
+                                1 => LogLevel.Warn,
+                                2 => LogLevel.Info,
+                                3 => LogLevel.Debug,
+                                _ => LogLevel.Off
+                            };
 
                             string defaultLogFile = Utility.Logger.DefaultLogFile;
                             using (await Model.Provider.AccessReadOnlyAsync())
