@@ -10,9 +10,10 @@ Compatible versions:
 
 Bug fixes:
 - M929 didn't set the correct log level
-- `return` and `abort` tried to evaluate expressions even if not specified
-- `abort` keyword did not always cancel all the internal codes in time
-- Suspended codes could be re-suspended in the wrong order
+- `abort` tried to evaluate following expression even if it was not specified
+- `abort` did not always cancel all the internal codes in time
+- Under rare conditions suspended codes could be re-suspended in the wrong order
+- G0/G1 with dynamic feedrate expressions caused an internal exception
 
 Version 3.2.0-rc2
 ================

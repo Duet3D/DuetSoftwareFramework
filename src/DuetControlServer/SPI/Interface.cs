@@ -390,11 +390,6 @@ namespace DuetControlServer.SPI
             {
                 _printStoppedReason = stopReason;
             }
-
-            using (await _channels[CodeChannel.File].LockAsync())
-            {
-                await _channels[CodeChannel.File].AbortFiles(true, true, false);
-            }
         }
 
         /// <summary>
@@ -645,7 +640,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[channel].LockAsync())
             {
-                await _channels[channel].AbortFiles(true, channel == CodeChannel.File, false);
+                await _channels[channel].AbortFiles(true, false);
             }
         }
 
@@ -1137,7 +1132,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[channel].LockAsync())
             {
-                await _channels[channel].AbortFiles(abortAll, false, true);
+                await _channels[channel].AbortFiles(abortAll, true);
             }
         }
 

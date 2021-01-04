@@ -4851,6 +4851,11 @@
             Indicates if this filament monitor is enabled
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.FilamentMonitor.Status">
+            <summary>
+            Last reported status of this filament monitor
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.FilamentMonitor.Type">
             <summary>
             Type of this filament monitor
@@ -4871,6 +4876,46 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="T:DuetAPI.ObjectModel.FilamentMonitorStatus">
+            <summary>
+            Possible filament sensor status
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.FilamentMonitorStatus.NoMonitor">
+            <summary>
+            No monitor is present
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.FilamentMonitorStatus.Ok">
+            <summary>
+            Filament working normally
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.FilamentMonitorStatus.NoDataReceived">
+            <summary>
+            No data received from the remote filament senosr
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.FilamentMonitorStatus.NoFilament">
+            <summary>
+            No filament present
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.FilamentMonitorStatus.TooLittleMovement">
+            <summary>
+            Sensor reads less movement than expected
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.FilamentMonitorStatus.TooMuchMovement">
+            <summary>
+            Sensor reads more movment than expected
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.FilamentMonitorStatus.SensorError">
+            <summary>
+            Sensor encountered an error
+            </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.FilamentMonitorType">
             <summary>

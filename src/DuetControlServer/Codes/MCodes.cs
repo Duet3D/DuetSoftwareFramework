@@ -1000,22 +1000,6 @@ namespace DuetControlServer.Codes
                     }
                     break;
 
-                // Absolute extrusion
-                case 82:
-                    using (await Model.Provider.AccessReadWriteAsync())
-                    {
-                        Model.Provider.Get.Inputs[code.Channel].DrivesRelative = false;
-                    }
-                    break;
-
-                // Relative extrusion
-                case 83:
-                    using (await Model.Provider.AccessReadWriteAsync())
-                    {
-                        Model.Provider.Get.Inputs[code.Channel].DrivesRelative = false;
-                    }
-                    break;
-
                 // Diagnostics
                 case 122:
                     if (code.Parameter('B', 0) == 0 && code.GetUnprecedentedString() != "DSF" && !code.Result.IsEmpty)

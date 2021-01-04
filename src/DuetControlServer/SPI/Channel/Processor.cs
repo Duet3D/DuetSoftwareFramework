@@ -434,10 +434,9 @@ namespace DuetControlServer.SPI.Channel
         /// Abort the last or all files
         /// </summary>
         /// <param name="abortAll">Whether to abort all files</param>
-        /// <param name="printStopped">Whether the print has been stopped</param>
         /// <param name="fromFirmware">Whether the request came from the firmware</param>
         /// <returns>Asynchronous task</returns>
-        public async Task AbortFiles(bool abortAll, bool printStopped, bool fromFirmware)
+        public async Task AbortFiles(bool abortAll, bool fromFirmware)
         {
             bool macroAborted = false;
 
@@ -516,8 +515,8 @@ namespace DuetControlServer.SPI.Channel
                 BytesBuffered = 0;
             }
 
-            // Stop the file print if necessary
-            if (Channel == CodeChannel.File && !printStopped && (abortAll || !macroAborted))
+            // Abort the file print if necessary
+            if (Channel == CodeChannel.File && (abortAll || !macroAborted))
             {
                 using (await FileExecution.Job.LockAsync())
                 {

@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using DuetAPI.Commands;
 
 namespace DuetControlServer.Codes
@@ -21,27 +20,6 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="code">Code processed by RepRapFirmware</param>
         /// <returns>Result to output</returns>
-        public static async Task CodeExecuted(Code code)
-        {
-            if (code.MajorNumber == null || !code.Result.IsSuccessful)
-            {
-                return;
-            }
-
-            // Set new tool number
-            using (await Model.Provider.AccessReadWriteAsync())
-            {
-                if (Model.Provider.Get.Tools.Any(tool => tool != null && tool.Number == code.MajorNumber))
-                {
-                    // Make sure the chosen tool actually exists
-                    Model.Provider.Get.State.CurrentTool = code.MajorNumber.Value;
-                }
-                else
-                {
-                    // Deselect the current tool if it does not exist
-                    Model.Provider.Get.State.CurrentTool = -1;
-                }
-            }
-        }
+        public static Task CodeExecuted(Code code) => Task.CompletedTask;
     }
 }

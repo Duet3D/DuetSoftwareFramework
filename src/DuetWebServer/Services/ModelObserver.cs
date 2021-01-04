@@ -186,6 +186,7 @@ namespace DuetWebServer.Services
                         model = await subscribeConnection.GetObjectModel(_stopRequest.Token);
                         if (!string.IsNullOrEmpty(model.Network.CorsSite))
                         {
+                            _logger.LogInformation("Changing CORS policy to accept site '{0}'", model.Network.CorsSite);
                             CorsPolicy.Origins.Add(model.Network.CorsSite);
                         }
                         lock (Endpoints)
@@ -217,7 +218,12 @@ namespace DuetWebServer.Services
                                 CorsPolicy.Origins.Clear();
                                 if (!string.IsNullOrEmpty(model.Network.CorsSite))
                                 {
+                                    _logger.LogInformation("Changing CORS policy to accept site '{0}'", model.Network.CorsSite);
                                     CorsPolicy.Origins.Add(model.Network.CorsSite);
+                                }
+                                else
+                                {
+                                    _logger.LogInformation("Reset CORS policy");
                                 }
                             }
 

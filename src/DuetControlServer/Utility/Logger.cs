@@ -121,6 +121,7 @@ namespace DuetControlServer.Utility
                 using (await Model.Provider.AccessReadWriteAsync())
                 {
                     Model.Provider.Get.State.LogFile = null;
+                    Model.Provider.Get.State.LogLevel = LogLevel.Off;
                 }
             }
         }

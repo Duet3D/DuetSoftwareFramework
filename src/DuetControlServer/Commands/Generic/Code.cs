@@ -541,10 +541,8 @@ namespace DuetControlServer.Commands
 
                 if (Keyword == KeywordType.Abort)
                 {
-                    CancelPending(Channel);
                     await Interface.AbortAll(Channel);
                 }
-
                 InternallyProcessed = true;
                 return true;
             }

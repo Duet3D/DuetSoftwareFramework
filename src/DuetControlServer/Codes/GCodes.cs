@@ -127,42 +127,6 @@ namespace DuetControlServer.Codes
 
             switch (code.MajorNumber)
             {
-                // Rapid/Regular positioning
-                case 0:
-                case 1:
-                    CodeParameter feedrate = code.Parameter('F');
-                    if (feedrate != null)
-                    {
-                        using (await Model.Provider.AccessReadWriteAsync())
-                        {
-                            if (Model.Provider.Get.Inputs[code.Channel].DistanceUnit == DistanceUnit.Inch)
-                            {
-                                Model.Provider.Get.Inputs[code.Channel].FeedRate = feedrate / (25.4F * 60F);
-                            }
-                            else
-                            {
-                                Model.Provider.Get.Inputs[code.Channel].FeedRate = feedrate / 60F;
-                            }
-                        }
-                    }
-                    break;
-
-                // Use inches
-                case 20:
-                    using (await Model.Provider.AccessReadWriteAsync())
-                    {
-                        Model.Provider.Get.Inputs[code.Channel].DistanceUnit = DistanceUnit.Inch;
-                    }
-                    break;
-
-                // Use millimetres
-                case 21:
-                    using (await Model.Provider.AccessReadWriteAsync())
-                    {
-                        Model.Provider.Get.Inputs[code.Channel].DistanceUnit = DistanceUnit.MM;
-                    }
-                    break;
-
                 // Save heightmap
                 case 29:
                     // If no S parameter is present, check for /sys/mesh.g and continue only if it does not exist
@@ -209,22 +173,6 @@ namespace DuetControlServer.Codes
                             }
                             code.Result.Add(MessageType.Error, $"Failed to save height map to file {file}: {e.Message}");
                         }
-                    }
-                    break;
-
-                // Absolute positioning
-                case 90:
-                    using (await Model.Provider.AccessReadWriteAsync())
-                    {
-                        Model.Provider.Get.Inputs[code.Channel].AxesRelative = false;
-                    }
-                    break;
-
-                // Relative positioning
-                case 91:
-                    using (await Model.Provider.AccessReadWriteAsync())
-                    {
-                        Model.Provider.Get.Inputs[code.Channel].AxesRelative = true;
                     }
                     break;
             }
