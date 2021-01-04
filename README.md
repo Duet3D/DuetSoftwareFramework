@@ -398,7 +398,7 @@ Since it relies on a [model subscription](#model-subscriptions), it gives an ide
 ### 3. Building things on your own
 
 Of course you can build everything on your own, too. In order to build packages like those on the package feed, check out the `build.sh` script in the `pkg` directory.
-If you wish to make changes to the existing software and to test it, you need to get the [.NET Core 3.x SDK](https://dotnet.microsoft.com/download/dotnet-core) first.
+If you wish to make changes to the existing software and to test it, you need to get the [latest .NET SDK](https://dotnet.microsoft.com/download/dotnet-core) first.
 
 #### 3.1 Building on a remote system
 
