@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Class Provider
    ">
-    <meta name="generator" content="docfx 2.56.2.0">
+    <meta name="generator" content="docfx 2.56.6.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -139,6 +139,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeResult.html" title="CodeResult" class="">CodeResult</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeResultConverter.html" title="CodeResultConverter" class="">CodeResultConverter</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeType.html" title="CodeType" class="">CodeType</a>
@@ -330,6 +333,9 @@
                             <a href="DuetAPI.ObjectModel.DeltaTower.html" title="DeltaTower" class="">DeltaTower</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplay.html" title="DirectDisplay" class="">DirectDisplay</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Directories.html" title="Directories" class="">Directories</a>
                           </li>
                           <li class="">
@@ -355,6 +361,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitor.html" title="FilamentMonitor" class="">FilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FilamentMonitorStatus.html" title="FilamentMonitorStatus" class="">FilamentMonitorStatus</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitorType.html" title="FilamentMonitorType" class="">FilamentMonitorType</a>
@@ -441,6 +450,9 @@
                             <a href="DuetAPI.ObjectModel.LinuxPropertyAttribute.html" title="LinuxPropertyAttribute" class="">LinuxPropertyAttribute</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.LogLevel.html" title="LogLevel" class="">LogLevel</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.MachineMode.html" title="MachineMode" class="">MachineMode</a>
                           </li>
                           <li class="">
@@ -520,6 +532,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ParsedFileInfoConverter.html" title="ParsedFileInfoConverter" class="">ParsedFileInfoConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ParsedThumbnail.html" title="ParsedThumbnail" class="">ParsedThumbnail</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Plugin.html" title="Plugin" class="">Plugin</a>
@@ -911,6 +926,9 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Interface.html" title="Interface" class="">Interface</a>
                           </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Interface.MovementLock.html" title="Interface.MovementLock" class="">Interface.MovementLock</a>
+                          </li>
                         </ul>  </li>
                     <li class="">
                       <span class="expand-stub"></span>
@@ -990,7 +1008,7 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunkHeader.html" title="FileChunkHeader" class="">FileChunkHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModelHeader.html" title="GetObjectModelHeader" class="">GetObjectModelHeader</a>
@@ -1066,6 +1084,9 @@
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Utility.CRC16.html" title="CRC16" class="">CRC16</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Utility.CRC32.html" title="CRC32" class="">CRC32</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Utility.FilamentManager.html" title="FilamentManager" class="">FilamentManager</a>
@@ -1277,6 +1298,48 @@ so that pending updates can be performed as quickly as possible.</p>
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_Model_Provider_AccessReadOnly_" data-uid="DuetControlServer.Model.Provider.AccessReadOnly*"></a>
+  <h4 id="DuetControlServer_Model_Provider_AccessReadOnly_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.Provider.AccessReadOnly(System.Threading.CancellationToken)">AccessReadOnly(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Access the machine model for read operations only</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static IDisposable AccessReadOnly(CancellationToken cancellationToken)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.IDisposable</span></td>
+        <td><p>Disposable lock object to be used with a using directive</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_Model_Provider_AccessReadOnlyAsync_" data-uid="DuetControlServer.Model.Provider.AccessReadOnlyAsync*"></a>
   <h4 id="DuetControlServer_Model_Provider_AccessReadOnlyAsync" data-uid="DuetControlServer.Model.Provider.AccessReadOnlyAsync">AccessReadOnlyAsync()</h4>
   <div class="markdown level1 summary"><p>Access the machine model asynchronously for read operations only</p>
@@ -1286,6 +1349,48 @@ so that pending updates can be performed as quickly as possible.</p>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static Task&lt;IDisposable&gt; AccessReadOnlyAsync()</code></pre>
   </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.IDisposable</span>&gt;</td>
+        <td><p>Disposable lock object to be used with a using directive</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_Model_Provider_AccessReadOnlyAsync_" data-uid="DuetControlServer.Model.Provider.AccessReadOnlyAsync*"></a>
+  <h4 id="DuetControlServer_Model_Provider_AccessReadOnlyAsync_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.Provider.AccessReadOnlyAsync(System.Threading.CancellationToken)">AccessReadOnlyAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Access the machine model asynchronously for read operations only</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task&lt;IDisposable&gt; AccessReadOnlyAsync(CancellationToken cancellationToken)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h5 class="returns">Returns</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
@@ -1327,6 +1432,48 @@ so that pending updates can be performed as quickly as possible.</p>
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_Model_Provider_AccessReadWrite_" data-uid="DuetControlServer.Model.Provider.AccessReadWrite*"></a>
+  <h4 id="DuetControlServer_Model_Provider_AccessReadWrite_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.Provider.AccessReadWrite(System.Threading.CancellationToken)">AccessReadWrite(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Access the machine model for read/write operations</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static IDisposable AccessReadWrite(CancellationToken cancellationToken)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.IDisposable</span></td>
+        <td><p>Disposable lock object to be used with a using directive</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_Model_Provider_AccessReadWriteAsync_" data-uid="DuetControlServer.Model.Provider.AccessReadWriteAsync*"></a>
   <h4 id="DuetControlServer_Model_Provider_AccessReadWriteAsync" data-uid="DuetControlServer.Model.Provider.AccessReadWriteAsync">AccessReadWriteAsync()</h4>
   <div class="markdown level1 summary"><p>Access the machine model asynchronously for read/write operations</p>
@@ -1336,6 +1483,48 @@ so that pending updates can be performed as quickly as possible.</p>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static Task&lt;IDisposable&gt; AccessReadWriteAsync()</code></pre>
   </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.IDisposable</span>&gt;</td>
+        <td><p>Disposable lock object to be used with a using directive</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_Model_Provider_AccessReadWriteAsync_" data-uid="DuetControlServer.Model.Provider.AccessReadWriteAsync*"></a>
+  <h4 id="DuetControlServer_Model_Provider_AccessReadWriteAsync_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.Provider.AccessReadWriteAsync(System.Threading.CancellationToken)">AccessReadWriteAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Access the machine model asynchronously for read/write operations</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task&lt;IDisposable&gt; AccessReadWriteAsync(CancellationToken cancellationToken)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h5 class="returns">Returns</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>
@@ -1400,6 +1589,55 @@ so that pending updates can be performed as quickly as possible.</p>
       <tr>
         <td><span class="xref">System.Threading.Tasks.Task</span></td>
         <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_Model_Provider_Output_" data-uid="DuetControlServer.Model.Provider.Output*"></a>
+  <h4 id="DuetControlServer_Model_Provider_Output_DuetAPI_ObjectModel_LogLevel_DuetAPI_ObjectModel_Message_" data-uid="DuetControlServer.Model.Provider.Output(DuetAPI.ObjectModel.LogLevel,DuetAPI.ObjectModel.Message)">Output(LogLevel, Message)</h4>
+  <div class="markdown level1 summary"><p>Output a generic message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; Output(LogLevel level, Message message)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.ObjectModel.LogLevel.html">LogLevel</a></td>
+        <td><span class="parametername">level</span></td>
+        <td><p>Log level</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></td>
+        <td><span class="parametername">message</span></td>
+        <td><p>Message to output</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
+        <td><p>Whether the message has been written</p>
 </td>
       </tr>
     </tbody>
@@ -1497,6 +1735,31 @@ so that pending updates can be performed as quickly as possible.</p>
     </tbody>
   </table>
   <a id="DuetControlServer_Model_Provider_WaitForUpdate_" data-uid="DuetControlServer.Model.Provider.WaitForUpdate*"></a>
+  <h4 id="DuetControlServer_Model_Provider_WaitForUpdate" data-uid="DuetControlServer.Model.Provider.WaitForUpdate">WaitForUpdate()</h4>
+  <div class="markdown level1 summary"><p>Wait for an update to occur</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task WaitForUpdate()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_Model_Provider_WaitForUpdate_" data-uid="DuetControlServer.Model.Provider.WaitForUpdate*"></a>
   <h4 id="DuetControlServer_Model_Provider_WaitForUpdate_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.Provider.WaitForUpdate(System.Threading.CancellationToken)">WaitForUpdate(CancellationToken)</h4>
   <div class="markdown level1 summary"><p>Wait for an update to occur</p>
 </div>
@@ -1545,7 +1808,8 @@ so that pending updates can be performed as quickly as possible.</p>
           <div class="hidden-sm col-md-2" role="complementary">
             <div class="sideaffix">
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+                <h5>In This Article</h5>
+                <div></div>
               </nav>
             </div>
           </div>

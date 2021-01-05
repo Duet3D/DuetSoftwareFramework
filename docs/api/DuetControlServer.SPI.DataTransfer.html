@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Class DataTransfer
    ">
-    <meta name="generator" content="docfx 2.56.2.0">
+    <meta name="generator" content="docfx 2.56.6.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -139,6 +139,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeResult.html" title="CodeResult" class="">CodeResult</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeResultConverter.html" title="CodeResultConverter" class="">CodeResultConverter</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeType.html" title="CodeType" class="">CodeType</a>
@@ -330,6 +333,9 @@
                             <a href="DuetAPI.ObjectModel.DeltaTower.html" title="DeltaTower" class="">DeltaTower</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplay.html" title="DirectDisplay" class="">DirectDisplay</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Directories.html" title="Directories" class="">Directories</a>
                           </li>
                           <li class="">
@@ -355,6 +361,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitor.html" title="FilamentMonitor" class="">FilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FilamentMonitorStatus.html" title="FilamentMonitorStatus" class="">FilamentMonitorStatus</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitorType.html" title="FilamentMonitorType" class="">FilamentMonitorType</a>
@@ -441,6 +450,9 @@
                             <a href="DuetAPI.ObjectModel.LinuxPropertyAttribute.html" title="LinuxPropertyAttribute" class="">LinuxPropertyAttribute</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.LogLevel.html" title="LogLevel" class="">LogLevel</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.MachineMode.html" title="MachineMode" class="">MachineMode</a>
                           </li>
                           <li class="">
@@ -520,6 +532,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ParsedFileInfoConverter.html" title="ParsedFileInfoConverter" class="">ParsedFileInfoConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ParsedThumbnail.html" title="ParsedThumbnail" class="">ParsedThumbnail</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Plugin.html" title="Plugin" class="">Plugin</a>
@@ -911,6 +926,9 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Interface.html" title="Interface" class="">Interface</a>
                           </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Interface.MovementLock.html" title="Interface.MovementLock" class="">Interface.MovementLock</a>
+                          </li>
                         </ul>  </li>
                     <li class="">
                       <span class="expand-stub"></span>
@@ -990,7 +1008,7 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunkHeader.html" title="FileChunkHeader" class="">FileChunkHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModelHeader.html" title="GetObjectModelHeader" class="">GetObjectModelHeader</a>
@@ -1066,6 +1084,9 @@
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Utility.CRC16.html" title="CRC16" class="">CRC16</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Utility.CRC32.html" title="CRC32" class="">CRC32</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Utility.FilamentManager.html" title="FilamentManager" class="">FilamentManager</a>
@@ -1236,30 +1257,6 @@
     <tbody>
       <tr>
         <td><span class="xref">System.Int32</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_DataTransfer_Updating_" data-uid="DuetControlServer.SPI.DataTransfer.Updating*"></a>
-  <h4 id="DuetControlServer_SPI_DataTransfer_Updating" data-uid="DuetControlServer.SPI.DataTransfer.Updating">Updating</h4>
-  <div class="markdown level1 summary"><p>Indicates if an update is in progress</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static bool Updating { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Boolean</span></td>
         <td></td>
       </tr>
     </tbody>
@@ -1721,13 +1718,13 @@
     </tbody>
   </table>
   <a id="DuetControlServer_SPI_DataTransfer_ReadMacroRequest_" data-uid="DuetControlServer.SPI.DataTransfer.ReadMacroRequest*"></a>
-  <h4 id="DuetControlServer_SPI_DataTransfer_ReadMacroRequest_DuetAPI_CodeChannel__System_Boolean__System_Boolean__System_String__" data-uid="DuetControlServer.SPI.DataTransfer.ReadMacroRequest(DuetAPI.CodeChannel@,System.Boolean@,System.Boolean@,System.String@)">ReadMacroRequest(out CodeChannel, out Boolean, out Boolean, out String)</h4>
+  <h4 id="DuetControlServer_SPI_DataTransfer_ReadMacroRequest_DuetAPI_CodeChannel__System_Boolean__System_String__" data-uid="DuetControlServer.SPI.DataTransfer.ReadMacroRequest(DuetAPI.CodeChannel@,System.Boolean@,System.String@)">ReadMacroRequest(out CodeChannel, out Boolean, out String)</h4>
   <div class="markdown level1 summary"><p>Read the content of a <a class="xref" href="DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.html">ExecuteMacroHeader</a> packet</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out bool isSystemMacro, out string filename)</code></pre>
+    <pre><code class="lang-csharp hljs">public static void ReadMacroRequest(out CodeChannel channel, out bool isSystemMacro, out string filename)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1743,12 +1740,6 @@
         <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
         <td><span class="parametername">channel</span></td>
         <td><p>Channel requesting a macro file</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Boolean</span></td>
-        <td><span class="parametername">reportMissing</span></td>
-        <td><p>Write an error message if the macro is not found</p>
 </td>
       </tr>
       <tr>
@@ -1798,6 +1789,31 @@
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_SPI_DataTransfer_ReadNextPacket_" data-uid="DuetControlServer.SPI.DataTransfer.ReadNextPacket*"></a>
+  <h4 id="DuetControlServer_SPI_DataTransfer_ReadNextPacket" data-uid="DuetControlServer.SPI.DataTransfer.ReadNextPacket">ReadNextPacket()</h4>
+  <div class="markdown level1 summary"><p>Read the next packet</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static PacketHeader? ReadNextPacket()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Nullable</span>&lt;<a class="xref" href="DuetControlServer.SPI.Communication.Shared.PacketHeader.html">PacketHeader</a>&gt;</td>
+        <td><p>The next packet or null if none is available</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_DataTransfer_ReadObjectModel_" data-uid="DuetControlServer.SPI.DataTransfer.ReadObjectModel*"></a>
   <h4 id="DuetControlServer_SPI_DataTransfer_ReadObjectModel_System_ReadOnlySpan_System_Byte___" data-uid="DuetControlServer.SPI.DataTransfer.ReadObjectModel(System.ReadOnlySpan{System.Byte}@)">ReadObjectModel(out ReadOnlySpan&lt;Byte&gt;)</h4>
   <div class="markdown level1 summary"><p>Read the result of a <a class="xref" href="DuetControlServer.SPI.Communication.LinuxRequests.Request.html#DuetControlServer_SPI_Communication_LinuxRequests_Request_GetObjectModel">GetObjectModel</a> request</p>
@@ -1821,31 +1837,6 @@
         <td><span class="xref">System.ReadOnlySpan</span>&lt;<span class="xref">System.Byte</span>&gt;</td>
         <td><span class="parametername">json</span></td>
         <td><p>JSON data</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetControlServer_SPI_DataTransfer_ReadPacket_" data-uid="DuetControlServer.SPI.DataTransfer.ReadPacket*"></a>
-  <h4 id="DuetControlServer_SPI_DataTransfer_ReadPacket" data-uid="DuetControlServer.SPI.DataTransfer.ReadPacket">ReadPacket()</h4>
-  <div class="markdown level1 summary"><p>Read the next packet</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static PacketHeader? ReadPacket()</code></pre>
-  </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Nullable</span>&lt;<a class="xref" href="DuetControlServer.SPI.Communication.Shared.PacketHeader.html">PacketHeader</a>&gt;</td>
-        <td><p>The next packet or null if none is available</p>
 </td>
       </tr>
     </tbody>
@@ -1884,13 +1875,13 @@
     </tbody>
   </table>
   <a id="DuetControlServer_SPI_DataTransfer_ResendPacket_" data-uid="DuetControlServer.SPI.DataTransfer.ResendPacket*"></a>
-  <h4 id="DuetControlServer_SPI_DataTransfer_ResendPacket_DuetControlServer_SPI_Communication_Shared_PacketHeader_" data-uid="DuetControlServer.SPI.DataTransfer.ResendPacket(DuetControlServer.SPI.Communication.Shared.PacketHeader)">ResendPacket(PacketHeader)</h4>
+  <h4 id="DuetControlServer_SPI_DataTransfer_ResendPacket_DuetControlServer_SPI_Communication_Shared_PacketHeader_DuetControlServer_SPI_Communication_LinuxRequests_Request__" data-uid="DuetControlServer.SPI.DataTransfer.ResendPacket(DuetControlServer.SPI.Communication.Shared.PacketHeader,DuetControlServer.SPI.Communication.LinuxRequests.Request@)">ResendPacket(PacketHeader, out Request)</h4>
   <div class="markdown level1 summary"><p>Resend a packet back to the firmware</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static void ResendPacket(PacketHeader packet)</code></pre>
+    <pre><code class="lang-csharp hljs">public static void ResendPacket(PacketHeader packet, out Request linuxRequest)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1907,6 +1898,11 @@
         <td><span class="parametername">packet</span></td>
         <td><p>Packet holding the resend request</p>
 </td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetControlServer.SPI.Communication.LinuxRequests.Request.html">Request</a></td>
+        <td><span class="parametername">linuxRequest</span></td>
+        <td></td>
       </tr>
     </tbody>
   </table>
@@ -2207,6 +2203,49 @@
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_SPI_DataTransfer_WriteFilesAborted_" data-uid="DuetControlServer.SPI.DataTransfer.WriteFilesAborted*"></a>
+  <h4 id="DuetControlServer_SPI_DataTransfer_WriteFilesAborted_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.DataTransfer.WriteFilesAborted(DuetAPI.CodeChannel)">WriteFilesAborted(CodeChannel)</h4>
+  <div class="markdown level1 summary"><p>Called when all the files have been aborted by DSF (e.g. via abort keyword)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool WriteFilesAborted(CodeChannel channel)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Code channel that requires the lock</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><p>True if the packet could be written</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_DataTransfer_WriteGetHeightMap_" data-uid="DuetControlServer.SPI.DataTransfer.WriteGetHeightMap*"></a>
   <h4 id="DuetControlServer_SPI_DataTransfer_WriteGetHeightMap" data-uid="DuetControlServer.SPI.DataTransfer.WriteGetHeightMap">WriteGetHeightMap()</h4>
   <div class="markdown level1 summary"><p>Request the heightmap from the firmware</p>
@@ -2485,6 +2524,49 @@ This function is only used for macro files that the firmware requested</p>
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_SPI_DataTransfer_WriteMacroStarted_" data-uid="DuetControlServer.SPI.DataTransfer.WriteMacroStarted*"></a>
+  <h4 id="DuetControlServer_SPI_DataTransfer_WriteMacroStarted_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.DataTransfer.WriteMacroStarted(DuetAPI.CodeChannel)">WriteMacroStarted(CodeChannel)</h4>
+  <div class="markdown level1 summary"><p>Notify RepRapFirmware that a macro file could be started</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool WriteMacroStarted(CodeChannel channel)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Code channel that requires the lock</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><p>True if the packet could be written</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_DataTransfer_WriteMessage_" data-uid="DuetControlServer.SPI.DataTransfer.WriteMessage*"></a>
   <h4 id="DuetControlServer_SPI_DataTransfer_WriteMessage_DuetControlServer_SPI_Communication_Shared_MessageTypeFlags_System_String_" data-uid="DuetControlServer.SPI.DataTransfer.WriteMessage(DuetControlServer.SPI.Communication.Shared.MessageTypeFlags,System.String)">WriteMessage(MessageTypeFlags, String)</h4>
   <div class="markdown level1 summary"><p>Write a message</p>
@@ -2743,7 +2825,8 @@ This function is only used for macro files that the firmware requested</p>
           <div class="hidden-sm col-md-2" role="complementary">
             <div class="sideaffix">
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+                <h5>In This Article</h5>
+                <div></div>
               </nav>
             </div>
           </div>

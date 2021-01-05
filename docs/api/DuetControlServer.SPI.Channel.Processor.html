@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Class Processor
    ">
-    <meta name="generator" content="docfx 2.56.2.0">
+    <meta name="generator" content="docfx 2.56.6.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -139,6 +139,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeResult.html" title="CodeResult" class="">CodeResult</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeResultConverter.html" title="CodeResultConverter" class="">CodeResultConverter</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeType.html" title="CodeType" class="">CodeType</a>
@@ -330,6 +333,9 @@
                             <a href="DuetAPI.ObjectModel.DeltaTower.html" title="DeltaTower" class="">DeltaTower</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplay.html" title="DirectDisplay" class="">DirectDisplay</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Directories.html" title="Directories" class="">Directories</a>
                           </li>
                           <li class="">
@@ -355,6 +361,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitor.html" title="FilamentMonitor" class="">FilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FilamentMonitorStatus.html" title="FilamentMonitorStatus" class="">FilamentMonitorStatus</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitorType.html" title="FilamentMonitorType" class="">FilamentMonitorType</a>
@@ -441,6 +450,9 @@
                             <a href="DuetAPI.ObjectModel.LinuxPropertyAttribute.html" title="LinuxPropertyAttribute" class="">LinuxPropertyAttribute</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.LogLevel.html" title="LogLevel" class="">LogLevel</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.MachineMode.html" title="MachineMode" class="">MachineMode</a>
                           </li>
                           <li class="">
@@ -520,6 +532,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ParsedFileInfoConverter.html" title="ParsedFileInfoConverter" class="">ParsedFileInfoConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ParsedThumbnail.html" title="ParsedThumbnail" class="">ParsedThumbnail</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Plugin.html" title="Plugin" class="">Plugin</a>
@@ -911,6 +926,9 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Interface.html" title="Interface" class="">Interface</a>
                           </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Interface.MovementLock.html" title="Interface.MovementLock" class="">Interface.MovementLock</a>
+                          </li>
                         </ul>  </li>
                     <li class="">
                       <span class="expand-stub"></span>
@@ -990,7 +1008,7 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunkHeader.html" title="FileChunkHeader" class="">FileChunkHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModelHeader.html" title="GetObjectModelHeader" class="">GetObjectModelHeader</a>
@@ -1066,6 +1084,9 @@
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Utility.CRC16.html" title="CRC16" class="">CRC16</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Utility.CRC32.html" title="CRC32" class="">CRC32</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Utility.FilamentManager.html" title="FilamentManager" class="">FilamentManager</a>
@@ -1188,7 +1209,7 @@
   <h6><strong>Assembly</strong>: DuetControlServer.dll</h6>
   <h5 id="DuetControlServer_SPI_Channel_Processor_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public class Processor</code></pre>
+    <pre><code class="lang-csharp hljs">public sealed class Processor</code></pre>
   </div>
   <h3 id="constructors">Constructors
   </h3>
@@ -1317,30 +1338,6 @@
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_Channel_Processor_IsBlocked_" data-uid="DuetControlServer.SPI.Channel.Processor.IsBlocked*"></a>
-  <h4 id="DuetControlServer_SPI_Channel_Processor_IsBlocked" data-uid="DuetControlServer.SPI.Channel.Processor.IsBlocked">IsBlocked</h4>
-  <div class="markdown level1 summary"><p>Indicates if this channel is blocked until the next full transfer</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public bool IsBlocked { get; set; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Boolean</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_SPI_Channel_Processor_IsWaitingForAcknowledgement_" data-uid="DuetControlServer.SPI.Channel.Processor.IsWaitingForAcknowledgement*"></a>
   <h4 id="DuetControlServer_SPI_Channel_Processor_IsWaitingForAcknowledgement" data-uid="DuetControlServer.SPI.Channel.Processor.IsWaitingForAcknowledgement">IsWaitingForAcknowledgement</h4>
   <div class="markdown level1 summary"><p>Checks if this channel is waiting for acknowledgement</p>
@@ -1368,6 +1365,30 @@
   <h5 id="DuetControlServer_SPI_Channel_Processor_IsWaitingForAcknowledgement_remarks">Remarks</h5>
   <div class="markdown level1 remarks"><p>This is volatile to allow fast access without locking this instance first</p>
 </div>
+  <a id="DuetControlServer_SPI_Channel_Processor_PendingReplies_" data-uid="DuetControlServer.SPI.Channel.Processor.PendingReplies*"></a>
+  <h4 id="DuetControlServer_SPI_Channel_Processor_PendingReplies" data-uid="DuetControlServer.SPI.Channel.Processor.PendingReplies">PendingReplies</h4>
+  <div class="markdown level1 summary"><p>Stack of code replies for codes that pushed the stack (e.g. macro files or blocking messages)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Stack&lt;Tuple&lt;MessageTypeFlags, string&gt;&gt; PendingReplies { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Stack</span>&lt;<span class="xref">System.Tuple</span>&lt;<a class="xref" href="DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.html">MessageTypeFlags</a>, <span class="xref">System.String</span>&gt;&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_Channel_Processor_PriorityCodes_" data-uid="DuetControlServer.SPI.Channel.Processor.PriorityCodes*"></a>
   <h4 id="DuetControlServer_SPI_Channel_Processor_PriorityCodes" data-uid="DuetControlServer.SPI.Channel.Processor.PriorityCodes">PriorityCodes</h4>
   <div class="markdown level1 summary"><p>Prioritised codes that override every other code</p>
@@ -1418,14 +1439,14 @@
   </table>
   <h3 id="methods">Methods
   </h3>
-  <a id="DuetControlServer_SPI_Channel_Processor_AbortFile_" data-uid="DuetControlServer.SPI.Channel.Processor.AbortFile*"></a>
-  <h4 id="DuetControlServer_SPI_Channel_Processor_AbortFile_System_Boolean_System_Boolean_" data-uid="DuetControlServer.SPI.Channel.Processor.AbortFile(System.Boolean,System.Boolean)">AbortFile(Boolean, Boolean)</h4>
+  <a id="DuetControlServer_SPI_Channel_Processor_AbortFiles_" data-uid="DuetControlServer.SPI.Channel.Processor.AbortFiles*"></a>
+  <h4 id="DuetControlServer_SPI_Channel_Processor_AbortFiles_System_Boolean_System_Boolean_" data-uid="DuetControlServer.SPI.Channel.Processor.AbortFiles(System.Boolean,System.Boolean)">AbortFiles(Boolean, Boolean)</h4>
   <div class="markdown level1 summary"><p>Abort the last or all files</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Task AbortFile(bool abortAll, bool printStopped)</code></pre>
+    <pre><code class="lang-csharp hljs">public Task AbortFiles(bool abortAll, bool fromFirmware)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1445,8 +1466,8 @@
       </tr>
       <tr>
         <td><span class="xref">System.Boolean</span></td>
-        <td><span class="parametername">printStopped</span></td>
-        <td><p>Whether the print has been stopped</p>
+        <td><span class="parametername">fromFirmware</span></td>
+        <td><p>Whether the request came from the firmware</p>
 </td>
       </tr>
     </tbody>
@@ -1538,13 +1559,13 @@
     </tbody>
   </table>
   <a id="DuetControlServer_SPI_Channel_Processor_DoMacroFile_" data-uid="DuetControlServer.SPI.Channel.Processor.DoMacroFile*"></a>
-  <h4 id="DuetControlServer_SPI_Channel_Processor_DoMacroFile_System_String_System_Boolean_System_Boolean_" data-uid="DuetControlServer.SPI.Channel.Processor.DoMacroFile(System.String,System.Boolean,System.Boolean)">DoMacroFile(String, Boolean, Boolean)</h4>
+  <h4 id="DuetControlServer_SPI_Channel_Processor_DoMacroFile_System_String_System_Boolean_" data-uid="DuetControlServer.SPI.Channel.Processor.DoMacroFile(System.String,System.Boolean)">DoMacroFile(String, Boolean)</h4>
   <div class="markdown level1 summary"><p>Attempt to start a file macro</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Task DoMacroFile(string fileName, bool reportMissing, bool fromCode)</code></pre>
+    <pre><code class="lang-csharp hljs">public Task DoMacroFile(string fileName, bool fromCode)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1560,12 +1581,6 @@
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">fileName</span></td>
         <td><p>Name of the macro file</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Boolean</span></td>
-        <td><span class="parametername">reportMissing</span></td>
-        <td><p>Report an error if the file could not be found</p>
 </td>
       </tr>
       <tr>
@@ -1793,6 +1808,31 @@
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_SPI_Channel_Processor_MacroFileClosed_" data-uid="DuetControlServer.SPI.Channel.Processor.MacroFileClosed*"></a>
+  <h4 id="DuetControlServer_SPI_Channel_Processor_MacroFileClosed" data-uid="DuetControlServer.SPI.Channel.Processor.MacroFileClosed">MacroFileClosed()</h4>
+  <div class="markdown level1 summary"><p>Called when RepRapFirmware has closed the last macro file internally</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task MacroFileClosed()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_SPI_Channel_Processor_MessageAcknowledged_" data-uid="DuetControlServer.SPI.Channel.Processor.MessageAcknowledged*"></a>
   <h4 id="DuetControlServer_SPI_Channel_Processor_MessageAcknowledged" data-uid="DuetControlServer.SPI.Channel.Processor.MessageAcknowledged">MessageAcknowledged()</h4>
   <div class="markdown level1 summary"><p>Called when a message has been acknowledged</p>
@@ -1924,7 +1964,7 @@
     <tbody>
       <tr>
         <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
-        <td><p>If anything more can be done on this channel</p>
+        <td><p>Whether a response can be expected from RRF in the next transmission</p>
 </td>
       </tr>
     </tbody>
@@ -1969,7 +2009,8 @@
           <div class="hidden-sm col-md-2" role="complementary">
             <div class="sideaffix">
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+                <h5>In This Article</h5>
+                <div></div>
               </nav>
             </div>
           </div>

@@ -3164,12 +3164,11 @@
             </summary>
             <returns>Asynchronous task</returns>
         </member>
-        <member name="M:DuetControlServer.SPI.Channel.Processor.AbortFiles(System.Boolean,System.Boolean,System.Boolean)">
+        <member name="M:DuetControlServer.SPI.Channel.Processor.AbortFiles(System.Boolean,System.Boolean)">
             <summary>
             Abort the last or all files
             </summary>
             <param name="abortAll">Whether to abort all files</param>
-            <param name="printStopped">Whether the print has been stopped</param>
             <param name="fromFirmware">Whether the request came from the firmware</param>
             <returns>Asynchronous task</returns>
         </member>

@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Class ModelObserver
    ">
-    <meta name="generator" content="docfx 2.56.2.0">
+    <meta name="generator" content="docfx 2.56.6.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -139,6 +139,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeResult.html" title="CodeResult" class="">CodeResult</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeResultConverter.html" title="CodeResultConverter" class="">CodeResultConverter</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeType.html" title="CodeType" class="">CodeType</a>
@@ -330,6 +333,9 @@
                             <a href="DuetAPI.ObjectModel.DeltaTower.html" title="DeltaTower" class="">DeltaTower</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplay.html" title="DirectDisplay" class="">DirectDisplay</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Directories.html" title="Directories" class="">Directories</a>
                           </li>
                           <li class="">
@@ -355,6 +361,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitor.html" title="FilamentMonitor" class="">FilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FilamentMonitorStatus.html" title="FilamentMonitorStatus" class="">FilamentMonitorStatus</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitorType.html" title="FilamentMonitorType" class="">FilamentMonitorType</a>
@@ -441,6 +450,9 @@
                             <a href="DuetAPI.ObjectModel.LinuxPropertyAttribute.html" title="LinuxPropertyAttribute" class="">LinuxPropertyAttribute</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.LogLevel.html" title="LogLevel" class="">LogLevel</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.MachineMode.html" title="MachineMode" class="">MachineMode</a>
                           </li>
                           <li class="">
@@ -520,6 +532,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ParsedFileInfoConverter.html" title="ParsedFileInfoConverter" class="">ParsedFileInfoConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ParsedThumbnail.html" title="ParsedThumbnail" class="">ParsedThumbnail</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Plugin.html" title="Plugin" class="">Plugin</a>
@@ -911,6 +926,9 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Interface.html" title="Interface" class="">Interface</a>
                           </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Interface.MovementLock.html" title="Interface.MovementLock" class="">Interface.MovementLock</a>
+                          </li>
                         </ul>  </li>
                     <li class="">
                       <span class="expand-stub"></span>
@@ -990,7 +1008,7 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunkHeader.html" title="FileChunkHeader" class="">FileChunkHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModelHeader.html" title="GetObjectModelHeader" class="">GetObjectModelHeader</a>
@@ -1066,6 +1084,9 @@
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Utility.CRC16.html" title="CRC16" class="">CRC16</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Utility.CRC32.html" title="CRC32" class="">CRC32</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Utility.FilamentManager.html" title="FilamentManager" class="">FilamentManager</a>
@@ -1232,6 +1253,29 @@
   </table>
   <h3 id="fields">Fields
   </h3>
+  <h4 id="DuetWebServer_Services_ModelObserver_CorsPolicy" data-uid="DuetWebServer.Services.ModelObserver.CorsPolicy">CorsPolicy</h4>
+  <div class="markdown level1 summary"><p>Configured CORS policy for cross-origin requests</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static readonly CorsPolicy CorsPolicy</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">Microsoft.AspNetCore.Cors.Infrastructure.CorsPolicy</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h4 id="DuetWebServer_Services_ModelObserver_Endpoints" data-uid="DuetWebServer.Services.ModelObserver.Endpoints">Endpoints</h4>
   <div class="markdown level1 summary"><p>Dictionary of registered third-party paths vs third-party HTTP endpoints</p>
 </div>
@@ -1306,6 +1350,49 @@
   </table>
   <h3 id="methods">Methods
   </h3>
+  <a id="DuetWebServer_Services_ModelObserver_CheckWebSocketOrigin_" data-uid="DuetWebServer.Services.ModelObserver.CheckWebSocketOrigin*"></a>
+  <h4 id="DuetWebServer_Services_ModelObserver_CheckWebSocketOrigin_Microsoft_AspNetCore_Http_HttpContext_" data-uid="DuetWebServer.Services.ModelObserver.CheckWebSocketOrigin(Microsoft.AspNetCore.Http.HttpContext)">CheckWebSocketOrigin(HttpContext)</h4>
+  <div class="markdown level1 summary"><p>Check the origin of an incoming WebSocket request and set the status on error</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool CheckWebSocketOrigin(HttpContext httpContext)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">Microsoft.AspNetCore.Http.HttpContext</span></td>
+        <td><span class="parametername">httpContext</span></td>
+        <td><p>HTTP context to check</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><p>True if the origin is allowed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetWebServer_Services_ModelObserver_Dispose_" data-uid="DuetWebServer.Services.ModelObserver.Dispose*"></a>
   <h4 id="DuetWebServer_Services_ModelObserver_Dispose" data-uid="DuetWebServer.Services.ModelObserver.Dispose">Dispose()</h4>
   <div class="markdown level1 summary"><p>Dispose this instance</p>
@@ -1463,7 +1550,8 @@
           <div class="hidden-sm col-md-2" role="complementary">
             <div class="sideaffix">
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+                <h5>In This Article</h5>
+                <div></div>
               </nav>
             </div>
           </div>

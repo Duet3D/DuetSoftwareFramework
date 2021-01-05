@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Class BaseCommandConnection
    ">
-    <meta name="generator" content="docfx 2.56.2.0">
+    <meta name="generator" content="docfx 2.56.6.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -139,6 +139,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeResult.html" title="CodeResult" class="">CodeResult</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeResultConverter.html" title="CodeResultConverter" class="">CodeResultConverter</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeType.html" title="CodeType" class="">CodeType</a>
@@ -330,6 +333,9 @@
                             <a href="DuetAPI.ObjectModel.DeltaTower.html" title="DeltaTower" class="">DeltaTower</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplay.html" title="DirectDisplay" class="">DirectDisplay</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Directories.html" title="Directories" class="">Directories</a>
                           </li>
                           <li class="">
@@ -355,6 +361,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitor.html" title="FilamentMonitor" class="">FilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FilamentMonitorStatus.html" title="FilamentMonitorStatus" class="">FilamentMonitorStatus</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitorType.html" title="FilamentMonitorType" class="">FilamentMonitorType</a>
@@ -441,6 +450,9 @@
                             <a href="DuetAPI.ObjectModel.LinuxPropertyAttribute.html" title="LinuxPropertyAttribute" class="">LinuxPropertyAttribute</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.LogLevel.html" title="LogLevel" class="">LogLevel</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.MachineMode.html" title="MachineMode" class="">MachineMode</a>
                           </li>
                           <li class="">
@@ -520,6 +532,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ParsedFileInfoConverter.html" title="ParsedFileInfoConverter" class="">ParsedFileInfoConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ParsedThumbnail.html" title="ParsedThumbnail" class="">ParsedThumbnail</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Plugin.html" title="Plugin" class="">Plugin</a>
@@ -911,6 +926,9 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Interface.html" title="Interface" class="">Interface</a>
                           </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Interface.MovementLock.html" title="Interface.MovementLock" class="">Interface.MovementLock</a>
+                          </li>
                         </ul>  </li>
                     <li class="">
                       <span class="expand-stub"></span>
@@ -990,7 +1008,7 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunkHeader.html" title="FileChunkHeader" class="">FileChunkHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModelHeader.html" title="GetObjectModelHeader" class="">GetObjectModelHeader</a>
@@ -1066,6 +1084,9 @@
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Utility.CRC16.html" title="CRC16" class="">CRC16</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Utility.CRC32.html" title="CRC32" class="">CRC32</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Utility.FilamentManager.html" title="FilamentManager" class="">FilamentManager</a>
@@ -1472,6 +1493,112 @@
   <div class="seealso">
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ManageUserSessions">ManageUserSessions</a></div>
   </div>
+  <a id="DuetAPIClient_BaseCommandConnection_EvaluateExpression_" data-uid="DuetAPIClient.BaseCommandConnection.EvaluateExpression*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_EvaluateExpression__1_System_String_DuetAPI_CodeChannel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.EvaluateExpression``1(System.String,DuetAPI.CodeChannel,System.Threading.CancellationToken)">EvaluateExpression&lt;T&gt;(String, CodeChannel, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Evaluate an arbitrary expression</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;T&gt; EvaluateExpression&lt;T&gt;(string expression, CodeChannel channel = CodeChannel.SBC, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">expression</span></td>
+        <td><p>Expression to evaluate</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">channel</span></td>
+        <td><p>Context of the evaluation</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;T&gt;</td>
+        <td><p>Evaluation result</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td><p>Type of the evaluation result</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><p>Requested code channel is disabled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Text.Json.JsonException</span></td>
+        <td><p>Expected and returned data type do not match</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetAPIClient_BaseCommandConnection_EvaluateExpression__1_System_String_DuetAPI_CodeChannel_System_Threading_CancellationToken__seealso">See Also</h5>
+  <div class="seealso">
+      <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_CommandExecution">CommandExecution</a></div>
+  </div>
   <a id="DuetAPIClient_BaseCommandConnection_Flush_" data-uid="DuetAPIClient.BaseCommandConnection.Flush*"></a>
   <h4 id="DuetAPIClient_BaseCommandConnection_Flush_DuetAPI_CodeChannel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.Flush(DuetAPI.CodeChannel,System.Threading.CancellationToken)">Flush(CodeChannel, CancellationToken)</h4>
   <div class="markdown level1 summary"><p>Wait for all pending codes of the given channel to finish</p>
@@ -1530,6 +1657,11 @@
       </tr>
     </thead>
     <tbody>
+      <tr>
+        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><p>Requested code channel is disabled</p>
+</td>
+      </tr>
       <tr>
         <td><span class="xref">System.Net.Sockets.SocketException</span></td>
         <td><p>Command could not be processed</p>
@@ -1618,6 +1750,72 @@
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_FileSystemAccess">FileSystemAccess</a></div>
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ReadGCodes">ReadGCodes</a></div>
   </div>
+  <a id="DuetAPIClient_BaseCommandConnection_GetMachineModel_" data-uid="DuetAPIClient.BaseCommandConnection.GetMachineModel*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_GetMachineModel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.GetMachineModel(System.Threading.CancellationToken)">GetMachineModel(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Retrieve the full object model of the machine.
+In subscription mode this is the first command that has to be called once a connection has been established</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[Obsolete]
+public Task&lt;ObjectModel&gt; GetMachineModel(CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html">ObjectModel</a>&gt;</td>
+        <td><p>The current machine model</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetAPIClient_BaseCommandConnection_GetObjectModel_" data-uid="DuetAPIClient.BaseCommandConnection.GetObjectModel*"></a>
   <h4 id="DuetAPIClient_BaseCommandConnection_GetObjectModel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.GetObjectModel(System.Threading.CancellationToken)">GetObjectModel(CancellationToken)</h4>
   <div class="markdown level1 summary"><p>Retrieve the full object model of the machine.
@@ -1688,6 +1886,71 @@ In subscription mode this is the first command that has to be called once a conn
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelRead">ObjectModelRead</a></div>
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
   </div>
+  <a id="DuetAPIClient_BaseCommandConnection_GetSerializedMachineModel_" data-uid="DuetAPIClient.BaseCommandConnection.GetSerializedMachineModel*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_GetSerializedMachineModel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.GetSerializedMachineModel(System.Threading.CancellationToken)">GetSerializedMachineModel(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Optimized method to directly query the machine model UTF-8 JSON</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[Obsolete]
+public Task&lt;MemoryStream&gt; GetSerializedMachineModel(CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.IO.MemoryStream</span>&gt;</td>
+        <td><p>Machine model JSON</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetAPIClient_BaseCommandConnection_GetSerializedObjectModel_" data-uid="DuetAPIClient.BaseCommandConnection.GetSerializedObjectModel*"></a>
   <h4 id="DuetAPIClient_BaseCommandConnection_GetSerializedObjectModel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.GetSerializedObjectModel(System.Threading.CancellationToken)">GetSerializedObjectModel(CancellationToken)</h4>
   <div class="markdown level1 summary"><p>Optimized method to directly query the machine model UTF-8 JSON</p>
@@ -1831,6 +2094,72 @@ In subscription mode this is the first command that has to be called once a conn
   <div class="seealso">
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ManagePlugins">ManagePlugins</a></div>
   </div>
+  <a id="DuetAPIClient_BaseCommandConnection_LockMachineModel_" data-uid="DuetAPIClient.BaseCommandConnection.LockMachineModel*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_LockMachineModel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.LockMachineModel(System.Threading.CancellationToken)">LockMachineModel(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Lock the machine model for read/write access.
+It is MANDATORY to call <a class="xref" href="DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_UnlockMachineModel_System_Threading_CancellationToken_">UnlockMachineModel(CancellationToken)</a> when write access has finished</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[Obsolete]
+public Task LockMachineModel(CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetAPIClient_BaseCommandConnection_LockObjectModel_" data-uid="DuetAPIClient.BaseCommandConnection.LockObjectModel*"></a>
   <h4 id="DuetAPIClient_BaseCommandConnection_LockObjectModel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.LockObjectModel(System.Threading.CancellationToken)">LockObjectModel(CancellationToken)</h4>
   <div class="markdown level1 summary"><p>Lock the machine model for read/write access.</p>
@@ -1906,7 +2235,8 @@ In subscription mode this is the first command that has to be called once a conn
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Task PatchMachineModel(string key, object patch, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+    <pre><code class="lang-csharp hljs">[Obsolete]
+public Task PatchMachineModel(string key, object patch, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -1979,6 +2309,86 @@ In subscription mode this is the first command that has to be called once a conn
   <div class="seealso">
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
   </div>
+  <a id="DuetAPIClient_BaseCommandConnection_PatchObjectModel_" data-uid="DuetAPIClient.BaseCommandConnection.PatchObjectModel*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_PatchObjectModel_System_String_System_Object_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.PatchObjectModel(System.String,System.Object,System.Threading.CancellationToken)">PatchObjectModel(String, Object, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Apply a full patch to the object model. Use with care!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task PatchObjectModel(string key, object patch, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">key</span></td>
+        <td><p>Key to update</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span></td>
+        <td><span class="parametername">patch</span></td>
+        <td><p>Patch to apply</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetAPIClient_BaseCommandConnection_PatchObjectModel_System_String_System_Object_System_Threading_CancellationToken__seealso">See Also</h5>
+  <div class="seealso">
+      <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
+  </div>
   <a id="DuetAPIClient_BaseCommandConnection_PerformCode_" data-uid="DuetAPIClient.BaseCommandConnection.PerformCode*"></a>
   <h4 id="DuetAPIClient_BaseCommandConnection_PerformCode_DuetAPI_Commands_Code_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.PerformCode(DuetAPI.Commands.Code,System.Threading.CancellationToken)">PerformCode(Code, CancellationToken)</h4>
   <div class="markdown level1 summary"><p>Execute an arbitrary pre-parsed code</p>
@@ -2040,6 +2450,11 @@ In subscription mode this is the first command that has to be called once a conn
       </tr>
     </thead>
     <tbody>
+      <tr>
+        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><p>Requested code channel is disabled</p>
+</td>
+      </tr>
       <tr>
         <td><span class="xref">System.OperationCanceledException</span></td>
         <td><p>Code or operation has been cancelled</p>
@@ -2124,6 +2539,11 @@ In subscription mode this is the first command that has to be called once a conn
       </tr>
     </thead>
     <tbody>
+      <tr>
+        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><p>Requested code channel is disabled</p>
+</td>
+      </tr>
       <tr>
         <td><span class="xref">System.OperationCanceledException</span></td>
         <td><p>Code or operation has been cancelled</p>
@@ -2383,7 +2803,8 @@ In subscription mode this is the first command that has to be called once a conn
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; SetMachineModel(string path, string value, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+    <pre><code class="lang-csharp hljs">[Obsolete]
+public Task&lt;bool&gt; SetMachineModel(string path, string value, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -2452,7 +2873,83 @@ In subscription mode this is the first command that has to be called once a conn
       </tr>
     </tbody>
   </table>
-  <h5 id="DuetAPIClient_BaseCommandConnection_SetMachineModel_System_String_System_String_System_Threading_CancellationToken__seealso">See Also</h5>
+  <a id="DuetAPIClient_BaseCommandConnection_SetObjectModel_" data-uid="DuetAPIClient.BaseCommandConnection.SetObjectModel*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_SetObjectModel_System_String_System_String_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.SetObjectModel(System.String,System.String,System.Threading.CancellationToken)">SetObjectModel(String, String, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Set a given property to a certain value. Make sure to lock the object model before calling this</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; SetObjectModel(string path, string value, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">path</span></td>
+        <td><p>Path to the property</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">value</span></td>
+        <td><p>New value as string</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
+        <td><p>True if the property could be updated</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetAPIClient_BaseCommandConnection_SetObjectModel_System_String_System_String_System_Threading_CancellationToken__seealso">See Also</h5>
   <div class="seealso">
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
   </div>
@@ -2754,7 +3251,8 @@ In subscription mode this is the first command that has to be called once a conn
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Task SyncMachineModel(CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+    <pre><code class="lang-csharp hljs">[Obsolete]
+public Task SyncMachineModel(CancellationToken cancellationToken = default(CancellationToken))</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -2811,7 +3309,71 @@ In subscription mode this is the first command that has to be called once a conn
       </tr>
     </tbody>
   </table>
-  <h5 id="DuetAPIClient_BaseCommandConnection_SyncMachineModel_System_Threading_CancellationToken__seealso">See Also</h5>
+  <a id="DuetAPIClient_BaseCommandConnection_SyncObjectModel_" data-uid="DuetAPIClient.BaseCommandConnection.SyncObjectModel*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_SyncObjectModel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.SyncObjectModel(System.Threading.CancellationToken)">SyncObjectModel(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Wait for the full object model to be updated from RepRapFirmware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task SyncObjectModel(CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetAPIClient_BaseCommandConnection_SyncObjectModel_System_Threading_CancellationToken__seealso">See Also</h5>
   <div class="seealso">
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_CommandExecution">CommandExecution</a></div>
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelRead">ObjectModelRead</a></div>
@@ -2891,6 +3453,158 @@ In subscription mode this is the first command that has to be called once a conn
   <div class="seealso">
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ManagePlugins">ManagePlugins</a></div>
   </div>
+  <a id="DuetAPIClient_BaseCommandConnection_UnlockMachineModel_" data-uid="DuetAPIClient.BaseCommandConnection.UnlockMachineModel*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_UnlockMachineModel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.UnlockMachineModel(System.Threading.CancellationToken)">UnlockMachineModel(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Unlock the machine model again</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[Obsolete]
+public Task UnlockMachineModel(CancellationToken cancellationToken)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetAPIClient_BaseCommandConnection_WriteMessage_" data-uid="DuetAPIClient.BaseCommandConnection.WriteMessage*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_WriteMessage_DuetAPI_ObjectModel_Message_System_Boolean_DuetAPI_ObjectModel_LogLevel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.Message,System.Boolean,DuetAPI.ObjectModel.LogLevel,System.Threading.CancellationToken)">WriteMessage(Message, Boolean, LogLevel, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Write an arbitrary generic message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task WriteMessage(Message message, bool outputMessage = true, LogLevel logLevel = LogLevel.Off, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></td>
+        <td><span class="parametername">message</span></td>
+        <td><p>Message</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="parametername">outputMessage</span></td>
+        <td><p>Whether to output the message</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetAPI.ObjectModel.LogLevel.html">LogLevel</a></td>
+        <td><span class="parametername">logLevel</span></td>
+        <td><p>Target log level</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetAPIClient_BaseCommandConnection_WriteMessage_DuetAPI_ObjectModel_Message_System_Boolean_DuetAPI_ObjectModel_LogLevel_System_Threading_CancellationToken__seealso">See Also</h5>
+  <div class="seealso">
+      <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_CommandExecution">CommandExecution</a></div>
+      <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
+  </div>
   <a id="DuetAPIClient_BaseCommandConnection_WriteMessage_" data-uid="DuetAPIClient.BaseCommandConnection.WriteMessage*"></a>
   <h4 id="DuetAPIClient_BaseCommandConnection_WriteMessage_DuetAPI_ObjectModel_Message_System_Boolean_System_Boolean_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.Message,System.Boolean,System.Boolean,System.Threading.CancellationToken)">WriteMessage(Message, Boolean, Boolean, CancellationToken)</h4>
   <div class="markdown level1 summary"><p>Write an arbitrary generic message</p>
@@ -2898,7 +3612,8 @@ In subscription mode this is the first command that has to be called once a conn
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Task WriteMessage(Message message, bool outputMessage = true, bool logMessage = false, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+    <pre><code class="lang-csharp hljs">[Obsolete]
+public Task WriteMessage(Message message, bool outputMessage = true, bool logMessage = false, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -2979,13 +3694,107 @@ In subscription mode this is the first command that has to be called once a conn
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
   </div>
   <a id="DuetAPIClient_BaseCommandConnection_WriteMessage_" data-uid="DuetAPIClient.BaseCommandConnection.WriteMessage*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_WriteMessage_DuetAPI_ObjectModel_MessageType_System_String_System_Boolean_DuetAPI_ObjectModel_LogLevel_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.MessageType,System.String,System.Boolean,DuetAPI.ObjectModel.LogLevel,System.Threading.CancellationToken)">WriteMessage(MessageType, String, Boolean, LogLevel, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Write an arbitrary generic message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task WriteMessage(MessageType type, string message, bool outputMessage = true, LogLevel logLevel = LogLevel.Off, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.ObjectModel.MessageType.html">MessageType</a></td>
+        <td><span class="parametername">type</span></td>
+        <td><p>Message type</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">message</span></td>
+        <td><p>Message content</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="parametername">outputMessage</span></td>
+        <td><p>Whether to output the message</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetAPI.ObjectModel.LogLevel.html">LogLevel</a></td>
+        <td><span class="parametername">logLevel</span></td>
+        <td><p>Target log level</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Threading.CancellationToken</span></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetAPIClient_BaseCommandConnection_WriteMessage_DuetAPI_ObjectModel_MessageType_System_String_System_Boolean_DuetAPI_ObjectModel_LogLevel_System_Threading_CancellationToken__seealso">See Also</h5>
+  <div class="seealso">
+      <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_CommandExecution">CommandExecution</a></div>
+      <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
+  </div>
+  <a id="DuetAPIClient_BaseCommandConnection_WriteMessage_" data-uid="DuetAPIClient.BaseCommandConnection.WriteMessage*"></a>
   <h4 id="DuetAPIClient_BaseCommandConnection_WriteMessage_DuetAPI_ObjectModel_MessageType_System_String_System_Boolean_System_Boolean_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.MessageType,System.String,System.Boolean,System.Boolean,System.Threading.CancellationToken)">WriteMessage(MessageType, String, Boolean, Boolean, CancellationToken)</h4>
   <div class="markdown level1 summary"><p>Write an arbitrary generic message</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Task WriteMessage(MessageType type, string message, bool outputMessage = true, bool logMessage = false, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
+    <pre><code class="lang-csharp hljs">[Obsolete]
+public Task WriteMessage(MessageType type, string message, bool outputMessage, bool logMessage, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -3085,7 +3894,8 @@ In subscription mode this is the first command that has to be called once a conn
           <div class="hidden-sm col-md-2" role="complementary">
             <div class="sideaffix">
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+                <h5>In This Article</h5>
+                <div></div>
               </nav>
             </div>
           </div>

@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Class Settings
    ">
-    <meta name="generator" content="docfx 2.56.2.0">
+    <meta name="generator" content="docfx 2.56.6.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -139,6 +139,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeResult.html" title="CodeResult" class="">CodeResult</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.Commands.CodeResultConverter.html" title="CodeResultConverter" class="">CodeResultConverter</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeType.html" title="CodeType" class="">CodeType</a>
@@ -330,6 +333,9 @@
                             <a href="DuetAPI.ObjectModel.DeltaTower.html" title="DeltaTower" class="">DeltaTower</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplay.html" title="DirectDisplay" class="">DirectDisplay</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Directories.html" title="Directories" class="">Directories</a>
                           </li>
                           <li class="">
@@ -355,6 +361,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitor.html" title="FilamentMonitor" class="">FilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FilamentMonitorStatus.html" title="FilamentMonitorStatus" class="">FilamentMonitorStatus</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitorType.html" title="FilamentMonitorType" class="">FilamentMonitorType</a>
@@ -441,6 +450,9 @@
                             <a href="DuetAPI.ObjectModel.LinuxPropertyAttribute.html" title="LinuxPropertyAttribute" class="">LinuxPropertyAttribute</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.LogLevel.html" title="LogLevel" class="">LogLevel</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.MachineMode.html" title="MachineMode" class="">MachineMode</a>
                           </li>
                           <li class="">
@@ -520,6 +532,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ParsedFileInfoConverter.html" title="ParsedFileInfoConverter" class="">ParsedFileInfoConverter</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ParsedThumbnail.html" title="ParsedThumbnail" class="">ParsedThumbnail</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Plugin.html" title="Plugin" class="">Plugin</a>
@@ -911,6 +926,9 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Interface.html" title="Interface" class="">Interface</a>
                           </li>
+                          <li class="">
+                            <a href="DuetControlServer.SPI.Interface.MovementLock.html" title="Interface.MovementLock" class="">Interface.MovementLock</a>
+                          </li>
                         </ul>  </li>
                     <li class="">
                       <span class="expand-stub"></span>
@@ -990,7 +1008,7 @@
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter.html" title="CodeParameter" class="">CodeParameter</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunk.html" title="FileChunk" class="">FileChunk</a>
+                            <a href="DuetControlServer.SPI.Communication.LinuxRequests.FileChunkHeader.html" title="FileChunkHeader" class="">FileChunkHeader</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.LinuxRequests.GetObjectModelHeader.html" title="GetObjectModelHeader" class="">GetObjectModelHeader</a>
@@ -1066,6 +1084,9 @@
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Utility.CRC16.html" title="CRC16" class="">CRC16</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Utility.CRC32.html" title="CRC32" class="">CRC32</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Utility.FilamentManager.html" title="FilamentManager" class="">FilamentManager</a>
@@ -1410,6 +1431,33 @@ public static string ConfigFilename { get; set; }</code></pre>
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_Settings_FirmwareComments_" data-uid="DuetControlServer.Settings.FirmwareComments*"></a>
+  <h4 id="DuetControlServer_Settings_FirmwareComments" data-uid="DuetControlServer.Settings.FirmwareComments">FirmwareComments</h4>
+  <div class="markdown level1 summary"><p>List of string chunks that are identified by RepRapFirmware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static List&lt;string&gt; FirmwareComments { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.List</span>&lt;<span class="xref">System.String</span>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetControlServer_Settings_FirmwareComments_remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>Only if a comment contains one of these identifiers they will be sent to the firmware</p>
+</div>
   <a id="DuetControlServer_Settings_FullSocketPath_" data-uid="DuetControlServer.Settings.FullSocketPath*"></a>
   <h4 id="DuetControlServer_Settings_FullSocketPath" data-uid="DuetControlServer.Settings.FullSocketPath">FullSocketPath</h4>
   <div class="markdown level1 summary"><p>Fully-qualified path to the main IPC UNIX socket (evaluated during runtime)</p>
@@ -1628,6 +1676,30 @@ the host controller (e.g. network information and mass storages) are updated (in
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_Settings_MaxCodeBufferSize_" data-uid="DuetControlServer.Settings.MaxCodeBufferSize*"></a>
+  <h4 id="DuetControlServer_Settings_MaxCodeBufferSize" data-uid="DuetControlServer.Settings.MaxCodeBufferSize">MaxCodeBufferSize</h4>
+  <div class="markdown level1 summary"><p>Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int MaxCodeBufferSize { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_Settings_MaxLayerHeight_" data-uid="DuetControlServer.Settings.MaxLayerHeight*"></a>
   <h4 id="DuetControlServer_Settings_MaxLayerHeight" data-uid="DuetControlServer.Settings.MaxLayerHeight">MaxLayerHeight</h4>
   <div class="markdown level1 summary"><p>Maximum allowed layer height. Used by the file info parser</p>
@@ -1698,6 +1770,30 @@ Note that messages are only cleared when the host update task runs.</p>
     <tbody>
       <tr>
         <td><span class="xref">System.Double</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_Settings_MaxMessageLength_" data-uid="DuetControlServer.Settings.MaxMessageLength*"></a>
+  <h4 id="DuetControlServer_Settings_MaxMessageLength" data-uid="DuetControlServer.Settings.MaxMessageLength">MaxMessageLength</h4>
+  <div class="markdown level1 summary"><p>Maximum supported length of messages to be sent to RepRapFirmware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int MaxMessageLength { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
         <td></td>
       </tr>
     </tbody>
@@ -1996,6 +2092,54 @@ Should not be greater than the kernel spidev buffer size</p>
       </tr>
     </tbody>
   </table>
+  <a id="DuetControlServer_Settings_SpiConnectionTimeout_" data-uid="DuetControlServer.Settings.SpiConnectionTimeout*"></a>
+  <h4 id="DuetControlServer_Settings_SpiConnectionTimeout" data-uid="DuetControlServer.Settings.SpiConnectionTimeout">SpiConnectionTimeout</h4>
+  <div class="markdown level1 summary"><p>Maximum allowed delay between full transfers (in ms)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int SpiConnectionTimeout { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_Settings_SpiConnectTimeout_" data-uid="DuetControlServer.Settings.SpiConnectTimeout*"></a>
+  <h4 id="DuetControlServer_Settings_SpiConnectTimeout" data-uid="DuetControlServer.Settings.SpiConnectTimeout">SpiConnectTimeout</h4>
+  <div class="markdown level1 summary"><p>Maximum allowed time when waiting for the first SPI transfer (in ms)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int SpiConnectTimeout { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetControlServer_Settings_SpiDevice_" data-uid="DuetControlServer.Settings.SpiDevice*"></a>
   <h4 id="DuetControlServer_Settings_SpiDevice" data-uid="DuetControlServer.Settings.SpiDevice">SpiDevice</h4>
   <div class="markdown level1 summary"><p>SPI device that is connected to RepRapFirmware</p>
@@ -2215,7 +2359,8 @@ public static bool UpdateOnly { get; set; }</code></pre>
           <div class="hidden-sm col-md-2" role="complementary">
             <div class="sideaffix">
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+                <h5>In This Article</h5>
+                <div></div>
               </nav>
             </div>
           </div>
