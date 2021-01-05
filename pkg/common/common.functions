@@ -183,7 +183,7 @@ build_dwc() {
 
 	if [ ! -d $DEST_DIR/DuetWebControl ] ; then
 		echo "- Cloning repository..."
-		git clone -q --single-branch --branch v3.2-dev https://github.com/Duet3D/DuetWebControl.git $DEST_DIR/DuetWebControl
+		git clone -q --single-branch --branch $(git branch --show-current) https://github.com/Duet3D/DuetWebControl.git $DEST_DIR/DuetWebControl
 	else
 		echo "- Using existing repository in $DEST_DIR/DuetWebControl"
 	fi
