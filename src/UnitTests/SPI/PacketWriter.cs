@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.LinuxRequests;
@@ -31,8 +31,8 @@ namespace UnitTests.SPI
             Assert.AreEqual(Consts.ProtocolVersion, header.ProtocolVersion);
             Assert.AreEqual(0, header.SequenceNumber);
             Assert.AreEqual(0, header.DataLength);
-            Assert.AreEqual(0, header.ChecksumData);
-            Assert.AreEqual(0, header.ChecksumHeader);
+            Assert.AreEqual(0, header.ChecksumData32);
+            Assert.AreEqual(0, header.ChecksumHeader32);
 
             // No padding
         }
@@ -449,7 +449,7 @@ namespace UnitTests.SPI
             Assert.AreEqual(4, numY);
 
             // Points
-            Span<float> zCoordinates = MemoryMarshal.Cast<byte, float>(span.Slice(32));
+            Span<float> zCoordinates = MemoryMarshal.Cast<byte, float>(span[32..]);
             for (int i = 0; i < map.ZCoordinates.Length; i++)
             {
                 Assert.AreEqual(zCoordinates[i], 10 * i + 10, 0.0001);
@@ -529,7 +529,7 @@ namespace UnitTests.SPI
             // Header
             uint messageFlags = MemoryMarshal.Read<uint>(span);
             Assert.AreEqual((MessageTypeFlags)(1 << (int)DuetAPI.CodeChannel.USB), (MessageTypeFlags)messageFlags);
-            uint messageLength = MemoryMarshal.Read<uint>(span.Slice(4));
+            uint messageLength = MemoryMarshal.Read<uint>(span[4..]);
             Assert.AreEqual(5, messageLength);
 
             // Message

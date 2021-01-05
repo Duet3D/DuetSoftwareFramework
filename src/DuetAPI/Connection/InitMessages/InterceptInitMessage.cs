@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace DuetAPI.Connection.InitMessages
 {
     /// <summary>
@@ -19,19 +21,37 @@ namespace DuetAPI.Connection.InitMessages
     /// flag if new codes are inserted, else they will be started when the macro file(s) have finished. This step
     /// is obsolete if a <see cref="Commands.SimpleCode"/> is inserted.
     /// </remarks>
-    public class InterceptInitMessage : ClientInitMessage
+    public sealed class InterceptInitMessage : ClientInitMessage
     {
         /// <summary>
         /// Creates a new init message instance
         /// </summary>
-        public InterceptInitMessage()
-        {
-            Mode = ConnectionMode.Intercept;
-        }
+        public InterceptInitMessage() => Mode = ConnectionMode.Intercept;
         
         /// <summary>
         /// Defines in what mode commands are supposed to be intercepted
         /// </summary>
         public InterceptionMode InterceptionMode { get; set; }
+
+        /// <summary>
+        /// List of channel where codes may be intercepted. If the list is empty, all available channels are used
+        /// </summary>
+        public List<CodeChannel> Channels { get; set; }
+
+        /// <summary>
+        /// List of G/M/T-codes to filter or Q for comments
+        /// </summary>
+        /// <remarks>
+        /// This may only specify the code type and major/minor number (e.g. G1 or M105).
+        /// Alternatively keyword types may be specified (e.g. if or elif).
+        /// Asterisks are supported, too (e.g. T*)
+        /// </remarks>
+        public List<string> Filters { get; set; }
+
+        /// <summary>
+        /// Defines if either regular or priority codes are supposed to be intercepted
+        /// </summary>
+        /// <seealso cref="DuetAPI.Commands.CodeFlags.IsPrioritized"/>
+        public bool PriortyCodes { get; set; }
     }
 }

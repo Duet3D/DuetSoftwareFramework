@@ -1,6 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using System;
 using System.IO;
 using System.Linq;
@@ -36,7 +36,7 @@ namespace DuetControlServer.Model
                 using (await Provider.AccessReadWriteAsync())
                 {
                     UpdateNetwork();
-                    UpdateStorages();
+                    UpdateVolumes();
                     CleanMessages();
                 }
 
@@ -47,7 +47,7 @@ namespace DuetControlServer.Model
                     _logger.Info("System time has been changed");
                     Code code = new Code
                     {
-                        InternallyProcessed = true,
+                        InternallyProcessed = !Settings.NoSpi,
                         Flags = CodeFlags.Asynchronous,
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
@@ -65,7 +65,7 @@ namespace DuetControlServer.Model
                     lastHostname = Environment.MachineName;
                     Code code = new Code
                     {
-                        InternallyProcessed = true,
+                        InternallyProcessed = !Settings.NoSpi,
                         Flags = CodeFlags.Asynchronous,
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
@@ -95,10 +95,10 @@ namespace DuetControlServer.Model
                                                       select unicastAddress).FirstOrDefault();
                 if (ipInfo != null && !System.Net.IPAddress.IsLoopback(ipInfo.Address))
                 {
-                    DuetAPI.Machine.NetworkInterface networkInterface;
+                    DuetAPI.ObjectModel.NetworkInterface networkInterface;
                     if (index >= Provider.Get.Network.Interfaces.Count)
                     {
-                        networkInterface = new DuetAPI.Machine.NetworkInterface();
+                        networkInterface = new DuetAPI.ObjectModel.NetworkInterface();
                         Provider.Get.Network.Interfaces.Add(networkInterface);
                     }
                     else
@@ -126,13 +126,13 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
-        /// Update storage devices
+        /// Update volume devices
         /// </summary>
         /// <remarks>
-        /// Storage 0 always represents the root (/) on Linux. The following code achieves this but it
+        /// Volume 0 always represents the virtual SD card on Linux. The following code achieves this but it
         /// might need further adjustments to ensure this on every Linux distribution
         /// </remarks>
-        private static void UpdateStorages()
+        private static void UpdateVolumes()
         {
             int index = 0;
             foreach (DriveInfo drive in DriveInfo.GetDrives())
@@ -169,9 +169,9 @@ namespace DuetControlServer.Model
                 }
             }
 
-            for (int i = Provider.Get.Network.Interfaces.Count; i > index; i--)
+            for (int i = Provider.Get.Volumes.Count; i > index; i--)
             {
-                Provider.Get.Network.Interfaces.RemoveAt(i - 1);
+                Provider.Get.Volumes.RemoveAt(i - 1);
             }
         }
 

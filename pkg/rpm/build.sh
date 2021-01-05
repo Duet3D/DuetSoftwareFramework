@@ -32,7 +32,7 @@ pkg_sd() {
 }
 
 pkg_dwc() {
-	echo "- Packaging DWC2..."
+	echo "- Packaging DWC..."
 	[ -z "$dwcver" ] && dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)-2
 
 	rpmbuild --target=noarch --define="%_topdir $RPMBUILD_DIR" --define="%_arch noarch" \

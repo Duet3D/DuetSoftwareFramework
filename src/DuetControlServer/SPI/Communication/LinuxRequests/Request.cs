@@ -100,7 +100,7 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Response to a <see cref="FirmwareRequests.FileChunkHeader"/>
         /// </summary>
-        /// <seealso cref="LinuxRequests.FileChunk"/>
+        /// <seealso cref="LinuxRequests.FileChunkHeader"/>
         FileChunk = 15,
 
         /// <summary>
@@ -113,6 +113,18 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// Send an arbitrary RepRapFirmware message
         /// </summary>
         /// <seealso cref="Shared.MessageHeader"/>
-        Message = 17
+        Message = 17,
+
+        /// <summary>
+        /// Notify the firmware that a macro file has been started
+        /// </summary>
+        /// <seealso cref="Shared.CodeChannelHeader"/>
+        MacroStarted = 18,
+
+        /// <summary>
+        /// All the files have been aborted on a particular channel
+        /// </summary>
+        /// <seealso cref="Shared.CodeChannelHeader"/>
+        FilesAborted = 19
     }
 }

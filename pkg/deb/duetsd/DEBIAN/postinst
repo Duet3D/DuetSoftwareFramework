@@ -1,0 +1,4 @@
+#!/bin/sh
+
+chown -R dsf:dsf /opt/dsf/sd
+chmod -R g+wX /opt/dsf/sd

@@ -28,8 +28,8 @@ namespace UnitTests.SPI
             Assert.AreEqual(Consts.ProtocolVersion, header.ProtocolVersion);
             Assert.AreEqual(12345, header.SequenceNumber);
             Assert.AreEqual(1436, header.DataLength);
-            Assert.AreEqual(0, header.ChecksumData);
-            Assert.AreEqual(0, header.ChecksumHeader);
+            Assert.AreEqual(0, header.ChecksumData32);
+            Assert.AreEqual(0, header.ChecksumHeader32);
             
             // No padding
         }
@@ -39,7 +39,8 @@ namespace UnitTests.SPI
         {
             Span<byte> blob = GetBlob("packetHeader.bin");
             
-            PacketHeader header = Reader.ReadPacketHeader(blob);
+            int bytesRead = Reader.ReadPacketHeader(blob, out PacketHeader header);
+            Assert.AreEqual(8, bytesRead);
             
             // Header
             Assert.AreEqual((ushort)Request.ObjectModel, header.Request);
@@ -52,7 +53,8 @@ namespace UnitTests.SPI
         {
             Span<byte> blob = GetBlob("packetHeaderResend.bin");
 
-            PacketHeader header = Reader.ReadPacketHeader(blob);
+            int bytesRead = Reader.ReadPacketHeader(blob, out PacketHeader header);
+            Assert.AreEqual(8, bytesRead);
 
             // Header
             Assert.AreEqual((ushort)Request.ResendPacket, header.Request);
@@ -125,12 +127,11 @@ namespace UnitTests.SPI
         {
             Span<byte> blob = GetBlob("macroRequest.bin");
             
-            int bytesRead = Reader.ReadMacroRequest(blob, out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename);
+            int bytesRead = Reader.ReadMacroRequest(blob, out CodeChannel channel, out bool fromCode, out string filename);
             Assert.AreEqual(16, bytesRead);
             
             // Header
             Assert.AreEqual(DuetAPI.CodeChannel.USB, channel);
-            Assert.IsFalse(reportMissing);
             Assert.IsTrue(fromCode);
             
             // Message

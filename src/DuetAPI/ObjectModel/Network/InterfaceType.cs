@@ -1,0 +1,22 @@
+﻿using DuetAPI.Utility;
+using System.Text.Json.Serialization;
+
+namespace DuetAPI.ObjectModel
+{
+    /// <summary>
+    /// Supported types of network interfaces
+    /// </summary>
+    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+    public enum InterfaceType
+    {
+        /// <summary>
+        /// Wireless network interface
+        /// </summary>
+        WiFi,
+
+        /// <summary>
+        /// Wired network interface
+        /// </summary>
+        LAN
+    }
+}

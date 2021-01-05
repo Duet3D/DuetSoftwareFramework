@@ -1,6 +1,5 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -20,47 +19,6 @@ namespace DuetControlServer.Files
         /// Logger instance
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-        /// <summary>
-        /// Dictionary holding the currently open code files
-        /// </summary>
-        private static readonly List<CodeFile>[] _openFiles = new List<CodeFile>[Inputs.Total];
-
-        /// <summary>
-        /// Lock for accessing the list of open files
-        /// </summary>
-        private static readonly AsyncLock _openFilesLock = new AsyncLock();
-
-        /// <summary>
-        /// Static constructor of this class
-        /// </summary>
-        static CodeFile()
-        {
-            for (int i = 0; i < Inputs.Total; i++)
-            {
-                _openFiles[i] = new List<CodeFile>();
-            }
-        }
-
-        /// <summary>
-        /// Abort all running macro files on a given code channel
-        /// </summary>
-        /// <param name="channel">Code channel</param>
-        /// <returns>Asynchronous task</returns>
-        private static async Task AbortAll(CodeChannel channel)
-        {
-            int numChannel = (int)channel;
-            using (await _openFilesLock.LockAsync(Program.CancellationToken))
-            {
-                foreach (CodeFile file in _openFiles[numChannel])
-                {
-                    using (await file.LockAsync())
-                    {
-                        file.Close();
-                    }
-                }
-            }
-        }
 
         /// <summary>
         /// Internal lock
@@ -189,11 +147,6 @@ namespace DuetControlServer.Files
 
             _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
             _reader = new StreamReader(_fileStream);
-
-            lock (_openFiles)
-            {
-                _openFiles[(int)channel].Add(this);
-            }
         }
 
         /// <summary>
@@ -226,11 +179,6 @@ namespace DuetControlServer.Files
                 return;
             }
 
-            lock (_openFiles)
-            {
-                _openFiles[(int)Channel].Remove(this);
-            }
-
             if (disposing)
             {
                 using (_lock.Lock())
@@ -247,26 +195,26 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Read the next available code and interpret conditional codes except for echo
         /// </summary>
+        /// <param name="sharedCode">Code that may be reused</param>
         /// <returns>Read code or null if none found</returns>
         /// <exception cref="CodeParserException">Failed to read the next code</exception>
         /// <exception cref="OperationCanceledException">Failed to flush the pending codes</exception>
         /// <remarks>
         /// This instance must NOT be locked when this is called
         /// </remarks>
-        public async Task<Code> ReadCodeAsync()
+        public async Task<Code> ReadCodeAsync(Code sharedCode = null)
         {
             while (true)
             {
+                // Prepare the result
+                Code code = sharedCode ?? new Code();
+                code.Channel = Channel;
+                code.File = this;
+                code.LineNumber = LineNumber;
+                code.FilePosition = Position;
+
                 // Read the next available code
                 bool codeRead;
-                Code code = new Code
-                {
-                    Channel = Channel,
-                    File = this,
-                    LineNumber = LineNumber,
-                    FilePosition = Position
-                };
-
                 using (await _lock.LockAsync(Program.CancellationToken))
                 {
                     if (IsClosed)
@@ -421,14 +369,17 @@ namespace DuetControlServer.Files
                             }
 
                             // Evaluate the condition
-                            string evaluationResult = await Model.Expressions.Evaluate(code, false);
-                            if (evaluationResult != "true" && evaluationResult != "false")
+                            string stringEvaluationResult = await Model.Expressions.Evaluate(code, true);
+                            if (bool.TryParse(stringEvaluationResult, out bool evaluationResult))
                             {
-                                throw new CodeParserException($"invalid conditional result '{evaluationResult}', must be either true or false", code);
+                                _logger.Debug("Evaluation result: ({0}) = {1}", code.KeywordArgument, evaluationResult);
+                                codeBlock.ProcessBlock = evaluationResult;
+                                codeBlock.ExpectingElse = (code.Keyword != KeywordType.While) && !evaluationResult;
                             }
-                            _logger.Debug("Evaluation result: {0} = {1}", code.KeywordArgument, evaluationResult);
-                            codeBlock.ProcessBlock = (evaluationResult == "true");
-                            codeBlock.ExpectingElse = (code.Keyword != KeywordType.While && evaluationResult == "false");
+                            else
+                            {
+                                throw new CodeParserException($"invalid conditional result '{stringEvaluationResult}', must be either true or false", code);
+                            }
                             break;
 
                         case KeywordType.Else:
@@ -470,10 +421,6 @@ namespace DuetControlServer.Files
                             break;
 
                         case KeywordType.Abort:
-                            _logger.Debug("Doing {0}", code.Keyword);
-                            await AbortAll(Channel);
-                            return code;
-
                         case KeywordType.Return:
                             _logger.Debug("Doing {0}", code.Keyword);
                             using (await _lock.LockAsync(Program.CancellationToken))
@@ -497,6 +444,12 @@ namespace DuetControlServer.Files
                         default:
                             throw new CodeParserException($"Keyword {code.Keyword} is not supported", code);
                     }
+                }
+
+                // Make a new shared code so it isn't reused in code blocks
+                if (sharedCode != null)
+                {
+                    sharedCode = new Code();
                 }
             }
         }

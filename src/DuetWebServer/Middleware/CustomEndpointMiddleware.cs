@@ -1,5 +1,5 @@
 ﻿using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -86,18 +86,21 @@ namespace DuetWebServer.Middleware
                 // See what to do with this request
                 if (httpEndpoint.EndpointType == HttpEndpointType.WebSocket)
                 {
-                    using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                    if (Services.ModelObserver.CheckWebSocketOrigin(context))
+                    {
+                        using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
-                    using CancellationTokenSource cts = new CancellationTokenSource();
-                    Task webSocketTask = ReadFromWebSocket(webSocket, endpointConnection, sessionId, cts.Token);
-                    Task unixSocketTask = ReadFromUnixSocket(webSocket, endpointConnection, cts.Token);
+                        using CancellationTokenSource cts = new CancellationTokenSource();
+                        Task webSocketTask = ReadFromWebSocket(webSocket, endpointConnection, sessionId, cts.Token);
+                        Task unixSocketTask = ReadFromUnixSocket(webSocket, endpointConnection, cts.Token);
 
-                    await Task.WhenAny(webSocketTask, unixSocketTask);
-                    cts.Cancel();
+                        await Task.WhenAny(webSocketTask, unixSocketTask);
+                        cts.Cancel();
+                    }
                 }
                 else
                 {
-                    await ProcessRestRequst(context, endpointConnection, sessionId);
+                    await ProcessRestRequst(context, httpEndpoint, endpointConnection, sessionId);
                 }
             }
             else
@@ -194,15 +197,34 @@ namespace DuetWebServer.Middleware
         /// Process a RESTful HTTP request
         /// </summary>
         /// <param name="context">HTTP context</param>
+        /// <param name="endpoint">HTTP endpoint descriptor</param>
         /// <param name="endpointConnection">Endpoint connection</param>
         /// <param name="sessionId">Session ID</param>
         /// <returns>Asynchronous task</returns>
-        private async Task ProcessRestRequst(HttpContext context, HttpEndpointConnection endpointConnection, int sessionId)
+        private async Task ProcessRestRequst(HttpContext context, HttpEndpoint endpoint, HttpEndpointConnection endpointConnection, int sessionId)
         {
-            // Deal with RESTful HTTP requests. Read the full HTTP request body first
             string body;
-            using (StreamReader reader = new StreamReader(context.Request.Body))
+            if (endpoint.IsUploadRequest)
             {
+                // Write to a temporary file
+                string filename = Path.GetTempFileName();
+                using (FileStream fileStream = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.Read))
+                {
+                    await context.Request.Body.CopyToAsync(fileStream);
+                }
+
+                // Adjust the file permissions if possible
+                endpointConnection.GetPeerCredentials(out _, out int uid, out int gid);
+                if (uid != 0 && gid != 0)
+                {
+                    LinuxApi.Commands.Chown(filename, uid, gid);
+                }
+                body = filename;
+            }
+            else
+            {
+                // Read the body content
+                using StreamReader reader = new StreamReader(context.Request.Body);
                 body = await reader.ReadToEndAsync();
             }
 

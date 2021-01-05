@@ -24,6 +24,11 @@ namespace DuetControlServer.SPI.Channel
         private readonly Processor[] _channels;
 
         /// <summary>
+        /// Last channel that started processing stuff
+        /// </summary>
+        private CodeChannel _nextChannel = CodeChannel.HTTP;
+
+        /// <summary>
         /// Constructor of the channel store
         /// </summary>
         public Manager()
@@ -85,34 +90,35 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Process requests in the G-code channel processors
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public async Task Run()
+        /// <returns>Whether a response can be expected from RRF in the next transmission</returns>
+        public async Task<bool> Run()
         {
-            bool dataProcessed;
-            do
+            // Iterate over all the available channels
+            bool overlapped = false, dataProcessed = false;
+            CodeChannel channel = _nextChannel;
+            while (channel != _nextChannel || !overlapped)
             {
-                dataProcessed = false;
-                foreach (Processor channel in _channels)
+                Processor channelProcessor = this[channel];
+                using (await channelProcessor.LockAsync())
                 {
-                    using (await channel.LockAsync())
-                    {
-                        if (!channel.IsBlocked)
-                        {
-                            if (await channel.Run())
-                            {
-                                // Something could be processed
-                                dataProcessed = true;
-                            }
-                            else
-                            {
-                                // Cannot do any more on this channel
-                                channel.IsBlocked = true;
-                            }
-                        }
-                    }
+                    dataProcessed |= await channelProcessor.Run();
+                }
+
+                channel++;
+                if (channel == CodeChannel.Unknown)
+                {
+                    channel = CodeChannel.HTTP;
+                    overlapped = true;
                 }
             }
-            while (dataProcessed);
+
+            // Let the following code channel start next time, no channel is preferred
+            _nextChannel++;
+            if (_nextChannel == CodeChannel.Unknown)
+            {
+                _nextChannel = CodeChannel.HTTP;
+            }
+            return dataProcessed;
         }
 
         /// <summary>
@@ -135,17 +141,6 @@ namespace DuetControlServer.SPI.Channel
                 }
             }
             return false;
-        }
-
-        /// <summary>
-        /// Reset busy channels
-        /// </summary>
-        public void ResetBlockedChannels()
-        {
-            foreach (Processor channel in _channels)
-            {
-                channel.IsBlocked = false;
-            }
         }
 
         /// <summary>

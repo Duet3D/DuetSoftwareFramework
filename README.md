@@ -72,6 +72,7 @@ The following command-line arguments are available:
 - `-S`, `--socket-directory`: Override the path where DCS creates UNIX sockets. Defaults to `/var/run/dsf`
 - `-s`, `--socket-file`: Override the filename of DCS's UNIX socket. Defaults to `dcs.sock`
 - `-b`, `--base-directory`: Set the base directory of the virtual SD card directoy. This is used for RepRapFirmware compatibility. Defaults to `/opt/dsf/sd`
+- `-D`, `--no-spi`: Do NOT connect over SPI. Not recommended, use at your own risk!
 - `-h`, `--help`: Display all available command-line parameters
 
 Note that all the command-line options are case-sensitive.
@@ -98,11 +99,11 @@ DuetControlServer provides several functions for synchronized access along with 
 ## DuetWebServer
 
 This application provides Duet Web Control along with a RESTful API and possibly custom HTTP endpoints.
-It is implemented using ASP.NET Core and uses Kestrel internally. The coniguration file defaults to `/opt/dsf/conf/http.conf`.
+It is implemented using ASP.NET Core and uses Kestrel internally. The coniguration file defaults to `/opt/dsf/conf/http.json`.
 
 ### Configuration
 
-The configuration file of DuetWebServer can be found in `/opt/dsf/conf/http.conf`. In this file various settings can be tuned.
+The configuration file of DuetWebServer can be found in `/opt/dsf/conf/http.json`. In this file various settings can be tuned.
 
 In the `Logging` section, the default minimum `LogLevel` can be changed to one of `Trace`, `Debug`, `Information`, `Warning`, `Error`, or`Critical`. It defaults to `Information`.
 
@@ -113,8 +114,9 @@ Apart from these two sections, you can also customize the following settings:
 - `KeepAliveInterval`: Default keep-alive interval for WebSocket connections. This is useful if DWS is operating as a reverse proxy
 - `ModelRetryDelay`: If DuetControlServer is not running, this specifies the delay between reconnect attempts in milliseconds
 - `ObjectModelUpdateTimeout`: When a WebSocket is connected and waiting for object model changes, this specifies the timeout after which DWS stops waiting and polls the WebSocket again
-- `UseCors`: This defines if CORS requests are allowed. This is useful for DWC development (when DWC is running on localhost) or for running a print farm
 - `UseStaticFiles`: Whether to provide web files from the virtual `www` directory. This is required for DWC if DWS is not running as a reverse proxy
+- `DefaultWebDirectory`: Default web directory to fall back to if DCS could not be contacted (requires `UseStaticFiles` to be set)
+- `MaxAge`: Maximum cache time for static files (requires `UseStaticFiles` to be true)
 - `WebSocketBufferSize`: This defines the maximum buffer size per third-party WebSocket connection
 
 It is possible to override these settings using command-line arguments, too.
@@ -178,11 +180,11 @@ Returns one of these HTTP status codes:
 
 #### PUT /machine/file/\{filename\}
 
-Upload a file. The file path is translated to a physical file path.
+Upload a file. The file path is translated to a physical file path. The body payload is the file content.
 
 Returns one of these HTTP status codes:
 
-- `201`: File content
+- `201`: File created
 - `500`: Generic error
 - `502`: Incompatible DCS version
 - `503`: DCS is unavailable
@@ -258,7 +260,70 @@ Create the given directory. The directory path is translated to a physical direc
 
 Returns one of these HTTP status codes:
 
-- `204`: Directory created
+- `201`: Directory created
+- `500`: Generic error
+- `502`: Incompatible DCS version
+- `503`: DCS is unavailable
+
+#### PUT /machine/plugin
+
+Install or upgrade a plugin ZIP file. The body payload is the ZIP file content.
+
+Returns one of these HTTP status codes:
+
+- `204`: Plugin has been installed
+- `500`: Generic error
+- `502`: Incompatible DCS version
+- `503`: DCS is unavailable
+
+#### DELETE /machine/plugin
+
+Uninstall a plugin. The body payload is the name of the plugin to remove.
+
+Returns one of these HTTP status codes:
+
+- `204`: Plugin has been uninstalled
+- `500`: Generic error
+- `502`: Incompatible DCS version
+- `503`: DCS is unavailable
+
+#### PATCH /machine/plugin
+
+Set plugin data in the object model if there is no SBC executable. The body payload is JSON in the format
+
+```
+{
+    "plugin": "<PluginName>",
+    "key": "<Key>",
+    "value": <JSON value>
+}
+```
+
+If there is an SBC executable, expose your own HTTP endpoints to modify shared plugin data.
+
+Returns one of these HTTP status codes:
+
+- `204`: Data has been set
+- `500`: Generic error
+- `502`: Incompatible DCS version
+- `503`: DCS is unavailable
+
+#### POST /machine/startPlugin
+
+Start a plugin on the SBC. The body payload is the name of the plugin to start.
+This does nothing if a plugin has already been started.
+
+- `204`: Plugin has been started
+- `500`: Generic error
+- `502`: Incompatible DCS version
+- `503`: DCS is unavailable
+
+#### POST /machine/stopPlugin
+
+Stop a plugin on the SBC. The body payload is the name of the plugin to stop.
+This does nothing if a plugin has already been stopped.
+
+- `204`: Plugin has been started
 - `500`: Generic error
 - `502`: Incompatible DCS version
 - `503`: DCS is unavailable
@@ -333,7 +398,7 @@ Since it relies on a [model subscription](#model-subscriptions), it gives an ide
 ### 3. Building things on your own
 
 Of course you can build everything on your own, too. In order to build packages like those on the package feed, check out the `build.sh` script in the `pkg` directory.
-If you wish to make changes to the existing software and to test it, you need to get the [.NET Core 3.x SDK](https://dotnet.microsoft.com/download/dotnet-core) first.
+If you wish to make changes to the existing software and to test it, you need to get the [latest .NET SDK](https://dotnet.microsoft.com/download/dotnet-core) first.
 
 #### 3.1 Building on a remote system
 
@@ -386,6 +451,8 @@ To get a basic idea how the .NET Core-based DuetAPIClient works, check out the s
 
 The .NET-based API libraries are - unlike the other DSF components - licensed under the terms of the LGPL 3.0 or later.
 If you wish to build your own API client, it is strongly recommended to follow the DuetAPIClient implementation because it properly documents and handles possible exceptions of every command.
+
+Note that DSF 3.2 requires permissions for third-party plugins that are installed from the web interface. Please see the [plugins](PLUGINS.md) documentation for further details.
 
 ### Inter-Process Communication
 
@@ -592,7 +659,8 @@ To create a new HTTP REST endpoint, one may send
     "command": "AddHttpEndpoint",
     "endpointType": "GET",
     "namespace": "third-party-app",
-    "path", "test"
+    "path", "test",
+    "uploadRequest": false
 }
 ```
 

@@ -1,8 +1,14 @@
-﻿using System;
+﻿using DuetAPI.ObjectModel;
+using DuetControlServer.Commands;
+using DuetControlServer.FileExecution;
+using DuetControlServer.Files;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -85,7 +91,7 @@ namespace DuetControlServer
             {
                 Model.Provider.Init();
                 Model.Observer.Init();
-                Utility.FilamentManager.Init();
+                await Utility.FilamentManager.Init();
                 _logger.Info("Environment initialized");
             }
             catch (Exception e)
@@ -95,9 +101,9 @@ namespace DuetControlServer
             }
 
             // Set up SPI subsystem and connect to RRF controller
-            if (Settings.NoSpiTask)
+            if (Settings.NoSpi)
             {
-                _logger.Warn("Connection to Duet is NOT established, things may not work as expected");
+                _logger.Warn("SPI connection to Duet is disabled");
             }
             else
             {
@@ -155,7 +161,91 @@ namespace DuetControlServer
                     CancelSource.Cancel();
                 }
             };
-            
+
+            if (!Settings.UpdateOnly)
+            {
+                // Load plugin manifests and start them again
+                foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
+                {
+                    if (file.EndsWith(".json"))
+                    {
+                        try
+                        {
+                            using FileStream manifestStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                            using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
+                            Plugin plugin = new Plugin();
+                            plugin.UpdateFromJson(manifestJson.RootElement);
+                            plugin.Pid = -1;
+                            using (await Model.Provider.AccessReadWriteAsync())
+                            {
+                                Model.Provider.Get.Plugins.Add(plugin);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.Error(e, "Failed to load plugin manifest {0}", Path.GetFileName(file));
+                        }
+                    }
+                }
+
+                if (File.Exists(Settings.PluginsFilename))
+                {
+                    string[] pluginsToStart = await File.ReadAllLinesAsync(Settings.PluginsFilename);
+                    await Utility.Plugins.StartPlugins(pluginsToStart);
+                }
+
+                // Execute runonce.g after config.g if it is present
+                string runOnceFile = await FilePath.ToPhysicalAsync(FilePath.RunOnceFile, FileDirectory.System);
+                if (File.Exists(runOnceFile))
+                {
+                    do
+                    {
+                        using (await Model.Provider.AccessReadOnlyAsync())
+                        {
+                            if (Model.Provider.Get.State.Status != MachineStatus.Starting)
+                            {
+                                break;
+                            }
+                        }
+                        await Task.Delay(250);
+                    }
+                    while (!CancellationToken.IsCancellationRequested);
+
+                    if (!CancellationToken.IsCancellationRequested)
+                    {
+                        using (Macro macro = new Macro(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger))
+                        {
+                            await macro.FinishAsync();
+                        }
+
+                        try
+                        {
+                            File.Delete(runOnceFile);
+                        }
+                        catch (Exception e)
+                        {
+                            await Model.Provider.Output(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
+                        }
+                    }
+                }
+
+                // Notify the service manager that we're up and running
+                string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
+                if (!string.IsNullOrEmpty(notifySocket))
+                {
+                    try
+                    {
+                        using Socket socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
+                        socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
+                        socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Warn(e, "Failed to notify systmed about process start");
+                    }
+                }
+            }
+
             // Wait for the first task to terminate.
             // In case this is an unusual shutdown, log this event and shut down the application
             Task terminatedTask = await Task.WhenAny(mainTasks.Keys);
@@ -194,6 +284,14 @@ namespace DuetControlServer
             }
             while (mainTasks.Count > 0);
 
+            // Stop the plugins again and save the state
+            if (!Settings.UpdateOnly)
+            {
+                _logger.Debug("Stopping plugins and saving their execution state");
+                IEnumerable<string> startedPlugins = await Utility.Plugins.StopPlugins();
+                await File.WriteAllLinesAsync(Settings.PluginsFilename, startedPlugins);
+            }
+
             // End
             _logger.Info("Application has shut down");
             NLog.LogManager.Shutdown();
@@ -221,7 +319,7 @@ namespace DuetControlServer
                 Console.Write("Sending update request to DCS... ");
                 try
                 {
-                    await connection.PerformCode(new DuetAPI.Commands.Code
+                    await connection.PerformCode(new Code
                     {
                         Type = DuetAPI.Commands.CodeType.MCode,
                         MajorNumber = 997,

@@ -1,4 +1,4 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.ObjectModel;
 using NUnit.Framework;
 using System.IO;
 using System.Text.Json;
@@ -15,7 +15,7 @@ namespace UnitTests.Machine
             string jsonText = System.IO.File.ReadAllText(modelPath);
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
-            MachineModel model = new MachineModel();
+            ObjectModel model = new ObjectModel();
 
             model.UpdateFromJson(parsedJson.RootElement);
 
@@ -31,7 +31,7 @@ namespace UnitTests.Machine
         [Test]
         public void Patch()
         {
-            MachineModel modelToUpdate = new MachineModel();
+            ObjectModel modelToUpdate = new ObjectModel();
             modelToUpdate.Boards.Add(new Board
             {
                 FirmwareName = "Foobar"
@@ -52,7 +52,7 @@ namespace UnitTests.Machine
             });
             modelToUpdate.State.Status = MachineStatus.Busy;
 
-            MachineModel updatedModel = new MachineModel();
+            ObjectModel updatedModel = new ObjectModel();
             updatedModel.Boards.Add(new Board
             {
                 FirmwareName = "Yum"
@@ -105,10 +105,10 @@ namespace UnitTests.Machine
             string jsonText = System.IO.File.ReadAllText(modelPath);
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
-            MachineModel model = new MachineModel();
+            ObjectModel model = new ObjectModel();
             model.UpdateFromJson(parsedJson.RootElement);
 
-            MachineModel newModel = new MachineModel();
+            ObjectModel newModel = new ObjectModel();
             newModel.Assign(model);
 
             string serializedModel = newModel.ToString();
@@ -122,10 +122,10 @@ namespace UnitTests.Machine
             string jsonText = System.IO.File.ReadAllText(modelPath);
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
-            MachineModel model = new MachineModel();
+            ObjectModel model = new ObjectModel();
             model.UpdateFromJson(parsedJson.RootElement);
 
-            MachineModel newModel = (MachineModel)model.Clone();
+            ObjectModel newModel = (ObjectModel)model.Clone();
 
             string serializedModel = newModel.ToString();
             Assert.AreEqual(jsonText, serializedModel);
@@ -138,7 +138,7 @@ namespace UnitTests.Machine
             string jsonText = System.IO.File.ReadAllText(modelPath);
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
-            MachineModel model = new MachineModel();
+            ObjectModel model = new ObjectModel();
             bool success = model.UpdateFromFirmwareModel("state", parsedJson.RootElement);
 
             Assert.IsTrue(success);

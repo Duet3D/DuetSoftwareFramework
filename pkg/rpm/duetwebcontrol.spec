@@ -10,29 +10,20 @@
 
 Name:    duetwebcontrol
 Version: %{_tversion}
-Release: %{_release}.900
+Release: %{_release}
 Summary: Official web interface for Duet electronics
 Group:   3D Printing
-Source0: duetwebcontrol_%{_tversion}-%{_release}
+Source0: duetwebcontrol_%{_tversion}
 License: GPLv3
-URL:     https://github.com/chrishamm/DuetWebControl
+URL:     https://github.com/Duet3D/DuetWebControl
 BuildRequires: rpm >= 4.7.2-2
-Requires: duetruntime
 
 AutoReq:  0
 
 %description
 Official web interface for Duet electronics
 
-%prep
-%setup -q -T -c -n %{name}-%{version}
-
-%build
-
-%install
-rsync -vaH %{S:0}/. %{buildroot}/
-
 %files
 %defattr(-,root,root,-)
-%{dsfoptdir}/dwc2
+%{dsfoptdir}/dwc
 %{dsfoptdir}/sd/www

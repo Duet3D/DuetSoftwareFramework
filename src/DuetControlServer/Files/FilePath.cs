@@ -36,24 +36,14 @@ namespace DuetControlServer.Files
         public const string DefaultHeightmapFile = "heightmap.csv";
 
         /// <summary>
-        /// Fallback file if the probe-specific deploy probe file could not be found
+        /// Macro to be called when G29 is invoked without an S parameter
         /// </summary>
-        public const string DeployProbeFallbackFile = "deployprobe.g";
+        public const string MeshFile = "mesh.g";
 
         /// <summary>
-        /// Fallback file if the probe-specific retract probe file could not be found
+        /// File to run once after start if it exists, then deleted again
         /// </summary>
-        public const string RetractProbeFallbackFile = "retractprobe.g";
-
-        /// <summary>
-        /// Probe-specific deploy file name pattern
-        /// </summary>
-        public static Regex DeployProbePattern = new Regex(@"deployprobe\d+\.g");
-
-        /// <summary>
-        /// Probe-specific retract file name pattern
-        /// </summary>
-        public static Regex RetractProbePattern = new Regex(@"retractprobe\d+\.g");
+        public const string RunOnceFile = "runonce.g";
 
         /// <summary>
         /// File holding the filaments mapping
@@ -122,7 +112,7 @@ namespace DuetControlServer.Files
                 }
                 return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directoryPath, filePath);
             }
-            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath.Substring(1) : filePath);
+            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
         }
 
         /// <summary>
@@ -174,7 +164,7 @@ namespace DuetControlServer.Files
 
                 return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directory, filePath);
             }
-            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath.Substring(1) : filePath);
+            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
         }
 
         /// <summary>
@@ -187,17 +177,17 @@ namespace DuetControlServer.Files
         {
             if (filePath.StartsWith(Settings.BaseDirectory))
             {
-                filePath = filePath.Substring(Settings.BaseDirectory.EndsWith('/') ? Settings.BaseDirectory.Length : (Settings.BaseDirectory.Length + 1));
+                filePath = filePath[(Settings.BaseDirectory.EndsWith('/') ? Settings.BaseDirectory.Length : (Settings.BaseDirectory.Length + 1))..];
                 return Path.Combine("0:/", filePath);
             }
 
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                foreach (DuetAPI.Machine.Volume storage in Model.Provider.Get.Volumes)
+                foreach (DuetAPI.ObjectModel.Volume storage in Model.Provider.Get.Volumes)
                 {
                     if (filePath.StartsWith(storage.Path))
                     {
-                        return Path.Combine("0:/", filePath.Substring(storage.Path.Length));
+                        return Path.Combine("0:/", filePath[storage.Path.Length..]);
                     }
                 }
             }

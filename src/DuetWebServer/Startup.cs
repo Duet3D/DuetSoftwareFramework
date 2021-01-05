@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Net.Http.Headers;
 using System;
 
 namespace DuetWebServer
@@ -13,11 +14,6 @@ namespace DuetWebServer
     /// </summary>
     public class Startup
     {
-        /// <summary>
-        /// Name of the CORS policy to use
-        /// </summary>
-        private const string CorsPolicy = "cors-policy";
-
         /// <summary>
         /// Copy of the app configuration
         /// </summary>
@@ -38,20 +34,7 @@ namespace DuetWebServer
         /// <param name="services">Service collection</param>
         public static void ConfigureServices(IServiceCollection services)
         {
-            // Register CORS policy (may or may not be used)
-            services.AddCors(options =>
-            {
-                options.AddPolicy(CorsPolicy,
-                builder =>
-                {
-                    // Create a rule for very unrestrictive CORS requests
-                    builder
-                        .AllowAnyOrigin()
-                        .AllowAnyHeader()
-                        .AllowAnyMethod();
-                });
-            });
-
+            services.AddCors(options => options.AddDefaultPolicy(Services.ModelObserver.CorsPolicy));
             services.AddControllers();
         }
 
@@ -74,38 +57,20 @@ namespace DuetWebServer
             });
             app.UseRouting();
 
-            // Set CORS flags if applicable
-            if (_configuration.GetValue("UseCors", true))
-            {
-                app.UseCors(CorsPolicy);
-            }
-
-            // Use static files from 0:/www if applicable
-            if (_configuration.GetValue("UseStaticFiles", true))
-            {
-                app.UseStaticFiles();
-                app.UseFileServer(new FileServerOptions
-                {
-                    FileProvider = new FileProviders.DuetFileProvider()
-                });
-            }
+            // Enable CORS policy
+            app.UseCors();
 
             // Define a keep-alive interval for operation as a reverse proxy
             app.UseWebSockets(new WebSocketOptions
             {
-                KeepAliveInterval = TimeSpan.FromSeconds(_configuration.GetValue("KeepAliveInterval", 30))
-            }); ;
-
+                KeepAliveInterval = TimeSpan.FromSeconds(_configuration.GetValue("KeepAliveInterval", 30)),
+            });
 
             // Define endpoints
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllerRoute("WebSocket", "{controller=WebSocket}");
                 endpoints.MapControllerRoute("default", "{controller=Machine}");
-                if (_configuration.GetValue("UseCors", false))
-                {
-                    endpoints.MapControllers().RequireCors(CorsPolicy);
-                }
             });
 
             // Use middleware for third-pary HTTP requests
@@ -113,6 +78,23 @@ namespace DuetWebServer
 
             // Use fallback middlware
             app.UseMiddleware(typeof(Middleware.FallbackMiddleware));
+
+            // Use static files from 0:/www if applicable
+            if (_configuration.GetValue("UseStaticFiles", true))
+            {
+                app.UseStaticFiles(new StaticFileOptions
+                {
+                    OnPrepareResponse = ctx =>
+                    {
+                        ctx.Context.Response.Headers[HeaderNames.CacheControl] = $"public,max-age={_configuration.GetValue("MaxAge", 3600)},must-revalidate";
+                        ctx.Context.Response.Headers[HeaderNames.Expires] = "0";
+                    }
+                });
+                app.UseFileServer(new FileServerOptions
+                {
+                    FileProvider = new FileProviders.DuetFileProvider()
+                });
+            }
         }
     }
 }

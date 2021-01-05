@@ -2,6 +2,7 @@
 using DuetAPIClient;
 using System;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace CodeConsole
@@ -31,8 +32,8 @@ namespace CodeConsole
                 {
                     Console.WriteLine("Available command line arguments:");
                     Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
-                    Console.WriteLine("-c, --code <code>: Execute the given code(s), wait for the result and exit");
-                    Console.WriteLine("-q, --quiet: Do not display when a connection has been established (only applicable in interactive mode)");
+                    Console.WriteLine("-c, --code <code>: Execute the given code(s), wait for the result and exit. Alternative codes: startUpdate (Set DSF to updating), endUpdate (End DSF updating state)");
+                    Console.WriteLine("-q, --quiet: Do not output any messages (not applicable for code replies in interactive mode)");
                     Console.WriteLine("-h, --help: Display this help text");
                     return;
                 }
@@ -53,7 +54,7 @@ namespace CodeConsole
                 }
 
                 // Register an (interactive) user session
-                int sessionId = await connection.AddUserSession(DuetAPI.Machine.AccessLevel.ReadWrite, DuetAPI.Machine.SessionType.Local, "console");
+                int sessionId = await connection.AddUserSession(DuetAPI.ObjectModel.AccessLevel.ReadWrite, DuetAPI.ObjectModel.SessionType.Local, "console");
 
                 // Start reading lines from stdin and send them to DCS as simple codes.
                 // When the code has finished, the result is printed to stdout
@@ -62,14 +63,32 @@ namespace CodeConsole
                 {
                     try
                     {
-                        string output = await connection.PerformSimpleCode(input);
-                        if (output.EndsWith(Environment.NewLine))
+                        if (input.Equals("startUpdate", StringComparison.InvariantCultureIgnoreCase))
                         {
-                            Console.Write(output);
+                            await connection.SetUpdateStatus(true);
+                            Console.WriteLine("DSF is now in update mode");
+                        }
+                        else if (input.Equals("endUpdate", StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            await connection.SetUpdateStatus(false);
+                            Console.WriteLine("DSF is no longer in update mode");
+                        }
+                        else if (input.StartsWith("eval ", StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            JsonElement result = await connection.EvaluateExpression<JsonElement>(input[5..].Trim());
+                            Console.WriteLine("Evaluation result: {0}", result.GetRawText());
                         }
                         else
                         {
-                            Console.WriteLine(output);
+                            string output = await connection.PerformSimpleCode(input);
+                            if (output.EndsWith(Environment.NewLine))
+                            {
+                                Console.Write(output);
+                            }
+                            else
+                            {
+                                Console.WriteLine(output);
+                            }
                         }
                     }
                     catch (SocketException)
@@ -94,17 +113,36 @@ namespace CodeConsole
                     await connection.RemoveUserSession(sessionId);
                 }
             }
+            else if (codeToExecute.Equals("startUpdate", StringComparison.InvariantCultureIgnoreCase))
+            {
+                await connection.SetUpdateStatus(true);
+                if (!quiet)
+                {
+                    Console.WriteLine("DSF is now in update mode");
+                }
+            }
+            else if (codeToExecute.Equals("endUpdate", StringComparison.InvariantCultureIgnoreCase))
+            {
+                await connection.SetUpdateStatus(false);
+                if (!quiet)
+                {
+                    Console.WriteLine("DSF is no longer in update mode");
+                }
+            }
             else
             {
                 // Execute only the given code(s) and quit
                 string output = await connection.PerformSimpleCode(codeToExecute);
-                if (output.EndsWith('\n'))
+                if (!quiet)
                 {
-                    Console.Write(output);
-                }
-                else
-                {
-                    Console.WriteLine(output);
+                    if (output.EndsWith('\n'))
+                    {
+                        Console.Write(output);
+                    }
+                    else
+                    {
+                        Console.WriteLine(output);
+                    }
                 }
             }
         }

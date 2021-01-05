@@ -1,6 +1,144 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.2.0
+=============
+
+Compatible versions:
+- RepRapFirmware 3.2.0
+- DuetWebControl 3.2.0
+
+Bug fixes:
+- M929 didn't set the correct log level
+- `abort` tried to evaluate following expression even if it was not specified
+- `abort` did not always cancel all the internal codes in time
+- Under rare conditions suspended codes could be re-suspended in the wrong order
+- G0/G1 with dynamic feedrate expressions caused an internal exception
+
+Version 3.2.0-rc2
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-rc2
+- DuetWebControl 3.2.0-rc2
+
+Changed behaviour:
+- Increased SPI connection timeout from 2.5s to 4s (same value as in RRF)
+- Partial SPI transmissions may not take longer than 500ms (same value as in RRF)
+
+Bug fixes:
+- M997 and M999 could generate "Operation has been cancelled" errors
+- When DCS terminated sockets of command connections were not correctly shut down
+- Object model write locks were not correctly disposed of when DCS terminated
+- Calling abort in macro files could cause an exception
+- M501 could freeze if no config-override.g was found
+- "Macro not found" warning messages were not output as part of code results
+
+Version 3.2.0-rc1
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-rc1
+- DuetWebControl 3.2.0-rc1
+
+Changed behaviour:
+- RRF downgrades from later protocol versions are now possible
+- CORS headers are only sent if explictly configured by `M586 C`-parameter
+- SPI transfers use CRC32 instead of CRC16 with new protocol version
+- DCS service notifies systemd when it is up and running
+- DCS terminates when a firmware update of the main board is complete (unless `NoTerminateOnReset` is set)
+- `runonce.g` is no longer processed if DCS starts in update-only mode (i.e. with `-u` parameter)
+- Third-party DSF plugins cannot be installed any more (TBD for v3.3)
+
+Bug fixes:
+- Fixed incompatibilities when updating RRF from older firmware versions
+- LockMovementAndWaitForStandstill retransmissions were logged
+- Expressions were not automatically evaluated in the code processors
+- Internally processed codes were only logged if they resulted in a warning or error
+- DWS didn't send correct `Cache-Control` header which could result in DuetPi using outdated DWC versions
+- Sometimes the filament mapping was not fully restored if the `NoTerminateOnReset` option was enabled
+- M929 was not fully implemented for new log levels
+
+Version 3.2.0-b4
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-b4
+- DuetWebControl 3.2.0-b4
+
+Changed behaviour:
+- DCS service is now started via sysinit.target instead of basic.target so that config.g is processed faster on boot
+- Thumbnails from PrusaSlicer are now parsed (thanks Sindarius)
+- M500 writes new heater tuning parameters to config-override.g
+- In Marlin emulation "ok" responses are only sent when the line is complete
+
+Bug fixes:
+- Codes could be sent to code interceptors in the wrong order
+- M21 (P0) returned an error message breaking Octoprint support
+- Under certain circumstances some object model keys were not updated on initialisation
+- DCS service didn't have permission to change the datetime
+- Print times with decimal places were incorrectly parsed
+- When the controller was reset or updated, an extra data transfer was performed
+
+Version 3.2.0-b3
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-b3
+- DuetWebControl 3.2.0-b3
+
+Changed behaviour:
+- DCS is now explicitly notified about closed messages and files (hence no longer compatible with 3.2-b2)
+- CodeConsole utility allows evaluation of expressions using `eval <expression>`
+
+Bug fixes:
+- When certain G-code inputs were disabled, the DSF API threw NullReferenceExceptions
+- When the heaters contained null items, no config-override.g could be writen
+- When the move compensation type was set to none, the heightmap file was not reset
+- Starting macro files could cause out-of-order execution and stack underruns
+- Sometimes the object model wasn't fully updated after a disconnect
+
+Version 3.2.0-b2
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-b2
+- DuetWebControl 3.2.0-b2
+
+Changed behaviour:
+- runonce.g is no longer processed before config.g to match RRF's behaviour
+- Increased SPI protocol version due to slight changes for the new Linux task in RRF
+
+Bug fixes:
+- Added missing "Starting" item to the MachineStatus enumeration
+- M112/M999 were executed out-of-order when read from files
+- Sometimes in print files codes invoking macro files could crash DCS
+- Aborted macro files did not cancel codes properly
+- Comments following codes directly without a whitespace could cause parsing errors
+
+Version 3.2.0-b1
+================
+
+Compatible files:
+- RepRapFirmware 3.2.0-b1
+- DuetWebControl 3.2.0-b1
+
+Changed behaviour:
+- Permissions are now required for DSF commands for executables running in `/opt/dsf/plugins`
+- Simulation times are automatically written to G-code files
+- Increased API level due to object model changes
+- Renamed namespace `DuetAPI.Machine` to `DuetAPI.ObjectModel` and `MachineModel` to `ObjectModel`
+- DSF processes are now running as their own `dsf` user
+
+Bug fixes:
+- DCS service file contained an invalid CPU priority
+- Event logging via M929 was not working
+- Macro files with an unknown start code were not properly cancelled by M99/M292 P1
+
+Known issues:
+- Security permissions are not enforced via AppArmor yet (and they are still subject to change)
+- Package dependencies are not yet installed when a plugin is installed
+
 Version 3.1.1
 ==============
 

@@ -5,9 +5,12 @@ Description=Duet Control Server
 ExecStart=/opt/dsf/bin/DuetControlServer
 TimeoutStopSec=15
 Restart=always
-RestartSec=5
-Type=simple
-CPUSchedulingPriority=20
+Type=notify
+User=dsf
+Group=dsf
+UMask=0002
+CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_SYS_TIME
+AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_SYS_TIME
 
 [Install]
-WantedBy=basic.target
+WantedBy=sysinit.target

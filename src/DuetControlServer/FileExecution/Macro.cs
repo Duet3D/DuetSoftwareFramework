@@ -1,6 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using DuetControlServer.Utility;
 using Nito.AsyncEx;
@@ -63,22 +63,12 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Internal cancellation token source used for codes
         /// </summary>
-        private CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+        private readonly CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
         /// <summary>
         /// Cancellation token that is triggered when the file is cancelled/aborted
         /// </summary>
         public CancellationToken CancellationToken { get => _cts.Token; }
-
-        /// <summary>
-        /// Cancel pending codes
-        /// </summary>
-        public void CancelPendingCodes()
-        {
-            _cts.Cancel();
-            _cts.Dispose();
-            _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-        }
 
         /// <summary>
         /// Internal lock used for starting codes in the right order
@@ -150,9 +140,19 @@ namespace DuetControlServer.FileExecution
         public bool IsConfigOverride { get; }
 
         /// <summary>
+        /// Indicates if the macro file has just started
+        /// </summary>
+        public bool JustStarted { get; set; }
+
+        /// <summary>
         /// Indicates if the macro file is being executed
         /// </summary>
-        public bool IsExecuting { get; private set; }
+        public bool IsExecuting
+        {
+            get => _isExecuting;
+            set => _isExecuting = value;
+        }
+        private volatile bool _isExecuting;
 
         /// <summary>
         /// Indicates if the macro file has been aborted
@@ -172,7 +172,7 @@ namespace DuetControlServer.FileExecution
         /// <param name="channel">Code requesting the macro</param>
         /// <param name="isNested">Whether the code was started from a G/M/T-code</param>
         /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
-        public Macro(string fileName, string physicalFile, CodeChannel channel, bool isNested, int sourceConnection)
+        public Macro(string fileName, string physicalFile, CodeChannel channel, bool isNested = false, int sourceConnection = 0)
         {
             FileName = fileName;
             Channel = channel;
@@ -197,18 +197,26 @@ namespace DuetControlServer.FileExecution
                 _file = new CodeFile(physicalFile, channel);
                 _logger.Info("Starting macro file {0} on channel {1}", fileName, channel);
             }
+            catch (FileNotFoundException)
+            {
+                if (channel != CodeChannel.Daemon)
+                {
+                    _logger.Debug("Macro file {0} not found", fileName);
+                }
+                else
+                {
+                    _logger.Trace("Macro file {0} not found", fileName);
+                }
+            }
             catch (Exception e)
             {
-                if (!(e is FileNotFoundException))
-                {
-                    _logger.Error(e, "Failed to start macro file {0}: {1}", fileName, e.Message);
-                }
+                _logger.Error(e, "Failed to start macro file {0}: {1}", fileName, e.Message);
             }
             finally
             {
-                if (IsConfig || _file != null)
+                if (_file != null || (name == FilePath.ConfigFile && _file != null) || name == FilePath.ConfigFileFallback)
                 {
-                    IsExecuting = true;
+                    IsExecuting = JustStarted = true;
                     _ = Task.Run(Run);
                 }
             }
@@ -220,11 +228,12 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public async Task Abort()
         {
-            if (IsAborted)
+            if (IsAborted || disposed)
             {
                 return;
             }
             IsAborted = true;
+            _cts.Cancel();
 
             if (_file != null)
             {
@@ -255,7 +264,6 @@ namespace DuetControlServer.FileExecution
             {
                 return Task.FromResult(Result);
             }
-            _cts.Cancel();
 
             if (_finishTCS != null)
             {
@@ -335,7 +343,8 @@ namespace DuetControlServer.FileExecution
 
                             if (!IsNested)
                             {
-                                await Logger.LogOutput(result);
+                                // When we get here log messages were already handled by the channel processor
+                                await Model.Provider.Output(result);
                             }
                         }
                     }
@@ -476,6 +485,7 @@ namespace DuetControlServer.FileExecution
                 _ = Task.Run(async () =>
                 {
                     await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
+                    FilamentManager.RefreshMapping();
                     _runningConfig = false;
                 });
             }

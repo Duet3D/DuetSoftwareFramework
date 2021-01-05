@@ -1,4 +1,4 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.ObjectModel;
 using DuetControlServer.Model;
 using NUnit.Framework;
 using System.Collections.Generic;
@@ -15,7 +15,7 @@ namespace UnitTests.IPC
 
             // state.status
             object[] pathA = new object[] { "state", "status" };
-            object resultA = DuetControlServer.IPC.Processors.Subscription.GetPathNode(root, pathA);
+            object resultA = DuetControlServer.IPC.Processors.ModelSubscription.GetPathNode(root, pathA);
 
             Assert.AreEqual(1, root.Count);
             if (root.TryGetValue("state", out object stateObject))
@@ -37,7 +37,7 @@ namespace UnitTests.IPC
 
             // boards[0 of 2]/v12/current
             object[] pathB = new object[] { new ItemPathNode("boards", 0, new object[] { new Board(), new Board() }), "v12", "current" };
-            object resultB = DuetControlServer.IPC.Processors.Subscription.GetPathNode(root, pathB);
+            object resultB = DuetControlServer.IPC.Processors.ModelSubscription.GetPathNode(root, pathB);
 
             Assert.AreEqual(2, root.Count);
             if (root.TryGetValue("boards", out object boardsObject))
@@ -87,7 +87,7 @@ namespace UnitTests.IPC
 
             // move.axes[0 of 2].homed
             object[] pathC = new object[] { "move", new ItemPathNode("axes", 0, new object[] { new Axis(), new Axis(), new Axis() }), "homed" };
-            object resultC = DuetControlServer.IPC.Processors.Subscription.GetPathNode(root, pathC);
+            object resultC = DuetControlServer.IPC.Processors.ModelSubscription.GetPathNode(root, pathC);
 
             Assert.AreEqual(3, root.Count);
             if (root.TryGetValue("move", out object moveObject))

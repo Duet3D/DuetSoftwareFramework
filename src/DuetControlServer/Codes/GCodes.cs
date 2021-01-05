@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Files;
 
@@ -51,61 +51,48 @@ namespace DuetControlServer.Codes
                                 {
                                     map = new Heightmap();
                                     await map.Load(physicalFile);
-                                }
-                                if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
-                                {
-                                    if (cp == 1)
+
+                                    await using (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
                                     {
-                                        try
+                                        await SPI.Interface.SetHeightmap(map);
+                                    }
+
+                                    string virtualFile = await FilePath.ToVirtualAsync(physicalFile);
+                                    using (await Model.Provider.AccessReadWriteAsync())
+                                    {
+                                        Model.Provider.Get.Move.Compensation.File = virtualFile;
+                                    }
+
+                                    CodeResult result = new CodeResult();
+                                    using (await Model.Provider.AccessReadOnlyAsync())
+                                    {
+                                        if (Model.Provider.Get.Move.Axes.Any(axis => axis.Letter == 'Z' && !axis.Homed))
                                         {
-                                            await SPI.Interface.SetHeightmap(map);
+                                            result.Add(MessageType.Warning, "The height map was loaded when the current Z=0 datum was not determined. This may result in a height offset.");
                                         }
-                                        finally
-                                        {
-                                            await SPI.Interface.UnlockAll(code.Channel);
-                                        }
+                                    }
+                                    result.Add(MessageType.Success, $"Height map loaded from file {file}");
+                                    return result;
+                                }
+                                else
+                                {
+                                    await using (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
+                                    {
+                                        map = await SPI.Interface.GetHeightmap();
+                                    }
+
+                                    if (map.NumX * map.NumY > 0)
+                                    {
+                                        await map.Save(physicalFile);
 
                                         string virtualFile = await FilePath.ToVirtualAsync(physicalFile);
                                         using (await Model.Provider.AccessReadWriteAsync())
                                         {
                                             Model.Provider.Get.Move.Compensation.File = virtualFile;
                                         }
-
-                                        CodeResult result = new CodeResult();
-                                        using (await Model.Provider.AccessReadOnlyAsync())
-                                        {
-                                            if (Model.Provider.Get.Move.Axes.Any(axis => axis.Letter == 'Z' && !axis.Homed))
-                                            {
-                                                result.Add(MessageType.Warning, "The height map was loaded when the current Z=0 datum was not determined. This may result in a height offset.");
-                                            }
-                                        }
-                                        result.Add(MessageType.Success, $"Height map loaded from file {file}");
-                                        return result;
+                                        return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
                                     }
-                                    else
-                                    {
-                                        try
-                                        {
-                                            map = await SPI.Interface.GetHeightmap();
-                                        }
-                                        finally
-                                        {
-                                            await SPI.Interface.UnlockAll(code.Channel);
-                                        }
-
-                                        if (map.NumX * map.NumY > 0)
-                                        {
-                                            await map.Save(physicalFile);
-
-                                            string virtualFile = await FilePath.ToVirtualAsync(physicalFile);
-                                            using (await Model.Provider.AccessReadWriteAsync())
-                                            {
-                                                Model.Provider.Get.Move.Compensation.File = virtualFile;
-                                            }
-                                            return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
-                                        }
-                                        return new CodeResult();
-                                    }
+                                    return new CodeResult();
                                 }
                             }
                             catch (Exception e)
@@ -140,44 +127,18 @@ namespace DuetControlServer.Codes
 
             switch (code.MajorNumber)
             {
-                // Rapid/Regular positioning
-                case 0:
-                case 1:
-                    CodeParameter feedrate = code.Parameter('F');
-                    if (feedrate != null)
-                    {
-                        using (await Model.Provider.AccessReadWriteAsync())
-                        {
-                            if (Model.Provider.Get.Inputs[code.Channel].DistanceUnit == DistanceUnit.Inch)
-                            {
-                                Model.Provider.Get.Inputs[code.Channel].FeedRate = feedrate / (25.4F * 60F);
-                            }
-                            else
-                            {
-                                Model.Provider.Get.Inputs[code.Channel].FeedRate = feedrate / 60F;
-                            }
-                        }
-                    }
-                    break;
-
-                // Use inches
-                case 20:
-                    using (await Model.Provider.AccessReadWriteAsync())
-                    {
-                        Model.Provider.Get.Inputs[code.Channel].DistanceUnit = DistanceUnit.Inch;
-                    }
-                    break;
-
-                // Use millimetres
-                case 21:
-                    using (await Model.Provider.AccessReadWriteAsync())
-                    {
-                        Model.Provider.Get.Inputs[code.Channel].DistanceUnit = DistanceUnit.MM;
-                    }
-                    break;
-
                 // Save heightmap
                 case 29:
+                    // If no S parameter is present, check for /sys/mesh.g and continue only if it does not exist
+                    if (code.Parameter('S') == null)
+                    {
+                        string meshMacroFile = await FilePath.ToPhysicalAsync(FilePath.MeshFile, FileDirectory.System);
+                        if (System.IO.File.Exists(meshMacroFile))
+                        {
+                            break;
+                        }
+                    }
+
                     if (code.Parameter('S', 0) == 0)
                     {
                         string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
@@ -185,29 +146,22 @@ namespace DuetControlServer.Codes
 
                         try
                         {
-                            if (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
+                            Heightmap map;
+                            await using (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
                             {
-                                Heightmap map;
-                                try
-                                {
-                                    map = await SPI.Interface.GetHeightmap();
-                                }
-                                finally
-                                {
-                                    await SPI.Interface.UnlockAll(code.Channel);
-                                }
+                                map = await SPI.Interface.GetHeightmap();
+                            }
 
-                                if (map.NumX * map.NumY > 0)
-                                {
-                                    await map.Save(physicalFile);
+                            if (map.NumX * map.NumY > 0)
+                            {
+                                await map.Save(physicalFile);
 
-                                    string virtualFile = await FilePath.ToVirtualAsync(physicalFile);
-                                    using (await Model.Provider.AccessReadWriteAsync())
-                                    {
-                                        Model.Provider.Get.Move.Compensation.File = virtualFile;
-                                    }
-                                    code.Result.Add(MessageType.Success, $"Height map saved to file {file}");
+                                string virtualFile = await FilePath.ToVirtualAsync(physicalFile);
+                                using (await Model.Provider.AccessReadWriteAsync())
+                                {
+                                    Model.Provider.Get.Move.Compensation.File = virtualFile;
                                 }
+                                code.Result.Add(MessageType.Success, $"Height map saved to file {file}");
                             }
                         }
                         catch (Exception e)
@@ -219,22 +173,6 @@ namespace DuetControlServer.Codes
                             }
                             code.Result.Add(MessageType.Error, $"Failed to save height map to file {file}: {e.Message}");
                         }
-                    }
-                    break;
-
-                // Absolute positioning
-                case 90:
-                    using (await Model.Provider.AccessReadWriteAsync())
-                    {
-                        Model.Provider.Get.Inputs[code.Channel].AxesRelative = false;
-                    }
-                    break;
-
-                // Relative positioning
-                case 91:
-                    using (await Model.Provider.AccessReadWriteAsync())
-                    {
-                        Model.Provider.Get.Inputs[code.Channel].AxesRelative = true;
                     }
                     break;
             }

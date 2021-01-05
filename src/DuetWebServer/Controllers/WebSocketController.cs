@@ -6,8 +6,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPIClient;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -63,12 +64,15 @@ namespace DuetWebServer.Controllers
         {
             if (HttpContext.WebSockets.IsWebSocketRequest)
             {
-                using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-                await Process(webSocket);
+                if (Services.ModelObserver.CheckWebSocketOrigin(HttpContext))
+                {
+                    using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+                    await Process(webSocket);
+                }
             }
             else
             {
-                HttpContext.Response.StatusCode = 400;
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
             }
         }
 
@@ -91,7 +95,7 @@ namespace DuetWebServer.Controllers
             try
             {
                 // Subscribe to object model updates
-                await subscribeConnection.Connect(SubscriptionMode.Patch, null, socketPath);
+                await subscribeConnection.Connect(SubscriptionMode.Patch, Array.Empty<string>(), socketPath);
             }
             catch (Exception e)
             {
@@ -108,7 +112,7 @@ namespace DuetWebServer.Controllers
                 if (e is SocketException)
                 {
                     _logger.LogError($"[{nameof(WebSocketController)}] DCS is not started");
-                    await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "DCS is not started");
+                    await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "Failed to connect to Duet, please check your connection (DCS is not started)");
                     return;
                 }
                 _logger.LogError(e, $"[{nameof(WebSocketController)}] Failed to connect to DCS");
@@ -131,7 +135,7 @@ namespace DuetWebServer.Controllers
                 sessionId = await commandConnection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, ipAddress, port);
 
                 // 4b. Fetch full model copy and send it over initially
-                using (MemoryStream json = await subscribeConnection.GetSerializedMachineModel())
+                using (MemoryStream json = await subscribeConnection.GetSerializedObjectModel())
                 {
                     await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, default);
                 }
@@ -263,7 +267,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Wait for another object model update and send it to the client
-                using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedMachineModel(cancellationToken);
+                using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedObjectModel(cancellationToken);
                 await webSocket.SendAsync(objectModelPatch.ToArray(), WebSocketMessageType.Text, true, cancellationToken);
             }
             while (webSocket.State == WebSocketState.Open);

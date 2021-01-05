@@ -97,6 +97,61 @@
             <param name="directory">Directory to create</param>
             <returns>HTTP status code: (204) Directory created (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
         </member>
+        <member name="M:DuetWebServer.Controllers.MachineController.InstallPlugin">
+            <summary>
+            PUT /machine/plugin
+            Install or upgrade a plugin ZIP file
+            </summary>
+            <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        </member>
+        <member name="M:DuetWebServer.Controllers.MachineController.UninstallPlugin">
+            <summary>
+            DELETE /machine/plugin
+            Uninstall a plugin
+            </summary>
+            <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        </member>
+        <member name="T:DuetWebServer.Controllers.MachineController.PluginPatchInstruction">
+            <summary>
+            Private class for wrapping plugin data patch instructions
+            </summary>
+        </member>
+        <member name="P:DuetWebServer.Controllers.MachineController.PluginPatchInstruction.plugin">
+            <summary>
+            Plugin to change
+            </summary>
+        </member>
+        <member name="P:DuetWebServer.Controllers.MachineController.PluginPatchInstruction.key">
+            <summary>
+            Key to change
+            </summary>
+        </member>
+        <member name="P:DuetWebServer.Controllers.MachineController.PluginPatchInstruction.value">
+            <summary>
+            Target value
+            </summary>
+        </member>
+        <member name="M:DuetWebServer.Controllers.MachineController.SetPluginData">
+            <summary>
+            PATCH /machine/plugin
+            Set plugin data in the object model if there is no SBC executable.
+            </summary>
+            <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        </member>
+        <member name="M:DuetWebServer.Controllers.MachineController.StartPlugin">
+            <summary>
+            POST /machine/startPlugin
+            Start a plugin on the SBC
+            </summary>
+            <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        </member>
+        <member name="M:DuetWebServer.Controllers.MachineController.StopPlugin">
+            <summary>
+            POST /machine/stopPlugin
+            Stop a plugin on the SBC
+            </summary>
+            <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        </member>
         <member name="T:DuetWebServer.Controllers.WebSocketController">
             <summary>
             MVC controller for WebSocket requests
@@ -287,11 +342,12 @@
             <param name="message">Close message</param>
             <returns>Asynchronous task</returns>
         </member>
-        <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.ProcessRestRequst(Microsoft.AspNetCore.Http.HttpContext,DuetWebServer.Middleware.HttpEndpointConnection,System.Int32)">
+        <member name="M:DuetWebServer.Middleware.CustomEndpointMiddleware.ProcessRestRequst(Microsoft.AspNetCore.Http.HttpContext,DuetAPI.ObjectModel.HttpEndpoint,DuetWebServer.Middleware.HttpEndpointConnection,System.Int32)">
             <summary>
             Process a RESTful HTTP request
             </summary>
             <param name="context">HTTP context</param>
+            <param name="endpoint">HTTP endpoint descriptor</param>
             <param name="endpointConnection">Endpoint connection</param>
             <param name="sessionId">Session ID</param>
             <returns>Asynchronous task</returns>
@@ -382,6 +438,14 @@
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
         </member>
+        <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.GetPeerCredentials(System.Int32@,System.Int32@,System.Int32@)">
+            <summary>
+            Get the peer credentials of the UNIX socket
+            </summary>
+            <param name="pid">Process ID</param>
+            <param name="uid">User ID</param>
+            <param name="gid">Group ID</param>
+        </member>
         <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.Receive``1(System.Threading.CancellationToken)">
             <summary>
             Receive a deserialized object from the server
@@ -389,15 +453,6 @@
             <param name="cancellationToken">Cancellation token</param>
             <typeparam name="T">Type of the received object</typeparam>
             <returns>Received object</returns>
-            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
-            <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
-        </member>
-        <member name="M:DuetWebServer.Middleware.HttpEndpointConnection.ReceiveJson(System.Threading.CancellationToken)">
-            <summary>
-            Receive partially deserialized object from the server
-            </summary>
-            <param name="cancellationToken">Cancellation token</param>
-            <returns>Partially deserialized data</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
         </member>
@@ -439,6 +494,11 @@
             Class used to observe the machine model
             </summary>
         </member>
+        <member name="F:DuetWebServer.Services.ModelObserver.CorsPolicy">
+            <summary>
+            Configured CORS policy for cross-origin requests
+            </summary>
+        </member>
         <member name="F:DuetWebServer.Services.ModelObserver.Endpoints">
             <summary>
             Dictionary of registered third-party paths vs third-party HTTP endpoints
@@ -475,6 +535,13 @@
             Configuration of this application
             </summary>
         </member>
+        <member name="M:DuetWebServer.Services.ModelObserver.CheckWebSocketOrigin(Microsoft.AspNetCore.Http.HttpContext)">
+            <summary>
+            Check the origin of an incoming WebSocket request and set the status on error
+            </summary>
+            <param name="httpContext">HTTP context to check</param>
+            <returns>True if the origin is allowed</returns>
+        </member>
         <member name="F:DuetWebServer.Services.ModelObserver._logger">
             <summary>
             Logger instance
@@ -495,6 +562,7 @@
             Constructor of this service class
             </summary>
             <param name="configuration">App configuration</param>
+            <param name="corsService">Default CORS service</param>
             <param name="logger">Logger instance</param>
         </member>
         <member name="M:DuetWebServer.Services.ModelObserver.Dispose">
@@ -531,11 +599,6 @@
         <member name="T:DuetWebServer.Startup">
             <summary>
             Class used to start the ASP.NET Core endpoint
-            </summary>
-        </member>
-        <member name="F:DuetWebServer.Startup.CorsPolicy">
-            <summary>
-            Name of the CORS policy to use
             </summary>
         </member>
         <member name="F:DuetWebServer.Startup._configuration">

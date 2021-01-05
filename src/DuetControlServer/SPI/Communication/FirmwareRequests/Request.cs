@@ -86,6 +86,16 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// Firmware is waiting for a blocking message to be acknowledged
         /// </summary>
         /// <seealso cref="Shared.CodeChannelHeader"/>
-        WaitForAcknowledgement = 13
+        WaitForAcknowledgement = 13,
+
+        /// <summary>
+        /// Last file closed successfully
+        /// </summary>
+        MacroFileClosed = 14,
+
+        /// <summary>
+        /// Last message successfully acknowledged
+        /// </summary>
+        MessageAcknowledged = 15
     }
 }

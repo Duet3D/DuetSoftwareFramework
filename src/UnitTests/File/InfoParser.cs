@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using NUnit.Framework;
 
 namespace UnitTests.File
@@ -30,6 +30,17 @@ namespace UnitTests.File
             Assert.IsNotEmpty(info.GeneratedBy);
             // Assert.AreNotEqual(0, info.PrintTime);
             // Assert.AreNotEqual(0, info.SimulatedTime);
+        }
+
+        [TestCase("Thumbnail.gcode", 2)]
+        public async Task TestThumbnails(string fileName, int thumbnailCount)
+        {
+            string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes", fileName);
+            ParsedFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath);
+          
+            TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(ParsedFileInfo), new JsonSerializerOptions { WriteIndented = true }));
+            
+            Assert.AreEqual(info.Thumbnails.Count, thumbnailCount);
         }
 
         [Test]

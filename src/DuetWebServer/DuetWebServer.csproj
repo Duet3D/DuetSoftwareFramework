@@ -5,14 +5,15 @@
     <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D Ltd</Company>
-    <AssemblyVersion>3.1.0.0</AssemblyVersion>
-    <FileVersion>3.1.0.0</FileVersion>
-    <Version>3.1.0</Version>
+    <AssemblyVersion>3.2.0.0</AssemblyVersion>
+    <FileVersion>3.2.0.0</FileVersion>
+    <Version>3.2.0</Version>
     <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <RepositoryUrl>https://github.com/chrishamm/DuetSoftwareFramework.git</RepositoryUrl>
+    <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://github.com/chrishamm/DuetSoftwareFramework</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
+    <Copyright>Duet3D Ltd</Copyright>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -26,13 +27,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.2.1" />
-    <PackageReference Include="Nito.AsyncEx" Version="5.0.0" />
-    <PackageReference Include="System.IO.Pipelines" Version="4.7.1" />
+    <PackageReference Include="Nito.AsyncEx" Version="5.1.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
     <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
+    <ProjectReference Include="..\LinuxApi\LinuxApi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

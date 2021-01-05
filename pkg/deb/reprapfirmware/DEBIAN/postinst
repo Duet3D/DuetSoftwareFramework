@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Adjust file permissions
+chown dsf:dsf /opt/dsf/sd/sys/*.bin
+
 # Instruct DuetControlServer to update the firmware.
 # Do this only if GPIO and SPI nodes are available in SysFS
 if [ -e /opt/dsf/bin/DuetControlServer ] && [ -d /sys/class/gpio ] && [ -d /sys/module/spidev ]; then

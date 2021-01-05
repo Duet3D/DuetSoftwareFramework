@@ -19,6 +19,7 @@ namespace DuetControlServer
     public static class Settings
     {
         private const string DefaultConfigFile = "/opt/dsf/conf/config.json";
+        private const string DefaultPluginsFile = "/opt/dsf/conf/plugins.txt";
         private const RegexOptions RegexFlags = RegexOptions.IgnoreCase | RegexOptions.Singleline;
 
         /// <summary>
@@ -31,13 +32,28 @@ namespace DuetControlServer
         /// Do NOT start the SPI task. This is meant entirely for development purposes and should not be used!
         /// </summary>
         [JsonIgnore]
-        public static bool NoSpiTask { get; set; }
+        public static bool NoSpi { get; set; }
 
         /// <summary>
         /// Path to the configuration file
         /// </summary>
         [JsonIgnore]
         public static string ConfigFilename { get; set; } = DefaultConfigFile;
+
+        /// <summary>
+        /// Path to the file holding a list of loaded plugins
+        /// </summary>
+        public static string PluginsFilename { get; set; } = DefaultPluginsFile;
+
+        /// <summary>
+        /// Command to install third-party packages
+        /// </summary>
+        public static string InstallPackageCommand { get; set; } = "/usr/bin/apt-get";
+
+        /// <summary>
+        /// Command-line arguments to install third-party packages
+        /// </summary>
+        public static string InstallPackageArguments { get; set; } = "install -y {package}";
 
         /// <summary>
         /// Minimum log level for console output
@@ -78,6 +94,11 @@ namespace DuetControlServer
         public static string BaseDirectory { get; set; } = "/opt/dsf/sd";
 
         /// <summary>
+        /// Directory holding DSF plugins
+        /// </summary>
+        public static string PluginDirectory { get; set; } = "/opt/dsf/plugins";
+
+        /// <summary>
         /// Set this to true to prevent M999 from stopping this application
         /// </summary>
         public static bool NoTerminateOnReset { get; set; }
@@ -100,14 +121,35 @@ namespace DuetControlServer
         public static string SpiDevice { get; set; } = "/dev/spidev0.0";
 
         /// <summary>
+        /// SPI Tx and Rx buffer size
+        /// Should not be greater than the kernel spidev buffer size
+        /// </summary>
+        public static int SpiBufferSize { get; set; } = SPI.Communication.Consts.BufferSize;
+
+        /// <summary>
+        /// SPI Transfer Mode 0-3
+        /// </summary>
+        public static int SpiTransferMode { get; set; } = 0;
+
+        /// <summary>
         /// Frequency to use for SPI transfers (in Hz)
         /// </summary>
         public static int SpiFrequency { get; set; } = 8_000_000;
 
         /// <summary>
+        /// Maximum allowed time when waiting for the first SPI transfer (in ms)
+        /// </summary>
+        public static int SpiConnectTimeout { get; set; } = 500;
+
+        /// <summary>
         /// Maximum allowed delay between data exchanges during a full transfer (in ms)
         /// </summary>
         public static int SpiTransferTimeout { get; set; } = 500;
+
+        /// <summary>
+        /// Maximum allowed delay between full transfers (in ms)
+        /// </summary>
+        public static int SpiConnectionTimeout { get; set; } = 4000;
 
         /// <summary>
         /// Maximum number of sequential transfer retries
@@ -143,6 +185,34 @@ namespace DuetControlServer
         /// Maximum space of buffered codes per channel (in bytes)
         /// </summary>
         public static int MaxBufferSpacePerChannel { get; set; } = 1536;
+
+        /// <summary>
+        /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
+        /// </summary>
+        public static int MaxCodeBufferSize { get; set; } = 256;
+
+        /// <summary>
+        /// Maximum supported length of messages to be sent to RepRapFirmware
+        /// </summary>
+        public static int MaxMessageLength { get; set; } = 4096;
+
+        /// <summary>
+        /// List of string chunks that are identified by RepRapFirmware
+        /// </summary>
+        /// <remarks>
+        /// Only if a comment contains one of these identifiers they will be sent to the firmware
+        /// </remarks>
+        public static List<string> FirmwareComments { get; set; } = new List<string>
+        {
+            "printing object",			// slic3r
+            "MESH",						// Cura
+            "process",					// S3D
+            "stop printing object",		// slic3r
+            "layer",					// S3D "; layer 1, z=0.200"
+            "LAYER",					// Ideamaker, Cura (followed by layer number starting at zero)
+            "BEGIN_LAYER_OBJECT z=",	// KISSlicer (followed by Z height)
+            "HEIGHT"					// Ideamaker
+        };
 
         /// <summary>
         /// Interval of object model updates (in ms)
@@ -195,7 +265,7 @@ namespace DuetControlServer
             new Regex(@"filament used\D+(((?<mm>\d+\.?\d*)mm)(\D+)?)+", RegexFlags),        // Slic3r (mm)
             new Regex(@"filament used\D+(((?<m>\d+\.?\d*)m([^m]|$))(\D+)?)+", RegexFlags),  // Cura (m)
             new Regex(@"filament length\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+", RegexFlags),   // Simplify3D (mm)
-            new Regex(@"filament used \[mm\]\D+((?<mm>\d+\.?\d*)(\D+)?)+", RegexFlags),       // Prusa Slicer (mm)
+            new Regex(@"filament used \[mm\]\D+((?<mm>\d+\.?\d*)(\D+)?)+", RegexFlags),     // Prusa Slicer (mm)
             new Regex(@"material\#\d+\D+(?<mm>\d+\.?\d*)", RegexFlags),                     // IdeaMaker (mm)
             new Regex(@"Filament used per extruder:\r\n;\s*(?<name>.+)\s+=\s*(?<mm>[0-9.]+)", RegexFlags)   // Canvas
         };
@@ -217,10 +287,10 @@ namespace DuetControlServer
         /// </summary>
         public static List<Regex> PrintTimeFilters { get; set; } = new List<Regex>
         {
-            new Regex(@"estimated printing time .*= ((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                                     // Slic3r PE
-            new Regex(@"TIME:(?<s>(\d+\.?\d*))", RegexFlags),                                                                                           // Cura
-            new Regex(@"Build time: ((?<h>\d+) hour(s)?\s*)?((?<m>\d+) minute(s)?\s*)?((?<s>(\d+) second(s)?))?", RegexFlags),                                    // Simplify3D
-            new Regex(@"Estimated Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?", RegexFlags)   // KISSlicer and Canvas
+            new Regex(@"estimated printing time .*= ((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                                              // Slic3r PE
+            new Regex(@"TIME:(?<s>(\d+\.?\d*))", RegexFlags),                                                                                                       // Cura
+            new Regex(@"Build time: ((?<h>\d+) hour(s)?\s*)?((?<m>\d+) minute(s)?\s*)?((?<s>(\d+) second(s)?))?", RegexFlags),                                      // Simplify3D
+            new Regex(@"Estimated Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?", RegexFlags)     // KISSlicer and Canvas
         };
 
         /// <summary>
@@ -254,10 +324,8 @@ namespace DuetControlServer
                     Console.WriteLine("-r, --no-reset-stop: Do not terminate this application when M999 has been processed");
                     Console.WriteLine("-S, --socket-directory: Specify the UNIX socket directory");
                     Console.WriteLine("-s, --socket-file: Specify the UNIX socket file");
-                    Console.WriteLine("-u, --socket-user <user>: Specify the owning user of the UNIX socket file");
-                    Console.WriteLine("-g, --socket-group <group>: Specify the owning group of the UNIX socket file");
                     Console.WriteLine("-b, --base-directory: Set the virtual SD card base directory");
-                    // Console.WriteLine("--no-spi-task: Do NOT start the SPI task. This is only intended for development purposes!");
+                    Console.WriteLine("-D, --no-spi: Do NOT connect over SPI. Not recommended, use at your own risk!");
                     Console.WriteLine("-h, --help: Display this text");
                     return false;
                 }
@@ -341,9 +409,9 @@ namespace DuetControlServer
                 {
                     NoTerminateOnReset = true;
                 }
-                else if (arg == "--no-spi-task")
+                else if (arg == "-D" || arg == "--no-spi")
                 {
-                    NoSpiTask = true;
+                    NoSpi = true;
                 }
                 lastArg = arg;
             }
@@ -444,12 +512,27 @@ namespace DuetControlServer
                             JsonRegexListConverter regexListConverter = new JsonRegexListConverter();
                             property.SetValue(null, regexListConverter.Read(ref reader, typeof(List<Regex>), null));
                         }
+                        else if (property.PropertyType == typeof(List<string>))
+                        {
+                            List<string> list = new List<string>();
+                            while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+                            {
+                                list.Add(reader.GetString());
+                            }
+                            property.SetValue(null, list);
+                        }
                         else
                         {
                             throw new JsonException($"Bad list type: {property.PropertyType.Name}");
                         }
                         break;
                 }
+            }
+
+            if (!NoSpi && (SpiDevice == "/dev/null" || GpioChipDevice == "/dev/null"))
+            {
+                // Do NOT start the SPI subsystem if one of the used devices is disabled
+                NoSpi = true;
             }
         }
 
@@ -502,6 +585,16 @@ namespace DuetControlServer
 
                         JsonRegexListConverter regexListConverter = new JsonRegexListConverter();
                         regexListConverter.Write(writer, regexList, null);
+                    }
+                    else if (value is List<string> stringList)
+                    {
+                        writer.WritePropertyName(property.Name);
+                        writer.WriteStartArray();
+                        foreach (string item in stringList)
+                        {
+                            writer.WriteStringValue(item);
+                        }
+                        writer.WriteEndArray();
                     }
                     else if (value is LogLevel logLevelValue)
                     {

@@ -1,4 +1,4 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.ObjectModel;
 using DuetControlServer.FileExecution;
 using DuetControlServer.Files;
 using DuetControlServer.Model;
@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.Utility
 {
@@ -44,9 +45,16 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Initialize this class
         /// </summary>
-        public static void Init()
+        /// <returns>Asynchronous task</returns>
+        public static async Task Init()
         {
-            string filename = FilePath.ToPhysicalAsync(FilamentsCsvFile, FileDirectory.System).Result;
+            if (Settings.NoSpi)
+            {
+                // Do not deal with filament mapping if no SPI task is running
+                return;
+            }
+
+            string filename = await FilePath.ToPhysicalAsync(FilamentsCsvFile, FileDirectory.System);
             if (File.Exists(filename))
             {
                 using FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read);
@@ -56,10 +64,10 @@ namespace DuetControlServer.Utility
                 if (line != null && line.StartsWith(FilamentsCsvHeader))
                 {
                     // Second line holds the CSV column headers...
-                    _ = reader.ReadLine();
+                    _ = await reader.ReadLineAsync();
 
                     // This is then followed by the actual mapping
-                    while ((line = reader.ReadLine()) != null)
+                    while ((line = await reader.ReadLineAsync()) != null)
                     {
                         string[] args = line.Split(',');
                         if (args.Length == 2 && int.TryParse(args[0], out int extruder) && extruder >= 0)
@@ -143,6 +151,20 @@ namespace DuetControlServer.Utility
                             SaveMapping();
                         }
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Send the current filament mapping to RRF
+        /// </summary>
+        public static void RefreshMapping()
+        {
+            lock (_filamentMapping)
+            {
+                foreach (int extruder in _filamentMapping.Keys)
+                {
+                    SPI.Interface.AssignFilament(extruder, _filamentMapping[extruder]);
                 }
             }
         }

@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.FileExecution;
 using DuetControlServer.Files;
@@ -33,7 +33,29 @@ namespace DuetControlServer.SPI
         private static int _bytesReserved = 0, _bufferSpace = 0;
 
         // Object model queries
-        private static readonly Queue<Tuple<string, string>> _pendingModelQueries = new Queue<Tuple<string, string>>();
+        private sealed class PendingModelQuery
+        {
+            /// <summary>
+            /// Key to query
+            /// </summary>
+            public string Key { get; set; }
+
+            /// <summary>
+            /// Flags to query
+            /// </summary>
+            public string Flags { get; set; }
+
+            /// <summary>
+            /// Whether the model query has been sent
+            /// </summary>
+            public bool QuerySent { get; set; }
+
+            /// <summary>
+            /// Task to complete when the query has finished
+            /// </summary>
+            public TaskCompletionSource<byte[]> TCS { get; } = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+        private static readonly Queue<PendingModelQuery> _pendingModelQueries = new Queue<PendingModelQuery>();
         private static DateTime _lastQueryTime = DateTime.Now;
 
         // Expression evaluation requests
@@ -57,7 +79,7 @@ namespace DuetControlServer.SPI
         private static TaskCompletionSource<object> _firmwareResetRequest;
 
         // Miscellaneous requests
-        private static readonly Queue<Tuple<int, string>> _extruderFilamentUpdates = new Queue<Tuple<int, string>>();
+        private static readonly Dictionary<int, string> _extruderFilamentMapping = new Dictionary<int, string>();
         private static readonly AsyncLock _printStopppedReasonLock = new AsyncLock();
         private static PrintStoppedReason? _printStoppedReason;
         private static volatile bool _printStarted, _assignFilaments;
@@ -90,12 +112,20 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="key">Key to request</param>
         /// <param name="flags">Object model flags</param>
-        public static void RequestObjectModel(string key, string flags)
+        /// <returns>Deserialized JSON document</returns>
+        public static Task<byte[]> RequestObjectModel(string key, string flags)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
+            PendingModelQuery query = new PendingModelQuery { Key = key, Flags = flags };
             lock (_pendingModelQueries)
             {
-                _pendingModelQueries.Enqueue(new Tuple<string, string>(key, flags));
+                _pendingModelQueries.Enqueue(query);
             }
+            return query.TCS.Task;
         }
 
         /// <summary>
@@ -105,9 +135,13 @@ namespace DuetControlServer.SPI
         /// <param name="expression">Expression to evaluate</param>
         /// <returns>Result of the evaluated expression</returns>
         /// <exception cref="CodeParserException">Failed to evaluate expression</exception>
-        /// <exception cref="InvalidOperationException">Incompatible firmware version</exception>
+        /// <exception cref="InvalidOperationException">Incompatible firmware version or not connected over SPI</exception>
         public static Task<object> EvaluateExpression(CodeChannel channel, string expression)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
             if (DataTransfer.ProtocolVersion == 1)
             {
                 throw new InvalidOperationException("Incompatible firmware version");
@@ -136,8 +170,14 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <returns>Heightmap in use</returns>
         /// <exception cref="OperationCanceledException">Operation could not finish</exception>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         public static Task<Heightmap> GetHeightmap()
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             TaskCompletionSource<Heightmap> tcs;
             using (_heightmapLock.Lock(Program.CancellationToken))
             {
@@ -161,15 +201,20 @@ namespace DuetControlServer.SPI
         /// <param name="map">Heightmap to set</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation could not finish</exception>
-        /// <exception cref="InvalidOperationException">Heightmap is already being set</exception>
+        /// <exception cref="InvalidOperationException">Heightmap is already being set or not connected over SPI</exception>
         public static Task SetHeightmap(Heightmap map)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             TaskCompletionSource<object> tcs;
             using (_heightmapLock.Lock(Program.CancellationToken))
             {
                 if (_setHeightmapRequest != null)
                 {
-                    throw new InvalidProgramException("Heightmap is already being set");
+                    throw new InvalidOperationException("Heightmap is already being set");
                 }
 
                 tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -182,7 +227,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Get a channel that is currently idle in order to process a priority code
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Idle channel</returns>
         public static Task<CodeChannel> GetIdleChannel() => _channels.GetIdleChannel();
 
         /// <summary>
@@ -197,8 +242,14 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="code">Code to execute</param>
         /// <returns>Asynchronous task</returns>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         public static async Task ProcessCode(Code code)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             if (code.Type == CodeType.MCode && code.MajorNumber == 703)
             {
                 // It is safe to assume that the tools and extruders have been configured at this point.
@@ -219,6 +270,11 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static Task<bool> Flush(CodeChannel channel)
         {
+            if (Settings.NoSpi)
+            {
+                return Task.FromResult(true);
+            }
+
             using (_channels[channel].Lock())
             {
                 return _channels[channel].Flush();
@@ -226,15 +282,38 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Wait for all pending codes on the same stack level as the given code to finish
+        /// Wait for all pending codes on the same stack level as the given code to finish.
+        /// By default this replaces all expressions as well for convinient parsing by the code processors.
         /// </summary>
         /// <param name="code">Code waiting for the flush</param>
+        /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
+        /// <param name="evaluateAll">Evaluate the expressions or only Linux fields if evaluateExpressions is set to true</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static Task<bool> Flush(Code code)
+        public static Task<bool> Flush(Code code, bool evaluateExpressions = true, bool evaluateAll = true)
         {
+            if (Settings.NoSpi)
+            {
+                return Task.FromResult(true);
+            }
+
             using (_channels[code.Channel].Lock())
             {
-                return _channels[code.Channel].Flush(code);
+                return _channels[code.Channel]
+                    .Flush(code)
+                    .ContinueWith(async task =>
+                    {
+                        if (await task)
+                        {
+                            if (evaluateExpressions)
+                            {
+                                // Code is about to be processed internally, evaluate potential expressions
+                                await Model.Expressions.Evaluate(code, evaluateAll);
+                            }
+                            return true;
+                        }
+                        return false;
+                    }, TaskContinuationOptions.RunContinuationsAsynchronously)
+                    .Unwrap();
             }
         }
 
@@ -244,18 +323,19 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         public static async Task EmergencyStop()
         {
-            await Invalidate("Firmware halted");
-
-            Task onFirmwareHalted;
-            using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
+            if (!Settings.NoSpi)
             {
-                if (_firmwareHaltRequest == null)
+                Task onFirmwareHalted;
+                using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
                 {
-                    _firmwareHaltRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    if (_firmwareHaltRequest == null)
+                    {
+                        _firmwareHaltRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    }
+                    onFirmwareHalted = _firmwareHaltRequest.Task;
                 }
-                onFirmwareHalted = _firmwareHaltRequest.Task;
+                await onFirmwareHalted;
             }
-            await onFirmwareHalted;
         }
 
         /// <summary>
@@ -264,41 +344,75 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         public static async Task Reset()
         {
-            await Invalidate("Firmware reset imminent");
-
-            Task onFirmwareReset;
-            using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
+            if (!Settings.NoSpi)
             {
-                if (_firmwareResetRequest == null)
+                Task onFirmwareReset;
+                using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
                 {
-                    _firmwareResetRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    if (_firmwareResetRequest == null)
+                    {
+                        _firmwareResetRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    }
+                    onFirmwareReset = _firmwareResetRequest.Task;
                 }
-                onFirmwareReset = _firmwareResetRequest.Task;
+                await onFirmwareReset;
             }
-            await onFirmwareReset;
         }
 
         /// <summary>
         /// Notify the firmware that a file print has started
         /// </summary>
-        public static void SetPrintStarted() => _printStarted = true;
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
+        public static void SetPrintStarted()
+        {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
+            _printStarted = true;
+        }
 
         /// <summary>
         /// Notify the firmware that the file print has been stopped
         /// </summary>
         /// <param name="stopReason">Reason why the print has stopped</param>
         /// <returns>Asynchronous task</returns>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         public static async Task SetPrintStopped(PrintStoppedReason stopReason)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             using (await _printStopppedReasonLock.LockAsync(Program.CancellationToken))
             {
                 _printStoppedReason = stopReason;
             }
+        }
 
-            using (await _channels[CodeChannel.File].LockAsync())
-            {
-                await _channels[CodeChannel.File].AbortFile(true, true);
-            }
+        /// <summary>
+        /// Class representing an acquired movement lock
+        /// </summary>
+        public class MovementLock : IAsyncDisposable
+        {
+            /// <summary>
+            /// Constructor of this class
+            /// </summary>
+            /// <param name="channel">Locked code channel</param>
+            public MovementLock(CodeChannel channel) => _channel = channel;
+
+            /// <summary>
+            /// Locked code channel
+            /// </summary>
+            private readonly CodeChannel _channel;
+
+            /// <summary>
+            /// Called when this instance is being disposed
+            /// </summary>
+            /// <returns>Asynchronous task</returns>
+            public async ValueTask DisposeAsync() => await UnlockAll(_channel);
         }
 
         /// <summary>
@@ -306,11 +420,28 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Code channel acquiring the lock</param>
         /// <returns>Whether the resource could be locked</returns>
-        public static Task<bool> LockMovementAndWaitForStandstill(CodeChannel channel)
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
+        /// <exception cref="OperationCanceledException">Failed to get movement lock</exception>
+        public static Task<IAsyncDisposable> LockMovementAndWaitForStandstill(CodeChannel channel)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             using (_channels[channel].Lock())
             {
-                return _channels[channel].LockMovementAndWaitForStandstill();
+                return _channels[channel]
+                    .LockMovementAndWaitForStandstill()
+                    .ContinueWith(async task =>
+                    {
+                        if (await task)
+                        {
+                            return (IAsyncDisposable)(new MovementLock(channel));
+                        }
+                        throw new OperationCanceledException();
+                    }, TaskContinuationOptions.RunContinuationsAsynchronously)
+                    .Unwrap();
             }
         }
 
@@ -319,8 +450,14 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Channel holding the resources</param>
         /// <returns>Asynchronous task</returns>
-        public static Task UnlockAll(CodeChannel channel)
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
+        private static Task UnlockAll(CodeChannel channel)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             using (_channels[channel].Lock())
             {
                 return _channels[channel].UnlockAll();
@@ -332,10 +469,15 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="iapStream">IAP binary</param>
         /// <param name="firmwareStream">Firmware binary</param>
-        /// <exception cref="InvalidOperationException">Firmware is already being updated</exception>
+        /// <exception cref="InvalidOperationException">Firmware is already being updated or not connected over SPI</exception>
         /// <returns>Asynchronous task</returns>
         public static async Task UpdateFirmware(Stream iapStream, Stream firmwareStream)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
             TaskCompletionSource<object> tcs;
             using (await _firmwareUpdateLock.LockAsync(Program.CancellationToken))
             {
@@ -362,47 +504,44 @@ namespace DuetControlServer.SPI
             {
                 Model.Provider.Get.State.Status = MachineStatus.Updating;
             }
-            DataTransfer.Updating = true;
 
-            try
+            // Get the CRC16 checksum of the firmware binary
+            ushort crc16 = CRC16.Calculate(_firmwareStream);
+
+            // Send the IAP binary to the firmware
+            _logger.Info("Flashing IAP binary");
+            bool dataSent;
+            do
             {
-                // Get the CRC16 checksum of the firmware binary
-                byte[] firmwareBlob = new byte[_firmwareStream.Length];
-                await _firmwareStream.ReadAsync(firmwareBlob, 0, (int)_firmwareStream.Length);
-                ushort crc16 = CRC16.Calculate(firmwareBlob);
-
-                // Send the IAP binary to the firmware
-                _logger.Info("Flashing IAP binary");
-                bool dataSent;
-                do
-                {
-                    dataSent = DataTransfer.WriteIapSegment(_iapStream);
-                    DataTransfer.PerformFullTransfer();
-                    if (_logger.IsDebugEnabled)
-                    {
-                        Console.Write('.');
-                    }
-                }
-                while (dataSent);
+                dataSent = DataTransfer.WriteIapSegment(_iapStream);
                 if (_logger.IsDebugEnabled)
                 {
-                    Console.WriteLine();
+                    Console.Write('.');
+                }
+            }
+            while (dataSent);
+            if (_logger.IsDebugEnabled)
+            {
+                Console.WriteLine();
+            }
+
+            // Start the IAP binary
+            DataTransfer.StartIap();
+
+            // Send the firmware binary to the IAP program
+            int numRetries = 0;
+            do
+            {
+                if (numRetries != 0)
+                {
+                    _logger.Error("Firmware checksum verification failed");
                 }
 
-                // Start the IAP binary
-                DataTransfer.StartIap();
+                _logger.Info("Flashing RepRapFirmware");
+                _firmwareStream.Seek(0, SeekOrigin.Begin);
 
-                // Send the firmware binary to the IAP program
-                int numRetries = 0;
-                do
+                try
                 {
-                    if (numRetries != 0)
-                    {
-                        _logger.Error("Firmware checksum verification failed");
-                    }
-
-                    _logger.Info("Flashing RepRapFirmware");
-                    _firmwareStream.Seek(0, SeekOrigin.Begin);
                     while (DataTransfer.FlashFirmwareSegment(_firmwareStream))
                     {
                         if (_logger.IsDebugEnabled)
@@ -414,28 +553,29 @@ namespace DuetControlServer.SPI
                     {
                         Console.WriteLine();
                     }
-
-                    _logger.Info("Verifying checksum");
                 }
-                while (++numRetries < 3 && !DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
-
-                if (numRetries == 3)
+                catch
                 {
-                    // Failed to flash the firmware
-                    await Logger.LogOutput(MessageType.Error, "Could not flash the firmware binary after 3 attempts. Please install it manually via bossac.");
+                    await Logger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
                     Program.CancelSource.Cancel();
+                    throw;
                 }
-                else
-                {
-                    // Wait for the IAP binary to restart the controller
-                    await DataTransfer.WaitForIapReset();
-                    _logger.Info("Firmware update successful");
-                }
+
+                _logger.Info("Verifying checksum");
             }
-            finally
+            while (++numRetries < 3 && !DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
+
+            if (numRetries == 3)
             {
-                DataTransfer.Updating = false;
-                // Machine state is reset when the next status response is processed
+                // Failed to flash the firmware
+                await Logger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
+                Program.CancelSource.Cancel();
+            }
+            else
+            {
+                // Wait for the IAP binary to restart the controller
+                await DataTransfer.WaitForIapReset();
+                _logger.Info("Firmware update successful");
             }
         }
 
@@ -444,11 +584,17 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="extruder">Extruder drive</param>
         /// <param name="filament">Loaded filament</param>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         public static void AssignFilament(int extruder, string filament)
         {
-            lock (_extruderFilamentUpdates)
+            if (Settings.NoSpi)
             {
-                _extruderFilamentUpdates.Enqueue(new Tuple<int, string>(extruder, filament));
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
+            lock (_extruderFilamentMapping)
+            {
+                _extruderFilamentMapping[extruder] = filament;
             }
         }
 
@@ -457,14 +603,18 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="flags">Message flags</param>
         /// <param name="message">Message content</param>
-        /// <exception cref="InvalidOperationException">Incompatible firmware</exception>
+        /// <exception cref="InvalidOperationException">Incompatible firmware or not connected over SPI</exception>
         public static void SendMessage(MessageTypeFlags flags, string message)
         {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
             if (DataTransfer.ProtocolVersion == 1)
             {
                 throw new InvalidOperationException("Incompatible firmware version");
             }
-            if (message.Length > Consts.MaxMessageLength)
+            if (message.Length > Settings.MaxMessageLength)
             {
                 throw new ArgumentException($"{nameof(message)} too long");
             }
@@ -476,45 +626,71 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Perform communication with the RepRapFirmware controller
+        /// Abort all files in RRF on the given channel
+        /// </summary>
+        /// <param name="channel">Channel where all the files have been aborted</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
+        public static async Task AbortAll(CodeChannel channel)
+        {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
+            using (await _channels[channel].LockAsync())
+            {
+                await _channels[channel].AbortFiles(true, false);
+            }
+        }
+
+        /// <summary>
+        /// Perform communication with the RepRapFirmware controller over SPI
         /// </summary>
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
-            if (Settings.NoSpiTask)
+            if (Settings.NoSpi)
             {
                 await Task.Delay(-1, Program.CancellationToken);
-                return;
             }
 
             do
             {
+                bool skipChannels = false;
                 using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
                 {
                     // Check if an emergency stop has been requested
-                    if (_firmwareHaltRequest != null && DataTransfer.WriteEmergencyStop())
+                    if (_firmwareHaltRequest != null)
                     {
-                        _logger.Warn("Emergency stop");
-                        DataTransfer.PerformFullTransfer();
-
-                        _firmwareHaltRequest.SetResult(null);
-                        _firmwareHaltRequest = null;
+                        await Invalidate("Firmware halted");
+                        if (DataTransfer.WriteEmergencyStop())
+                        {
+                            _logger.Warn("Emergency stop");
+                            _firmwareHaltRequest.SetResult(null);
+                            _firmwareHaltRequest = null;
+                        }
+                        skipChannels = true;
                     }
 
                     // Check if a firmware reset has been requested
-                    if (_firmwareResetRequest != null && DataTransfer.WriteReset())
+                    if (_firmwareResetRequest != null)
                     {
-                        _logger.Warn("Resetting controller");
-                        DataTransfer.PerformFullTransfer();
-
-                        _firmwareResetRequest.SetResult(null);
-                        _firmwareResetRequest = null;
-
-                        if (!Settings.NoTerminateOnReset)
+                        await Invalidate("Firmware reset imminent");
+                        if (DataTransfer.WriteReset())
                         {
-                            // Wait for the program to terminate and don't perform any extra transfers
-                            await Task.Delay(-1, Program.CancellationToken);
+                            _logger.Warn("Resetting controller");
+                            DataTransfer.PerformFullTransfer();
+                            _firmwareResetRequest.SetResult(null);
+                            _firmwareResetRequest = null;
+
+                            if (!Settings.NoTerminateOnReset)
+                            {
+                                // Wait for the program to terminate and don't perform any extra transfers
+                                await Task.Delay(-1, Program.CancellationToken);
+                            }
                         }
+                        skipChannels = true;
                     }
                 }
 
@@ -528,7 +704,6 @@ namespace DuetControlServer.SPI
                         try
                         {
                             await PerformFirmwareUpdate();
-
                             _firmwareUpdateRequest?.SetResult(null);
                             _firmwareUpdateRequest = null;
                         }
@@ -537,17 +712,20 @@ namespace DuetControlServer.SPI
                             _firmwareUpdateRequest?.SetException(e);
                             _firmwareUpdateRequest = null;
 
-                            if (e is OperationCanceledException)
+                            if (!Settings.UpdateOnly && Settings.NoTerminateOnReset && e is OperationCanceledException)
                             {
                                 _logger.Debug(e, "Firmware update cancelled");
                             }
-                            else
-                            {
-                                throw;
-                            }
+                            throw;
                         }
 
                         _iapStream = _firmwareStream = null;
+
+                        if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
+                        {
+                            // Wait for the requesting task to complete, it will terminate DCS next
+                            await Task.Delay(-1, Program.CancellationToken);
+                        }
                     }
                 }
 
@@ -595,19 +773,20 @@ namespace DuetControlServer.SPI
                 }
 
                 // Process incoming packets
+                bool skipDelay = false;
                 for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
                     PacketHeader? packet;
 
                     try
                     {
-                        packet = DataTransfer.ReadPacket();
+                        packet = DataTransfer.ReadNextPacket();
                         if (packet == null)
                         {
                             _logger.Error("Read invalid packet");
                             break;
                         }
-                        await ProcessPacket(packet.Value);
+                        skipDelay |= await ProcessPacket(packet.Value);
                     }
                     catch (ArgumentOutOfRangeException)
                     {
@@ -618,12 +797,15 @@ namespace DuetControlServer.SPI
                 _bytesReserved = 0;
 
                 // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
-                await _channels.Run();
+                if (!skipChannels)
+                {
+                    skipDelay |= await _channels.Run();
+                }
 
                 // Request object model updates
-                if (DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
+                if (DataTransfer.ProtocolVersion == 1)
                 {
-                    if (DataTransfer.ProtocolVersion == 1)
+                    if (DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
                     {
                         using (await Model.Provider.AccessReadOnlyAsync())
                         {
@@ -634,24 +816,15 @@ namespace DuetControlServer.SPI
                             }
                         }
                     }
-                    else
+                }
+                else
+                {
+                    lock (_pendingModelQueries)
                     {
-                        bool objectModelQueried = false;
-                        lock (_pendingModelQueries)
+                        if (_pendingModelQueries.TryPeek(out PendingModelQuery query) &&
+                            !query.QuerySent && DataTransfer.WriteGetObjectModel(query.Key, query.Flags))
                         {
-                            // Query specific object model values on demand
-                            if (_pendingModelQueries.TryPeek(out Tuple<string, string> modelQuery) &&
-                                DataTransfer.WriteGetObjectModel(modelQuery.Item1, modelQuery.Item2))
-                            {
-                                objectModelQueried = true;
-                                _pendingModelQueries.Dequeue();
-                            }
-                        }
-
-                        if (!objectModelQueried && DataTransfer.WriteGetObjectModel(string.Empty, "d99fn"))
-                        {
-                            // Query live values in regular intervals
-                            _lastQueryTime = DateTime.Now;
+                            skipDelay = query.QuerySent = true;
                         }
                     }
                 }
@@ -666,7 +839,7 @@ namespace DuetControlServer.SPI
                         {
                             if (DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression))
                             {
-                                request.Written = true;
+                                skipDelay = request.Written = true;
 
                                 numEvaluationsSent++;
                                 if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
@@ -697,13 +870,13 @@ namespace DuetControlServer.SPI
                 // Update filament assignment per extruder drive. This must happen when config.g has finished or M701 is requested
                 if (!Macro.RunningConfig || _assignFilaments)
                 {
-                    lock (_extruderFilamentUpdates)
+                    lock (_extruderFilamentMapping)
                     {
-                        while (_extruderFilamentUpdates.TryPeek(out Tuple<int, string> filamentMapping))
+                        foreach (int extruder in _extruderFilamentMapping.Keys)
                         {
-                            if (DataTransfer.WriteAssignFilament(filamentMapping.Item1, filamentMapping.Item2))
+                            if (DataTransfer.WriteAssignFilament(extruder, _extruderFilamentMapping[extruder]))
                             {
-                                _extruderFilamentUpdates.Dequeue();
+                                _extruderFilamentMapping.Remove(extruder);
                             }
                             else
                             {
@@ -716,14 +889,8 @@ namespace DuetControlServer.SPI
 
                 // Do another full SPI transfe
                 DataTransfer.PerformFullTransfer();
-                _channels.ResetBlockedChannels();
 
                 // Wait a moment unless instructions are being sent rapidly to RRF
-                bool skipDelay;
-                using (await Model.Provider.AccessReadOnlyAsync())
-                {
-                    skipDelay = Model.Provider.Get.State.Status == MachineStatus.Updating;
-                }
                 if (!skipDelay)
                 {
                     await Task.Delay(Settings.SpiPollDelay, Program.CancellationToken);
@@ -753,21 +920,26 @@ namespace DuetControlServer.SPI
         /// Process a packet from RepRapFirmware
         /// </summary>
         /// <param name="packet">Received packet</param>
-        /// <returns>Asynchronous task</returns>
-        private static Task ProcessPacket(PacketHeader packet)
+        /// <returns>Whether a response can be expected that is not channel-related</returns>
+        private static async Task<bool> ProcessPacket(PacketHeader packet)
         {
             Request request = (Request)packet.Request;
 
             if (Settings.UpdateOnly && request != Request.ObjectModel)
             {
                 // Don't process any requests except for object model responses if only the firmware is supposed to be updated
-                return Task.CompletedTask;
+                return false;
             }
 
             switch (request)
             {
                 case Request.ResendPacket:
-                    DataTransfer.ResendPacket(packet);
+                    DataTransfer.ResendPacket(packet, out Communication.LinuxRequests.Request linuxRequest);
+                    if (linuxRequest != Communication.LinuxRequests.Request.LockMovementAndWaitForStandstill)
+                    {
+                        // It's expected that RRF will need a moment to lock the movement but report other resend requests
+                        _logger.Warn("Resending packet #{0} (request {1})", packet.Id, linuxRequest);
+                    }
                     break;
                 case Request.ObjectModel:
                     HandleObjectModel();
@@ -776,29 +948,43 @@ namespace DuetControlServer.SPI
                     HandleCodeBufferUpdate();
                     break;
                 case Request.Message:
-                    return HandleMessage();
+                    await HandleMessage();
+                    break;
                 case Request.ExecuteMacro:
-                    return HandleMacroRequest();
+                    await HandleMacroRequest();
+                    break;
                 case Request.AbortFile:
-                    return HandleAbortFileRequest();
-                // StackEvent is no longer supported
+                    await HandleAbortFileRequest();
+                    break;
                 case Request.PrintPaused:
-                    return HandlePrintPaused();
+                    await HandlePrintPaused();
+                    break;
                 case Request.HeightMap:
-                    return HandleHeightMap();
+                    await HandleHeightMap();
+                    break;
                 case Request.Locked:
-                    return HandleResourceLocked();
+                    await HandleResourceLocked();
+                    break;
                 case Request.FileChunk:
-                    return HandleFileChunkRequest();
+                    await HandleFileChunkRequest();
+                    return true;
                 case Request.EvaluationResult:
                     HandleEvaluationResult();
                     break;
                 case Request.DoCode:
-                    return HandleDoCode();
+                    await HandleDoCode();
+                    break;
                 case Request.WaitForAcknowledgement:
-                    return HandleWaitForAcknowledgement();
+                    await HandleWaitForAcknowledgement();
+                    break;
+                case Request.MacroFileClosed:
+                    await HandleMacroFileClosed();
+                    break;
+                case Request.MessageAcknowledged:
+                    await HandleMessageAcknowledgement();
+                    break;
             }
-            return Task.CompletedTask;
+            return false;
         }
 
         /// <summary>
@@ -808,15 +994,25 @@ namespace DuetControlServer.SPI
         private static void HandleObjectModel()
         {
             _logger.Trace("Received object model");
-            if (DataTransfer.ProtocolVersion == 1)
+            if (DataTransfer.ProtocolVersion > 1)
             {
-                DataTransfer.ReadLegacyConfigResponse(out ReadOnlySpan<byte> json);
-                Model.Updater.ProcessResponse(json);
+                DataTransfer.ReadObjectModel(out ReadOnlySpan<byte> json);
+                lock (_pendingModelQueries)
+                {
+                    if (_pendingModelQueries.TryDequeue(out PendingModelQuery query))
+                    {
+                        query.TCS.SetResult(json.ToArray());
+                    }
+                    else
+                    {
+                        _logger.Warn("Failed to find query for object model response");
+                    }
+                }
             }
             else
             {
-                DataTransfer.ReadObjectModel(out ReadOnlySpan<byte> json);
-                Model.Updater.ProcessResponse(json);
+                DataTransfer.ReadLegacyConfigResponse(out ReadOnlySpan<byte> json);
+                _ = Model.Updater.ProcessLegacyConfigResponse(json.ToArray());
             }
         }
 
@@ -845,7 +1041,7 @@ namespace DuetControlServer.SPI
             _logger.Trace("Received message [{0}] {1}", flags, reply);
 
             // Deal with log messages
-            if (flags.HasFlag(MessageTypeFlags.LogMessage))
+            if ((flags & MessageTypeFlags.LogOff) != MessageTypeFlags.LogOff)
             {
                 _partialLogMessage += reply;
                 if (!flags.HasFlag(MessageTypeFlags.PushFlag))
@@ -855,31 +1051,36 @@ namespace DuetControlServer.SPI
                         MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                                             : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                                 : MessageType.Success;
-                        await Logger.Log(type, _partialLogMessage);
+                        LogLevel level = flags.HasFlag(MessageTypeFlags.LogOff) ? LogLevel.Off
+                                            : flags.HasFlag(MessageTypeFlags.LogWarn) ? LogLevel.Warn
+                                                : flags.HasFlag(MessageTypeFlags.LogInfo) ? LogLevel.Info
+                                                    : LogLevel.Debug;
+                        await Logger.Log(level, type, _partialLogMessage.TrimEnd());
                     }
                     _partialLogMessage = null;
                 }
             }
 
             // Deal with generic replies
-            if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage ||
-                flags == MessageTypeFlags.LogMessage || flags == (MessageTypeFlags.LogMessage | MessageTypeFlags.PushFlag))
+            if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage)
             {
                 await OutputGenericMessage(flags, reply);
                 return;
             }
 
             // Check if this is a code reply
-            bool replyHandled = false;
-            if (!replyHandled && flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
+            if (flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
             {
-                replyHandled = await _channels.HandleReply(flags, reply);
+                if (!await _channels.HandleReply(flags, reply))
+                {
+                    // Must be a left-over error message...
+                    await OutputGenericMessage(flags, reply);
+                }
             }
-
-            if (!replyHandled)
+            else
             {
-                // Must be a left-over error message...
-                await OutputGenericMessage(flags, reply);
+                // Unhandled?
+                _logger.Debug(reply);
             }
         }
 
@@ -899,7 +1100,7 @@ namespace DuetControlServer.SPI
                     MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                                         : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                             : MessageType.Success;
-                    await Logger.LogOutput(type, _partialGenericMessage.TrimEnd());
+                    await Model.Provider.Output(type, _partialGenericMessage.TrimEnd());
                 }
                 _partialGenericMessage = null;
             }
@@ -911,12 +1112,12 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         private static async Task HandleMacroRequest()
         {
-            DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool reportMissing, out bool fromCode, out string filename);
+            DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool fromCode, out string filename);
             _logger.Trace("Received macro request for file {0} on channel {1}", filename, channel);
 
             using (await _channels[channel].LockAsync())
             {
-                await _channels[channel].DoMacroFile(filename, reportMissing, fromCode);
+                await _channels[channel].DoMacroFile(filename, fromCode);
             }
         }
 
@@ -931,7 +1132,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[channel].LockAsync())
             {
-                await _channels[channel].AbortFile(abortAll, false);
+                await _channels[channel].AbortFiles(abortAll, true);
             }
         }
 
@@ -1003,7 +1204,7 @@ namespace DuetControlServer.SPI
         private static async Task HandleFileChunkRequest()
         {
             DataTransfer.ReadFileChunkRequest(out string filename, out uint offset, out uint maxLength);
-            _logger.Trace("Received file chunk request for {0}, offset {1}, maxLength {2}", filename, offset, maxLength);
+            _logger.Debug("Received file chunk request for {0}, offset {1}, maxLength {2}", filename, offset, maxLength);
 
             try
             {
@@ -1067,6 +1268,10 @@ namespace DuetControlServer.SPI
             }
         }
 
+        /// <summary>
+        /// Handle a firmware request to wait for a message to be acknowledged
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
         private static async Task HandleWaitForAcknowledgement()
         {
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
@@ -1075,6 +1280,36 @@ namespace DuetControlServer.SPI
             using (await _channels[channel].LockAsync())
             {
                 _channels[channel].WaitForAcknowledgement();
+            }
+        }
+
+        /// <summary>
+        /// Handle a firmwre request that is sent when RRF has internally closed a macro file
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private static async Task HandleMacroFileClosed()
+        {
+            DataTransfer.ReadCodeChannel(out CodeChannel channel);
+            _logger.Trace("Received file closal on channel {0}", channel);
+
+            using (await _channels[channel].LockAsync())
+            {
+                await _channels[channel].MacroFileClosed();
+            }
+        }
+
+        /// <summary>
+        /// Handle a firmwre request that is sent when RRF has succesfully acknowledged a blocking message
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private static async Task HandleMessageAcknowledgement()
+        {
+            DataTransfer.ReadCodeChannel(out CodeChannel channel);
+            _logger.Trace("Received message acknowledgement on channel {0}", channel);
+
+            using (await _channels[channel].LockAsync())
+            {
+                await _channels[channel].MessageAcknowledged();
             }
         }
 
@@ -1103,9 +1338,13 @@ namespace DuetControlServer.SPI
             }
             _bytesReserved = _bufferSpace = 0;
 
-            // Clear object model requests
+            // Resolve pending object model requests
             lock (_pendingModelQueries)
             {
+                foreach (PendingModelQuery query in _pendingModelQueries)
+                {
+                    query.TCS.SetCanceled();
+                }
                 _pendingModelQueries.Clear();
             }
 
@@ -1144,10 +1383,13 @@ namespace DuetControlServer.SPI
             }
 
             // Clear filament assign requests
-            lock (_extruderFilamentUpdates)
+            lock (_extruderFilamentMapping)
             {
-                while (_extruderFilamentUpdates.TryDequeue(out _)) { }
+                _extruderFilamentMapping.Clear();
             }
+
+            // Notify the updater task
+            Model.Updater.ConnectionLost();
 
             // Keep this event in the log...
             if (!string.IsNullOrWhiteSpace(message))

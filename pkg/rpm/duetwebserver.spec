@@ -10,29 +10,20 @@
 
 Name:    duetwebserver
 Version: %{_tversion}
-Release: 901
+Release: %{_release}
 Summary: DSF Web Server
 Group:   3D Printing
 Source0: duetwebserver_%{_tversion}
 License: GPLv3
-URL:     https://github.com/chrishamm/DuetSoftwareFramework
+URL:     https://github.com/Duet3D/DuetSoftwareFramework
 BuildRequires: rpm >= 4.7.2-2
-Requires: duetcontrolserver
-Requires: duetruntime
+Requires: duetcontrolserver >= %{_tversion}
 %systemd_requires
 
 AutoReq:  0
 
 %description
 DSF Web Server
-
-%prep
-%setup -q -T -c -n %{name}-%{version}
-
-%build
-
-%install
-rsync -vaH %{S:0}/. %{buildroot}/
 
 %pre
 if [ $1 -gt 1 ] && systemctl -q is-active %{name}.service ; then

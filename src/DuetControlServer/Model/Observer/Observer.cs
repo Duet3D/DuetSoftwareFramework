@@ -28,9 +28,9 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Add a new element to a property path
         /// </summary>
-        /// <param name="path"></param>
-        /// <param name="toAdd"></param>
-        /// <returns></returns>
+        /// <param name="path">Existing path</param>
+        /// <param name="toAdd">Element(s) to add</param>
+        /// <returns>Combined property path</returns>
         private static object[] AddToPath(object[] path, params object[] toAdd)
         {
             object[] newPath = new object[path.Length + toAdd.Length];

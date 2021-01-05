@@ -1,11 +1,11 @@
 Package: duetsd
-Version: 1.0.6
+Version: 1.1.0
 Architecture: all
-Depends: duetcontrolserver
-Suggests: duetwebcontrol
+Depends: duetsoftwareframework (>= 3.2.0)
+Suggests: duetcontrolserver, duetwebcontrol
 Conflicts: reprapfirmware (<= 1.1.0.0-1)
 Priority: standard
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
-Vcs-Git: https://github.com/chrishamm/DuetSoftwareFramework.git
+Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git
 Description: Virtual SD card directory for the Duet software framework

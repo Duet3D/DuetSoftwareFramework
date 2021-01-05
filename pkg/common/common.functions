@@ -128,6 +128,7 @@ build_progs() {
 	rm -rf $DEST_DIR/duetcontrolserver_$dcsver
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/DuetControlServer/DuetControlServer.csproj
 	mkdir -p $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
+	mkdir -p $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/plugins
 	[ -d $COMMON_DIR/duetcontrolserver/ ] && $RSYNC $COMMON_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
 	[ -d $PACKAGER_DIR/duetcontrolserver/ ] && $RSYNC $PACKAGER_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
 	mv $DEST_DIR/files/DuetControlServer* $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
@@ -146,6 +147,7 @@ build_progs() {
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CodeLogger/CodeLogger.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CustomHttpEndpoint/CustomHttpEndpoint.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/ModelObserver/ModelObserver.csproj
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/PluginManager/PluginManager.csproj
 	mkdir -p $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	[ -d $COMMON_DIR/duettools/ ] && $RSYNC $COMMON_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
 	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
@@ -153,6 +155,7 @@ build_progs() {
 	mv $DEST_DIR/files/CodeLogger* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	mv $DEST_DIR/files/CustomHttpEndpoint* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 	mv $DEST_DIR/files/ModelObserver* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
+	mv $DEST_DIR/files/PluginManager* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duetruntime_$dcsver
 	mkdir -p $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin
@@ -169,17 +172,18 @@ build_sd() {
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/firmware
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/gcodes
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/macros
+	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/menu
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/sys
 	[ -d $COMMON_DIR/duetsd/ ] && $RSYNC $COMMON_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
 	[ -d $PACKAGER_DIR/duetsd/ ] && $RSYNC $PACKAGER_DIR/duetsd/. $DEST_DIR/duetsd_$sdver/ || :
 }
 
 build_dwc() {
-	echo "Building DWC2..."
+	echo "Building DWC..."
 
 	if [ ! -d $DEST_DIR/DuetWebControl ] ; then
 		echo "- Cloning repository..."
-		git clone -q --single-branch --branch master https://github.com/chrishamm/DuetWebControl.git $DEST_DIR/DuetWebControl
+		git clone -q --single-branch --branch $(git branch --show-current) https://github.com/Duet3D/DuetWebControl.git $DEST_DIR/DuetWebControl
 	else
 		echo "- Using existing repository in $DEST_DIR/DuetWebControl"
 	fi
@@ -196,14 +200,14 @@ build_dwc() {
 	>/dev/null popd
 
 	rm -rf $DEST_DIR/duetwebcontrol_$dwcver
-	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc2
+	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc
 	[ -d $COMMON_DIR/duetwebcontrol/ ] && $RSYNC $COMMON_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
 	[ -d $PACKAGER_DIR/duetwebcontrol/ ] && $RSYNC $PACKAGER_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
 
-	unzip -q $DEST_DIR/DuetWebControl/dist/DuetWebControl-SBC.zip -d $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc2
+	unzip -q $DEST_DIR/DuetWebControl/dist/DuetWebControl-SBC.zip -d $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc
 	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/sd
 	>/dev/null pushd $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/sd
-	ln -s ../dwc2 www
+	ln -s ../dwc www
 	>/dev/null popd
 
 }

@@ -1,6 +1,6 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.Connection;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using System;
 using System.Diagnostics;

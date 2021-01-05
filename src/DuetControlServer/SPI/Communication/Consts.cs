@@ -12,14 +12,19 @@ namespace DuetControlServer.SPI.Communication
         public const byte FormatCode = 0x5F;
 
         /// <summary>
+        /// Format code indicating that RRF is generally available but has not processed the last transfer yet
+        /// </summary>
+        public const byte FormatCodeStandalone = 0x60;
+
+        /// <summary>
         /// Unique format code that is not used anywhere else
         /// </summary>
         public const byte InvalidFormatCode = 0xC9;
-        
+
         /// <summary>
         /// Used protocol version. This is incremented whenever the protocol details change
         /// </summary>
-        public const ushort ProtocolVersion = 2;
+        public const ushort ProtocolVersion = 4;
 
         /// <summary>
         /// Size of a packet transfer buffer
@@ -27,19 +32,9 @@ namespace DuetControlServer.SPI.Communication
         public const int BufferSize = 8192;
 
         /// <summary>
-        /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
-        /// </summary>
-        public const int MaxCodeBufferSize = 256;
-
-        /// <summary>
         /// Maximum length of a whole-line comment to send to RRF
         /// </summary>
         public const int MaxCommentLength = 100;
-
-        /// <summary>
-        /// Maximum supported length of messages to be sent to RepRapFirmware
-        /// </summary>
-        public const int MaxMessageLength = 4096;
 
         /// <summary>
         /// Maximum number of evaluation requests to send per transfer

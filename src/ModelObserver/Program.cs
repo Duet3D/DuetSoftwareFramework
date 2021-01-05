@@ -50,7 +50,9 @@ namespace ModelObserver
 
             // Connect to DCS
             using SubscribeConnection connection = new SubscribeConnection();
+#pragma warning disable CS0612 // Type or member is obsolete
             await connection.Connect(SubscriptionMode.Patch, filter, socketPath);
+#pragma warning restore CS0612 // Type or member is obsolete
 
             if (!quiet)
             {
@@ -62,7 +64,7 @@ namespace ModelObserver
             {
                 try
                 {
-                    using JsonDocument patch = await connection.GetMachineModelPatch();
+                    using JsonDocument patch = await connection.GetObjectModelPatch();
                     Console.WriteLine(GetIndentedJson(patch));
                 }
                 catch (SocketException)

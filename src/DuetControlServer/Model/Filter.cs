@@ -1,4 +1,4 @@
-﻿using DuetAPI.Machine;
+﻿using DuetAPI.ObjectModel;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -19,17 +19,27 @@ namespace DuetControlServer.Model
         private static readonly Regex _indexRegex = new Regex(@"(.*)\[([\d,*]+)\]");
 
         /// <summary>
-        /// Convert multiple filter strings into an object array that can be used to traverse the object model
+        /// Convert delimited filter strings into an object array that can be used to traverse the object model
         /// </summary>
         /// <param name="filters">Delimited filter expressions</param>
         /// <returns>Object array</returns>
         public static object[][] ConvertFilters(string filters)
         {
             string[] filterStrings = filters.Split(',', '|', '\r', '\n', ' ');
+            return ConvertFilters(filterStrings);
+        }
+
+        /// <summary>
+        /// Convert multiple filter strings into an object array that can be used to traverse the object model
+        /// </summary>
+        /// <param name="filters">Delimited filter expressions</param>
+        /// <returns>Object array</returns>
+        public static object[][] ConvertFilters(IEnumerable<string> filters)
+        {
             List<object[]> convertedFilters = new List<object[]>();
-            for (int i = 0; i < filterStrings.Length; i++)
+            foreach (string filter in filters)
             {
-                object[] convertedFilter = ConvertFilter(filterStrings[i], false);
+                object[] convertedFilter = ConvertFilter(filter, false);
                 if (convertedFilter.Length > 0)
                 {
                     convertedFilters.Add(convertedFilter);
@@ -37,7 +47,6 @@ namespace DuetControlServer.Model
             }
             return convertedFilters.ToArray();
         }
-
         /// <summary>
         /// Convert a filter string into an object array that can be used to traverse the object model
         /// </summary>

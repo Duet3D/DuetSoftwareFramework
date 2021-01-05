@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
-using DuetAPI.Machine;
+using DuetAPI.ObjectModel;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Files
@@ -34,6 +35,8 @@ namespace DuetControlServer.Files
             {
                 await ParseHeader(reader, result);
                 await ParseFooter(reader, result);
+                await ParseThumbnails(reader, result);
+
                 if (result.FirstLayerHeight + result.LayerHeight > 0F && result.Height > 0F)
                 {
                     result.NumLayers = (int)Math.Round((result.Height - result.FirstLayerHeight) / result.LayerHeight) + 1;
@@ -54,7 +57,7 @@ namespace DuetControlServer.Files
             CodeParserBuffer codeParserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
 
             bool inRelativeMode = false, lastCodeHadInfo = false, gotNewInfo = false;
-            long fileReadLimit = Math.Min(Settings.FileInfoReadLimitHeader + Settings.FileBufferSize, reader.BaseStream.Length);
+            long fileReadLimit = Math.Min(Settings.FileInfoReadLimitHeader, reader.BaseStream.Length);
             while (codeParserBuffer.GetPosition(reader) < fileReadLimit)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
@@ -388,18 +391,19 @@ namespace DuetControlServer.Files
                     long seconds = 0;
                     foreach (Group grp in match.Groups)
                     {
-                        if (long.TryParse(grp.Value, out long printTime))
+                        if (float.TryParse(grp.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float printTime) &&
+                            float.IsFinite(printTime))
                         {
                             switch (grp.Name)
                             {
                                 case "h":
-                                    seconds += printTime * 3600;
+                                    seconds += (long)Math.Round(printTime) * 3600L;
                                     break;
                                 case "m":
-                                    seconds += printTime * 60;
+                                    seconds += (long)Math.Round(printTime)* 60L;
                                     break;
                                 case "s":
-                                    seconds += printTime;
+                                    seconds += (long)Math.Round(printTime);
                                     break;
                             }
                         }
@@ -454,6 +458,148 @@ namespace DuetControlServer.Files
                 }
             }
             return false;
+        }
+
+        /// <summary>
+        /// Parse the file for thumbnails
+        /// </summary>
+        /// <param name="reader">Stream reader</param>
+        /// <param name="partialFileInfo">G-code file information</param>
+        /// <returns>Asynchronous task</returns>
+        /// <remarks>
+        /// This functionality should be moved to ParseHeader in the long term
+        /// </remarks>
+        private static async Task ParseThumbnails(StreamReader reader, ParsedFileInfo parsedFileInfo)
+        {
+            Code code = new Code();
+            CodeParserBuffer codeParserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
+            bool imageFound = false;
+            int encodedLength = 0;
+            StringBuilder encodedImage = new StringBuilder();
+            reader.BaseStream.Seek(0, SeekOrigin.Begin);
+            ParsedThumbnail thumbnail = null;
+            while (codeParserBuffer.GetPosition(reader) < reader.BaseStream.Length)
+            {
+                Program.CancellationToken.ThrowIfCancellationRequested();
+                if (!await DuetAPI.Commands.Code.ParseAsync(reader, code, codeParserBuffer))
+                {
+                    continue;
+                }
+
+                if (code.Type != CodeType.Comment)
+                {
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(code.Comment))
+                {
+                    code.Reset();
+                    continue;
+                }
+
+                if (code.Comment.Contains("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    //Exit if we find another start tag before ending the previous image
+                    if (imageFound)
+                    {
+                        return;
+                    }
+                    string[] thumbnailTokens = code.Comment.Trim().Split(' ');
+                    //Stop processing since the thumbnail may be corrupt.
+                    if (thumbnailTokens.Length != 4)
+                    {
+                        return;
+                    }
+                    string[] dimensions = thumbnailTokens[2].Split('x');
+                    if (dimensions.Length != 2)
+                    {
+                        continue;
+                    }
+                    imageFound = true;
+
+                    thumbnail = new ParsedThumbnail
+                    {
+                        Width = int.Parse(dimensions[0]),
+                        Height = int.Parse(dimensions[1])
+                    };
+
+                    encodedLength = int.Parse(thumbnailTokens[3]);
+                    encodedImage.Clear();
+                    code.Reset();
+                    continue;
+                }
+                else if (code.Comment.Contains("thumbnail end", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    if (encodedImage.Length == encodedLength)
+                    {
+                        thumbnail.EncodedImage = "data:image/png;base64," + encodedImage.ToString();
+                        parsedFileInfo.Thumbnails.Add(thumbnail);
+                    }
+                    thumbnail = null;
+                    imageFound = false;
+                }
+                else if (imageFound)
+                {
+                    encodedImage.Append(code.Comment.Trim());
+                }
+                code.Reset();
+            }
+        }
+
+        /// <summary>
+        /// Marker used by RepRapFirmware for simulation times at the end of a file
+        /// </summary>
+        private const string SimulatedTimeString = "\n; Simulated print time";
+
+        /// <summary>
+        /// Update the last simulation time in a job file
+        /// </summary>
+        /// <param name="filename">Path to the job file</param>
+        /// <param name="totalSeconds">Total print or simulated time</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task UpdateSimulatedTime(string filename, int totalSeconds)
+        {
+            // Get the last modified datetime
+            DateTime lastWriteTime = File.GetLastWriteTime(filename);
+
+            // Update the simulated time in the file
+            using (FileStream fileStream = new FileStream(filename, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+            {
+                // Check if we need to truncate the file before the last simulated time
+                bool truncate = false;
+                Memory<byte> buffer = new byte[64];
+                if (fileStream.Length >= buffer.Length)
+                {
+                    fileStream.Seek(-buffer.Length, SeekOrigin.End);
+                    int bytesRead = await fileStream.ReadAsync(buffer), offset = 0;
+                    if (bytesRead > 0)
+                    {
+                        string bufferString = Encoding.UTF8.GetString(buffer.Slice(0, bytesRead).Span);
+                        int simulationMarkerPosition = bufferString.IndexOf(SimulatedTimeString);
+                        if (simulationMarkerPosition >= 0)
+                        {
+                            offset = bytesRead - simulationMarkerPosition;
+                            truncate = true;
+                        }
+                    }
+                    fileStream.Seek(-offset, SeekOrigin.End);
+                }
+
+                // Write the simulated time
+                using (StreamWriter writer = new StreamWriter(fileStream, leaveOpen: true))
+                {
+                    await writer.WriteLineAsync(SimulatedTimeString + ": " + totalSeconds.ToString());
+                }
+
+                // Truncate the file if necessary
+                if (truncate)
+                {
+                    fileStream.SetLength(fileStream.Position);
+                }
+            }
+
+            // Restore the last modified datetime
+            File.SetLastWriteTime(filename, lastWriteTime);
         }
     }
 }

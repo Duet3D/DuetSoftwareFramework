@@ -1,15 +1,18 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
-using Command = DuetControlServer.IPC.Processors.Command;
+using DuetControlServer.Utility;
+using LinuxApi;
 
 namespace DuetControlServer.IPC
 {
@@ -34,6 +37,21 @@ namespace DuetControlServer.IPC
         public int Id { get; }
 
         /// <summary>
+        /// API version of the client
+        /// </summary>
+        public int ApiVersion { get; set; }
+
+        /// <summary>
+        /// Name of the connected plugin
+        /// </summary>
+        public string PluginName { get; private set; }
+
+        /// <summary>
+        /// Permissions of this connection
+        /// </summary>
+        public SbcPermissions Permissions { get; private set; }
+
+        /// <summary>
         /// Socket holding the connection of the UNIX socket
         /// </summary>
         private readonly Socket _unixSocket;
@@ -48,6 +66,104 @@ namespace DuetControlServer.IPC
             Id = Interlocked.Increment(ref _idCounter);
 
             Logger = NLog.LogManager.GetLogger($"IPC#{Id}");
+        }
+
+        /// <summary>
+        /// Get the peer credentials and assign the available permissions
+        /// </summary>
+        /// <returns>True if permissions could be assigned</returns>
+        public async Task<bool> AssignPermissions()
+        {
+            _unixSocket.GetPeerCredentials(out int pid, out int uid, out int gid);
+
+            // Try to figure out what process this is
+            Process peerProcess = Process.GetProcessById(pid);
+            string processName = peerProcess?.MainModule?.FileName;
+            if (processName == null && uid != 0 && gid != 0)
+            {
+                Logger.Error("Failed to get process details from pid {0} (uid {1}, gid {2}). Cannot assign any permissions", pid, uid, gid);
+                return false;
+            }
+
+            // Check if this is an installed plugin
+            string pluginPath = Path.GetFullPath(processName ?? string.Empty);
+            if (pluginPath.StartsWith(Settings.PluginDirectory))
+            {
+                pluginPath = processName[Settings.PluginDirectory.Length..];
+                if (pluginPath.StartsWith('/'))
+                {
+                    pluginPath = pluginPath[1..];
+                }
+
+                // Retrieve the corresponding plugin permissions
+                if (pluginPath.Contains('/'))
+                {
+                    string pluginName = pluginPath.Substring(0, pluginPath.IndexOf('/'));
+                    using (await Model.Provider.AccessReadOnlyAsync())
+                    {
+                        foreach (PluginManifest plugin in Model.Provider.Get.Plugins)
+                        {
+                            if (plugin.Name == pluginName)
+                            {
+                                PluginName = plugin.Name;
+                                Permissions = plugin.SbcPermissions;
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                if (uid != 0 && gid != 0)
+                {
+                    // Failed to find plugin and it isn't running as root
+                    Logger.Error("Failed to find corresponding plugin for peer application {0}", processName);
+                    return false;
+                }
+            }
+
+            // Grant full permissions
+            Logger.Debug("Granting full DSF permissions to external plugin");
+            foreach (Enum permission in Enum.GetValues(typeof(SbcPermissions)))
+            {
+                Permissions |= (SbcPermissions)permission;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Check if any of the given commands may be executed by this connection
+        /// </summary>
+        /// <param name="supportedCommands">List of supported commands</param>
+        /// <returns>True if any command may be executed</returns>
+        public bool CheckCommandPermissions(Type[] supportedCommands)
+        {
+            foreach (Type commandType in supportedCommands)
+            {
+                foreach (Attribute attribute in Attribute.GetCustomAttributes(commandType))
+                {
+                    if (attribute is RequiredPermissionsAttribute permissionsAttribute && permissionsAttribute.Check(Permissions))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Check if the current permissions are sufficient to execute this command
+        /// </summary>
+        /// <param name="commandType">Command type to check</param>
+        /// <exception cref="UnauthorizedAccessException">Permissions are insufficient</exception>
+        public void CheckPermissions(Type commandType)
+        {
+            foreach (Attribute attribute in Attribute.GetCustomAttributes(commandType))
+            {
+                if (attribute is RequiredPermissionsAttribute permissionsAttribute && !permissionsAttribute.Check(Permissions))
+                {
+                    throw new UnauthorizedAccessException("Insufficient permissions");
+                }
+            }
         }
 
         /// <summary>
@@ -129,6 +245,18 @@ namespace DuetControlServer.IPC
         }
 
         /// <summary>
+        /// Command name mapping for API version 8 or lower
+        /// </summary>
+        private static readonly Dictionary<string, string> _legacyCommandMapping = new Dictionary<string, string>
+        {
+            { "getmachinemodel", "GetObjectModel" },
+            { "lockmachinemodel", "LockObjectModel" },
+            { "patchmachinemodel", "PatchObjectModel" },
+            { "setmachinemodel", "SetObjectModel" },
+            { "unlockmachinemodel", "UnlockObjectModel" }
+        };
+
+        /// <summary>
         /// Receive a fully-populated instance of a BaseCommand from the client
         /// </summary>
         /// <returns>Received command or null if nothing could be read</returns>
@@ -147,11 +275,18 @@ namespace DuetControlServer.IPC
                         throw new ArgumentException("Command type must be a string");
                     }
 
+                    // Map it in case we need to retain backwards-compatibility
+                    string commandName = item.Value.GetString();
+                    if (ApiVersion <= 8 && _legacyCommandMapping.TryGetValue(commandName.ToLowerInvariant(), out string newCommandName))
+                    {
+                        commandName = newCommandName;
+                    }
+
                     // Check if the received command is valid
-                    Type commandType = GetCommandType(item.Value.GetString());
+                    Type commandType = Base.GetCommandType(commandName);
                     if (!typeof(BaseCommand).IsAssignableFrom(commandType))
                     {
-                        throw new ArgumentException("Command is not of type BaseCommand");
+                        throw new ArgumentException($"Unsupported command {commandName}");
                     }
 
                     // Log this
@@ -165,59 +300,15 @@ namespace DuetControlServer.IPC
                     }
 
                     // Perform final deserialization and assign source identifier to this command
-                    BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonDocument.RootElement.GetRawText(), commandType, JsonHelper.DefaultJsonOptions);
-                    SetSourceConnection(command);
+                    BaseCommand command = (BaseCommand)jsonDocument.RootElement.ToObject(commandType, JsonHelper.DefaultJsonOptions);
+                    if (command is Commands.IConnectionCommand commandWithSourceConnection)
+                    {
+                        commandWithSourceConnection.Connection = this;
+                    }
                     return command;
                 }
             }
             throw new ArgumentException("Command type not found");
-        }
-
-        /// <summary>
-        /// Retrieve the type of a supported command
-        /// </summary>
-        /// <param name="name">Name of the command</param>
-        /// <returns>Type of the command or null if none found</returns>
-        private Type GetCommandType(string name)
-        {
-            Type result = Command.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
-            if (result == null)
-            {
-                result = Interception.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
-            }
-            if (result == null)
-            {
-                result = Subscription.SupportedCommands.FirstOrDefault(type => type.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// Assign the source connection to a command
-        /// </summary>
-        /// <param name="command">Deserialized command</param>
-        private void SetSourceConnection(BaseCommand command)
-        {
-            if (command is Code code)
-            {
-                code.SourceConnection = Id;
-            }
-            else if (command is Commands.SimpleCode simpleCode)
-            {
-                simpleCode.SourceConnection = Id;
-            }
-            else if (command is Commands.Flush flushCommand)
-            {
-                flushCommand.SourceConnection = Id;
-            }
-            else if (command is Commands.LockMachineModel lockCommand)
-            {
-                lockCommand.SourceConnection = Id;
-            }
-            else if (command is Commands.UnlockMachineModel unlockCommand)
-            {
-                unlockCommand.SourceConnection = Id;
-            }
         }
 
         /// <summary>
@@ -265,5 +356,10 @@ namespace DuetControlServer.IPC
         /// </summary>
         /// <exception cref="SocketException">Connection is no longer available</exception>
         public void Poll() => _unixSocket.Send(Array.Empty<byte>());
+
+        /// <summary>
+        /// Close the socket before shutting down
+        /// </summary>
+        public void Close() => _unixSocket.Shutdown(SocketShutdown.Send);
     }
 }

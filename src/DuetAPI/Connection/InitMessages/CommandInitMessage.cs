@@ -4,14 +4,11 @@ namespace DuetAPI.Connection.InitMessages
     /// Enter command-based connection mode
     /// In this conneciton mode nearly all of the commands in the <see cref="Commands"/> namespace can be used
     /// </summary>
-    public class CommandInitMessage : ClientInitMessage
+    public sealed class CommandInitMessage : ClientInitMessage
     {
         /// <summary>
         /// Creates a new init message instance
         /// </summary>
-        public CommandInitMessage()
-        {
-            Mode = ConnectionMode.Command;
-        }
+        public CommandInitMessage() => Mode = ConnectionMode.Command;
     }
 }
