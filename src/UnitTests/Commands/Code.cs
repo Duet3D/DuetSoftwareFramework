@@ -309,7 +309,7 @@ namespace UnitTests.Commands
         {
             foreach (DuetAPI.Commands.Code code in Parse(" \t M586 P2 S0                               ; Disable Telnet"))
             {
-                Assert.AreEqual(3, code.Indent);
+                Assert.AreEqual(5, code.Indent);
                 Assert.AreEqual(CodeType.MCode, code.Type);
                 Assert.AreEqual(586, code.MajorNumber);
                 Assert.IsNull(code.MinorNumber);
@@ -372,7 +372,23 @@ namespace UnitTests.Commands
         }
 
         [Test]
-        public void ParseUnprecedentedExpression()
+        public void ParseM117()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M117 Hello world!;comment"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(117, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual('@', code.Parameters[0].Letter);
+                Assert.IsFalse(code.Parameters[0].IsExpression);
+                Assert.AreEqual("Hello world!", (string)code.Parameters[0]);
+                Assert.AreEqual("comment", code.Comment);
+            }
+        }
+
+        [Test]
+        public void ParseM117Expressino()
         {
             foreach (DuetAPI.Commands.Code code in Parse("M117 { \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }"))
             {
@@ -407,12 +423,24 @@ namespace UnitTests.Commands
         [Test]
         public void ParseIf()
         {
-            foreach (DuetAPI.Commands.Code code in Parse("if machine.tool.is.great <= {(0.03 - 0.001) + {foo}} (some nice) ; comment"))
+            foreach (DuetAPI.Commands.Code code in Parse("if machine.tool.is.great <= {(0.03 - 0.001) + {foo}} ;some nice comment"))
             {
                 Assert.AreEqual(0, code.Indent);
                 Assert.AreEqual(KeywordType.If, code.Keyword);
                 Assert.AreEqual("machine.tool.is.great <= {(0.03 - 0.001) + {foo}}", code.KeywordArgument);
                 Assert.AreEqual("some nice comment", code.Comment);
+            }
+        }
+
+        [Test]
+        public void ParseIf2()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("  if {abs(move.calibration.final.deviation - move.calibration.initial.deviation)} < 0.005"))
+            {
+                Assert.AreEqual(2, code.Indent);
+                Assert.AreEqual(KeywordType.If, code.Keyword);
+                Assert.AreEqual("{abs(move.calibration.final.deviation - move.calibration.initial.deviation)} < 0.005", code.KeywordArgument);
+                Assert.IsNull(code.Comment);
             }
         }
 
@@ -523,6 +551,17 @@ namespace UnitTests.Commands
                 Assert.AreEqual(0, code.Indent);
                 Assert.AreEqual(KeywordType.Echo, code.Keyword);
                 Assert.AreEqual("{{3 + 3} + (volumes[0].freeSpace - 4)}", code.KeywordArgument);
+            }
+        }
+
+        [Test]
+        public void ParseEchoWithBraces()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse(" \techo \"debug \" ^ abs(3)"))
+            {
+                Assert.AreEqual(4, code.Indent);
+                Assert.AreEqual(KeywordType.Echo, code.Keyword);
+                Assert.AreEqual("\"debug \" ^ abs(3)", code.KeywordArgument);
             }
         }
 

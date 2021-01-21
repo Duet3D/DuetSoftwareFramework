@@ -1,6 +1,19 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.3.0-b1
+================
+
+Compatible versions:
+- RepRapFirmware 3.3.0-b1
+- DuetWebControl 3.3.0-b1
+
+Bug fixes:
+- Tabs at the beginning of G-code lines were not interpreted as up to 4 spaces
+- Payloads for conditional keywords had to be encapsulated in curly braces to allow usage of round braces
+- Parameters for codes that expected unprecedented parameters always had to be encapsulated in double quotes
+- When DWS was configured for a different port, no WebSocket sessions were permitted without extra CORS exception
+
 Version 3.2.0
 =============
 

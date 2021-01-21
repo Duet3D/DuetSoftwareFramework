@@ -43,7 +43,7 @@ namespace DuetAPI.Commands
                 // Read the next character
                 int currentChar = reader.Read();
                 c = (currentChar < 0) ? '\n' : (char)currentChar;
-                result.Length += encoding.GetByteCount(new char[] { c });
+                result.Length += encoding.GetByteCount(stackalloc char[] { c });
 
                 if (c == '\r')
                 {
@@ -103,17 +103,8 @@ namespace DuetAPI.Commands
                             numCurlyBraces--;
                             break;
                         case '(':
-                            if (numCurlyBraces > 0)
-                            {
-                                result.KeywordArgument += '(';
-                                numRoundBraces++;
-                            }
-                            else
-                            {
-                                inCondition = false;
-                                wasCondition = true;
-                                inEncapsulatedComment = true;
-                            }
+                            result.KeywordArgument += '(';
+                            numRoundBraces++;
                             break;
                         case ')':
                             if (numRoundBraces > 0)
@@ -272,11 +263,23 @@ namespace DuetAPI.Commands
                     isLineNumber = (char.ToUpperInvariant(c) == 'N');
                     if (char.IsWhiteSpace(c) && c != '\n')
                     {
-                        if (result.Indent == byte.MaxValue)
+                        if (c == '\t')
                         {
-                            throw new CodeParserException("Indentation too big", result);
+                            int indent = (result.Indent + 4) & ~3;
+                            if (indent >= byte.MaxValue)
+                            {
+                                throw new CodeParserException("Indentation too big", result);
+                            }
+                            result.Indent = (byte)indent;
                         }
-                        result.Indent++;
+                        else
+                        {
+                            if (result.Indent == byte.MaxValue)
+                            {
+                                throw new CodeParserException("Indentation too big", result);
+                            }
+                            result.Indent++;
+                        }
                     }
                     else
                     {
@@ -428,7 +431,12 @@ namespace DuetAPI.Commands
                             {
                                 letter = '@';
                             }
-                            else if (!unprecedentedParameter)
+                            else if (unprecedentedParameter)
+                            {
+                                value = letter + value;
+                                letter = '@';
+                            }
+                            else
                             {
                                 letter = char.ToUpperInvariant(letter);
                             }
