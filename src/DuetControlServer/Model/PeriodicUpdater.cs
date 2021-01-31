@@ -79,7 +79,7 @@ namespace DuetControlServer.Model
                 lastUpdateTime = DateTime.Now;
                 await Task.Delay(Settings.HostUpdateInterval, Program.CancellationToken);
             }
-            while (!Program.CancelSource.IsCancellationRequested);
+            while (!Program.CancellationToken.IsCancellationRequested);
         }
 
         /// <summary>

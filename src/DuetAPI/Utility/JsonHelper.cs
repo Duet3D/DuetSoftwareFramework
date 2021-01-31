@@ -128,7 +128,7 @@ namespace DuetAPI.Utility
         /// <returns>Plain JSON</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        public static async Task<MemoryStream> ReceiveUtf8Json(Socket socket, CancellationToken cancellationToken = default)
+        public static async ValueTask<MemoryStream> ReceiveUtf8Json(Socket socket, CancellationToken cancellationToken = default)
         {
             MemoryStream jsonStream = new MemoryStream();
             bool inJson = false, inQuotes = false, isEscaped = false;

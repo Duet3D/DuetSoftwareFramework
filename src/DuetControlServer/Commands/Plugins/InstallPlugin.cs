@@ -3,7 +3,7 @@ using DuetAPI.Utility;
 using System;
 using System.IO;
 using System.IO.Compression;
-using System.Runtime.InteropServices;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -15,9 +15,9 @@ namespace DuetControlServer.Commands
     public sealed class InstallPlugin : DuetAPI.Commands.InstallPlugin
     {
         /// <summary>
-        /// Logger instance
+        /// Internal flag to indicate that custom plugin files should not be purged
         /// </summary>
-        private NLog.Logger _logger;
+        public bool Upgrade { get; set; }
 
         /// <summary>
         /// Install or upgrade a plugin
@@ -26,203 +26,98 @@ namespace DuetControlServer.Commands
         /// <exception cref="ArgumentException">Plugin is incompatible</exception>
         public override async Task Execute()
         {
-            using ZipArchive zipArchive = ZipFile.OpenRead(PluginFile);
-            Plugin plugin = await GetManifest(zipArchive);
-
-            // Run preflight check to make sure no malicious files are installed
-            _logger = NLog.LogManager.GetLogger($"InstallPlugin#{plugin.Name}");
-            _logger.Debug("Checking files");
-            foreach (ZipArchiveEntry entry in zipArchive.Entries)
+            Plugin plugin;
+            using (ZipArchive zipArchive = ZipFile.OpenRead(PluginFile))
             {
-                if (entry.FullName.Contains("..") ||
-                    entry.FullName == "rrf/sys/config.g" ||
-                    entry.FullName == "rrf/sys/config-override.g" ||
-                    entry.FullName.StartsWith("rrf/firmware/"))
-                {
-                    throw new ArgumentException($"Illegal filename {entry.FullName}, stopping installation");
-                }
-            }
+                // Get the plugin manifest from the ZIP file
+                plugin = await ExtractManifest(zipArchive);
 
-            // Remove the old plugin files
-            bool pluginFound = false;
-            using (await Model.Provider.AccessReadWriteAsync())
-            {
-                foreach (Plugin item in Model.Provider.Get.Plugins)
+                // Run preflight check to make sure no malicious files are installed
+                foreach (ZipArchiveEntry entry in zipArchive.Entries)
                 {
-                    if (item.Name == plugin.Name)
+                    if (entry.FullName.Contains("..") ||
+                        entry.FullName == "rrf/sys/config.g" ||
+                        entry.FullName == "rrf/sys/config-override.g" ||
+                        entry.FullName.StartsWith("rrf/firmware/"))
                     {
-                        pluginFound = true;
-                        break;
+                        throw new ArgumentException($"Illegal filename {entry.FullName}, stopping installation");
                     }
                 }
             }
 
-            if (pluginFound)
+            // Validate the current DSF/RRF versions
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
-                _logger.Debug("Uninstalling old files for upgrade");
-                UninstallPlugin uninstallPlugin = new UninstallPlugin()
+                // Check the required DSF version
+                if (!PluginManifest.CheckVersion(Model.Provider.Get.State.DsfVersion, plugin.SbcDsfVersion))
                 {
-                    Plugin = plugin.Name,
-                    Upgrading = true
-                };
-                await uninstallPlugin.Execute();
-            }
-
-            // Clear file lists, they are assigned during the installation
-            plugin.DwcFiles.Clear();
-            plugin.RrfFiles.Clear();
-            plugin.SbcFiles.Clear();
-
-            // Install plugin dependencies
-            foreach (string package in plugin.SbcPackageDependencies)
-            {
-                _logger.Debug("Installing dependency package {0}", package);
-                await InstallPackage(package);
-            }
-
-            // Make plugin directory
-            string pluginBase = Path.Combine(Settings.PluginDirectory, plugin.Name);
-            if (!Directory.Exists(pluginBase))
-            {
-                _logger.Debug("Creating plugin base directory {0}", pluginBase);
-                Directory.CreateDirectory(pluginBase);
-            }
-
-            // Install new plugin files
-            foreach (ZipArchiveEntry entry in zipArchive.Entries)
-            {
-                // Ignore plugin.json, it will be written when this archive has been extracted
-                // Also ignore directories, they are automatically created below
-                if (entry.FullName == "plugin.json" || entry.FullName.EndsWith('/'))
-                {
-                    continue;
+                    throw new ArgumentException($"Incompatible DSF version (requires {plugin.SbcDsfVersion}, got {Model.Provider.Get.State.DsfVersion})");
                 }
 
-                string fileName;
-                if (entry.FullName.StartsWith("rrf/"))
+                // Check the required RRF version
+                if (!string.IsNullOrEmpty(plugin.RrfVersion))
                 {
-                    // Put RRF files into 0:/
-                    fileName = Path.Combine(Settings.BaseDirectory, entry.FullName);
-                    plugin.RrfFiles.Add(entry.FullName[4..]);
-                }
-                else
-                {
-                    // Put other files into <PluginDirectory>/<PluginName>/
-                    fileName = Path.Combine(pluginBase, entry.FullName);
-
-                    // Check what type of file this is
-                    if (entry.FullName.StartsWith("www/"))
+                    if (Model.Provider.Get.Boards.Count > 0)
                     {
-                        plugin.DwcFiles.Add(entry.FullName[4..]);
+                        if (!PluginManifest.CheckVersion(Model.Provider.Get.Boards[0].FirmwareVersion, plugin.RrfVersion))
+                        {
+                            throw new ArgumentException($"Incompatible RRF version (requires {plugin.RrfVersion}, got {Model.Provider.Get.Boards[0].FirmwareVersion})");
+                        }
                     }
                     else
                     {
-                        plugin.SbcFiles.Add(entry.FullName);
+                        throw new ArgumentException("Failed to check RRF version");
                     }
                 }
-
-                // Make sure the parent directory exists
-                string parentDirectory = Path.GetDirectoryName(fileName);
-                if (!Directory.Exists(parentDirectory))
-                {
-                    _logger.Debug("Creating new directory {0}", parentDirectory);
-                    Directory.CreateDirectory(parentDirectory);
-                }
-
-                // Extract the file
-                _logger.Debug("Extracting {0} to {1}", entry.FullName, fileName);
-                using FileStream fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
-                using Stream zipFileStream = entry.Open();
-                await zipFileStream.CopyToAsync(fileStream);
             }
 
-            // Make the SBC executable
-            if (!string.IsNullOrEmpty(plugin.SbcExecutable))
+            // Make sure all the required plugins dependencies are installed
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
-#if true
-                throw new InvalidOperationException("This feature has been disabled. It will be fully available in software version 3.3 and later");
-#else
-                string architecture = RuntimeInformation.OSArchitecture switch
+                foreach (string dependency in plugin.SbcPluginDependencies)
                 {
-                    Architecture.Arm => "arm",
-                    Architecture.Arm64 => "arm64",
-                    Architecture.X86 => "x86",
-                    Architecture.X64 => "x86_64",
-                    _ => "unknown"
-                };
-
-                string sbcExecutable = Path.Combine(pluginBase, "bin", architecture, plugin.SbcExecutable);
-                if (!File.Exists(sbcExecutable))
-                {
-                    sbcExecutable = Path.Combine(pluginBase, "bin", plugin.SbcExecutable);
+                    if (!Model.Provider.Get.Plugins.Any(item => item.Name == dependency))
+                    {
+                        throw new ArgumentException($"Missing plugin dependency {dependency}");
+                    }
                 }
-
-                if (File.Exists(sbcExecutable))
-                {
-                    _logger.Debug("Changing mode of {0} to 750", sbcExecutable);
-                    LinuxApi.Commands.Chmod(sbcExecutable,
-                        LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
-                        LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
-                        LinuxApi.UnixPermissions.None);
-                }
-                else
-                {
-                    throw new ArgumentException("SBC executable {0} not found", plugin.SbcExecutable);
-                }
-#endif
             }
 
-            // Install the web files. Try to use a symlink or copy the files if that failed
-            if (plugin.DwcFiles.Count > 0)
+            // Validate package dependencies to prevent potentially dangerous command injection
+            foreach (string package in plugin.SbcPackageDependencies)
             {
-                string pluginWwwPath = Path.Combine(pluginBase, "www");
-                string installWwwPath = Path.Combine(Settings.BaseDirectory, "www", plugin.Name);
-
-                bool createDirectory = false;
-                if (!File.Exists(installWwwPath))
+                foreach (char c in package)
                 {
-                    try
+                    if (!char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '+')
                     {
-                        _logger.Debug("Trying to create symlink {0} -> {1}", pluginWwwPath, installWwwPath);
-                        LinuxApi.Commands.Symlink(pluginWwwPath, installWwwPath);
+                        throw new ArgumentException($"Illegal characters in required package {package}");
                     }
-                    catch (IOException e)
-                    {
-                        _logger.Debug(e);
-                        _logger.Warn("Failed to create symlink to web directory, trying to copy web files instead...");
-                        createDirectory = true;
-                    }
-                }
-
-                if (createDirectory)
-                {
-                    _logger.Debug("Copying web files from {0} to {1}", pluginWwwPath, installWwwPath);
-                    DirectoryCopy(pluginWwwPath, installWwwPath, true);
                 }
             }
 
-            // Install refreshed plugin manifest
-            string manifestFilename = Path.Combine(Settings.PluginDirectory, $"{plugin.Name}.json");
-            _logger.Debug("Installing plugin manifest {0}", manifestFilename);
-            using FileStream manifestFile = new FileStream(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None);
-            await JsonSerializer.SerializeAsync(manifestFile, plugin, JsonHelper.DefaultJsonOptions);
+            // Uninstall the old plugin (if applicable)
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                Upgrade = Model.Provider.Get.Plugins.Any(item => item.Name == plugin.Name);
+            }
 
-            // Add it to the object model
+            if (Upgrade)
+            {
+                UninstallPlugin uninstallCommand = new UninstallPlugin() { Plugin = plugin.Name, ForUpgrade = true };
+                await uninstallCommand.Execute();
+            }
+
+            // Forward this command to the plugin services
+            // 1) Install regular files via dsf user
+            // 2) Perform policy generation using AppArmor profiles via root
+            await IPC.Processors.PluginService.PerformCommand(this, false);
+            await IPC.Processors.PluginService.PerformCommand(this, true);
+
+            // Register the new plugin in the object model
             using (await Model.Provider.AccessReadWriteAsync())
             {
                 Model.Provider.Get.Plugins.Add(plugin);
             }
-            _logger.Info("Plugin successfully installed");
-        }
-
-        /// <summary>
-        /// Install a Linux package
-        /// </summary>
-        /// <param name="package">Name of the package to install</param>
-        private Task InstallPackage(string package)
-        {
-            // TODO Ask elevation service to install this package
-            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -231,7 +126,7 @@ namespace DuetControlServer.Commands
         /// <param name="zipArchive">ZIP archive containing the plugin files</param>
         /// <returns>Plugin manifest</returns>
         /// <exception cref="ArgumentException">Plugin is incompatible</exception>
-        private async Task<Plugin> GetManifest(ZipArchive zipArchive)
+        private static async Task<Plugin> ExtractManifest(ZipArchive zipArchive)
         {
             // Extract the plugin manifest
             ZipArchiveEntry manifestFile = zipArchive.GetEntry("plugin.json");
@@ -248,69 +143,14 @@ namespace DuetControlServer.Commands
             }
             plugin.Pid = -1;
 
-            // Check the plugin name
-            if (string.IsNullOrWhiteSpace(plugin.Name) || plugin.Name.Length > 64)
+            // Check for reserved permissions
+            if (plugin.SbcPermissions.HasFlag(SbcPermissions.ServicePlugins))
             {
-                throw new ArgumentException("Invalid plugin name");
-            }
-
-            foreach (char c in plugin.Name)
-            {
-                if (!char.IsLetterOrDigit(c) && c != ' ' && c != '.' && c != '-' && c != '_')
-                {
-                    throw new ArgumentException("Illegal plugin name");
-                }
+                throw new ArgumentException("ServicePlugins permission is reserved for internal purposes");
             }
 
             // All OK
             return plugin;
-        }
-
-        /// <summary>
-        /// Copy an entire directory
-        /// </summary>
-        /// <param name="sourceDirName">Source directory</param>
-        /// <param name="destDirName">Destination directory</param>
-        /// <param name="copySubDirs">True if sub directories may be copied</param>
-        /// <remarks>
-        /// Copied from https://docs.microsoft.com/de-de/dotnet/standard/io/how-to-copy-directories
-        /// </remarks>
-        private static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
-        {
-            // Get the subdirectories for the specified directory.
-            DirectoryInfo dir = new DirectoryInfo(sourceDirName);
-
-            if (!dir.Exists)
-            {
-                throw new DirectoryNotFoundException(
-                    "Source directory does not exist or could not be found: "
-                    + sourceDirName);
-            }
-
-            DirectoryInfo[] dirs = dir.GetDirectories();
-            // If the destination directory doesn't exist, create it.
-            if (!Directory.Exists(destDirName))
-            {
-                Directory.CreateDirectory(destDirName);
-            }
-
-            // Get the files in the directory and copy them to the new location.
-            FileInfo[] files = dir.GetFiles();
-            foreach (FileInfo file in files)
-            {
-                string temppath = Path.Combine(destDirName, file.Name);
-                file.CopyTo(temppath, false);
-            }
-
-            // If copying subdirectories, copy them and their contents to new location.
-            if (copySubDirs)
-            {
-                foreach (DirectoryInfo subdir in dirs)
-                {
-                    string temppath = Path.Combine(destDirName, subdir.Name);
-                    DirectoryCopy(subdir.FullName, temppath, copySubDirs);
-                }
-            }
         }
     }
 }

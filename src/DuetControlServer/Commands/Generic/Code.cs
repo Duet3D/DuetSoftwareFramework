@@ -134,7 +134,7 @@ namespace DuetControlServer.Commands
         private Task<IDisposable> WaitForExecution()
         {
             // Assign a cancellation token if required
-            if (CancellationToken == null)
+            if (CancellationToken == default)
             {
                 lock (_cancellationTokenSources)
                 {
@@ -437,7 +437,7 @@ namespace DuetControlServer.Commands
             }
 
             // Enqueue this code for further processing in RepRapFirmware
-            FirmwareTCS = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            FirmwareTCS = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             await Interface.ProcessCode(this);
 
             // Wait for the code to be processed by RepRapFirmware
@@ -567,7 +567,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
         /// </summary>
-        internal TaskCompletionSource<object> FirmwareTCS { get; private set; }
+        internal TaskCompletionSource FirmwareTCS { get; private set; }
 
         /// <summary>
         /// Indicates if the code has been fully executed (including the Executed interceptor if applicable)

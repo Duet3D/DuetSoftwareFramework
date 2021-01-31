@@ -468,7 +468,7 @@ namespace DuetControlServer.SPI.Channel
                                 {
                                     startCode.Result.AddRange(macroResult);
                                 }
-                                startCode.FirmwareTCS.SetResult(null);
+                                startCode.FirmwareTCS.SetResult();
                             }, TaskContinuationOptions.RunContinuationsAsynchronously);
                         }
 
@@ -550,7 +550,7 @@ namespace DuetControlServer.SPI.Channel
             {
                 BytesBuffered -= BufferedCodes[0].BinarySize;
                 BufferedCodes[0].Result = new CodeResult();
-                BufferedCodes[0].FirmwareTCS.SetResult(null);
+                BufferedCodes[0].FirmwareTCS.SetResult();
                 BufferedCodes.RemoveAt(0);
             }
         }
@@ -935,7 +935,7 @@ namespace DuetControlServer.SPI.Channel
                             : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                             : MessageType.Success;
                 code.Result.Add(type, reply.TrimEnd());
-                code.FirmwareTCS.SetResult(null);
+                code.FirmwareTCS.SetResult();
             }
             else
             {

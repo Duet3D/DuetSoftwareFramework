@@ -31,6 +31,7 @@ namespace DuetWebServer
         /// <returns>Web host builder</returns>
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
+                .UseSystemd()
                 .ConfigureAppConfiguration((hostingContext, config) =>
                 {
                     config.AddJsonFile(DefaultConfigFile, false, true);

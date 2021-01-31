@@ -214,6 +214,10 @@ namespace DuetControlServer.IPC
                         initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response, JsonHelper.DefaultJsonOptions);
                         return new ModelSubscription(conn, initMessage);
 
+                    case ConnectionMode.PluginService:
+                        initMessage = JsonSerializer.Deserialize<PluginServiceInitMessage>(response, JsonHelper.DefaultJsonOptions);
+                        return new PluginService(conn);
+
                     default:
                         throw new ArgumentException("Invalid connection mode");
                 }

@@ -30,6 +30,11 @@ namespace DuetAPI.Connection
         /// Subscription mode. In this mode object model updates are transmitted to the client after each update
         /// </summary>
         /// <seealso cref="InitMessages.SubscribeInitMessage"/>
-        Subscribe
+        Subscribe,
+
+        /// <summary>
+        /// Plugin service mode. This mode is used internally and should not be used by third-party plugins!
+        /// </summary>
+        PluginService
     }
 }

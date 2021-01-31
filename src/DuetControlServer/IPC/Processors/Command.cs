@@ -35,7 +35,9 @@ namespace DuetControlServer.IPC.Processors
             typeof(InstallPlugin),
             typeof(SetPluginData),
             typeof(StartPlugin),
+            typeof(StartPlugins),
             typeof(StopPlugin),
+            typeof(StopPlugins),
             typeof(UninstallPlugin),
             typeof(AddUserSession),
             typeof(RemoveUserSession)

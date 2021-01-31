@@ -659,14 +659,14 @@
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.CommandExecution"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ObjectModelReadWrite"/>
         </member>
-        <member name="M:DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.MessageType,System.String,System.Boolean,DuetAPI.ObjectModel.LogLevel,System.Threading.CancellationToken)">
+        <member name="M:DuetAPIClient.BaseCommandConnection.WriteMessage(DuetAPI.ObjectModel.MessageType,System.String,System.Boolean,System.Nullable{DuetAPI.ObjectModel.LogLevel},System.Threading.CancellationToken)">
             <summary>
             Write an arbitrary generic message
             </summary>
             <param name="type">Message type</param>
             <param name="message">Message content</param>
             <param name="outputMessage">Whether to output the message</param>
-            <param name="logLevel">Target log level</param>
+            <param name="logLevel">Target log level or null to determine log level from the message type</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
@@ -724,6 +724,17 @@
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Init message could not be processed</exception>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.SetPluginProcess(System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Update the process id of a given plugin. Reserved for internal purposes, do not use
+            </summary>
+            <param name="name">Name of the plugin</param>
+            <param name="pid">New process id</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
         </member>
         <member name="T:DuetAPIClient.HttpEndpointConnection">
             <summary>

@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
+using DuetAPI.Utility;
+using DuetControlServer.IPC;
 using System;
-using System.IO;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -9,13 +10,18 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.UninstallPlugin"/> command
     /// </summary>
-    public sealed class UninstallPlugin : DuetAPI.Commands.UninstallPlugin
+    public sealed class UninstallPlugin : DuetAPI.Commands.UninstallPlugin, IConnectionCommand
     {
         /// <summary>
-        /// Internal flag to be set when a plugin may be upgraded
+        /// Internal flag to indicate that custom plugin files should not be purged
+        /// </summary>
+        public bool ForUpgrade { get; set; }
+
+        /// <summary>
+        /// Client connection
         /// </summary>
         [JsonIgnore]
-        public bool Upgrading { get; set; }
+        public Connection Connection { get; set; }
 
         /// <summary>
         /// Uninstall a plugin
@@ -24,16 +30,13 @@ namespace DuetControlServer.Commands
         /// <exception cref="ArgumentException">Plugin is invalid</exception>
         public override async Task Execute()
         {
-            NLog.Logger logger = NLog.LogManager.GetLogger($"UninstallPlugin#{Plugin}");
-
-            // Stop the plugin first
-            StopPlugin stopPlugin = new StopPlugin
+            // Make sure the upgrade switch is only used by the plugin service
+            if (ForUpgrade && !Connection.Permissions.HasFlag(SbcPermissions.ServicePlugins))
             {
-                Plugin = Plugin
-            };
-            await stopPlugin.Execute();
+                throw new ArgumentException($"{nameof(ForUpgrade)} switch must not be used by third-party applications");
+            }
 
-            // Remove the plugin from the object model
+            // Find the plugin to uninstall
             Plugin plugin = null;
             using (await Model.Provider.AccessReadOnlyAsync())
             {
@@ -42,70 +45,43 @@ namespace DuetControlServer.Commands
                     if (item.Name == Plugin)
                     {
                         plugin = item;
-                        Model.Provider.Get.Plugins.Remove(item);
                         break;
                     }
                 }
             }
-
             if (plugin == null)
             {
-                // should never get here...
-                throw new ArgumentException("Invalid plugin");
+                throw new ArgumentException($"Plugin {Plugin} not found");
             }
 
-            // Remove the plugin manifest
-            string manifestFile = Path.Combine(Settings.PluginDirectory, $"{Plugin}.json");
-            if (File.Exists(manifestFile))
+            // Make sure no other plugin depends on this plugin
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
-                File.Delete(manifestFile);
-            }
-
-            // Remove symlink from www if present
-            string installWwwPath = Path.Combine(Settings.BaseDirectory, "www", Plugin);
-            if (Directory.Exists(installWwwPath))
-            {
-                logger.Debug("Removing installed www directory");
-                Directory.Delete(installWwwPath, true);
-            }
-            else if (File.Exists(installWwwPath))
-            {
-                logger.Debug("Removing www symlink");
-                File.Delete(installWwwPath);
-            }
-
-            if (Upgrading)
-            {
-                // Remove only installed files
-                foreach (string rrfFile in plugin.RrfFiles)
+                foreach (Plugin item in Model.Provider.Get.Plugins)
                 {
-                    string file = Path.Combine(Settings.BaseDirectory, rrfFile);
-                    if (File.Exists(file))
+                    if (item.Name != Plugin && (item.DwcDependencies.Contains(Plugin) || item.SbcPluginDependencies.Contains(Plugin)))
                     {
-                        logger.Debug("Deleting file {0}", file);
-                        File.Delete(file);
-                    }
-                }
-
-                foreach (string sbcFile in plugin.SbcFiles)
-                {
-                    string file = Path.Combine(Settings.PluginDirectory, Plugin, sbcFile);
-                    if (File.Exists(file))
-                    {
-                        logger.Debug("Deleting file {0}", file);
-                        File.Delete(file);
+                        throw new ArgumentException($"Cannot uninstall plugin because plugin {item.Name} depends on it");
                     }
                 }
             }
-            else
+
+            // Stop it if required
+            StopPlugin stopCommand = new StopPlugin
             {
-                // Remove the full plugin directory
-                string pluginDirectory = Path.Combine(Settings.PluginDirectory, Plugin);
-                if (Directory.Exists(pluginDirectory))
-                {
-                    logger.Debug("Removing plugin directory {0}", pluginDirectory);
-                    Directory.Delete(pluginDirectory, true);
-                }
+                Plugin = Plugin
+            };
+            await IPC.Processors.PluginService.PerformCommand(stopCommand, plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser));
+
+            // Perform the actual uninstallation via the plugin service.
+            // If it is a root plugin, the root plugin service will clean up everything
+            await IPC.Processors.PluginService.PerformCommand(this, false);
+            await IPC.Processors.PluginService.PerformCommand(this, true);
+
+            // Remove it from the object model
+            using (await Model.Provider.AccessReadWriteAsync())
+            {
+                Model.Provider.Get.Plugins.Remove(plugin);
             }
         }
     }

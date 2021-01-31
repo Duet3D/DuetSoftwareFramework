@@ -14,7 +14,7 @@ namespace DuetAPI.Commands
         /// <param name="buffer">Internal buffer for parsing codes</param>
         /// <returns>Whether anything could be read</returns>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
-        public static async Task<bool> ParseAsync(StreamReader reader, Code result, CodeParserBuffer buffer)
+        public static async ValueTask<bool> ParseAsync(StreamReader reader, Code result, CodeParserBuffer buffer)
         {
             char letter = '\0', lastC, c = '\0';
             string value = string.Empty;

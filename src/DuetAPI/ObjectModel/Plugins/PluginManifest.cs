@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Utility;
+using System;
 using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
@@ -14,7 +15,23 @@ namespace DuetAPI.ObjectModel
         public string Name
         {
             get => _name;
-            set => SetPropertyValue(ref _name, value);
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value) || value.Length > 64)
+                {
+                    throw new ArgumentException("Invalid plugin name");
+                }
+
+                foreach (char c in value)
+                {
+                    if (!char.IsLetterOrDigit(c) && c != ' ' && c != '-' && c != '_')
+                    {
+                        throw new ArgumentException("Illegal plugin name");
+                    }
+                }
+
+                SetPropertyValue(ref _name, value);
+            }
         }
         private string _name;
 
@@ -119,7 +136,14 @@ namespace DuetAPI.ObjectModel
         public string SbcExecutable
         {
             get => _sbcExecutable;
-            set => SetPropertyValue(ref _sbcExecutable, value);
+            set
+            {
+                if (value.Contains(".."))
+                {
+                    throw new ArgumentException("Executable must not contain relative file paths");
+                }
+                SetPropertyValue(ref _sbcExecutable, value);
+            }
         }
         private string _sbcExecutable;
 
@@ -172,5 +196,28 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _rrfVersion, value);
         }
         private string _rrfVersion;
+
+        /// <summary>
+        /// Check if the given version satisfies a required version
+        /// </summary>
+        /// <param name="actual">Actual version</param>
+        /// <param name="required">Required version</param>
+        /// <returns>Whether the actual version fulfills teh requirement</returns>
+        public static bool CheckVersion(string actual, string required)
+        {
+            if (!string.IsNullOrWhiteSpace(required))
+            {
+                string[] actualItems = actual.Split(new char[] { '.', '-', '+' });
+                string[] requiredItems = required.Split(new char[] { '.', '-', '+' });
+                for (int i = 0; i < Math.Min(actualItems.Length, requiredItems.Length); i++)
+                {
+                    if (actualItems[i] != requiredItems[i])
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
     }
 }

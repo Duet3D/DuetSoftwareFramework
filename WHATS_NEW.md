@@ -8,11 +8,18 @@ Compatible versions:
 - RepRapFirmware 3.3.0-b1
 - DuetWebControl 3.3.0-b1
 
+Changed behaviour:
+- Initial plugin support has been implemented
+- DuetWebServer notifies systemd about finished start like DuetControlServer does
+- `G29 S0` does no longer support a custom filename (follows implementation in RRF)
+
 Bug fixes:
 - Tabs at the beginning of G-code lines were not interpreted as up to 4 spaces
 - Payloads for conditional keywords had to be encapsulated in curly braces to allow usage of round braces
 - Parameters for codes that expected unprecedented parameters always had to be encapsulated in double quotes
 - When DWS was configured for a different port, no WebSocket sessions were permitted without extra CORS exception
+- DCS could be killed by systemd if runonce.g didn't finish quickly enough
+- `break` and `continue` didn't wait for pending codes to finish which could lead to problems with `iterations`
 
 Version 3.2.0
 =============

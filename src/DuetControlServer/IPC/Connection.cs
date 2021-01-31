@@ -52,6 +52,11 @@ namespace DuetControlServer.IPC
         public SbcPermissions Permissions { get; private set; }
 
         /// <summary>
+        /// Whether the connection is from the root user
+        /// </summary>
+        public bool IsRoot { get; private set; }
+
+        /// <summary>
         /// Socket holding the connection of the UNIX socket
         /// </summary>
         private readonly Socket _unixSocket;
@@ -76,56 +81,47 @@ namespace DuetControlServer.IPC
         {
             _unixSocket.GetPeerCredentials(out int pid, out int uid, out int gid);
 
-            // Try to figure out what process this is
-            Process peerProcess = Process.GetProcessById(pid);
-            string processName = peerProcess?.MainModule?.FileName;
-            if (processName == null && uid != 0 && gid != 0)
+            // Check if the remote program is running as root
+            if (uid == 0 || gid == 0)
             {
-                Logger.Error("Failed to get process details from pid {0} (uid {1}, gid {2}). Cannot assign any permissions", pid, uid, gid);
-                return false;
+                IsRoot = true;
+                Permissions |= SbcPermissions.SuperUser;
             }
 
-            // Check if this is an installed plugin
-            string pluginPath = Path.GetFullPath(processName ?? string.Empty);
-            if (pluginPath.StartsWith(Settings.PluginDirectory))
+            // Assign permissions based on previously launched plugins
+            using (await Model.Provider.AccessReadOnlyAsync())
             {
-                pluginPath = processName[Settings.PluginDirectory.Length..];
-                if (pluginPath.StartsWith('/'))
+                foreach (Plugin plugin in Model.Provider.Get.Plugins)
                 {
-                    pluginPath = pluginPath[1..];
-                }
-
-                // Retrieve the corresponding plugin permissions
-                if (pluginPath.Contains('/'))
-                {
-                    string pluginName = pluginPath.Substring(0, pluginPath.IndexOf('/'));
-                    using (await Model.Provider.AccessReadOnlyAsync())
+                    if (plugin.Pid == pid)
                     {
-                        foreach (PluginManifest plugin in Model.Provider.Get.Plugins)
-                        {
-                            if (plugin.Name == pluginName)
-                            {
-                                PluginName = plugin.Name;
-                                Permissions = plugin.SbcPermissions;
-                                return true;
-                            }
-                        }
+                        PluginName = plugin.Name;
+                        Permissions |= plugin.SbcPermissions;
+                        return true;
                     }
                 }
+            }
 
-                if (uid != 0 && gid != 0)
+            // If the remote process is running as dsf, reject it unless the process is in the same directory as DCS (like DWS or DPS)
+            if (!IsRoot && (uid == LinuxApi.Commands.GetEffectiveUserID() || gid == LinuxApi.Commands.GetEffectiveGroupID()))
+            {
+                string dcsDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                string remoteDirectory = Path.GetDirectoryName(Process.GetProcessById(pid)?.MainModule?.FileName);
+                if (dcsDirectory != remoteDirectory)
                 {
-                    // Failed to find plugin and it isn't running as root
-                    Logger.Error("Failed to find corresponding plugin for peer application {0}", processName);
+                    Logger.Error("Failed to find plugin permissions for pid #{0}", pid);
                     return false;
                 }
             }
 
-            // Grant full permissions
+            // Grant full permissions to other programs
             Logger.Debug("Granting full DSF permissions to external plugin");
             foreach (Enum permission in Enum.GetValues(typeof(SbcPermissions)))
             {
-                Permissions |= (SbcPermissions)permission;
+                if (permission != (Enum)SbcPermissions.SuperUser)
+                {
+                    Permissions |= (SbcPermissions)permission;
+                }
             }
             return true;
         }
@@ -197,7 +193,7 @@ namespace DuetControlServer.IPC
         /// <returns>JsonDocument for deserialization</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        public async Task<JsonDocument> ReceiveJson()
+        public async ValueTask<JsonDocument> ReceiveJson()
         {
             do
             {
@@ -218,12 +214,35 @@ namespace DuetControlServer.IPC
         }
 
         /// <summary>
+        /// Read a generic response from the socket
+        /// </summary>
+        /// <returns>Deserialized base response</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
+        public async ValueTask<BaseResponse> ReceiveResponse()
+        {
+            using JsonDocument jsonDocument = await ReceiveJson();
+            foreach (var item in jsonDocument.RootElement.EnumerateObject())
+            {
+                if (item.Name.Equals(nameof(BaseResponse.Success), StringComparison.InvariantCultureIgnoreCase) &&
+                    item.Value.ValueKind == JsonValueKind.True)
+                {
+                    // Response OK
+                    return jsonDocument.ToObject<BaseResponse>(JsonHelper.DefaultJsonOptions);
+                }
+            }
+
+            // Error
+            return jsonDocument.ToObject<ErrorResponse>(JsonHelper.DefaultJsonOptions);
+        }
+
+        /// <summary>
         /// Read a plain JSON object as a string from the socket
         /// </summary>
         /// <returns>JsonDocument for deserialization</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        public async Task<string> ReceivePlainJson()
+        public async ValueTask<string> ReceivePlainJson()
         {
             do
             {
@@ -262,7 +281,7 @@ namespace DuetControlServer.IPC
         /// <returns>Received command or null if nothing could be read</returns>
         /// <exception cref="ArgumentException">Received bad command</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        public async Task<BaseCommand> ReceiveCommand()
+        public async ValueTask<BaseCommand> ReceiveCommand()
         {
             using JsonDocument jsonDocument = await ReceiveJson();
             foreach (JsonProperty item in jsonDocument.RootElement.EnumerateObject())
@@ -344,11 +363,11 @@ namespace DuetControlServer.IPC
         /// <param name="obj">Object to send</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="SocketException">Message could not be sent</exception>
-        public async Task Send(object obj)
+        public Task Send(object obj)
         {
             byte[] toSend = (obj is byte[] byteArray) ? byteArray : JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
             Logger.Trace(() => $"Sending {Encoding.UTF8.GetString(toSend)}");
-            await _unixSocket.SendAsync(toSend, SocketFlags.None);
+            return _unixSocket.SendAsync(toSend, SocketFlags.None);
         }
 
         /// <summary>

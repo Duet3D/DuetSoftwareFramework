@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using System;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -19,20 +20,32 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
-#pragma warning disable CS0612 // Type or member is obsolete
+            if (LogLevel == null)
+            {
+                LogLevel = Type switch
+                {
+                    MessageType.Error => DuetAPI.ObjectModel.LogLevel.Warn,
+                    MessageType.Warning => DuetAPI.ObjectModel.LogLevel.Warn,
+                    MessageType.Success => DuetAPI.ObjectModel.LogLevel.Info,
+                    _ => throw new NotImplementedException()
+                };
+            }
+
+#pragma warning disable CS0618 // Type or member is obsolete
             if (LogMessage)
             {
-                LogLevel = LogLevel.Warn;
+                LogLevel = DuetAPI.ObjectModel.LogLevel.Warn;
             }
-#pragma warning restore CS0612 // Type or member is obsolete
+#pragma warning restore CS0618 // Type or member is obsolete
 
             Message msg = new Message(Type, Content);
-            await Utility.Logger.Log(LogLevel, msg);
+            await Utility.Logger.Log(LogLevel.Value, msg);
             if (OutputMessage)
             {
                 await Model.Provider.Output(msg);
             }
-            if (LogLevel == LogLevel.Off && !OutputMessage)
+
+            if (LogLevel == DuetAPI.ObjectModel.LogLevel.Off && !OutputMessage)
             {
                 // If the message is supposed to be written neither to the object model nor to the log file, send it to the DCS log
                 _logger.Info(msg.ToString());

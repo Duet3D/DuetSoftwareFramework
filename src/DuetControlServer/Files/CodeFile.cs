@@ -407,7 +407,9 @@ namespace DuetControlServer.Files
                             {
                                 throw new CodeParserException("break or continue cannot be called outside while loop", code);
                             }
+
                             _logger.Debug("Doing {0}", code.Keyword);
+                            await WaitForPendingCodes();
 
                             foreach (CodeBlock state in _codeBlocks)
                             {

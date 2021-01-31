@@ -45,7 +45,7 @@ Every plugin must provide a `plugin.json` in the root of its ZIP bundle. It may 
 }
 ```
 
-The name may consist of only alphanumeric characters and whitespaces. It must not be empty and may not exceed 64 characters.
+The name may consist of only alphanumeric characters, spaces, dashes (`-`), and underscores (`_`). It must not be empty and may not exceed 64 characters.
 
 ## Permissions
 
@@ -66,27 +66,27 @@ DSF 3.2 introduces the following set of permissions:
 | CommandExecution | Execute generic commands |
 | CodeInterceptionRead | Read codes from the G/M/T-code streams but do not modify them |
 | CodeInterceptionReadWrite | Read codes from the G/M/T-code streams and optionally modify them |
-| ManagePlugins | Install, start, stop, and uninstall other plugins |
+| ManagePlugins | Install, load, unload, and uninstall plugins. Grants FS access to all third-party plugins too |
 | ManageUserSessions | Add or remove user sessions |
 | ObjectModelRead | Read from the object model |
 | ObjectModelReadWrite | Read from and write to the object model |
 | RegisterHttpEndpoints | Register HTTP endpoints via Duet Web Server |
-| ReadFilaments | Read from `0:/filaments` (enforced via AppArmor) |
-| WriteFilaments | Write to `0:/filaments` (enforced via AppArmor) |
-| ReadFirmware | Read from `0:/firmware` (enforced via AppArmor) |
-| WriteFirmware | Write to `0:/firmware` (enforced via AppArmor) |
-| ReadGCodes | Read from `0:/gcodes` (enforced via AppArmor) |
-| WriteGCodes | Write to `0:/gcodes` (enforced via AppArmor) |
-| ReadMacros | Read from `0:/macros` (enforced via AppArmor) |
-| WriteMacros | Write to `0:/macros` (enforced via AppArmor) |
-| ReadSystem | Read from `0:/sys` (enforced via AppArmor) |
-| WriteSystem | Write to `0:/sys` (enforced via AppArmor) |
-| ReadWeb | Read from `0:/www` (enforced via AppArmor) |
-| WriteWeb | Write to `0:/www` (enforced via AppArmor) |
-| FileSystemAccess | Read and write to all files (enforced via AppArmor) |
-| LaunchProcesses | Launch new processes (enforced via AppArmor) |
-| NetworkAccess | Stand-alone network access (enforced via AppArmor) |
-| SuperUser | Plugin runs as super-user (potentially dangerous) and gets all of the permissions above |
+| ReadFilaments | Read from `0:/filaments` |
+| WriteFilaments | Write to `0:/filaments` |
+| ReadFirmware | Read from `0:/firmware` |
+| WriteFirmware | Write to `0:/firmware` |
+| ReadGCodes | Read from `0:/gcodes` |
+| WriteGCodes | Write to `0:/gcodes` |
+| ReadMacros | Read from `0:/macros` |
+| WriteMacros | Write to `0:/macros` |
+| ReadSystem | Read from `0:/sys` |
+| WriteSystem | Write to `0:/sys` |
+| ReadWeb | Read from `0:/www` |
+| WriteWeb | Write to `0:/www` |
+| FileSystemAccess | Read and write to all files |
+| LaunchProcesses | Launch new processes |
+| NetworkAccess | Stand-alone network access |
+| SuperUser | Plugin runs as super-user (potentially dangerous) |
 
 ### Required Permissions for each Command
 
@@ -111,8 +111,10 @@ corresponding command in DCS:
 | UnlockObjectModel | Unlock the object model again, see LockObjectModel | ObjectModelReadWrite |
 | InstallPlugin | Install or upgrade a plugin | ManagePlugins |
 | StartPlugin | Start a plugin | ManagePlugins |
+| StartPlugins | Start all the plugins | ManagePlugins |
 | SetPluginData | Set custom plugin data in the object model | ObjectModelReadWrite, ManagePlugins* |
-| StopPlugin | Stop a plugin | ManagePlugins |
+| StopPlugin | Stop a plugin (possibly including the one performing this command) | ManagePlugins |
+| StopPlugins | Stop all the plugins (possibly including the one performing this command) | ManagePlugins |
 | UninstallPlugin | Uninstall a plugin | ManagePlugins |
 
 \* Only needed to modify other data of other plugins

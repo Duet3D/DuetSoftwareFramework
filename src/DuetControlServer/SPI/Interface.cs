@@ -65,18 +65,18 @@ namespace DuetControlServer.SPI
         private static readonly AsyncLock _heightmapLock = new AsyncLock();
         private static TaskCompletionSource<Heightmap> _getHeightmapRequest;
         private static bool _isHeightmapRequested;
-        private static TaskCompletionSource<object> _setHeightmapRequest;
+        private static TaskCompletionSource _setHeightmapRequest;
         private static Heightmap _heightmapToSet;
 
         // Firmware updates
         private static readonly AsyncLock _firmwareUpdateLock = new AsyncLock();
         private static Stream _iapStream, _firmwareStream;
-        private static TaskCompletionSource<object> _firmwareUpdateRequest;
+        private static TaskCompletionSource _firmwareUpdateRequest;
 
         // Firmware halt/restart requests
         private static readonly AsyncLock _firmwareActionLock = new AsyncLock();
-        private static TaskCompletionSource<object> _firmwareHaltRequest;
-        private static TaskCompletionSource<object> _firmwareResetRequest;
+        private static TaskCompletionSource _firmwareHaltRequest;
+        private static TaskCompletionSource _firmwareResetRequest;
 
         // Miscellaneous requests
         private static readonly Dictionary<int, string> _extruderFilamentMapping = new Dictionary<int, string>();
@@ -209,7 +209,7 @@ namespace DuetControlServer.SPI
                 throw new InvalidOperationException("Not connected over SPI");
             }
 
-            TaskCompletionSource<object> tcs;
+            TaskCompletionSource tcs;
             using (_heightmapLock.Lock(Program.CancellationToken))
             {
                 if (_setHeightmapRequest != null)
@@ -217,7 +217,7 @@ namespace DuetControlServer.SPI
                     throw new InvalidOperationException("Heightmap is already being set");
                 }
 
-                tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 _heightmapToSet = map;
                 _setHeightmapRequest = tcs;
             }
@@ -330,7 +330,7 @@ namespace DuetControlServer.SPI
                 {
                     if (_firmwareHaltRequest == null)
                     {
-                        _firmwareHaltRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        _firmwareHaltRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     }
                     onFirmwareHalted = _firmwareHaltRequest.Task;
                 }
@@ -351,7 +351,7 @@ namespace DuetControlServer.SPI
                 {
                     if (_firmwareResetRequest == null)
                     {
-                        _firmwareResetRequest = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        _firmwareResetRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     }
                     onFirmwareReset = _firmwareResetRequest.Task;
                 }
@@ -478,7 +478,7 @@ namespace DuetControlServer.SPI
                 throw new InvalidOperationException("Not connected over SPI");
             }
 
-            TaskCompletionSource<object> tcs;
+            TaskCompletionSource tcs;
             using (await _firmwareUpdateLock.LockAsync(Program.CancellationToken))
             {
                 if (_firmwareUpdateRequest != null)
@@ -486,7 +486,7 @@ namespace DuetControlServer.SPI
                     throw new InvalidOperationException("Firmware is already being updated");
                 }
 
-                tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 _iapStream = iapStream;
                 _firmwareStream = firmwareStream;
                 _firmwareUpdateRequest = tcs;
@@ -557,7 +557,6 @@ namespace DuetControlServer.SPI
                 catch
                 {
                     await Logger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
-                    Program.CancelSource.Cancel();
                     throw;
                 }
 
@@ -569,14 +568,12 @@ namespace DuetControlServer.SPI
             {
                 // Failed to flash the firmware
                 await Logger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
-                Program.CancelSource.Cancel();
+                throw new OperationCanceledException("Faield to flash firmware after 3 attempts");
             }
-            else
-            {
-                // Wait for the IAP binary to restart the controller
-                await DataTransfer.WaitForIapReset();
-                _logger.Info("Firmware update successful");
-            }
+
+            // Wait for the IAP binary to restart the controller
+            await DataTransfer.WaitForIapReset();
+            _logger.Info("Firmware update successful");
         }
 
         /// <summary>
@@ -667,7 +664,7 @@ namespace DuetControlServer.SPI
                         if (DataTransfer.WriteEmergencyStop())
                         {
                             _logger.Warn("Emergency stop");
-                            _firmwareHaltRequest.SetResult(null);
+                            _firmwareHaltRequest.SetResult();
                             _firmwareHaltRequest = null;
                         }
                         skipChannels = true;
@@ -681,7 +678,7 @@ namespace DuetControlServer.SPI
                         {
                             _logger.Warn("Resetting controller");
                             DataTransfer.PerformFullTransfer();
-                            _firmwareResetRequest.SetResult(null);
+                            _firmwareResetRequest.SetResult();
                             _firmwareResetRequest = null;
 
                             if (!Settings.NoTerminateOnReset)
@@ -704,7 +701,7 @@ namespace DuetControlServer.SPI
                         try
                         {
                             await PerformFirmwareUpdate();
-                            _firmwareUpdateRequest?.SetResult(null);
+                            _firmwareUpdateRequest?.SetResult();
                             _firmwareUpdateRequest = null;
                         }
                         catch (Exception e)
@@ -761,7 +758,7 @@ namespace DuetControlServer.SPI
                     // Check if the heightmap is supposed to be set
                     if (_setHeightmapRequest != null && DataTransfer.WriteHeightMap(_heightmapToSet))
                     {
-                        _setHeightmapRequest.SetResult(null);
+                        _setHeightmapRequest.SetResult();
                         _setHeightmapRequest = null;
                     }
 
@@ -1214,7 +1211,7 @@ namespace DuetControlServer.SPI
                     Position = offset
                 };
                 byte[] buffer = new byte[maxLength];
-                int bytesRead = await fs.ReadAsync(buffer, 0, (int)maxLength);
+                int bytesRead = await fs.ReadAsync(buffer);
 
                 DataTransfer.WriteFileChunk(buffer.AsSpan(0, bytesRead), fs.Length);
             }

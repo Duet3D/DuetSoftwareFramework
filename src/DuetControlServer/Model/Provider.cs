@@ -63,7 +63,7 @@ namespace DuetControlServer.Model
                         {
                             await Task.Delay(Settings.MaxMachineModelLockTime, _releaseCts.Token);
                             _logger.Fatal("{0} deadlock detected, stack trace of the deadlock:\n{1}", isWriteLock ? "Writer" : "Reader", stackTrace);
-                            Program.CancelSource.Cancel();
+                            await Program.Shutdown();
                         }
                         finally
                         {
@@ -101,7 +101,7 @@ namespace DuetControlServer.Model
                     _lock.Dispose();
 
                     // Stop the deadlock detection task if applicable
-                    if (!Program.CancelSource.IsCancellationRequested)
+                    if (!Program.CancellationToken.IsCancellationRequested)
                     {
                         _releaseCts?.Cancel();
                     }
@@ -245,7 +245,7 @@ namespace DuetControlServer.Model
             using (await _updateLock.LockAsync(cancellationToken))
             {
                 await _updateEvent.WaitAsync(cancellationToken);
-                Program.CancelSource.Token.ThrowIfCancellationRequested();
+                Program.CancellationToken.ThrowIfCancellationRequested();
             }
         }
 

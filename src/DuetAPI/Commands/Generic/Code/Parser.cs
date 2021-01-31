@@ -36,6 +36,7 @@ namespace DuetAPI.Commands
             bool wasQuoted = false, wasCondition = false, wasExpression = false;
             int numCurlyBraces = 0, numRoundBraces = 0;
 
+            char[] charArray = new char[1];
             Encoding encoding = (reader is StreamReader sr) ? sr.CurrentEncoding : Encoding.UTF8;
             result.Length = 0;
             do
@@ -43,7 +44,8 @@ namespace DuetAPI.Commands
                 // Read the next character
                 int currentChar = reader.Read();
                 c = (currentChar < 0) ? '\n' : (char)currentChar;
-                result.Length += encoding.GetByteCount(stackalloc char[] { c });
+                charArray[0] = c;
+                result.Length += encoding.GetByteCount(charArray);
 
                 if (c == '\r')
                 {

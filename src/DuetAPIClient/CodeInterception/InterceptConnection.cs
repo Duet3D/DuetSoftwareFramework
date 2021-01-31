@@ -60,7 +60,7 @@ namespace DuetAPIClient
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Init message could not be processed</exception>
-        [Obsolete]
+        [Obsolete("Use the new constructor to specify the code channels to intercept")]
         public Task Connect(InterceptionMode mode, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
             Mode = mode;
@@ -118,7 +118,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CodeInterceptionRead"/>
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-        public Task<Code> ReceiveCode(CancellationToken cancellationToken = default) => Receive<Code>(cancellationToken);
+        public ValueTask<Code> ReceiveCode(CancellationToken cancellationToken = default) => Receive<Code>(cancellationToken);
 
         /// <summary>
         /// Instruct the control server to cancel the last received code (in intercepting mode)
@@ -129,7 +129,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="Cancel"/>
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-        public Task CancelCode(CancellationToken cancellationToken = default) => Send(new Cancel(), cancellationToken);
+        public ValueTask CancelCode(CancellationToken cancellationToken = default) => Send(new Cancel(), cancellationToken);
 
         /// <summary>
         /// Instruct the control server to ignore the last received code (in intercepting mode)
@@ -141,7 +141,7 @@ namespace DuetAPIClient
         /// <seealso cref="Ignore"/>
         /// <seealso cref="SbcPermissions.CodeInterceptionRead"/>
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-        public Task IgnoreCode(CancellationToken cancellationToken = default) => Send(new Ignore(), cancellationToken);
+        public ValueTask IgnoreCode(CancellationToken cancellationToken = default) => Send(new Ignore(), cancellationToken);
 
         /// <summary>
         /// Instruct the control server to resolve the last received code with the given message details (in intercepting mode)
@@ -155,7 +155,7 @@ namespace DuetAPIClient
         /// <seealso cref="Message"/>
         /// <seealso cref="Resolve"/>
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-        public Task ResolveCode(MessageType type, string content, CancellationToken cancellationToken = default)
+        public ValueTask ResolveCode(MessageType type, string content, CancellationToken cancellationToken = default)
         {
             return Send(new Resolve { Content = content, Type = type }, cancellationToken);
         }

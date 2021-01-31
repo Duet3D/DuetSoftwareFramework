@@ -32,12 +32,12 @@ namespace DuetControlServer
         /// <summary>
         /// Global cancellation source that is triggered when the program is supposed to terminate
         /// </summary>
-        public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
+        private static readonly CancellationTokenSource _cancelSource = new CancellationTokenSource();
 
         /// <summary>
         /// Global cancellation token that is triggered when the program is supposed to terminate
         /// </summary>
-        public static readonly CancellationToken CancellationToken = CancelSource.Token;
+        public static readonly CancellationToken CancellationToken = _cancelSource.Token;
 
         /// <summary>
         /// Cancellation token to be called when the program has been terminated
@@ -146,25 +146,42 @@ namespace DuetControlServer
             // Deal with program termination requests (SIGTERM and Ctrl+C)
             AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
             {
-                if (!CancelSource.IsCancellationRequested)
+                if (!_cancelSource.IsCancellationRequested)
                 {
                     _logger.Warn("Received SIGTERM, shutting down...");
-                    CancelSource.Cancel();
+                    Shutdown().Wait();
                 }
             };
             Console.CancelKeyPress += (sender, e) =>
             {
-                if (!CancelSource.IsCancellationRequested)
+                if (!_cancelSource.IsCancellationRequested)
                 {
                     _logger.Warn("Received SIGINT, shutting down...");
                     e.Cancel = true;
-                    CancelSource.Cancel();
+                    Shutdown().Wait();
                 }
             };
 
             if (!Settings.UpdateOnly)
             {
-                // Load plugin manifests and start them again
+                // Notify the service manager that we're up and running.
+                // It might take a while to process runonce.g so do it first
+                string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
+                if (!string.IsNullOrEmpty(notifySocket))
+                {
+                    try
+                    {
+                        using Socket socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
+                        socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
+                        socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Warn(e, "Failed to notify systemd about process start");
+                    }
+                }
+
+                // Load plugin manifests
                 foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
                 {
                     if (file.EndsWith(".json"))
@@ -186,12 +203,6 @@ namespace DuetControlServer
                             _logger.Error(e, "Failed to load plugin manifest {0}", Path.GetFileName(file));
                         }
                     }
-                }
-
-                if (File.Exists(Settings.PluginsFilename))
-                {
-                    string[] pluginsToStart = await File.ReadAllLinesAsync(Settings.PluginsFilename);
-                    await Utility.Plugins.StartPlugins(pluginsToStart);
                 }
 
                 // Execute runonce.g after config.g if it is present
@@ -228,28 +239,12 @@ namespace DuetControlServer
                         }
                     }
                 }
-
-                // Notify the service manager that we're up and running
-                string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
-                if (!string.IsNullOrEmpty(notifySocket))
-                {
-                    try
-                    {
-                        using Socket socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
-                        socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
-                        socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.Warn(e, "Failed to notify systmed about process start");
-                    }
-                }
             }
 
             // Wait for the first task to terminate.
             // In case this is an unusual shutdown, log this event and shut down the application
             Task terminatedTask = await Task.WhenAny(mainTasks.Keys);
-            if (!CancelSource.IsCancellationRequested)
+            if (!_cancelSource.IsCancellationRequested)
             {
                 _logger.Fatal("Abnormal program termination");
                 if (terminatedTask.IsFaulted)
@@ -257,7 +252,13 @@ namespace DuetControlServer
                     string taskName = mainTasks[terminatedTask];
                     _logger.Fatal(terminatedTask.Exception, "{0} task faulted", taskName);
                 }
-                CancelSource.Cancel();
+
+                if (!Settings.UpdateOnly)
+                {
+                    StopPlugins stopCommand = new StopPlugins();
+                    await stopCommand.Execute();
+                }
+                _cancelSource.Cancel();
             }
 
             // Wait for the other tasks to finish
@@ -283,14 +284,6 @@ namespace DuetControlServer
                 }
             }
             while (mainTasks.Count > 0);
-
-            // Stop the plugins again and save the state
-            if (!Settings.UpdateOnly)
-            {
-                _logger.Debug("Stopping plugins and saving their execution state");
-                IEnumerable<string> startedPlugins = await Utility.Plugins.StopPlugins();
-                await File.WriteAllLinesAsync(Settings.PluginsFilename, startedPlugins);
-            }
 
             // End
             _logger.Info("Application has shut down");
@@ -334,7 +327,7 @@ namespace DuetControlServer
                 }
                 finally
                 {
-                    CancelSource.Cancel();
+                    _cancelSource.Cancel();
                 }
             }
             else
@@ -347,22 +340,34 @@ namespace DuetControlServer
         /// <summary>
         /// Terminate this program and kill it forcefully if required
         /// </summary>
+        /// <param name="savePluginState">Whether the loaded plugins are supposed to be saved</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Terminate()
+        public static async Task Shutdown(bool savePluginState = true)
         {
-            try
+            // Shut down the plugins if they were started before
+            if (savePluginState && !Settings.UpdateOnly)
             {
-                // Try to shut down this program normally
-                CancelSource.Cancel();
-                await Task.Delay(4000, _programTerminated.Token);
+                try
+                {
+                    StopPlugins stopCommand = new StopPlugins();
+                    await stopCommand.Execute();
+                }
+                catch (Exception e)
+                {
+                    _logger.Error(e, "Failed to stop plugins");
 
-                // If that fails, kill it
-                Environment.Exit(1);
+                }
             }
-            catch (OperationCanceledException)
+
+            // Try to shut down this program normally 
+            _cancelSource.Cancel();
+
+            // If that fails, kill the program forcefully
+            _ = Task.Delay(4500, _programTerminated.Token).ContinueWith(async task =>
             {
-                // expected
-            }
+                await task;
+                Environment.Exit(1);
+            }, TaskContinuationOptions.RunContinuationsAsynchronously);
         }
     }
 }

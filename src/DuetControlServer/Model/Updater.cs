@@ -41,7 +41,7 @@ namespace DuetControlServer.Model
             using (await _monitor.EnterAsync(cancellationToken))
             {
                 await _monitor.WaitAsync(cancellationToken);
-                Program.CancelSource.Token.ThrowIfCancellationRequested();
+                Program.CancellationToken.ThrowIfCancellationRequested();
             }
         }
 
@@ -113,7 +113,7 @@ namespace DuetControlServer.Model
                     // Request the limits if no sequence numbers have been set yet
                     using (await _monitor.EnterAsync(Program.CancellationToken))
                     {
-                        if (_lastSeqs.Count == 0)
+                        if (_lastSeqs.IsEmpty)
                         {
                             jsonData = await SPI.Interface.RequestObjectModel("limits", "d99vn");
                             using JsonDocument limitsDocument = JsonDocument.Parse(jsonData);
@@ -231,7 +231,7 @@ namespace DuetControlServer.Model
                 // Wait a moment
                 await Task.Delay(Settings.ModelUpdateInterval);
             }
-            while (!Program.CancelSource.IsCancellationRequested);
+            while (!Program.CancellationToken.IsCancellationRequested);
         }
 
         /// <summary>

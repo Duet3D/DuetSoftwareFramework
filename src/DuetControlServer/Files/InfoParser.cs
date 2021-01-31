@@ -218,7 +218,7 @@ namespace DuetControlServer.Files
         /// <param name="buffer">Internal buffer</param>
         /// <param name="bufferPointer">Pointer to the next byte in the buffer</param>
         /// <returns>Read result</returns>
-        private static async Task<ReadLineFromEndResult> ReadLineFromEndAsync(StreamReader reader, char[] buffer, int bufferPointer)
+        private static async ValueTask<ReadLineFromEndResult> ReadLineFromEndAsync(StreamReader reader, char[] buffer, int bufferPointer)
         {
             string line = string.Empty;
             do

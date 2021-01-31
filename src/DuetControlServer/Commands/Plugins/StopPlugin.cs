@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
+using DuetAPI.Utility;
 using System;
-using System.Diagnostics;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -17,17 +18,34 @@ namespace DuetControlServer.Commands
         /// <exception cref="ArgumentException">Plugin is invalid</exception>
         public override async Task Execute()
         {
-            bool pluginFound = false;
-            int pid = -1;
+            bool pluginFound = false, stopPlugin = false, asRoot = false;
             using (await Model.Provider.AccessReadWriteAsync())
             {
                 foreach (Plugin item in Model.Provider.Get.Plugins)
                 {
                     if (item.Name == Plugin)
                     {
-                        pid = item.Pid;
                         pluginFound = true;
-                        break;
+                        if (item.Pid > 0)
+                        {
+                            // Make sure no other running plugin depends on it
+                            if (!StoppingAll)
+                            {
+                                foreach (Plugin other in Model.Provider.Get.Plugins)
+                                {
+                                    if (other.Name != Plugin && other.Pid > 0 && other.SbcPluginDependencies.Contains(Plugin))
+                                    {
+                                        throw new ArgumentException($"Cannot stop plugin because plugin {other.Name} depends on it");
+                                    }
+                                }
+                            }
+
+                            // Stop the plugin
+                            item.Pid = 0;
+                            stopPlugin = true;
+                            asRoot = item.SbcPermissions.HasFlag(SbcPermissions.SuperUser);
+                        }
+                        return;
                     }
                 }
             }
@@ -37,21 +55,14 @@ namespace DuetControlServer.Commands
                 throw new ArgumentException($"Plugin {Plugin} not found");
             }
 
-            if (pid > 0)
+            if (stopPlugin)
             {
-                // TODO If the process is running as super user, ask the elevation service to terminate it
-
-                Process process = Process.GetProcessById(pid);
-                if (process != null)
-                {
-                    // Ask process to terminate and wait a moment
-                    LinuxApi.Commands.Kill(pid, LinuxApi.Signal.SIGTERM);
-                    process.WaitForExit(4000);
-
-                    // Kill it and any potential child processes
-                    process.Kill(true);
-                }
+                // Stop it via the plugin service. This will reset the PID to -1 too
+                await IPC.Processors.PluginService.PerformCommand(this, asRoot);
             }
         }
+
+        [JsonIgnore]
+        public bool StoppingAll { get; set; }
     }
 }

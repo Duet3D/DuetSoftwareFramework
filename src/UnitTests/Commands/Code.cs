@@ -844,7 +844,7 @@ namespace UnitTests.Commands
             using StreamReader reader = new StreamReader(memoryStream);
             CodeParserBuffer buffer = new CodeParserBuffer(128, true);
             DuetAPI.Commands.Code codeObj = new DuetAPI.Commands.Code();
-            DuetAPI.Commands.Code.ParseAsync(reader, codeObj, buffer).Wait();
+            DuetAPI.Commands.Code.ParseAsync(reader, codeObj, buffer).AsTask().Wait();
             yield return codeObj;
         }
     }

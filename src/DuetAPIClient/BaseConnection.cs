@@ -30,10 +30,7 @@ namespace DuetAPIClient
         /// Create a new connection instance
         /// </summary>
         /// <param name="mode">Mode of the new connection</param>
-        protected BaseConnection(ConnectionMode mode)
-        {
-            _connectionMode = mode;
-        }
+        protected BaseConnection(ConnectionMode mode) => _connectionMode = mode;
 
         /// <summary>
         /// Finalizer of this class
@@ -198,7 +195,7 @@ namespace DuetAPIClient
         /// <returns>Received object</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        protected async Task<T> Receive<T>(CancellationToken cancellationToken)
+        protected async ValueTask<T> Receive<T>(CancellationToken cancellationToken)
         {
             using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
             return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken);
@@ -211,7 +208,7 @@ namespace DuetAPIClient
         /// <returns>Deserialized base response</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        private async Task<BaseResponse> ReceiveResponse(CancellationToken cancellationToken)
+        private async ValueTask<BaseResponse> ReceiveResponse(CancellationToken cancellationToken)
         {
             using JsonDocument jsonDocument = await ReceiveJson(cancellationToken);
             foreach (var item in jsonDocument.RootElement.EnumerateObject())
@@ -236,7 +233,7 @@ namespace DuetAPIClient
         /// <returns>Deserialized response</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        private async Task<BaseResponse> ReceiveResponse<T>(CancellationToken cancellationToken)
+        private async ValueTask<BaseResponse> ReceiveResponse<T>(CancellationToken cancellationToken)
         {
             using JsonDocument jsonDocument = await ReceiveJson(cancellationToken);
             foreach (JsonProperty property in jsonDocument.RootElement.EnumerateObject())
@@ -260,10 +257,10 @@ namespace DuetAPIClient
         /// <returns>Partially deserialized data</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        protected async Task<JsonDocument> ReceiveJson(CancellationToken cancellationToken)
+        protected async ValueTask<JsonDocument> ReceiveJson(CancellationToken cancellationToken)
         {
             using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
-            return await JsonDocument.ParseAsync(json);
+            return await JsonDocument.ParseAsync(json, cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -274,7 +271,7 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Message could not be processed</exception>
-        protected async Task Send(object obj, CancellationToken cancellationToken)
+        protected async ValueTask Send(object obj, CancellationToken cancellationToken)
         {
             byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
             //Console.Write($"OUT {Encoding.UTF8.GetString(jsonToWrite)}");

@@ -61,6 +61,30 @@ namespace LinuxApi
         }
 
         /// <summary>
+        /// Get the current group ID
+        /// </summary>
+        /// <returns>Group ID</returns>
+        public static int GetGroupID() => Interop.getgid();
+
+        /// <summary>
+        /// Get the effective group ID
+        /// </summary>
+        /// <returns>Effective group ID</returns>
+        public static int GetEffectiveGroupID() => Interop.getegid();
+
+        /// <summary>
+        /// Get the current user ID
+        /// </summary>
+        /// <returns>User ID</returns>
+        public static int GetUserID() => Interop.getuid();
+
+        /// <summary>
+        /// Get the effective user ID
+        /// </summary>
+        /// <returns>Effective user ID</returns>
+        public static int GetEffectiveUserID() => Interop.geteuid();
+
+        /// <summary>
         /// Send a signal to another process
         /// </summary>
         /// <param name="pid">Target process ID</param>

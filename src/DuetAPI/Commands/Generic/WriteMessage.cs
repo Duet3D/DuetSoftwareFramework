@@ -29,12 +29,12 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Write the message to the log file (if applicable)
         /// </summary>
-        [Obsolete]
+        [Obsolete("Deprecated in favor of LogLevel")]
         public bool LogMessage { get; set; }
 
         /// <summary>
         /// Log level of this message
         /// </summary>
-        public LogLevel LogLevel { get; set; } = LogLevel.Off;
+        public LogLevel? LogLevel { get; set; }
     }
 }

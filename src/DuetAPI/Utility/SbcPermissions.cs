@@ -22,7 +22,7 @@ namespace DuetAPI.Utility
         CommandExecution,
 
         /// <summary>
-        /// Intercept codes in a non-blocking way
+        /// Intercept codes but don't interact with them
         /// </summary>
         CodeInterceptionRead,
 
@@ -32,9 +32,14 @@ namespace DuetAPI.Utility
         CodeInterceptionReadWrite,
 
         /// <summary>
-        /// Install, load, unload, and uninstall plugins
+        /// Install, load, unload, and uninstall plugins. Grants FS access to all third-party plugins too
         /// </summary>
         ManagePlugins,
+
+        /// <summary>
+        /// Service plugin runtime information (for internal purposes only, do not use)
+        /// </summary>
+        ServicePlugins,
 
         /// <summary>
         /// Manage user sessions
@@ -56,7 +61,7 @@ namespace DuetAPI.Utility
         /// </summary>
         RegisterHttpEndpoints,
 
-        #region Reserved permissions - will require AppArmor and elevation process
+        #region OS permissions enforced by AppArmor
         /// <summary>
         /// Read files in 0:/filaments
         /// </summary>
@@ -128,7 +133,7 @@ namespace DuetAPI.Utility
         WriteWeb,
 
         /// <summary>
-        /// Access files outside the virtual SD directory (as DSF user)
+        /// Access files including all subdirecotires of the virtual SD directory as DSF user
         /// </summary>
         FileSystemAccess,
 

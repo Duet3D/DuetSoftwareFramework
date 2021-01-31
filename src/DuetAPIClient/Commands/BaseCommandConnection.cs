@@ -63,7 +63,7 @@ namespace DuetAPIClient
         {
             if (originPort == null)
             {
-                originPort = Process.GetCurrentProcess().Id;
+                originPort = Environment.ProcessId;
             }
             return PerformCommand<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin, OriginPort = originPort.Value }, cancellationToken);
         }
@@ -125,7 +125,7 @@ namespace DuetAPIClient
         /// <returns>The current machine model</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
-        [Obsolete]
+        [Obsolete("Deprecated in favor of GetObjectModel")]
         public Task<ObjectModel> GetMachineModel(CancellationToken cancellationToken = default)
         {
             return PerformCommand<ObjectModel>(new GetObjectModel(), cancellationToken);
@@ -153,8 +153,8 @@ namespace DuetAPIClient
         /// <returns>Machine model JSON</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
-        [Obsolete]
-        public async Task<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
+        [Obsolete("Deprecated in favor of GetSerializedObjectModel")]
+        public async ValueTask<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
         {
             await Send(new GetObjectModel(), cancellationToken);
             return await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
@@ -229,7 +229,7 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
-        [Obsolete]
+        [Obsolete("Deprecated in favor of LockObjectModel")]
         public Task LockMachineModel(CancellationToken cancellationToken = default)
         {
             return PerformCommand(new LockObjectModel(), cancellationToken);
@@ -259,7 +259,7 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        [Obsolete]
+        [Obsolete("Deprecated in favor of PatchObjectModel")]
         public async Task PatchMachineModel(string key, object patch, CancellationToken cancellationToken = default)
         {
             using JsonDocument jsonDocument = JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(patch, JsonHelper.DefaultJsonOptions));
@@ -371,7 +371,7 @@ namespace DuetAPIClient
         /// <returns>True if the property could be updated</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
-        [Obsolete]
+        [Obsolete("Deprecated in favor of SetObjectModel")]
         public Task<bool> SetMachineModel(string path, string value, CancellationToken cancellationToken = default)
         {
             return PerformCommand<bool>(new SetObjectModel { PropertyPath = path, Value = value }, cancellationToken);
@@ -461,7 +461,7 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
-        [Obsolete]
+        [Obsolete("Deprecated in favor of SyncObjectModel")]
         public Task SyncMachineModel(CancellationToken cancellationToken = default)
         {
             return PerformCommand(new SyncObjectModel(), cancellationToken);
@@ -503,7 +503,7 @@ namespace DuetAPIClient
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
-        [Obsolete]
+        [Obsolete("Deprecated in favor of UnlockObjectModel")]
         public Task UnlockMachineModel(CancellationToken cancellationToken)
         {
             return PerformCommand(new UnlockObjectModel(), cancellationToken);
@@ -522,7 +522,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        [Obsolete]
+        [Obsolete("This overload is deprecated because it lacks support for log levels")]
         public Task WriteMessage(MessageType type, string message, bool outputMessage, bool logMessage, CancellationToken cancellationToken = default)
         {
             return PerformCommand(new WriteMessage { Type = type, Content = message, OutputMessage = outputMessage, LogMessage = logMessage }, cancellationToken);
@@ -534,14 +534,14 @@ namespace DuetAPIClient
         /// <param name="type">Message type</param>
         /// <param name="message">Message content</param>
         /// <param name="outputMessage">Whether to output the message</param>
-        /// <param name="logLevel">Target log level</param>
+        /// <param name="logLevel">Target log level or null to determine log level from the message type</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        public Task WriteMessage(MessageType type, string message, bool outputMessage = true, LogLevel logLevel = LogLevel.Off, CancellationToken cancellationToken = default)
+        public Task WriteMessage(MessageType type, string message, bool outputMessage = true, LogLevel? logLevel = null, CancellationToken cancellationToken = default)
         {
             return PerformCommand(new WriteMessage { Type = type, Content = message, OutputMessage = outputMessage, LogLevel = logLevel }, cancellationToken);
         }
@@ -558,7 +558,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        [Obsolete]
+        [Obsolete("This overload is deprecated because it lacks support for log levels")]
         public Task WriteMessage(Message message, bool outputMessage = true, bool logMessage = false, CancellationToken cancellationToken = default)
         {
             return PerformCommand(new WriteMessage { Type = message.Type, Content = message.Content, OutputMessage = outputMessage, LogMessage = logMessage }, cancellationToken);

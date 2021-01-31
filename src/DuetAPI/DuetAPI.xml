@@ -1248,6 +1248,22 @@
             Value to set
             </summary>
         </member>
+        <member name="T:DuetAPI.Commands.SetPluginProcess">
+            <summary>
+            Command to update the process identifier of a given plugin.
+            Reserved for internal purposes, do not use
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.SetPluginProcess.Plugin">
+            <summary>
+            Name of the plugin to update
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.SetPluginProcess.Pid">
+            <summary>
+            New process identifier of the plugin
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.StartPlugin">
             <summary>
             Start a plugin
@@ -1258,6 +1274,11 @@
             Name of the plugin
             </summary>
         </member>
+        <member name="T:DuetAPI.Commands.StartPlugins">
+            <summary>
+            Start all the plugins
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.StopPlugin">
             <summary>
             Stop a plugin
@@ -1266,6 +1287,11 @@
         <member name="P:DuetAPI.Commands.StopPlugin.Plugin">
             <summary>
             Name of the plugin
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Commands.StopPlugins">
+            <summary>
+            Stop all the plugins
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.UninstallPlugin">
@@ -1406,6 +1432,11 @@
             </summary>
             <seealso cref="T:DuetAPI.Connection.InitMessages.SubscribeInitMessage"/>
         </member>
+        <member name="F:DuetAPI.Connection.ConnectionMode.PluginService">
+            <summary>
+            Plugin service mode. This mode is used internally and should not be used by third-party plugins!
+            </summary>
+        </member>
         <member name="T:DuetAPI.Connection.Defaults">
             <summary>
             Static class that holds the connection defaults
@@ -1541,6 +1572,17 @@
             Defines if either regular or priority codes are supposed to be intercepted
             </summary>
             <seealso cref="F:DuetAPI.Commands.CodeFlags.IsPrioritized"/>
+        </member>
+        <member name="T:DuetAPI.Connection.InitMessages.PluginServiceInitMessage">
+            <summary>
+            Enter connection mode for the plugin service.
+            This init message is used for internal IPC and should not be used by third-party plugins!
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Connection.InitMessages.PluginServiceInitMessage.#ctor">
+            <summary>
+            Creates a new init message instance
+            </summary>
         </member>
         <member name="T:DuetAPI.Connection.InitMessages.ServerInitMessage">
             <summary>
@@ -4509,11 +4551,8 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.Plugin.Pid">
             <summary>
-            Process ID of the plugin or -1 if not started
+            Process ID of the plugin or -1 if not started. It is set to 0 while the plugin is being shut down
             </summary>
-            <remarks>
-            This may become 0 when the plugin has been stopped and the application is being shut down
-            </remarks>
         </member>
         <member name="T:DuetAPI.ObjectModel.PluginManifest">
             <summary>
@@ -4614,6 +4653,14 @@
             <summary>
             Major/minor supported RRF version (optional)
             </summary>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.PluginManifest.CheckVersion(System.String,System.String)">
+            <summary>
+            Check if the given version satisfies a required version
+            </summary>
+            <param name="actual">Actual version</param>
+            <param name="required">Required version</param>
+            <returns>Whether the actual version fulfills teh requirement</returns>
         </member>
         <member name="T:DuetAPI.ObjectModel.Scanner">
             <summary>
@@ -6492,7 +6539,7 @@
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.CodeInterceptionRead">
             <summary>
-            Intercept codes in a non-blocking way
+            Intercept codes but don't interact with them
             </summary>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.CodeInterceptionReadWrite">
@@ -6502,7 +6549,12 @@
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.ManagePlugins">
             <summary>
-            Install, load, unload, and uninstall plugins
+            Install, load, unload, and uninstall plugins. Grants FS access to all third-party plugins too
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Utility.SbcPermissions.ServicePlugins">
+            <summary>
+            Service plugin runtime information (for internal purposes only, do not use)
             </summary>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.ManageUserSessions">
@@ -6597,7 +6649,7 @@
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.FileSystemAccess">
             <summary>
-            Access files outside the virtual SD directory (as DSF user)
+            Access files including all subdirecotires of the virtual SD directory as DSF user
             </summary>
         </member>
         <member name="F:DuetAPI.Utility.SbcPermissions.LaunchProcesses">

@@ -879,6 +879,7 @@ namespace DuetControlServer.Codes
                     {
                         if (await SPI.Interface.Flush(code))
                         {
+                            // Get the IAP and Firmware files
                             string iapFile, firmwareFile;
                             using (await Model.Provider.AccessReadOnlyAsync())
                             {
@@ -909,8 +910,14 @@ namespace DuetControlServer.Codes
                                 return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
                             }
 
-                            IEnumerable<string> stoppedPlugins = await Utility.Plugins.StopPlugins();
+                            // Stop all the plugins
+                            if (!Settings.UpdateOnly)
+                            {
+                                Commands.StopPlugins stopCommand = new Commands.StopPlugins();
+                                await stopCommand.Execute();
+                            }
 
+                            // Flash the firmware
                             using FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
                             using FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
                             if (Path.GetExtension(firmwareFile) == ".uf2")
@@ -923,14 +930,17 @@ namespace DuetControlServer.Codes
                                 await SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
                             }
 
+                            // Terminate the program - or - restart the plugins when done
                             if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
                             {
-                                Program.CancelSource.Cancel();
+                                await Program.Shutdown(false);
                             }
                             else
                             {
                                 await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
-                                await Utility.Plugins.StartPlugins(stoppedPlugins);
+
+                                Commands.StartPlugins startCommand = new Commands.StartPlugins();
+                                await startCommand.Execute();
                             }
                             return new CodeResult();
                         }
@@ -1008,24 +1018,12 @@ namespace DuetControlServer.Codes
                     }
                     break;
 
-                // Set compatibility
-                case 555:
-                    if (code.Parameter('P') != null)
-                    {
-                        Compatibility compatibility = (Compatibility)(int)code.Parameter('P');
-                        using (await Model.Provider.AccessReadWriteAsync())
-                        {
-                            Model.Provider.Get.Inputs[code.Channel].Compatibility = compatibility;
-                        }
-                    }
-                    break;
-
                 // Reset controller
                 case 999:
                     if (!Settings.NoTerminateOnReset && code.Parameters.Count == 0)
                     {
                         // DCS is supposed to terminate via M999 unless this option is explicitly disabled
-                        _ = Task.Run(Program.Terminate);
+                        await Program.Shutdown();
                     }
                     break;
             }

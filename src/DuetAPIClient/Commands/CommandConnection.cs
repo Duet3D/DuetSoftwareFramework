@@ -3,8 +3,10 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
+using DuetAPI.ObjectModel;
 
 namespace DuetAPIClient
 {
@@ -33,6 +35,20 @@ namespace DuetAPIClient
         {
             CommandInitMessage initMessage = new CommandInitMessage();
             return Connect(initMessage, socketPath, cancellationToken);
+        }
+
+        /// <summary>
+        /// Update the process id of a given plugin. Reserved for internal purposes, do not use
+        /// </summary>
+        /// <param name="name">Name of the plugin</param>
+        /// <param name="pid">New process id</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        public Task SetPluginProcess(string name, int pid, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new SetPluginProcess { Plugin = name, Pid = pid }, cancellationToken);
         }
     }
 }
