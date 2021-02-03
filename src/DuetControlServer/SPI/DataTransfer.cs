@@ -31,7 +31,7 @@ namespace DuetControlServer.SPI
 
         // General transfer variables
         private static InputGpioPin _transferReadyPin;
-	private static bool _expectedValue = false;
+        private static bool _expectedValue = false;
         private static volatile bool _transferReadyPinMonitored;
         private static SpiDevice _spiDevice;
         private static readonly AsyncManualResetEvent _transferReadyEvent = new AsyncManualResetEvent();
@@ -1089,7 +1089,7 @@ namespace DuetControlServer.SPI
                     }
                 }
                 _waitingForFirstTransfer = false;
-		_expectedValue = false;
+                _expectedValue = false;
             }
             else if (_updating)
             {
@@ -1116,7 +1116,7 @@ namespace DuetControlServer.SPI
                         throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                     }
                     _transferReadyEvent.Reset();
-	        }while(_transferReadyPin.Value != _expectedValue);
+                } while(_transferReadyPin.Value != _expectedValue);
                 _expectedValue = !_expectedValue;
             }
             _transferReadyEvent.Reset();
