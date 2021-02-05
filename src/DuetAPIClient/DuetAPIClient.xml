@@ -205,7 +205,7 @@
             Establishes a connection to the given UNIX socket file
             </summary>
             <param name="mode">Interception mode</param>
-            <param name="channels">Optional list of input channels where codes may be intercepted</param>
+            <param name="channels">List of input channels where codes may be intercepted or null for all available channels</param>
             <param name="filters">Optional list of codes that may be intercepted</param>
             <param name="priortyCodes">Define if priorty codes may be intercepted</param>
             <param name="socketPath">Path to the UNIX socket file</param>
@@ -226,6 +226,16 @@
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.CodeInterceptionRead"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.CodeInterceptionReadWrite"/>
+        </member>
+        <member name="M:DuetAPIClient.InterceptConnection.Flush(System.Threading.CancellationToken)">
+            <summary>
+            When intercepting a code wait for all previous codes of the given channel to finish
+            </summary>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>True if all pending codes could be flushed</returns>
+            <exception cref="T:System.InvalidOperationException">Requested code channel is disabled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.CommandExecution"/>
         </member>
         <member name="M:DuetAPIClient.InterceptConnection.CancelCode(System.Threading.CancellationToken)">
             <summary>
@@ -256,6 +266,19 @@
             </summary>
             <param name="type">Type of the resolving message</param>
             <param name="content">Content of the resolving message</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+            <seealso cref="T:DuetAPI.ObjectModel.Message"/>
+            <seealso cref="T:DuetAPI.Commands.Resolve"/>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.CodeInterceptionReadWrite"/>
+        </member>
+        <member name="M:DuetAPIClient.InterceptConnection.ResolveCode(DuetAPI.ObjectModel.Message,System.Threading.CancellationToken)">
+            <summary>
+            Instruct the control server to resolve the last received code with the given message details (in intercepting mode)
+            </summary>
+            <param name="message">Message to resolve the code with</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
@@ -307,6 +330,17 @@
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ManageUserSessions"/>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.CheckPassword(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Check the given password (see M551)
+            </summary>
+            <param name="password">Password to check</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>True if the requested password is correct</returns>
+            <exception cref="T:System.InvalidOperationException">Requested code channel is disabled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.CommandExecution"/>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.EvaluateExpression``1(System.String,DuetAPI.CodeChannel,System.Threading.CancellationToken)">
             <summary>
@@ -724,6 +758,17 @@
             <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Init message could not be processed</exception>
+        </member>
+        <member name="M:DuetAPIClient.CommandConnection.SetNetworkProtocol(DuetAPI.ObjectModel.NetworkProtocol,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Update the status of a network protocol. Reserved for internal purposes, do not use
+            </summary>
+            <param name="protocol">Protocol to update</param>
+            <param name="enabled">If it is enabled or not</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
         </member>
         <member name="M:DuetAPIClient.CommandConnection.SetPluginProcess(System.String,System.Int32,System.Threading.CancellationToken)">
             <summary>

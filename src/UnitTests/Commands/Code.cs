@@ -3,6 +3,7 @@ using DuetAPI.Utility;
 using NUnit.Framework;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -246,6 +247,29 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseM587()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M587 S\"TestAp\" P\"Some pass\" I192.168.1.123 J192.168.1.254 K255.255.255.0"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(587, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
+                Assert.AreEqual(5, code.Parameters.Count);
+                Assert.AreEqual('S', code.Parameters[0].Letter);
+                Assert.AreEqual("TestAp", (string)code.Parameters[0]);
+                Assert.AreEqual('P', code.Parameters[1].Letter);
+                Assert.AreEqual("Some pass", (string)code.Parameters[1]);
+                Assert.AreEqual('I', code.Parameters[2].Letter);
+                Assert.AreEqual(IPAddress.Parse("192.168.1.123"), (IPAddress)code.Parameters[2]);
+                Assert.AreEqual('J', code.Parameters[3].Letter);
+                Assert.AreEqual(IPAddress.Parse("192.168.1.254"), (IPAddress)code.Parameters[3]);
+                Assert.AreEqual('K', code.Parameters[4].Letter);
+                Assert.AreEqual(IPAddress.Parse("255.255.255.0"), (IPAddress)code.Parameters[4]);
+            }
+        }
+
+        [Test]
         public void ParseM915()
         {
             foreach (DuetAPI.Commands.Code code in Parse("M915 P2:0.3:1.4 S22"))
@@ -399,6 +423,22 @@ namespace UnitTests.Commands
                 Assert.AreEqual('@', code.Parameters[0].Letter);
                 Assert.IsTrue(code.Parameters[0].IsExpression);
                 Assert.AreEqual("{ \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }", (string)code.Parameters[0]);
+            }
+        }
+
+        [Test]
+        public void ParseEmptyComments()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse(";"))
+            {
+                Assert.AreEqual(CodeType.Comment, code.Type);
+                Assert.AreEqual(string.Empty, code.Comment);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("()"))
+            {
+                Assert.AreEqual(CodeType.Comment, code.Type);
+                Assert.AreEqual(string.Empty, code.Comment);
             }
         }
 

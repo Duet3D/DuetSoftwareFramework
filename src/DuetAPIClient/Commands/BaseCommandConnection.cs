@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -69,6 +68,19 @@ namespace DuetAPIClient
         }
 
         /// <summary>
+        /// Check the given password (see M551)
+        /// </summary>
+        /// <param name="password">Password to check</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>True if the requested password is correct</returns>
+        /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        public Task<bool> CheckPassword(string password, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand<bool>(new CheckPassword { Password = password }, cancellationToken);
+        }
+        /// <summary>
         /// Evaluate an arbitrary expression
         /// </summary>
         /// <param name="channel">Context of the evaluation</param>
@@ -95,7 +107,7 @@ namespace DuetAPIClient
         /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
-        public Task<bool> Flush(CodeChannel channel = CodeChannel.SBC, CancellationToken cancellationToken = default)
+        public Task<bool> Flush(CodeChannel channel, CancellationToken cancellationToken = default)
         {
             return PerformCommand<bool>(new Flush { Channel = channel }, cancellationToken);
         }

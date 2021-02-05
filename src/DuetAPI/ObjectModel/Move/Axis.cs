@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using DuetAPI.Utility;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a configured axis
@@ -43,7 +45,7 @@
         /// <summary>
         /// List of the assigned drivers
         /// </summary>
-        public ModelCollection<string> Drivers { get; } = new ModelCollection<string>();
+        public ModelCollection<DriverId> Drivers { get; } = new ModelCollection<DriverId>();
 
         /// <summary>
         /// Whether or not the axis is homed

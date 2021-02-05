@@ -30,6 +30,11 @@ namespace DuetControlServer.Commands
         /// <exception cref="ArgumentException">Plugin is invalid</exception>
         public override async Task Execute()
         {
+            if (!Settings.PluginSupport)
+            {
+                throw new NotSupportedException("Plugin support has been disabled");
+            }
+
             // Make sure the upgrade switch is only used by the plugin service
             if (ForUpgrade && !Connection.Permissions.HasFlag(SbcPermissions.ServicePlugins))
             {

@@ -26,6 +26,11 @@ namespace DuetControlServer.Files
         public const string ConfigOverrideFile = "config-override.g";
 
         /// <summary>
+        /// Extra config file to be run when DCS + all third-party plugins have been started
+        /// </summary>
+        public const string DsfConfigFile = "dsf-config.g";
+
+        /// <summary>
         /// Daemon file used to perform periodic tasks
         /// </summary>
         public const string DaemonFile = "daemon.g";

@@ -15,6 +15,11 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
+            if (!Settings.PluginSupport)
+            {
+                throw new NotSupportedException("Plugin support has been disabled");
+            }
+
             using (await Model.Provider.AccessReadWriteAsync())
             {
                 foreach (Plugin item in Model.Provider.Get.Plugins)

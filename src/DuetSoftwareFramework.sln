@@ -34,7 +34,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PluginManager", "PluginManager\PluginManager.csproj", "{BCC22B04-E9F6-4DD5-AA95-24F02C7AC311}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetPluginService", "DuetPluginInstaller\DuetPluginService.csproj", "{48B50A0D-61DF-4888-B376-6FD3BE714835}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetPluginService", "DuetPluginService\DuetPluginService.csproj", "{48B50A0D-61DF-4888-B376-6FD3BE714835}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DuetPiManagementPlugin", "DuetPiManagementPlugin\DuetPiManagementPlugin.csproj", "{AD14D0B4-F62B-4453-A16E-B6A48607B1D0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -93,6 +95,10 @@ Global
 		{48B50A0D-61DF-4888-B376-6FD3BE714835}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{48B50A0D-61DF-4888-B376-6FD3BE714835}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{48B50A0D-61DF-4888-B376-6FD3BE714835}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AD14D0B4-F62B-4453-A16E-B6A48607B1D0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AD14D0B4-F62B-4453-A16E-B6A48607B1D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AD14D0B4-F62B-4453-A16E-B6A48607B1D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AD14D0B4-F62B-4453-A16E-B6A48607B1D0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

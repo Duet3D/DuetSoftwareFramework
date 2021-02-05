@@ -137,6 +137,16 @@ namespace DuetAPI.ObjectModel
         private int _nextTool = -1;
 
         /// <summary>
+        /// Indicates if at least one plugin has been started
+        /// </summary>
+        public bool PluginsStarted
+        {
+            get => _pluginsStarted;
+            set => SetPropertyValue(ref _pluginsStarted, value);
+        }
+        private bool _pluginsStarted;
+
+        /// <summary>
         /// Script to execute when the power fails
         /// </summary>
         public string PowerFailScript

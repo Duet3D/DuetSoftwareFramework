@@ -31,6 +31,16 @@
         private string _configuredIP;
 
         /// <summary>
+        /// Configured IPv4 DNS server fo the network adapter
+        /// </summary>
+        public string DnsServer
+        {
+            get => _dnsServer;
+            set => SetPropertyValue(ref _dnsServer, value);
+        }
+        private string _dnsServer;
+
+        /// <summary>
         /// Version of the network interface or null if unknown.
         /// This is primarily intended for the ESP8266-based network interfaces as used on the Duet WiFi
         /// </summary>
@@ -42,7 +52,7 @@
         private string _firmwareVersion;
 
         /// <summary>
-        /// Gateway of the network adapter
+        /// IPv4 gateway of the network adapter
         /// </summary>
         public string Gateway
         {
@@ -90,6 +100,8 @@
 			set => SetPropertyValue(ref _speed, value);
         }
         private int? _speed;
+
+        // DSF does not support the status property
 
         /// <summary>
         /// Subnet of the network adapter

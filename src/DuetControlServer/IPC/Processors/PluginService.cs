@@ -92,6 +92,11 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Asynchronous task</returns>
         public override async Task Process()
         {
+            if (!Settings.PluginSupport)
+            {
+                throw new NotSupportedException("Plugin support has been disabled");
+            }
+
             // Try to register this plugin service
             using (await _monitor.EnterAsync(Program.CancellationToken))
             {
@@ -116,6 +121,9 @@ namespace DuetControlServer.IPC.Processors
             // Start the plugins when both services are connected
             if (!Settings.UpdateOnly && _serviceConnected && _rootServiceConnected)
             {
+                // First ensure that object model is up-to-date
+                await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
+
                 Commands.StartPlugins startCommand = new Commands.StartPlugins();
                 _ = Task.Run(startCommand.Execute);
             }

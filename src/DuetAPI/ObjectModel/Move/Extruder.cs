@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using DuetAPI.Utility;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about an extruder drive
@@ -28,12 +30,12 @@
         /// <summary>
         /// Assigned driver
         /// </summary>
-        public string Driver
+        public DriverId Driver
         {
             get => _driver;
 			set => SetPropertyValue(ref _driver, value);
         }
-        private string _driver;
+        private DriverId _driver;
 
         /// <summary>
         /// Name of the currently loaded filament

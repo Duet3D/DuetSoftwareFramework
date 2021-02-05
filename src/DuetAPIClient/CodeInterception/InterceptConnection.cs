@@ -33,7 +33,7 @@ namespace DuetAPIClient
         /// <summary>
         /// List of input channels where codes may be intercepted. If the list is empty, all available channels are used
         /// </summary>
-        public List<CodeChannel> Channels { get; } = new List<CodeChannel>();
+        public List<CodeChannel> Channels { get; init; } = new List<CodeChannel>();
 
         /// <summary>
         /// List of G/M/T-codes to filter or Q0 for comments
@@ -41,7 +41,7 @@ namespace DuetAPIClient
         /// <remarks>
         /// This may only specify the code type and major/minor number (e.g. G1)
         /// </remarks>
-        public List<string> Filters { get; } = new List<string>();
+        public List<string> Filters { get; init; } = new List<string>();
 
         /// <summary>
         /// Defines if priority codes may be intercepted (e.g. M122 or M999)
@@ -60,8 +60,8 @@ namespace DuetAPIClient
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Init message could not be processed</exception>
-        [Obsolete("Use the new constructor to specify the code channels to intercept")]
-        public Task Connect(InterceptionMode mode, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+        [Obsolete("Use the new overload to specify the code channels to intercept")]
+        public Task Connect(InterceptionMode mode, string socketPath, CancellationToken cancellationToken = default)
         {
             Mode = mode;
             Channels.Clear();
@@ -77,7 +77,7 @@ namespace DuetAPIClient
         /// Establishes a connection to the given UNIX socket file
         /// </summary>
         /// <param name="mode">Interception mode</param>
-        /// <param name="channels">Optional list of input channels where codes may be intercepted</param>
+        /// <param name="channels">List of input channels where codes may be intercepted or null for all available channels</param>
         /// <param name="filters">Optional list of codes that may be intercepted</param>
         /// <param name="priortyCodes">Define if priorty codes may be intercepted</param>
         /// <param name="socketPath">Path to the UNIX socket file</param>
@@ -109,6 +109,7 @@ namespace DuetAPIClient
             InterceptInitMessage initMessage = new InterceptInitMessage { InterceptionMode = mode, Channels = Channels, Filters = Filters, PriortyCodes = priortyCodes };
             return Connect(initMessage, socketPath, cancellationToken);
         }
+
         /// <summary>
         /// Wait for a code to be intercepted and read it
         /// </summary>
@@ -119,6 +120,19 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.CodeInterceptionRead"/>
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
         public ValueTask<Code> ReceiveCode(CancellationToken cancellationToken = default) => Receive<Code>(cancellationToken);
+
+        /// <summary>
+        /// When intercepting a code wait for all previous codes of the given channel to finish
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>True if all pending codes could be flushed</returns>
+        /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        public Task<bool> Flush(CancellationToken cancellationToken = default)
+        {
+            return PerformCommand<bool>(new Flush(), cancellationToken);
+        }
 
         /// <summary>
         /// Instruct the control server to cancel the last received code (in intercepting mode)
@@ -158,6 +172,22 @@ namespace DuetAPIClient
         public ValueTask ResolveCode(MessageType type, string content, CancellationToken cancellationToken = default)
         {
             return Send(new Resolve { Content = content, Type = type }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Instruct the control server to resolve the last received code with the given message details (in intercepting mode)
+        /// </summary>
+        /// <param name="message">Message to resolve the code with</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="Message"/>
+        /// <seealso cref="Resolve"/>
+        /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
+        public ValueTask ResolveCode(Message message, CancellationToken cancellationToken = default)
+        {
+            return Send(new Resolve { Content = message.Content, Type = message.Type }, cancellationToken);
         }
     }
 }

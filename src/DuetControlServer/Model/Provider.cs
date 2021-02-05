@@ -16,6 +16,11 @@ namespace DuetControlServer.Model
     public static class Provider
     {
         /// <summary>
+        /// Default password (see also RRF)
+        /// </summary>
+        public const string DefaultPassword = "reprap";
+
+        /// <summary>
         /// Logger instance
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
@@ -133,6 +138,11 @@ namespace DuetControlServer.Model
         /// <seealso cref="WaitForUpdate(CancellationToken)"/>
         /// <seealso cref="Updater.WaitForFullUpdate(CancellationToken)"/>
         public static ObjectModel Get { get; } = new ObjectModel();
+
+        /// <summary>
+        /// Configured password (see M551)
+        /// </summary>
+        public static string Password { get; set; } = DefaultPassword;
 
         /// <summary>
         /// Whether the current machine status is overridden because an update is in progress

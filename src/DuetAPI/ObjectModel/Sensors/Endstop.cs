@@ -6,6 +6,16 @@
     public sealed class Endstop : ModelObject
     {
         /// <summary>
+        /// Whether this endstop is at the high end of the axis
+        /// </summary>
+        public bool HighEnd
+        {
+            get => _highEnd;
+            set => SetPropertyValue(ref _highEnd, value);
+        }
+        private bool _highEnd;
+
+        /// <summary>
         /// Whether or not the endstop is hit
         /// </summary>
         public bool Triggered
@@ -24,15 +34,5 @@
 			set => SetPropertyValue(ref _type, value);
         }
         private EndstopType _type;
-
-        /// <summary>
-        /// Index of the used probe (if <see cref="Type"/> is <see cref="EndstopType.ZProbeAsEndstop"/>)
-        /// </summary>
-        public int? ProbeNumber
-        {
-            get => _probeNumber;
-			set => SetPropertyValue(ref _probeNumber, value);
-        }
-        private int? _probeNumber;
     }
 }

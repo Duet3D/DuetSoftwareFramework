@@ -1,6 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
-using DuetAPIClient;
 using Nito.AsyncEx;
 using System;
 using System.Diagnostics;
@@ -132,9 +131,19 @@ namespace DuetPluginService.Commands
                     using FileStream fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
                     using Stream zipFileStream = entry.Open();
                     await zipFileStream.CopyToAsync(fileStream);
+
+                    // Make program binaries executable
+                    if (entry.FullName.StartsWith("bin/"))
+                    {
+                        _logger.Debug("Changing mode of {0} to 750", fileName);
+                        LinuxApi.Commands.Chmod(fileName,
+                            LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
+                            LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
+                            LinuxApi.UnixPermissions.None);
+                    }
                 }
 
-                // Make the SBC executable
+                // Retrieve the SBC executable
                 if (!string.IsNullOrEmpty(plugin.SbcExecutable))
                 {
                     string architecture = RuntimeInformation.OSArchitecture switch
@@ -152,15 +161,7 @@ namespace DuetPluginService.Commands
                         sbcExecutable = Path.Combine(pluginBase, "bin", plugin.SbcExecutable);
                     }
 
-                    if (File.Exists(sbcExecutable))
-                    {
-                        _logger.Debug("Changing mode of {0} to 750", sbcExecutable);
-                        LinuxApi.Commands.Chmod(sbcExecutable,
-                            LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
-                            LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
-                            LinuxApi.UnixPermissions.None);
-                    }
-                    else
+                    if (!File.Exists(sbcExecutable))
                     {
                         throw new ArgumentException("SBC executable {0} not found", plugin.SbcExecutable);
                     }
@@ -263,7 +264,17 @@ namespace DuetPluginService.Commands
 
             using (await _packageLock.LockAsync(Program.CancellationToken))
             {
-                using Process process = Process.Start(Settings.InstallPackageCommand, Settings.InstallPackageArguments.Replace("{package}", package));
+                ProcessStartInfo startInfo = new ProcessStartInfo
+                {
+                    FileName = Settings.InstallPackageCommand,
+                    Arguments = Settings.InstallPackageArguments.Replace("{package}", package)
+                };
+                foreach (var kv in Settings.InstallPackageEnvironment)
+                {
+                    startInfo.EnvironmentVariables.Add(kv.Key, kv.Value);
+                }
+
+                using Process process = Process.Start(startInfo);
                 await process.WaitForExitAsync(Program.CancellationToken);
                 if (process.ExitCode != 0)
                 {

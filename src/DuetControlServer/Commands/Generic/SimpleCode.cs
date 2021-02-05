@@ -83,8 +83,9 @@ namespace DuetControlServer.Commands
             {
                 await foreach (Code code in ParseAsync())
                 {
-                    // M108, M112, M122, and M999 always go to an idle channel so we (hopefully) get a low-latency response
-                    if (code.Type == CodeType.MCode && (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || code.MajorNumber == 999))
+                    // M108, M112, M122, and M999 (B0) always go to an idle channel so we (hopefully) get a low-latency response
+                    if (code.Type == CodeType.MCode &&
+                        (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || (code.MajorNumber == 999 && code.Parameter('B', 0) == 0)))
                     {
                         code.Channel = await SPI.Interface.GetIdleChannel();
                         code.Flags |= CodeFlags.IsPrioritized;

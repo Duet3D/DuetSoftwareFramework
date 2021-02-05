@@ -41,6 +41,12 @@ namespace DuetControlServer
         public static string ConfigFilename { get; set; } = DefaultConfigFile;
 
         /// <summary>
+        /// Whether this DCS instance may support third-party plugins.
+        /// If this is set to false, dsf-config.g will be run right after the start
+        /// </summary>
+        public static bool PluginSupport { get; set; } = true;
+
+        /// <summary>
         /// Path to the file holding a list of loaded plugins
         /// </summary>
         public static string PluginsFilename { get; set; } = DefaultPluginsFile;

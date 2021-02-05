@@ -22,7 +22,7 @@ namespace DuetAPI.Commands
             bool contentRead = false, unprecedentedParameter = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
             bool readingAtStart = buffer.SeenNewLine, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
-            bool wasQuoted = false, wasCondition = false, wasExpression = false;
+            bool wasQuoted = false, wasExpression = false;
             int numCurlyBraces = 0, numRoundBraces = 0;
             buffer.SeenNewLine = false;
 
@@ -78,6 +78,11 @@ namespace DuetAPI.Commands
                         // Add next character to the comment unless it is the "artificial" 0-character termination
                         result.Comment += c;
                     }
+                    else if (result.Comment == null)
+                    {
+                        // Something started a comment, so the comment cannot be null any more
+                        result.Comment = string.Empty;
+                    }
                     continue;
                 }
 
@@ -92,12 +97,12 @@ namespace DuetAPI.Commands
                     else
                     {
                         // End of encapsulated comment
-                        inEncapsulatedComment = false;
-                        if (wasCondition)
+                        if (result.Comment == null)
                         {
-                            inCondition = true;
-                            wasCondition = false;
+                            // Something started a comment, so the comment cannot be null any more
+                            result.Comment = string.Empty;
                         }
+                        inEncapsulatedComment = false;
                     }
                     continue;
                 }

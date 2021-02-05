@@ -38,6 +38,20 @@ namespace DuetAPIClient
         }
 
         /// <summary>
+        /// Update the status of a network protocol. Reserved for internal purposes, do not use
+        /// </summary>
+        /// <param name="protocol">Protocol to update</param>
+        /// <param name="enabled">If it is enabled or not</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        public Task SetNetworkProtocol(NetworkProtocol protocol, bool enabled, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new SetNetworkProtocol { Protocol = protocol, Enabled = enabled }, cancellationToken);
+        }
+
+        /// <summary>
         /// Update the process id of a given plugin. Reserved for internal purposes, do not use
         /// </summary>
         /// <param name="name">Name of the plugin</param>

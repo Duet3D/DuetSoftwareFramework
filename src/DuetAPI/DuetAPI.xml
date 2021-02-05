@@ -186,6 +186,17 @@
             Path that is RepRapFirmware-compatible
             </summary>
         </member>
+        <member name="T:DuetAPI.Commands.CheckPassword">
+            <summary>
+            Check if the given password is correct and matches the previously set value from M551.
+            If no password was configured before or if it was set to "reprap", this will always return true
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.CheckPassword.Password">
+            <summary>
+            Password to check
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.Code">
             <summary>
             A parsed representation of a generic G/M/T-code
@@ -633,6 +644,13 @@
         <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.String">
             <summary>
             Implicit conversion operator to string
+            </summary>
+            <param name="codeParameter">Target object</param>
+            <returns>Converted value</returns>
+        </member>
+        <member name="M:DuetAPI.Commands.CodeParameter.op_Implicit(DuetAPI.Commands.CodeParameter)~System.Net.IPAddress">
+            <summary>
+            Implicit conversion operator to an IP address
             </summary>
             <param name="codeParameter">Target object</param>
             <returns>Converted value</returns>
@@ -1183,6 +1201,24 @@
             JSON patch to apply
             </summary>
         </member>
+        <member name="T:DuetAPI.Commands.SetNetworkProtocol">
+            <summary>
+            Flag a given network protocol as enabled or disabled
+            </summary>
+            <remarks>
+            The object model must not be locked from the same connection via <see cref="T:DuetAPI.Commands.LockObjectModel"/> when this is called!
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.Commands.SetNetworkProtocol.Protocol">
+            <summary>
+            Protocol to change
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.SetNetworkProtocol.Enabled">
+            <summary>
+            Whether the protocol is enabled or not
+            </summary>
+        </member>
         <member name="T:DuetAPI.Commands.SetObjectModel">
             <summary>
             Set an atomic property in the machine model. Make sure to acquire the read/write lock first!
@@ -1276,7 +1312,7 @@
         </member>
         <member name="T:DuetAPI.Commands.StartPlugins">
             <summary>
-            Start all the plugins
+            Start all the previously started plugins again
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.StopPlugin">
@@ -1291,7 +1327,8 @@
         </member>
         <member name="T:DuetAPI.Commands.StopPlugins">
             <summary>
-            Stop all the plugins
+            Stop all the plugins and save which plugins were started before.
+            This command is intended for shutdown or update requests
             </summary>
         </member>
         <member name="T:DuetAPI.Commands.UninstallPlugin">
@@ -4290,6 +4327,11 @@
             Configured IPv4 address of the network adapter
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.NetworkInterface.DnsServer">
+            <summary>
+            Configured IPv4 DNS server fo the network adapter
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.NetworkInterface.FirmwareVersion">
             <summary>
             Version of the network interface or null if unknown.
@@ -4298,7 +4340,7 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.NetworkInterface.Gateway">
             <summary>
-            Gateway of the network adapter
+            IPv4 gateway of the network adapter
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.NetworkInterface.Mac">
@@ -4341,14 +4383,29 @@
             HTTP protocol
             </summary>
         </member>
+        <member name="F:DuetAPI.ObjectModel.NetworkProtocol.HTTPS">
+            <summary>
+            HTTPS protocol
+            </summary>
+        </member>
         <member name="F:DuetAPI.ObjectModel.NetworkProtocol.FTP">
             <summary>
             FTP protocol
             </summary>
         </member>
+        <member name="F:DuetAPI.ObjectModel.NetworkProtocol.SFTP">
+            <summary>
+            SFTP protocol
+            </summary>
+        </member>
         <member name="F:DuetAPI.ObjectModel.NetworkProtocol.Telnet">
             <summary>
             Telnet protocol
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.NetworkProtocol.SSH">
+            <summary>
+            SSH protocol
             </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.ObjectModel">
@@ -4843,6 +4900,11 @@
             Information about an endstop
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Endstop.HighEnd">
+            <summary>
+            Whether this endstop is at the high end of the axis
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Endstop.Triggered">
             <summary>
             Whether or not the endstop is hit
@@ -4851,11 +4913,6 @@
         <member name="P:DuetAPI.ObjectModel.Endstop.Type">
             <summary>
             Type of the endstop
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Endstop.ProbeNumber">
-            <summary>
-            Index of the used probe (if <see cref="P:DuetAPI.ObjectModel.Endstop.Type"/> is <see cref="F:DuetAPI.ObjectModel.EndstopType.ZProbeAsEndstop"/>)
             </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.EndstopType">
@@ -5767,6 +5824,11 @@
             Number of the next tool to be selected
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.State.PluginsStarted">
+            <summary>
+            Indicates if at least one plugin has been started
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.State.PowerFailScript">
             <summary>
             Script to execute when the power fails
@@ -6105,13 +6167,6 @@
             </summary>
             <param name="id">Driver ID to convert</param>
         </member>
-        <member name="M:DuetAPI.Utility.DriverId.Equals(System.Object)">
-            <summary>
-            Checks if two instances are equal
-            </summary>
-            <param name="obj"></param>
-            <returns></returns>
-        </member>
         <member name="M:DuetAPI.Utility.DriverId.GetHashCode">
             <summary>
             Compute a hash code for this instance
@@ -6123,6 +6178,28 @@
             Convert this instance to a string
             </summary>
             <returns>String representation</returns>
+        </member>
+        <member name="T:DuetAPI.Utility.DriverIdJsonConverter">
+            <summary>
+            Converter for <see cref="T:DuetAPI.Utility.DriverId"/> instances
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.DriverIdJsonConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Read an instance from JSON
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="typeToConvert">Target type</param>
+            <param name="options">JSON options</param>
+            <returns></returns>
+        </member>
+        <member name="M:DuetAPI.Utility.DriverIdJsonConverter.Write(System.Text.Json.Utf8JsonWriter,DuetAPI.Utility.DriverId,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Write an instance to JSON
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="value">Value to write</param>
+            <param name="options">JSON options</param>
         </member>
         <member name="T:DuetAPI.Utility.FileLists">
             <summary>

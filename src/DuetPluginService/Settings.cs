@@ -71,6 +71,14 @@ namespace DuetPluginService
         public static string InstallPackageArguments { get; set; } = "install -y {package}";
 
         /// <summary>
+        /// Environment variables for the installation command
+        /// </summary>
+        public static Dictionary<string, string> InstallPackageEnvironment = new Dictionary<string, string>()
+        {
+            { "DEBIAN_FRONTEND", "noninteractive"  }
+        };
+
+        /// <summary>
         /// Timeout in ms for SIGTERM requests. When it expires plugin processes are forcefully killed
         /// </summary>
         public static int StopTimeout { get; set; } = 4000;

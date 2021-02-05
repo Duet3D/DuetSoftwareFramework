@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -334,6 +335,13 @@ namespace DuetAPI.Commands
         public static implicit operator string(CodeParameter codeParameter) => codeParameter?.StringValue;
 
         /// <summary>
+        /// Implicit conversion operator to an IP address
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        public static implicit operator IPAddress(CodeParameter codeParameter) => (codeParameter != null) ? IPAddress.Parse(codeParameter.StringValue) : null;
+
+        /// <summary>
         /// Implicit conversion operator to float array
         /// </summary>
         /// <param name="codeParameter">Target object</param>
@@ -584,7 +592,7 @@ namespace DuetAPI.Commands
     /// <summary>
     /// Converts a <see cref="CodeParameter"/> instance to JSON
     /// </summary>
-    public class CodeParameterConverter : JsonConverter<CodeParameter>
+    public sealed class CodeParameterConverter : JsonConverter<CodeParameter>
     {
         /// <summary>
         /// Read a CodeParameter object from JSON

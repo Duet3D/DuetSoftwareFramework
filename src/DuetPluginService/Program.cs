@@ -146,7 +146,7 @@ namespace DuetPluginService
                 CancelSource.Cancel();
             }
 
-            // Stop the plugins
+            // Stop the plugins again
             _logger.Info("Stopping plugins...");
             List<Task> stopTasks = new List<Task>();
             using (await Plugins.LockAsync())

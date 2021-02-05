@@ -12,19 +12,22 @@ namespace DuetControlServer.Commands
     public sealed class StartPlugin : DuetAPI.Commands.StartPlugin
     {
         /// <summary>
-        /// Logger instance
-        /// </summary>
-        private NLog.Logger _logger;
-
-        /// <summary>
         /// Start a plugin
         /// </summary>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="ArgumentException">Plugin is invalid</exception>
-        public override Task Execute()
+        public override async Task Execute()
         {
-            _logger = NLog.LogManager.GetLogger($"Plugin {Plugin}");
-            return Start(Plugin);
+            if (!Settings.PluginSupport)
+            {
+                throw new NotSupportedException("Plugin support has been disabled");
+            }
+
+            await Start(Plugin);
+            using (await Model.Provider.AccessReadWriteAsync())
+            {
+                Model.Provider.Get.State.PluginsStarted = true;
+            }
         }
 
         /// <summary>
@@ -77,7 +80,7 @@ namespace DuetControlServer.Commands
                             }
                             else
                             {
-                                _logger.Warn("Failed to check RRF version");
+                                throw new ArgumentException("Failed to check RRF version");
                             }
                         }
 

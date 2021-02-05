@@ -1,5 +1,4 @@
 ﻿using DuetAPI.ObjectModel;
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -17,6 +16,20 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
+            if (!Settings.PluginSupport)
+            {
+                return;
+            }
+
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                if (!Model.Provider.Get.State.PluginsStarted)
+                {
+                    // No plugins started before, no need to save the execution state
+                    return;
+                }
+            }
+
             List<Task> stopTasks = new List<Task>();
             using (FileStream fileStream = new FileStream(Settings.PluginsFilename, FileMode.Create, FileAccess.Write))
             {
@@ -36,6 +49,12 @@ namespace DuetControlServer.Commands
                 }
             }
             await Task.WhenAll(stopTasks);
+
+            using (await Model.Provider.AccessReadWriteAsync())
+            {
+                // Plugins have been stopped
+                Model.Provider.Get.State.PluginsStarted = false;
+            }
         }
     }
 }

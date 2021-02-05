@@ -4,7 +4,6 @@ using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Files;
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -792,7 +791,7 @@ namespace DuetControlServer.Codes
                         {
                             if (DateTime.TryParseExact(pParam, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
                             {
-                                System.Diagnostics.Process.Start("timedatectl", $"set-time {date:yyyy-MM-dd}").WaitForExit();
+                                await System.Diagnostics.Process.Start("timedatectl", $"set-time {date:yyyy-MM-dd}").WaitForExitAsync(Program.CancellationToken);
                                 seen = true;
                             }
                             else
@@ -806,12 +805,26 @@ namespace DuetControlServer.Codes
                         {
                             if (DateTime.TryParseExact(sParam, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime time))
                             {
-                                System.Diagnostics.Process.Start("timedatectl", $"set-time {time:HH:mm:ss}").WaitForExit();
+                                await System.Diagnostics.Process.Start("timedatectl", $"set-time {time:HH:mm:ss}").WaitForExitAsync(Program.CancellationToken);
                                 seen = true;
                             }
                             else
                             {
                                 return new CodeResult(MessageType.Error, "Invalid time format");
+                            }
+                        }
+
+                        CodeParameter tParam = code.Parameter('T');
+                        if (tParam != null)
+                        {
+                            if (File.Exists($"/usr/share/zoneinfo/{tParam}"))
+                            {
+                                await System.Diagnostics.Process.Start("timedatectl", $"set-timezone ${tParam}").WaitForExitAsync(Program.CancellationToken);
+                                seen = true;
+                            }
+                            else
+                            {
+                                return new CodeResult(MessageType.Error, "Invalid time zone");
                             }
                         }
 
@@ -911,11 +924,8 @@ namespace DuetControlServer.Codes
                             }
 
                             // Stop all the plugins
-                            if (!Settings.UpdateOnly)
-                            {
-                                Commands.StopPlugins stopCommand = new Commands.StopPlugins();
-                                await stopCommand.Execute();
-                            }
+                            Commands.StopPlugins stopCommand = new Commands.StopPlugins();
+                            await stopCommand.Execute();
 
                             // Flash the firmware
                             using FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
@@ -933,7 +943,7 @@ namespace DuetControlServer.Codes
                             // Terminate the program - or - restart the plugins when done
                             if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
                             {
-                                await Program.Shutdown(false);
+                                await Program.Shutdown();
                             }
                             else
                             {

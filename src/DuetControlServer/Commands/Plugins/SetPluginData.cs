@@ -17,6 +17,11 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
+            if (!Settings.PluginSupport)
+            {
+                throw new NotSupportedException("Plugin support has been disabled");
+            }
+
             // Fill in plugin name if required
             if (string.IsNullOrEmpty(Plugin))
             {

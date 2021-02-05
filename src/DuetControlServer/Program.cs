@@ -182,25 +182,28 @@ namespace DuetControlServer
                 }
 
                 // Load plugin manifests
-                foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
+                if (Settings.PluginSupport)
                 {
-                    if (file.EndsWith(".json"))
+                    foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
                     {
-                        try
+                        if (file.EndsWith(".json"))
                         {
-                            using FileStream manifestStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
-                            using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-                            Plugin plugin = new Plugin();
-                            plugin.UpdateFromJson(manifestJson.RootElement);
-                            plugin.Pid = -1;
-                            using (await Model.Provider.AccessReadWriteAsync())
+                            try
                             {
-                                Model.Provider.Get.Plugins.Add(plugin);
+                                using FileStream manifestStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
+                                Plugin plugin = new Plugin();
+                                plugin.UpdateFromJson(manifestJson.RootElement);
+                                plugin.Pid = -1;
+                                using (await Model.Provider.AccessReadWriteAsync())
+                                {
+                                    Model.Provider.Get.Plugins.Add(plugin);
+                                }
                             }
-                        }
-                        catch (Exception e)
-                        {
-                            _logger.Error(e, "Failed to load plugin manifest {0}", Path.GetFileName(file));
+                            catch (Exception e)
+                            {
+                                _logger.Error(e, "Failed to load plugin manifest {0}", Path.GetFileName(file));
+                            }
                         }
                     }
                 }
@@ -253,11 +256,11 @@ namespace DuetControlServer
                     _logger.Fatal(terminatedTask.Exception, "{0} task faulted", taskName);
                 }
 
-                if (!Settings.UpdateOnly)
-                {
-                    StopPlugins stopCommand = new StopPlugins();
-                    await stopCommand.Execute();
-                }
+                // Stop the plugins again
+                StopPlugins stopCommand = new StopPlugins();
+                await stopCommand.Execute();
+
+                // Shut down DCS
                 _cancelSource.Cancel();
             }
 
@@ -340,23 +343,18 @@ namespace DuetControlServer
         /// <summary>
         /// Terminate this program and kill it forcefully if required
         /// </summary>
-        /// <param name="savePluginState">Whether the loaded plugins are supposed to be saved</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Shutdown(bool savePluginState = true)
+        public static async Task Shutdown()
         {
-            // Shut down the plugins if they were started before
-            if (savePluginState && !Settings.UpdateOnly)
+            // Shut down the plugins again
+            try
             {
-                try
-                {
-                    StopPlugins stopCommand = new StopPlugins();
-                    await stopCommand.Execute();
-                }
-                catch (Exception e)
-                {
-                    _logger.Error(e, "Failed to stop plugins");
-
-                }
+                StopPlugins stopCommand = new StopPlugins();
+                await stopCommand.Execute();
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to stop plugins");
             }
 
             // Try to shut down this program normally 

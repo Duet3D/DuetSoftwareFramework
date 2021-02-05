@@ -26,6 +26,11 @@ namespace DuetControlServer.Commands
         /// <exception cref="ArgumentException">Plugin is incompatible</exception>
         public override async Task Execute()
         {
+            if (!Settings.PluginSupport)
+            {
+                throw new NotSupportedException("Plugin support has been disabled");
+            }
+
             Plugin plugin;
             using (ZipArchive zipArchive = ZipFile.OpenRead(PluginFile))
             {

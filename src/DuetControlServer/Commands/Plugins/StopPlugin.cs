@@ -18,6 +18,11 @@ namespace DuetControlServer.Commands
         /// <exception cref="ArgumentException">Plugin is invalid</exception>
         public override async Task Execute()
         {
+            if (!Settings.PluginSupport)
+            {
+                throw new NotSupportedException("Plugin support has been disabled");
+            }
+
             bool pluginFound = false, stopPlugin = false, asRoot = false;
             using (await Model.Provider.AccessReadWriteAsync())
             {

@@ -2,10 +2,13 @@
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -22,6 +25,38 @@ namespace DuetControlServer.Model
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
+        /// List of enabled protocols
+        /// </summary>
+        private static List<NetworkProtocol> _activeProtocols = new List<NetworkProtocol>();
+
+        /// <summary>
+        /// Called when a network protocol has been enabled
+        /// </summary>
+        /// <param name="protocol">Enabled protocol</param>
+        public static void ProtocolEnabled(NetworkProtocol protocol)
+        {
+            lock (_activeProtocols)
+            {
+                if (!_activeProtocols.Contains(protocol))
+                {
+                    _activeProtocols.Add(protocol);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Called when a network protocol has been disabled
+        /// </summary>
+        /// <param name="protocol">Disabled protocol</param>
+        internal static void ProtocolDisabled(NetworkProtocol protocol)
+        {
+            lock (_activeProtocols)
+            {
+                _activeProtocols.Remove(protocol);
+            }
+        }
+
+        /// <summary>
         /// Run model updates in a certain interval.
         /// This function updates host properties like network interfaces and storage devices
         /// </summary>
@@ -35,7 +70,7 @@ namespace DuetControlServer.Model
                 // Run another update cycle
                 using (await Provider.AccessReadWriteAsync())
                 {
-                    UpdateNetwork();
+                    await UpdateNetwork();
                     UpdateVolumes();
                     CleanMessages();
                 }
@@ -85,21 +120,26 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Update network interfaces
         /// </summary>
-        private static void UpdateNetwork()
+        private static async Task UpdateNetwork()
         {
             int index = 0;
             foreach (var iface in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
             {
-                UnicastIPAddressInformation ipInfo = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                                      where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                                      select unicastAddress).FirstOrDefault();
-                if (ipInfo != null && !System.Net.IPAddress.IsLoopback(ipInfo.Address))
+                if (iface.NetworkInterfaceType != NetworkInterfaceType.Loopback)
                 {
                     DuetAPI.ObjectModel.NetworkInterface networkInterface;
                     if (index >= Provider.Get.Network.Interfaces.Count)
                     {
                         networkInterface = new DuetAPI.ObjectModel.NetworkInterface();
                         Provider.Get.Network.Interfaces.Add(networkInterface);
+
+                        lock (_activeProtocols)
+                        {
+                            foreach (NetworkProtocol protocol in _activeProtocols)
+                            {
+                                networkInterface.ActiveProtocols.Add(protocol);
+                            }
+                        }
                     }
                     else
                     {
@@ -107,15 +147,54 @@ namespace DuetControlServer.Model
                     }
                     index++;
 
+                    // Update IPv4 configuration
+                    IPAddress ipAddress = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
+                                           where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                           select unicastAddress.Address).FirstOrDefault();
+                    IPAddress netMask = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
+                                         where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                         select unicastAddress.IPv4Mask).FirstOrDefault();
+                    IPAddress gateway = (from gatewayAddress in iface.GetIPProperties().GatewayAddresses
+                                         where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                         select gatewayAddress.Address).FirstOrDefault();
+                    IPAddress dnsServer = (from item in iface.GetIPProperties().DnsAddresses
+                                           where item.AddressFamily == AddressFamily.InterNetwork
+                                           select item).FirstOrDefault();
+                    // In theory we could use ipInfo.DhcpLeaseLifetime to check if DHCP is configured but it isn't supported on Unix (.NET 5)
+                    networkInterface.ActualIP = networkInterface.ConfiguredIP = ipAddress?.ToString();
+                    networkInterface.Subnet = netMask?.ToString();
+                    networkInterface.Gateway = gateway?.ToString();
+                    networkInterface.DnsServer = dnsServer?.ToString();
                     networkInterface.Mac = BitConverter.ToString(iface.GetPhysicalAddress().GetAddressBytes()).Replace('-', ':');
-                    networkInterface.ActualIP = ipInfo.Address.ToString();
-                    networkInterface.ConfiguredIP = ipInfo.Address.ToString();
-                    networkInterface.Subnet = ipInfo.IPv4Mask.ToString();
-                    networkInterface.Gateway = (from gatewayAddress in iface.GetIPProperties().GatewayAddresses
-                                                where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                                select gatewayAddress.Address.ToString()).FirstOrDefault();
+                    networkInterface.Speed = (int?)(iface.Speed / 1000000);
                     networkInterface.Type = iface.Name.StartsWith("w") ? InterfaceType.WiFi : InterfaceType.LAN;
-                    // networkInterface.Speed = (uint)(iface.Speed / 1000000);                // Unsupported in .NET Core 2.2 on Linux
+
+                    // Get WiFi-specific values.
+                    // Note that iface.NetworkInterfaceType is broken on Unix and cannot be used (.NET 5)
+                    if (iface.Name.StartsWith('w'))
+                    {
+                        try
+                        {
+                            string wifiData = await File.ReadAllTextAsync("/proc/net/wireless", Program.CancellationToken);
+                            Regex signalRegex = new Regex(iface.Name + @".*(-\d+)\.");
+                            Match signalMatch = signalRegex.Match(wifiData);
+                            if (signalMatch.Success)
+                            {
+                                networkInterface.Signal = int.Parse(signalMatch.Groups[1].Value);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            networkInterface.Signal = null;
+                            _logger.Debug(e);
+                        }
+                        networkInterface.Type = InterfaceType.WiFi;
+                    }
+                    else
+                    {
+                        networkInterface.Signal = null;
+                        networkInterface.Type = InterfaceType.LAN;
+                    }
                 }
             }
 

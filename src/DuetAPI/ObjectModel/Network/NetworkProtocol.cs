@@ -15,13 +15,28 @@ namespace DuetAPI.ObjectModel
         HTTP,
 
         /// <summary>
+        /// HTTPS protocol
+        /// </summary>
+        HTTPS,
+
+        /// <summary>
         /// FTP protocol
         /// </summary>
         FTP,
 
         /// <summary>
+        /// SFTP protocol
+        /// </summary>
+        SFTP,
+
+        /// <summary>
         /// Telnet protocol
         /// </summary>
-        Telnet
+        Telnet,
+
+        /// <summary>
+        /// SSH protocol
+        /// </summary>
+        SSH
     }
 }

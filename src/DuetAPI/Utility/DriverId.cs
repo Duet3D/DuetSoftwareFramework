@@ -1,11 +1,14 @@
 ﻿using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.Utility
 {
     /// <summary>
     /// Class representing a driver identifier
     /// </summary>
-    public sealed class DriverId
+    [JsonConverter(typeof(DriverIdJsonConverter))]
+    public sealed record DriverId
     {
         /// <summary>
         /// Default constructor of this class
@@ -103,20 +106,6 @@ namespace DuetAPI.Utility
         public static implicit operator string(DriverId id) => id.ToString();
 
         /// <summary>
-        /// Checks if two instances are equal
-        /// </summary>
-        /// <param name="obj"></param>
-        /// <returns></returns>
-        public override bool Equals(object obj)
-        {
-            if (obj != null && obj is DriverId other)
-            {
-                return (Board == other.Board) && (Port == other.Port);
-            }
-            return false;
-        }
-
-        /// <summary>
         /// Compute a hash code for this instance
         /// </summary>
         /// <returns>Hash code</returns>
@@ -127,5 +116,49 @@ namespace DuetAPI.Utility
         /// </summary>
         /// <returns>String representation</returns>
         public override string ToString() => $"{Board}.{Port}";
+    }
+
+    /// <summary>
+    /// Converter for <see cref="DriverId"/> instances
+    /// </summary>
+    public sealed class DriverIdJsonConverter : JsonConverter<DriverId>
+    {
+        /// <summary>
+        /// Read an instance from JSON
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="typeToConvert">Target type</param>
+        /// <param name="options">JSON options</param>
+        /// <returns></returns>
+        public override DriverId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.Null:
+                    return null;
+                case JsonTokenType.String:
+                    return new DriverId(reader.GetString());
+                default:
+                    throw new JsonException("Invalid token type for DriverId");
+            }
+        }
+
+        /// <summary>
+        /// Write an instance to JSON
+        /// </summary>
+        /// <param name="writer">JSON writer</param>
+        /// <param name="value">Value to write</param>
+        /// <param name="options">JSON options</param>
+        public override void Write(Utf8JsonWriter writer, DriverId value, JsonSerializerOptions options)
+        {
+            if (value == null)
+            {
+                writer.WriteNullValue();
+            }
+            else
+            {
+                writer.WriteStringValue(value.ToString());
+            }
+        }
     }
 }

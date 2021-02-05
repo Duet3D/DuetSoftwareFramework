@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using DuetControlServer.Files;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -21,26 +22,44 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
-            if (File.Exists(Settings.PluginsFilename))
+            if (!Settings.PluginSupport)
             {
                 return;
             }
 
-            using FileStream fileStream = new FileStream(Settings.PluginsFilename, FileMode.Open, FileAccess.Read);
-            using StreamReader reader = new StreamReader(fileStream);
-            while (!reader.EndOfStream)
+            // Start all plugins
+            if (!File.Exists(Settings.PluginsFilename))
             {
-                string pluginName = await reader.ReadLineAsync();
-                try
+                using FileStream fileStream = new FileStream(Settings.PluginsFilename, FileMode.Open, FileAccess.Read);
+                using StreamReader reader = new StreamReader(fileStream);
+                while (!reader.EndOfStream)
                 {
-                    StartPlugin startCommand = new StartPlugin() { Plugin = pluginName };
-                    await startCommand.Execute();
+                    string pluginName = await reader.ReadLineAsync();
+                    try
+                    {
+                        StartPlugin startCommand = new StartPlugin() { Plugin = pluginName };
+                        await startCommand.Execute();
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Debug(e);
+                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to start plugin {pluginName}: {e.Message}");
+                    }
                 }
-                catch (Exception e)
+            }
+
+            // Run dsf-config.g when all the plugins have been started
+            string dsfConfigFile = await FilePath.ToPhysicalAsync(FilePath.DsfConfigFile, FileDirectory.System);
+            if (File.Exists(dsfConfigFile))
+            {
+                Code dsfConfigCode = new Code()
                 {
-                    _logger.Debug(e);
-                    await Utility.Logger.LogOutput(MessageType.Error, $"Failed to start plugin {pluginName}: {e.Message}");
-                }
+                    Channel = DuetAPI.CodeChannel.SBC,
+                    Type = DuetAPI.Commands.CodeType.MCode,
+                    MajorNumber = 98
+                };
+                dsfConfigCode.Parameters.Add(new DuetAPI.Commands.CodeParameter('P', FilePath.DsfConfigFile));
+                await dsfConfigCode.Execute();
             }
         }
     }
