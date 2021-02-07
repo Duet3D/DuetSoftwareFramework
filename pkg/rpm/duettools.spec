@@ -10,10 +10,10 @@
 
 Name:    duettools
 Version: %{_tversion}
-Release: %{_release}
+Release: %{_tag:%{_tag}-}%{_release}
 Summary: DSF Tools
 Group:   3D Printing
-Source0: duettools_%{_tversion}
+Source0: duettools_%{_tversion}%{_tag:-%{_tag}}
 License: GPLv3
 URL:     https://github.com/Duet3D/DuetSoftwareFramework
 BuildRequires: rpm >= 4.7.2-2
@@ -34,3 +34,5 @@ DSF Tools
 %{dsfoptdir}/bin/CustomHttpEndpoint.*
 %attr(0755, root, root) %{dsfoptdir}/bin/ModelObserver
 %{dsfoptdir}/bin/ModelObserver.*
+%attr(0755, root, root) %{dsfoptdir}/bin/PluginManager
+%{dsfoptdir}/bin/PluginManager.*

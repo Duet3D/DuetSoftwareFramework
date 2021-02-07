@@ -331,8 +331,10 @@ DuetRuntime.rpm: private MSG = "This could take a minute. $(if $(KEY_ID),, No si
 # We have to change "all" to "noarch" for rpm.
 %.rpm: PKGARCH = $(BUILD_ARCH:all=noarch)
 %.rpm: PKG = rpm
+%.rpm: BASEVERSION = $(shell echo $(VERSION) | sed -n -r -e "s/([^-]+)(-.*)?/\1/p")
 %.rpm: RELEASE = 950
-%.rpm: PKGNAME = $(LCTARGET)-$(VERSION)-$(RELEASE).$(PKGARCH)
+%.rpm: TAG = $(shell echo $(VERSION) | sed -n -r -e "s/([^-]+)(-(.*))?/\3/p")
+%.rpm: PKGNAME = $(LCTARGET)-$(BASEVERSION)$(if $(TAG),-$(TAG),)-$(RELEASE).$(PKGARCH)
 %.rpm: private MSG = $(if $(KEY_ID),," No signing key")
 %.rpm: %.pkgcommon
 	$(ECHO_PREFIX)$(TARGET_TITLE)
@@ -343,7 +345,8 @@ DuetRuntime.rpm: private MSG = "This could take a minute. $(if $(KEY_ID),, No si
 		--define="%_release $(RELEASE)" \
 		--define="%_rpmdir $(PKGDIR)" \
 		--define="%_arch $(PKGARCH)" \
-		--define="%_tversion $(VERSION)" \
+		--define="%_tversion $(BASEVERSION)" \
+		--define="%_tag $(if $(TAG),$(TAG),%{nil})" \
 		--define="%_smp_build_ncpus 1" \
 		--define="%_build_type $(CONFIG)" \
 		-bb pkg/rpm/$(LCTARGET).spec >/dev/null
@@ -362,11 +365,16 @@ DuetSoftwareFramework.deb: DuetWebControl.deb
 %.deb: private MSG = $(if $(KEY_ID),," No signing key")
 %.deb: %.pkgcommon
 	$(ECHO_PREFIX)$(TARGET_TITLE)
-	$(CMD_PREFIX)sed -i "s/TARGET_ARCH/$(PKGARCH)/g" $(PKGSRCDIR)/DEBIAN/{control,changelog}
-	$(CMD_PREFIX)sed -i "s/DCSVER/$(DuetControlServer-version)/g" $(PKGSRCDIR)/DEBIAN/{control,changelog}
-	$(CMD_PREFIX)sed -i "s/DWSVER/$(DuetWebServer-version)/g" $(PKGSRCDIR)/DEBIAN/{control,changelog}
-	$(CMD_PREFIX)sed -i "s/SDVER/$(DuetSD-version)/g" $(PKGSRCDIR)/DEBIAN/{control,changelog}
-	$(CMD_PREFIX)sed -i "s/DWCVER/$(DuetWebControl-version)/g" $(PKGSRCDIR)/DEBIAN/{control,changelog} 2>/dev/null || :
+	$(CMD_PREFIX)sed -i "s/TARGET_ARCH/$(PKGARCH)/g" $(PKGSRCDIR)/DEBIAN/control
+	$(CMD_PREFIX)sed -i "s/TARGET_ARCH/$(PKGARCH)/g" $(PKGSRCDIR)/DEBIAN/changelog
+	$(CMD_PREFIX)sed -i "s/DCSVER/$(DuetControlServer-version)/g" $(PKGSRCDIR)/DEBIAN/control
+	$(CMD_PREFIX)sed -i "s/DCSVER/$(DuetControlServer-version)/g" $(PKGSRCDIR)/DEBIAN/changelog
+	$(CMD_PREFIX)sed -i "s/DWSVER/$(DuetWebServer-version)/g" $(PKGSRCDIR)/DEBIAN/control
+	$(CMD_PREFIX)sed -i "s/DWSVER/$(DuetWebServer-version)/g" $(PKGSRCDIR)/DEBIAN/changelog
+	$(CMD_PREFIX)sed -i "s/SDVER/$(DuetSD-version)/g" $(PKGSRCDIR)/DEBIAN/control
+	$(CMD_PREFIX)sed -i "s/SDVER/$(DuetSD-version)/g" $(PKGSRCDIR)/DEBIAN/changelog
+	$(CMD_PREFIX)sed -i "s/DWCVER/$(DuetWebControl-version)/g" $(PKGSRCDIR)/DEBIAN/control 2>/dev/null || :
+	$(CMD_PREFIX)sed -i "s/DWCVER/$(DuetWebControl-version)/g" $(PKGSRCDIR)/DEBIAN/changelog 2>/dev/null || :
 	$(CMD_PREFIX)dpkg-deb --build $(PKGSRCDIR) $(PKGDIR) >/dev/null
 	$(CMD_PREFIX)rm -rf $(PKGSRCDIR)
 ifneq ($(KEY_ID),)
