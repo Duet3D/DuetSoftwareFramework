@@ -402,7 +402,7 @@ If you wish to make changes to the existing software and to test it, you need to
 
 #### 3.1 Building on a remote system
 
-Every .NET Core application of DSF is references the `DotnetPublishSsh` package which allows you to compile and upload .NET Core applications for ARMv7/AArch64.
+Every .NET application of DSF is references the `DotnetPublishSsh` package which allows you to compile and upload .NET Core applications for ARMv7/AArch64.
 In order to use this, it is recommended to enable remote `root` access first.
 To do so, open `/etc/ssh/sshd_config` with an editor of your choice, look for the line
 
@@ -441,7 +441,7 @@ If you do not wish to publish everything to your board at the time of compiling,
 
 ### 3.2 Building on the SBC itself
 
-Of course you can compile the required components on the SBC itself. Once the .NET Core SDK has been installed, enter the directory of the DSF application you want to compile and run `dotnet build`. This will generate suitable binaries for you.
+Of course you can compile the required components on the SBC itself. Once the latest .NET SDK has been installed, enter the directory of the DSF application you want to compile and run `dotnet build`. This will generate suitable binaries for you.
 
 ## API
 
