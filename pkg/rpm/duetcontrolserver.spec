@@ -11,10 +11,10 @@
 
 Name:    duetcontrolserver
 Version: %{_tversion}
-Release: %{_release}
+Release: %{_tag:%{_tag}-}%{_release}
 Summary: DSF Control Server
 Group:   3D Printing
-Source0: duetcontrolserver_%{_tversion}
+Source0: duetcontrolserver_%{_tversion}%{_tag:-%{_tag}}
 License: GPLv3
 URL:     https://github.com/Duet3D/DuetSoftwareFramework
 BuildRequires: rpm >= 4.7.2-2
@@ -52,3 +52,6 @@ fi
 %{_unitdir}/duetcontrolserver.service
 %config(noreplace) %{dsfoptdir}/conf/config.json
 %{dsfoptdir}/bin/DuetControlServer*
+%config(noreplace) %{_sysconfdir}/udev/rules.d/99-dsf-gpio.rules
+%{_exec_prefix}/lib/sysusers.d/duetcontrolserver.conf
+%{_exec_prefix}/lib/tmpfiles.d/duetcontrolserver.conf
