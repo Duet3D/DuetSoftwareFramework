@@ -21309,15 +21309,15 @@ references:
   commentId: T:DuetWebServer.Services.ModelObserver
   fullName: DuetWebServer.Services.ModelObserver
   nameWithType: ModelObserver
-- uid: DuetWebServer.Services.ModelObserver.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Services.ModelObserver})
-  name: ModelObserver(IConfiguration, ILogger<ModelObserver>)
-  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver__ctor_Microsoft_Extensions_Configuration_IConfiguration_Microsoft_Extensions_Logging_ILogger_DuetWebServer_Services_ModelObserver__
-  commentId: M:DuetWebServer.Services.ModelObserver.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Services.ModelObserver})
-  name.vb: ModelObserver(IConfiguration, ILogger(Of ModelObserver))
-  fullName: DuetWebServer.Services.ModelObserver.ModelObserver(Microsoft.Extensions.Configuration.IConfiguration, Microsoft.Extensions.Logging.ILogger<DuetWebServer.Services.ModelObserver>)
-  fullName.vb: DuetWebServer.Services.ModelObserver.ModelObserver(Microsoft.Extensions.Configuration.IConfiguration, Microsoft.Extensions.Logging.ILogger(Of DuetWebServer.Services.ModelObserver))
-  nameWithType: ModelObserver.ModelObserver(IConfiguration, ILogger<ModelObserver>)
-  nameWithType.vb: ModelObserver.ModelObserver(IConfiguration, ILogger(Of ModelObserver))
+- uid: DuetWebServer.Services.ModelObserver.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Services.ModelObserver},Microsoft.Extensions.Hosting.IHostApplicationLifetime)
+  name: ModelObserver(IConfiguration, ILogger<ModelObserver>, IHostApplicationLifetime)
+  href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver__ctor_Microsoft_Extensions_Configuration_IConfiguration_Microsoft_Extensions_Logging_ILogger_DuetWebServer_Services_ModelObserver__Microsoft_Extensions_Hosting_IHostApplicationLifetime_
+  commentId: M:DuetWebServer.Services.ModelObserver.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Services.ModelObserver},Microsoft.Extensions.Hosting.IHostApplicationLifetime)
+  name.vb: ModelObserver(IConfiguration, ILogger(Of ModelObserver), IHostApplicationLifetime)
+  fullName: DuetWebServer.Services.ModelObserver.ModelObserver(Microsoft.Extensions.Configuration.IConfiguration, Microsoft.Extensions.Logging.ILogger<DuetWebServer.Services.ModelObserver>, Microsoft.Extensions.Hosting.IHostApplicationLifetime)
+  fullName.vb: DuetWebServer.Services.ModelObserver.ModelObserver(Microsoft.Extensions.Configuration.IConfiguration, Microsoft.Extensions.Logging.ILogger(Of DuetWebServer.Services.ModelObserver), Microsoft.Extensions.Hosting.IHostApplicationLifetime)
+  nameWithType: ModelObserver.ModelObserver(IConfiguration, ILogger<ModelObserver>, IHostApplicationLifetime)
+  nameWithType.vb: ModelObserver.ModelObserver(IConfiguration, ILogger(Of ModelObserver), IHostApplicationLifetime)
 - uid: DuetWebServer.Services.ModelObserver.#ctor*
   name: ModelObserver
   href: api/DuetWebServer.Services.ModelObserver.html#DuetWebServer_Services_ModelObserver__ctor_

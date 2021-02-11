@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net5.0</TargetFramework>
     <TrimUnusedDependencies>true</TrimUnusedDependencies>
-    <Version>3.3.0</Version>
+    <Version>3.3-b1</Version>
     <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <Authors>Christian Hammacher</Authors>

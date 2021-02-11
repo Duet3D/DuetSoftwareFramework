@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Runtime.Loader;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -144,12 +145,12 @@ namespace DuetControlServer
             };
 
             // Deal with program termination requests (SIGTERM and Ctrl+C)
-            AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+            AssemblyLoadContext.Default.Unloading += (obj) =>
             {
                 if (!_cancelSource.IsCancellationRequested)
                 {
                     _logger.Warn("Received SIGTERM, shutting down...");
-                    Shutdown().Wait();
+                    Shutdown(true).Wait();
                 }
             };
             Console.CancelKeyPress += (sender, e) =>
@@ -162,25 +163,24 @@ namespace DuetControlServer
                 }
             };
 
+            // Notify the service manager that we're up and running
+            string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
+            if (!string.IsNullOrEmpty(notifySocket))
+            {
+                try
+                {
+                    using Socket socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
+                    socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
+                    socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
+                }
+                catch (Exception e)
+                {
+                    _logger.Warn(e, "Failed to notify systemd about process start");
+                }
+            }
+
             if (!Settings.UpdateOnly)
             {
-                // Notify the service manager that we're up and running.
-                // It might take a while to process runonce.g so do it first
-                string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
-                if (!string.IsNullOrEmpty(notifySocket))
-                {
-                    try
-                    {
-                        using Socket socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
-                        socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
-                        socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.Warn(e, "Failed to notify systemd about process start");
-                    }
-                }
-
                 // Load plugin manifests
                 if (Settings.PluginSupport)
                 {
@@ -343,8 +343,9 @@ namespace DuetControlServer
         /// <summary>
         /// Terminate this program and kill it forcefully if required
         /// </summary>
+        /// <param name="waitForTermination">Wait for program to be fully terminated</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Shutdown()
+        public static async Task Shutdown(bool waitForTermination = false)
         {
             // Shut down the plugins again
             try
@@ -361,11 +362,17 @@ namespace DuetControlServer
             _cancelSource.Cancel();
 
             // If that fails, kill the program forcefully
-            _ = Task.Delay(4500, _programTerminated.Token).ContinueWith(async task =>
+            Task terminationTask = Task.Delay(4500, _programTerminated.Token).ContinueWith(async task =>
             {
                 await task;
                 Environment.Exit(1);
             }, TaskContinuationOptions.RunContinuationsAsynchronously);
+
+            // Wait for program termination if required
+            if (waitForTermination)
+            {
+                await terminationTask;
+            }
         }
     }
 }

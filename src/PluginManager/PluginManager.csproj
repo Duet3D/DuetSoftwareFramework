@@ -10,7 +10,7 @@
     <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <Version>3.3.0</Version>
+    <Version>3.3-b1</Version>
   </PropertyGroup>
 
   <ItemGroup>

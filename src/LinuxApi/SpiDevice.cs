@@ -18,6 +18,7 @@ namespace LinuxApi
         /// </summary>
         /// <param name="devNode">Path to the /dev node</param>
         /// <param name="speed">Transfer speed in Hz</param>
+        /// <param name="transferMode">Transfer mode</param>
         public unsafe SpiDevice(string devNode, int speed, int transferMode)
         {
             _speed = (uint)speed;
@@ -28,24 +29,14 @@ namespace LinuxApi
                 throw new IOException($"Error {Marshal.GetLastWin32Error()}. Can not open SPI device file '{devNode}'.");
             }
 
-            UnixSpiMode mode;
-            switch (transferMode)
+            UnixSpiMode mode = transferMode switch
             {
-                case 0:
-                    mode = UnixSpiMode.SPI_MODE_0;
-                    break;
-                case 1:
-                    mode = UnixSpiMode.SPI_MODE_1;
-                    break;
-                case 2:
-                    mode = UnixSpiMode.SPI_MODE_2;
-                    break;
-                case 3:
-                    mode = UnixSpiMode.SPI_MODE_3;
-                    break;
-                default:
-                    throw new ArgumentException($"Transfer mode '{transferMode}' not regignized. Must be between 0 and 3.");
-            }
+                0 => UnixSpiMode.SPI_MODE_0,
+                1 => UnixSpiMode.SPI_MODE_1,
+                2 => UnixSpiMode.SPI_MODE_2,
+                3 => UnixSpiMode.SPI_MODE_3,
+                _ => throw new ArgumentException($"Transfer mode '{transferMode}' not regignized. Must be between 0 and 3."),
+            };
             IntPtr nativePtr = new IntPtr(&mode);
 
             int result = Interop.ioctl(_deviceFileDescriptor, (uint)SpiSettings.SPI_IOC_WR_MODE, nativePtr);

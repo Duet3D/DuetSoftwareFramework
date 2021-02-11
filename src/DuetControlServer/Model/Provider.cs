@@ -51,7 +51,6 @@ namespace DuetControlServer.Model
             /// </summary>
             /// <param name="lockItem">Actual lock</param>
             /// <param name="isWriteLock">Whether the lock is a read/write lock</param>
-            /// <param name="cancellationToken">Internal cancellation token</param>
             internal LockWrapper(IDisposable lockItem, bool isWriteLock)
             {
                 _lock = lockItem;
@@ -262,7 +261,6 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Wait for an update to occur
         /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Asynchronous task</returns>
         public static Task WaitForUpdate() => WaitForUpdate(Program.CancellationToken);
 

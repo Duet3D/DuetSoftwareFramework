@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/github/v/release/Duet3D/DuetSoftwareFramework) ![License](https://img.shields.io/github/license/Duet3D/DuetSoftwareFramework?color=blue) ![Issues](https://img.shields.io/github/issues/Duet3D/DuetSoftwareFramework?color=blue)
 
-Duet Software Framework resembles a collection of programs to control an attached Duet3D board from a Linux-based mini computer (SBC). Since it is using .NET Core, it requires an ARM processor that supports ARMv7 instructions processor is required (Raspberry Pi 2 or newer).
+Duet Software Framework resembles a collection of programs to control an attached Duet3D board from a Linux-based mini computer (SBC). Since it is using .NET, it requires an ARM processor that supports ARMv7 instructions processor is required (Raspberry Pi 2 or newer).
 
 ## Installation
 
@@ -86,7 +86,7 @@ More technical documentation about this can be found [here](https://duet3d.githu
 ### Inter-Process Communication
 
 DuetControlServer provides a UNIX socket for inter-process commmunication. This socket usually resides in `/var/run/dsf/dcs.sock` .
-For .NET Core, DSF provides the `DuetAPIClient` class library which is also used internally by the DSF core applications.
+For .NET, DSF provides the `DuetAPIClient` class library which is also used internally by the DSF core applications.
 
 Technical information about the way the communication over the UNIX socket works can be found in the [API description](#api).
 
@@ -99,7 +99,7 @@ DuetControlServer provides several functions for synchronized access along with 
 ## DuetWebServer
 
 This application provides Duet Web Control along with a RESTful API and possibly custom HTTP endpoints.
-It is implemented using ASP.NET Core and uses Kestrel internally. The coniguration file defaults to `/opt/dsf/conf/http.json`.
+It is implemented using ASP.NET and uses Kestrel internally. The coniguration file defaults to `/opt/dsf/conf/http.json`.
 
 ### Configuration
 
@@ -402,7 +402,7 @@ If you wish to make changes to the existing software and to test it, you need to
 
 #### 3.1 Building on a remote system
 
-Every .NET Core application of DSF is references the `DotnetPublishSsh` package which allows you to compile and upload .NET Core applications for ARMv7/AArch64.
+Every .NET application of DSF is references the `DotnetPublishSsh` package which allows you to compile and upload .NET applications for ARMv7/AArch64.
 In order to use this, it is recommended to enable remote `root` access first.
 To do so, open `/etc/ssh/sshd_config` with an editor of your choice, look for the line
 
@@ -441,13 +441,13 @@ If you do not wish to publish everything to your board at the time of compiling,
 
 ### 3.2 Building on the SBC itself
 
-Of course you can compile the required components on the SBC itself. Once the .NET Core SDK has been installed, enter the directory of the DSF application you want to compile and run `dotnet build`. This will generate suitable binaries for you.
+Of course you can compile the required components on the SBC itself. Once the latest .NET SDK has been installed, enter the directory of the DSF application you want to compile and run `dotnet build`. This will generate suitable binaries for you.
 
 ## API
 
-DSF provides a powerful API aimed at expandability and flexibility. The easiest way to get started with it is to obtain the .NET Core package called `DuetAPIClient`.
+DSF provides a powerful API aimed at expandability and flexibility. The easiest way to get started with it is to obtain the .NET package called `DuetAPIClient`.
 Both the API and the API client are available as nuget packages (see [here](https://www.nuget.org/packages/DuetAPI) and [here](https://www.nuget.org/packages/DuetAPIClient)).
-To get a basic idea how the .NET Core-based DuetAPIClient works, check out the source code of the [CodeConsole utility](src/CodeConsole/Program.cs) and the [code documentation](https://duet3d.github.io/DuetSoftwareFramework/api/DuetAPIClient.html).
+To get a basic idea how the .NET-based DuetAPIClient works, check out the source code of the [CodeConsole utility](src/CodeConsole/Program.cs) and the [code documentation](https://duet3d.github.io/DuetSoftwareFramework/api/DuetAPIClient.html).
 
 The .NET-based API libraries are - unlike the other DSF components - licensed under the terms of the LGPL 3.0 or later.
 If you wish to build your own API client, it is strongly recommended to follow the DuetAPIClient implementation because it properly documents and handles possible exceptions of every command.

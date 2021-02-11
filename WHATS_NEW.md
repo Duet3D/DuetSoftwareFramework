@@ -2,7 +2,7 @@ Summary of important changes in recent versions
 ===============================================
 
 Version 3.3-b1
-================
+==============
 
 Compatible versions:
 - RepRapFirmware 3.3-b1
@@ -14,6 +14,16 @@ Changed behaviour:
 - `M999` is only prioritized from text inputs if it is intended for the main board
 - New configuration file `dsf-config.g` is automatically executed when DCS and third-party plugins have been started
 
+Known issues:
+- `network.interfaces[].speed` does not work for WiFi adapters on the Pi (see https://github.com/dotnet/runtime/issues/47777)
+
+Version 3.2.2
+=============
+
+Compatible versions:
+- RepRapFirmware 3.2.2
+- DuetWebControl 3.2.2
+
 Bug fixes:
 - Tabs at the beginning of G-code lines were not interpreted as up to 4 spaces
 - Payloads for conditional keywords had to be encapsulated in curly braces to allow usage of round braces
@@ -23,9 +33,6 @@ Bug fixes:
 - `break` and `continue` didn't wait for pending codes to finish which could lead to problems with `iterations`
 - When empty comments were parsed, the `Comment` field of DSF codes remained `null` instead of `string.Empty`
 - Unlike in RRF `G29 S0` accepted custom filenames (better solution is to use `G29` followed by `G29 S3`)
-
-Known issues:
-- `network.interfaces[].speed` does not work for WiFi adapters on the Pi (see https://github.com/dotnet/runtime/issues/47777)
 
 Version 3.2.0
 =============
