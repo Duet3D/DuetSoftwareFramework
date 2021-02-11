@@ -557,13 +557,13 @@
             Cancellation token source that is triggered when the service is supposed to shut down
             </summary>
         </member>
-        <member name="M:DuetWebServer.Services.ModelObserver.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Services.ModelObserver})">
+        <member name="M:DuetWebServer.Services.ModelObserver.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Services.ModelObserver},Microsoft.Extensions.Hosting.IHostApplicationLifetime)">
             <summary>
             Constructor of this service class
             </summary>
             <param name="configuration">App configuration</param>
-            <param name="corsService">Default CORS service</param>
             <param name="logger">Logger instance</param>
+            <param name="hostAppLifetime">Host app lifetime provider</param>
         </member>
         <member name="M:DuetWebServer.Services.ModelObserver.Dispose">
             <summary>

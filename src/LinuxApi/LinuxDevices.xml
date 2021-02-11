@@ -33,7 +33,7 @@
             <summary>
             Change the owner of a file descriptor
             </summary>
-            <param name="file">File descriptor</param>
+            <param name="fd">File descriptor</param>
             <param name="uid">User ID</param>
             <param name="gid">Group ID</param>
         </member>
@@ -154,6 +154,7 @@
             </summary>
             <param name="devNode">Path to the /dev node</param>
             <param name="speed">Transfer speed in Hz</param>
+            <param name="transferMode">Transfer mode</param>
         </member>
         <member name="M:LinuxApi.SpiDevice.Finalize">
             <summary>

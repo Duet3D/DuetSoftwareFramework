@@ -464,7 +464,7 @@ namespace DuetControlServer.Files
         /// Parse the file for thumbnails
         /// </summary>
         /// <param name="reader">Stream reader</param>
-        /// <param name="partialFileInfo">G-code file information</param>
+        /// <param name="parsedFileInfo">G-code file information</param>
         /// <returns>Asynchronous task</returns>
         /// <remarks>
         /// This functionality should be moved to ParseHeader in the long term

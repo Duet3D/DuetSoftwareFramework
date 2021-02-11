@@ -39,27 +39,27 @@ namespace DuetControlServer.SPI.Communication.Shared
         /// </summary>
         [FieldOffset(6)]
         public ushort DataLength;
-        
+
         /// <summary>
-        /// CRC16 checksum of the transfer data (protocol version < 4)
+        /// CRC16 checksum of the transfer data (protocol version &lt; 4)
         /// </summary>
         [FieldOffset(8)]
         public ushort ChecksumData16;
 
         /// <summary>
-        /// CRC16 checksum of the transfer header (protocol version < 4)
+        /// CRC16 checksum of the transfer header (protocol version &lt; 4)
         /// </summary>
         [FieldOffset(10)]
         public ushort ChecksumHeader16;
 
         /// <summary>
-        /// CRC32 checksum of the transfer data (protocol version >= 4)
+        /// CRC32 checksum of the transfer data (protocol version &gt;= 4)
         /// </summary>
         [FieldOffset(8)]
         public uint ChecksumData32;
 
         /// <summary>
-        /// CRC32 checksum of the transfer header (protocol version >= 4)
+        /// CRC32 checksum of the transfer header (protocol version &gt;= 4)
         /// </summary>
         [FieldOffset(12)]
         public uint ChecksumHeader32;

@@ -49,7 +49,7 @@ namespace LinuxApi
         /// <summary>
         /// Change the owner of a file descriptor
         /// </summary>
-        /// <param name="file">File descriptor</param>
+        /// <param name="fd">File descriptor</param>
         /// <param name="uid">User ID</param>
         /// <param name="gid">Group ID</param>
         public static void Chown(int fd, int uid, int gid)

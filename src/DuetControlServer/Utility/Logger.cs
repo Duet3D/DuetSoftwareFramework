@@ -129,6 +129,7 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Write a message including timestamp to the log file
         /// </summary>
+        /// <param name="level">Log level of the message</param>
         /// <param name="msg">Message to log</param>
         /// <returns>Asynchronous task</returns>
         public static async Task Log(LogLevel level, Message msg)

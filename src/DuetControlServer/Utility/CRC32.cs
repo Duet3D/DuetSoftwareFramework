@@ -28,6 +28,11 @@ namespace DuetControlServer.Utility
 			}
 		}
 
+		/// <summary>
+		/// Calculate the CRC32 checksum for the given byte span
+		/// </summary>
+		/// <param name="buffer">Input data</param>
+		/// <returns>CRC32 checksum</returns>
 		public static uint Calculate(Span<byte> buffer)
 		{
 			uint crc = 0;

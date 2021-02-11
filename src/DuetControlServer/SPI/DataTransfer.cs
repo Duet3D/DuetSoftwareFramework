@@ -455,6 +455,7 @@ namespace DuetControlServer.SPI
         /// Resend a packet back to the firmware
         /// </summary>
         /// <param name="packet">Packet holding the resend request</param>
+        /// <param name="linuxRequest">Content of the packet to resend</param>
         public static void ResendPacket(PacketHeader packet, out Communication.LinuxRequests.Request linuxRequest)
         {
             Span<byte> buffer = (_txBuffer.Next ?? _txBuffers.First).Value.Span;

@@ -1449,7 +1449,7 @@
             Parse the file for thumbnails
             </summary>
             <param name="reader">Stream reader</param>
-            <param name="partialFileInfo">G-code file information</param>
+            <param name="parsedFileInfo">G-code file information</param>
             <returns>Asynchronous task</returns>
             <remarks>
             This functionality should be moved to ParseHeader in the long term
@@ -2417,7 +2417,6 @@
             </summary>
             <param name="lockItem">Actual lock</param>
             <param name="isWriteLock">Whether the lock is a read/write lock</param>
-            <param name="cancellationToken">Internal cancellation token</param>
         </member>
         <member name="M:DuetControlServer.Model.Provider.LockWrapper.Dispose">
             <summary>
@@ -2525,7 +2524,6 @@
             <summary>
             Wait for an update to occur
             </summary>
-            <param name="cancellationToken">Cancellation token</param>
             <returns>Asynchronous task</returns>
         </member>
         <member name="M:DuetControlServer.Model.Provider.Output(DuetAPI.ObjectModel.LogLevel,DuetAPI.ObjectModel.Message)">
@@ -4444,16 +4442,24 @@
             Total length of the data transfer in bytes
             </summary>
         </member>
-        <!-- Badly formed XML comment ignored for member "F:DuetControlServer.SPI.Communication.Shared.TransferHeader.ChecksumData16" -->
-        <!-- Badly formed XML comment ignored for member "F:DuetControlServer.SPI.Communication.Shared.TransferHeader.ChecksumHeader16" -->
+        <member name="F:DuetControlServer.SPI.Communication.Shared.TransferHeader.ChecksumData16">
+            <summary>
+            CRC16 checksum of the transfer data (protocol version &lt; 4)
+            </summary>
+        </member>
+        <member name="F:DuetControlServer.SPI.Communication.Shared.TransferHeader.ChecksumHeader16">
+            <summary>
+            CRC16 checksum of the transfer header (protocol version &lt; 4)
+            </summary>
+        </member>
         <member name="F:DuetControlServer.SPI.Communication.Shared.TransferHeader.ChecksumData32">
             <summary>
-            CRC32 checksum of the transfer data (protocol version >= 4)
+            CRC32 checksum of the transfer data (protocol version &gt;= 4)
             </summary>
         </member>
         <member name="F:DuetControlServer.SPI.Communication.Shared.TransferHeader.ChecksumHeader32">
             <summary>
-            CRC32 checksum of the transfer header (protocol version >= 4)
+            CRC32 checksum of the transfer header (protocol version &gt;= 4)
             </summary>
         </member>
         <member name="T:DuetControlServer.SPI.Communication.Shared.TransferResponse">
@@ -4671,6 +4677,7 @@
             Resend a packet back to the firmware
             </summary>
             <param name="packet">Packet holding the resend request</param>
+            <param name="linuxRequest">Content of the packet to resend</param>
         </member>
         <member name="M:DuetControlServer.SPI.DataTransfer.WriteEmergencyStop">
             <summary>
@@ -5591,6 +5598,13 @@
             The internals of this class originate from Crc32.NET, see https://github.com/force-net/Crc32.NET
             </remarks>
         </member>
+        <member name="M:DuetControlServer.Utility.CRC32.Calculate(System.Span{System.Byte})">
+            <summary>
+            Calculate the CRC32 checksum for the given byte span
+            </summary>
+            <param name="buffer">Input data</param>
+            <returns>CRC32 checksum</returns>
+        </member>
         <member name="T:DuetControlServer.Utility.FilamentManager">
             <summary>
             Provides functions for filament management
@@ -5710,6 +5724,7 @@
             <summary>
             Write a message including timestamp to the log file
             </summary>
+            <param name="level">Log level of the message</param>
             <param name="msg">Message to log</param>
             <returns>Asynchronous task</returns>
         </member>
