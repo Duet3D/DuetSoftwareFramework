@@ -31,7 +31,7 @@ namespace DuetControlServer
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
-        /// Global cancellation source that is triggered when the program is supposed to terminate
+        /// Cancellation source that is triggered when the program is supposed to terminate
         /// </summary>
         private static readonly CancellationTokenSource _cancelSource = new CancellationTokenSource();
 
@@ -358,14 +358,24 @@ namespace DuetControlServer
                 _logger.Error(e, "Failed to stop plugins");
             }
 
+            // Wait for potential firmware update to finish
+            await SPI.Interface.WaitForUpdate();
+
             // Try to shut down this program normally 
             _cancelSource.Cancel();
 
             // If that fails, kill the program forcefully
             Task terminationTask = Task.Delay(4500, _programTerminated.Token).ContinueWith(async task =>
             {
-                await task;
-                Environment.Exit(1);
+                try
+                {
+                    await task;
+                    Environment.Exit(1);
+                }
+                catch (OperationCanceledException)
+                {
+                    // expected
+                }
             }, TaskContinuationOptions.RunContinuationsAsynchronously);
 
             // Wait for program termination if required
