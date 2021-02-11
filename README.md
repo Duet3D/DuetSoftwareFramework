@@ -697,7 +697,6 @@ To ensure flawless operation of the most critical components, Duet Software Fram
 
 ## Known incompatibilities
 
-- `killall` may not be used to terminate DuetControlServer. Since it sends SIGTERM to all processes including worker threads of the .NET task scheduler, an abnormal program termination is the consequence. It is better to send SIGTERM only to the main PID
 - G-Code checksums and M998 are not supported
 
 ## Reporting issues

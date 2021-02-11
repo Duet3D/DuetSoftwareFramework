@@ -31,7 +31,7 @@ namespace DuetControlServer
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
-        /// Global cancellation source that is triggered when the program is supposed to terminate
+        /// Cancellation source that is triggered when the program is supposed to terminate
         /// </summary>
         public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
 
@@ -150,8 +150,7 @@ namespace DuetControlServer
                 if (!CancelSource.IsCancellationRequested)
                 {
                     _logger.Warn("Received SIGTERM, shutting down...");
-                    CancelSource.Cancel();
-                    Terminate().Wait();
+                    Shutdown().Wait();
                 }
             };
             Console.CancelKeyPress += (sender, e) =>
@@ -160,7 +159,7 @@ namespace DuetControlServer
                 {
                     _logger.Warn("Received SIGINT, shutting down...");
                     e.Cancel = true;
-                    Terminate().Wait();
+                    Shutdown().Wait();
                 }
             };
 
@@ -350,15 +349,18 @@ namespace DuetControlServer
         /// Terminate this program and kill it forcefully if required
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task Terminate()
+        public static async Task Shutdown()
         {
+            // Wait for potential firmware update to finish
+            await SPI.Interface.WaitForUpdate();
+
+            // Try to shut down this program normally
+            CancelSource.Cancel();
+
+            // Kill the program forcefully after a few seconds if a normal shutdown request does not work
             try
             {
-                // Try to shut down this program normally
-                CancelSource.Cancel();
-                await Task.Delay(4000, _programTerminated.Token);
-
-                // If that fails, kill it
+                await Task.Delay(4500, _programTerminated.Token);
                 Environment.Exit(1);
             }
             catch (OperationCanceledException)

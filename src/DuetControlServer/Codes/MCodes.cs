@@ -1025,7 +1025,7 @@ namespace DuetControlServer.Codes
                     if (!Settings.NoTerminateOnReset && code.Parameters.Count == 0)
                     {
                         // DCS is supposed to terminate via M999 unless this option is explicitly disabled
-                        _ = Task.Run(Program.Terminate);
+                        _ = Task.Run(Program.Shutdown);
                     }
                     break;
             }

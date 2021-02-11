@@ -465,6 +465,18 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Wait for potential firmware update to finish
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static async Task WaitForUpdate()
+        {
+            using (await _firmwareUpdateLock.LockAsync(Program.CancellationToken))
+            {
+                // This lock is acquired as long as a firmware update is in progress; no need to do anything else
+            }
+        }
+
+        /// <summary>
         /// Perform an update of the main firmware via IAP
         /// </summary>
         /// <param name="iapStream">IAP binary</param>
