@@ -76,7 +76,8 @@ namespace DuetWebServer.Services
             {
                 if (httpContext.Request.Headers.ContainsKey(HeaderNames.Host) &&
                     Uri.TryCreate(httpContext.Request.Headers[CorsConstants.Origin], UriKind.Absolute, out Uri uri) &&
-                    string.Equals(uri.Host, httpContext.Request.Headers[HeaderNames.Host], StringComparison.InvariantCultureIgnoreCase))
+                    (string.Equals(uri.Host, httpContext.Request.Headers[HeaderNames.Host], StringComparison.InvariantCultureIgnoreCase) ||
+                     string.Equals($"{uri.Host}:{uri.Port}", httpContext.Request.Headers[HeaderNames.Host], StringComparison.InvariantCultureIgnoreCase)))
                 {
                     // Origin matches Host, request is legit
                     return true;
@@ -115,9 +116,9 @@ namespace DuetWebServer.Services
         /// Constructor of this service class
         /// </summary>
         /// <param name="configuration">App configuration</param>
-        /// <param name="corsService">Default CORS service</param>
         /// <param name="logger">Logger instance</param>
-        public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger)
+        /// <param name="hostAppLifetime">Host app lifetime provider</param>
+        public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IHostApplicationLifetime hostAppLifetime)
         {
             _logger = logger;
             _configuration = configuration;

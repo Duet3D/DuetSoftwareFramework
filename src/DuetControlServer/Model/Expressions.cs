@@ -307,7 +307,7 @@ namespace DuetControlServer.Model
                             // Encapsulate fully expanded parameters so that plugins and RRF know it was an expression
                             parameterValue = '{' + parameterValue + '}';
                         }
-                        code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue);
+                        code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue, false, false);
                     }
                     catch (CodeParserException cpe)
                     {
@@ -382,7 +382,7 @@ namespace DuetControlServer.Model
 
                         string subExpression = parsedExpressions.Pop().ToString();
                         string evaluationResult = await EvaluateSubExpression(code, subExpression.Trim(), onlyLinuxFields, true);
-                        if (lastBracketType == '[' || subExpression == evaluationResult || onlyLinuxFields)
+                        if (lastBracketType == '(' || lastBracketType == '[' || subExpression == evaluationResult || onlyLinuxFields)
                         {
                             parsedExpressions.Peek().Append(lastBracketType);
                             parsedExpressions.Peek().Append(evaluationResult);

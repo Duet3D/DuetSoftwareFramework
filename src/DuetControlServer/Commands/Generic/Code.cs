@@ -134,7 +134,7 @@ namespace DuetControlServer.Commands
         private Task<IDisposable> WaitForExecution()
         {
             // Assign a cancellation token if required
-            if (CancellationToken == null)
+            if (CancellationToken == default)
             {
                 lock (_cancellationTokenSources)
                 {

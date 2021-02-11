@@ -141,8 +141,7 @@ namespace DuetControlServer.Codes
 
                     if (code.Parameter('S', 0) == 0)
                     {
-                        string file = code.Parameter('P', FilePath.DefaultHeightmapFile);
-                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.System);
+                        string physicalFile = await FilePath.ToPhysicalAsync(FilePath.DefaultHeightmapFile, FileDirectory.System);
 
                         try
                         {
@@ -161,7 +160,7 @@ namespace DuetControlServer.Codes
                                 {
                                     Model.Provider.Get.Move.Compensation.File = virtualFile;
                                 }
-                                code.Result.Add(MessageType.Success, $"Height map saved to file {file}");
+                                code.Result.Add(MessageType.Success, $"Height map saved to file {FilePath.DefaultHeightmapFile}");
                             }
                         }
                         catch (Exception e)
@@ -171,7 +170,7 @@ namespace DuetControlServer.Codes
                             {
                                 e = ae.InnerException;
                             }
-                            code.Result.Add(MessageType.Error, $"Failed to save height map to file {file}: {e.Message}");
+                            code.Result.Add(MessageType.Error, $"Failed to save height map to file {FilePath.DefaultHeightmapFile}: {e.Message}");
                         }
                     }
                     break;

@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Runtime.Loader;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -144,12 +145,13 @@ namespace DuetControlServer
             };
 
             // Deal with program termination requests (SIGTERM and Ctrl+C)
-            AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+            AssemblyLoadContext.Default.Unloading += (obj) =>
             {
                 if (!CancelSource.IsCancellationRequested)
                 {
                     _logger.Warn("Received SIGTERM, shutting down...");
                     CancelSource.Cancel();
+                    Terminate().Wait();
                 }
             };
             Console.CancelKeyPress += (sender, e) =>
@@ -158,9 +160,25 @@ namespace DuetControlServer
                 {
                     _logger.Warn("Received SIGINT, shutting down...");
                     e.Cancel = true;
-                    CancelSource.Cancel();
+                    Terminate().Wait();
                 }
             };
+
+            // Notify the service manager that we're up and running
+            string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
+            if (!string.IsNullOrEmpty(notifySocket))
+            {
+                try
+                {
+                    using Socket socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
+                    socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
+                    socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
+                }
+                catch (Exception e)
+                {
+                    _logger.Warn(e, "Failed to notify systemd about process start");
+                }
+            }
 
             if (!Settings.UpdateOnly)
             {
@@ -226,22 +244,6 @@ namespace DuetControlServer
                         {
                             await Model.Provider.Output(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
                         }
-                    }
-                }
-
-                // Notify the service manager that we're up and running
-                string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
-                if (!string.IsNullOrEmpty(notifySocket))
-                {
-                    try
-                    {
-                        using Socket socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
-                        socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
-                        socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.Warn(e, "Failed to notify systmed about process start");
                     }
                 }
             }

@@ -14,7 +14,7 @@ namespace DuetAPI.Commands
         /// <param name="buffer">Internal buffer for parsing codes</param>
         /// <returns>Whether anything could be read</returns>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
-        public static async Task<bool> ParseAsync(StreamReader reader, Code result, CodeParserBuffer buffer)
+        public static async ValueTask<bool> ParseAsync(StreamReader reader, Code result, CodeParserBuffer buffer)
         {
             char letter = '\0', lastC, c = '\0';
             string value = string.Empty;
@@ -22,7 +22,7 @@ namespace DuetAPI.Commands
             bool contentRead = false, unprecedentedParameter = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
             bool readingAtStart = buffer.SeenNewLine, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
-            bool wasQuoted = false, wasCondition = false, wasExpression = false;
+            bool wasQuoted = false, wasExpression = false;
             int numCurlyBraces = 0, numRoundBraces = 0;
             buffer.SeenNewLine = false;
 
@@ -78,6 +78,11 @@ namespace DuetAPI.Commands
                         // Add next character to the comment unless it is the "artificial" 0-character termination
                         result.Comment += c;
                     }
+                    else if (result.Comment == null)
+                    {
+                        // Something started a comment, so the comment cannot be null any more
+                        result.Comment = string.Empty;
+                    }
                     continue;
                 }
 
@@ -92,12 +97,12 @@ namespace DuetAPI.Commands
                     else
                     {
                         // End of encapsulated comment
-                        inEncapsulatedComment = false;
-                        if (wasCondition)
+                        if (result.Comment == null)
                         {
-                            inCondition = true;
-                            wasCondition = false;
+                            // Something started a comment, so the comment cannot be null any more
+                            result.Comment = string.Empty;
                         }
+                        inEncapsulatedComment = false;
                     }
                     continue;
                 }
@@ -122,17 +127,8 @@ namespace DuetAPI.Commands
                             numCurlyBraces--;
                             break;
                         case '(':
-                            if (numCurlyBraces > 0)
-                            {
-                                result.KeywordArgument += '(';
-                                numRoundBraces++;
-                            }
-                            else
-                            {
-                                inCondition = false;
-                                wasCondition = true;
-                                inEncapsulatedComment = true;
-                            }
+                            result.KeywordArgument += '(';
+                            numRoundBraces++;
                             break;
                         case ')':
                             if (numRoundBraces > 0)
@@ -298,12 +294,25 @@ namespace DuetAPI.Commands
                     isLineNumber = (char.ToUpperInvariant(c) == 'N');
                     if (char.IsWhiteSpace(c) && c != '\n')
                     {
-                        if (result.Indent == byte.MaxValue)
+                        if (c == '\t')
                         {
-                            throw new CodeParserException("Indentation too big", result);
+                            int indent = (result.Indent + 4) & ~3;
+                            if (indent >= byte.MaxValue)
+                            {
+                                throw new CodeParserException("Indentation too big", result);
+                            }
+                            result.Indent = (byte)indent;
+                            buffer.Indent = (byte)indent;
                         }
-                        result.Indent++;
-                        buffer.Indent++;
+                        else
+                        {
+                            if (result.Indent == byte.MaxValue)
+                            {
+                                throw new CodeParserException("Indentation too big", result);
+                            }
+                            result.Indent++;
+                            buffer.Indent++;
+                        }
                     }
                     else
                     {
@@ -458,7 +467,12 @@ namespace DuetAPI.Commands
                             {
                                 letter = '@';
                             }
-                            else if (!unprecedentedParameter)
+                            else if (unprecedentedParameter)
+                            {
+                                value = letter + value;
+                                letter = '@';
+                            }
+                            else
                             {
                                 letter = char.ToUpperInvariant(letter);
                             }

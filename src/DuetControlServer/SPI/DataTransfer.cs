@@ -31,6 +31,7 @@ namespace DuetControlServer.SPI
 
         // General transfer variables
         private static InputGpioPin _transferReadyPin;
+        private static bool _expectedTfrRdyPinValue = false;
         private static volatile bool _transferReadyPinMonitored;
         private static SpiDevice _spiDevice;
         private static readonly AsyncManualResetEvent _transferReadyEvent = new AsyncManualResetEvent();
@@ -1088,6 +1089,7 @@ namespace DuetControlServer.SPI
                     }
                 }
                 _waitingForFirstTransfer = false;
+                _expectedTfrRdyPinValue = false;
             }
             else if (_updating)
             {
@@ -1096,21 +1098,27 @@ namespace DuetControlServer.SPI
             }
             else
             {
-                // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
+                // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred.
                 using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
                 cts.CancelAfter(inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout);
-                try
+                do
                 {
-                    _transferReadyEvent.Wait(cts.Token);
-                }
-                catch
-                {
-                    if (Program.CancellationToken.IsCancellationRequested)
+                    try
                     {
-                        throw new OperationCanceledException("Program termination");
+                        _transferReadyEvent.Wait(cts.Token);
                     }
-                    throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
+                    catch
+                    {
+                        if (Program.CancellationToken.IsCancellationRequested)
+                        {
+                            throw new OperationCanceledException("Program termination");
+                        }
+                        throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
+                    }
+                    _transferReadyEvent.Reset();
                 }
+                while (_transferReadyPin.Value != _expectedTfrRdyPinValue);
+                _expectedTfrRdyPinValue = !_expectedTfrRdyPinValue;
             }
             _transferReadyEvent.Reset();
         }
