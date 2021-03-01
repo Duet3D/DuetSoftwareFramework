@@ -41,13 +41,19 @@ namespace DuetControlServer.Commands
                 foreach (ZipArchiveEntry entry in zipArchive.Entries)
                 {
                     if (entry.FullName.Contains("..") ||
-                        entry.FullName == "rrf/sys/config.g" ||
-                        entry.FullName == "rrf/sys/config-override.g" ||
-                        entry.FullName.StartsWith("rrf/firmware/"))
+                        entry.FullName == "sd/sys/config.g" ||
+                        entry.FullName == "sd/sys/config-override.g" ||
+                        entry.FullName.StartsWith("sd/firmware/"))
                     {
                         throw new ArgumentException($"Illegal filename {entry.FullName}, stopping installation");
                     }
                 }
+            }
+
+            // Permit root plugins only if they're enabled
+            if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) && !Settings.RootPluginSupport)
+            {
+                throw new ArgumentException("Installation of plugins with super-user permissions is not allowed");
             }
 
             // Validate the current DSF/RRF versions

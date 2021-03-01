@@ -62,10 +62,10 @@ namespace DuetPluginService.Commands
                 _ => "unknown"
             };
 
-            string sbcExecutable = Path.Combine(Settings.PluginDirectory, plugin.Name, "bin", architecture, plugin.SbcExecutable);
+            string sbcExecutable = Path.Combine(Settings.PluginDirectory, plugin.Name, "dsf", architecture, plugin.SbcExecutable);
             if (!File.Exists(sbcExecutable))
             {
-                sbcExecutable = Path.Combine(Settings.PluginDirectory, plugin.Name, "bin", plugin.SbcExecutable);
+                sbcExecutable = Path.Combine(Settings.PluginDirectory, plugin.Name, "dsf", plugin.SbcExecutable);
                 if (!File.Exists(sbcExecutable))
                 {
                     throw new ArgumentException($"Cannot find executable {sbcExecutable}");

@@ -8,16 +8,16 @@ They may contain files for execution on a SBC, in DWC, and/or configuration file
 Every plugin ZIP file may consist of the following files and directories:
 
 - `plugin.json` (required): This file holds general information about the plugin. See the following section for further details
-- `bin` directory: Contains executable and config files for the SBC portion (if supported)
-- `rrf` directory: Holds files that are supposed to be installed into `0:/`, that is the (virtual) SD card
-- `www` directory: Provides web files that are supposed to be accessible from Duet Web Control. It is symlinked to 0:/www/\<PluginName\>
+- `dsf/` directory: Contains executable and config files for the SBC portion (if applicable)
+- `dwc/` directory: Provides web files that are supposed to be accessible from Duet Web Control. It is symlinked or installed to 0:/www/\<PluginName\>
+- `sd/` directory: Holds files that are supposed to be installed into `0:/` (the [virtual] SD card)
 
 For security reasons a plugin bundle must not contain the following files:
 
 - Filenames containing `..`
-- `rrf/firmware/*`
-- `rrf/sys/config.g`
-- `rrf/sys/config-override.g`
+- `sd/firmware/*`
+- `sd/sys/config.g`
+- `sd/sys/config-override.g`
 
 ## Plugin Manifest
 
@@ -29,7 +29,7 @@ Every plugin must provide a `plugin.json` in the root of its ZIP bundle. It may 
   "author": "Plugin Author",
   "version": "1.0.0",
   "license": "Plugin License",
-  "sourceRepository": "Plugin Repository",
+  "homepage": "Plugin Repository",
   "dwcVersion": null,
   "dwcDependencies": [],
   "dwcResources": [],
@@ -54,7 +54,7 @@ In order to maintain security, a user installing new plugins is asked for the re
 the plugin may be installed. This must be considered when designing a new external plugin.
 
 This limitation does not effect external plugins running on the Pi (i.e. applications running outside
-the `/opt/dsf/plugins` directory as defined per PluginsDirectory in `config.json`). These programs
+the `/opt/dsf/plugins` directory as defined per `PluginsDirectory` in `config.json`). These programs
 are automatically granted full permissions in DCS to retain backwards-compatibility.
 
 ### List of Permissions

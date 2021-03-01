@@ -76,7 +76,7 @@ namespace DuetPluginService.Commands
                     if (ForUpgrade)
                     {
                         // Remove only installed files
-                        foreach (string rrfFile in plugin.RrfFiles)
+                        foreach (string rrfFile in plugin.SdFiles)
                         {
                             string file = Path.Combine(Settings.BaseDirectory, rrfFile);
                             if (File.Exists(file))
@@ -86,7 +86,7 @@ namespace DuetPluginService.Commands
                             }
                         }
 
-                        foreach (string sbcFile in plugin.SbcFiles)
+                        foreach (string sbcFile in plugin.DsfFiles)
                         {
                             string file = Path.Combine(Settings.PluginDirectory, Plugin, sbcFile);
                             if (File.Exists(file))

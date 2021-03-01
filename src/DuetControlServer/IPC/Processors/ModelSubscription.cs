@@ -289,17 +289,16 @@ namespace DuetControlServer.IPC.Processors
                     {
                         if (nodeObject is List<object> nodeList)
                         {
+                            for (int k = nodeList.Count; k > pathNode.List.Count; k--)
+                            {
+                                nodeList.RemoveAt(k - 1);
+                            }
                             currentList = nodeList;
                         }
                         else
                         {
                             // Stop here if the node type is unsupported
                             return nodeObject;
-                        }
-
-                        for (int k = currentList.Count; k > pathNode.List.Count; k--)
-                        {
-                            currentList.RemoveAt(k - 1);
                         }
                     }
                     else

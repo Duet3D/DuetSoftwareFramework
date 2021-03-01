@@ -167,6 +167,8 @@ namespace DuetControlServer.Model
         {
             Get.Move.Compensation.PropertyChanged += Compensation_PropertyChanged;
             Get.State.DsfVersion = Program.Version;
+            Get.State.DsfPluginSupport = Settings.PluginSupport;
+            Get.State.DsfRootPluginSupport = Settings.PluginSupport && Settings.RootPluginSupport;
             Get.Network.Hostname = Environment.MachineName;
             Get.Network.Name = Environment.MachineName;
         }

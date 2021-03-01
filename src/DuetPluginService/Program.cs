@@ -42,6 +42,11 @@ namespace DuetPluginService
         public static readonly CancellationToken CancellationToken = CancelSource.Token;
 
         /// <summary>
+        /// Cancellation token to be called when the program has been terminated
+        /// </summary>
+        private static readonly ManualResetEvent _programTerminated = new ManualResetEvent(false);
+
+        /// <summary>
         /// Entry point of the program
         /// </summary>
         /// <param name="args">Command-line arguments</param>
@@ -68,7 +73,16 @@ namespace DuetPluginService
             }
 
             // Attempt to connect to the control server
-            await IPC.Service.Connect();
+            try
+            {
+                await IPC.Service.Connect();
+                _logger.Info("Connection established");
+            }
+            catch (SocketException)
+            {
+                _logger.Fatal("Could not connect to DCS");
+                return;
+            }
 
             // Deal with program termination requests (SIGTERM and Ctrl+C)
             AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
@@ -77,6 +91,7 @@ namespace DuetPluginService
                 {
                     _logger.Warn("Received SIGTERM, shutting down...");
                     CancelSource.Cancel();
+                    _programTerminated.WaitOne();
                 }
             };
             Console.CancelKeyPress += (sender, e) =>
@@ -166,6 +181,7 @@ namespace DuetPluginService
             // End
             _logger.Info("Application has shut down");
             NLog.LogManager.Shutdown();
+            _programTerminated.Set();
         }
     }
 }

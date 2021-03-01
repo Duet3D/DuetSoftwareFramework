@@ -47,6 +47,12 @@ namespace DuetControlServer
         public static bool PluginSupport { get; set; } = true;
 
         /// <summary>
+        /// Whether this DCS instance may support third-party root plugins.
+        /// This is only respected if <see cref="PluginSupport"/> is set to true
+        /// </summary>
+        public static bool RootPluginSupport { get; set; }
+
+        /// <summary>
         /// Path to the file holding a list of loaded plugins
         /// </summary>
         public static string PluginsFilename { get; set; } = DefaultPluginsFile;

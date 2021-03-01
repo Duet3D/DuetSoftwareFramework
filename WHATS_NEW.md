@@ -13,6 +13,7 @@ Changed behaviour:
 - DuetWebServer notifies systemd when it has started like DuetControlServer does
 - `M999` is only prioritized from text inputs if it is intended for the main board
 - New configuration file `dsf-config.g` is automatically executed when DCS and third-party plugins have been started
+- CodeConsole application uses Telnet G-code channel instead of SBC
 
 Known issues:
 - `network.interfaces[].speed` does not work for WiFi adapters on the Pi (see https://github.com/dotnet/runtime/issues/47777)

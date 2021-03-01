@@ -59,6 +59,28 @@ namespace DuetAPI.ObjectModel
         private string _dsfVersion;
 
         /// <summary>
+        /// Indicates if DSF allows the installation and usage of third-party plugins
+        /// </summary>
+        [LinuxProperty]
+        public bool DsfPluginSupport
+        {
+            get => _dsfPluginSupport;
+            set => SetPropertyValue(ref _dsfPluginSupport, value);
+        }
+        private bool _dsfPluginSupport;
+
+        /// <summary>
+        /// Indicates if DSF allows the installation and usage of third-party root plugins (potentially dangerous)
+        /// </summary>
+        [LinuxProperty]
+        public bool DsfRootPluginSupport
+        {
+            get => _dsfRootPluginSupport;
+            set => SetPropertyValue(ref _dsfRootPluginSupport, value);
+        }
+        private bool _dsfRootPluginSupport;
+
+        /// <summary>
         /// List of general-purpose output ports
         /// </summary>
         /// <seealso cref="GpOutputPort"/>

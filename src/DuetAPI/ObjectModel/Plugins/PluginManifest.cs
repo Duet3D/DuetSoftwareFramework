@@ -66,14 +66,14 @@ namespace DuetAPI.ObjectModel
         private string _license = "LGPL-3.0-or-later";
 
         /// <summary>
-        /// Link to the source code repository
+        /// Link to the plugin homepage or source code repository
         /// </summary>
-        public string SourceRepository
+        public string Homepage
         {
-            get => _sourceRepository;
-            set => SetPropertyValue(ref _sourceRepository, value);
+            get => _homepage;
+            set => SetPropertyValue(ref _homepage, value);
         }
-        private string _sourceRepository;
+        private string _homepage;
 
         /// <summary>
         /// Major/minor compatible DWC version

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
@@ -95,27 +96,18 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// First temperature coefficient
         /// </summary>
-        [Obsolete]
+        [JsonIgnore]
+        [Obsolete("Use TemperatureCoefficients instead")]
         public float TemperatureCoefficient
         {
-            get => (TemperatureCoefficients.Count > 0) ? TemperatureCoefficients[0] : 0F;
-            set
-            {
-                if (TemperatureCoefficients.Count == 0)
-                {
-                    TemperatureCoefficients.Add(value);
-                }
-                else
-                {
-                    TemperatureCoefficients[0] = value;
-                }
-            }
+            get => TemperatureCoefficients[0];
+            set => TemperatureCoefficients[0] = value;
         }
 
         /// <summary>
         /// List of temperature coefficients
         /// </summary>
-        public ModelCollection<float> TemperatureCoefficients { get; } = new ModelCollection<float>();
+        public ModelCollection<float> TemperatureCoefficients { get; } = new ModelCollection<float>() { 0F, 0F };
 
         /// <summary>
         /// Configured trigger threshold (0..1023)

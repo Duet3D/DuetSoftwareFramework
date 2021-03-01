@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
+using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -12,6 +13,11 @@ namespace DuetControlServer.Commands
     public sealed class StartPlugin : DuetAPI.Commands.StartPlugin
     {
         /// <summary>
+        /// Lock to be used when a plugin is started to avoid race conditions
+        /// </summary>
+        private static readonly AsyncLock _startLock = new AsyncLock();
+
+        /// <summary>
         /// Start a plugin
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -23,10 +29,9 @@ namespace DuetControlServer.Commands
                 throw new NotSupportedException("Plugin support has been disabled");
             }
 
-            await Start(Plugin);
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (await _startLock.LockAsync(Program.CancellationToken))
             {
-                Model.Provider.Get.State.PluginsStarted = true;
+                await Start(Plugin);
             }
         }
 
@@ -90,27 +95,27 @@ namespace DuetControlServer.Commands
                         break;
                     }
                 }
-
-                // Make sure the requested plugin exists
-                if (!pluginFound)
-                {
-                    if (requiredBy == null)
-                    {
-                        throw new ArgumentException($"Plugin {Plugin} not found");
-                    }
-                    throw new ArgumentException($"Dependency {name} of plugin {requiredBy} not found");
-                }
-
-                // Start all the dependencies first
-                foreach (string dependency in dependencies)
-                {
-                    await Start(dependency, name);
-                }
-
-                // Start the plugin via the plugin service. This will update the PID too
-                StartPlugin startCommand = new StartPlugin() { Plugin = name };
-                await IPC.Processors.PluginService.PerformCommand(startCommand, rootPlugin);
             }
+
+            // Make sure the requested plugin exists
+            if (!pluginFound)
+            {
+                if (requiredBy == null)
+                {
+                    throw new ArgumentException($"Plugin {Plugin} not found");
+                }
+                throw new ArgumentException($"Dependency {name} of plugin {requiredBy} not found");
+            }
+
+            // Start all the dependencies first
+            foreach (string dependency in dependencies)
+            {
+                await Start(dependency, name);
+            }
+
+            // Start the plugin via the plugin service. This will update the PID too
+            StartPlugin startCommand = new StartPlugin() { Plugin = name };
+            await IPC.Processors.PluginService.PerformCommand(startCommand, rootPlugin);
         }
     }
 }

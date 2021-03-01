@@ -36,7 +36,7 @@ namespace DuetControlServer.Commands
             }
 
             // Make sure the upgrade switch is only used by the plugin service
-            if (ForUpgrade && !Connection.Permissions.HasFlag(SbcPermissions.ServicePlugins))
+            if (ForUpgrade && (Connection != null && !Connection.Permissions.HasFlag(SbcPermissions.ServicePlugins)))
             {
                 throw new ArgumentException($"{nameof(ForUpgrade)} switch must not be used by third-party applications");
             }

@@ -704,6 +704,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Check if a firmware update is supposed to be performed
+                bool blockTask = false;
                 using (await _firmwareUpdateLock.LockAsync(Program.CancellationToken))
                 {
                     if (_iapStream != null && _firmwareStream != null)
@@ -729,13 +730,13 @@ namespace DuetControlServer.SPI
                         }
 
                         _iapStream = _firmwareStream = null;
-
-                        if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
-                        {
-                            // Wait for the requesting task to complete, it will terminate DCS next
-                            await Task.Delay(-1, Program.CancellationToken);
-                        }
+                        blockTask = Settings.UpdateOnly || !Settings.NoTerminateOnReset;
                     }
+                }
+                if (blockTask)
+                {
+                    // Wait for the requesting task to complete, it will terminate DCS next
+                    await Task.Delay(-1, Program.CancellationToken);
                 }
 
                 // Invalidate data if a controller reset has been performed

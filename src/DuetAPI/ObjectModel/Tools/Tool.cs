@@ -96,6 +96,16 @@
         public ToolRetraction Retraction { get; } = new ToolRetraction();
 
         /// <summary>
+        /// Index of the mapped spindle or -1 if not mapped
+        /// </summary>
+        public int Spindle { get; set; } = -1;
+
+        /// <summary>
+        /// RPM of the mapped spindle
+        /// </summary>
+        public int SpindleRpm { get; set; }
+
+        /// <summary>
         /// Standby temperatures of the associated heaters (in C)
         /// </summary>
         public ModelCollection<float> Standby { get; } = new ModelCollection<float>();

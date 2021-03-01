@@ -24,7 +24,7 @@ namespace DuetPluginService.Permissions
         {
             // Load template
             string profile = await File.ReadAllTextAsync(Settings.AppArmorTemplate);
-            profile.Replace("{pluginDirectory}", Path.Combine(Settings.PluginDirectory, plugin.Name));
+            profile = profile.Replace("{pluginDirectory}", Path.Combine(Settings.PluginDirectory, plugin.Name));
 
             // Build security profile
             StringBuilder includes = new StringBuilder(), rules = new StringBuilder();
@@ -120,8 +120,8 @@ namespace DuetPluginService.Permissions
                 }
 
             }
-            profile.Replace("{includes}", includes.ToString());
-            profile.Replace("{rules}", rules.ToString());
+            profile = profile.Replace("{includes}", includes.ToString());
+            profile = profile.Replace("{rules}", rules.ToString());
 
             // Save and apply it
             string profilePath = Path.Combine(Settings.AppArmorProfileDirectory, $"dsf.{plugin.Name.Replace(' ', '.')}");

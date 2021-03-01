@@ -84,7 +84,7 @@ namespace DuetControlServer.IPC.Processors
         /// Constructor of the plugin runner proxy processor
         /// </summary>
         /// <param name="conn">Connection instance</param>
-        public PluginService(Connection conn) : base(conn) => conn.Logger.Debug("PluginInstaller processor added");
+        public PluginService(Connection conn) : base(conn) => conn.Logger.Debug("PluginService processor added");
 
         /// <summary>
         /// Handles the remote connection
@@ -98,7 +98,8 @@ namespace DuetControlServer.IPC.Processors
             }
 
             // Try to register this plugin service
-            using (await _monitor.EnterAsync(Program.CancellationToken))
+            AsyncMonitor monitor = Connection.IsRoot ? _rootMonitor : _monitor;
+            using (await monitor.EnterAsync(Program.CancellationToken))
             {
                 if (Connection.IsRoot)
                 {
@@ -129,7 +130,6 @@ namespace DuetControlServer.IPC.Processors
             }
 
             // Process incoming requests
-            AsyncMonitor monitor = Connection.IsRoot ? _rootMonitor : _monitor;
             Queue<Tuple<object, TaskCompletionSource>> pendingCommands = Connection.IsRoot ? _pendingRootCommands : _pendingCommands;
             try
             {
@@ -145,7 +145,7 @@ namespace DuetControlServer.IPC.Processors
                             {
                                 using CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SocketPollInterval);
                                 using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, Program.CancellationToken);
-                                await _monitor.WaitAsync(cts.Token);
+                                await monitor.WaitAsync(cts.Token);
                                 request = pendingCommands.Dequeue();
                             }
                         }
@@ -183,7 +183,7 @@ namespace DuetControlServer.IPC.Processors
             }
             finally
             {
-                using (await _monitor.EnterAsync())
+                using (await monitor.EnterAsync())
                 {
                     // Plugins from this service are no longer running
                     using (await Model.Provider.AccessReadWriteAsync())

@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -28,7 +29,7 @@ namespace DuetControlServer.Commands
             }
 
             // Start all plugins
-            if (!File.Exists(Settings.PluginsFilename))
+            if (File.Exists(Settings.PluginsFilename))
             {
                 using FileStream fileStream = new FileStream(Settings.PluginsFilename, FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new StreamReader(fileStream);
@@ -48,7 +49,13 @@ namespace DuetControlServer.Commands
                 }
             }
 
-            // Run dsf-config.g when all the plugins have been started
+            // Plugins have been started...
+            using (await Model.Provider.AccessReadWriteAsync())
+            {
+                Model.Provider.Get.State.PluginsStarted = true;
+            }
+
+            // Run dsf-config.g next
             string dsfConfigFile = await FilePath.ToPhysicalAsync(FilePath.DsfConfigFile, FileDirectory.System);
             if (File.Exists(dsfConfigFile))
             {
@@ -56,9 +63,12 @@ namespace DuetControlServer.Commands
                 {
                     Channel = DuetAPI.CodeChannel.SBC,
                     Type = DuetAPI.Commands.CodeType.MCode,
-                    MajorNumber = 98
+                    MajorNumber = 98,
+                    Parameters = new List<DuetAPI.Commands.CodeParameter>
+                    {
+                        new DuetAPI.Commands.CodeParameter('P', FilePath.DsfConfigFile)
+                    }
                 };
-                dsfConfigCode.Parameters.Add(new DuetAPI.Commands.CodeParameter('P', FilePath.DsfConfigFile));
                 await dsfConfigCode.Execute();
             }
         }

@@ -73,9 +73,9 @@ namespace DuetPluginService.Commands
                 }
 
                 // Clear file lists, they are assigned during the installation
+                plugin.DsfFiles.Clear();
                 plugin.DwcFiles.Clear();
-                plugin.RrfFiles.Clear();
-                plugin.SbcFiles.Clear();
+                plugin.SdFiles.Clear();
                 _logger.Info("Installing files");
 
                 // Make plugin directory
@@ -96,26 +96,29 @@ namespace DuetPluginService.Commands
                     }
 
                     string fileName;
-                    if (entry.FullName.StartsWith("rrf/"))
+                    if (entry.FullName.StartsWith("dsf/"))
                     {
-                        // Put RRF files into 0:/
-                        fileName = Path.Combine(Settings.BaseDirectory, entry.FullName[4..]);
-                        plugin.RrfFiles.Add(entry.FullName[4..]);
+                        // Put DSF plugin files into <PluginDirectory>/<PluginName>/dsf
+                        fileName = Path.Combine(pluginBase, entry.FullName);
+                        plugin.DsfFiles.Add(entry.FullName[4..]);
+                    }
+                    else if (entry.FullName.StartsWith("dwc/"))
+                    {
+                        // Put DWC plugin files into <PluginDirectory>/<PluginName>/dwc
+                        fileName = Path.Combine(pluginBase, entry.FullName);
+                        plugin.DwcFiles.Add(entry.FullName[4..]);
+                    }
+                    else if (entry.FullName.StartsWith("sd/"))
+                    {
+                        // Put SD files into 0:/
+                        fileName = Path.Combine(Settings.BaseDirectory, entry.FullName[3..]);
+                        plugin.SdFiles.Add(entry.FullName[3..]);
                     }
                     else
                     {
-                        // Put other files into <PluginDirectory>/<PluginName>/
-                        fileName = Path.Combine(pluginBase, entry.FullName);
-
-                        // Check what type of file this is
-                        if (entry.FullName.StartsWith("www/"))
-                        {
-                            plugin.DwcFiles.Add(entry.FullName[4..]);
-                        }
-                        else
-                        {
-                            plugin.SbcFiles.Add(entry.FullName);
-                        }
+                        // Skip other files
+                        _logger.Warn("Skipping installation of file {0}", entry.FullName);
+                        continue;
                     }
 
                     // Make sure the parent directory exists
@@ -133,12 +136,12 @@ namespace DuetPluginService.Commands
                     await zipFileStream.CopyToAsync(fileStream);
 
                     // Make program binaries executable
-                    if (entry.FullName.StartsWith("bin/"))
+                    if (plugin.SbcExecutable != null && entry.FullName.EndsWith(plugin.SbcExecutable))
                     {
-                        _logger.Debug("Changing mode of {0} to 750", fileName);
+                        _logger.Debug("Changing mode of {0} to 770", fileName);
                         LinuxApi.Commands.Chmod(fileName,
-                            LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
-                            LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
+                            LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
+                            LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
                             LinuxApi.UnixPermissions.None);
                     }
                 }
@@ -155,10 +158,10 @@ namespace DuetPluginService.Commands
                         _ => "unknown"
                     };
 
-                    string sbcExecutable = Path.Combine(pluginBase, "bin", architecture, plugin.SbcExecutable);
+                    string sbcExecutable = Path.Combine(pluginBase, "dsf", architecture, plugin.SbcExecutable);
                     if (!File.Exists(sbcExecutable))
                     {
-                        sbcExecutable = Path.Combine(pluginBase, "bin", plugin.SbcExecutable);
+                        sbcExecutable = Path.Combine(pluginBase, "dsf", plugin.SbcExecutable);
                     }
 
                     if (!File.Exists(sbcExecutable))
@@ -170,7 +173,7 @@ namespace DuetPluginService.Commands
                 // Install the web files. Try to use a symlink or copy the files if that failed
                 if (plugin.DwcFiles.Count > 0)
                 {
-                    string pluginWwwPath = Path.Combine(pluginBase, "www");
+                    string pluginWwwPath = Path.Combine(pluginBase, "dwc");
                     string installWwwPath = Path.Combine(Settings.BaseDirectory, "www", plugin.Name);
 
                     bool copyDirectory = false;

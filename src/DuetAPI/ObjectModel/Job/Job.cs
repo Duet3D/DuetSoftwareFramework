@@ -1,4 +1,7 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System;
+using System.Text.Json.Serialization;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about the current job
@@ -43,6 +46,8 @@
         /// <summary>
         /// Duration of the first layer (in s or null)
         /// </summary>
+        [JsonIgnore]
+        [Obsolete("No longer used, will always return null")]
         public int? FirstLayerDuration
         {
             get => _firstLayerDuration;
@@ -114,6 +119,8 @@
         /// <summary>
         /// Time elapsed since the beginning of the current layer (in s or null)
         /// </summary>
+        [JsonIgnore]
+        [Obsolete("No longer used, will always return null")]
         public int? LayerTime
         {
             get => _layerTime;

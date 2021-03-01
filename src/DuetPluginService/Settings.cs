@@ -73,7 +73,7 @@ namespace DuetPluginService
         /// <summary>
         /// Environment variables for the installation command
         /// </summary>
-        public static Dictionary<string, string> InstallPackageEnvironment = new Dictionary<string, string>()
+        public static Dictionary<string, string> InstallPackageEnvironment { get; set; } = new Dictionary<string, string>()
         {
             { "DEBIAN_FRONTEND", "noninteractive"  }
         };

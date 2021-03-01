@@ -3277,6 +3277,11 @@
             Time left based on the layer progress (in s or null)
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.TimesLeft.Slicer">
+            <summary>
+            Time left based on the slicer reports (see M73, in s or null)
+            </summary>
+        </member>
         <member name="T:DuetAPI.ObjectModel.Limits">
             <summary>
             Machine configuration limits
@@ -3595,29 +3600,6 @@
             <summary>
             Top speed of the current move (in mm/s)
             </summary>
-        </member>
-        <member name="T:DuetAPI.ObjectModel.DAA">
-            <summary>
-            Information about dynamic acceleration adjustment
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.DAA.Enabled">
-            <summary>
-            Indicates if DAA is enabled
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.DAA.MinimumAcceleration">
-            <summary>
-            Minimum acceleration allowed (in mm/s^2)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.DAA.Period">
-            <summary>
-            Period of the ringing that is supposed to be cancelled (in s)
-            </summary>
-            <remarks>
-            This is the reciprocal of the configured ringing frequency
-            </remarks>
         </member>
         <member name="T:DuetAPI.ObjectModel.Extruder">
             <summary>
@@ -4048,11 +4030,6 @@
             Information about the current move
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.Move.DAA">
-            <summary>
-            Information about the configured dynamic acceleration adjustment
-            </summary>
-        </member>
         <member name="P:DuetAPI.ObjectModel.Move.Extruders">
             <summary>
             List of configured extruders
@@ -4072,6 +4049,11 @@
         <member name="P:DuetAPI.ObjectModel.Move.PrintingAcceleration">
             <summary>
             Maximum acceleration allowed while printing (in mm/s^2)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Move.Shaping">
+            <summary>
+            Parameters for input shaping
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Move.SpeedFactor">
@@ -4098,7 +4080,6 @@
             <summary>
             Index of the currently selected workspace
             </summary>
-            <seealso cref="P:DuetAPI.ObjectModel.Move.WorkplaceNumber"/>
         </member>
         <member name="T:DuetAPI.ObjectModel.MoveCalibration">
             <summary>
@@ -4185,11 +4166,113 @@
             Mean deviation (in mm)
             </summary>
         </member>
+        <member name="T:DuetAPI.ObjectModel.MoveInputShaping">
+            <summary>
+            Parameters describing input shaping
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MoveInputShaping.Damping">
+            <summary>
+            Damping factor
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MoveInputShaping.Frequency">
+            <summary>
+            Frequency (in Hz)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MoveInputShaping.MinimumAcceleration">
+            <summary>
+            Minimum acceleration (in mm/s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MoveInputShaping.Type">
+            <summary>
+            Configured input shaping type
+            </summary>
+        </member>
+        <member name="T:DuetAPI.ObjectModel.MoveInputShapingType">
+            <summary>
+            Enumeration of possible input shaping methods
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.MoveInputShapingType.None">
+            <summary>
+            None
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.MoveInputShapingType.ZVD">
+            <summary>
+            ZVD
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.MoveInputShapingType.ZVDD">
+            <summary>
+            ZVDD
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.MoveInputShapingType.EI2">
+            <summary>
+            EI2
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.MoveInputShapingType.DAA">
+            <summary>
+            DAA
+            </summary>
+        </member>
+        <member name="T:DuetAPI.ObjectModel.MoveInputShapingTypeConverter">
+            <summary>
+            Class for easier access to JsonStringEnumConverter with camel-case naming
+            </summary>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MoveInputShapingTypeConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Read an enum value from a JSON stream
+            </summary>
+            <param name="reader">JSON reader</param>
+            <param name="typeToConvert">Target type</param>
+            <param name="options">Serializer options</param>
+            <returns>Deserialized value</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MoveInputShapingTypeConverter.Write(System.Text.Json.Utf8JsonWriter,DuetAPI.ObjectModel.MoveInputShapingType,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Write an enum value to a JSON stream
+            </summary>
+            <param name="writer">JSON writer</param>
+            <param name="value">Value to write</param>
+            <param name="options">Serializer options</param>
+        </member>
         <member name="T:DuetAPI.ObjectModel.ProbeGrid">
             <summary>
             Information about the configured probe grid (see M557)
             </summary>
             <seealso cref="T:DuetAPI.Utility.Heightmap"/>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeGrid.Axes">
+            <summary>
+            Axis letters of this heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeGrid.Maxs">
+            <summary>
+            End coordinates of the heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeGrid.Mins">
+            <summary>
+            Start coordinates of the heightmap
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeGrid.Radius">
+            <summary>
+            Probing radius for delta kinematics
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeGrid.Spacings">
+            <summary>
+            Spacings between the coordinates
+            </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.ProbeGrid.XMin">
             <summary>
@@ -4219,11 +4302,6 @@
         <member name="P:DuetAPI.ObjectModel.ProbeGrid.YSpacing">
             <summary>
             Spacing between the probe points in Y direction
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.ProbeGrid.Radius">
-            <summary>
-            Probing radius for delta kinematics
             </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.Skew">
@@ -4591,19 +4669,19 @@
             Class representing a loaded plugin
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Plugin.DsfFiles">
+            <summary>
+            List of files for the DSF plugin
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Plugin.DwcFiles">
             <summary>
-            List of files for DWC
+            List of files for the DWC plugin
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.Plugin.SbcFiles">
+        <member name="P:DuetAPI.ObjectModel.Plugin.SdFiles">
             <summary>
-            List of installed SBC Files in the plugin directory
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Plugin.RrfFiles">
-            <summary>
-            List of RRF files on the (virtual) SD excluding web files
+            List of files to be installed to the (virtual) SD excluding web files
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Plugin.Pid">
@@ -4636,9 +4714,9 @@
             License of the plugin. Should follow the SPDX format (see https://spdx.org/licenses/)
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.PluginManifest.SourceRepository">
+        <member name="P:DuetAPI.ObjectModel.PluginManifest.Homepage">
             <summary>
-            Link to the source code repository
+            Link to the plugin homepage or source code repository
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.DwcVersion">
@@ -5510,9 +5588,34 @@
             Maximum RPM
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.Spindle.Tool">
+        <member name="P:DuetAPI.ObjectModel.Spindle.State">
             <summary>
-            Mapped tool number or -1 if not assigned
+            Current state
+            </summary>
+        </member>
+        <member name="T:DuetAPI.ObjectModel.SpindleState">
+            <summary>
+            Possible state of a spindle
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.SpindleState.Unconfigured">
+            <summary>
+            Spinde not configured
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.SpindleState.Stopped">
+            <summary>
+            Spindle is stopped (inactive)
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.SpindleState.Forward">
+            <summary>
+            Spindle is going forwards
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.SpindleState.Reverse">
+            <summary>
+            Spindle is going in reverse
             </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.BeepRequest">
@@ -5783,6 +5886,16 @@
             Version of the Duet Software Framework package
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.State.DsfPluginSupport">
+            <summary>
+            Indicates if DSF allows the installation and usage of third-party plugins
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.State.DsfRootPluginSupport">
+            <summary>
+            Indicates if DSF allows the installation and usage of third-party root plugins (potentially dangerous)
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.State.GpOut">
             <summary>
             List of general-purpose output ports
@@ -5932,6 +6045,16 @@
         <member name="P:DuetAPI.ObjectModel.Tool.Retraction">
             <summary>
             Firmware retraction parameters
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Tool.Spindle">
+            <summary>
+            Index of the mapped spindle or -1 if not mapped
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Tool.SpindleRpm">
+            <summary>
+            RPM of the mapped spindle
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Tool.Standby">

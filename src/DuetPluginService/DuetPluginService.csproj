@@ -26,4 +26,8 @@
     <ProjectReference Include="..\LinuxApi\LinuxApi.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
+  </ItemGroup>
+
 </Project>

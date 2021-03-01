@@ -80,7 +80,7 @@ namespace CodeConsole
                         }
                         else
                         {
-                            string output = await connection.PerformSimpleCode(input);
+                            string output = await connection.PerformSimpleCode(input, DuetAPI.CodeChannel.Telnet);
                             if (output.EndsWith(Environment.NewLine))
                             {
                                 Console.Write(output);

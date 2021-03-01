@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
@@ -27,11 +28,6 @@ namespace DuetAPI.ObjectModel
         /// Information about the current move
         /// </summary>
         public CurrentMove CurrentMove { get; } = new CurrentMove();
-
-        /// <summary>
-        /// Information about the configured dynamic acceleration adjustment
-        /// </summary>
-        public DAA DAA { get; } = new DAA();
 
         /// <summary>
         /// List of configured extruders
@@ -63,6 +59,11 @@ namespace DuetAPI.ObjectModel
 			set => SetPropertyValue(ref _printingAcceleration, value);
         }
         private float _printingAcceleration = 10000F;
+
+        /// <summary>
+        /// Parameters for input shaping
+        /// </summary>
+        public MoveInputShaping Shaping { get; } = new MoveInputShaping();
 
         /// <summary>
         /// Speed factor applied to every regular move (0.01..1 or greater)
@@ -107,8 +108,8 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Index of the currently selected workspace
         /// </summary>
-        /// <seealso cref="WorkplaceNumber"/>
-        [Obsolete]
+        [JsonIgnore]
+        [Obsolete("Use WorkplaceNumber instead")]
         public int WorkspaceNumber
         {
             get => _workplaceNumber + 1;

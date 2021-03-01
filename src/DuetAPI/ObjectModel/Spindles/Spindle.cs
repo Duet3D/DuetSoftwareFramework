@@ -14,7 +14,7 @@
 			set => SetPropertyValue(ref _active, value);
         }
         private int _active;
-        
+
         /// <summary>
         /// Current RPM, negative if anticlockwise direction
         /// </summary>
@@ -56,13 +56,13 @@
         private int _max = 10000;
 
         /// <summary>
-        /// Mapped tool number or -1 if not assigned
+        /// Current state
         /// </summary>
-        public int Tool
+        public SpindleState State
         {
-            get => _tool;
-			set => SetPropertyValue(ref _tool, value);
+            get => _state;
+            set => SetPropertyValue(ref _state, value);
         }
-        private int _tool = -1;
+        private SpindleState _state;
     }
 }

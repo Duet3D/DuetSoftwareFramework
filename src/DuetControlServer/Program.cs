@@ -74,6 +74,10 @@ namespace DuetControlServer
                     return;
                 }
                 _logger.Info("Settings loaded");
+                if (Settings.RootPluginSupport)
+                {
+                    _logger.Warn("Support for third-party root plugins is enabled");
+                }
             }
             catch (Exception e)
             {
