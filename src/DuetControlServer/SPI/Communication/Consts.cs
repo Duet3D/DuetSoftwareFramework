@@ -37,6 +37,11 @@ namespace DuetControlServer.SPI.Communication
         public const int MaxCommentLength = 100;
 
         /// <summary>
+        /// Maximum length of an expression
+        /// </summary>
+        public const int MaxExpressionLength = 100;
+
+        /// <summary>
         /// Maximum number of evaluation requests to send per transfer
         /// </summary>
         public const int MaxEvaluationRequestsPerTransfer = 32;
