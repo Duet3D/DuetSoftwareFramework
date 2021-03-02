@@ -146,6 +146,10 @@ namespace DuetControlServer.SPI
             {
                 throw new InvalidOperationException("Incompatible firmware version");
             }
+            if (Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
+            {
+                throw new InvalidOperationException($"Expression too long (max {Consts.MaxExpressionLength} chars)");
+            }
 
             lock (_evaluateExpressionRequests)
             {
@@ -1260,10 +1264,12 @@ namespace DuetControlServer.SPI
                             request.SetResult(result);
                         }
                         _evaluateExpressionRequests.Remove(request);
-                        break;
+                        return;
                     }
                 }
             }
+
+            _logger.Warn("Unresolved evaluation result for expression {0} = {1}", expression, result);
         }
 
         /// <summary>

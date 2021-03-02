@@ -110,7 +110,7 @@ namespace DuetControlServer.SPI.Serialization
             {
                 // Write comment as an unprecedented parameter
                 string comment = (code.Comment ?? string.Empty).Trim();
-                int commentLength = Math.Min(comment.Length, Consts.MaxCommentLength);
+                int commentLength = Math.Min(comment.Length, Consts.MaxCommentLength - 1);
                 CodeParameter binaryParam = new CodeParameter
                 {
                     Letter = (byte)'@',
