@@ -10,6 +10,14 @@ This service is supposed to run as a regular user (`duetpluginservice.service`) 
 During the installation of third-party plugins it creates AppArmor security profiles and activates them for regular plugins.
 For Linux distributions that do not support AppArmor, security policy generation can be disabled by setting `DisableAppArmor` to `true` in `/opt/dsf/conf/plugins.json`.
 
+## Root Plugins
+
+By default root plugins are not allowed (except for DuetPiManagementPlugin which is available separately).
+To enable support for them the setting `RootPluginSupport` in `/opt/dsf/conf/config.json` can be set from `false` to `true`.
+In order to apply this option, DCS must be restarted via `sudo systemctl restart duetcontrolserver`.
+
+Note that enabling this option is a potential security hazard.
+
 ## ZIP File Structure
 
 Every plugin ZIP file may consist of the following files and directories:
@@ -140,5 +148,5 @@ In case the web interface portion needs to change something, create a new HTTP e
 
 ## Lifecycle
 
-Whenever DCS is started, plugins that were started will be restarted. When DCS is shut down, it closes, and
-if that fails, forcefully kills, plugin processes.
+Whenever DCS is started, plugins that were started will be restarted.
+When DCS is shut down, it terminates (SIGTERM), and if that fails, forcefully kills (SIGKILL), plugin processes.
