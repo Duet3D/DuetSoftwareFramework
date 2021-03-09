@@ -131,12 +131,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Time elapsed since the last layer change (in s or null)
         /// </summary>
-        public int? LayerTime
+        public float? LayerTime
         {
             get => _layerTime;
 			set => SetPropertyValue(ref _layerTime, value);
         }
-        private int? _layerTime;
+        private float? _layerTime;
         
         /// <summary>
         /// Total pause time since the job started

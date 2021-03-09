@@ -38,8 +38,8 @@ namespace DuetControlServer.SPI
         private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting, _updating;
         private static ushort _lastTransferNumber;
 
-        private static DateTime _lastMeasureTime = DateTime.Now;
-        private static volatile int _numMeasuredTransfers, _maxRxSize, _maxTxSize;
+        private static DateTime _lastTransferMeasureTime = DateTime.Now, _lastCodesMeasureTime = DateTime.Now;
+        private static volatile int _numMeasuredTransfers, _numMeasuredCodes, _maxRxSize, _maxTxSize;
 
         // Transfer headers
         private static readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf<TransferHeader>()];
@@ -106,7 +106,7 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Get the nubmer of full transfers per second
+        /// Get the number of full transfers per second
         /// </summary>
         /// <returns>Full transfers per second</returns>
         private static decimal GetFullTransfersPerSecond()
@@ -116,9 +116,26 @@ namespace DuetControlServer.SPI
                 return 0;
             }
 
-            decimal result = _numMeasuredTransfers / (decimal)(DateTime.Now - _lastMeasureTime).TotalSeconds;
-            _lastMeasureTime = DateTime.Now;
+            decimal result = _numMeasuredTransfers / (decimal)(DateTime.Now - _lastTransferMeasureTime).TotalSeconds;
+            _lastTransferMeasureTime = DateTime.Now;
             _numMeasuredTransfers = 0;
+            return result;
+        }
+
+        /// <summary>
+        /// Get the number of transferred codes per second
+        /// </summary>
+        /// <returns>Full transfers per second</returns>
+        private static decimal GetCodesPerSecond()
+        {
+            if (_numMeasuredCodes == 0)
+            {
+                return 0;
+            }
+
+            decimal result = _numMeasuredCodes / (decimal)(DateTime.Now - _lastCodesMeasureTime).TotalSeconds;
+            _lastCodesMeasureTime = DateTime.Now;
+            _numMeasuredCodes = 0;
             return result;
         }
 
@@ -130,6 +147,7 @@ namespace DuetControlServer.SPI
         {
             builder.AppendLine($"Configured SPI speed: {Settings.SpiFrequency} Hz");
             builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}");
+            builder.AppendLine($"Codes per second: {GetCodesPerSecond():F2}");
             builder.AppendLine($"Maximum length of RX/TX data transfers: {_maxRxSize}/{_maxTxSize}");
         }
 
@@ -558,6 +576,7 @@ namespace DuetControlServer.SPI
             {
                 return false;
             }
+            _numMeasuredCodes++;
 
             // Write it
             WritePacket(Communication.LinuxRequests.Request.Code, codeLength);
