@@ -15,6 +15,17 @@ This plugin provides system management functions using regular RepRapFirmware M-
 - `M589` Configure access point parameters
 - `M999 B-1` Reboot SBC
 
+## Requirements
+
+To use all the features of this plugin, the following packages should be installed:
+- openssl
+- proftpd
+- ssh
+- telnetd
+- dnsmasq
+- hostapd
+- wpa_supplicant
+
 ## Build instructions
 
 This plugin requires .NET 5 SDK to be installed first.
