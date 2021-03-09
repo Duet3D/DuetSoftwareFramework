@@ -63,7 +63,7 @@ namespace UnitTests.SPI
         {
             Span<byte> span = new byte[128];
 
-            Code code = new Code("G53 G10")
+            Code code = new("G53 G10")
             {
                 Channel = DuetAPI.CodeChannel.HTTP
             };
@@ -93,7 +93,7 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            Code code = new Code("G1 X4 Y23.5 Z12.2 J\"testok\" E12:3.45:5.67")
+            Code code = new("G1 X4 Y23.5 Z12.2 J\"testok\" E12:3.45:5.67")
             {
                 Channel = DuetAPI.CodeChannel.File
             };
@@ -164,7 +164,7 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            Code code = new Code("; Hello world")
+            Code code = new("; Hello world")
             {
                 Channel = DuetAPI.CodeChannel.Telnet
             };
@@ -260,7 +260,7 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            ParsedFileInfo info = new ParsedFileInfo
+            ParsedFileInfo info = new()
             {
                 Size = 452432,
                 FileName = "0:/gcodes/test.g",
@@ -319,7 +319,7 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            ParsedFileInfo info = new ParsedFileInfo
+            ParsedFileInfo info = new()
             {
                 Size = 4180,
                 FileName = "0:/gcodes/circle.g",
@@ -406,7 +406,7 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            Heightmap map = new Heightmap
+            Heightmap map = new()
             {
                 XMin = 20,
                 XMax = 180,

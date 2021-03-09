@@ -2,6 +2,7 @@
 using DuetAPI.Utility;
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace DuetPluginService.Commands
@@ -31,7 +32,7 @@ namespace DuetPluginService.Commands
                 Plugin plugin = null;
                 foreach (Plugin item in Plugins.List)
                 {
-                    if (item.Name == Plugin)
+                    if (item.Id == Plugin)
                     {
                         plugin = item;
                         break;
@@ -60,25 +61,29 @@ namespace DuetPluginService.Commands
                         File.Delete(manifestFile);
                     }
 
-                    // Remove symlink from www if present
-                    string installWwwPath = Path.Combine(Settings.BaseDirectory, "www", Plugin);
-                    if (Directory.Exists(installWwwPath))
+                    // Remove installed files and directories from the dwc and www directories
+                    foreach (string dwcFile in plugin.DwcFiles)
                     {
-                        logger.Debug("Removing installed www directory");
-                        Directory.Delete(installWwwPath, true);
-                    }
-                    else if (File.Exists(installWwwPath))
-                    {
-                        logger.Debug("Removing www symlink");
-                        File.Delete(installWwwPath);
+                        string installWwwPath = Path.Combine(Settings.BaseDirectory, "www", dwcFile);
+                        if (File.Exists(installWwwPath))
+                        {
+                            logger.Debug("Removing {0}", installWwwPath);
+                        }
+
+                        string directory = Path.GetDirectoryName(installWwwPath);
+                        if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                        {
+                            logger.Debug("Removing {0}", directory);
+                            Directory.Delete(directory);
+                        }
                     }
 
                     if (ForUpgrade)
                     {
                         // Remove only installed files
-                        foreach (string rrfFile in plugin.SdFiles)
+                        foreach (string dsfFile in plugin.DsfFiles)
                         {
-                            string file = Path.Combine(Settings.BaseDirectory, rrfFile);
+                            string file = Path.Combine(Settings.PluginDirectory, Plugin, "dsf", dsfFile);
                             if (File.Exists(file))
                             {
                                 logger.Debug("Deleting file {0}", file);
@@ -86,9 +91,19 @@ namespace DuetPluginService.Commands
                             }
                         }
 
-                        foreach (string sbcFile in plugin.DsfFiles)
+                        foreach (string dwcFile in plugin.DwcFiles)
                         {
-                            string file = Path.Combine(Settings.PluginDirectory, Plugin, sbcFile);
+                            string file = Path.Combine(Settings.PluginDirectory, Plugin, "dwc", dwcFile);
+                            if (File.Exists(file))
+                            {
+                                logger.Debug("Deleting file {0}", file);
+                                File.Delete(file);
+                            }
+                        }
+
+                        foreach (string sdFile in plugin.SdFiles)
+                        {
+                            string file = Path.Combine(Settings.BaseDirectory, sdFile);
                             if (File.Exists(file))
                             {
                                 logger.Debug("Deleting file {0}", file);

@@ -27,7 +27,20 @@ namespace DuetControlServer.Model
         /// <summary>
         /// List of enabled protocols
         /// </summary>
-        private static List<NetworkProtocol> _activeProtocols = new List<NetworkProtocol>();
+        private static readonly List<NetworkProtocol> _activeProtocols = new();
+
+        /// <summary>
+        /// Check if the given protocol is enabled
+        /// </summary>
+        /// <param name="protocol">Protocol to check</param>
+        /// <returns>True if the protocol is enabled</returns>
+        public static bool IsProtocolEnabled(NetworkProtocol protocol)
+        {
+            lock (_activeProtocols)
+            {
+                return _activeProtocols.Contains(protocol);
+            }
+        }
 
         /// <summary>
         /// Called when a network protocol has been enabled
@@ -80,7 +93,7 @@ namespace DuetControlServer.Model
                     !System.Diagnostics.Debugger.IsAttached)
                 {
                     _logger.Info("System time has been changed");
-                    Code code = new Code
+                    Code code = new()
                     {
                         InternallyProcessed = !Settings.NoSpi,
                         Flags = CodeFlags.Asynchronous,
@@ -98,7 +111,7 @@ namespace DuetControlServer.Model
                 {
                     _logger.Info("Hostname has been changed");
                     lastHostname = Environment.MachineName;
-                    Code code = new Code
+                    Code code = new()
                     {
                         InternallyProcessed = !Settings.NoSpi,
                         Flags = CodeFlags.Asynchronous,
@@ -176,7 +189,7 @@ namespace DuetControlServer.Model
                         try
                         {
                             string wifiData = await File.ReadAllTextAsync("/proc/net/wireless", Program.CancellationToken);
-                            Regex signalRegex = new Regex(iface.Name + @".*(-\d+)\.");
+                            Regex signalRegex = new(iface.Name + @".*(-\d+)\.");
                             Match signalMatch = signalRegex.Match(wifiData);
                             if (signalMatch.Success)
                             {

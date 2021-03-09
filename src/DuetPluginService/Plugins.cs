@@ -14,7 +14,7 @@ namespace DuetPluginService
         /// <summary>
         /// Internal lock for the plugin list
         /// </summary>
-        private static readonly AsyncLock _lock = new AsyncLock();
+        private static readonly AsyncLock _lock = new();
 
         /// <summary>
         /// Lock access to the plugins

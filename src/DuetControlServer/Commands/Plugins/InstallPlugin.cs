@@ -3,7 +3,6 @@ using DuetAPI.Utility;
 using System;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -87,7 +86,7 @@ namespace DuetControlServer.Commands
             {
                 foreach (string dependency in plugin.SbcPluginDependencies)
                 {
-                    if (!Model.Provider.Get.Plugins.Any(item => item.Name == dependency))
+                    if (!Model.Provider.Get.Plugins.ContainsKey(dependency))
                     {
                         throw new ArgumentException($"Missing plugin dependency {dependency}");
                     }
@@ -109,12 +108,12 @@ namespace DuetControlServer.Commands
             // Uninstall the old plugin (if applicable)
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                Upgrade = Model.Provider.Get.Plugins.Any(item => item.Name == plugin.Name);
+                Upgrade = Model.Provider.Get.Plugins.ContainsKey(plugin.Id);
             }
 
             if (Upgrade)
             {
-                UninstallPlugin uninstallCommand = new UninstallPlugin() { Plugin = plugin.Name, ForUpgrade = true };
+                UninstallPlugin uninstallCommand = new() { Plugin = plugin.Id, ForUpgrade = true };
                 await uninstallCommand.Execute();
             }
 
@@ -124,10 +123,20 @@ namespace DuetControlServer.Commands
             await IPC.Processors.PluginService.PerformCommand(this, false);
             await IPC.Processors.PluginService.PerformCommand(this, true);
 
-            // Register the new plugin in the object model
-            using (await Model.Provider.AccessReadWriteAsync())
+            // If possible, reload the plugin manifest with the updated file lists and register it in the object model
+            string manifestFilename = Path.Combine(Settings.PluginDirectory, plugin.Id + ".json");
+            if (File.Exists(manifestFilename))
             {
-                Model.Provider.Get.Plugins.Add(plugin);
+                using (FileStream manifestStream = new(manifestFilename, FileMode.Open, FileAccess.Read))
+                {
+                    using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
+                    plugin.UpdateFromJson(manifestJson.RootElement);
+                }
+
+                using (await Model.Provider.AccessReadWriteAsync())
+                {
+                    Model.Provider.Get.Plugins.Add(plugin.Id, plugin);
+                }
             }
         }
 
@@ -146,7 +155,7 @@ namespace DuetControlServer.Commands
                 throw new ArgumentException("plugin.json not found in the ZIP file");
             }
 
-            Plugin plugin = new Plugin();
+            Plugin plugin = new();
             using (Stream manifestStream = manifestFile.Open())
             {
                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);

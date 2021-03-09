@@ -63,7 +63,7 @@ namespace DuetControlServer.Codes
                                         Model.Provider.Get.Move.Compensation.File = virtualFile;
                                     }
 
-                                    CodeResult result = new CodeResult();
+                                    CodeResult result = new();
                                     using (await Model.Provider.AccessReadOnlyAsync())
                                     {
                                         if (Model.Provider.Get.Move.Axes.Any(axis => axis.Letter == 'Z' && !axis.Homed))

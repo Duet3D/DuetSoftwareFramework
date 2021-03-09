@@ -51,7 +51,7 @@ namespace DuetControlServer.Commands
 
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                HttpEndpoint endpoint = new HttpEndpoint();
+                HttpEndpoint endpoint = new();
                 Model.Provider.Get.HttpEndpoints.Add(endpoint);
 
                 endpoint.EndpointType = EndpointType;
@@ -74,7 +74,7 @@ namespace DuetControlServer.Commands
         {
             try
             {
-                using Socket testSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+                using Socket testSocket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
                 testSocket.Connect(new UnixDomainSocketEndPoint(filename));
                 testSocket.Close();
                 return true;

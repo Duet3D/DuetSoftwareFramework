@@ -47,7 +47,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Lock used when accessing this instance
         /// </summary>
-        private readonly AsyncLock _lock = new AsyncLock();
+        private readonly AsyncLock _lock = new();
 
         /// <summary>
         /// Lock access to this code channel
@@ -87,10 +87,10 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>New state</returns>
         public State Push()
         {
-            State state = new State();
+            State state = new();
 
             // Dequeue already suspended codes first so the correct order is maintained
-            Queue<Code> alreadySuspendedCodes = new Queue<Code>(CurrentState.SuspendedCodes.Count);
+            Queue<Code> alreadySuspendedCodes = new(CurrentState.SuspendedCodes.Count);
             while (CurrentState.SuspendedCodes.TryDequeue(out Code suspendedCode))
             {
                 alreadySuspendedCodes.Enqueue(suspendedCode);
@@ -213,7 +213,7 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>Asynchronous task</returns>
         public async Task Diagnostics(StringBuilder builder)
         {
-            StringBuilder channelDiagostics = new StringBuilder();
+            StringBuilder channelDiagostics = new();
 
             using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
             IDisposable lockObject = null;
@@ -380,7 +380,7 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>Whether the codes could be flushed</returns>
         public Task<bool> Flush(Code code = null)
         {
-            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
             if (code != null)
             {
@@ -414,7 +414,7 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>Whether the resource could be locked</returns>
         public Task<bool> LockMovementAndWaitForStandstill()
         {
-            LockRequest request = new LockRequest(true);
+            LockRequest request = new(true);
             CurrentState.LockRequests.Enqueue(request);
             return request.Task;
         }
@@ -425,7 +425,7 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>Asynchronous task</returns>
         public Task UnlockAll()
         {
-            LockRequest request = new LockRequest(false);
+            LockRequest request = new(false);
             CurrentState.LockRequests.Enqueue(request);
             return request.Task;
         }
@@ -724,7 +724,7 @@ namespace DuetControlServer.SPI.Channel
             try
             {
                 _logger.Debug("Running code from firmware '{0}' on channel {1}", code, Channel);
-                Code codeObj = new Code(code) { Channel = Channel, Flags = CodeFlags.IsFromFirmware };
+                Code codeObj = new(code) { Channel = Channel, Flags = CodeFlags.IsFromFirmware };
                 _ = codeObj.Execute().ContinueWith(async task =>
                 {
                     try

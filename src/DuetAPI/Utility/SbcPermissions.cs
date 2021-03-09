@@ -14,143 +14,143 @@ namespace DuetAPI.Utility
         /// <summary>
         /// No permissions set (default value)
         /// </summary>
-        None,
+        None = 0,
 
         /// <summary>
         /// Execute generic commands
         /// </summary>
-        CommandExecution,
+        CommandExecution = 1,
 
         /// <summary>
         /// Intercept codes but don't interact with them
         /// </summary>
-        CodeInterceptionRead,
+        CodeInterceptionRead = 2,
 
         /// <summary>
         /// Intercept codes in a blocking way with options to resolve or cancel them
         /// </summary>
-        CodeInterceptionReadWrite,
+        CodeInterceptionReadWrite = 4,
 
         /// <summary>
         /// Install, load, unload, and uninstall plugins. Grants FS access to all third-party plugins too
         /// </summary>
-        ManagePlugins,
+        ManagePlugins = 8,
 
         /// <summary>
         /// Service plugin runtime information (for internal purposes only, do not use)
         /// </summary>
-        ServicePlugins,
+        ServicePlugins = 16,
 
         /// <summary>
         /// Manage user sessions
         /// </summary>
-        ManageUserSessions,
+        ManageUserSessions = 32,
 
         /// <summary>
         /// Read from the object model
         /// </summary>
-        ObjectModelRead,
+        ObjectModelRead = 64,
 
         /// <summary>
         /// Read from and write to the object model
         /// </summary>
-        ObjectModelReadWrite,
+        ObjectModelReadWrite = 128,
 
         /// <summary>
         /// Create new HTTP endpoints
         /// </summary>
-        RegisterHttpEndpoints,
+        RegisterHttpEndpoints = 256,
 
         #region OS permissions enforced by AppArmor
         /// <summary>
         /// Read files in 0:/filaments
         /// </summary>
-        ReadFilaments,
+        ReadFilaments = 512,
 
         /// <summary>
         /// Write files in 0:/filaments
         /// </summary>
-        WriteFilaments,
+        WriteFilaments = 1024,
 
         /// <summary>
         /// Read files in 0:/firmware
         /// </summary>
-        ReadFirmware,
+        ReadFirmware = 2048,
 
         /// <summary>
         /// Write files in 0:/firmware
         /// </summary>
-        WriteFirmware,
+        WriteFirmware = 4096,
 
         /// <summary>
         /// Read files in 0:/gcodes
         /// </summary>
-        ReadGCodes,
+        ReadGCodes = 8192,
 
         /// <summary>
         /// Write files in 0:/gcodes
         /// </summary>
-        WriteGCodes,
+        WriteGCodes = 16384,
 
         /// <summary>
         /// Read files in 0:/macros
         /// </summary>
-        ReadMacros,
+        ReadMacros = 32768,
 
         /// <summary>
         /// Write files in 0:/macros
         /// </summary>
-        WriteMacros,
+        WriteMacros = 65536,
 
         /// <summary>
         /// Read files in 0:/menu
         /// </summary>
-        ReadMenu,
+        ReadMenu = 131072,
 
         /// <summary>
         /// Write files in 0:/menu
         /// </summary>
-        WriteMenu,
+        WriteMenu = 262144,
 
         /// <summary>
         /// Read files in 0:/sys
         /// </summary>
-        ReadSystem,
+        ReadSystem = 524288,
 
         /// <summary>
         /// Write files in 0:/sys
         /// </summary>
-        WriteSystem,
+        WriteSystem = 1048576,
 
         /// <summary>
         /// Read files in 0:/www
         /// </summary>
-        ReadWeb,
+        ReadWeb = 2097152,
 
         /// <summary>
         /// Write files in 0:/www
         /// </summary>
-        WriteWeb,
+        WriteWeb = 4194304,
 
         /// <summary>
         /// Access files including all subdirecotires of the virtual SD directory as DSF user
         /// </summary>
-        FileSystemAccess,
+        FileSystemAccess = 8388608,
 
         /// <summary>
         /// Launch new processes
         /// </summary>
-        LaunchProcesses,
+        LaunchProcesses = 16777216,
 
         /// <summary>
         /// Communicate over the network (stand-alone)
         /// </summary>
-        NetworkAccess,
+        NetworkAccess = 33554432,
 
         /// <summary>
         /// Launch process as root user (for full device control - potentially dangerous)
         /// </summary>
-        SuperUser
+        SuperUser = 67108864
         #endregion
     }
 
@@ -196,9 +196,9 @@ namespace DuetAPI.Utility
         public override void Write(Utf8JsonWriter writer, SbcPermissions value, JsonSerializerOptions options)
         {
             writer.WriteStartArray();
-            foreach (Enum permission in Enum.GetValues(typeof(SbcPermissions)))
+            foreach (SbcPermissions permission in Enum.GetValues(typeof(SbcPermissions)))
             {
-                if (value.HasFlag(permission) && !permission.Equals(SbcPermissions.None))
+                if (permission != SbcPermissions.None && value.HasFlag(permission))
                 {
                     string permissionString = JsonNamingPolicy.CamelCase.ConvertName(permission.ToString());
                     writer.WriteStringValue(permissionString);

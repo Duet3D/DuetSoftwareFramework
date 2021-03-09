@@ -24,10 +24,10 @@ namespace DuetPluginService.Permissions
         {
             // Load template
             string profile = await File.ReadAllTextAsync(Settings.AppArmorTemplate);
-            profile = profile.Replace("{pluginDirectory}", Path.Combine(Settings.PluginDirectory, plugin.Name));
+            profile = profile.Replace("{pluginDirectory}", Path.Combine(Settings.PluginDirectory, plugin.Id));
 
             // Build security profile
-            StringBuilder includes = new StringBuilder(), rules = new StringBuilder();
+            StringBuilder includes = new(), rules = new();
             foreach (SbcPermissions permission in Enum.GetValues(typeof(SbcPermissions)))
             {
                 if (plugin.SbcPermissions.HasFlag(permission))
@@ -124,7 +124,7 @@ namespace DuetPluginService.Permissions
             profile = profile.Replace("{rules}", rules.ToString());
 
             // Save and apply it
-            string profilePath = Path.Combine(Settings.AppArmorProfileDirectory, $"dsf.{plugin.Name.Replace(' ', '.')}");
+            string profilePath = Path.Combine(Settings.AppArmorProfileDirectory, $"dsf.{plugin.Id}");
             await File.WriteAllTextAsync(profilePath, profile);
 
             await System.Diagnostics.Process
@@ -139,7 +139,7 @@ namespace DuetPluginService.Permissions
         /// <returns>Asynchronous task</returns>
         public static async Task UninstallProfile(Plugin plugin)
         {
-            string profilePath = Path.Combine(Settings.AppArmorProfileDirectory, $"dsf.{plugin.Name.Replace(' ', '.')}");
+            string profilePath = Path.Combine(Settings.AppArmorProfileDirectory, $"dsf.{plugin.Id}");
             if (File.Exists(profilePath))
             {
                 // Disable the profile via AppArmor

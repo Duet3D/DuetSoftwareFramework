@@ -113,7 +113,7 @@
 			get => _calibrated;
 			set => SetPropertyValue(ref _calibrated, value);
 		}
-		private PulsedFilamentMonitorCalibrated _calibrated = new PulsedFilamentMonitorCalibrated();
+		private PulsedFilamentMonitorCalibrated _calibrated = new();
 
 		/// <summary>
 		/// Configured properties of this filament monitor

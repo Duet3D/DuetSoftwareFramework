@@ -117,10 +117,20 @@ namespace DuetAPI.ObjectModel
         private int? _layer;
         
         /// <summary>
-        /// Time elapsed since the beginning of the current layer (in s or null)
+        /// Information about the past layers
         /// </summary>
-        [JsonIgnore]
-        [Obsolete("No longer used, will always return null")]
+        /// <remarks>
+        /// In previous API versions this was a <see cref="ModelGrowingCollection"/> but it has been changed to <see cref="ModelCollection"/> to
+        /// allow past layers to be modified again when needed. Note that previous plugins subscribing to this property will not receive any more
+        /// updates about this property to avoid memory leaks
+        /// </remarks>
+        /// <seealso cref="Layer"/>
+        [LinuxProperty]
+        public ModelCollection<Layer> Layers { get; } = new ModelCollection<Layer>();
+
+        /// <summary>
+        /// Time elapsed since the last layer change (in s or null)
+        /// </summary>
         public int? LayerTime
         {
             get => _layerTime;
@@ -129,10 +139,14 @@ namespace DuetAPI.ObjectModel
         private int? _layerTime;
         
         /// <summary>
-        /// Information about the past layers
+        /// Total pause time since the job started
         /// </summary>
-        /// <seealso cref="Layer"/>
-        public ModelGrowingCollection<Layer> Layers { get; } = new ModelGrowingCollection<Layer>();
+        public int? PauseDuration
+        {
+            get => _pauseDuration;
+            set => SetPropertyValue(ref _pauseDuration, value);
+        }
+        private int? _pauseDuration;
         
         /// <summary>
         /// Estimated times left

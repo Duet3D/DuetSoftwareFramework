@@ -126,8 +126,8 @@ namespace DuetPluginService
             finally
             {
                 // Initialize logging
-                LoggingConfiguration logConfig = new LoggingConfiguration();
-                ColoredConsoleTarget logConsoleTarget = new ColoredConsoleTarget
+                LoggingConfiguration logConfig = new();
+                ColoredConsoleTarget logConsoleTarget = new()
                 {
                     // Create a layout for messages like:
                     // [trace] Really verbose stuff
@@ -181,13 +181,13 @@ namespace DuetPluginService
         private static void LoadFromFile(string fileName)
         {
             byte[] content;
-            using (FileStream fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read))
+            using (FileStream fileStream = new(fileName, FileMode.Open, FileAccess.Read))
             {
                 content = new byte[fileStream.Length];
                 fileStream.Read(content, 0, (int)fileStream.Length);
             }
 
-            Utf8JsonReader reader = new Utf8JsonReader(content);
+            Utf8JsonReader reader = new(content);
             PropertyInfo property = null;
             while (reader.Read())
             {
@@ -266,7 +266,7 @@ namespace DuetPluginService
                     case JsonTokenType.StartArray:
                         if (property.PropertyType == typeof(List<string>))
                         {
-                            List<string> list = new List<string>();
+                            List<string> list = new();
                             while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                             {
                                 list.Add(reader.GetString());
@@ -288,8 +288,8 @@ namespace DuetPluginService
         /// <param name="fileName">File to save the settings to</param>
         private static void SaveToFile(string fileName)
         {
-            using FileStream fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write);
-            using Utf8JsonWriter writer = new Utf8JsonWriter(fileStream, new JsonWriterOptions()
+            using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write);
+            using Utf8JsonWriter writer = new(fileStream, new JsonWriterOptions()
             {
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 Indented = true

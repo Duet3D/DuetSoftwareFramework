@@ -38,7 +38,7 @@ namespace DuetControlServer.Commands
             }
 #pragma warning restore CS0618 // Type or member is obsolete
 
-            Message msg = new Message(Type, Content);
+            Message msg = new(Type, Content);
             await Utility.Logger.Log(LogLevel.Value, msg);
             if (OutputMessage)
             {

@@ -23,7 +23,7 @@ namespace DuetControlServer.Commands
                 Interpreter interpreter = new Interpreter(InterpreterOptions.DefaultCaseInsensitive).EnableAssignment(AssignmentOperators.None);
                 using (await Model.Provider.AccessReadOnlyAsync())
                 {
-                    List<Parameter> parameters = new List<Parameter>();
+                    List<Parameter> parameters = new();
                     foreach (var kv in Model.Provider.Get.JsonProperties)
                     {
                         parameters.Add(new Parameter(kv.Key, kv.Value.GetValue(Model.Provider.Get)));

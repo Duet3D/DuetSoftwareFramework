@@ -251,7 +251,7 @@ namespace UnitTests.SPI
 
         private Span<byte> GetBlob(string filename)
         {
-            FileStream stream = new FileStream(Path.Combine(Directory.GetCurrentDirectory(), "../../../SPI/Blobs", filename), FileMode.Open, FileAccess.Read);
+            FileStream stream = new(Path.Combine(Directory.GetCurrentDirectory(), "../../../SPI/Blobs", filename), FileMode.Open, FileAccess.Read);
             Span<byte> content = new byte[stream.Length];
             stream.Read(content);
             stream.Close();

@@ -11,7 +11,7 @@ namespace UnitTests.IPC
         [Test]
         public void GetPathNode()
         {
-            Dictionary<string, object> root = new Dictionary<string, object>();
+            Dictionary<string, object> root = new();
 
             // state.status
             object[] pathA = new object[] { "state", "status" };

@@ -13,7 +13,7 @@ namespace UnitTests.File
         public async Task TestPosition()
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes/Cura.gcode");
-            CodeFile file = new CodeFile(filePath, DuetAPI.CodeChannel.File);
+            CodeFile file = new(filePath, DuetAPI.CodeChannel.File);
             Code code;
 
             // Line 1

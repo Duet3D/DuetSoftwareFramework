@@ -60,7 +60,7 @@ namespace DuetControlServer.Model
                 {
                     _releaseCts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
-                    StackTrace stackTrace = new StackTrace(true);
+                    StackTrace stackTrace = new(true);
                     _ = Task.Run(async () =>
                     {
                         try
@@ -116,17 +116,17 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Lock for read/write access
         /// </summary>
-        private static readonly AsyncReaderWriterLock _readWriteLock = new AsyncReaderWriterLock();
+        private static readonly AsyncReaderWriterLock _readWriteLock = new();
 
         /// <summary>
         /// Base lock for update conditions
         /// </summary>
-        private static readonly AsyncLock _updateLock = new AsyncLock();
+        private static readonly AsyncLock _updateLock = new();
 
         /// <summary>
         /// Condition variable to trigger when the machine model has been updated
         /// </summary>
-        private static readonly AsyncConditionVariable _updateEvent = new AsyncConditionVariable(_updateLock);
+        private static readonly AsyncConditionVariable _updateEvent = new(_updateLock);
 
         /// <summary>
         /// Get the machine model. Make sure to call the acquire the corresponding lock first!

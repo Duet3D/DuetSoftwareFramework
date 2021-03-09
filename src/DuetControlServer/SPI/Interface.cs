@@ -29,7 +29,7 @@ namespace DuetControlServer.SPI
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         // Information about the code channels
-        private static readonly Channel.Manager _channels = new Channel.Manager();
+        private static readonly Channel.Manager _channels = new();
         private static int _bytesReserved = 0, _bufferSpace = 0;
 
         // Object model queries
@@ -55,35 +55,35 @@ namespace DuetControlServer.SPI
             /// </summary>
             public TaskCompletionSource<byte[]> TCS { get; } = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
-        private static readonly Queue<PendingModelQuery> _pendingModelQueries = new Queue<PendingModelQuery>();
+        private static readonly Queue<PendingModelQuery> _pendingModelQueries = new();
         private static DateTime _lastQueryTime = DateTime.Now;
 
         // Expression evaluation requests
-        private static readonly List<EvaluateExpressionRequest> _evaluateExpressionRequests = new List<EvaluateExpressionRequest>();
+        private static readonly List<EvaluateExpressionRequest> _evaluateExpressionRequests = new();
 
         // Heightmap requests
-        private static readonly AsyncLock _heightmapLock = new AsyncLock();
+        private static readonly AsyncLock _heightmapLock = new();
         private static TaskCompletionSource<Heightmap> _getHeightmapRequest;
         private static bool _isHeightmapRequested;
         private static TaskCompletionSource _setHeightmapRequest;
         private static Heightmap _heightmapToSet;
 
         // Firmware updates
-        private static readonly AsyncLock _firmwareUpdateLock = new AsyncLock();
+        private static readonly AsyncLock _firmwareUpdateLock = new();
         private static Stream _iapStream, _firmwareStream;
         private static TaskCompletionSource _firmwareUpdateRequest;
 
         // Firmware halt/restart requests
-        private static readonly AsyncLock _firmwareActionLock = new AsyncLock();
+        private static readonly AsyncLock _firmwareActionLock = new();
         private static TaskCompletionSource _firmwareHaltRequest;
         private static TaskCompletionSource _firmwareResetRequest;
 
         // Miscellaneous requests
-        private static readonly Dictionary<int, string> _extruderFilamentMapping = new Dictionary<int, string>();
-        private static readonly AsyncLock _printStopppedReasonLock = new AsyncLock();
+        private static readonly Dictionary<int, string> _extruderFilamentMapping = new();
+        private static readonly AsyncLock _printStopppedReasonLock = new();
         private static PrintStoppedReason? _printStoppedReason;
         private static volatile bool _printStarted, _assignFilaments;
-        private static readonly Queue<Tuple<MessageTypeFlags, string>> _messagesToSend = new Queue<Tuple<MessageTypeFlags, string>>();
+        private static readonly Queue<Tuple<MessageTypeFlags, string>> _messagesToSend = new();
 
         // Partial incoming message (if any)
         private static string _partialGenericMessage;
@@ -120,7 +120,7 @@ namespace DuetControlServer.SPI
                 throw new InvalidOperationException("Not connected over SPI");
             }
 
-            PendingModelQuery query = new PendingModelQuery { Key = key, Flags = flags };
+            PendingModelQuery query = new() { Key = key, Flags = flags };
             lock (_pendingModelQueries)
             {
                 _pendingModelQueries.Enqueue(query);
@@ -162,7 +162,7 @@ namespace DuetControlServer.SPI
                     }
                 }
 
-                EvaluateExpressionRequest newItem = new EvaluateExpressionRequest(channel, expression);
+                EvaluateExpressionRequest newItem = new(channel, expression);
                 _evaluateExpressionRequests.Add(newItem);
                 _logger.Debug("Evaluating {0} on channel {1}", expression, channel);
                 return newItem.Task;
@@ -1223,7 +1223,7 @@ namespace DuetControlServer.SPI
             try
             {
                 string filePath = await FilePath.ToPhysicalAsync(filename, filename.EndsWith(".bin") ? FileDirectory.Firmware : FileDirectory.System);
-                using FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read)
+                using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read)
                 {
                     Position = offset
                 };

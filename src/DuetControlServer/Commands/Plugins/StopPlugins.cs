@@ -30,19 +30,19 @@ namespace DuetControlServer.Commands
                 }
             }
 
-            List<Task> stopTasks = new List<Task>();
-            using (FileStream fileStream = new FileStream(Settings.PluginsFilename, FileMode.Create, FileAccess.Write))
+            List<Task> stopTasks = new();
+            using (FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write))
             {
-                using StreamWriter writer = new StreamWriter(fileStream);
+                using StreamWriter writer = new(fileStream);
                 using (await Model.Provider.AccessReadOnlyAsync())
                 {
-                    foreach (Plugin item in Model.Provider.Get.Plugins)
+                    foreach (Plugin item in Model.Provider.Get.Plugins.Values)
                     {
                         if (item.Pid > 0)
                         {
-                            await writer.WriteLineAsync(item.Name);
+                            await writer.WriteLineAsync(item.Id);
 
-                            StopPlugin stopCommand = new StopPlugin() { Plugin = item.Name, StoppingAll = true };
+                            StopPlugin stopCommand = new() { Plugin = item.Id, StoppingAll = true };
                             stopTasks.Add(Task.Run(stopCommand.Execute));
                         }
                     }

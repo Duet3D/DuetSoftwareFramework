@@ -10,7 +10,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Task completion source that completes when the lock request has been resolved
         /// </summary>
-        private readonly TaskCompletionSource<bool> _tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         /// <summary>
         /// Indicates if this is a lock or unlock request

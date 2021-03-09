@@ -39,7 +39,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Dictionary of interception mode vs item containers (connection vs queue of codes being intercepted)
         /// </summary>
-        private static readonly Dictionary<InterceptionMode, List<CodeInterception>> _connections = new Dictionary<InterceptionMode, List<CodeInterception>>
+        private static readonly Dictionary<InterceptionMode, List<CodeInterception>> _connections = new()
         {
             { InterceptionMode.Pre, new List<CodeInterception>() },
             { InterceptionMode.Post, new List<CodeInterception>() },
@@ -69,7 +69,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Monitor for exchanging data during interceptions
         /// </summary>
-        private readonly AsyncMonitor _codeMonitor = new AsyncMonitor();
+        private readonly AsyncMonitor _codeMonitor = new();
 
         /// <summary>
         /// Current code being intercepted
@@ -299,7 +299,7 @@ namespace DuetControlServer.IPC.Processors
                 return false;
             }
 
-            List<CodeInterception> processors = new List<CodeInterception>();
+            List<CodeInterception> processors = new();
             lock (_connections[type])
             {
                 processors.AddRange(_connections[type]);

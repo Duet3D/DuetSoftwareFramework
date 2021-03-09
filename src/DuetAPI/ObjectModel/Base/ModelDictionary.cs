@@ -4,19 +4,23 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Class for holding dynamic properties. Properties may not be deleted again
     /// </summary>
+    /// <remarks>
+    /// In a future version this should implement Assign() and UpdateFromJson() like the other classes.
+    /// </remarks>
     /// <typeparam name="TValue"></typeparam>
     public class ModelDictionary<TValue> : INotifyPropertyChanging, INotifyPropertyChanged, IDictionary<string, TValue>
     {
         /// <summary>
         /// Internal storage for key/value pairs
         /// </summary>
-        private readonly Dictionary<string, TValue> _dictionary = new Dictionary<string, TValue>();
+        private readonly Dictionary<string, TValue> _dictionary = new();
 
         /// <summary>
         /// Index operator
@@ -98,7 +102,7 @@ namespace DuetAPI.ObjectModel
         /// <returns></returns>
         public object Clone()
         {
-            ModelDictionary<TValue> clone = new ModelDictionary<TValue>();
+            ModelDictionary<TValue> clone = new();
             foreach (KeyValuePair<string, TValue> kv in _dictionary)
             {
                 if (kv.Value is ICloneable cloneable)

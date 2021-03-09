@@ -617,14 +617,14 @@ namespace DuetAPI.Commands
         {
             if (!parameter.IsExpression)
             {
-                List<DriverId> drivers = new List<DriverId>();
+                List<DriverId> drivers = new();
 
                 string[] parameters = parameter.StringValue.Split(':');
                 foreach (string value in parameters)
                 {
                     try
                     {
-                        DriverId id = new DriverId(value);
+                        DriverId id = new(value);
                         drivers.Add(id);
                     }
                     catch (ArgumentException e)

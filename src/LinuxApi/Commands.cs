@@ -106,7 +106,7 @@ namespace LinuxApi
         /// <param name="gid">Group ID</param>
         public static void Stat(string pathname, out int uid, out int gid)
         {
-            statbuf buffer = new statbuf();
+            statbuf buffer = new();
             if (Interop.stat(Interop.STATVER, pathname, ref buffer) < 0)
             {
                 throw new ArgumentException($"Failed to get file info (error {Marshal.GetLastWin32Error()})");

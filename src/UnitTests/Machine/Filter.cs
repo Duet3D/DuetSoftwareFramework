@@ -96,13 +96,13 @@ namespace UnitTests.Machine
             string filterC = "tools[*]";
             object[] parsedFilterC = DuetControlServer.Model.Filter.ConvertFilter(filterC, false);
 
-            DuetAPI.ObjectModel.Tool toolA = new DuetAPI.ObjectModel.Tool();
+            DuetAPI.ObjectModel.Tool toolA = new();
             toolA.Active.Add(123F);
             toolA.Standby.Add(456F);
             toolA.State = DuetAPI.ObjectModel.ToolState.Active;
             Provider.Get.Tools.Add(toolA);
 
-            DuetAPI.ObjectModel.Tool toolB = new DuetAPI.ObjectModel.Tool();
+            DuetAPI.ObjectModel.Tool toolB = new();
             toolB.Active.Add(10F);
             toolB.Standby.Add(20F);
             toolB.State = DuetAPI.ObjectModel.ToolState.Standby;
@@ -136,7 +136,7 @@ namespace UnitTests.Machine
             Assert.IsTrue(toolsKeyC[1] is DuetAPI.ObjectModel.Tool);
 
             // Merge A+B
-            Dictionary<string, object> merged = new Dictionary<string, object>();
+            Dictionary<string, object> merged = new();
             DuetControlServer.Model.Filter.MergeFiltered(merged, partialModelA);
             DuetControlServer.Model.Filter.MergeFiltered(merged, partialModelB);
             List<object> mergedTools = (List<object>)merged["tools"];

@@ -645,8 +645,8 @@ namespace UnitTests.Commands
         [Test]
         public async Task SimpleCodes()
         {
-            DuetControlServer.Commands.SimpleCode simpleCode = new DuetControlServer.Commands.SimpleCode { Code = "G91 G1 X5 Y2" };
-            List<DuetControlServer.Commands.Code> codes = new List<DuetControlServer.Commands.Code>();
+            DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "G91 G1 X5 Y2" };
+            List<DuetControlServer.Commands.Code> codes = new();
             await foreach (DuetControlServer.Commands.Code code in simpleCode.ParseAsync())
             {
                 codes.Add(code);
@@ -669,8 +669,8 @@ namespace UnitTests.Commands
         [Test]
         public async Task SimpleCodesG53Line()
         {
-            DuetControlServer.Commands.SimpleCode simpleCode = new DuetControlServer.Commands.SimpleCode { Code = "G53 G1 X100 G0 Y200\nG1 Z50" };
-            List<DuetControlServer.Commands.Code> codes = new List<DuetControlServer.Commands.Code>();
+            DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "G53 G1 X100 G0 Y200\nG1 Z50" };
+            List<DuetControlServer.Commands.Code> codes = new();
             await foreach (DuetControlServer.Commands.Code code in simpleCode.ParseAsync())
             {
                 codes.Add(code);
@@ -699,8 +699,8 @@ namespace UnitTests.Commands
         [Test]
         public async Task SimpleCodesNL()
         {
-            DuetControlServer.Commands.SimpleCode simpleCode = new DuetControlServer.Commands.SimpleCode { Code = "G91\nG1 X5 Y2" };
-            List<DuetControlServer.Commands.Code> codes = new List<DuetControlServer.Commands.Code>();
+            DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "G91\nG1 X5 Y2" };
+            List<DuetControlServer.Commands.Code> codes = new();
             await foreach (DuetControlServer.Commands.Code code in simpleCode.ParseAsync())
             {
                 codes.Add(code);
@@ -723,8 +723,8 @@ namespace UnitTests.Commands
         [Test]
         public async Task SimpleCodesIndented()
         {
-            DuetControlServer.Commands.SimpleCode simpleCode = new DuetControlServer.Commands.SimpleCode { Code = "    G1 X5 Y5 G1 X10 Y10\nG1 X15 Y15" };
-            List<DuetControlServer.Commands.Code> codes = new List<DuetControlServer.Commands.Code>();
+            DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "    G1 X5 Y5 G1 X10 Y10\nG1 X15 Y15" };
+            List<DuetControlServer.Commands.Code> codes = new();
             await foreach (DuetControlServer.Commands.Code code in simpleCode.ParseAsync())
             {
                 codes.Add(code);
@@ -765,11 +765,11 @@ namespace UnitTests.Commands
         {
             string codeString = "G53 G1 X0 Y5 F3000 G0 X5 Y10";
             byte[] codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new MemoryStream(codeBytes))
+            using (MemoryStream memoryStream = new(codeBytes))
             {
-                using StreamReader reader = new StreamReader(memoryStream);
-                CodeParserBuffer buffer = new CodeParserBuffer(128, true);
-                DuetAPI.Commands.Code code = new DuetAPI.Commands.Code() { LineNumber = 1 };
+                using StreamReader reader = new(memoryStream);
+                CodeParserBuffer buffer = new(128, true);
+                DuetAPI.Commands.Code code = new() { LineNumber = 1 };
 
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
                 Assert.AreEqual(CodeType.GCode, code.Type);
@@ -794,12 +794,12 @@ namespace UnitTests.Commands
 
             codeString = "G1 X1 Y5 F3000\nG1 X5 F300\nG0 Y40";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new MemoryStream(codeBytes))
+            using (MemoryStream memoryStream = new(codeBytes))
             {
-                using StreamReader reader = new StreamReader(memoryStream);
-                CodeParserBuffer buffer = new CodeParserBuffer(128, true);
+                using StreamReader reader = new(memoryStream);
+                CodeParserBuffer buffer = new(128, true);
 
-                DuetAPI.Commands.Code code = new DuetAPI.Commands.Code() { LineNumber = 0 };
+                DuetAPI.Commands.Code code = new() { LineNumber = 0 };
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
 
                 code.Reset();
@@ -815,12 +815,12 @@ namespace UnitTests.Commands
 
             codeString = "G1 X1 Y5 F3000\n  G53 G1 X5 F300\n    G53 G0 Y40 G1 Z50\n  G4 S3\nG1 Z3";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new MemoryStream(codeBytes))
+            using (MemoryStream memoryStream = new(codeBytes))
             {
-                using StreamReader reader = new StreamReader(memoryStream);
-                CodeParserBuffer buffer = new CodeParserBuffer(128, true);
+                using StreamReader reader = new(memoryStream);
+                CodeParserBuffer buffer = new(128, true);
 
-                DuetAPI.Commands.Code code = new DuetAPI.Commands.Code() { LineNumber = 0 };
+                DuetAPI.Commands.Code code = new() { LineNumber = 0 };
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
                 Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(0, code.Indent);
@@ -859,12 +859,12 @@ namespace UnitTests.Commands
 
             codeString = "M291 P\"Please go to <a href=\"\"https://www.duet3d.com/StartHere\"\" target=\"\"_blank\"\">this</a> page for further instructions on how to set it up.\" R\"Welcome to your new Duet 3!\" S1 T0";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new MemoryStream(codeBytes))
+            using (MemoryStream memoryStream = new(codeBytes))
             {
-                using StreamReader reader = new StreamReader(memoryStream);
-                CodeParserBuffer buffer = new CodeParserBuffer(128, true);
+                using StreamReader reader = new(memoryStream);
+                CodeParserBuffer buffer = new(128, true);
 
-                DuetAPI.Commands.Code code = new DuetAPI.Commands.Code();
+                DuetAPI.Commands.Code code = new();
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
                 Assert.AreEqual(CodeType.MCode, code.Type);
                 Assert.AreEqual(291, code.MajorNumber);
@@ -880,10 +880,10 @@ namespace UnitTests.Commands
             yield return new DuetAPI.Commands.Code(code);
 
             byte[] codeBytes = Encoding.UTF8.GetBytes(code);
-            using MemoryStream memoryStream = new MemoryStream(codeBytes);
-            using StreamReader reader = new StreamReader(memoryStream);
-            CodeParserBuffer buffer = new CodeParserBuffer(128, true);
-            DuetAPI.Commands.Code codeObj = new DuetAPI.Commands.Code();
+            using MemoryStream memoryStream = new(codeBytes);
+            using StreamReader reader = new(memoryStream);
+            CodeParserBuffer buffer = new(128, true);
+            DuetAPI.Commands.Code codeObj = new();
             DuetAPI.Commands.Code.ParseAsync(reader, codeObj, buffer).AsTask().Wait();
             yield return codeObj;
         }

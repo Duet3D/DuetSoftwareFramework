@@ -10,7 +10,7 @@ namespace DuetAPI.Commands
     public class SetPluginProcess : Command
     {
         /// <summary>
-        /// Name of the plugin to update
+        /// Identifier of the plugin to update
         /// </summary>
         public string Plugin { get; set; }
 

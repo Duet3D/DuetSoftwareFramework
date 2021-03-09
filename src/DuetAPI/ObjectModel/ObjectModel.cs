@@ -79,10 +79,14 @@ namespace DuetAPI.ObjectModel
         public Network Network { get; } = new Network();
 
         /// <summary>
-        /// List of loaded SBC plugins
+        /// Dictionary of SBC plugins where each key is the plugin identifier
         /// </summary>
+        /// <remarks>
+        /// Values in this dictionary cannot become null. If a change to null is reported, the corresponding key is deleted.
+        /// Do not rely on the setter of this property; it will be removed from a future version.
+        /// </remarks>
         [LinuxProperty]
-        public ModelCollection<Plugin> Plugins { get; } = new ModelCollection<Plugin>();
+        public ModelObjectDictionary<Plugin> Plugins { get; set; } = new ModelObjectDictionary<Plugin>();
 
         /// <summary>
         /// Information about the 3D scanner subsystem
@@ -121,6 +125,8 @@ namespace DuetAPI.ObjectModel
         /// List of user-defined variables
         /// </summary>
         /// <seealso cref="UserVariable"/>
+        [JsonIgnore]
+        [Obsolete("Do not use this field. The underlying type may be changed to MutableModelDictionary in a future update")]
         public ModelCollection<UserVariable> UserVariables { get; } = new ModelCollection<UserVariable>();
 
         /// <summary>
@@ -236,7 +242,7 @@ namespace DuetAPI.ObjectModel
                 return null;
             }
 
-            ObjectModel machineModel = new ObjectModel();
+            ObjectModel machineModel = new();
             machineModel.UpdateFromJson(jsonDocument.RootElement);
             return machineModel;
         }

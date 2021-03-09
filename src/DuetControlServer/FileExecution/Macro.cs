@@ -26,7 +26,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Lock for this instance
         /// </summary>
-        private readonly AsyncLock _lock = new AsyncLock();
+        private readonly AsyncLock _lock = new();
 
         /// <summary>
         /// Lock this instance
@@ -73,12 +73,12 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Internal lock used for starting codes in the right order
         /// </summary>
-        private readonly AsyncLock _codeStartLock = new AsyncLock();
+        private readonly AsyncLock _codeStartLock = new();
 
         /// <summary>
         /// Internal lock used for starting codes in the right order
         /// </summary>
-        private readonly AsyncLock _codeFinishLock = new AsyncLock();
+        private readonly AsyncLock _codeFinishLock = new();
 
         /// <summary>
         /// Method to wait until a new code can be started in the right order
@@ -279,8 +279,8 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         private async Task Run()
         {
-            Queue<Code> codes = new Queue<Code>();
-            Queue<Task<CodeResult>> codesBeingExecuted = new Queue<Task<CodeResult>>();
+            Queue<Code> codes = new();
+            Queue<Task<CodeResult>> codesBeingExecuted = new();
 
             do
             {

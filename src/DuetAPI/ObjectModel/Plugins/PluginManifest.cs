@@ -10,7 +10,36 @@ namespace DuetAPI.ObjectModel
     public class PluginManifest : ModelObject
     {
         /// <summary>
-        /// Name of the plugin
+        /// Identifier of this plugin. May consist of letters and digits only (max length 32 chars)
+        /// </summary>
+        /// <remarks>
+        /// For plugins with DWC components, this is the Webpack chunk name too
+        /// </remarks>
+        public string Id
+        {
+            get => _id;
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value) || value.Length > 32)
+                {
+                    throw new ArgumentException("Invalid plugin identifier");
+                }
+
+                foreach (char c in value)
+                {
+                    if (!char.IsLetterOrDigit(c))
+                    {
+                        throw new ArgumentException("Illegal plugin identifier");
+                    }
+                }
+
+                SetPropertyValue(ref _id, value);
+            }
+        }
+        private string _id;
+
+        /// <summary>
+        /// Name of the plugin. May consist of letters, digits, dashes, and underscores only (max length 64 chars)
         /// </summary>
         public string Name
         {
@@ -91,16 +120,6 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<string> DwcDependencies { get; } = new ModelCollection<string>();
 
         /// <summary>
-        /// Name of the generated webpack chunk
-        /// </summary>
-        public string DwcWebpackChunk
-        {
-            get => _dwcWebpackChunk;
-            set => SetPropertyValue(ref _dwcWebpackChunk, value);
-        }
-        private string _dwcWebpackChunk;
-
-        /// <summary>
         /// Set to true if a SBC is absolutely required for this plugin
         /// </summary>
         public bool SbcRequired
@@ -121,13 +140,7 @@ namespace DuetAPI.ObjectModel
         private string _sbcDsfVersion;
 
         /// <summary>
-        /// Object holding key value pairs of a plugin running on the SBC.
-        /// May be used to share data between plugins or between the SBC and web interface
-        /// </summary>
-        public ModelDictionary<JsonElement> SbcData { get; } = new ModelDictionary<JsonElement>();
-
-        /// <summary>
-        /// Filename in the bin directory used to start the plugin
+        /// Filename in the dsf directory used to start the plugin
         /// </summary>
         /// <remarks>
         /// A plugin may provide different binaries in subdirectories per architecture.
@@ -138,7 +151,7 @@ namespace DuetAPI.ObjectModel
             get => _sbcExecutable;
             set
             {
-                if (value.Contains(".."))
+                if (value != null && value.Contains(".."))
                 {
                     throw new ArgumentException("Executable must not contain relative file paths");
                 }
@@ -146,6 +159,11 @@ namespace DuetAPI.ObjectModel
             }
         }
         private string _sbcExecutable;
+
+        /// <summary>
+        /// List of other filenames in the dsf directory that should be executable
+        /// </summary>
+        public ModelCollection<string> SbcExtraExecutables { get; } = new ModelCollection<string>();
 
         /// <summary>
         /// Command-line arguments for the executable
@@ -196,6 +214,13 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _rrfVersion, value);
         }
         private string _rrfVersion;
+
+        /// <summary>
+        /// Custom plugin data to be populated in the object model (DSF/DWC in SBC mode - or - DWC in standalone mode).
+        /// Before <see cref="Commands.SetPluginData"/> can be used, corresponding properties must be registered via this property first!
+        /// </summary>
+        /// <seealso cref="Commands.SetPluginData"/>
+        public ModelDictionary<JsonElement> Data { get; set; } = new ModelDictionary<JsonElement>();
 
         /// <summary>
         /// Check if the given version satisfies a required version

@@ -102,7 +102,7 @@ namespace DuetControlServer.Codes
                             compatibility = Model.Provider.Get.Inputs[code.Channel].Compatibility;
                         }
 
-                        StringBuilder result = new StringBuilder();
+                        StringBuilder result = new();
                         if (compatibility == Compatibility.Default || compatibility == Compatibility.RepRapFirmware)
                         {
                             result.AppendLine("GCode files:");
@@ -283,8 +283,8 @@ namespace DuetControlServer.Codes
                             string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
                             try
                             {
-                                FileStream fileStream = new FileStream(physicalFile, FileMode.Create, FileAccess.Write);
-                                StreamWriter writer = new StreamWriter(fileStream);
+                                FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write);
+                                StreamWriter writer = new(fileStream);
                                 Commands.Code.FilesBeingWritten[numChannel] = writer;
                                 return new CodeResult(MessageType.Success, prefix + $"Writing to file: {file}");
                             }
@@ -410,7 +410,7 @@ namespace DuetControlServer.Codes
 
                         try
                         {
-                            using FileStream stream = new FileStream(file, FileMode.Open, FileAccess.Read);
+                            using FileStream stream = new(file, FileMode.Open, FileAccess.Read);
 
                             byte[] hash;
                             using System.Security.Cryptography.SHA1 sha1 = System.Security.Cryptography.SHA1.Create();
@@ -489,7 +489,7 @@ namespace DuetControlServer.Codes
                 case 122:
                     if (code.Parameter('B', 0) == 0 && code.GetUnprecedentedString() == "DSF")
                     {
-                        CodeResult result = new CodeResult();
+                        CodeResult result = new();
                         await Diagnostics(result);
                         return result;
                     }
@@ -544,7 +544,7 @@ namespace DuetControlServer.Codes
 
                         try
                         {
-                            Heightmap map = new Heightmap();
+                            Heightmap map = new();
                             await map.Load(physicalFile);
 
                             await using (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
@@ -558,7 +558,7 @@ namespace DuetControlServer.Codes
                                 Model.Provider.Get.Move.Compensation.File = virtualFile;
                             }
 
-                            CodeResult result = new CodeResult();
+                            CodeResult result = new();
                             using (await Model.Provider.AccessReadOnlyAsync())
                             {
                                 if (Model.Provider.Get.Move.Axes.Any(axis => axis.Letter == 'Z' && !axis.Homed))
@@ -924,12 +924,12 @@ namespace DuetControlServer.Codes
                             }
 
                             // Stop all the plugins
-                            Commands.StopPlugins stopCommand = new Commands.StopPlugins();
+                            Commands.StopPlugins stopCommand = new();
                             await stopCommand.Execute();
 
                             // Flash the firmware
-                            using FileStream iapStream = new FileStream(iapFile, FileMode.Open, FileAccess.Read);
-                            using FileStream firmwareStream = new FileStream(firmwareFile, FileMode.Open, FileAccess.Read);
+                            using FileStream iapStream = new(iapFile, FileMode.Open, FileAccess.Read);
+                            using FileStream firmwareStream = new(firmwareFile, FileMode.Open, FileAccess.Read);
                             if (Path.GetExtension(firmwareFile) == ".uf2")
                             {
                                 using MemoryStream unpackedFirmwareStream = await Utility.UF2.Unpack(firmwareStream);
@@ -949,7 +949,7 @@ namespace DuetControlServer.Codes
                             {
                                 await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
 
-                                Commands.StartPlugins startCommand = new Commands.StartPlugins();
+                                Commands.StartPlugins startCommand = new();
                                 await startCommand.Execute();
                             }
                             return new CodeResult();
@@ -1046,7 +1046,7 @@ namespace DuetControlServer.Codes
         /// <returns>Asynchronous task</returns>
         private static async Task Diagnostics(CodeResult result)
         {
-            StringBuilder builder = new StringBuilder();
+            StringBuilder builder = new();
             builder.AppendLine("=== Duet Control Server ===");
             builder.AppendLine($"Duet Control Server v{Program.Version}");
 

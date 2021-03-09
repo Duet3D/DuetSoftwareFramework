@@ -15,12 +15,12 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Monitor for the service interfaces
         /// </summary>
-        private static readonly AsyncMonitor _monitor = new AsyncMonitor();
+        private static readonly AsyncMonitor _monitor = new();
 
         /// <summary>
         /// Monitor for the root service interfaces
         /// </summary>
-        private static readonly AsyncMonitor _rootMonitor = new AsyncMonitor();
+        private static readonly AsyncMonitor _rootMonitor = new();
 
         /// <summary>
         /// Indicates if a service is currently connected
@@ -35,12 +35,12 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Queue of pending service commands vs tasks
         /// </summary>
-        private static readonly Queue<Tuple<object, TaskCompletionSource>> _pendingCommands = new Queue<Tuple<object, TaskCompletionSource>>();
+        private static readonly Queue<Tuple<object, TaskCompletionSource>> _pendingCommands = new();
 
         /// <summary>
         /// Queue of pending service commands vs tasks
         /// </summary>
-        private static readonly Queue<Tuple<object, TaskCompletionSource>> _pendingRootCommands = new Queue<Tuple<object, TaskCompletionSource>>();
+        private static readonly Queue<Tuple<object, TaskCompletionSource>> _pendingRootCommands = new();
 
         /// <summary>
         /// Perform a command via the plugin service
@@ -50,7 +50,7 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Asynchronous task</returns>
         public static async Task PerformCommand(object command, bool asRoot)
         {
-            TaskCompletionSource tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
             using (await (asRoot ? _rootMonitor : _monitor).EnterAsync(Program.CancellationToken))
             {
                 if (asRoot)
@@ -125,7 +125,7 @@ namespace DuetControlServer.IPC.Processors
                 // First ensure that object model is up-to-date
                 await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
 
-                Commands.StartPlugins startCommand = new Commands.StartPlugins();
+                Commands.StartPlugins startCommand = new();
                 _ = Task.Run(startCommand.Execute);
             }
 
@@ -143,7 +143,7 @@ namespace DuetControlServer.IPC.Processors
                         {
                             if (!pendingCommands.TryDequeue(out request))
                             {
-                                using CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.SocketPollInterval);
+                                using CancellationTokenSource timeoutCts = new(Settings.SocketPollInterval);
                                 using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, Program.CancellationToken);
                                 await monitor.WaitAsync(cts.Token);
                                 request = pendingCommands.Dequeue();
@@ -188,7 +188,7 @@ namespace DuetControlServer.IPC.Processors
                     // Plugins from this service are no longer running
                     using (await Model.Provider.AccessReadWriteAsync())
                     {
-                        foreach (Plugin item in Model.Provider.Get.Plugins)
+                        foreach (Plugin item in Model.Provider.Get.Plugins.Values)
                         {
                             if (item.Pid > 0 && item.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Connection.IsRoot)
                             {
@@ -217,7 +217,7 @@ namespace DuetControlServer.IPC.Processors
                     // Stop the remaining plugins again unless they are already stopped
                     if (stopPlugins)
                     {
-                        StopPlugins stopCommand = new StopPlugins();
+                        StopPlugins stopCommand = new();
                         _ = Task.Run(stopCommand.Execute);
                     }
                 }

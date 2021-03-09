@@ -65,11 +65,11 @@ namespace DuetAPI.Commands
             else if (isDriverId)
             {
                 // Value is a (list of) driver identifier(s)
-                List<DriverId> driverIds = new List<DriverId>();
+                List<DriverId> driverIds = new();
 
                 foreach (string item in value.Split(':'))
                 {
-                    DriverId driverId = new DriverId(item);
+                    DriverId driverId = new(item);
                     driverIds.Add(driverId);
                 }
 

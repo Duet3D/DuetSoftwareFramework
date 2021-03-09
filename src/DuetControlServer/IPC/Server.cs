@@ -25,7 +25,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// UNIX socket for inter-process communication
         /// </summary>
-        private static readonly Socket _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        private static readonly Socket _unixSocket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 
         /// <summary>
         /// Initialize the IPC subsystem and start listening for connections
@@ -49,7 +49,7 @@ namespace DuetControlServer.IPC
             }
 
             // Create a new UNIX socket and start listening
-            UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(Settings.FullSocketPath);
+            UnixDomainSocketEndPoint endPoint = new(Settings.FullSocketPath);
             _unixSocket.Bind(endPoint);
             _unixSocket.Listen(Settings.Backlog);
         }
@@ -71,7 +71,7 @@ namespace DuetControlServer.IPC
             Program.CancellationToken.Register(_unixSocket.Close, false);
 
             // Start accepting incoming connections
-            List<Task> connectionTasks = new List<Task>();
+            List<Task> connectionTasks = new();
             try
             {
                 do
@@ -112,7 +112,7 @@ namespace DuetControlServer.IPC
         /// <returns>Asynchronous task</returns>
         private static async Task ProcessConnection(Socket socket)
         {
-            using Connection connection = new Connection(socket);
+            using Connection connection = new(socket);
             try
             {
                 // Check if this connection is permitted

@@ -22,9 +22,9 @@ namespace DuetControlServer.Files
         /// <returns>Information about the file</returns>
         public static async Task<ParsedFileInfo> Parse(string fileName)
         {
-            using FileStream fileStream = new FileStream(fileName, FileMode.Open);
-            using StreamReader reader = new StreamReader(fileStream, null, true, Settings.FileBufferSize);
-            ParsedFileInfo result = new ParsedFileInfo
+            using FileStream fileStream = new(fileName, FileMode.Open);
+            using StreamReader reader = new(fileStream, null, true, Settings.FileBufferSize);
+            ParsedFileInfo result = new()
             {
                 FileName = await FilePath.ToVirtualAsync(fileName),
                 LastModified = File.GetLastWriteTime(fileName),
@@ -35,7 +35,18 @@ namespace DuetControlServer.Files
             {
                 await ParseHeader(reader, result);
                 await ParseFooter(reader, result);
-                await ParseThumbnails(reader, result);
+                await ParseThumbnails(reader, result);      // TODO merge this with ParseHeader
+
+                while (result.Filament.Count > 0 && result.Filament[0] == 0F)
+                {
+                    // In case the filament index did not start at zero...
+                    result.Filament.RemoveAt(0);
+                }
+                while (result.Filament.Count > 0 && result.Filament[^1] == 0F)
+                {
+                    // In case the last items were zero
+                    result.Filament.RemoveAt(result.Filament.Count - 1);
+                }
 
                 if (result.FirstLayerHeight + result.LayerHeight > 0F && result.Height > 0F)
                 {
@@ -53,8 +64,8 @@ namespace DuetControlServer.Files
         /// <returns>Asynchronous task</returns>
         private static async Task ParseHeader(StreamReader reader, ParsedFileInfo partialFileInfo)
         {
-            Code code = new Code();
-            CodeParserBuffer codeParserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
+            Code code = new();
+            CodeParserBuffer codeParserBuffer = new(Settings.FileBufferSize, true);
 
             bool inRelativeMode = false, lastCodeHadInfo = false, gotNewInfo = false;
             long fileReadLimit = Math.Min(Settings.FileInfoReadLimitHeader, reader.BaseStream.Length);
@@ -126,7 +137,7 @@ namespace DuetControlServer.Files
             char[] buffer = new char[Settings.FileBufferSize];
             int bufferPointer = 0;
 
-            Code code = new Code();
+            Code code = new();
             bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = partialFileInfo.Filament.Count > 0;
             do
             {
@@ -142,7 +153,7 @@ namespace DuetControlServer.Files
 
                 // See what codes to deal with
                 bool gotNewInfo = false;
-                using (StringReader stringReader = new StringReader(readResult.Line))
+                using (StringReader stringReader = new(readResult.Line))
                 {
                     while (DuetAPI.Commands.Code.Parse(stringReader, code))
                     {
@@ -317,42 +328,55 @@ namespace DuetControlServer.Files
         /// <returns>Whether filament consumption could be found</returns>
         private static bool FindFilamentUsed(string line, ref ParsedFileInfo fileInfo)
         {
-            bool hadMatch = false;
             foreach (Regex item in Settings.FilamentFilters)
             {
                 Match match = item.Match(line);
                 if (match.Success)
                 {
-                    foreach (Group grp in match.Groups)
+                    if (match.Groups.TryGetValue("mm", out Group mmGroup))
                     {
-                        if (grp.Name == "mm")
+                        if (float.TryParse(mmGroup.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float filamentUsage) &&
+                            float.IsFinite(filamentUsage))
                         {
-                            foreach (Capture c in grp.Captures)
+                            if (match.Groups.TryGetValue("index", out Group indexGroup) && int.TryParse(indexGroup.Value, out int index))
                             {
-                                if (float.TryParse(c.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float filamentUsage) &&
-                                    float.IsFinite(filamentUsage))
+                                for (int i = fileInfo.Filament.Count; i <= index; i++)
                                 {
-                                    fileInfo.Filament.Add(filamentUsage);
+                                    fileInfo.Filament.Add(0F);
                                 }
+                                fileInfo.Filament[index] = filamentUsage;
                             }
-                            hadMatch = true;
+                            else
+                            {
+                                fileInfo.Filament.Add(filamentUsage);
+                            }
                         }
-                        else if (grp.Name == "m")
+                        return true;
+                    }
+
+                    if (match.Groups.TryGetValue("m", out Group mGroup))
+                    {
+                        if (float.TryParse(mGroup.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float filamentUsage) &&
+                            float.IsFinite(filamentUsage))
                         {
-                            foreach (Capture c in grp.Captures)
+                            if (match.Groups.TryGetValue("index", out Group indexGroup) && int.TryParse(indexGroup.Value, out int index))
                             {
-                                if (float.TryParse(c.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float filamentUsage) &&
-                                    float.IsFinite(filamentUsage))
+                                for (int i = fileInfo.Filament.Count; i <= index; i++)
                                 {
-                                    fileInfo.Filament.Add(filamentUsage * 1000F);
+                                    fileInfo.Filament.Add(0F);
                                 }
+                                fileInfo.Filament[index] = filamentUsage * 1000F;
                             }
-                            hadMatch = true;
+                            else
+                            {
+                                fileInfo.Filament.Add(filamentUsage * 1000F);
+                            }
                         }
+                        return true;
                     }
                 }
             }
-            return hadMatch;
+            return false;
         }
 
         /// <summary>
@@ -471,11 +495,11 @@ namespace DuetControlServer.Files
         /// </remarks>
         private static async Task ParseThumbnails(StreamReader reader, ParsedFileInfo parsedFileInfo)
         {
-            Code code = new Code();
-            CodeParserBuffer codeParserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
+            Code code = new();
+            CodeParserBuffer codeParserBuffer = new(Settings.FileBufferSize, true);
             bool imageFound = false;
             int encodedLength = 0;
-            StringBuilder encodedImage = new StringBuilder();
+            StringBuilder encodedImage = new();
             reader.BaseStream.Seek(0, SeekOrigin.Begin);
             ParsedThumbnail thumbnail = null;
             while (codeParserBuffer.GetPosition(reader) < reader.BaseStream.Length)
@@ -563,7 +587,7 @@ namespace DuetControlServer.Files
             DateTime lastWriteTime = File.GetLastWriteTime(filename);
 
             // Update the simulated time in the file
-            using (FileStream fileStream = new FileStream(filename, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+            using (FileStream fileStream = new(filename, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
             {
                 // Check if we need to truncate the file before the last simulated time
                 bool truncate = false;
@@ -586,7 +610,7 @@ namespace DuetControlServer.Files
                 }
 
                 // Write the simulated time
-                using (StreamWriter writer = new StreamWriter(fileStream, leaveOpen: true))
+                using (StreamWriter writer = new(fileStream, leaveOpen: true))
                 {
                     await writer.WriteLineAsync(SimulatedTimeString + ": " + totalSeconds.ToString());
                 }

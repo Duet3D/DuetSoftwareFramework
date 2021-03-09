@@ -40,7 +40,7 @@ namespace LinuxApi
             }
 
             // Set up the pin
-            gpioevent_request tr = new gpioevent_request
+            gpioevent_request tr = new()
             {
                 line_offset = (uint)pin,
                 handle_flags = (uint)GpioHandleFlags.GPIOHANDLE_REQUEST_INPUT,
@@ -62,7 +62,7 @@ namespace LinuxApi
             _reqFd = tr.fd;
 
             // Read initial value
-            gpiohandle_data data = new gpiohandle_data();
+            gpiohandle_data data = new();
 
             result = Interop.ioctl(_reqFd, GPIOHANDLE_GET_LINE_VALUES_IOCTL, new IntPtr(&data));
             if (result < 0)
@@ -142,7 +142,7 @@ namespace LinuxApi
 
             return Task.Run(() =>
             {
-                gpioevent_data eventData = new gpioevent_data();
+                gpioevent_data eventData = new();
                 int sizeOfEventData = Marshal.SizeOf(typeof(gpioevent_data));
 
                 do

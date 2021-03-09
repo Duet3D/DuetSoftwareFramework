@@ -34,7 +34,7 @@ namespace DuetControlServer.SPI
         private static bool _expectedTfrRdyPinValue = false;
         private static volatile bool _transferReadyPinMonitored;
         private static SpiDevice _spiDevice;
-        private static readonly AsyncManualResetEvent _transferReadyEvent = new AsyncManualResetEvent();
+        private static readonly AsyncManualResetEvent _transferReadyEvent = new();
         private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting, _updating;
         private static ushort _lastTransferNumber;
 
@@ -52,7 +52,7 @@ namespace DuetControlServer.SPI
         private static readonly int bufferSize = Settings.SpiBufferSize;
         private const int NumTxBuffers = 3;
         private static readonly Memory<byte> _rxBuffer = new byte[bufferSize];
-        private static readonly LinkedList<Memory<byte>> _txBuffers = new LinkedList<Memory<byte>>();
+        private static readonly LinkedList<Memory<byte>> _txBuffers = new();
         private static LinkedListNode<Memory<byte>> _txBuffer;
         private static int _rxPointer, _txPointer;
         private static PacketHeader _lastPacket;
@@ -394,7 +394,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         public static void DumpMalformedPacket()
         {
-            using (FileStream stream = new FileStream(Path.Combine(Directory.GetCurrentDirectory(), "transferDump.bin"), FileMode.Create, FileAccess.Write))
+            using (FileStream stream = new(Path.Combine(Directory.GetCurrentDirectory(), "transferDump.bin"), FileMode.Create, FileAccess.Write))
             {
                 stream.Write(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
             }
@@ -425,7 +425,7 @@ namespace DuetControlServer.SPI
         /// <param name="dataLength">Length of the extra payload</param>
         private static void WritePacket(Communication.LinuxRequests.Request request, int dataLength = 0)
         {
-            PacketHeader header = new PacketHeader
+            PacketHeader header = new()
             {
                 Request = (ushort)request,
                 Id = _packetId++,
@@ -848,7 +848,7 @@ namespace DuetControlServer.SPI
             Thread.Sleep(Consts.FirmwareFinishedDelay);
 
             // Send the final firmware size plus CRC16 checksum to IAP
-            Communication.LinuxRequests.FlashVerify verifyRequest = new Communication.LinuxRequests.FlashVerify
+            Communication.LinuxRequests.FlashVerify verifyRequest = new()
             {
                 firmwareLength = (uint)firmwareLength,
                 crc16 = crc16

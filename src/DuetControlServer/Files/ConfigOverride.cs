@@ -23,8 +23,8 @@ namespace DuetControlServer.Files
             int[] pParam = code.Parameter('P', Array.Empty<int>());
 
             string file = await FilePath.ToPhysicalAsync(FilePath.ConfigOverrideFile, FileDirectory.System);
-            using FileStream fs = new FileStream(file, FileMode.Create, FileAccess.Write);
-            using StreamWriter writer = new StreamWriter(fs);
+            using FileStream fs = new(file, FileMode.Create, FileAccess.Write);
+            using StreamWriter writer = new(fs);
 
             using (await Model.Provider.AccessReadOnlyAsync())
             {
@@ -135,7 +135,7 @@ namespace DuetControlServer.Files
                 {
                     if (tool != null && (tool.OffsetsProbed != 0 || forceWrite))
                     {
-                        List<string> values = new List<string>();
+                        List<string> values = new();
                         for (int i = 0; i < Model.Provider.Get.Move.Axes.Count; i++)
                         {
                             Axis axis = Model.Provider.Get.Move.Axes[i];
@@ -156,7 +156,7 @@ namespace DuetControlServer.Files
             await writer.WriteLineAsync("; Workplace coordinates");
             for (int i = 0; i < Model.Provider.Get.Limits.Workplaces; i++)
             {
-                List<string> values = new List<string>();
+                List<string> values = new();
                 for (int axisIndex = 0; axisIndex < Model.Provider.Get.Move.Axes.Count; axisIndex++)
                 {
                     Axis axis = Model.Provider.Get.Move.Axes[axisIndex];

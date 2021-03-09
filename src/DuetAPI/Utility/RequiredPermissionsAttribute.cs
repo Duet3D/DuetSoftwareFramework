@@ -5,7 +5,8 @@ namespace DuetAPI.Utility
     /// <summary>
     /// Attribute to define the permissions of each command
     /// </summary>
-    public class RequiredPermissionsAttribute : Attribute
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class RequiredPermissionsAttribute : Attribute
     {
         /// <summary>
         /// Required permissions for the given command

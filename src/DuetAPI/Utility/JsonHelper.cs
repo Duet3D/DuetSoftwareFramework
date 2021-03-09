@@ -33,7 +33,7 @@ namespace DuetAPI.Utility
         {
             if (reader.TokenType == JsonTokenType.StartArray)
             {
-                List<Regex> regexList = new List<Regex>();
+                List<Regex> regexList = new();
 
                 string pattern = null;
                 int optionsValue = 0;
@@ -108,7 +108,7 @@ namespace DuetAPI.Utility
         /// <summary>
         /// Default JSON (de-)serialization options
         /// </summary>
-        public static readonly JsonSerializerOptions DefaultJsonOptions = new JsonSerializerOptions
+        public static readonly JsonSerializerOptions DefaultJsonOptions = new()
         {
             Converters = {
                 new JsonPolymorphicWriteOnlyConverter<Kinematics>(),
@@ -130,7 +130,7 @@ namespace DuetAPI.Utility
         /// <exception cref="SocketException">Connection has been closed</exception>
         public static async ValueTask<MemoryStream> ReceiveUtf8Json(Socket socket, CancellationToken cancellationToken = default)
         {
-            MemoryStream jsonStream = new MemoryStream();
+            MemoryStream jsonStream = new();
             bool inJson = false, inQuotes = false, isEscaped = false;
             int numBraces = 0;
 
@@ -197,8 +197,8 @@ namespace DuetAPI.Utility
         /// </remarks>
         public static T ToObject<T>(this JsonElement element, JsonSerializerOptions options = null)
         {
-            ArrayBufferWriter<byte> bufferWriter = new ArrayBufferWriter<byte>();
-            using (Utf8JsonWriter writer = new Utf8JsonWriter(bufferWriter))
+            ArrayBufferWriter<byte> bufferWriter = new();
+            using (Utf8JsonWriter writer = new(bufferWriter))
             {
                 element.WriteTo(writer);
             }
@@ -218,8 +218,8 @@ namespace DuetAPI.Utility
         /// </remarks>
         public static object ToObject(this JsonElement element, Type type, JsonSerializerOptions options = null)
         {
-            ArrayBufferWriter<byte> bufferWriter = new ArrayBufferWriter<byte>();
-            using (Utf8JsonWriter writer = new Utf8JsonWriter(bufferWriter))
+            ArrayBufferWriter<byte> bufferWriter = new();
+            using (Utf8JsonWriter writer = new(bufferWriter))
             {
                 element.WriteTo(writer);
             }

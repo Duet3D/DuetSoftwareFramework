@@ -5,6 +5,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -36,7 +37,7 @@ namespace DuetPluginService.Commands
             // Extract the plugin manifest
             using ZipArchive zipArchive = ZipFile.OpenRead(PluginFile);
             Plugin plugin = await ExtractManifest(zipArchive);
-            _logger = NLog.LogManager.GetLogger($"Plugin {plugin.Name}");
+            _logger = NLog.LogManager.GetLogger($"Plugin {plugin.Id}");
 
             // Install plugin dependencies as root
             if (Program.IsRoot)
@@ -50,14 +51,17 @@ namespace DuetPluginService.Commands
 
             if (Program.IsRoot)
             {
-                // Apply security profile for this plugin
-                await Permissions.Manager.InstallProfile(plugin);
-                _logger.Info("Security profile installed");
+                // Apply security profile for this plugin unless it gets root permissions anyway
+                if (!plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser))
+                {
+                    await Permissions.Manager.InstallProfile(plugin);
+                    _logger.Info("Security profile installed");
+                }
             }
             else
             {
                 // Delete old files
-                string pluginBase = Path.Combine(Settings.PluginDirectory, plugin.Name);
+                string pluginBase = Path.Combine(Settings.PluginDirectory, plugin.Id);
                 if (!Upgrade && Directory.Exists(pluginBase))
                 {
                     try
@@ -86,6 +90,15 @@ namespace DuetPluginService.Commands
                 }
 
                 // Install new plugin files
+                string architecture = RuntimeInformation.OSArchitecture switch
+                {
+                    Architecture.Arm => "arm",
+                    Architecture.Arm64 => "arm64",
+                    Architecture.X86 => "x86",
+                    Architecture.X64 => "x86_64",
+                    _ => "unknown"
+                };
+
                 foreach (ZipArchiveEntry entry in zipArchive.Entries)
                 {
                     // Ignore plugin.json, it will be written when this archive has been extracted
@@ -131,12 +144,14 @@ namespace DuetPluginService.Commands
 
                     // Extract the file
                     _logger.Debug("Extracting {0} to {1}", entry.FullName, fileName);
-                    using FileStream fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
+                    using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
                     using Stream zipFileStream = entry.Open();
                     await zipFileStream.CopyToAsync(fileStream);
 
                     // Make program binaries executable
-                    if (plugin.SbcExecutable != null && entry.FullName.EndsWith(plugin.SbcExecutable))
+                    if (!string.IsNullOrEmpty(plugin.SbcExecutable) &&
+                        (entry.FullName == "dsf/" + plugin.SbcExecutable || entry.FullName == $"dsf/{architecture}/{plugin.SbcExecutable}" ||
+                         plugin.SbcExtraExecutables.Any(executable => (entry.FullName == "dsf/" + executable) || (entry.FullName == $"dsf/{architecture}/{executable}"))))
                     {
                         _logger.Debug("Changing mode of {0} to 770", fileName);
                         LinuxApi.Commands.Chmod(fileName,
@@ -149,15 +164,6 @@ namespace DuetPluginService.Commands
                 // Retrieve the SBC executable
                 if (!string.IsNullOrEmpty(plugin.SbcExecutable))
                 {
-                    string architecture = RuntimeInformation.OSArchitecture switch
-                    {
-                        Architecture.Arm => "arm",
-                        Architecture.Arm64 => "arm64",
-                        Architecture.X86 => "x86",
-                        Architecture.X64 => "x86_64",
-                        _ => "unknown"
-                    };
-
                     string sbcExecutable = Path.Combine(pluginBase, "dsf", architecture, plugin.SbcExecutable);
                     if (!File.Exists(sbcExecutable))
                     {
@@ -171,12 +177,24 @@ namespace DuetPluginService.Commands
                 }
 
                 // Install the web files. Try to use a symlink or copy the files if that failed
-                if (plugin.DwcFiles.Count > 0)
+                foreach (string dwcFile in plugin.DwcFiles)
                 {
-                    string pluginWwwPath = Path.Combine(pluginBase, "dwc");
-                    string installWwwPath = Path.Combine(Settings.BaseDirectory, "www", plugin.Name);
+                    string pluginWwwPath = Path.Combine(pluginBase, "dwc", dwcFile);
+                    string installWwwPath = Path.Combine(Settings.BaseDirectory, "www", dwcFile);
 
-                    bool copyDirectory = false;
+                    // Create parent directory first
+                    string directory = Path.GetDirectoryName(installWwwPath);
+                    if (!Directory.Exists(directory))
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+
+#if true
+                    // Copy the file. ASP.NET 5 does not perform lstat on symlinks so files served from symlinks are always truncated
+                    _logger.Debug("Copying {0} -> {1}", pluginWwwPath, installWwwPath);
+                    File.Copy(pluginWwwPath, installWwwPath, true);
+#else
+                    // Attempt to symlink or copy the file
                     if (!File.Exists(installWwwPath))
                     {
                         try
@@ -187,22 +205,17 @@ namespace DuetPluginService.Commands
                         catch (IOException e)
                         {
                             _logger.Debug(e);
-                            _logger.Warn("Failed to create symlink to web directory, trying to copy web files instead...");
-                            copyDirectory = true;
+                            _logger.Warn("Failed to create symlink to web directory, trying to copy web file instead...");
+                            File.Copy(pluginWwwPath, installWwwPath);
                         }
                     }
-
-                    if (copyDirectory)
-                    {
-                        _logger.Debug("Copying web files from {0} to {1}", pluginWwwPath, installWwwPath);
-                        DirectoryCopy(pluginWwwPath, installWwwPath, true);
-                    }
+#endif
                 }
 
                 // Install refreshed plugin manifest
                 _logger.Debug("Installing plugin manifest");
-                string manifestFilename = Path.Combine(Settings.PluginDirectory, $"{plugin.Name}.json");
-                using (FileStream manifestFile = new FileStream(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None))
+                string manifestFilename = Path.Combine(Settings.PluginDirectory, $"{plugin.Id}.json");
+                using (FileStream manifestFile = new(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
                     await JsonSerializer.SerializeAsync(manifestFile, plugin, JsonHelper.DefaultJsonOptions);
                 }
@@ -231,7 +244,7 @@ namespace DuetPluginService.Commands
                 throw new ArgumentException("plugin.json not found in the ZIP file");
             }
 
-            Plugin plugin = new Plugin();
+            Plugin plugin = new();
             using (Stream manifestStream = manifestFile.Open())
             {
                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
@@ -252,7 +265,7 @@ namespace DuetPluginService.Commands
         /// <summary>
         /// Lock 
         /// </summary>
-        private static readonly AsyncLock _packageLock = new AsyncLock();
+        private static readonly AsyncLock _packageLock = new();
 
         /// <summary>
         /// Install a Linux package
@@ -267,7 +280,7 @@ namespace DuetPluginService.Commands
 
             using (await _packageLock.LockAsync(Program.CancellationToken))
             {
-                ProcessStartInfo startInfo = new ProcessStartInfo
+                ProcessStartInfo startInfo = new()
                 {
                     FileName = Settings.InstallPackageCommand,
                     Arguments = Settings.InstallPackageArguments.Replace("{package}", package)
@@ -282,53 +295,6 @@ namespace DuetPluginService.Commands
                 if (process.ExitCode != 0)
                 {
                     throw new ArgumentException($"Failed to install package {package}, package manager exited with code {process.ExitCode}");
-                }
-            }
-        }
-
-        /// <summary>
-        /// Copy an entire directory
-        /// </summary>
-        /// <param name="sourceDirName">Source directory</param>
-        /// <param name="destDirName">Destination directory</param>
-        /// <param name="copySubDirs">True if sub directories may be copied</param>
-        /// <remarks>
-        /// Copied from https://docs.microsoft.com/de-de/dotnet/standard/io/how-to-copy-directories
-        /// </remarks>
-        private static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
-        {
-            // Get the subdirectories for the specified directory.
-            DirectoryInfo dir = new DirectoryInfo(sourceDirName);
-
-            if (!dir.Exists)
-            {
-                throw new DirectoryNotFoundException(
-                    "Source directory does not exist or could not be found: "
-                    + sourceDirName);
-            }
-
-            DirectoryInfo[] dirs = dir.GetDirectories();
-            // If the destination directory doesn't exist, create it.
-            if (!Directory.Exists(destDirName))
-            {
-                Directory.CreateDirectory(destDirName);
-            }
-
-            // Get the files in the directory and copy them to the new location.
-            FileInfo[] files = dir.GetFiles();
-            foreach (FileInfo file in files)
-            {
-                string temppath = Path.Combine(destDirName, file.Name);
-                file.CopyTo(temppath, false);
-            }
-
-            // If copying subdirectories, copy them and their contents to new location.
-            if (copySubDirs)
-            {
-                foreach (DirectoryInfo subdir in dirs)
-                {
-                    string temppath = Path.Combine(destDirName, subdir.Name);
-                    DirectoryCopy(subdir.FullName, temppath, copySubDirs);
                 }
             }
         }

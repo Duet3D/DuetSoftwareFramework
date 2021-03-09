@@ -33,7 +33,7 @@ namespace DuetControlServer.Commands
                 }
 
                 // Create a new session
-                UserSession newSession = new UserSession();
+                UserSession newSession = new();
                 Model.Provider.Get.UserSessions.Add(newSession);
 
                 newSession.AccessLevel = AccessLevel;

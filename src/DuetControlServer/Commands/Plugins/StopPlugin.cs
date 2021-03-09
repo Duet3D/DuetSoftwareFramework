@@ -23,41 +23,35 @@ namespace DuetControlServer.Commands
                 throw new NotSupportedException("Plugin support has been disabled");
             }
 
-            bool pluginFound = false, stopPlugin = false, asRoot = false;
+            bool stopPlugin = false, asRoot = false;
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                foreach (Plugin item in Model.Provider.Get.Plugins)
+                if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin plugin))
                 {
-                    if (item.Name == Plugin)
+                    if (plugin.Pid > 0)
                     {
-                        pluginFound = true;
-                        if (item.Pid > 0)
+                        // Make sure no other running plugin depends on it
+                        if (!StoppingAll)
                         {
-                            // Make sure no other running plugin depends on it
-                            if (!StoppingAll)
+                            foreach (Plugin other in Model.Provider.Get.Plugins.Values)
                             {
-                                foreach (Plugin other in Model.Provider.Get.Plugins)
+                                if (other.Id != Plugin && other.Pid > 0 && other.SbcPluginDependencies.Contains(Plugin))
                                 {
-                                    if (other.Name != Plugin && other.Pid > 0 && other.SbcPluginDependencies.Contains(Plugin))
-                                    {
-                                        throw new ArgumentException($"Cannot stop plugin because plugin {other.Name} depends on it");
-                                    }
+                                    throw new ArgumentException($"Cannot stop plugin because plugin {other.Id} depends on it");
                                 }
                             }
-
-                            // Stop the plugin
-                            item.Pid = 0;
-                            stopPlugin = true;
-                            asRoot = item.SbcPermissions.HasFlag(SbcPermissions.SuperUser);
                         }
-                        return;
+
+                        // Stop the plugin
+                        plugin.Pid = 0;
+                        stopPlugin = true;
+                        asRoot = plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser);
                     }
                 }
-            }
-
-            if (!pluginFound)
-            {
-                throw new ArgumentException($"Plugin {Plugin} not found");
+                else
+                {
+                    throw new ArgumentException($"Plugin {Plugin} not found");
+                }
             }
 
             if (stopPlugin)

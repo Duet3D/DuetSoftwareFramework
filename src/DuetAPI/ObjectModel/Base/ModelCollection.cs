@@ -16,7 +16,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of types that are derived from this class
         /// </summary>
-        private static readonly ConcurrentDictionary<Type, Type> _derivedTypes = new ConcurrentDictionary<Type, Type>();
+        private static readonly ConcurrentDictionary<Type, Type> _derivedTypes = new();
 
         /// <summary>
         /// Check if the given type is derived from a <see cref="ModelCollection{T}"/> and return the corresponding item type
@@ -50,7 +50,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         protected override void ClearItems()
         {
-            List<T> removed = new List<T>(this);
+            List<T> removed = new(this);
             base.ClearItems();
             base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
         }
@@ -74,7 +74,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            ModelCollection<T> clone = new ModelCollection<T>();
+            ModelCollection<T> clone = new();
             foreach (T item in this)
             {
                 if (item is ICloneable cloneableItem)

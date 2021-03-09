@@ -31,14 +31,14 @@ namespace DuetControlServer.Commands
             // Start all plugins
             if (File.Exists(Settings.PluginsFilename))
             {
-                using FileStream fileStream = new FileStream(Settings.PluginsFilename, FileMode.Open, FileAccess.Read);
-                using StreamReader reader = new StreamReader(fileStream);
+                using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Open, FileAccess.Read);
+                using StreamReader reader = new(fileStream);
                 while (!reader.EndOfStream)
                 {
                     string pluginName = await reader.ReadLineAsync();
                     try
                     {
-                        StartPlugin startCommand = new StartPlugin() { Plugin = pluginName };
+                        StartPlugin startCommand = new() { Plugin = pluginName };
                         await startCommand.Execute();
                     }
                     catch (Exception e)
@@ -59,7 +59,7 @@ namespace DuetControlServer.Commands
             string dsfConfigFile = await FilePath.ToPhysicalAsync(FilePath.DsfConfigFile, FileDirectory.System);
             if (File.Exists(dsfConfigFile))
             {
-                Code dsfConfigCode = new Code()
+                Code dsfConfigCode = new()
                 {
                     Channel = DuetAPI.CodeChannel.SBC,
                     Type = DuetAPI.Commands.CodeType.MCode,

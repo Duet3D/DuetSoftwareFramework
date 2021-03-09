@@ -17,7 +17,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Cached dictionary of derived types vs JSON property names vs property descriptors
         /// </summary>
-        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
+        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = new();
 
         /// <summary>
         /// Get the cached JSON properties of this type

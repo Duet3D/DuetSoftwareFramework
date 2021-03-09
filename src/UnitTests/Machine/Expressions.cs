@@ -15,7 +15,7 @@ namespace UnitTests.Machine
             Assert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G92 Z{{3 + 3} + (volumes[0].freeSpace - 4)"));
             Assert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G92 Z{{3 + 3 + (move.axes[0].userPosition - 4)"));
 
-            DuetControlServer.Commands.Code code = new DuetControlServer.Commands.Code("G1 Z{move.axes[2].userPosition - 3}");
+            DuetControlServer.Commands.Code code = new("G1 Z{move.axes[2].userPosition - 3}");
             Assert.IsFalse(DuetControlServer.Model.Expressions.ContainsLinuxFields(code));
 
             code = new DuetControlServer.Commands.Code("echo {{3 + 3} + (volumes[0].freeSpace - 4)}");
@@ -44,7 +44,7 @@ namespace UnitTests.Machine
             DuetControlServer.Model.Provider.Get.Volumes.Clear();
             DuetControlServer.Model.Provider.Get.Volumes.Add(new DuetAPI.ObjectModel.Volume { FreeSpace = 12345 });
 
-            DuetControlServer.Commands.Code code = new DuetControlServer.Commands.Code("echo volumes[0].freeSpace");
+            DuetControlServer.Commands.Code code = new("echo volumes[0].freeSpace");
             object result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("12345", result);
 

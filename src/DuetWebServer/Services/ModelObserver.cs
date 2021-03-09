@@ -32,12 +32,12 @@ namespace DuetWebServer.Services
         /// <summary>
         /// Dictionary of registered third-party paths vs third-party HTTP endpoints
         /// </summary>
-        public static readonly Dictionary<string, HttpEndpoint> Endpoints = new Dictionary<string, HttpEndpoint>();
+        public static readonly Dictionary<string, HttpEndpoint> Endpoints = new();
 
         /// <summary>
         /// Dictionary holding the current user sessions in the form IP vs Id
         /// </summary>
-        public static readonly Dictionary<string, int> UserSessions = new Dictionary<string, int>();
+        public static readonly Dictionary<string, int> UserSessions = new();
 
         /// <summary>
         /// Path to the web directory
@@ -85,7 +85,7 @@ namespace DuetWebServer.Services
 
                 if (!CorsPolicy.Origins.Any(origin =>
                     {
-                        Regex corsRegex = new Regex('^' + Regex.Escape(origin).Replace("\\*", ".*").Replace("\\?", ".") + '$', RegexOptions.IgnoreCase);
+                        Regex corsRegex = new('^' + Regex.Escape(origin).Replace("\\*", ".*").Replace("\\?", ".") + '$', RegexOptions.IgnoreCase);
                         return corsRegex.IsMatch(httpContext.Request.Headers[CorsConstants.Origin]);
                     }))
                 {
@@ -110,7 +110,7 @@ namespace DuetWebServer.Services
         /// <summary>
         /// Cancellation token source that is triggered when the service is supposed to shut down
         /// </summary>
-        private readonly CancellationTokenSource _stopRequest = new CancellationTokenSource();
+        private readonly CancellationTokenSource _stopRequest = new();
 
         /// <summary>
         /// Constructor of this service class
@@ -172,8 +172,8 @@ namespace DuetWebServer.Services
                     try
                     {
                         // Establish connections to DCS
-                        using SubscribeConnection subscribeConnection = new SubscribeConnection();
-                        using CommandConnection commandConnection = new CommandConnection();
+                        using SubscribeConnection subscribeConnection = new();
+                        using CommandConnection commandConnection = new();
                         await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, new string[] {
                             "directories/www",
                             "httpEndpoints/**",

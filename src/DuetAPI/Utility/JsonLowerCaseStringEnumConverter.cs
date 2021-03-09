@@ -31,8 +31,8 @@ namespace DuetAPI.Utility
         /// <summary>
         /// Inner converter for char to enum conversions
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        private class JsonLowerCaseStringEnumConverterInner<T> : JsonConverter<T> where T : Enum
+        /// <typeparam name="T">Enum type</typeparam>
+        private sealed class JsonLowerCaseStringEnumConverterInner<T> : JsonConverter<T> where T : Enum
         {
             /// <summary>
             /// Checks if the type can be converted

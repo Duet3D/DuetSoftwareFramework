@@ -113,7 +113,7 @@
 			get => _calibrated;
 			set => SetPropertyValue(ref _calibrated, value);
 		}
-		private LaserFilamentMonitorCalibrated _calibrated = new LaserFilamentMonitorCalibrated();
+		private LaserFilamentMonitorCalibrated _calibrated = new();
 
 		/// <summary>
 		/// Configured properties of this filament monitor

@@ -3,6 +3,7 @@ using DuetControlServer.Model;
 using NUnit.Framework;
 using System;
 using System.Collections;
+using System.Text.Json;
 
 namespace UnitTests.Machine
 {
@@ -44,7 +45,7 @@ namespace UnitTests.Machine
 
             // Nested item property
             TestContext.Out.WriteLine("Adding new item");
-            Board mainBoard = new Board();
+            Board mainBoard = new();
             Provider.Get.Boards.Add(mainBoard);
 
             // Reset
@@ -83,7 +84,7 @@ namespace UnitTests.Machine
 
             // Replaceable model object
             TestContext.Out.WriteLine("Assign MessageBox");
-            MessageBox messageBox = new MessageBox
+            MessageBox messageBox = new()
             {
                 Message = "Test",
                 Mode = MessageBoxMode.OkCancel,
@@ -146,7 +147,7 @@ namespace UnitTests.Machine
             DuetControlServer.Model.Observer.OnPropertyPathChanged += onPropertyChanged;
 
             // job.build[]
-            Build newBuild = new Build();
+            Build newBuild = new();
             Provider.Get.Job.Build = newBuild;
 
             Assert.AreEqual(1, numEvents);
@@ -156,6 +157,95 @@ namespace UnitTests.Machine
 
             // End
             DuetControlServer.Model.Observer.OnPropertyPathChanged -= onPropertyChanged;
+        }
+
+        [Test]
+        public void ObserveModelDictionary()
+        {
+            int numEvents = 0;
+            object[] recordedPath = null;
+            PropertyChangeType recordedChangeType = PropertyChangeType.Property;
+            object recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
+            {
+                numEvents++;
+                recordedChangeType = changeType;
+                recordedPath = path;
+                recordedValue = value;
+
+                TestContext.Out.WriteLine("Change {0} ({1}) -> {2}", string.Join('.', path), changeType, value);
+            }
+            DuetControlServer.Model.Observer.OnPropertyPathChanged += onPropertyChanged;
+
+            // plugins
+            Plugin plugin = new() { Id = "Foobar" };
+            Provider.Get.Plugins.Add("Foobar", plugin);
+
+            Assert.AreEqual(1, numEvents);
+            Assert.AreEqual(new object[] { "plugins", "Foobar" }, recordedPath);
+            Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
+            Assert.AreSame(plugin, recordedValue);
+
+            // plugins.foobar.data.test
+            JsonElement customData = new();
+            plugin.Data["test"] = customData;
+
+            Assert.AreEqual(2, numEvents);
+            Assert.AreEqual(new object[] { "plugins", "Foobar", "data", "test" }, recordedPath);
+            Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
+            Assert.AreEqual(customData, recordedValue);
+
+            // End
+            DuetControlServer.Model.Observer.OnPropertyPathChanged -= onPropertyChanged;
+            Provider.Get.Plugins.Clear();
+        }
+
+        [Test]
+        public void ObserveModelObjectDictionary()
+        {
+            int numEvents = 0;
+            object[] recordedPath = null;
+            PropertyChangeType recordedChangeType = PropertyChangeType.Property;
+            object recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
+            {
+                numEvents++;
+                recordedChangeType = changeType;
+                recordedPath = path;
+                recordedValue = value;
+
+                TestContext.Out.WriteLine("Change {0} ({1}) -> {2}", string.Join('.', path), changeType, value);
+            }
+            DuetControlServer.Model.Observer.OnPropertyPathChanged += onPropertyChanged;
+
+            // plugins
+            Plugin plugin = new() { Id = "Foobar" };
+            Provider.Get.Plugins.Add("Foobar", plugin);
+
+            Assert.AreEqual(1, numEvents);
+            Assert.AreEqual(new object[] { "plugins", "Foobar" }, recordedPath);
+            Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
+            Assert.AreSame(plugin, recordedValue);
+
+            // plugins.foobar.pid
+            plugin.Pid = 1234;
+
+            Assert.AreEqual(2, numEvents);
+            Assert.AreEqual(new object[] { "plugins", "Foobar", "pid" }, recordedPath);
+            Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
+            Assert.AreEqual(plugin.Pid, recordedValue);
+
+            // delete item
+            Provider.Get.Plugins.Remove("Foobar");
+
+            Assert.AreEqual(3, numEvents);
+            Assert.AreEqual(new object[] { "plugins", "Foobar" }, recordedPath);
+            Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
+            Assert.IsNull(recordedValue);
+
+            // End
+            DuetControlServer.Model.Observer.OnPropertyPathChanged -= onPropertyChanged;
+            Provider.Get.Plugins.Clear();
         }
 
         [Test]
@@ -178,7 +268,7 @@ namespace UnitTests.Machine
 
             // Add first item
             TestContext.Out.WriteLine("Add item");
-            Heater newHeater = new Heater();
+            Heater newHeater = new();
             Provider.Get.Heat.Heaters.Add(newHeater);
 
             Assert.AreEqual(1, numEvents);
@@ -318,7 +408,7 @@ namespace UnitTests.Machine
 
             // Add item
             TestContext.Out.WriteLine("Add item");
-            Message msg = new Message(MessageType.Success, "TEST");
+            Message msg = new(MessageType.Success, "TEST");
             Provider.Get.Messages.Add(msg);
 
             Assert.AreEqual(1, numEvents);

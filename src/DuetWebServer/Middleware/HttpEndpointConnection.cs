@@ -18,7 +18,7 @@ namespace DuetWebServer.Middleware
         /// <summary>
         /// Socket used for inter-process communication
         /// </summary>
-        private readonly Socket _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        private readonly Socket _unixSocket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 
         /// <summary>
         /// Establishes a connection to the given UNIX socket file
@@ -27,7 +27,7 @@ namespace DuetWebServer.Middleware
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         public void Connect(string socketPath)
         {
-            UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(socketPath);
+            UnixDomainSocketEndPoint endPoint = new(socketPath);
             _unixSocket.Connect(endPoint);
         }
 

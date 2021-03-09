@@ -25,11 +25,11 @@ namespace DuetControlServer.Commands
             // Fill in plugin name if required
             if (string.IsNullOrEmpty(Plugin))
             {
-                Plugin = Connection.PluginName;
+                Plugin = Connection.PluginId;
             }
 
-            // Check permissions
-            if (Connection.PluginName != Plugin && !Connection.Permissions.HasFlag(SbcPermissions.ManagePlugins))
+            // Check permissions. Only the owner or plugins with the ManagePlugins permission may modify plugin data
+            if (Connection.PluginId != Plugin && !Connection.Permissions.HasFlag(SbcPermissions.ManagePlugins))
             {
                 throw new UnauthorizedAccessException("Insufficient permissions");
             }
@@ -37,18 +37,19 @@ namespace DuetControlServer.Commands
             // Update the plugin data
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                foreach (Plugin plugin in Model.Provider.Get.Plugins)
+                if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin plugin))
                 {
-                    if (plugin.Name == Plugin)
+                    if (!Model.Provider.Get.Plugins[Plugin].Data.ContainsKey(Key))
                     {
-                        plugin.SbcData[Key] = Value.Clone();        // create a clone so that the instance can be used even after the JsonDocument is disposed
-                        return;
+                        throw new ArgumentException($"Key {Key} not found in the plugin data");
                     }
+                    Model.Provider.Get.Plugins[Plugin].Data[Key] = Value.Clone();        // create a clone so that the instance can be used even after the JsonDocument is disposed
+                }
+                else
+                {
+                    throw new ArgumentException($"Plugin {Plugin} not found");
                 }
             }
-
-            // Plugin not found
-            throw new ArgumentException($"Plugin {Plugin} not found");
         }
 
         /// <summary>

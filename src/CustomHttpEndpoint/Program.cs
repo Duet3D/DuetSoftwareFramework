@@ -97,7 +97,7 @@ namespace CustomHttpEndpoint
             }
 
             // Create a new Command connection
-            CommandConnection connection = new CommandConnection();
+            CommandConnection connection = new();
             await connection.Connect(socketPath);
 
             // Create a new HTTP GET endpoint and keep listening for new requests
@@ -197,7 +197,7 @@ namespace CustomHttpEndpoint
 
                 try
                 {
-                    using CancellationTokenSource cts = new CancellationTokenSource();
+                    using CancellationTokenSource cts = new();
                     Task webSocketTask = ReadFromWebSocket(requestConnection, cts.Token);
                     Task consoleTask = ReadFromConsole(requestConnection, cts.Token);
 
@@ -268,7 +268,7 @@ namespace CustomHttpEndpoint
                     }
 
                     // Prepare the process start info
-                    using Process process = new Process
+                    using Process process = new()
                     {
                         StartInfo = new ProcessStartInfo
                         {

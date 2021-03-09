@@ -22,16 +22,15 @@ namespace DuetControlServer.Commands
 
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                foreach (Plugin item in Model.Provider.Get.Plugins)
+                if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin plugin))
                 {
-                    if (item.Name == Plugin)
-                    {
-                        item.Pid = Pid;
-                        return;
-                    }
+                    plugin.Pid = Pid;
+                }
+                else
+                {
+                    throw new ArgumentException($"Plugin {Plugin} not found");
                 }
             }
-            throw new ArgumentException($"Plugin {Plugin} not found");
         }
     }
 }

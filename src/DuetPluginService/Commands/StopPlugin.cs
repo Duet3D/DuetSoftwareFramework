@@ -25,7 +25,7 @@ namespace DuetPluginService.Commands
                 Plugin plugin = null;
                 foreach (Plugin item in Plugins.List)
                 {
-                    if (item.Name == Plugin)
+                    if (item.Id == Plugin)
                     {
                         plugin = item;
                         break;
@@ -43,11 +43,11 @@ namespace DuetPluginService.Commands
                 }
 
                 // Try to stop the process
-                if (Plugins.Processes.TryGetValue(plugin.Name, out Process process) && !process.HasExited)
+                if (Plugins.Processes.TryGetValue(plugin.Id, out Process process) && !process.HasExited)
                 {
                     // Ask process to terminate and wait a moment
                     LinuxApi.Commands.Kill(process.Id, LinuxApi.Signal.SIGTERM);
-                    using (CancellationTokenSource timeoutCts = new CancellationTokenSource(Settings.StopTimeout))
+                    using (CancellationTokenSource timeoutCts = new(Settings.StopTimeout))
                     {
                         // Do not link this CTS to the main CTS because we may be shutting down at this point
                         await process.WaitForExitAsync(timeoutCts.Token);

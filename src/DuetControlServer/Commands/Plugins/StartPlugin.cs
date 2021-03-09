@@ -15,7 +15,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Lock to be used when a plugin is started to avoid race conditions
         /// </summary>
-        private static readonly AsyncLock _startLock = new AsyncLock();
+        private static readonly AsyncLock _startLock = new();
 
         /// <summary>
         /// Start a plugin
@@ -38,83 +38,76 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Start a plugin (as a dependency)
         /// </summary>
-        /// <param name="name">Plugin name</param>
+        /// <param name="id">Plugin identifier</param>
         /// <param name="requiredBy">Plugin that requires this plugin</param>
         /// <returns>Whether the plugin could be found</returns>
-        private async Task Start(string name, string requiredBy = null)
+        private async Task Start(string id, string requiredBy = null)
         {
-            bool pluginFound = false, rootPlugin = false;
-            List<string> dependencies = new List<string>();
+            bool rootPlugin = false;
+            List<string> dependencies = new();
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                foreach (Plugin item in Model.Provider.Get.Plugins)
+                if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin plugin))
                 {
-                    if (item.Name == Plugin)
+                    // Don't do anything if the plugin is already running or if it cannot be started on the SBC
+                    if (plugin.Pid > 0 || string.IsNullOrEmpty(plugin.SbcExecutable))
                     {
-                        // Don't do anything if the plugin is already running or if it cannot be started on the SBC
-                        if (item.Pid > 0 || string.IsNullOrEmpty(item.SbcExecutable))
-                        {
-                            return;
-                        }
-
-                        // Start plugin dependencies
-                        foreach (string dependency in item.SbcPluginDependencies)
-                        {
-                            if (dependency != requiredBy)
-                            {
-                                dependencies.Add(dependency);
-                            }
-                        }
-
-                        // Check the required DSF version
-                        if (!PluginManifest.CheckVersion(Program.Version, item.SbcDsfVersion))
-                        {
-                            throw new ArgumentException($"Incompatible DSF version (requires {item.SbcDsfVersion}, got {Program.Version})");
-                        }
-
-                        // Check the required RRF version
-                        if (!string.IsNullOrEmpty(item.RrfVersion))
-                        {
-                            if (Model.Provider.Get.Boards.Count > 0)
-                            {
-                                string rrfVersion = Model.Provider.Get.Boards[0].FirmwareVersion;
-                                if (!PluginManifest.CheckVersion(rrfVersion, item.RrfVersion))
-                                {
-                                    throw new ArgumentException($"Incompatible RRF version (requires {item.RrfVersion}, got {rrfVersion})");
-                                }
-                            }
-                            else
-                            {
-                                throw new ArgumentException("Failed to check RRF version");
-                            }
-                        }
-
-                        // Got a plugin
-                        pluginFound = true;
-                        rootPlugin = item.SbcPermissions.HasFlag(SbcPermissions.SuperUser);
-                        break;
+                        return;
                     }
-                }
-            }
 
-            // Make sure the requested plugin exists
-            if (!pluginFound)
-            {
-                if (requiredBy == null)
-                {
-                    throw new ArgumentException($"Plugin {Plugin} not found");
+                    // Start plugin dependencies
+                    foreach (string dependency in plugin.SbcPluginDependencies)
+                    {
+                        if (dependency != requiredBy)
+                        {
+                            dependencies.Add(dependency);
+                        }
+                    }
+
+                    // Check the required DSF version
+                    if (!PluginManifest.CheckVersion(Program.Version, plugin.SbcDsfVersion))
+                    {
+                        throw new ArgumentException($"Incompatible DSF version (requires {plugin.SbcDsfVersion}, got {Program.Version})");
+                    }
+
+                    // Check the required RRF version
+                    if (!string.IsNullOrEmpty(plugin.RrfVersion))
+                    {
+                        if (Model.Provider.Get.Boards.Count > 0)
+                        {
+                            string rrfVersion = Model.Provider.Get.Boards[0].FirmwareVersion;
+                            if (!PluginManifest.CheckVersion(rrfVersion, plugin.RrfVersion))
+                            {
+                                throw new ArgumentException($"Incompatible RRF version (requires {plugin.RrfVersion}, got {rrfVersion})");
+                            }
+                        }
+                        else
+                        {
+                            throw new ArgumentException("Failed to check RRF version");
+                        }
+                    }
+
+                    // Got a plugin
+                    rootPlugin = plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser);
                 }
-                throw new ArgumentException($"Dependency {name} of plugin {requiredBy} not found");
+                else
+                {
+                    if (requiredBy == null)
+                    {
+                        throw new ArgumentException($"Plugin {Plugin} not found");
+                    }
+                    throw new ArgumentException($"Dependency {id} of plugin {requiredBy} not found");
+                }
             }
 
             // Start all the dependencies first
             foreach (string dependency in dependencies)
             {
-                await Start(dependency, name);
+                await Start(dependency, id);
             }
 
             // Start the plugin via the plugin service. This will update the PID too
-            StartPlugin startCommand = new StartPlugin() { Plugin = name };
+            StartPlugin startCommand = new() { Plugin = id };
             await IPC.Processors.PluginService.PerformCommand(startCommand, rootPlugin);
         }
     }

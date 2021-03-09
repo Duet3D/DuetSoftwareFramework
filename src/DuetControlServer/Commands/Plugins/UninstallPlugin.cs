@@ -42,37 +42,28 @@ namespace DuetControlServer.Commands
             }
 
             // Find the plugin to uninstall
-            Plugin plugin = null;
+            Plugin plugin;
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                foreach (Plugin item in Model.Provider.Get.Plugins)
+                if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out plugin))
                 {
-                    if (item.Name == Plugin)
+                    // Make sure no other plugin depends on this plugin
+                    foreach (Plugin item in Model.Provider.Get.Plugins.Values)
                     {
-                        plugin = item;
-                        break;
+                        if (item.Id != Plugin && (item.DwcDependencies.Contains(Plugin) || item.SbcPluginDependencies.Contains(Plugin)))
+                        {
+                            throw new ArgumentException($"Cannot uninstall plugin because plugin {item.Id} depends on it");
+                        }
                     }
                 }
-            }
-            if (plugin == null)
-            {
-                throw new ArgumentException($"Plugin {Plugin} not found");
-            }
-
-            // Make sure no other plugin depends on this plugin
-            using (await Model.Provider.AccessReadOnlyAsync())
-            {
-                foreach (Plugin item in Model.Provider.Get.Plugins)
+                else
                 {
-                    if (item.Name != Plugin && (item.DwcDependencies.Contains(Plugin) || item.SbcPluginDependencies.Contains(Plugin)))
-                    {
-                        throw new ArgumentException($"Cannot uninstall plugin because plugin {item.Name} depends on it");
-                    }
+                    throw new ArgumentException($"Plugin {Plugin} not found");
                 }
             }
 
             // Stop it if required
-            StopPlugin stopCommand = new StopPlugin
+            StopPlugin stopCommand = new()
             {
                 Plugin = Plugin
             };
@@ -83,10 +74,10 @@ namespace DuetControlServer.Commands
             await IPC.Processors.PluginService.PerformCommand(this, false);
             await IPC.Processors.PluginService.PerformCommand(this, true);
 
-            // Remove it from the object model
+            // Reset it in the object model
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                Model.Provider.Get.Plugins.Remove(plugin);
+                Model.Provider.Get.Plugins.Remove(Plugin);
             }
         }
     }

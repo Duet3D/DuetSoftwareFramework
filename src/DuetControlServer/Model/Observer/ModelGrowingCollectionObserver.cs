@@ -8,7 +8,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Dictionary of growing collections vs change handlers
         /// </summary>
-        private static readonly Dictionary<object, NotifyCollectionChangedEventHandler> _growingCollectionChangeHandlers = new Dictionary<object, NotifyCollectionChangedEventHandler>();
+        private static readonly Dictionary<object, NotifyCollectionChangedEventHandler> _growingCollectionChangeHandlers = new();
 
         /// <summary>
         /// Function to generate a growing collection change handler

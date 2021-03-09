@@ -48,7 +48,7 @@ namespace DuetAPI.ObjectModel
             get => _kinematics;
 			set => SetPropertyValue(ref _kinematics, value);
         }
-        private Kinematics _kinematics = new Kinematics();
+        private Kinematics _kinematics = new();
 
         /// <summary>
         /// Maximum acceleration allowed while printing (in mm/s^2)
@@ -59,6 +59,11 @@ namespace DuetAPI.ObjectModel
 			set => SetPropertyValue(ref _printingAcceleration, value);
         }
         private float _printingAcceleration = 10000F;
+
+        /// <summary>
+        /// List of move queue items (DDA rings)
+        /// </summary>
+        public ModelCollection<MoveQueueItem> Queue { get; } = new ModelCollection<MoveQueueItem>();
 
         /// <summary>
         /// Parameters for input shaping

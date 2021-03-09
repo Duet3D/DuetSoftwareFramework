@@ -49,7 +49,7 @@ namespace ModelObserver
             }
 
             // Connect to DCS
-            using SubscribeConnection connection = new SubscribeConnection();
+            using SubscribeConnection connection = new();
 #pragma warning disable CS0612 // Type or member is obsolete
             await connection.Connect(SubscriptionMode.Patch, filter, socketPath);
 #pragma warning restore CS0612 // Type or member is obsolete
@@ -86,14 +86,14 @@ namespace ModelObserver
         /// <returns>Indented text</returns>
         public static string GetIndentedJson(JsonDocument jsonDocument)
         {
-            using MemoryStream stream = new MemoryStream();
-            using (Utf8JsonWriter writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+            using MemoryStream stream = new();
+            using (Utf8JsonWriter writer = new(stream, new JsonWriterOptions { Indented = true }))
             {
                 jsonDocument.WriteTo(writer);
             }
             stream.Seek(0, SeekOrigin.Begin);
 
-            using StreamReader reader = new StreamReader(stream);
+            using StreamReader reader = new(stream);
             return reader.ReadToEnd();
         }
     }

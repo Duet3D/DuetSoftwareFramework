@@ -35,12 +35,12 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Lock for this class
         /// </summary>
-        private static readonly AsyncLock _lock = new AsyncLock();
+        private static readonly AsyncLock _lock = new();
 
         /// <summary>
         /// Mapping of extruder vs filament
         /// </summary>
-        private static readonly Dictionary<int, string> _filamentMapping = new Dictionary<int, string>();
+        private static readonly Dictionary<int, string> _filamentMapping = new();
 
         /// <summary>
         /// Initialize this class
@@ -57,8 +57,8 @@ namespace DuetControlServer.Utility
             string filename = await FilePath.ToPhysicalAsync(FilamentsCsvFile, FileDirectory.System);
             if (File.Exists(filename))
             {
-                using FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read);
-                using StreamReader reader = new StreamReader(fs);
+                using FileStream fs = new(filename, FileMode.Open, FileAccess.Read);
+                using StreamReader reader = new(fs);
 
                 string line = reader.ReadLine();
                 if (line != null && line.StartsWith(FilamentsCsvHeader))
@@ -177,8 +177,8 @@ namespace DuetControlServer.Utility
             using (await _lock.LockAsync(Program.CancellationToken))
             {
                 string filename = await FilePath.ToPhysicalAsync(FilamentsCsvFile, FileDirectory.System);
-                using FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.Write);
-                using StreamWriter writer = new StreamWriter(fs);
+                using FileStream fs = new(filename, FileMode.Create, FileAccess.Write);
+                using StreamWriter writer = new(fs);
 
                 writer.WriteLine($"{FilamentsCsvHeader} generated at {DateTime.Now:yyyy-MM-dd HH:mm}");
                 writer.WriteLine("extruder,filament");

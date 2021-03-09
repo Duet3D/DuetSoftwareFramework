@@ -34,7 +34,7 @@ namespace DuetPluginService
         /// <summary>
         /// Global cancellation source that is triggered when the program is supposed to terminate
         /// </summary>
-        public static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
+        public static readonly CancellationTokenSource CancelSource = new();
 
         /// <summary>
         /// Global cancellation token that is triggered when the program is supposed to terminate
@@ -44,7 +44,7 @@ namespace DuetPluginService
         /// <summary>
         /// Cancellation token to be called when the program has been terminated
         /// </summary>
-        private static readonly ManualResetEvent _programTerminated = new ManualResetEvent(false);
+        private static readonly ManualResetEvent _programTerminated = new(false);
 
         /// <summary>
         /// Entry point of the program
@@ -111,7 +111,7 @@ namespace DuetPluginService
             {
                 try
                 {
-                    using Socket socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
+                    using Socket socket = new(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
                     socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
                     socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
                 }
@@ -128,16 +128,16 @@ namespace DuetPluginService
                 {
                     try
                     {
-                        using FileStream manifestStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
                         using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-                        Plugin plugin = new Plugin();
+                        Plugin plugin = new();
                         plugin.UpdateFromJson(manifestJson.RootElement);
                         plugin.Pid = -1;
                         using (await Plugins.LockAsync())
                         {
                             Plugins.List.Add(plugin);
                         }
-                        _logger.Info("Plugin {0} loaded", plugin.Name);
+                        _logger.Info("Plugin {0} loaded", plugin.Id);
                     }
                     catch (Exception e)
                     {
@@ -163,14 +163,14 @@ namespace DuetPluginService
 
             // Stop the plugins again
             _logger.Info("Stopping plugins...");
-            List<Task> stopTasks = new List<Task>();
+            List<Task> stopTasks = new();
             using (await Plugins.LockAsync())
             {
                 foreach (Plugin plugin in Plugins.List)
                 {
-                    if (Plugins.Processes.ContainsKey(plugin.Name))
+                    if (Plugins.Processes.ContainsKey(plugin.Id))
                     {
-                        StopPlugin stopCommand = new StopPlugin() { Plugin = plugin.Name };
+                        StopPlugin stopCommand = new() { Plugin = plugin.Id };
                         stopTasks.Add(Task.Run(stopCommand.Execute));
                     }
                 }

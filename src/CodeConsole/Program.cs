@@ -41,7 +41,7 @@ namespace CodeConsole
             }
 
             // Create a new connection and connect to DuetControlServer
-            using CommandConnection connection = new CommandConnection();
+            using CommandConnection connection = new();
             await connection.Connect(socketPath);
 
             // Check if this is an interactive session

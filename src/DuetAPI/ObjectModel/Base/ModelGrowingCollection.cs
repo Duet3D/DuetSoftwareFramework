@@ -14,7 +14,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of types that are derived from this class
         /// </summary>
-        private static readonly List<Type> _derivedTypes = new List<Type>();
+        private static readonly List<Type> _derivedTypes = new();
 
         /// <summary>
         /// Check if the given type is derived from a <see cref="ModelCollection{T}"/>

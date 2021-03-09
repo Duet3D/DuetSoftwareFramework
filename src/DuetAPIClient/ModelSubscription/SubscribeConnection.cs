@@ -61,7 +61,7 @@ namespace DuetAPIClient
             Filter = filter;
             Filters.Clear();
 
-            SubscribeInitMessage initMessage = new SubscribeInitMessage { SubscriptionMode = mode, Filter = Filter };
+            SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filter = Filter };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -86,7 +86,7 @@ namespace DuetAPIClient
                 Filters.AddRange(filters);
             }
 
-            SubscribeInitMessage initMessage = new SubscribeInitMessage { SubscriptionMode = mode, Filters = Filters };
+            SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filters = Filters };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 

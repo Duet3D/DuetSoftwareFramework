@@ -45,7 +45,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="length">Length of the packet</param>
         public static void WritePacketHeader(Span<byte> to, Request request, ushort id, int length)
         {
-            PacketHeader header = new PacketHeader()
+            PacketHeader header = new()
             {
                 Request = (ushort)request,
                 Id = id,
@@ -67,7 +67,7 @@ namespace DuetControlServer.SPI.Serialization
             int bytesWritten = 0;
 
             // Write code header
-            CodeHeader header = new CodeHeader
+            CodeHeader header = new()
             {
                 Channel = code.Channel,
                 FilePosition = (uint)(code.FilePosition ?? 0xFFFFFFFF),
@@ -110,8 +110,8 @@ namespace DuetControlServer.SPI.Serialization
             {
                 // Write comment as an unprecedented parameter
                 string comment = (code.Comment ?? string.Empty).Trim();
-                int commentLength = Math.Min(comment.Length, Consts.MaxCommentLength - 1);
-                CodeParameter binaryParam = new CodeParameter
+                int commentLength = Math.Min(comment.Length, Consts.MaxCommentLength);
+                CodeParameter binaryParam = new()
                 {
                     Letter = (byte)'@',
                     IntValue = commentLength,
@@ -128,10 +128,10 @@ namespace DuetControlServer.SPI.Serialization
             else
             {
                 // Write code parameters
-                List<object> extraParameters = new List<object>();
+                List<object> extraParameters = new();
                 foreach (var parameter in code.Parameters)
                 {
-                    CodeParameter binaryParam = new CodeParameter
+                    CodeParameter binaryParam = new()
                     {
                         Letter = (byte)parameter.Letter
                     };
@@ -269,7 +269,7 @@ namespace DuetControlServer.SPI.Serialization
             Span<byte> unicodeFlags = Encoding.UTF8.GetBytes(flags);
 
             // Write header
-            GetObjectModelHeader request = new GetObjectModelHeader
+            GetObjectModelHeader request = new()
             {
                 KeyLength = (ushort)unicodeKey.Length,
                 FlagsLength = (ushort)unicodeFlags.Length
@@ -306,7 +306,7 @@ namespace DuetControlServer.SPI.Serialization
             }
 
             // First the header followed by the field path plus optional padding
-            SetObjectModelHeader request = new SetObjectModelHeader
+            SetObjectModelHeader request = new()
             {
                 FieldLength = (byte)unicodeField.Length
             };
@@ -426,17 +426,17 @@ namespace DuetControlServer.SPI.Serialization
             Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName);
             if (unicodeFilename.Length > 254)
             {
-                throw new ArgumentException("Value is too long", nameof(info.FileName));
+                throw new ArgumentException("Filename is too long", nameof(info));
             }
 
             Span<byte> unicodeGeneratedBy = Encoding.UTF8.GetBytes(info.GeneratedBy ?? string.Empty);
             if (unicodeGeneratedBy.Length > 254)
             {
-                throw new ArgumentException("Value is too long", nameof(info.GeneratedBy));
+                throw new ArgumentException("GeneratedBy is too long", nameof(info));
             }
 
             // Write header
-            PrintStartedHeader header = new PrintStartedHeader
+            PrintStartedHeader header = new()
             {
                 FilenameLength = (byte)unicodeFilename.Length,
                 GeneratedByLength = (byte)unicodeGeneratedBy.Length,
@@ -478,7 +478,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes written</returns>
         public static int WritePrintStopped(Span<byte> to, PrintStoppedReason reason)
         {
-            PrintStoppedHeader header = new PrintStoppedHeader
+            PrintStoppedHeader header = new()
             {
                 Reason = reason
             };
@@ -495,7 +495,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes written</returns>
         public static int WriteMacroCompleted(Span<byte> to, CodeChannel channel, bool error)
         {
-            MacroCompleteHeader header = new MacroCompleteHeader
+            MacroCompleteHeader header = new()
             {
                 Channel = channel,
                 Error = (byte)(error ? 1 : 0)
@@ -512,7 +512,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes written</returns>
         public static int WriteHeightMap(Span<byte> to, Heightmap map)
         {
-            HeightMapHeader header = new HeightMapHeader
+            HeightMapHeader header = new()
             {
                 XMin = map.XMin,
                 XMax = map.XMax,
@@ -543,7 +543,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <returns>Number of bytes written</returns>
         public static int WriteCodeChannel(Span<byte> to, CodeChannel channel)
         {
-            CodeChannelHeader header = new CodeChannelHeader
+            CodeChannelHeader header = new()
             {
                 Channel = channel
             };
@@ -567,7 +567,7 @@ namespace DuetControlServer.SPI.Serialization
             }
 
             // Write header
-            AssignFilamentHeader header = new AssignFilamentHeader
+            AssignFilamentHeader header = new()
             {
                 Extruder = extruder,
                 FilamentLength = (uint)unicodeFilamentName.Length
@@ -591,7 +591,7 @@ namespace DuetControlServer.SPI.Serialization
         public static int WriteFileChunk(Span<byte> to, Span<byte> data, long fileLength)
         {
             // Write header
-            FileChunkHeader header = new FileChunkHeader
+            FileChunkHeader header = new()
             {
                 DataLength = (data != null) ? data.Length : -1,
                 FileLength = (uint)fileLength
@@ -620,7 +620,7 @@ namespace DuetControlServer.SPI.Serialization
             Span<byte> unicodeExpression = Encoding.UTF8.GetBytes(expression);
 
             // Write header
-            CodeChannelHeader header = new CodeChannelHeader
+            CodeChannelHeader header = new()
             {
                 Channel = channel
             };
@@ -644,7 +644,7 @@ namespace DuetControlServer.SPI.Serialization
             Span<byte> unicodeData = Encoding.UTF8.GetBytes(data);
 
             // Write header
-            StringHeader request = new StringHeader
+            StringHeader request = new()
             {
                 Length = (ushort)unicodeData.Length
             };
@@ -669,7 +669,7 @@ namespace DuetControlServer.SPI.Serialization
             Span<byte> unicodeMessage = Encoding.UTF8.GetBytes(message);
 
             // Write header
-            MessageHeader request = new MessageHeader
+            MessageHeader request = new()
             {
                 MessageType = type,
                 Length = (ushort)unicodeMessage.Length

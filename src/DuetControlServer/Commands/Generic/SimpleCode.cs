@@ -42,13 +42,13 @@ namespace DuetControlServer.Commands
         /// <returns>Parsed G/M/T-codes</returns>
         public async IAsyncEnumerable<Code> ParseAsync()
         {
-            using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(Code));
-            using StreamReader reader = new StreamReader(stream);
-            CodeParserBuffer buffer = new CodeParserBuffer((int)stream.Length, Code.Contains('\n'));
+            using MemoryStream stream = new(Encoding.UTF8.GetBytes(Code));
+            using StreamReader reader = new(stream);
+            CodeParserBuffer buffer = new((int)stream.Length, Code.Contains('\n'));
 
             while (buffer.GetPosition(reader) < stream.Length)
             {
-                Code code = new Code()
+                Code code = new()
                 {
                     Channel = Channel,
                     Connection = Connection
@@ -78,7 +78,7 @@ namespace DuetControlServer.Commands
             }
 
             // Parse the input string
-            List<Code> codes = new List<Code>(), priorityCodes = new List<Code>();
+            List<Code> codes = new(), priorityCodes = new();
             try
             {
                 await foreach (Code code in ParseAsync())
@@ -108,7 +108,7 @@ namespace DuetControlServer.Commands
                 return (new CodeResult(MessageType.Error, e.Message)).ToString();
             }
 
-            CodeResult result = new CodeResult();
+            CodeResult result = new();
             try
             {
                 // Execute priority codes first

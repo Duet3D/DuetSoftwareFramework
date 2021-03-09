@@ -31,7 +31,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Lock around the print class
         /// </summary>
-        private static readonly AsyncLock _lock = new AsyncLock();
+        private static readonly AsyncLock _lock = new();
 
         /// <summary>
         /// Lock this class
@@ -48,12 +48,12 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Condition to trigger when the print is supposed to resume
         /// </summary>
-        private static readonly AsyncConditionVariable _resume = new AsyncConditionVariable(_lock);
+        private static readonly AsyncConditionVariable _resume = new(_lock);
 
         /// <summary>
         /// Condition to trigger when the print has finished
         /// </summary>
-        private static readonly AsyncConditionVariable _finished = new AsyncConditionVariable(_lock);
+        private static readonly AsyncConditionVariable _finished = new(_lock);
 
         /// <summary>
         /// Name of the job file
@@ -168,7 +168,7 @@ namespace DuetControlServer.FileExecution
         {
             // Analyze and open the file
             ParsedFileInfo info = await InfoParser.Parse(fileName);
-            CodeFile file = new CodeFile(fileName, CodeChannel.File);
+            CodeFile file = new(fileName, CodeChannel.File);
 
             // A file being printed may start another file print
             if (IsFileSelected)
@@ -202,7 +202,7 @@ namespace DuetControlServer.FileExecution
         {
             // Use a code pool for print files. This is possible for regular codes but should be avoided
             // for macro codes, because those codes may be referenced even after they finish
-            Queue<Code> codePool = new Queue<Code>();
+            Queue<Code> codePool = new();
             for (int i = 0; i < Math.Max(Settings.BufferedPrintCodes, 1); i++)
             {
                 codePool.Enqueue(new Code());
@@ -230,8 +230,8 @@ namespace DuetControlServer.FileExecution
                     SPI.Interface.SetPrintStarted();
 
                     // Process the file
-                    Queue<Code> codes = new Queue<Code>();
-                    Queue<Task<CodeResult>> codeTasks = new Queue<Task<CodeResult>>();
+                    Queue<Code> codes = new();
+                    Queue<Task<CodeResult>> codeTasks = new();
                     long nextFilePosition = 0;
                     do
                     {

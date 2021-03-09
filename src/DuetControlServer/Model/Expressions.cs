@@ -22,7 +22,7 @@ namespace DuetControlServer.Model
         /// <returns>Expression items</returns>
         private static IEnumerable<string> SplitExpression(string expression)
         {
-            StringBuilder parsedExpression = new StringBuilder();
+            StringBuilder parsedExpression = new();
             bool inQuotes = false;
             char lastC = '\0';
             foreach (char c in expression)
@@ -104,8 +104,8 @@ namespace DuetControlServer.Model
         /// <exception cref="CodeParserException">Failed to parse expression</exception>
         private static bool ContainsLinuxFields(string expression, Code code)
         {
-            Stack<char> lastBracketTypes = new Stack<char>();
-            Stack<StringBuilder> parsedExpressions = new Stack<StringBuilder>();
+            Stack<char> lastBracketTypes = new();
+            Stack<StringBuilder> parsedExpressions = new();
             parsedExpressions.Push(new StringBuilder());
 
             bool inQuotes = false;
@@ -262,7 +262,7 @@ namespace DuetControlServer.Model
             {
                 if (code.Keyword == KeywordType.Echo)
                 {
-                    StringBuilder builder = new StringBuilder();
+                    StringBuilder builder = new();
                     foreach (string expression in SplitExpression(code.KeywordArgument))
                     {
                         try
@@ -330,8 +330,8 @@ namespace DuetControlServer.Model
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
         private static async Task<string> EvaluateExpression(Code code, string expression, bool onlyLinuxFields, bool encodeResult)
         {
-            Stack<char> lastBracketTypes = new Stack<char>();
-            Stack<StringBuilder> parsedExpressions = new Stack<StringBuilder>();
+            Stack<char> lastBracketTypes = new();
+            Stack<StringBuilder> parsedExpressions = new();
             parsedExpressions.Push(new StringBuilder());
 
             bool inQuotes = false;
@@ -437,7 +437,7 @@ namespace DuetControlServer.Model
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
         private static async Task<string> EvaluateSubExpression(Code code, string expression, bool onlyLinuxFields, bool encodeResult)
         {
-            StringBuilder result = new StringBuilder(), partialExpression = new StringBuilder();
+            StringBuilder result = new(), partialExpression = new();
             bool inQuotes = false;
 
             char lastC = '\0';

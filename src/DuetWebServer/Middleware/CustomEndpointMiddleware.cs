@@ -69,7 +69,7 @@ namespace DuetWebServer.Middleware
             if (httpEndpoint != null)
             {
                 // Try to connect to the given UNIX socket
-                using HttpEndpointConnection endpointConnection = new HttpEndpointConnection();
+                using HttpEndpointConnection endpointConnection = new();
                 endpointConnection.Connect(httpEndpoint.UnixSocket);
 
                 // Try to find a user session
@@ -90,7 +90,7 @@ namespace DuetWebServer.Middleware
                     {
                         using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
-                        using CancellationTokenSource cts = new CancellationTokenSource();
+                        using CancellationTokenSource cts = new();
                         Task webSocketTask = ReadFromWebSocket(webSocket, endpointConnection, sessionId, cts.Token);
                         Task unixSocketTask = ReadFromUnixSocket(webSocket, endpointConnection, cts.Token);
 
@@ -140,7 +140,7 @@ namespace DuetWebServer.Middleware
                 }
 
                 // Forward it to the UNIX socket connection
-                ReceivedHttpRequest receivedHttpRequest = new ReceivedHttpRequest
+                ReceivedHttpRequest receivedHttpRequest = new()
                 {
                     Body = Encoding.UTF8.GetString(rxBuffer, 0, result.Count),
                     SessionId = sessionId
@@ -208,7 +208,7 @@ namespace DuetWebServer.Middleware
             {
                 // Write to a temporary file
                 string filename = Path.GetTempFileName();
-                using (FileStream fileStream = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.Read))
+                using (FileStream fileStream = new(filename, FileMode.Create, FileAccess.Write, FileShare.Read))
                 {
                     await context.Request.Body.CopyToAsync(fileStream);
                 }
@@ -224,12 +224,12 @@ namespace DuetWebServer.Middleware
             else
             {
                 // Read the body content
-                using StreamReader reader = new StreamReader(context.Request.Body);
+                using StreamReader reader = new(context.Request.Body);
                 body = await reader.ReadToEndAsync();
             }
 
             // Prepare the HTTP request notification
-            ReceivedHttpRequest receivedHttpRequest = new ReceivedHttpRequest
+            ReceivedHttpRequest receivedHttpRequest = new()
             {
                 Body = body,
                 ContentType = context.Request.ContentType,
@@ -256,7 +256,7 @@ namespace DuetWebServer.Middleware
             {
                 context.Response.ContentType = "application/octet-stream";
 
-                using FileStream fs = new FileStream(httpResponse.Response, FileMode.Open, FileAccess.Read);
+                using FileStream fs = new(httpResponse.Response, FileMode.Open, FileAccess.Read);
                 await fs.CopyToAsync(context.Response.Body);
             }
             else

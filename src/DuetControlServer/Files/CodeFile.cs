@@ -23,7 +23,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Internal lock
         /// </summary>
-        private readonly AsyncLock _lock = new AsyncLock();
+        private readonly AsyncLock _lock = new();
 
         /// <summary>
         /// Lock this instance
@@ -50,7 +50,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Internal buffer used for reading from files
         /// </summary>
-        private readonly CodeParserBuffer _parserBuffer = new CodeParserBuffer(Settings.FileBufferSize, true);
+        private readonly CodeParserBuffer _parserBuffer = new(Settings.FileBufferSize, true);
 
         /// <summary>
         /// File path to the file being executed
@@ -65,7 +65,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Internal stack for conditional G-code execution
         /// </summary>
-        private readonly Stack<CodeBlock> _codeBlocks = new Stack<CodeBlock>();
+        private readonly Stack<CodeBlock> _codeBlocks = new();
 
         /// <summary>
         /// Last code block
@@ -75,7 +75,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Internal queue of codes read used to determine when pending codes have been processed
         /// </summary>
-        private readonly Queue<Code> _pendingCodes = new Queue<Code>();
+        private readonly Queue<Code> _pendingCodes = new();
 
         /// <summary>
         /// Gets or sets the current file position in bytes

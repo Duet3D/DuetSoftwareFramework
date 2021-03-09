@@ -17,7 +17,7 @@ namespace DuetPluginService.IPC
         /// <summary>
         /// IPC connection to DCS
         /// </summary>
-        private static readonly PluginServiceConnection _connection = new PluginServiceConnection();
+        private static readonly PluginServiceConnection _connection = new();
 
         /// <summary>
         /// Connect to DCS after the first start

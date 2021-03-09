@@ -39,12 +39,13 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// API version of the client
         /// </summary>
+        /// <seealso cref="DuetAPI.Connection.Defaults.ProtocolVersion"/>
         public int ApiVersion { get; set; }
 
         /// <summary>
         /// Name of the connected plugin
         /// </summary>
-        public string PluginName { get; private set; }
+        public string PluginId { get; private set; }
 
         /// <summary>
         /// Permissions of this connection
@@ -91,11 +92,11 @@ namespace DuetControlServer.IPC
             // Assign permissions based on previously launched plugins
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                foreach (Plugin plugin in Model.Provider.Get.Plugins)
+                foreach (Plugin plugin in Model.Provider.Get.Plugins.Values)
                 {
                     if (plugin.Pid == pid)
                     {
-                        PluginName = plugin.Name;
+                        PluginId = plugin.Id;
                         Permissions |= plugin.SbcPermissions;
                         return true;
                     }
@@ -251,7 +252,7 @@ namespace DuetControlServer.IPC
                     using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, Program.CancellationToken);
                     Logger.Trace(() => $"Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
-                    using StreamReader reader = new StreamReader(jsonStream);
+                    using StreamReader reader = new(jsonStream);
                     return await reader.ReadToEndAsync();
                 }
                 catch (JsonException e)
@@ -266,7 +267,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Command name mapping for API version 8 or lower
         /// </summary>
-        private static readonly Dictionary<string, string> _legacyCommandMapping = new Dictionary<string, string>
+        private static readonly Dictionary<string, string> _legacyCommandMapping = new()
         {
             { "getmachinemodel", "GetObjectModel" },
             { "lockmachinemodel", "LockObjectModel" },
@@ -349,11 +350,11 @@ namespace DuetControlServer.IPC
                 {
                     e = ae.InnerException;
                 }
-                ErrorResponse errorResponse = new ErrorResponse(e);
+                ErrorResponse errorResponse = new(e);
                 return Send(errorResponse);
             }
 
-            Response<object> response = new Response<object>(obj);
+            Response<object> response = new(obj);
             return Send(response);
         }
         

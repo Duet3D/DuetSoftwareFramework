@@ -70,10 +70,10 @@ namespace PluginManager
                     Console.WriteLine("list: List plugin status (default)");
                     Console.WriteLine("list-data: List plugin data");
                     Console.WriteLine("install <zipfile>: Install new ZIP bundle");
-                    Console.WriteLine("start <name>: Start a plugin");
-                    Console.WriteLine("set-data <plugin>:<key>=<value>: Set plugin data (JSON or text)");
-                    Console.WriteLine("stop <name>: Stop a plugin");
-                    Console.WriteLine("uninstall <name>: Uninstall a plugin");
+                    Console.WriteLine("start <id>: Start a plugin");
+                    Console.WriteLine("set-data <id>:<key>=<value>: Set plugin data (JSON or text)");
+                    Console.WriteLine("stop <id>: Stop a plugin");
+                    Console.WriteLine("uninstall <id>: Uninstall a plugin");
                     Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
                     Console.WriteLine("-h, --help: Display this help text");
                     return;
@@ -82,7 +82,7 @@ namespace PluginManager
             }
 
             // Create a new connection and connect to DuetControlServer
-            using CommandConnection connection = new CommandConnection();
+            using CommandConnection connection = new();
             await connection.Connect(socketPath);
 
             // Check what to do
@@ -93,15 +93,18 @@ namespace PluginManager
                     model = await connection.GetObjectModel();
                     if (model.Plugins.Count > 0)
                     {
-                        Console.WriteLine("{0,-24} {1,-16} {2,-24} {3,-24} {4,-12}", "Plugin", "Version", "Author", "License", "Status");
-                        foreach (Plugin item in model.Plugins)
+                        Console.WriteLine("{0,-24} {1,-16} {2,-16} {3,-24} {4,-24} {5,-12}", "Plugin", "Id", "Version", "Author", "License", "Status");
+                        foreach (Plugin item in model.Plugins.Values)
                         {
-                            string pluginState = "n/a";
-                            if (!string.IsNullOrEmpty(item.SbcExecutable))
+                            if (item != null)
                             {
-                                pluginState = (item.Pid > 0) ? "Started" : "Stopped";
+                                string pluginState = "n/a";
+                                if (!string.IsNullOrEmpty(item.SbcExecutable))
+                                {
+                                    pluginState = (item.Pid > 0) ? "Started" : "Stopped";
+                                }
+                                Console.WriteLine("{0,-24} {1,-16} {2,-16} {3,-24} {4,-24} {5,-12}", item.Name, item.Id, item.Version, item.Author, item.License, pluginState);
                             }
-                            Console.WriteLine("{0,-24} {1,-16} {2,-24} {3,-24} {4,-12}", item.Name, item.Version, item.Author, item.License, pluginState);
                         }
                     }
                     else
@@ -114,10 +117,10 @@ namespace PluginManager
                     model = await connection.GetObjectModel();
                     if (model.Plugins.Count > 0)
                     {
-                        foreach (Plugin item in model.Plugins)
+                        foreach (Plugin item in model.Plugins.Values)
                         {
-                            Console.WriteLine("Plugin {0}:", item.Name);
-                            foreach (var kv in item.SbcData)
+                            Console.WriteLine("Plugin {0}:", item.Id);
+                            foreach (var kv in item.Data)
                             {
                                 Console.WriteLine("{0} = {1}", kv.Key, JsonSerializer.Serialize(kv.Value, DuetAPI.Utility.JsonHelper.DefaultJsonOptions));
                             }

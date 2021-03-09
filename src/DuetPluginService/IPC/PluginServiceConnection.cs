@@ -46,7 +46,7 @@ namespace DuetPluginService
         /// <exception cref="SocketException">Init message could not be processed</exception>
         public Task Connect(string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
-            PluginServiceInitMessage initMessage = new PluginServiceInitMessage();
+            PluginServiceInitMessage initMessage = new();
             return Connect(initMessage, socketPath, cancellationToken);
         }
         
@@ -103,11 +103,11 @@ namespace DuetPluginService
                 {
                     e = ae.InnerException;
                 }
-                ErrorResponse errorResponse = new ErrorResponse(e);
+                ErrorResponse errorResponse = new(e);
                 return Send(errorResponse);
             }
 
-            Response<object> response = new Response<object>(obj);
+            Response<object> response = new(obj);
             return Send(response);
         }
 

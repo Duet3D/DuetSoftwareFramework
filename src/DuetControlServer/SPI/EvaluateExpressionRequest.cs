@@ -38,7 +38,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Internal TCS for the task
         /// </summary>
-        private readonly TaskCompletionSource<object> _tcs = new TaskCompletionSource<object>();
+        private readonly TaskCompletionSource<object> _tcs = new();
 
         /// <summary>
         /// Task that completes when the request has been fulfilled

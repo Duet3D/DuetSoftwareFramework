@@ -96,7 +96,7 @@ namespace DuetAPIClient
         {
             try
             {
-                SendHttpResponse httpResponse = new SendHttpResponse
+                SendHttpResponse httpResponse = new()
                 {
                     StatusCode = statusCode,
                     Response = response,

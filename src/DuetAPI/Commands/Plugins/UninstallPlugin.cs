@@ -9,7 +9,7 @@ namespace DuetAPI.Commands
     public class UninstallPlugin : Command
     {
         /// <summary>
-        /// Name of the plugin
+        /// Identifier of the plugin
         /// </summary>
         public string Plugin { get; set; }
     }

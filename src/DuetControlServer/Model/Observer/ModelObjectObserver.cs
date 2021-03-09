@@ -29,7 +29,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Dictionary of model objects vs property change handlers
         /// </summary>
-        private static readonly Dictionary<ModelObject, PropertyChangedEventHandler> _propertyChangedHandlers = new Dictionary<ModelObject, PropertyChangedEventHandler>();
+        private static readonly Dictionary<ModelObject, PropertyChangedEventHandler> _propertyChangedHandlers = new();
 
         /// <summary>
         /// Function to generate a property change handler
@@ -89,9 +89,16 @@ namespace DuetControlServer.Model
                         SubscribeToModelCollection(value, itemType, propertyName, path);
                     }
                 }
-                else if (property.PropertyType.IsGenericType && typeof(ModelDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
+                else if (property.PropertyType.IsGenericType)
                 {
-                    SubscribeToModelDictionary(value, AddToPath(path, propertyName));
+                    if (typeof(ModelDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
+                    {
+                        SubscribeToModelDictionary(value, AddToPath(path, propertyName));
+                    }
+                    if (typeof(ModelObjectDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
+                    {
+                        SubscribeToModelObjectDictionary(value, AddToPath(path, propertyName));
+                    }
                 }
             }
 
@@ -150,9 +157,16 @@ namespace DuetControlServer.Model
                         UnsubscribeFromModelCollection(value, property.PropertyType.GetGenericArguments()[0]);
                     }
                 }
-                else if (property.PropertyType.IsGenericType && typeof(ModelDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
+                else if (property.PropertyType.IsGenericType)
                 {
-                    UnsubscribeFromModelDictionary(value);
+                    if (typeof(ModelDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
+                    {
+                        UnsubscribeFromModelDictionary(value);
+                    }
+                    if (typeof(ModelObjectDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
+                    {
+                        UnsubscribeFromModelObjectDictionary(value);
+                    }
                 }
             }
 

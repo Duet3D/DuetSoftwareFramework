@@ -14,6 +14,15 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                if (Enabled == Model.PeriodicUpdater.IsProtocolEnabled(Protocol))
+                {
+                    // Cannot enable/disable a single protocol multiple times
+                    return;
+                }
+            }
+
             if (Enabled)
             {
                 Model.PeriodicUpdater.ProtocolEnabled(Protocol);

@@ -87,11 +87,11 @@ namespace DuetWebServer.Controllers
             string socketPath = _configuration.GetValue("SocketPath", Defaults.FullSocketPath);
 
             // 1. Authentification. This will require an extra API command
-            using CommandConnection commandConnection = new CommandConnection();
+            using CommandConnection commandConnection = new();
             // TODO
 
             // 2. Connect to DCS
-            using SubscribeConnection subscribeConnection = new SubscribeConnection();
+            using SubscribeConnection subscribeConnection = new();
             try
             {
                 // Subscribe to object model updates
@@ -126,7 +126,7 @@ namespace DuetWebServer.Controllers
             _logger.LogInformation("WebSocket connected from {0}:{1}", ipAddress, port);
 
             // 4. Register this client and keep it up-to-date
-            using CancellationTokenSource cts = new CancellationTokenSource();
+            using CancellationTokenSource cts = new();
             int sessionId = -1;
             try
             {
@@ -141,7 +141,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 // 4c. Deal with this connection in full-duplex mode
-                AsyncAutoResetEvent dataAcknowledged = new AsyncAutoResetEvent();
+                AsyncAutoResetEvent dataAcknowledged = new();
                 Task rxTask = ReadFromClient(webSocket, dataAcknowledged, cts.Token);
                 Task txTask = WriteToClient(webSocket, subscribeConnection, dataAcknowledged, cts.Token);
 

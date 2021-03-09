@@ -12,7 +12,7 @@ namespace UnitTests.Utility
         {
             string path = Path.Combine(Directory.GetCurrentDirectory(), "../../../Utility/heightmap.csv");
 
-            Heightmap map = new Heightmap();
+            Heightmap map = new();
             map.Load(path).Wait();
 
             Assert.AreEqual(30, map.XMin, 0.0001);
@@ -40,11 +40,11 @@ namespace UnitTests.Utility
             string tempFile = Path.GetTempFileName();
             TestContext.Out.WriteLine(tempFile);
 
-            Heightmap tempMap = new Heightmap();
+            Heightmap tempMap = new();
             tempMap.Load(path).Wait();
             tempMap.Save(tempFile).Wait();
 
-            Heightmap map = new Heightmap();
+            Heightmap map = new();
             map.Load(tempFile).Wait();
 
             Assert.AreEqual(30, map.XMin, 0.0001);

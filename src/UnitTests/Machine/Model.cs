@@ -15,7 +15,7 @@ namespace UnitTests.Machine
             string jsonText = System.IO.File.ReadAllText(modelPath);
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
-            ObjectModel model = new ObjectModel();
+            ObjectModel model = new();
 
             model.UpdateFromJson(parsedJson.RootElement);
 
@@ -31,7 +31,7 @@ namespace UnitTests.Machine
         [Test]
         public void Patch()
         {
-            ObjectModel modelToUpdate = new ObjectModel();
+            ObjectModel modelToUpdate = new();
             modelToUpdate.Boards.Add(new Board
             {
                 FirmwareName = "Foobar"
@@ -52,7 +52,7 @@ namespace UnitTests.Machine
             });
             modelToUpdate.State.Status = MachineStatus.Busy;
 
-            ObjectModel updatedModel = new ObjectModel();
+            ObjectModel updatedModel = new();
             updatedModel.Boards.Add(new Board
             {
                 FirmwareName = "Yum"
@@ -105,10 +105,10 @@ namespace UnitTests.Machine
             string jsonText = System.IO.File.ReadAllText(modelPath);
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
-            ObjectModel model = new ObjectModel();
+            ObjectModel model = new();
             model.UpdateFromJson(parsedJson.RootElement);
 
-            ObjectModel newModel = new ObjectModel();
+            ObjectModel newModel = new();
             newModel.Assign(model);
 
             string serializedModel = newModel.ToString();
@@ -122,7 +122,7 @@ namespace UnitTests.Machine
             string jsonText = System.IO.File.ReadAllText(modelPath);
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
-            ObjectModel model = new ObjectModel();
+            ObjectModel model = new();
             model.UpdateFromJson(parsedJson.RootElement);
 
             ObjectModel newModel = (ObjectModel)model.Clone();
@@ -138,7 +138,7 @@ namespace UnitTests.Machine
             string jsonText = System.IO.File.ReadAllText(modelPath);
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
-            ObjectModel model = new ObjectModel();
+            ObjectModel model = new();
             bool success = model.UpdateFromFirmwareModel("state", parsedJson.RootElement);
 
             Assert.IsTrue(success);

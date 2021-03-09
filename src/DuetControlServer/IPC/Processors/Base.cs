@@ -16,7 +16,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// List of supported command types
         /// </summary>
-        private static readonly List<Type> SupportedCommands = new List<Type>();
+        private static readonly List<Type> SupportedCommands = new();
 
         /// <summary>
         /// Add a list of supported commands

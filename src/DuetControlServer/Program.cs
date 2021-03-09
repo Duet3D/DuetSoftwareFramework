@@ -33,7 +33,7 @@ namespace DuetControlServer
         /// <summary>
         /// Cancellation source that is triggered when the program is supposed to terminate
         /// </summary>
-        private static readonly CancellationTokenSource _cancelSource = new CancellationTokenSource();
+        private static readonly CancellationTokenSource _cancelSource = new();
 
         /// <summary>
         /// Global cancellation token that is triggered when the program is supposed to terminate
@@ -43,7 +43,7 @@ namespace DuetControlServer
         /// <summary>
         /// Cancellation token to be called when the program has been terminated
         /// </summary>
-        private static readonly CancellationTokenSource _programTerminated = new CancellationTokenSource();
+        private static readonly CancellationTokenSource _programTerminated = new();
 
         /// <summary>
         /// Entry point of the program
@@ -54,7 +54,7 @@ namespace DuetControlServer
             // Performing an update implies a reduced log level
             if (args.Contains("-u") && !args.Contains("--update"))
             {
-                List<string> newArgs = new List<string>() { "--log-level", "error" };
+                List<string> newArgs = new() { "--log-level", "error" };
                 newArgs.AddRange(args);
                 args = newArgs.ToArray();
             }
@@ -139,7 +139,7 @@ namespace DuetControlServer
             }
 
             // Start main tasks in the background
-            Dictionary<Task, string> mainTasks = new Dictionary<Task, string>
+            Dictionary<Task, string> mainTasks = new()
             {
                 { Task.Factory.StartNew(Model.Updater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Update" },
                 { Task.Factory.StartNew(SPI.Interface.Run, TaskCreationOptions.LongRunning).Unwrap(), "SPI" },
@@ -173,7 +173,7 @@ namespace DuetControlServer
             {
                 try
                 {
-                    using Socket socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
+                    using Socket socket = new(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
                     socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
                     socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
                 }
@@ -194,14 +194,14 @@ namespace DuetControlServer
                         {
                             try
                             {
-                                using FileStream manifestStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
                                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-                                Plugin plugin = new Plugin();
+                                Plugin plugin = new();
                                 plugin.UpdateFromJson(manifestJson.RootElement);
                                 plugin.Pid = -1;
                                 using (await Model.Provider.AccessReadWriteAsync())
                                 {
-                                    Model.Provider.Get.Plugins.Add(plugin);
+                                    Model.Provider.Get.Plugins.Add(plugin.Id, plugin);
                                 }
                             }
                             catch (Exception e)
@@ -231,7 +231,7 @@ namespace DuetControlServer
 
                     if (!CancellationToken.IsCancellationRequested)
                     {
-                        using (Macro macro = new Macro(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger))
+                        using (Macro macro = new(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger))
                         {
                             await macro.FinishAsync();
                         }
@@ -261,7 +261,7 @@ namespace DuetControlServer
                 }
 
                 // Stop the plugins again
-                StopPlugins stopCommand = new StopPlugins();
+                StopPlugins stopCommand = new();
                 await stopCommand.Execute();
 
                 // Shut down DCS
@@ -304,7 +304,7 @@ namespace DuetControlServer
         /// <returns>True if another instance is running</returns>
         private static async Task<bool> CheckForAnotherInstance()
         {
-            using DuetAPIClient.CommandConnection connection = new DuetAPIClient.CommandConnection();
+            using DuetAPIClient.CommandConnection connection = new();
             try
             {
                 await connection.Connect(Settings.FullSocketPath);
@@ -354,7 +354,7 @@ namespace DuetControlServer
             // Shut down the plugins again
             try
             {
-                StopPlugins stopCommand = new StopPlugins();
+                StopPlugins stopCommand = new();
                 await stopCommand.Execute();
             }
             catch (Exception e)

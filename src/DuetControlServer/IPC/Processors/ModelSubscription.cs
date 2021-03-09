@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -37,7 +38,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// List of active subscribers
         /// </summary>
-        private static readonly List<ModelSubscription> _subscriptions = new List<ModelSubscription>();
+        private static readonly List<ModelSubscription> _subscriptions = new();
 
         /// <summary>
         /// True if any subscribers are connected
@@ -67,7 +68,12 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Dictionary of updated fields (in Patch mode)
         /// </summary>
-        private readonly Dictionary<string, object> _patch = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _patch = new();
+
+        /// <summary>
+        /// Memory stream holding the JSON patch in UTF-8 format
+        /// </summary>
+        private readonly MemoryStream _patchStream = new();
         
         /// <summary>
         /// Constructor of the subscription processor
@@ -124,13 +130,16 @@ namespace DuetControlServer.IPC.Processors
                     }
                     else
                     {
-                        Dictionary<string, object> patchModel = new Dictionary<string, object>();
+                        Dictionary<string, object> patchModel = new();
                         foreach (object[] filter in _filters)
                         {
                             Dictionary<string, object> partialModel = Filter.GetFiltered(filter);
                             Filter.MergeFiltered(patchModel, partialModel);
                         }
-                        jsonData = JsonSerializer.SerializeToUtf8Bytes(patchModel, JsonHelper.DefaultJsonOptions);
+
+                        _patchStream.SetLength(0);
+                        SerializeJsonChanges(patchModel);
+                        jsonData = _patchStream.ToArray();
                     }
                 }
 
@@ -181,8 +190,10 @@ namespace DuetControlServer.IPC.Processors
                         {
                             if (_patch.Count > 0)
                             {
-                                jsonData = JsonSerializer.SerializeToUtf8Bytes(_patch, JsonHelper.DefaultJsonOptions);
+                                _patchStream.SetLength(0);
+                                SerializeJsonChanges(_patch);
                                 _patch.Clear();
+                                jsonData = _patchStream.ToArray();
                             }
                         }
                     }
@@ -278,7 +289,7 @@ namespace DuetControlServer.IPC.Processors
                     }
                     else
                     {
-                        Dictionary<string, object> newNode = new Dictionary<string, object>();
+                        Dictionary<string, object> newNode = new();
                         currentDictionary.Add(pathString, newNode);
                         currentDictionary = newNode;
                     }
@@ -386,6 +397,12 @@ namespace DuetControlServer.IPC.Processors
                             ItemPathNode pathNode = (ItemPathNode)path[^1];
                             if (node is not List<object> objectCollectionList)
                             {
+                                if (pathNode.Name.Equals(nameof(ObjectModel.Job.Layers)) && Connection.ApiVersion < 11)
+                                {
+                                    // Don't record job.layers[] any more; the data type has changed and sending it to outdated clients would result in memory leaks
+                                    break;
+                                }
+
                                 Dictionary<string, object> objectCollectionNode = (Dictionary<string, object>)node;
                                 if (objectCollectionNode.TryGetValue(pathNode.Name, out object objectCollection))
                                 {
@@ -469,6 +486,34 @@ namespace DuetControlServer.IPC.Processors
                     Connection.Logger.Error(e, "Failed to record {0} = {1} ({2})", string.Join('/', path), value, changeType);
                 }
             }
+        }
+
+        /// <summary>
+        /// Write JSON changes to the JSON memory stream
+        /// </summary>
+        /// <param name="changes">Changes to write</param>
+        /// <returns></returns>
+        private void SerializeJsonChanges(Dictionary<string, object> changes)
+        {
+            using Utf8JsonWriter writer = new(_patchStream);
+            void WriteData(Dictionary<string, object> data)
+            {
+                writer.WriteStartObject();
+                foreach (var kv in data)
+                {
+                    writer.WritePropertyName(kv.Key);
+                    if (kv.Value is Dictionary<string, object> childNode)
+                    {
+                        WriteData(childNode);
+                    }
+                    else
+                    {
+                        JsonSerializer.Serialize(writer, kv.Value, JsonHelper.DefaultJsonOptions);
+                    }
+                }
+                writer.WriteEndObject();
+            }
+            WriteData(changes);
         }
     }
 }

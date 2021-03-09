@@ -24,12 +24,12 @@ namespace DuetControlServer.Model
         /// <summary>
         /// General-purpose lock for this class
         /// </summary>
-        private static readonly AsyncMonitor _monitor = new AsyncMonitor();
+        private static readonly AsyncMonitor _monitor = new();
 
         /// <summary>
         /// Dictionary of main keys vs last sequence numbers
         /// </summary>
-        private static readonly ConcurrentDictionary<string, int> _lastSeqs = new ConcurrentDictionary<string, int>();
+        private static readonly ConcurrentDictionary<string, int> _lastSeqs = new();
 
         /// <summary>
         /// Wait for the model to be fully updated from RepRapFirmware
@@ -248,7 +248,7 @@ namespace DuetControlServer.Model
             Console.Write("Updating firmware... ");
             try
             {
-                Commands.Code updateCode = new Commands.Code
+                Commands.Code updateCode = new()
                 {
                     Type = CodeType.MCode,
                     MajorNumber = 997
@@ -304,7 +304,7 @@ namespace DuetControlServer.Model
                 }
 
                 int printDuration = Provider.Get.Job.Duration.Value - Provider.Get.Job.WarmUpDuration.Value;
-                Layer layer = new Layer
+                Layer layer = new()
                 {
                     Duration = printDuration - lastDuration,
                     FractionPrinted = fractionPrinted - lastProgress,

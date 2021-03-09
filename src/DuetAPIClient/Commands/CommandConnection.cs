@@ -33,7 +33,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Init message could not be processed</exception>
         public Task Connect(string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
-            CommandInitMessage initMessage = new CommandInitMessage();
+            CommandInitMessage initMessage = new();
             return Connect(initMessage, socketPath, cancellationToken);
         }
 

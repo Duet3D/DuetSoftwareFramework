@@ -8,7 +8,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Dictionary of model objects vs property change handlers
         /// </summary>
-        private static readonly Dictionary<object, PropertyChangedEventHandler> _dictionaryChangedHandlers = new Dictionary<object, PropertyChangedEventHandler>();
+        private static readonly Dictionary<object, PropertyChangedEventHandler> _dictionaryChangedHandlers = new();
 
         /// <summary>
         /// Function to generate a property change handler for model dictionaries
@@ -42,11 +42,10 @@ namespace DuetControlServer.Model
         /// <param name="dictionary">Dictionary to unsubscribe from</param>
         private static void UnsubscribeFromModelDictionary(object dictionary)
         {
-            PropertyChangedEventHandler changeHandler = _dictionaryChangedHandlers[dictionary];
-            if (changeHandler != null)
+            if (_modelDictionaryChangedHandlers.TryGetValue(dictionary, out PropertyChangedEventHandler changeHandler))
             {
                 (dictionary as INotifyPropertyChanged).PropertyChanged -= changeHandler;
-                _dictionaryChangedHandlers.Remove(dictionary);
+                _modelDictionaryChangedHandlers.Remove(dictionary);
             }
         }
     }

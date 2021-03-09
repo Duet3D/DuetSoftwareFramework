@@ -14,7 +14,7 @@ namespace UnitTests.File
         public async Task ProcessConfig()
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes/config.g");
-            CodeFile macro = new CodeFile(filePath, DuetAPI.CodeChannel.Trigger);
+            CodeFile macro = new(filePath, DuetAPI.CodeChannel.Trigger);
 
             Code code;
             do

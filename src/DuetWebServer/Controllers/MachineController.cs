@@ -89,7 +89,7 @@ namespace DuetWebServer.Controllers
         public async Task<IActionResult> DoCode()
         {
             string code;
-            using (StreamReader reader = new StreamReader(Request.Body, Encoding.UTF8))
+            using (StreamReader reader = new(Request.Body, Encoding.UTF8))
             {
                 code = await reader.ReadToEndAsync();
             }
@@ -146,7 +146,7 @@ namespace DuetWebServer.Controllers
                     return NotFound(HttpUtility.UrlPathEncode(filename));
                 }
 
-                FileStream stream = new FileStream(resolvedPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                FileStream stream = new(resolvedPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 return File(stream, "application/octet-stream");
             }
             catch (Exception e)
@@ -195,7 +195,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Write file
-                using (FileStream stream = new FileStream(resolvedPath, FileMode.Create, FileAccess.Write))
+                using (FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.Write))
                 {
                     await Request.Body.CopyToAsync(stream);
                 }
@@ -502,7 +502,7 @@ namespace DuetWebServer.Controllers
                 try
                 {
                     // Write ZIP file
-                    using (FileStream stream = new FileStream(zipFile, FileMode.Create, FileAccess.Write, FileShare.None))
+                    using (FileStream stream = new(zipFile, FileMode.Create, FileAccess.Write, FileShare.None))
                     {
                         await Request.Body.CopyToAsync(stream);
                     }
@@ -551,7 +551,7 @@ namespace DuetWebServer.Controllers
             {
                 // Get the plugin name
                 string pluginName;
-                using (StreamReader reader = new StreamReader(HttpContext.Request.Body))
+                using (StreamReader reader = new(HttpContext.Request.Body))
                 {
                     pluginName = await reader.ReadToEndAsync();
                 }
@@ -621,21 +621,17 @@ namespace DuetWebServer.Controllers
 
                 using CommandConnection connection = await BuildConnection();
                 ObjectModel model = await connection.GetObjectModel();
-                foreach (Plugin plugin in model.Plugins)
+                if (model.Plugins.TryGetValue(instruction.plugin, out Plugin plugin))
                 {
-                    if (plugin.Name == instruction.plugin)
+                    if (!string.IsNullOrEmpty(plugin.SbcExecutable))
                     {
-                        if (!string.IsNullOrEmpty(plugin.SbcExecutable))
-                        {
-                            _logger.LogWarning("Tried to set plugin data for {0} but it has an SBC executable set");
-                            return Forbid();
-                        }
-
-                        await connection.SetPluginData(instruction.key, instruction.value, instruction.plugin);
-                        return NoContent();
+                        _logger.LogWarning("Tried to set plugin data for {0} but it has an SBC executable set");
+                        return Forbid();
                     }
-                }
 
+                    await connection.SetPluginData(instruction.key, instruction.value, instruction.plugin);
+                    return NoContent();
+                }
                 return NotFound();
             }
             catch (Exception e)
@@ -671,7 +667,7 @@ namespace DuetWebServer.Controllers
             {
                 // Get the plugin name
                 string pluginName;
-                using (StreamReader reader = new StreamReader(HttpContext.Request.Body))
+                using (StreamReader reader = new(HttpContext.Request.Body))
                 {
                     pluginName = await reader.ReadToEndAsync();
                 }
@@ -715,7 +711,7 @@ namespace DuetWebServer.Controllers
             {
                 // Get the plugin name
                 string pluginName;
-                using (StreamReader reader = new StreamReader(HttpContext.Request.Body))
+                using (StreamReader reader = new(HttpContext.Request.Body))
                 {
                     pluginName = await reader.ReadToEndAsync();
                 }
@@ -750,7 +746,7 @@ namespace DuetWebServer.Controllers
 
         private async Task<CommandConnection> BuildConnection()
         {
-            CommandConnection connection = new CommandConnection();
+            CommandConnection connection = new();
             await connection.Connect(_configuration.GetValue("SocketPath", Defaults.FullSocketPath));
             return connection;
         }

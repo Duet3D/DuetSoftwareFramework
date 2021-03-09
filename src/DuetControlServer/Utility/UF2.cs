@@ -44,7 +44,7 @@ namespace DuetControlServer.Utility
                 throw new IOException("UF2 file size must be a multiple of 512 bytes");
             }
 
-            MemoryStream result = new MemoryStream();
+            MemoryStream result = new();
 
             Memory<byte> blockBuffer = new byte[512];
             UF2BlockHeader block;

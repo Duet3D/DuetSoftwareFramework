@@ -16,7 +16,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Regular expressinon to extract name and index from a filter item
         /// </summary>
-        private static readonly Regex _indexRegex = new Regex(@"(.*)\[([\d,*]+)\]");
+        private static readonly Regex _indexRegex = new(@"(.*)\[([\d,*]+)\]");
 
         /// <summary>
         /// Convert delimited filter strings into an object array that can be used to traverse the object model
@@ -36,7 +36,7 @@ namespace DuetControlServer.Model
         /// <returns>Object array</returns>
         public static object[][] ConvertFilters(IEnumerable<string> filters)
         {
-            List<object[]> convertedFilters = new List<object[]>();
+            List<object[]> convertedFilters = new();
             foreach (string filter in filters)
             {
                 object[] convertedFilter = ConvertFilter(filter, false);
@@ -65,7 +65,7 @@ namespace DuetControlServer.Model
         /// <returns>Object array</returns>
         public static object[] ConvertFilter(string[] filter)
         {
-            List<object> filterItems = new List<object>();
+            List<object> filterItems = new();
             foreach (string filterItem in filter)
             {
                 Match match = _indexRegex.Match(filterItem);
@@ -182,7 +182,7 @@ namespace DuetControlServer.Model
             {
                 if (partialModel is ModelObject model)
                 {
-                    Dictionary<string, object> result = new Dictionary<string, object>();
+                    Dictionary<string, object> result = new();
                     foreach (KeyValuePair<string, PropertyInfo> property in model.JsonProperties)
                     {
                         if (propertyName == "*" || property.Key == propertyName)
@@ -229,7 +229,7 @@ namespace DuetControlServer.Model
                     }
 
                     // This is an object list, return either the filter results or dummy objects
-                    List<object> results = new List<object>(new object[list.Count]);
+                    List<object> results = new(new object[list.Count]);
                     for (int i = 0; i < list.Count; i++)
                     {
                         object item = list[i];

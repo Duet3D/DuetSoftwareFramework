@@ -86,12 +86,18 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Probe speed (in mm/s)
         /// </summary>
+        [JsonIgnore]
+        [Obsolete("Use Speeds[0] instead")]
         public float Speed
         {
-            get => _speed;
-			set => SetPropertyValue(ref _speed, value);
+            get => Speeds[0];
+            set => Speeds[0] = value;
         }
-        private float _speed = 2F;
+
+        /// <summary>
+        /// Fast and slow probing speeds (in mm/s)
+        /// </summary>
+        public ModelCollection<float> Speeds { get; } = new ModelCollection<float>() { 2F, 2F };
 
         /// <summary>
         /// First temperature coefficient

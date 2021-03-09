@@ -69,7 +69,7 @@ namespace DuetAPIClient
             Filters.Clear();
             PriortyCodes = false;
 
-            InterceptInitMessage initMessage = new InterceptInitMessage { InterceptionMode = mode };
+            InterceptInitMessage initMessage = new() { InterceptionMode = mode };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -106,7 +106,7 @@ namespace DuetAPIClient
             }
             PriortyCodes = priortyCodes;
 
-            InterceptInitMessage initMessage = new InterceptInitMessage { InterceptionMode = mode, Channels = Channels, Filters = Filters, PriortyCodes = priortyCodes };
+            InterceptInitMessage initMessage = new() { InterceptionMode = mode, Channels = Channels, Filters = Filters, PriortyCodes = priortyCodes };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 

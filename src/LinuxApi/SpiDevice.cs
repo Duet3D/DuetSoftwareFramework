@@ -37,7 +37,7 @@ namespace LinuxApi
                 3 => UnixSpiMode.SPI_MODE_3,
                 _ => throw new ArgumentException($"Transfer mode '{transferMode}' not regignized. Must be between 0 and 3."),
             };
-            IntPtr nativePtr = new IntPtr(&mode);
+            IntPtr nativePtr = new(&mode);
 
             int result = Interop.ioctl(_deviceFileDescriptor, (uint)SpiSettings.SPI_IOC_WR_MODE, nativePtr);
             if (result == -1)

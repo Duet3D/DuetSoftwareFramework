@@ -38,7 +38,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Actual UNIX socket instance
         /// </summary>
-        private readonly Socket _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        private readonly Socket _unixSocket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 
         /// <summary>
         /// Open a new UNIX socket on the given file path
@@ -63,7 +63,7 @@ namespace DuetAPIClient
             // Create a new UNIX socket and start listening
             try
             {
-                UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(socketPath);
+                UnixDomainSocketEndPoint endPoint = new(socketPath);
                 _unixSocket.Bind(endPoint);
                 _unixSocket.Listen(backlog);
                 AcceptConnections();
@@ -119,7 +119,7 @@ namespace DuetAPIClient
                 do
                 {
                     Socket socket = await _unixSocket.AcceptAsync();
-                    HttpEndpointConnection connection = new HttpEndpointConnection(socket, EndpointType == HttpEndpointType.WebSocket);
+                    HttpEndpointConnection connection = new(socket, EndpointType == HttpEndpointType.WebSocket);
 
                     if (OnEndpointRequestReceived != null)
                     {

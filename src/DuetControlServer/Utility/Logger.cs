@@ -26,7 +26,7 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Lock for the file
         /// </summary>
-        private static readonly AsyncLock _lock = new AsyncLock();
+        private static readonly AsyncLock _lock = new();
 
         /// <summary>
         /// Filestream of the log file

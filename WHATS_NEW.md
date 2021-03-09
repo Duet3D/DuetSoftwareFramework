@@ -1,6 +1,21 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.3-b2
+==============
+
+Compatible versions:
+- RepRapFirmware 3.3-b1
+- DuetWebControl 3.3-b1
+
+Changed behaviour:
+- Changed file format of the new plugin manifest
+- Layers code is no longer compatible with previous versions
+
+Bug fixes:
+- Updated regular expressions for various slicer formats
+- SBC permissions for third-party plugins were not properly enforced
+
 Version 3.3-b1
 ==============
 
