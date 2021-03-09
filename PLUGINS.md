@@ -1,7 +1,14 @@
 # DSF Plugins
 
-Starting from version 3.3, DSF will allow the usage of third-party plugins.
+Starting from version 3.3, DSF allows the installation and management of third-party plugins.
 They may contain files for execution on a SBC, in DWC, and/or configuration files for RepRapFirmware.
+
+## Plugin Service
+
+The main service that manages plugin installations and manages their execution is called DuetPluginService.
+This service is supposed to run as a regular user (`duetpluginservice.service`) and as root user (`duetpluginservice-root`).
+During the installation of third-party plugins it creates AppArmor security profiles and activates them for regular plugins.
+For Linux distributions that do not support AppArmor, security policy generation can be disabled by setting `DisableAppArmor` to `true` in `/opt/dsf/conf/plugins.json`.
 
 ## ZIP File Structure
 

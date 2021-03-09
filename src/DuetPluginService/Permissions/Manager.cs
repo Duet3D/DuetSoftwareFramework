@@ -13,13 +13,27 @@ namespace DuetPluginService.Permissions
         /// </summary>
         /// <param name="plugin">Plugin</param>
         /// <returns>Asynchronous task</returns>
-        public static Task InstallProfile(Plugin plugin) => AppArmor.InstallProfile(plugin);
+        public static Task InstallProfile(Plugin plugin)
+        {
+            if (Settings.DisableAppArmor)
+            {
+                return Task.CompletedTask;
+            }
+            return AppArmor.InstallProfile(plugin);
+        }
 
         /// <summary>
         /// Uninstall a security profile for a given plugin
         /// </summary>
         /// <param name="plugin">Plugin</param>
         /// <returns>Asynchronous task</returns>
-        public static Task UninstallProfile(Plugin plugin) => AppArmor.UninstallProfile(plugin);
+        public static Task UninstallProfile(Plugin plugin)
+        {
+            if (Settings.DisableAppArmor)
+            {
+                return Task.CompletedTask;
+            }
+            return AppArmor.UninstallProfile(plugin);
+        }
     }
 }

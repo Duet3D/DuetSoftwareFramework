@@ -46,6 +46,11 @@ namespace DuetPluginService
         public static string BaseDirectory { get; set; } = "/opt/dsf/sd";
 
         /// <summary>
+        /// Disable AppArmor security policy generation (not recommended, potential security hazard)
+        /// </summary>
+        public static bool DisableAppArmor { get; set; }
+
+        /// <summary>
         /// Path to the utility that allows profile management
         /// </summary>
         public static string AppArmorParser { get; set; } = "/usr/sbin/apparmor_parser";
