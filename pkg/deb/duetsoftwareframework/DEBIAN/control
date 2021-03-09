@@ -4,6 +4,7 @@ Section: electronics
 Priority: standard
 Architecture: TARGET_ARCH
 Depends: duetcontrolserver (= DCSVER), duetsd (= SDVER), duettools (= DCSVER), duetwebserver (= DWSVER), duetwebcontrol (= DWCVER), reprapfirmware (>= DCSVER-1), reprapfirmware (<= DCSVER-999)
+Recommends: duetpluginservice (= DPSVER)
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
 Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git

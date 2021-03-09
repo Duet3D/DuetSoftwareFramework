@@ -98,13 +98,13 @@ BINDIR = $(CONFIGDIR)/$(BUILD_ARCH)
 
 # These variables are static and only need to be expanded once
 # so we use the ":=" assignment
-DIRS := DuetControlServer DuetWebServer CodeConsole CodeLogger CustomHttpEndpoint ModelObserver PluginManager
+DIRS := DuetControlServer DuetWebServer DuetPluginService CodeConsole CodeLogger CustomHttpEndpoint ModelObserver PluginManager
 # DIRS_BUILD will expaned to DuetControlServer-build DuetWebServer-build, etc.
 # Same for the following rules.
 DIRS_BUILD := $(addsuffix .build,$(DIRS))
 DIRS_CLEAN := $(addsuffix .clean,$(DIRS))
 DIRS_PUBLISH := $(addsuffix .publish,$(DIRS))
-PACKAGES := DuetControlServer DuetWebServer DuetTools DuetRuntime DuetSD DuetSoftwareFramework DuetWebControl
+PACKAGES := DuetControlServer DuetWebServer DuetPluginService DuetTools DuetRuntime DuetSD DuetSoftwareFramework DuetWebControl
 BUILDROOTS := $(addsuffix .buildroot,$(PACKAGES))
 RPMS := $(addsuffix .rpm,$(PACKAGES))
 DEBS := $(addsuffix .deb,$(PACKAGES))
@@ -114,6 +114,7 @@ DEBS := $(addsuffix .deb,$(PACKAGES))
 # Once is enough.
 DuetControlServer-version := $(shell xmllint --xpath "string(//Project/PropertyGroup/Version)" src/DuetControlServer/DuetControlServer.csproj)
 DuetWebServer-version := $(shell xmllint --xpath "string(//Project/PropertyGroup/Version)" src/DuetWebServer/DuetWebServer.csproj)
+DuetPluginService-version := $(shell xmllint --xpath "string(//Project/PropertyGroup/Version)" src/DuetPluginService/DuetPluginService.csproj)
 DuetTools-version := $(DuetControlServer-version)
 DuetRuntime-version := $(DuetControlServer-version)
 DuetSoftwareFramework-version := $(DuetControlServer-version)
@@ -371,6 +372,8 @@ DuetSoftwareFramework.deb: DuetWebControl.deb
 	$(CMD_PREFIX)sed -i "s/DCSVER/$(DuetControlServer-version)/g" $(PKGSRCDIR)/DEBIAN/changelog
 	$(CMD_PREFIX)sed -i "s/DWSVER/$(DuetWebServer-version)/g" $(PKGSRCDIR)/DEBIAN/control
 	$(CMD_PREFIX)sed -i "s/DWSVER/$(DuetWebServer-version)/g" $(PKGSRCDIR)/DEBIAN/changelog
+	$(CMD_PREFIX)sed -i "s/DPSVER/$(DuetPluginService-version)/g" $(PKGSRCDIR)/DEBIAN/control
+	$(CMD_PREFIX)sed -i "s/DPSVER/$(DuetPluginService-version)/g" $(PKGSRCDIR)/DEBIAN/changelog
 	$(CMD_PREFIX)sed -i "s/SDVER/$(DuetSD-version)/g" $(PKGSRCDIR)/DEBIAN/control
 	$(CMD_PREFIX)sed -i "s/SDVER/$(DuetSD-version)/g" $(PKGSRCDIR)/DEBIAN/changelog
 	$(CMD_PREFIX)sed -i "s/DWCVER/$(DuetWebControl-version)/g" $(PKGSRCDIR)/DEBIAN/control 2>/dev/null || :
@@ -388,6 +391,7 @@ endif
 info:
 	@echo "DuetControlServer version:     $(DuetControlServer-version)"
 	@echo "DuetWebServer version:         $(DuetWebServer-version)"
+	@echo "DuetPluginService version:     $(DuetPluginService-version)"
 	@echo "DuetTools version:             $(DuetTools-version)"
 	@echo "DuetSD version:                $(DuetSD-version)"
 	@echo "DuetSoftwareFramework version: $(DuetSoftwareFramework-version)"

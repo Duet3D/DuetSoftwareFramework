@@ -15,6 +15,7 @@ Changed behaviour:
 Bug fixes:
 - Updated regular expressions for various slicer formats
 - SBC permissions for third-party plugins were not properly enforced
+- When DCS failed to start too many times in a row, it remained disabled
 
 Version 3.3-b1
 ==============

@@ -1,0 +1,11 @@
+{
+  "SocketPath": "/var/run/dsf/dcs.sock",
+  "LogLevel": "info",
+  "PluginDirectory": "/opt/dsf/plugins",
+  "BaseDirectory": "/opt/dsf/sd",
+  "DisableAppArmor": false,
+  "AppArmorParser": "/usr/sbin/apparmor_parser",
+  "AppArmorTemplate": "/opt/dsf/conf/apparmor.conf",
+  "AppArmorProfileDirectory": "/etc/apparmor.d",
+  "InstallPackageCommand": "/usr/bin/apt-get",
+  "InstallPackageArguments": "install -y {package}"

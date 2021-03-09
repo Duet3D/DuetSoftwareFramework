@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Set ownership and permissions
+chown -R dsf:dsf /opt/dsf/conf/plugins*
+chmod 755 /opt/dsf/plugins
+
+# Update systemd services
+systemctl -q daemon-reload
+
+# Start DPS instances again if it is enabled via systemd
+if (systemctl -q is-enabled duetpluginservice); then
+    systemctl -q start duetpluginservice || true
+fi
+
+if (systemctl -q is-enabled duetpluginservice-root); then
+    systemctl -q start duetpluginservice-root || true
+fi
+
+# Don't block the configuration of other packages if DPS failed to start
+exit 0

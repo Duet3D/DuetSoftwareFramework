@@ -1,0 +1,11 @@
+Package: duetpluginservice
+Version: DPSVER
+Section: electronics
+Priority: standard
+Architecture: TARGET_ARCH
+Depends: duetsoftwareframework (>= 3.3.0), duetcontrolserver (= DCSVER)
+Recommends: apparmor
+Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
+Homepage: https://pkg.duet3d.com
+Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git
+Description: Management service for DSF third-party plugins

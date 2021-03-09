@@ -1,7 +1,7 @@
 {
+  "PluginSupport": true,
+  "RootPluginSupport": false,
   "PluginsFilename": "/opt/dsf/conf/plugins.txt",
-  "InstallPackageCommand": "/usr/bin/apt-get",
-  "InstallPackageArguments": "install -y {package}",
   "LogLevel": "info",
   "SocketDirectory": "/var/run/dsf",
   "SocketFile": "dcs.sock",
@@ -64,11 +64,15 @@
     {
       "Pattern": "layerThickness\\D+(?<mm>(\\d+\\.?\\d*))",
       "Options": 17
+    },
+    {
+      "Pattern": "sliceHeight\\D+(?<mm>(\\d+\\.?\\d*))",
+      "Options": 17
     }
   ],
   "FilamentFilters": [
     {
-      "Pattern": "filament used\\D+(((?<mm>\\d+\\.?\\d*)mm)(\\D+)?)+",
+      "Pattern": "filament used\\D+(((?<mm>\\d+\\.?\\d*)\\s*mm)(\\D+)?)+",
       "Options": 17
     },
     {
@@ -84,11 +88,19 @@
       "Options": 17
     },
     {
-      "Pattern": "material\\#\\d+\\D+(?<mm>\\d+\\.?\\d*)",
+      "Pattern": "material\\#(?<index>\\d+)\\D+(?<mm>\\d+\\.?\\d*)",
+      "Options": 17
+    },
+    {
+      "Pattern": "Ext\\s*\\#\\d+\\D+(?<mm>\\d+\\.?\\d*)",
       "Options": 17
     },
     {
       "Pattern": "Filament used per extruder:\\r\\n;\\s*(?<name>.+)\\s+=\\s*(?<mm>[0-9.]+)",
+      "Options": 17
+    },
+    {
+      "Pattern": "filament used extruder (?<index>\\d+) \\(mm\\) = (?<mm>\\d+\\.?\\d*)",
       "Options": 17
     }
   ],
@@ -124,11 +136,19 @@
       "Options": 17
     },
     {
-      "Pattern": "Build time: ((?<h>\\d+) hour(s)?\\s*)?((?<m>\\d+) minute(s)?\\s*)?((?<s>(\\d+) second(s)?))?",
+      "Pattern": "Build Time:\\s+((?<h>(\\d+\\.?\\d*)) hour(s)?\\s*)?((?<m>(\\d+\\.?\\d*)) minute(s)?\\s*)?((?<s>(\\d+\\.?\\d*)) second(s)?)?",
       "Options": 17
     },
     {
-      "Pattern": "Estimated Build Time:\\s+((?<h>(\\d+\\.?\\d*)) hour(s)?\\s*)?((?<m>(\\d+\\.?\\d*)) minute(s)?\\s*)?((?<s>(\\d+\\.?\\d*)) second(s)?)?",
+      "Pattern": "print time:\\s+(?<s>(\\d+\\.?\\d*))(s)?",
+      "Options": 17
+    },
+    {
+      "Pattern": "Total estimated \\(pre-cool\\) minutes: ((?<m>\\d+\\.?\\d*))",
+      "Options": 17
+    },
+    {
+      "Pattern": "total print time \\(s\\) = (?<s>(\\d+\\.?\\d*))",
       "Options": 17
     }
   ],

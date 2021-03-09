@@ -20,7 +20,7 @@ TOP_DIR=$(readlink -f $PKG_DIR/..)
 
 [ "$PACKAGE_TYPE" == "deb" ] && TARGET_ARCH=armhf || TARGET_ARCH=armhfp
 BUILD_TYPE=Debug
-PACKAGES="progs,sd,dwc,meta"
+PACKAGES="progs,plugins,sd,dwc,meta"
 
 source $COMMON_DIR/parse_args
 
@@ -48,7 +48,7 @@ no-build:      Packages existing builds.
 no-cleanup:    Prevents the work subdirectories in <dest-dir> from being cleaned up.
                Automatically set if no-pkgs was specified.
 print-debug:   Prints the setup variables and exits.
-packages:      One or more of progs, sd, dwc, meta separated by commas.
+packages:      One or more of progs, plugins, sd, dwc, meta separated by commas.
                If none are specified, all will be built.
 
 EOF
@@ -72,6 +72,8 @@ DEST_DIR=${DEST_DIR:-/tmp/duet/${PACKAGE_TYPE}/${BUILD_TYPE}/${TARGET_ARCH}}
 
 dcsver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/DuetControlServer/DuetControlServer.csproj)
 dwsver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/DuetWebServer/DuetWebServer.csproj)
+dpsver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/DuetPluginService/DuetPluginService.csproj)
+dmpver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj)
 # We always get the sd version from the deb control file even if we're building an rpm
 sdver=$(cat $PKG_DIR/deb/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
 
@@ -109,6 +111,8 @@ print_debug() {
 	echo "DEST_DIR:         $DEST_DIR"
 	echo "dcsver:           $dcsver"
 	echo "dwsver:           $dwsver"
+	echo "dpsver:           $dpsver"
+	echo "dmpver:           $dmpver"
 	echo "sdver:            $sdver"
 	echo "SIGNING_KEY:      $SIGNING_KEY"
 	echo "PACKAGES:         $PACKAGES"
@@ -120,7 +124,7 @@ print_debug
 [ $PRINT_DEBUG -eq 1 ] && exit 0
 
 build_progs() {
-	echo "Building $DOTNET_ARCH $BUILD_TYPE (DCS $dcsver and DWS $dwsver) to $DEST_DIR,,,"
+	echo "Building $DOTNET_ARCH $BUILD_TYPE (DCS $dcsver, DWS $dwsver, DPS $dpsver) to $DEST_DIR,,,"
 
 	rm -rf $DEST_DIR/files
 	mkdir -p $DEST_DIR/files
@@ -140,7 +144,14 @@ build_progs() {
 	[ -d $PACKAGER_DIR/duetwebserver/ ] && $RSYNC $PACKAGER_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
 	mv $DEST_DIR/files/DuetWebServer* $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
 	mv $DEST_DIR/files/appsettings.* $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
-	mv $DEST_DIR/files/web.config $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
+
+	rm -rf $DEST_DIR/duetpluginservice_$dpsver
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/DuetPluginService/DuetPluginService.csproj
+	mkdir -p $DEST_DIR/duetpluginservice_$dpsver/opt/dsf/bin
+	mkdir -p $DEST_DIR/duetpluginservice_$dpsver/opt/dsf/plugins
+	[ -d $COMMON_DIR/duetpluginservice/ ] && $RSYNC $COMMON_DIR/duetpluginservice/. $DEST_DIR/duetpluginservice_$dpsver/
+	[ -d $PACKAGER_DIR/duetpluginservice/ ] && $RSYNC $PACKAGER_DIR/duetpluginservice/. $DEST_DIR/duetpluginservice_$dpsver/
+	mv $DEST_DIR/files/DuetPluginService* $DEST_DIR/duetpluginservice_$dpsver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duettools_$dcsver/
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CodeConsole/CodeConsole.csproj
@@ -164,8 +175,25 @@ build_progs() {
 	mv $DEST_DIR/files/* $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin
 }
 
+build_plugins() {
+	echo "Building $DOTNET_ARCH $BUILD_TYPE (DMP $dmpver) to $DEST_DIR,,,"
+
+	rm -rf $DEST_DIR/duetpimanagementplugin_$dmpver
+	mkdir -p $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin
+	mkdir -p $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf $SRC_DIR/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj /p:PublishTrimmed=true
+	[ -d $SRC_DIR/DuetPiManagementPlugin/zip/dsf ] && $RSYNC $SRC_DIR/DuetPiManagementPlugin/zip/dsf/. $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/ || :
+	chmod +x $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/gen-https-cert.sh
+
+	SBCFILES=`find $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf -type f -printf '%f\n' | sort | jq -R -s -c 'split("\n")[:-1]'`
+	jq -e ".sbcFiles=$SBCFILES" $SRC_DIR/DuetPiManagementPlugin/zip/plugin.json > $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
+
+	[ -d $PACKAGER_DIR/duetpimanagementplugin/ ] && $RSYNC $PACKAGER_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dmpver/
+}
+
 build_sd() {
 	echo "Building virtual SD card package v$sdver..."
+
 	rm -rf $DEST_DIR/duetsd_$sdver
 	mkdir -p $DEST_DIR/duetsd_$sdver
 	mkdir -p $DEST_DIR/duetsd_$sdver/opt/dsf/sd/filaments
@@ -188,13 +216,13 @@ build_dwc() {
 		echo "- Using existing repository in $DEST_DIR/DuetWebControl"
 	fi
 
-	dwcver=$(jq -r ".version" $DEST_DIR/DuetWebControl/package.json)
+	dwcver=$(jq -r ".pkgVersion" $DEST_DIR/DuetWebControl/package.json)
 	>/dev/null pushd $DEST_DIR/DuetWebControl
 
 	echo "- Installing dependencies..."
 	npm install > /dev/null
 
-	echo "- Building web interface..."
+	echo "- Building web interface (DWC $dwcver)..."
 	npm run build > /dev/null
 
 	>/dev/null popd
@@ -227,9 +255,11 @@ cleanup_tmp() {
 		rm -rf $DEST_DIR/files
 		rm -rf $DEST_DIR/duetcontrolserver_$dcsver
 		rm -rf $DEST_DIR/duetwebserver_$dwsver
+		rm -rf $DEST_DIR/duetpluginservice_$dpsver
 		rm -rf $DEST_DIR/duettools_$dcsver
 		rm -rf $DEST_DIR/duetruntime_$dcsver
 	fi
+	[ $BUILD_PLUGINS -eq 1 ] && rm -rf $DEST_DIR/duetpimanagementplugin_$dmpver
 	[ $BUILD_SD -eq 1 ] && rm -rf $DEST_DIR/duetsd_$sdver
 	if [ $BUILD_DWC -eq 1 ] ; then
 		rm -rf $DEST_DIR/duetwebcontrol_$dwcver

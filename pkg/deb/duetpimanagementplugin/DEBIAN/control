@@ -1,0 +1,11 @@
+Package: duetpimanagementplugin
+Version: DMPVER
+Section: electronics
+Priority: standard
+Architecture: TARGET_ARCH
+Depends: duetpluginservice (= DPSVER), openssl
+Recommends: proftpd, ssh, telnetd, dnsmasq, hostapd, wpa_supplicant
+Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
+Homepage: https://pkg.duet3d.com
+Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git
+Description: Management service for DSF third-party plugins

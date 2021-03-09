@@ -52,7 +52,7 @@ no-build:      Packages existing builds.
 no-cleanup:    Prevents the work subdirectories in <dest-dir> from being cleaned up.
                Automatically set if no-pkgs was specified.
 print-debug:   Prints the setup variables and exits.
-packages:      One or more of progs, sd, dwc, meta separated by commas.
+packages:      One or more of progs, plugins, sd, dwc, meta separated by commas.
                If none are specified, all will be built.
 
 EOF

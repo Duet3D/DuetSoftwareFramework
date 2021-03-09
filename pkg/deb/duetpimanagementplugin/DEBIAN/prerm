@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# Stop DuetPiManagementPlugin
+if (systemctl is-active -q duetpluginservice-root); then
+	/opt/dsf/bin/PluginManager stop DuetPiManagementPlugin
+fi
+
+# Make manifest writable again
+chmod 660 /opt/dsf/plugins/DuetPiManagementPlugin.json
+

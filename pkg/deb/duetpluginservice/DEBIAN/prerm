@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Stop DPS instances
+if (systemctl -q is-active duetpluginservice); then
+    systemctl -q stop duetpluginservice
+fi
+
+if (systemctl -q is-active duetpluginservice-root); then
+    systemctl -q stop duetpluginservice-root
+fi
+

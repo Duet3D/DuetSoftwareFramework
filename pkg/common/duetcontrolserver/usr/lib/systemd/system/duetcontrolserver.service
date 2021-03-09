@@ -1,5 +1,6 @@
 [Unit]
 Description=Duet Control Server
+StartLimitIntervalSec=0
 
 [Service]
 ExecStart=/opt/dsf/bin/DuetControlServer

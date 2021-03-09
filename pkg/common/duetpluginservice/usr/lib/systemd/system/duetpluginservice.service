@@ -1,0 +1,15 @@
+[Unit]
+Description=Duet Plugin Service
+BindsTo=duetcontrolserver.service
+After=duetcontrolserver.service multi-user.target
+
+[Service]
+ExecStart=/opt/dsf/bin/DuetPluginService
+TimeoutStopSec=15
+Restart=always
+User=dsf
+Group=dsf
+UMask=0002
+
+[Install]
+WantedBy=multi-user.target

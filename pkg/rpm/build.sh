@@ -20,9 +20,15 @@ pkg_progs() {
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
 		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dwsver" -ba ${PACKAGER_DIR}/duetwebserver.spec
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dwsver" -ba ${PACKAGER_DIR}/duetpluginservice.spec
+	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
 		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -ba ${PACKAGER_DIR}/duettools.spec
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
 		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -ba ${PACKAGER_DIR}/duetruntime.spec
+}
+
+pkg_plugins() {
+	echo "- Plugins not supported on this platform."
 }
 
 pkg_sd() {
@@ -47,6 +53,7 @@ pkg_meta() {
 }
 
 [ $BUILD_PROGS -eq 1 ] && { [ $BUILD -eq 1 ] && build_progs || : ; } && [ $PKGS -eq 1 ] && pkg_progs
+[ $BUILD_PLUGINS -eq 1 ] && { [ $BUILD -eq 1 ] && build_plugins || : ; } && [ $PKGS -eq 1 ] && pkg_plugins
 [ $BUILD_SD -eq 1 ] && { [ $BUILD -eq 1 ] && build_sd || : ; } && [ $PKGS -eq 1 ] && pkg_sd
 [ $BUILD_DWC -eq 1 ] && { [ $BUILD -eq 1 ] && build_dwc || : ; } && [ $PKGS -eq 1 ] && pkg_dwc
 [ $BUILD_META -eq 1 ] && { [ $BUILD -eq 1 ] && build_meta || : ; } && [ $PKGS -eq 1 ] && pkg_meta
