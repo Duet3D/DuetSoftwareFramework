@@ -5,8 +5,8 @@ Version 3.3-b2
 ==============
 
 Compatible versions:
-- RepRapFirmware 3.3-b1
-- DuetWebControl 3.3-b1
+- RepRapFirmware 3.3-b2
+- DuetWebControl 3.3-b2
 
 Changed behaviour:
 - Changed file format of the new plugin manifest
