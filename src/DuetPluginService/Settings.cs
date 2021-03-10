@@ -283,6 +283,25 @@ namespace DuetPluginService
                             throw new JsonException($"Bad list type: {property.PropertyType.Name}");
                         }
                         break;
+
+                    case JsonTokenType.StartObject:
+                        if (property != null)
+                        {
+                            if (property.PropertyType == typeof(Dictionary<string, string>))
+                            {
+                                Dictionary<string, string> dict = new();
+                                while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+                                {
+                                    dict.Add(reader.GetString(), reader.GetString());
+                                }
+                                property.SetValue(null, dict);
+                            }
+                            else
+                            {
+                                throw new JsonException($"Bad object type: {property.PropertyType.Name}");
+                            }
+                        }
+                        break;
                 }
             }
         }
@@ -343,6 +362,16 @@ namespace DuetPluginService
                     else if (value is LogLevel logLevelValue)
                     {
                         writer.WriteString(property.Name, logLevelValue.ToString().ToLowerInvariant());
+                    }
+                    else if (value is Dictionary<string, string> dict)
+                    {
+                        writer.WritePropertyName(property.Name);
+                        writer.WriteStartObject();
+                        foreach (var kv in dict)
+                        {
+                            writer.WriteString(kv.Key, kv.Value);
+                        }
+                        writer.WriteEndObject();
                     }
                     else
                     {

@@ -540,17 +540,6 @@ namespace UnitTests.Commands
         }
 
         [Test]
-        public void ParseReturn()
-        {
-            foreach (DuetAPI.Commands.Code code in Parse("    return"))
-            {
-                Assert.AreEqual(4, code.Indent);
-                Assert.AreEqual(KeywordType.Return, code.Keyword);
-                Assert.IsEmpty(code.KeywordArgument);
-            }
-        }
-
-        [Test]
         public void ParseAbort()
         {
             foreach (DuetAPI.Commands.Code code in Parse("    abort foo bar"))

@@ -302,11 +302,14 @@ namespace DuetAPI.Commands
                 KeywordType.While => "while",
                 KeywordType.Break => "break",
                 KeywordType.Continue => "continue",
+#pragma warning disable CS0618 // Type or member is obsolete
                 KeywordType.Return => "return",
+#pragma warning restore CS0618 // Type or member is obsolete
                 KeywordType.Abort => "abort",
                 KeywordType.Var => "var",
                 KeywordType.Set => "set",
                 KeywordType.Echo => "echo",
+                KeywordType.Global => "global",
                 _ => throw new NotImplementedException()
             };
         }

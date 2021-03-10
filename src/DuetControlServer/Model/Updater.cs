@@ -3,7 +3,7 @@ using DuetAPI.ObjectModel;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
-using System.Linq;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -229,7 +229,7 @@ namespace DuetControlServer.Model
                 }
 
                 // Wait a moment
-                await Task.Delay(Settings.ModelUpdateInterval);
+                await Task.Delay(Settings.ModelUpdateInterval, Program.CancellationToken);
             }
             while (!Program.CancellationToken.IsCancellationRequested);
         }
@@ -264,64 +264,126 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
+        /// Number of the last layer
+        /// </summary>
+        private static int _lastLayer = -1;
+
+        /// <summary>
+        /// Last recorded print duration
+        /// </summary>
+        private static int _lastDuration;
+
+        /// <summary>
+        /// Filament usage at the time of the last layer change
+        /// </summary>
+        private static List<float> _lastFilamentUsage = new();
+
+        /// <summary>
+        /// Last file position at the time of the last layer change
+        /// </summary>
+        private static long _lastFilePosition;
+
+        /// <summary>
+        /// Last known Z height
+        /// </summary>
+        private static float _lastHeight;
+
+        /// <summary>
         /// Update the layers
         /// </summary>
         private static void UpdateLayers()
         {
-            if (Provider.Get.State.Status != MachineStatus.Processing && Provider.Get.State.Status != MachineStatus.Simulating)
+            // Are we printing?
+            if (Provider.Get.Job.Duration == null || Provider.Get.Job.Layer == null)
             {
-                // Don't do anything if no print is in progress
+                if (_lastLayer != -1)
+                {
+                    _lastLayer = -1;
+                    _lastDuration = 0;
+                    _lastFilamentUsage.Clear();
+                    _lastFilePosition = 0L;
+                    _lastHeight = 0F;
+                }
                 return;
             }
 
-            // Check if the last layer is complete
-            if (Provider.Get.Job.Layer > Provider.Get.Job.Layers.Count + 1)
+            // Reset the layers when a new print is started
+            if (_lastLayer == -1)
             {
-                float[] extrRaw = (from extruder in Provider.Get.Move.Extruders
-                                   where extruder != null
-                                   select extruder.RawPosition).ToArray();
-                float fractionPrinted = (float)((double)Provider.Get.Job.FilePosition / Provider.Get.Job.File.Size);
-                float currentHeight = Provider.Get.Move.Axes.FirstOrDefault(axis => axis.Letter == 'Z').UserPosition ?? 0F;
-
-                float lastHeight = 0F, lastProgress = 0F;
-                int lastDuration = 0;
-                float[] lastFilamentUsage = new float[extrRaw.Length];
-                foreach (Layer l in Provider.Get.Job.Layers)
-                {
-                    lastHeight += l.Height;
-                    lastDuration += l.Duration;
-                    lastProgress += l.FractionPrinted;
-                    for (int i = 0; i < Math.Min(lastFilamentUsage.Length, l.Filament.Count); i++)
-                    {
-                        lastFilamentUsage[i] += l.Filament[i];
-                    }
-                }
-
-                float[] filamentUsage = new float[extrRaw.Length];
-                for (int i = 0; i < filamentUsage.Length; i++)
-                {
-                    filamentUsage[i] = extrRaw[i] - lastFilamentUsage[i];
-                }
-
-                int printDuration = Provider.Get.Job.Duration.Value - Provider.Get.Job.WarmUpDuration.Value;
-                Layer layer = new()
-                {
-                    Duration = printDuration - lastDuration,
-                    FractionPrinted = fractionPrinted - lastProgress,
-                    Height = (Provider.Get.Job.Layer > 2) ? currentHeight - lastHeight : Provider.Get.Job.File.FirstLayerHeight
-                };
-                foreach (float filamentItem in filamentUsage)
-                {
-                    layer.Filament.Add(filamentItem);
-                }
-
-                Provider.Get.Job.Layers.Add(layer);
-            }
-            else if (Provider.Get.Job.Layer < Provider.Get.Job.Layers.Count)
-            {
-                // Starting a new print job, clear the layers
+                _lastLayer = 0;
                 Provider.Get.Job.Layers.Clear();
             }
+
+            int numChangedLayers = Math.Abs(Provider.Get.Job.Layer.Value - _lastLayer);
+            if (numChangedLayers > 0 && Provider.Get.Job.Layer.Value > 0 && _lastLayer > 0)
+            {
+                // Compute average stats per changed layer
+                int printDuration = Provider.Get.Job.Duration.Value - (Provider.Get.Job.WarmUpDuration != null ? Provider.Get.Job.WarmUpDuration.Value : 0);
+                float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
+                List<float> totalFilamentUsage = new(), avgFilamentUsage = new();
+                long bytesPrinted = (Provider.Get.Job.FilePosition != null) ? (Provider.Get.Job.FilePosition.Value - _lastFilePosition) : 0L;
+                float avgFractionPrinted = (Provider.Get.Job.File.Size > 0) ? (float)bytesPrinted / (Provider.Get.Job.File.Size * numChangedLayers) : 0F;
+                for (int i = 0; i < Provider.Get.Move.Extruders.Count; i++)
+                {
+                    if (Provider.Get.Move.Extruders[i] != null)
+                    {
+                        float lastFilamentUsage = (i < _lastFilamentUsage.Count) ? _lastFilamentUsage[i] : 0F;
+                        totalFilamentUsage.Add(Provider.Get.Move.Extruders[i].RawPosition);
+                        avgFilamentUsage.Add((Provider.Get.Move.Extruders[i].RawPosition - lastFilamentUsage) / numChangedLayers);
+                    }
+                }
+                float currentHeight = 0F;
+                foreach (Axis axis in Provider.Get.Move.Axes)
+                {
+                    if (axis != null && axis.Letter == 'Z' && axis.UserPosition != null)
+                    {
+                        currentHeight = axis.UserPosition.Value;
+                        break;
+                    }
+                }
+                float avgHeight = Math.Abs(currentHeight - _lastHeight) / numChangedLayers;
+
+                // Add missing layers
+                for (int i = Provider.Get.Job.Layers.Count; i < Provider.Get.Job.Layer.Value - 1; i++)
+                {
+                    Layer newLayer = new();
+                    foreach (AnalogSensor sensor in Provider.Get.Sensors.Analog)
+                    {
+                        if (sensor != null)
+                        {
+                            newLayer.Temperatures.Add(sensor.LastReading);
+                        }
+                    }
+                    newLayer.Height = avgHeight;
+                    Provider.Get.Job.Layers.Add(newLayer);
+                }
+
+                // Merge data
+                for (int i = Math.Min(_lastLayer, Provider.Get.Job.Layer.Value); i < Math.Max(_lastLayer, Provider.Get.Job.Layer.Value); i++)
+                {
+                    Layer layer = Provider.Get.Job.Layers[i - 1];
+                    layer.Duration += avgLayerDuration;
+                    for (int k = 0; k < avgFilamentUsage.Count; k++)
+                    {
+                        if (k >= layer.Filament.Count)
+                        {
+                            layer.Filament.Add(avgFilamentUsage[k]);
+                        }
+                        else
+                        {
+                            layer.Filament[k] += avgFilamentUsage[k];
+                        }
+                    }
+                    layer.FractionPrinted += avgFractionPrinted;
+                }
+
+                // Record values for the next layer change
+                _lastDuration = printDuration;
+                _lastFilamentUsage = totalFilamentUsage;
+                _lastFilePosition = Provider.Get.Job.FilePosition ?? 0L;
+                _lastHeight = currentHeight;
+            }
+            _lastLayer = Provider.Get.Job.Layer.Value;
         }
 
         /// <summary>

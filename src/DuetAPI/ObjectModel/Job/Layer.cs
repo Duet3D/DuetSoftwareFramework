@@ -8,12 +8,12 @@
         /// <summary>
         /// Duration of the layer (in s)
         /// </summary>
-        public int Duration
+        public float Duration
         {
             get => _duration;
 			set => SetPropertyValue(ref _duration, value);
         }
-        private int _duration;
+        private float _duration;
 
         /// <summary>
         /// Actual amount of filament extruded during this layer (in mm)
@@ -39,5 +39,11 @@
 			set => SetPropertyValue(ref _height, value);
         }
         private float _height;
+
+        /// <summary>
+        /// Last heater temperatures (in C or null if unknown)
+        /// </summary>
+        /// <seealso cref="AnalogSensor.LastReading"/>
+        public ModelCollection<float?> Temperatures { get; } = new ModelCollection<float?>();
     }
 }

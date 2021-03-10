@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.Commands
+﻿using System;
+
+namespace DuetAPI.Commands
 {
     /// <summary>
     /// Enumeration of conditional G-code keywords
@@ -39,6 +41,7 @@
         /// <summary>
         /// Return instruction
         /// </summary>
+        [Obsolete("Was never supported in RRF, will be removed again")]
         Return,
 
         /// <summary>
@@ -65,6 +68,11 @@
         /// Continue instruction
         /// </summary>
         /// <seealso cref="While"/>
-        Continue
+        Continue,
+
+        /// <summary>
+        /// Global operation
+        /// </summary>
+        Global
     }
 }

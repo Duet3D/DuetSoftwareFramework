@@ -11,11 +11,17 @@ Compatible versions:
 Changed behaviour:
 - Changed file format of the new plugin manifest
 - Layers code is no longer compatible with previous versions
+- Emulation is always applied to results from code interceptors
+- The DSF-only keyword `return` is now obsolete and will be removed from a future version (unless support for it is added to RRF)
 
 Bug fixes:
 - Updated regular expressions for various slicer formats
 - SBC permissions for third-party plugins were not properly enforced
 - When DCS failed to start too many times in a row, it remained disabled
+- DPS didn't (de-)serialize string dictionaries properly
+
+Known issues:
+- Variable support isn't implemented yet, this is TBD in 3.3-b3
 
 Version 3.3-b1
 ==============

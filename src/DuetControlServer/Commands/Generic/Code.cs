@@ -223,12 +223,12 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Lock around the files being written
         /// </summary>
-        public static AsyncLock[] FileLocks = new AsyncLock[Inputs.Total];
+        public static readonly AsyncLock[] FileLocks = new AsyncLock[Inputs.Total];
 
         /// <summary>
         /// Current stream writer of the files being written to (M28/M29)
         /// </summary>
-        public static StreamWriter[] FilesBeingWritten = new StreamWriter[Inputs.Total];
+        public static readonly StreamWriter[] FilesBeingWritten = new StreamWriter[Inputs.Total];
 
         /// <summary>
         /// Constructor of a new code
@@ -313,11 +313,6 @@ namespace DuetControlServer.Commands
         /// Macro that started this code or null
         /// </summary>
         internal Macro Macro { get; set; }
-
-        /// <summary>
-        /// Indicates if this code has been resolved by an interceptor
-        /// </summary>
-        internal bool ResolvedByInterceptor { get; private set; }
 
         /// <summary>
         /// Execute the given code internally
@@ -468,7 +463,9 @@ namespace DuetControlServer.Commands
         /// <returns>Whether the code could be processed internally</returns>
         private async Task<bool> ProcessInternally()
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             if (Keyword != KeywordType.None && Keyword != KeywordType.Echo && Keyword != KeywordType.Abort && Keyword != KeywordType.Return)
+#pragma warning restore CS0618 // Type or member is obsolete
             {
                 // Other meta keywords must be handled before we get here...
                 throw new InvalidOperationException("Conditional codes must not be executed");
@@ -482,7 +479,7 @@ namespace DuetControlServer.Commands
                 Flags |= CodeFlags.IsPreProcessed;
                 if (resolved)
                 {
-                    ResolvedByInterceptor = InternallyProcessed = true;
+                    InternallyProcessed = true;
                     return true;
                 }
             }
@@ -523,13 +520,15 @@ namespace DuetControlServer.Commands
                 Flags |= CodeFlags.IsPostProcessed;
                 if (resolved)
                 {
-                    ResolvedByInterceptor = InternallyProcessed = true;
+                    InternallyProcessed = true;
                     return true;
                 }
             }
 
             // Evaluate echo, abort, and return
+#pragma warning disable CS0618 // Type or member is obsolete
             if (Keyword == KeywordType.Echo || Keyword == KeywordType.Abort || Keyword == KeywordType.Return)
+#pragma warning restore CS0618 // Type or member is obsolete
             {
                 if (!await Interface.Flush(this, false))
                 {
@@ -587,72 +586,69 @@ namespace DuetControlServer.Commands
         {
             if (Result != null)
             {
-                if (!ResolvedByInterceptor)
+                // Process the code result
+                switch (Type)
                 {
-                    // Process the code result
-                    switch (Type)
+                    case CodeType.GCode:
+                        await GCodes.CodeExecuted(this);
+                        break;
+
+                    case CodeType.MCode:
+                        await MCodes.CodeExecuted(this);
+                        break;
+
+                    case CodeType.TCode:
+                        await TCodes.CodeExecuted(this);
+                        break;
+                }
+
+                if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
+                {
+                    // RepRapFirmware generally prefixes error messages with the code itself, mimic this behavior
+                    foreach (Message msg in Result)
                     {
-                        case CodeType.GCode:
-                            await GCodes.CodeExecuted(this);
-                            break;
-
-                        case CodeType.MCode:
-                            await MCodes.CodeExecuted(this);
-                            break;
-
-                        case CodeType.TCode:
-                            await TCodes.CodeExecuted(this);
-                            break;
-                    }
-
-                    if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
-                    {
-                        // RepRapFirmware generally prefixes error messages with the code itself, mimic this behavior
-                        foreach (Message msg in Result)
+                        if (msg.Type == MessageType.Error)
                         {
-                            if (msg.Type == MessageType.Error)
-                            {
-                                msg.Content = ToShortString() + ": " + msg.Content;
-                            }
-                        }
-
-                        // Messages from RRF and replies to file print codes are logged somewhere else,
-                        // so we only need to log internal code replies that are not part of file prints
-                        if (File == null || Channel != CodeChannel.File)
-                        {
-                            await Utility.Logger.Log(Result);
+                            msg.Content = ToShortString() + ": " + msg.Content;
                         }
                     }
 
-                    // Deal with firmware emulation
-                    if (!Flags.HasFlag(CodeFlags.IsFromMacro))
+                    // Messages from RRF and replies to file print codes are logged somewhere else,
+                    // so we only need to log internal code replies that are not part of file prints
+                    if (File == null || Channel != CodeChannel.File)
                     {
-                        if (await EmulatingMarlin())
+                        await Utility.Logger.Log(Result);
+                    }
+                }
+
+                // Deal with firmware emulation
+                if (!Flags.HasFlag(CodeFlags.IsFromMacro))
+                {
+                    if (await EmulatingMarlin())
+                    {
+                        if (Flags.HasFlag(CodeFlags.IsLastCode))
                         {
-                            if (Flags.HasFlag(CodeFlags.IsLastCode))
+                            if (Result.Count != 0 && Type == CodeType.MCode && MajorNumber == 105)
                             {
-                                if (Result.Count != 0 && Type == CodeType.MCode && MajorNumber == 105)
-                                {
-                                    Result[0].Content = "ok " + Result[0].Content;
-                                }
-                                else if (Result.IsEmpty)
-                                {
-                                    Result.Add(MessageType.Success, "ok\n");
-                                }
-                                else
-                                {
-                                    Result[^1].Content += "\nok\n";
-                                }
+                                Result[0].Content = "ok " + Result[0].Content;
+                            }
+                            else if (Result.IsEmpty)
+                            {
+                                Result.Add(MessageType.Success, "ok\n");
+                            }
+                            else
+                            {
+                                Result[^1].Content += "\nok\n";
                             }
                         }
-                        else if (!Result.IsEmpty)
-                        {
-                            Result[^1].Content += "\n";
-                        }
-                        else
-                        {
-                            Result.Add(MessageType.Success, "\n");
-                        }
+                    }
+                    else if (!Result.IsEmpty)
+                    {
+                        Result[^1].Content += "\n";
+                    }
+                    else
+                    {
+                        Result.Add(MessageType.Success, "\n");
                     }
                 }
 
@@ -688,7 +684,6 @@ namespace DuetControlServer.Commands
             InternallyProcessed = false;
             File = null;
             Macro = null;
-            ResolvedByInterceptor = false;
             FirmwareTCS = null;
             BinarySize = 0;
             IsExecuted = false;

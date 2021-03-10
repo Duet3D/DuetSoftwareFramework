@@ -423,7 +423,9 @@ namespace DuetControlServer.Files
                             break;
 
                         case KeywordType.Abort:
+#pragma warning disable CS0618 // Type or member is obsolete
                         case KeywordType.Return:
+#pragma warning restore CS0618 // Type or member is obsolete
                             _logger.Debug("Doing {0}", code.Keyword);
                             using (await _lock.LockAsync(Program.CancellationToken))
                             {
