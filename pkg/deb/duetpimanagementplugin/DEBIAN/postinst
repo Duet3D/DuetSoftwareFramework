@@ -1,9 +1,10 @@
 #!/bin/sh
 
 # Set ownership and permissions
-chown -R dsf:dsf /opt/dsf/conf/plugins/DuetPiManagementPlugin.json
-chown -R dsf:dsf /opt/dsf/conf/plugins/DuetPiManagementPlugin
+chown dsf:dsf /opt/dsf/plugins/DuetPiManagementPlugin.json
 chmod 440 /opt/dsf/plugins/DuetPiManagementPlugin.json
+
+chown -R dsf:dsf /opt/dsf/plugins/DuetPiManagementPlugin
 chmod 755 /opt/dsf/plugins/DuetPiManagementPlugin
 
 # Restart DCS to load the new manifest and start DPM
