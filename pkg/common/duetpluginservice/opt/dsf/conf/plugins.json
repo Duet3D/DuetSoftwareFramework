@@ -8,4 +8,9 @@
   "AppArmorTemplate": "/opt/dsf/conf/apparmor.conf",
   "AppArmorProfileDirectory": "/etc/apparmor.d",
   "InstallPackageCommand": "/usr/bin/apt-get",
-  "InstallPackageArguments": "install -y {package}"
+  "InstallPackageArguments": "install -y {package}",
+  "InstallPackageEnvironment": {
+    "DEBIAN_FRONTEND": "noninteractive"
+  },
+  "StopTimeout": 4000
+}

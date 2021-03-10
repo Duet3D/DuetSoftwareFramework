@@ -1,6 +1,6 @@
 [Unit]
 Description=Duet Plugin Service
-BindsTo=duetcontrolserver.service
+PartOf=duetcontrolserver.service
 After=duetcontrolserver.service multi-user.target
 
 [Service]
