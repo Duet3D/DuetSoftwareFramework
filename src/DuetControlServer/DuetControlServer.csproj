@@ -32,6 +32,7 @@
     <PackageReference Include="DynamicExpresso.Core" Version="2.3.3" />
     <PackageReference Include="Nito.AsyncEx" Version="5.1.0" />
     <PackageReference Include="NLog" Version="4.7.7" />
+    <PackageReference Include="System.Drawing.Common" Version="5.0.2" />
   </ItemGroup>
 
   <ItemGroup>
