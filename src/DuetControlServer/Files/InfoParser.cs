@@ -17,6 +17,11 @@ namespace DuetControlServer.Files
     public static class InfoParser
     {
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// Parse a G-code file
         /// </summary>
         /// <param name="fileName">File to analyze</param>
@@ -521,11 +526,13 @@ namespace DuetControlServer.Files
                 //This is the start of a PrusaSlicer Image.
                 if (code.Comment.Contains("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
                 {
+                    _logger.Debug("Found Prusa Slicer Image");
                     await PrusaSlicerImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code);
                 }
                 //Icon Image 
                 else if (code.Comment.Contains("Icon:"))
                 {
+                    _logger.Debug("Found Icon Image");
                     await IconImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code);
                 }
                 code.Reset();

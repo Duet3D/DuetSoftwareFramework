@@ -13,8 +13,16 @@ namespace DuetControlServer.Files.ImageProcessing
 {
     public static class IconImageParser
     {
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+
+
         public static async Task ProcessAsync(StreamReader reader, CodeParserBuffer codeParserBuffer, ParsedFileInfo parsedFileInfo, Code code)
         {
+            _logger.Info($"Processing Image {parsedFileInfo.FileName}");
             StringBuilder imageBuffer = new StringBuilder();
             code.Reset();
 
@@ -28,18 +36,19 @@ namespace DuetControlServer.Files.ImageProcessing
                 }
 
                 //Icon data goes until the first line of executable code.
-                if(code.Type == CodeType.Comment)
+                if (code.Type == CodeType.Comment)
                 {
                     imageBuffer.Append(code.Comment.Trim());
                     code.Reset();
                 }
-                else 
+                else
                 {
                     try
                     {
-                        ParsedThumbnail thumbnail = new ParsedThumbnail();
-                        thumbnail.EncodedImage = ReadImage(imageBuffer.ToString());
+                        ParsedThumbnail thumbnail = ReadImage(imageBuffer.ToString());
                         parsedFileInfo.Thumbnails.Add(thumbnail);
+                        _logger.Error("Icon Thumbnails Found");
+
                     }
                     catch
                     {
@@ -51,18 +60,32 @@ namespace DuetControlServer.Files.ImageProcessing
             }
         }
 
-        private static string ReadImage(string imageBuffer)
+        private static ParsedThumbnail ReadImage(string imageBuffer)
         {
+            ParsedThumbnail thumbnail = new ParsedThumbnail();
             //Convert the string into a usable format
             var finalString = imageBuffer.Replace("Icon: ", String.Empty).Replace(";", string.Empty).Replace(" ", string.Empty).Replace("\r\n", string.Empty);
-           
+
             using (MemoryStream ms = new MemoryStream(Convert.FromBase64String(finalString)))
             using (MemoryStream bitmapSource = new MemoryStream())
             {
-                BinaryToImage(ms).Save(bitmapSource, System.Drawing.Imaging.ImageFormat.Png);
-                return Convert.ToBase64String(bitmapSource.GetBuffer());
+                _logger.Debug("Encoding Image");
+                try
+                {
+                    BinaryToImage(ms, out int width, out int height).Save(bitmapSource, System.Drawing.Imaging.ImageFormat.Png);
+                    thumbnail.EncodedImage = "data:image/png;base64," + Convert.ToBase64String(bitmapSource.GetBuffer());
+                    _logger.Debug(thumbnail.EncodedImage);
+                    thumbnail.Width = width;
+                    thumbnail.Height = height;
+                    return thumbnail;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex);
+                }
+                return null;
+                
             }
-
         }
 
         /// <summary>
@@ -70,11 +93,11 @@ namespace DuetControlServer.Files.ImageProcessing
         /// </summary>
         /// <param name="ms">memory stream containing the header icon + 4 size-bytes</param>
         /// <returns></returns>
-        public static Bitmap BinaryToImage(MemoryStream ms)
+        public static Bitmap BinaryToImage(MemoryStream ms, out int width, out int height)
         {
             ms.Position = 0;
-            int width = ms.ReadByte() << 8 | ms.ReadByte();
-            int height = ms.ReadByte() << 8 | ms.ReadByte();
+            width = ms.ReadByte() << 8 | ms.ReadByte();
+            height = ms.ReadByte() << 8 | ms.ReadByte();
 
             Bitmap target = new Bitmap(width, height);
             for (int y = 0; y < height; y++)
