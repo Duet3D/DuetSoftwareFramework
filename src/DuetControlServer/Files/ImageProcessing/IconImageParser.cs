@@ -8,6 +8,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Formats.Png;
 
 namespace DuetControlServer.Files.ImageProcessing
 {
@@ -72,19 +75,22 @@ namespace DuetControlServer.Files.ImageProcessing
                 _logger.Debug("Encoding Image");
                 try
                 {
-                    BinaryToImage(ms, out int width, out int height).Save(bitmapSource, System.Drawing.Imaging.ImageFormat.Png);
-                    thumbnail.EncodedImage = "data:image/png;base64," + Convert.ToBase64String(bitmapSource.GetBuffer());
+                    var image = BinaryToImage(ms, out int width, out int height);
+                    thumbnail.EncodedImage = image.ToBase64String(PngFormat.Instance);
                     _logger.Debug(thumbnail.EncodedImage);
                     thumbnail.Width = width;
                     thumbnail.Height = height;
+                    image?.Dispose(); //Clean up image after getting data from it.
                     return thumbnail;
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error(ex);
+                    var imageProcessingException = new ImageProcessingException("Error processing Icon image", ex);
+                    _logger.Error(imageProcessingException);
+                    throw imageProcessingException;
                 }
                 return null;
-                
+
             }
         }
 
@@ -93,23 +99,23 @@ namespace DuetControlServer.Files.ImageProcessing
         /// </summary>
         /// <param name="ms">memory stream containing the header icon + 4 size-bytes</param>
         /// <returns></returns>
-        public static Bitmap BinaryToImage(MemoryStream ms, out int width, out int height)
+        public static Image BinaryToImage(MemoryStream ms, out int width, out int height)
         {
             ms.Position = 0;
             width = ms.ReadByte() << 8 | ms.ReadByte();
             height = ms.ReadByte() << 8 | ms.ReadByte();
 
-            Bitmap target = new Bitmap(width, height);
+            var target = new Image<Rgba32>(width, height);
             for (int y = 0; y < height; y++)
             {
+                Span<Rgba32> pixelRowSpan = target.GetPixelRowSpan(y);
                 for (int x = 0; x < width; x++)
                 {
                     byte upper = (byte)ms.ReadByte();
                     byte lower = (byte)ms.ReadByte();
                     int color = lower | upper << 8;
                     byte[] rgb = RGB2To3Bytes(color);
-                    Color pixel = Color.FromArgb(rgb[0], rgb[1], rgb[2]);
-                    target.SetPixel(x, y, pixel);
+                    pixelRowSpan[x] = new Rgba32(rgb[0], rgb[1], rgb[2]);
                 }
             }
             return target;
