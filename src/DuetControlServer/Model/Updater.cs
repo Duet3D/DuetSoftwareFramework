@@ -152,44 +152,59 @@ namespace DuetControlServer.Model
                         // Update object model keys depending on the sequence numbers
                         foreach (JsonProperty seqProperty in statusResult.GetProperty("seqs").EnumerateObject())
                         {
-                            if (seqProperty.Name != "reply" && (!Settings.UpdateOnly || seqProperty.Name == "boards"))
+                            if (seqProperty.Name != "reply" && (!Settings.UpdateOnly || seqProperty.Name == "boards") &&
+                                seqProperty.Value.ValueKind == JsonValueKind.Number)
                             {
                                 int newSeq = seqProperty.Value.GetInt32();
                                 if (!_lastSeqs.TryGetValue(seqProperty.Name, out int lastSeq) || lastSeq != newSeq)
                                 {
                                     _logger.Debug("Requesting update of key {0}, seq {1} -> {2}", seqProperty.Name, lastSeq, newSeq);
 
-                                    jsonData = await SPI.Interface.RequestObjectModel(seqProperty.Name, "d99vn");
-                                    using JsonDocument keyDocument = JsonDocument.Parse(jsonData);
-                                    if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
-                                        keyDocument.RootElement.TryGetProperty("result", out JsonElement keyResult))
+                                    int next = 0, offset = 0;
+                                    do
                                     {
-                                        _lastSeqs[seqProperty.Name] = newSeq;
-                                        using (await Provider.AccessReadWriteAsync())
+                                        // Request the next model chunk
+                                        jsonData = await SPI.Interface.RequestObjectModel(seqProperty.Name, (next == 0) ? "d99vn" : $"d99vna{next}");
+                                        using JsonDocument keyDocument = JsonDocument.Parse(jsonData);
+                                        offset = next;
+                                        next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
+
+                                        if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
+                                            keyDocument.RootElement.TryGetProperty("result", out JsonElement keyResult))
                                         {
-                                            if (Provider.Get.UpdateFromFirmwareModel(keyName.GetString(), keyResult))
+                                            _lastSeqs[seqProperty.Name] = newSeq;
+                                            using (await Provider.AccessReadWriteAsync())
                                             {
-                                                _logger.Debug("Updated key {0}", keyName.GetString());
-                                                if (_logger.IsTraceEnabled)
+                                                if (Provider.Get.UpdateFromFirmwareModel(keyName.GetString(), keyResult, offset, next == 0))
                                                 {
-                                                    _logger.Trace("Key JSON: {0}", keyResult.ToString());
+                                                    _logger.Debug("Updated key {0}{1}", keyName.GetString(), (offset + next != 0) ? $" starting from {offset}, next {next}" : string.Empty);
+                                                    if (_logger.IsTraceEnabled)
+                                                    {
+                                                        _logger.Trace("Key JSON: {0}", keyResult.ToString());
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    _logger.Warn($"Invalid key {keyName.GetString()} in the object model");
+                                                    break;
+                                                }
+
+                                                if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
+                                                {
+                                                    Provider.Get.State.Status = MachineStatus.Updating;
                                                 }
                                             }
-                                            else
-                                            {
-                                                _logger.Warn($"Invalid key {keyName.GetString()} in the object model");
-                                            }
-
-                                            if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
-                                            {
-                                                Provider.Get.State.Status = MachineStatus.Updating;
-                                            }
                                         }
+                                        else
+                                        {
+                                            _logger.Warn("Received invalid object model key response without key and/or result field(s)");
+                                            break;
+                                        }
+
+                                        // Check the index of the next element
+                                        offset = next;
                                     }
-                                    else
-                                    {
-                                        _logger.Warn("Received invalid object model key response without key and/or result field(s)");
-                                    }
+                                    while (next != 0);
                                 }
                             }
                         }

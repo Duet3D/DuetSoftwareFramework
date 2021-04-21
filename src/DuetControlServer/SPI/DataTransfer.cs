@@ -61,7 +61,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Currently-used protocol version
         /// </summary>
-        public static int ProtocolVersion { get => _rxHeader.ProtocolVersion; }
+        public static int ProtocolVersion { get; private set; }
 
         /// <summary>
         /// Set up the SPI device and the controller for the transfer ready pin
@@ -190,6 +190,7 @@ namespace DuetControlServer.SPI
                     }
 
                     // Verify the protocol version
+                    ProtocolVersion = _rxHeader.ProtocolVersion;
                     if ((_hadTimeout || !_started) && ProtocolVersion != Consts.ProtocolVersion)
                     {
                         _ = Logger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
@@ -1028,6 +1029,56 @@ namespace DuetControlServer.SPI
 
             WritePacket(Communication.LinuxRequests.Request.FilesAborted, dataLength);
             Serialization.Writer.WriteCodeChannel(GetWriteBuffer(dataLength), channel);
+            return true;
+        }
+
+        /// <summary>
+        /// Set a global or local variable
+        /// </summary>
+        /// <param name="channel">G-code channel</param>
+        /// <param name="createVariable">Whether the variable should be created or updated</param>
+        /// <param name="varName">Name of the variable including global or var prefix</param>
+        /// <param name="expression">New value of the variable</param>
+        /// <returns>True if the packet could be written</returns>
+        public static bool WriteSetVariable(CodeChannel channel, bool createVariable, string varName, string expression)
+        {
+            // Serialize the request first to see how much space it requires
+            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
+            int dataLength = Serialization.Writer.WriteSetVariable(span, channel, createVariable, varName, expression);
+
+            // See if the request fits into the buffer
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            // Write it
+            WritePacket(Communication.LinuxRequests.Request.SetVariable, dataLength);
+            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            return true;
+        }
+
+        /// <summary>
+        /// Delete a local variable at the end of the current code block
+        /// </summary>
+        /// <param name="channel">G-code channel</param>
+        /// <param name="varName">Name of the variable excluding var prefix</param>
+        /// <returns>True fi the packet could be written</returns>
+        public static bool WriteDeleteLocalVariable(CodeChannel channel, string varName)
+        {
+            // Serialize the request first to see how much space it requires
+            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
+            int dataLength = Serialization.Writer.WriteDeleteLocalVariable(span, channel, varName);
+
+            // See if the request fits into the buffer
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            // Write it
+            WritePacket(Communication.LinuxRequests.Request.DeleteLocalVariable, dataLength);
+            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 

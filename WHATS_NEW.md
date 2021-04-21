@@ -1,6 +1,24 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.3-b3
+==============
+
+Compatible versions:
+- RepRapFirmware 3.3-b3
+- DuetWebControl 3.3-b3
+
+New features:
+- Added support for variables in G-code files (`global`, `var`, `set`)
+
+Changed behaviour:
+- Added fallback to `directories.system` if firmware files cannot be found in `directories.firmware`
+
+Bug fixes:
+- Tilt factors for delta kinematics were off in config-override.g
+- M0/M1 didn't cancel already queued file codes
+- Truncated tool lists are now fetched using multiple queries
+
 Version 3.3-b2
 ==============
 

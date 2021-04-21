@@ -125,6 +125,18 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// All the files have been aborted on a particular channel
         /// </summary>
         /// <seealso cref="Shared.CodeChannelHeader"/>
-        FilesAborted = 19
+        FilesAborted = 19,
+
+        /// <summary>
+        /// Initialize or update a variable (global, var, or set)
+        /// </summary>
+        /// <seealso cref="SetVariableHeader"/>
+        SetVariable = 20,
+
+        /// <summary>
+        /// Delete an existing local variable at the end of a code block
+        /// </summary>
+        /// <seealso cref="Shared.StringHeader"/>
+        DeleteLocalVariable = 21
     }
 }

@@ -96,6 +96,12 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// <summary>
         /// Last message successfully acknowledged
         /// </summary>
-        MessageAcknowledged = 15
+        MessageAcknowledged = 15,
+
+        /// <summary>
+        /// Response to a variable set request
+        /// </summary>
+        /// <seealso cref="EvaluationResultHeader"/>
+        VariableResult = 16
     }
 }

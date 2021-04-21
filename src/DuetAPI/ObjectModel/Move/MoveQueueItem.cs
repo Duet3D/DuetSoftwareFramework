@@ -6,9 +6,9 @@
     public sealed class MoveQueueItem : ModelObject
     {
         /// <summary>
-        /// The minimum idle time in milliseconds, before we should start a move
+        /// The minimum idle time before we should start a move (in s)
         /// </summary>
-        public uint GracePeriod { get; set; }
+        public float GracePeriod { get; set; }
 
         /// <summary>
         /// Maximum number of moves that can be accomodated in the DDA ring

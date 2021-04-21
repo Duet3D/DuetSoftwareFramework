@@ -331,6 +331,12 @@ namespace DuetAPI.Commands
                                     throw new CodeParserException("Dynamic command numbers are only supported for T-codes");
                                 }
                             }
+                            else if (letter == 'g' && value == "lobal")
+                            {
+                                result.Keyword = KeywordType.Global;
+                                result.KeywordArgument = string.Empty;
+                                inCondition = true;
+                            }
                             else if (value.Contains('.'))
                             {
                                 string[] args = value.Split('.');

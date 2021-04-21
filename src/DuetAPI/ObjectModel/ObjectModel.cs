@@ -37,6 +37,11 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<Fan> Fans { get; } = new ModelCollection<Fan>();
 
         /// <summary>
+        /// Dictionary of global variables vs atomic values (float, int, string)
+        /// </summary>
+        public ModelDictionary<object> Global { get; set; } = new ModelDictionary<object>();
+
+        /// <summary>
         /// Information about the heat subsystem
         /// </summary>
         public Heat Heat { get; } = new Heat();
@@ -141,8 +146,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="key">Property name to update</param>
         /// <param name="jsonElement">Element to update this intance from</param>
+        /// <param name="offset">Index offset</param>
+        /// <param name="last">Whether this is the last update</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromFirmwareModel(string key, JsonElement jsonElement) => InternalUpdateFromModel(key, jsonElement, true);
+        public bool UpdateFromFirmwareModel(string key, JsonElement jsonElement, int offset = 0, bool last = true) => InternalUpdateFromModel(key, jsonElement, true, offset, last);
 
         /// <summary>
         /// Update a specific key of this instance from a given JSON element
@@ -158,8 +165,10 @@ namespace DuetAPI.ObjectModel
         /// <param name="key">Property name to update</param>
         /// <param name="jsonElement">Element to update this intance from</param>
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <param name="offset">Index offset</param>
+        /// <param name="last">Whether this is the last update</param>
         /// <returns>Whether the key could be updated</returns>
-        private bool InternalUpdateFromModel(string key, JsonElement jsonElement, bool ignoreSbcProperties)
+        private bool InternalUpdateFromModel(string key, JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
         {
             if (string.IsNullOrEmpty(key))
             {
@@ -191,7 +200,19 @@ namespace DuetAPI.ObjectModel
                     }
                     else
                     {
-                        ModelCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonElement, ignoreSbcProperties);
+                        ModelCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonElement, ignoreSbcProperties, offset, last);
+                    }
+                    return true;
+                }
+
+                if (key == "global")
+                {
+                    foreach (var jsonProperty in jsonElement.EnumerateObject())
+                    {
+                        if (!Global.TryGetValue(jsonProperty.Name, out object value) || !value.Equals(jsonProperty.Value))
+                        {
+                            Global[jsonProperty.Name] = jsonProperty.Value.Clone();
+                        }
                     }
                     return true;
                 }

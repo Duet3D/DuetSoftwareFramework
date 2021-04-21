@@ -53,6 +53,15 @@ namespace DuetControlServer.Codes
                                 {
                                     return new CodeResult(MessageType.Error, "Pause the print before attempting to cancel it");
                                 }
+
+                                // Reassign the code's cancellation token to ensure M0/M1 is forwarded to RRF
+                                if (code.Channel == CodeChannel.File)
+                                {
+                                    code.ResetCancellationToken();
+                                }
+
+                                // Invalidate the print file and make sure no more codes are read from it
+                                await FileExecution.Job.Cancel();
                             }
                         }
                         break;
@@ -911,16 +920,28 @@ namespace DuetControlServer.Codes
                                 return new CodeResult(MessageType.Error, "Cannot update firmware because IAP and firmware filenames are unknown");
                             }
 
-                            iapFile = await FilePath.ToPhysicalAsync(iapFile, FileDirectory.Firmware);
-                            if (!File.Exists(iapFile))
+                            string physicalIapFile = await FilePath.ToPhysicalAsync(iapFile, FileDirectory.Firmware);
+                            if (!File.Exists(physicalIapFile))
                             {
-                                return new CodeResult(MessageType.Error, $"Failed to find IAP file {iapFile}");
+                                string sysIapFile = await FilePath.ToPhysicalAsync(iapFile, FileDirectory.System);
+                                if (!File.Exists(sysIapFile))
+                                {
+                                    return new CodeResult(MessageType.Error, $"Failed to find IAP file {iapFile}");
+                                }
+                                _logger.Warn("Using fallback IAP file {0}", sysIapFile);
+                                physicalIapFile = sysIapFile;
                             }
 
-                            firmwareFile = await FilePath.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware);
-                            if (!File.Exists(firmwareFile))
+                            string physicalFrmwareFile = await FilePath.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware);
+                            if (!File.Exists(physicalFrmwareFile))
                             {
-                                return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
+                                string sysFirmwareFile = await FilePath.ToPhysicalAsync(firmwareFile, FileDirectory.System);
+                                if (!File.Exists(sysFirmwareFile))
+                                {
+                                    return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
+                                }
+                                _logger.Warn("Using fallback firmware file {0}", sysFirmwareFile);
+                                physicalFrmwareFile = sysFirmwareFile;
                             }
 
                             // Stop all the plugins
@@ -928,8 +949,8 @@ namespace DuetControlServer.Codes
                             await stopCommand.Execute();
 
                             // Flash the firmware
-                            using FileStream iapStream = new(iapFile, FileMode.Open, FileAccess.Read);
-                            using FileStream firmwareStream = new(firmwareFile, FileMode.Open, FileAccess.Read);
+                            using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read);
+                            using FileStream firmwareStream = new(physicalFrmwareFile, FileMode.Open, FileAccess.Read);
                             if (Path.GetExtension(firmwareFile) == ".uf2")
                             {
                                 using MemoryStream unpackedFirmwareStream = await Utility.UF2.Unpack(firmwareStream);
@@ -968,7 +989,7 @@ namespace DuetControlServer.Codes
                     {
                         if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await SPI.Interface.Flush(code))
                         {
-                            await SPI.Interface.Reset();
+                            await SPI.Interface.ResetFirmware();
                             return new CodeResult();
                         }
                         throw new OperationCanceledException();
@@ -993,20 +1014,6 @@ namespace DuetControlServer.Codes
 
             switch (code.MajorNumber)
             {
-                // Stop or Unconditional stop
-                // Sleep or Conditional stop
-                case 0:
-                case 1:
-                    using (await FileExecution.Job.LockAsync())
-                    {
-                        if (FileExecution.Job.IsFileSelected)
-                        {
-                            // Invalidate the print file and make sure no more codes are read from it
-                            await FileExecution.Job.Cancel();
-                        }
-                    }
-                    break;
-
                 // Resume print
                 // Select file and start SD print
                 // Simulate file

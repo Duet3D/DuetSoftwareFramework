@@ -77,7 +77,9 @@ namespace DuetAPI.ObjectModel
         /// Update this collection from a given JSON array
         /// </summary>
         /// <param name="jsonElement">Element to update this intance from</param>
-        public override void UpdateFromJson(JsonElement jsonElement)
+        /// <param name="offset">Index offset</param>
+        /// <param name="last">Whether this is the last update</param>
+        public override void UpdateFromJson(JsonElement jsonElement, int offset = 0, bool last = true)
         {
             ModelGrowingCollectionHelper.UpdateFromJson(this, typeof(T), jsonElement, false);
         }

@@ -458,13 +458,17 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Cancel the current print (e.g. when M0 is called)
+        /// Cancel the current print (e.g. when M0/M1 is called)
         /// </summary>
         /// <returns>Asynchronous task</returns>
         public static async Task Cancel()
         {
             if (IsFileSelected)
             {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+
                 using (await _file.LockAsync())
                 {
                     _file.Close();

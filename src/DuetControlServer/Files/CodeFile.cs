@@ -248,18 +248,7 @@ namespace DuetControlServer.Files
                 {
                     if (!codeRead || ((code.Keyword != KeywordType.None || code.Type != CodeType.Comment) && code.Indent <= state.StartingCode.Indent))
                     {
-                        if (state.StartingCode.Keyword == KeywordType.If ||
-                            state.StartingCode.Keyword == KeywordType.ElseIf ||
-                            state.StartingCode.Keyword == KeywordType.Else)
-                        {
-                            // End of conditional block
-                            using (await _lock.LockAsync(Program.CancellationToken))
-                            {
-                                _logger.Debug("End of {0} block", state.StartingCode.Keyword);
-                                _lastCodeBlock = _codeBlocks.Pop();
-                            }
-                        }
-                        else if (state.StartingCode.Keyword == KeywordType.While)
+                        if (state.StartingCode.Keyword == KeywordType.While)
                         {
                             if (state.ProcessBlock && !state.SeenCodes)
                             {
@@ -284,18 +273,18 @@ namespace DuetControlServer.Files
                                     }
                                     break;
                                 }
-
-                                using (await _lock.LockAsync(Program.CancellationToken))
-                                {
-                                    _logger.Debug("End of {0} block", state.StartingCode.Keyword);
-                                    _lastCodeBlock = _codeBlocks.Pop();
-                                }
+                                await EndCodeBlock();
                             }
                             else
                             {
                                 // Restarting while loop
                                 break;
                             }
+                        }
+                        else
+                        {
+                            // End of generic code block
+                            await EndCodeBlock();
                         }
                     }
                     else
@@ -312,6 +301,7 @@ namespace DuetControlServer.Files
                 // Check if any more codes could be read
                 if (!codeRead)
                 {
+                    // RRF cleans up the local variables automatically when a file is closed, no need to do it here as well
                     return null;
                 }
 
@@ -433,6 +423,31 @@ namespace DuetControlServer.Files
                             }
                             return code;
 
+                        case KeywordType.Global:
+                        case KeywordType.Var:
+                        case KeywordType.Set:
+                            if (codeBlock != null)
+                            {
+                                codeBlock.SeenCodes = true;
+                            }
+                            if (codeBlock == null || codeBlock.StartingCode.Indent < code.Indent)
+                            {
+                                using (await _lock.LockAsync(Program.CancellationToken))
+                                {
+                                    codeBlock = new CodeBlock
+                                    {
+                                        StartingCode = code
+                                    };
+                                    _codeBlocks.Push(codeBlock);
+                                }
+                            }
+
+                            using (await _lock.LockAsync(Program.CancellationToken))
+                            {
+                                _pendingCodes.Enqueue(code);
+                            }
+                            return code;
+
                         case KeywordType.Echo:
                         case KeywordType.None:
                             if (codeBlock != null)
@@ -492,6 +507,45 @@ namespace DuetControlServer.Files
                 }
                 throw new OperationCanceledException();
             }
+        }
+
+        /// <summary>
+        /// Called to finish the current code block
+        /// </summary>
+        /// <returns>True if the last code block could be disposed of</returns>
+        private async Task<bool> EndCodeBlock()
+        {
+            using (await _lock.LockAsync(Program.CancellationToken))
+            {
+                if (_codeBlocks.TryPop(out CodeBlock block))
+                {
+                    // Log the end of this block
+                    if (block.StartingCode.Keyword == KeywordType.If ||
+                        block.StartingCode.Keyword == KeywordType.ElseIf ||
+                        block.StartingCode.Keyword == KeywordType.Else ||
+                        block.StartingCode.Keyword == KeywordType.While)
+                    {
+                        _logger.Debug("End of {0} block", block.StartingCode.Keyword);
+                    }
+                    else
+                    {
+                        _logger.Debug("End of generic block", block.StartingCode.Keyword);
+                    }
+
+                    // Delete previously created local variables
+                    Task[] deletionTasks = new Task[block.LocalVariables.Count];
+                    for (int i = 0; i < block.LocalVariables.Count; i++)
+                    {
+                        deletionTasks[i] = SPI.Interface.SetVariable(Channel, false, block.LocalVariables[i], null);
+                    }
+                    await Task.WhenAll(deletionTasks);
+
+                    // End
+                    _lastCodeBlock = block;
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

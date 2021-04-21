@@ -62,7 +62,7 @@ namespace DuetControlServer.Files
                     $"X{deltaKinematics.Towers[0].AngleCorrection:F3} Y{deltaKinematics.Towers[1].AngleCorrection:F3} Z{deltaKinematics.Towers[2].AngleCorrection:F3}");
                 await writer.WriteLineAsync("M666 " +
                     $"X{deltaKinematics.Towers[0].EndstopAdjustment:F3} Y{deltaKinematics.Towers[1].EndstopAdjustment:F3} Z{deltaKinematics.Towers[2].EndstopAdjustment:F3} " +
-                    $"A{deltaKinematics.XTilt:F2} B{deltaKinematics.YTilt:F2}");
+                    $"A{deltaKinematics.XTilt * 100F:F2} B{deltaKinematics.YTilt * 100F:F2}");
             }
         }
 

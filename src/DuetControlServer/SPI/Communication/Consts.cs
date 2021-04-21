@@ -24,7 +24,7 @@ namespace DuetControlServer.SPI.Communication
         /// <summary>
         /// Used protocol version. This is incremented whenever the protocol details change
         /// </summary>
-        public const ushort ProtocolVersion = 4;
+        public const ushort ProtocolVersion = 5;
 
         /// <summary>
         /// Default size of a data transfer buffer
@@ -42,7 +42,12 @@ namespace DuetControlServer.SPI.Communication
         public const int MaxExpressionLength = 256;
 
         /// <summary>
-        /// Maximum number of evaluation requests to send per transfer
+        /// Maximum lenght of a variable name
+        /// </summary>
+        public const int MaxVariableLength = 120;
+
+        /// <summary>
+        /// Maximum number of evaluation and variable requests to send per transfer
         /// </summary>
         public const int MaxEvaluationRequestsPerTransfer = 32;
 

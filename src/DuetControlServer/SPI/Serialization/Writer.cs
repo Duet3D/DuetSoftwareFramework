@@ -618,6 +618,10 @@ namespace DuetControlServer.SPI.Serialization
         public static int WriteEvaluateExpression(Span<byte> to, CodeChannel channel, string expression)
         {
             Span<byte> unicodeExpression = Encoding.UTF8.GetBytes(expression);
+            if (unicodeExpression.Length > Consts.MaxExpressionLength)
+            {
+                throw new ArgumentException("Value is too long", nameof(expression));
+            }
 
             // Write header
             CodeChannelHeader header = new()
@@ -680,6 +684,80 @@ namespace DuetControlServer.SPI.Serialization
             // Write data
             unicodeMessage.CopyTo(to[bytesWritten..]);
             bytesWritten += unicodeMessage.Length;
+            return AddPadding(to, bytesWritten);
+        }
+
+        /// <summary>
+        /// Write a <see cref="SetVariableHeader"/> to a memory span
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="channel">Source of this request</param>
+        /// <param name="createVariable">Create a new variable</param>
+        /// <param name="varName">Name of the variable including prefix</param>
+        /// <param name="expression">Content to assign to the variable</param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteSetVariable(Span<byte> to, CodeChannel channel, bool createVariable, string varName, string expression)
+        {
+            Span<byte> unicodeVarName = Encoding.UTF8.GetBytes(varName);
+            if (unicodeVarName.Length > Consts.MaxVariableLength)
+            {
+                throw new ArgumentException("Value is too long", nameof(varName));
+            }
+
+            Span<byte> unicodeExpression = Encoding.UTF8.GetBytes(expression);
+            if (unicodeExpression.Length > Consts.MaxExpressionLength)
+            {
+                throw new ArgumentException("Value is too long", nameof(expression));
+            }
+
+            // Write header
+            SetVariableHeader request = new()
+            {
+                Channel = channel,
+                CreateVariable = (byte)(createVariable ? 1 : 0),
+                VariableLength = (byte)unicodeVarName.Length,
+                ExpressionLength = (byte)unicodeExpression.Length
+            };
+            MemoryMarshal.Write(to, ref request);
+            int bytesWritten = Marshal.SizeOf<SetVariableHeader>();
+
+            // Write variable name
+            unicodeVarName.CopyTo(to[bytesWritten..]);
+            bytesWritten += unicodeVarName.Length;
+
+            // Write expression
+            unicodeExpression.CopyTo(to[bytesWritten..]);
+            bytesWritten += unicodeExpression.Length;
+            return AddPadding(to, bytesWritten);
+        }
+
+        /// <summary>
+        /// Write a <see cref="DeleteLocalVariableHeader"/> to a memory span
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="channel">Source of this request</param>
+        /// <param name="varName">Name of the variable excluding var prefix</param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteDeleteLocalVariable(Span<byte> to, CodeChannel channel, string varName)
+        {
+            Span<byte> unicodeVarName = Encoding.UTF8.GetBytes(varName);
+            if (unicodeVarName.Length > Consts.MaxVariableLength)
+            {
+                throw new ArgumentException("Value is too long", nameof(varName));
+            }
+
+            // Write header
+            SetVariableHeader request = new()
+            {
+                Channel = channel,
+                VariableLength = (byte)unicodeVarName.Length
+            };
+            MemoryMarshal.Write(to, ref request);
+            int bytesWritten = Marshal.SizeOf<SetVariableHeader>();
+
+            // Write variable name
+            unicodeVarName.CopyTo(to[bytesWritten..]);
+            bytesWritten += unicodeVarName.Length;
             return AddPadding(to, bytesWritten);
         }
 

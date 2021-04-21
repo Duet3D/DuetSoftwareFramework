@@ -573,6 +573,17 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseGlobal()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse(" \tglobal foo=\"bar\""))
+            {
+                Assert.AreEqual(4, code.Indent);
+                Assert.AreEqual(KeywordType.Global, code.Keyword);
+                Assert.AreEqual("foo=\"bar\"", code.KeywordArgument);
+            }
+        }
+
+        [Test]
         public void ParseEcho()
         {
             foreach (DuetAPI.Commands.Code code in Parse("echo {{3 + 3} + (volumes[0].freeSpace - 4)}"))

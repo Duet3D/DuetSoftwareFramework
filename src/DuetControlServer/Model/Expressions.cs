@@ -282,15 +282,57 @@ namespace DuetControlServer.Model
                     return builder.ToString();
                 }
 
-                string keywordArgument = code.KeywordArgument.Trim();
+                if (code.Keyword == KeywordType.Abort ||
+#pragma warning disable CS0618 // Type or member is obsolete
+                    code.Keyword == KeywordType.Return
+#pragma warning restore CS0618 // Type or member is obsolete
+                    )
+                {
+                    string keywordArgument = code.KeywordArgument.Trim();
+                    try
+                    {
+                        string result = await EvaluateExpression(code, keywordArgument, !evaluateAll, false);
+                        return result;
+                    }
+                    catch (CodeParserException cpe)
+                    {
+                        throw new CodeParserException($"Failed to evaluate \"{keywordArgument}\": {cpe.Message}", cpe);
+                    }
+                }
+
+                string keywordExpression;
+                if (code.Keyword == KeywordType.Global || code.Keyword == KeywordType.Var || code.Keyword == KeywordType.Set)
+                {
+                    // Get the actual expression
+                    keywordExpression = string.Empty;
+                    bool inExpression = false;
+                    foreach (char c in code.KeywordArgument)
+                    {
+                        if (inExpression)
+                        {
+                            keywordExpression += c;
+                        }
+                        else if (c == '=')
+                        {
+                            inExpression = true;
+                        }
+                    }
+                }
+                else
+                {
+                    // Condition equals the keyword argument
+                    keywordExpression = code.KeywordArgument;
+                }
+
+                // Evaluate Linux properties
                 try
                 {
-                    string result = await EvaluateExpression(code, keywordArgument, !evaluateAll, false);
+                    string result = await EvaluateExpression(code, keywordExpression.Trim(), !evaluateAll, false);
                     return result;
                 }
                 catch (CodeParserException cpe)
                 {
-                    throw new CodeParserException($"Failed to evaluate \"{keywordArgument}\": {cpe.Message}", cpe);
+                    throw new CodeParserException($"Failed to evaluate \"{keywordExpression}\": {cpe.Message}", cpe);
                 }
             }
 

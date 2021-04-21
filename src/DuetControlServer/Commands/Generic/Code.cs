@@ -126,6 +126,17 @@ namespace DuetControlServer.Commands
         internal CancellationToken CancellationToken { get; set; }
 
         /// <summary>
+        /// Used to reset the cancellation token of this code
+        /// </summary>
+        internal void ResetCancellationToken()
+        {
+            lock (_cancellationTokenSources)
+            {
+                CancellationToken = _cancellationTokenSources[(int)Channel].Token;
+            }
+        }
+
+        /// <summary>
         /// Create a task that waits until this code can be executed.
         /// It may be cancelled if this code is supposed to be cancelled before it is started
         /// </summary>
@@ -358,17 +369,17 @@ namespace DuetControlServer.Commands
                     }
                     throw;
                 }
-                catch (InvalidOperationException)
+                catch (InvalidOperationException ioe)
                 {
                     // Some inputs may be disabled in a custom build
                     Result = new CodeResult(MessageType.Error, $"Code channel {Channel} is disabled");
-                    _logger.Debug("{0} cannot be executed{1} because its code channel {1} is disabled", this, logSuffix, Channel);
+                    _logger.Debug(ioe, "{0} cannot be executed{1} because its code channel {2} is disabled", this, logSuffix, Channel);
                 }
-                catch (NotSupportedException)
+                catch (NotSupportedException nse)
                 {
                     // Some codes may not be supported yet
-                    Result = new CodeResult(MessageType.Error, "Code is not supported");
-                    _logger.Debug("{0} is not supported{1}", this, logSuffix);
+                    Result = new CodeResult(MessageType.Error, "Operation is not supported");
+                    _logger.Debug(nse, "{0} is not supported{1}", this, logSuffix);
                 }
                 catch (Exception e)
                 {
@@ -463,9 +474,15 @@ namespace DuetControlServer.Commands
         /// <returns>Whether the code could be processed internally</returns>
         private async Task<bool> ProcessInternally()
         {
+            if (Keyword != KeywordType.None &&
+                Keyword != KeywordType.Echo &&
+                Keyword != KeywordType.Abort &&
 #pragma warning disable CS0618 // Type or member is obsolete
-            if (Keyword != KeywordType.None && Keyword != KeywordType.Echo && Keyword != KeywordType.Abort && Keyword != KeywordType.Return)
+                Keyword != KeywordType.Return &&
 #pragma warning restore CS0618 // Type or member is obsolete
+                Keyword != KeywordType.Global &&
+                Keyword != KeywordType.Var &&
+                Keyword != KeywordType.Set)
             {
                 // Other meta keywords must be handled before we get here...
                 throw new InvalidOperationException("Conditional codes must not be executed");
@@ -525,23 +542,10 @@ namespace DuetControlServer.Commands
                 }
             }
 
-            // Evaluate echo, abort, and return
-#pragma warning disable CS0618 // Type or member is obsolete
-            if (Keyword == KeywordType.Echo || Keyword == KeywordType.Abort || Keyword == KeywordType.Return)
-#pragma warning restore CS0618 // Type or member is obsolete
+            // Handle keywords
+            if (Keyword != KeywordType.None)
             {
-                if (!await Interface.Flush(this, false))
-                {
-                    throw new OperationCanceledException();
-                }
-
-                string result = string.IsNullOrEmpty(KeywordArgument) ? string.Empty : await Expressions.Evaluate(this, true);
-                Result = new CodeResult(MessageType.Success, result);
-
-                if (Keyword == KeywordType.Abort)
-                {
-                    await Interface.AbortAll(Channel);
-                }
+                Result = await Keywords.Process(this);
                 InternallyProcessed = true;
                 return true;
             }
@@ -551,6 +555,7 @@ namespace DuetControlServer.Commands
                 (string.IsNullOrWhiteSpace(Comment) || !Settings.FirmwareComments.Any(chunk => Comment.Contains(chunk))))
             {
                 Result = new CodeResult();
+                InternallyProcessed = true;
                 return true;
             }
 

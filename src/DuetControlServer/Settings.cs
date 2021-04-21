@@ -213,7 +213,9 @@ namespace DuetControlServer
             "layer",					// S3D "; layer 1, z=0.200"
             "LAYER",					// Ideamaker, Cura (followed by layer number starting at zero)
             "BEGIN_LAYER_OBJECT z=",	// KISSlicer (followed by Z height)
-            "HEIGHT"					// Ideamaker
+            "HEIGHT",					// Ideamaker
+            "PRINTING",					// Ideamaker
+            "REMAINING_TIME"			// Ideamaker
         };
 
         /// <summary>

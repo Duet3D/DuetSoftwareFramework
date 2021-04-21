@@ -103,9 +103,11 @@ namespace DuetAPI.ObjectModel
         /// Update this collection from a given JSON array
         /// </summary>
         /// <param name="jsonElement">Element to update this intance from</param>
-        public virtual void UpdateFromJson(JsonElement jsonElement)
+        /// <param name="offset">Index offset</param>
+        /// <param name="last">Whether this is the last update</param>
+        public virtual void UpdateFromJson(JsonElement jsonElement, int offset = 0, bool last = true)
         {
-            ModelCollectionHelper.UpdateFromJson(this, typeof(T), jsonElement, false);
+            ModelCollectionHelper.UpdateFromJson(this, typeof(T), jsonElement, false, offset, last);
         }
     }
 
@@ -209,23 +211,28 @@ namespace DuetAPI.ObjectModel
         /// <param name="itemType">Item type</param>
         /// <param name="jsonElement">Element to update the intance from</param>
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-        public static void UpdateFromJson(IList list, Type itemType, JsonElement jsonElement, bool ignoreSbcProperties)
+        /// <param name="offset">Index offset</param>
+        /// <param name="last">Whether this is the last update call</param>
+        public static void UpdateFromJson(IList list, Type itemType, JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
         {
             int arrayLength = jsonElement.GetArrayLength();
 
-            // Delete obsolete items
-            for (int i = list.Count; i > arrayLength; i--)
+            // Delete obsolete items when the last update has been processed
+            if (last)
             {
-                list.RemoveAt(i - 1);
+                for (int i = list.Count; i > offset + arrayLength; i--)
+                {
+                    list.RemoveAt(i - 1);
+                }
             }
 
             if (itemType.IsSubclassOf(typeof(ModelObject)))
             {
                 // Update model items
-                for (int i = 0; i < Math.Min(list.Count, arrayLength); i++)
+                for (int i = offset; i < Math.Min(list.Count, offset + arrayLength); i++)
                 {
                     ModelObject item = (ModelObject)list[i];
-                    JsonElement jsonItem = jsonElement[i];
+                    JsonElement jsonItem = jsonElement[i - offset];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
                         if (list[i] != null)
@@ -249,9 +256,9 @@ namespace DuetAPI.ObjectModel
                 }
 
                 // Add missing items
-                for (int i = list.Count; i < arrayLength; i++)
+                for (int i = list.Count; i < offset + arrayLength; i++)
                 {
-                    JsonElement jsonItem = jsonElement[i];
+                    JsonElement jsonItem = jsonElement[i - offset];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
                         list.Add(null);
@@ -267,9 +274,9 @@ namespace DuetAPI.ObjectModel
             else
             {
                 // Update items
-                for (int i = 0; i < Math.Min(list.Count, arrayLength); i++)
+                for (int i = 0; i < Math.Min(list.Count, offset + arrayLength); i++)
                 {
-                    JsonElement jsonItem = jsonElement[i];
+                    JsonElement jsonItem = jsonElement[i - offset];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
                         if (list[i] != null)
@@ -329,9 +336,9 @@ namespace DuetAPI.ObjectModel
                 }
 
                 // Add missing items
-                for (int i = list.Count; i < arrayLength; i++)
+                for (int i = list.Count; i < offset + arrayLength; i++)
                 {
-                    JsonElement jsonItem = jsonElement[i];
+                    JsonElement jsonItem = jsonElement[i - offset];
                     if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
                     {
                         try

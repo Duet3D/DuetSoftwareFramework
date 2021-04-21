@@ -1,4 +1,5 @@
 ﻿using DuetControlServer.Commands;
+using System.Collections.Generic;
 
 namespace DuetControlServer.Files
 {
@@ -36,5 +37,10 @@ namespace DuetControlServer.Files
         /// Number of times this code block has been run so far
         /// </summary>
         public int Iterations { get; set; }
+
+        /// <summary>
+        /// List of local variables
+        /// </summary>
+        public List<string> LocalVariables { get; } = new List<string>();
     }
 }

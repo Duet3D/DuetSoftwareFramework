@@ -10,7 +10,7 @@ namespace DuetControlServer.SPI.Communication.Shared
     public struct CodeChannelHeader
     {
         /// <summary>
-        /// Channel which has locked or unlocked the resource
+        /// Channel of the corresponding request
         /// </summary>
         public CodeChannel Channel;
     }

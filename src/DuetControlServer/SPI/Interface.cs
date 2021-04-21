@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -58,8 +59,9 @@ namespace DuetControlServer.SPI
         private static readonly Queue<PendingModelQuery> _pendingModelQueries = new();
         private static DateTime _lastQueryTime = DateTime.Now;
 
-        // Expression evaluation requests
+        // Expression evaluation and variable requests
         private static readonly List<EvaluateExpressionRequest> _evaluateExpressionRequests = new();
+        private static readonly List<VariableRequest> _variableRequests = new();
 
         // Heightmap requests
         private static readonly AsyncLock _heightmapLock = new();
@@ -135,7 +137,9 @@ namespace DuetControlServer.SPI
         /// <param name="expression">Expression to evaluate</param>
         /// <returns>Result of the evaluated expression</returns>
         /// <exception cref="CodeParserException">Failed to evaluate expression</exception>
-        /// <exception cref="InvalidOperationException">Incompatible firmware version or not connected over SPI</exception>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
+        /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
+        /// <exception cref="ArgumentException">Invalid parameter</exception>
         public static Task<object> EvaluateExpression(CodeChannel channel, string expression)
         {
             if (Settings.NoSpi)
@@ -144,11 +148,11 @@ namespace DuetControlServer.SPI
             }
             if (DataTransfer.ProtocolVersion == 1)
             {
-                throw new InvalidOperationException("Incompatible firmware version");
+                throw new NotSupportedException("Incompatible firmware version");
             }
             if (Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
             {
-                throw new InvalidOperationException($"Expression too long (max {Consts.MaxExpressionLength} chars)");
+                throw new ArgumentException($"Expression too long (max {Consts.MaxExpressionLength} chars)", nameof(expression));
             }
 
             lock (_evaluateExpressionRequests)
@@ -162,10 +166,57 @@ namespace DuetControlServer.SPI
                     }
                 }
 
-                EvaluateExpressionRequest newItem = new(channel, expression);
-                _evaluateExpressionRequests.Add(newItem);
+                EvaluateExpressionRequest request = new(channel, expression);
+                _evaluateExpressionRequests.Add(request);
                 _logger.Debug("Evaluating {0} on channel {1}", expression, channel);
-                return newItem.Task;
+                return request.Task;
+            }
+        }
+
+        /// <summary>
+        /// Set or delete a global or local variable
+        /// </summary>
+        /// <param name="channel">Where to evaluate the expression</param>
+        /// <param name="createVariable">Whether the variable shall be created</param>
+        /// <param name="varName">Name of the variable</param>
+        /// <param name="expression">Expression to evaluate</param>
+        /// <returns>Result of the evaluated expression</returns>
+        /// <exception cref="CodeParserException">Failed to assign or delete variable</exception>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
+        /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
+        /// <exception cref="ArgumentException">Invalid parameter</exception>
+        public static Task<object> SetVariable(CodeChannel channel, bool createVariable, string varName, string expression)
+        {
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+            if (DataTransfer.ProtocolVersion < 5)
+            {
+                throw new NotSupportedException("Incompatible firmware version");
+            }
+            if (Encoding.UTF8.GetByteCount(varName) >= Consts.MaxVariableLength)
+            {
+                throw new ArgumentException($"Variable too long (max {Consts.MaxVariableLength} chars)");
+            }
+            if (expression != null && Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
+            {
+                throw new ArgumentException($"Expression too long (max {Consts.MaxExpressionLength} chars)");
+            }
+
+            lock (_variableRequests)
+            {
+                VariableRequest request = new(channel, createVariable, varName, expression);
+                _variableRequests.Add(request);
+                if (expression != null)
+                {
+                    _logger.Debug("Setting variable {0} to {1} on channel {2}", varName, expression, channel);
+                }
+                else
+                {
+                    _logger.Debug("Deleting local variable {0} on channel {1}", varName, channel);
+                }
+                return request.Task;
             }
         }
 
@@ -346,7 +397,7 @@ namespace DuetControlServer.SPI
         /// Perform a firmware reset and wait for it to finish
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task Reset()
+        public static async Task ResetFirmware()
         {
             if (!Settings.NoSpi)
             {
@@ -617,6 +668,8 @@ namespace DuetControlServer.SPI
         /// <param name="flags">Message flags</param>
         /// <param name="message">Message content</param>
         /// <exception cref="InvalidOperationException">Incompatible firmware or not connected over SPI</exception>
+        /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
+        /// <exception cref="ArgumentException">Invalid parameter</exception>
         public static void SendMessage(MessageTypeFlags flags, string message)
         {
             if (Settings.NoSpi)
@@ -625,7 +678,7 @@ namespace DuetControlServer.SPI
             }
             if (DataTransfer.ProtocolVersion == 1)
             {
-                throw new InvalidOperationException("Incompatible firmware version");
+                throw new NotSupportedException("Incompatible firmware version");
             }
             if (message.Length > Settings.MaxMessageLength)
             {
@@ -843,15 +896,15 @@ namespace DuetControlServer.SPI
                     }
                 }
 
-                // Ask for expressions to be evaluated
-                lock (_evaluateExpressionRequests)
                 {
                     int numEvaluationsSent = 0;
-                    foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
+
+                    // Ask for expressions to be evaluated
+                    lock (_evaluateExpressionRequests)
                     {
-                        if (!request.Written)
+                        foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
                         {
-                            if (DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression))
+                            if (!request.Written && DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression))
                             {
                                 skipDelay = request.Written = true;
 
@@ -859,6 +912,37 @@ namespace DuetControlServer.SPI
                                 if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
                                 {
                                     break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Perform variable updates
+                    lock (_variableRequests)
+                    {
+                        foreach (VariableRequest request in _variableRequests.ToList())
+                        {
+                            if (!request.Written)
+                            {
+                                if ((request.Expression != null && DataTransfer.WriteSetVariable(request.Channel, request.CreateVariable, request.VariableName, request.Expression)) ||
+                                    (request.Expression == null && DataTransfer.WriteDeleteLocalVariable(request.Channel, request.VariableName)))
+                                {
+                                    skipDelay = true;
+                                    if (request.Expression == null)
+                                    {
+                                        request.SetResult(null);
+                                        _variableRequests.Remove(request);
+                                    }
+                                    else
+                                    {
+                                        request.Written = true;
+                                    }
+
+                                    numEvaluationsSent++;
+                                    if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
+                                    {
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -996,6 +1080,9 @@ namespace DuetControlServer.SPI
                     break;
                 case Request.MessageAcknowledged:
                     await HandleMessageAcknowledgement();
+                    break;
+                case Request.VariableResult:
+                    HandleVariableResult();
                     break;
             }
             return false;
@@ -1222,7 +1309,20 @@ namespace DuetControlServer.SPI
 
             try
             {
-                string filePath = await FilePath.ToPhysicalAsync(filename, filename.EndsWith(".bin") ? FileDirectory.Firmware : FileDirectory.System);
+                string filePath;
+                if (filename.EndsWith(".bin") || filename.EndsWith(".uf2"))
+                {
+                    filePath = await FilePath.ToPhysicalAsync(filename, FileDirectory.Firmware);
+                    if (!File.Exists(filePath))
+                    {
+                        filePath = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
+                    }
+                }
+                else
+                {
+                    filePath = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
+                }
+
                 using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read)
                 {
                     Position = offset
@@ -1330,6 +1430,37 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Handle the result of a variable assignment
+        /// </summary>
+        private static void HandleVariableResult()
+        {
+            DataTransfer.ReadEvaluationResult(out string varName, out object result);
+            _logger.Trace("Received variable assignment result for {0} = {1}", varName, result);
+
+            lock (_evaluateExpressionRequests)
+            {
+                foreach (VariableRequest request in _variableRequests)
+                {
+                    if (request.VariableName == varName)
+                    {
+                        if (result is Exception exception)
+                        {
+                            request.SetException(exception);
+                        }
+                        else
+                        {
+                            request.SetResult(result);
+                        }
+                        _variableRequests.Remove(request);
+                        return;
+                    }
+                }
+            }
+
+            _logger.Warn("Unresolved variable set result for variable {0} = {1}", varName, result);
+        }
+
+        /// <summary>
         /// Invalidate every resource due to a critical event
         /// </summary>
         /// <param name="message">Reason why everything is being invalidated</param>
@@ -1364,7 +1495,7 @@ namespace DuetControlServer.SPI
                 _pendingModelQueries.Clear();
             }
 
-            // Resolve pending expression evaluation requests
+            // Resolve pending expression evaluation and variable requests
             lock (_evaluateExpressionRequests)
             {
                 foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
@@ -1372,6 +1503,15 @@ namespace DuetControlServer.SPI
                     request.SetCanceled();
                 }
                 _evaluateExpressionRequests.Clear();
+            }
+
+            lock (_variableRequests)
+            {
+                foreach (VariableRequest request in _variableRequests)
+                {
+                    request.SetCanceled();
+                }
+                _variableRequests.Clear();
             }
 
             // Resolve pending heightmap requests
