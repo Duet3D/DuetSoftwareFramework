@@ -173,6 +173,7 @@ build_progs() {
 	[ -d $COMMON_DIR/duetruntime/ ] && $RSYNC $COMMON_DIR/duetruntime/. $DEST_DIR/duetruntime_$dcsver/
 	[ -d $PACKAGER_DIR/duetruntime/ ] && $RSYNC $PACKAGER_DIR/duetruntime/. $DEST_DIR/duetruntime_$dcsver/
 	mv $DEST_DIR/files/* $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin
+	cp $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin/DuetAPI.xml $DEST_DIR/files/DuetAPI.xml
 }
 
 build_plugins() {
@@ -233,6 +234,7 @@ build_dwc() {
 	[ -d $PACKAGER_DIR/duetwebcontrol/ ] && $RSYNC $PACKAGER_DIR/duetwebcontrol/. $DEST_DIR/duetwebcontrol_$dwcver/
 
 	unzip -q $DEST_DIR/DuetWebControl/dist/DuetWebControl-SBC.zip -d $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc
+	cp $DEST_DIR/files/DuetAPI.xml $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/dwc/DuetAPI.xml
 	mkdir -p $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/sd
 	>/dev/null pushd $DEST_DIR/duetwebcontrol_$dwcver/opt/dsf/sd
 	ln -s ../dwc www
