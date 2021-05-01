@@ -5,8 +5,8 @@ Version 3.3-rc1
 ===============
 
 Compatible versions:
-- RepRapFirmware 3.3-b3
-- DuetWebControl 3.3-b3
+- RepRapFirmware 3.3-rc1
+- DuetWebControl 3.3-rc1
 
 New features:
 - Added support for abbreviated G-codes in CNC and Laser mode (Fanuc and LaserWeb G-code style)
