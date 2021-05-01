@@ -91,7 +91,7 @@ namespace DuetControlServer.Files
                     _reader.DiscardBufferedData();
                     _position = value;
                     _parserBuffer.Invalidate();
-                    _parserBuffer.LineNumber = LineNumber = (value == 0) ? (long?)1 : null;
+                    _parserBuffer.LineNumber = LineNumber = (value == 0) ? 1 : null;
                 }
             }
         }
@@ -193,7 +193,7 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
-        /// Read the next available code and interpret conditional codes except for echo
+        /// Read the next available code and interpret conditional codes performing flow control
         /// </summary>
         /// <param name="sharedCode">Code that may be reused</param>
         /// <returns>Read code or null if none found</returns>
@@ -230,6 +230,14 @@ namespace DuetControlServer.Files
 
                     do
                     {
+                        // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
+                        using (await Model.Provider.AccessReadOnlyAsync())
+                        {
+                            _parserBuffer.MayRepeatCode = Model.Provider.Get.State.MachineMode == DuetAPI.ObjectModel.MachineMode.CNC ||
+                                                          Model.Provider.Get.State.MachineMode == DuetAPI.ObjectModel.MachineMode.Laser;
+                        }
+
+                        // Get the next code
                         codeRead = await DuetAPI.Commands.Code.ParseAsync(_reader, code, _parserBuffer);
                         _position += code.Length.Value;
                         LineNumber = code.LineNumber;
@@ -246,7 +254,7 @@ namespace DuetControlServer.Files
                 bool readAgain = false;
                 while (_codeBlocks.TryPeek(out CodeBlock state))
                 {
-                    if (!codeRead || ((code.Keyword != KeywordType.None || code.Type != CodeType.Comment) && code.Indent <= state.StartingCode.Indent))
+                    if (!codeRead || ((code.Keyword != KeywordType.None || (code.Type != CodeType.None && code.Type != CodeType.Comment)) && code.Indent <= state.StartingCode.Indent))
                     {
                         if (state.StartingCode.Keyword == KeywordType.While)
                         {

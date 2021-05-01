@@ -7,6 +7,11 @@ namespace DuetAPI.Commands
     public partial class Code
     {
         /// <summary>
+        /// Array of possible axis letters for Fanuc CNC and LaserWeb G-code styles
+        /// </summary>
+        private static readonly char[] PossibleAxisLetters = { 'X', 'Y', 'Z', 'U', 'V', 'W', 'A', 'B', 'C', 'D' };
+
+        /// <summary>
         /// Parse the next available G/M/T-code from the given stream asynchronously
         /// </summary>
         /// <param name="reader">Input to read from</param>
@@ -397,7 +402,7 @@ namespace DuetAPI.Commands
                                 throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
                             }
                         }
-                        else if (result.Type == CodeType.Comment && result.MajorNumber == null && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
+                        else if (result.Type == CodeType.None && result.MajorNumber == null && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
                         {
                             // Check for conditional G-code
                             if (letter == 'i' && value == "f")
@@ -465,7 +470,7 @@ namespace DuetAPI.Commands
                             }
                             else if (result.Parameter(letter) == null)
                             {
-                                AddParameter(result, char.ToUpperInvariant(letter), value, false, false);
+                                AddParameter(result, char.ToUpperInvariant(letter), value, false, buffer.MayRepeatCode);
                             }
                             // Ignore duplicate parameters
                         }
@@ -535,6 +540,33 @@ namespace DuetAPI.Commands
             {
                 result.Flags |= CodeFlags.IsLastCode;
                 buffer.InvalidateData();
+            }
+
+            // Deal with Fanuc and LaserWeb G-code styles
+            if (buffer.MayRepeatCode)
+            {
+                if (result.Type == CodeType.GCode && result.MajorNumber != null)
+                {
+                    buffer.LastGCode = result.MajorNumber.Value;
+                }
+                else if (result.Type == CodeType.None && result.Keyword == KeywordType.None &&
+                         buffer.LastGCode >= 0 && buffer.LastGCode <= 3 &&
+                         (result.Parameters.Any(parameter => PossibleAxisLetters.Contains(parameter.Letter)) ||
+                          buffer.LastGCode >= 2 && result.Parameters.Any(parameter => parameter.Letter == 'I' || parameter.Letter == 'J')))
+                {
+                    result.Type = CodeType.GCode;
+                    result.MajorNumber = buffer.LastGCode;
+                }
+                else
+                {
+                    buffer.LastGCode = -1;
+                }
+            }
+
+            // Check if this is a whole-line comment
+            if (result.Type == CodeType.None && result.Parameters.Count == 0 && result.Comment != null)
+            {
+                result.Type = CodeType.Comment;
             }
 
             // Do not allow malformed codes

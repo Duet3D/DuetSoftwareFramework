@@ -45,9 +45,9 @@ namespace DuetAPI.Commands
         public CodeResult Result { get; set; }
 
         /// <summary>
-        /// Type of the code. If no exact type could be determined, it is interpreted as a comment
+        /// Type of the code
         /// </summary>
-        public CodeType Type { get; set; } = CodeType.Comment;
+        public CodeType Type { get; set; } = CodeType.None;
 
         /// <summary>
         /// Code channel to send this code to
@@ -121,7 +121,7 @@ namespace DuetAPI.Commands
         {
             SourceConnection = 0;
             Result = null;
-            Type = CodeType.Comment;
+            Type = CodeType.None;
             Channel = Defaults.InputChannel;
             LineNumber = null;
             Indent = 0;
@@ -215,26 +215,31 @@ namespace DuetAPI.Commands
             // After this append each parameter and encapsulate it in double quotes
             foreach(CodeParameter parameter in Parameters)
             {
+                if (builder.Length > 0)
+                {
+                    builder.Append(' ');
+                }
+
                 if (parameter.Letter != '@')
                 {
                     if (parameter.Type == typeof(string) && !parameter.IsExpression)
                     {
-                        builder.Append($" {parameter.Letter}\"{((string)parameter).Replace("\"", "\"\"")}\"");
+                        builder.Append($"{parameter.Letter}\"{((string)parameter).Replace("\"", "\"\"")}\"");
                     }
                     else
                     {
-                        builder.Append($" {parameter.Letter}{(string)parameter}");
+                        builder.Append($"{parameter.Letter}{(string)parameter}");
                     }
                 }
                 else
                 {
                     if (parameter.Type == typeof(string) && !parameter.IsExpression)
                     {
-                        builder.Append($" \"{((string)parameter).Replace("\"", "\"\"")}\"");
+                        builder.Append($"\"{((string)parameter).Replace("\"", "\"\"")}\"");
                     }
                     else
                     {
-                        builder.Append($" {(string)parameter}");
+                        builder.Append((string)parameter);
                     }
                 }
             }
@@ -246,6 +251,7 @@ namespace DuetAPI.Commands
                 {
                     builder.Append(' ');
                 }
+
                 builder.Append(';');
                 builder.Append(Comment);
             }
@@ -269,6 +275,11 @@ namespace DuetAPI.Commands
             if (Keyword != KeywordType.None)
             {
                 return KeywordToString();
+            }
+
+            if (Type == CodeType.None)
+            {
+                return string.Empty;
             }
 
             if (Type == CodeType.Comment)

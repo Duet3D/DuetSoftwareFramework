@@ -287,6 +287,47 @@
             <seealso cref="T:DuetAPI.Commands.Resolve"/>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.CodeInterceptionReadWrite"/>
         </member>
+        <member name="T:DuetAPIClient.CodeStreamConnection">
+            <summary>
+            Base connection class for sending commands to the control server
+            </summary>
+            <seealso cref="F:DuetAPI.Connection.ConnectionMode.Command"/>
+        </member>
+        <member name="M:DuetAPIClient.CodeStreamConnection.#ctor">
+            <summary>
+            Creates a new connection in intercepting mode
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.CodeStreamConnection.Connect(System.Int32,DuetAPI.CodeChannel,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Establish a connection to the given UNIX socket file
+            </summary>
+            <param name="socketPath">Path to the UNIX socket file</param>
+            <param name="bufferSize">Maximum number of codes to execute simultaneously</param>
+            <param name="channel">Destination channel for incoming codes</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:DuetAPI.Connection.IncompatibleVersionException">API level is incompatible</exception>
+            <exception cref="T:System.IO.IOException">Connection mode is unavailable</exception>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Init message could not be processed</exception>
+        </member>
+        <member name="P:DuetAPIClient.CodeStreamConnection.BufferSize">
+            <summary>
+            Maximum number of codes being executed simultaneously
+            </summary>
+        </member>
+        <member name="P:DuetAPIClient.CodeStreamConnection.Channel">
+            <summary>
+            Destination channel for incoming codes
+            </summary>
+        </member>
+        <member name="M:DuetAPIClient.CodeStreamConnection.GetStream">
+            <summary>
+            Get a network stream for input/output of codes
+            </summary>
+            <returns></returns>
+        </member>
         <member name="T:DuetAPIClient.BaseCommandConnection">
             <summary>
             Base connection class for sending commands to the control server

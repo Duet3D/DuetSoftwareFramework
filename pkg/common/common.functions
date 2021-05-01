@@ -156,6 +156,7 @@ build_progs() {
 	rm -rf $DEST_DIR/duettools_$dcsver/
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CodeConsole/CodeConsole.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CodeLogger/CodeLogger.csproj
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CodeStream/CodeStream.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/CustomHttpEndpoint/CustomHttpEndpoint.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/ModelObserver/ModelObserver.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/files $SRC_DIR/PluginManager/PluginManager.csproj

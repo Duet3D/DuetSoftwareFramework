@@ -147,7 +147,17 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _pauseDuration, value);
         }
         private int? _pauseDuration;
-        
+
+        /// <summary>
+        /// Total extrusion amount without extrusion factors applied (in mm)
+        /// </summary>
+        public float? RawExtrusion
+        {
+            get => _rawExtrusion;
+            set => SetPropertyValue(ref _rawExtrusion, value);
+        }
+        private float? _rawExtrusion;
+
         /// <summary>
         /// Estimated times left
         /// </summary>

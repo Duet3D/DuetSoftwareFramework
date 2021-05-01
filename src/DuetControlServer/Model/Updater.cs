@@ -413,6 +413,7 @@ namespace DuetControlServer.Model
                 {
                     Provider.Get.State.Status = MachineStatus.Off;
                 }
+                Provider.ClearGlobalVariables();
             }
 
             _lastSeqs.Clear();

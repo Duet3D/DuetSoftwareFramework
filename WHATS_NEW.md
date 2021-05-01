@@ -1,6 +1,22 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.3-rc1
+===============
+
+Compatible versions:
+- RepRapFirmware 3.3-b3
+- DuetWebControl 3.3-b3
+
+New features:
+- Added support for abbreviated G-codes in CNC and Laser mode (Fanuc and LaserWeb G-code style)
+- Added new code streaming mode to the API for easier Repetier and Octoprint integration
+- Implemented new command line utility to test and demonstrate the new code stream mode
+
+Bug fixes:
+- Global variables in the OM were not cleared when DSF lost connection to RRF
+- When prints were paused during macros, under special cirumstances the macro was run again on resume
+
 Version 3.3-b3
 ==============
 

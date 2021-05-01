@@ -125,7 +125,7 @@ namespace DuetAPIClient
         private async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
             using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_socket, cancellationToken);
-            return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions);
+            return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken);
         }
 
         /// <summary>

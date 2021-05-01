@@ -214,6 +214,14 @@ namespace DuetControlServer.IPC
                         initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response, JsonHelper.DefaultJsonOptions);
                         return new ModelSubscription(conn, initMessage);
 
+                    case ConnectionMode.CodeStream:
+                        if (!conn.CheckCommandPermissions(CodeStream.SupportedCommands))
+                        {
+                            throw new UnauthorizedAccessException("Insufficient permissions");
+                        }
+                        initMessage = JsonSerializer.Deserialize<CodeStreamInitMessage>(response, JsonHelper.DefaultJsonOptions);
+                        return new CodeStream(conn, initMessage);
+
                     case ConnectionMode.PluginService:
                         initMessage = JsonSerializer.Deserialize<PluginServiceInitMessage>(response, JsonHelper.DefaultJsonOptions);
                         return new PluginService(conn);

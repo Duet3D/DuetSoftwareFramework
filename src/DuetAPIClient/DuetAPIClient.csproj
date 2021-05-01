@@ -6,7 +6,7 @@
     <Company>Duet3D Ltd</Company>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
-    <Version>3.3-b3</Version>
+    <Version>3.3-rc1</Version>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Description>Official client API library for Duet Software Framework (Duet 3) by Duet3D</Description>
     <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>

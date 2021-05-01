@@ -33,6 +33,12 @@ namespace DuetAPI.Connection
         Subscribe,
 
         /// <summary>
+        /// Code stream mode. This mode lets users send and receive code replies asynchronously using a single socket connection
+        /// </summary>
+        /// <seealso cref="InitMessages.CodeStreamInitMessage"/>
+        CodeStream,
+
+        /// <summary>
         /// Plugin service mode. This mode is used internally and should not be used by third-party plugins!
         /// </summary>
         PluginService

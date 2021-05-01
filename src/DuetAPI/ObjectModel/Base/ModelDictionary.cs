@@ -93,7 +93,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Clear the items
         /// </summary>
-        public void Clear() => throw new NotSupportedException();
+        public void Clear() => _dictionary.Clear();
 
         /// <summary>
         /// Create a clone of this instance

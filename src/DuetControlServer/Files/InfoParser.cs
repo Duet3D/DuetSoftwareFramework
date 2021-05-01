@@ -510,7 +510,7 @@ namespace DuetControlServer.Files
                     continue;
                 }
 
-                if (code.Type != CodeType.Comment)
+                if (code.Type != CodeType.None && code.Type != CodeType.Comment)
                 {
                     return;
                 }

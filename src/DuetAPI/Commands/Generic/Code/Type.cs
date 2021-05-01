@@ -4,11 +4,16 @@ using System.Text.Json.Serialization;
 namespace DuetAPI.Commands
 {
     /// <summary>
-    /// Type of a generic G/M/T-code. If none is applicable, it is treated as a comment
+    /// Type of a generic G/M/T-code
     /// </summary>
     [JsonConverter(typeof(JsonCharEnumConverter))]
     public enum CodeType
     {
+        /// <summary>
+        /// Undetermined
+        /// </summary>
+        None = '\0',
+
         /// <summary>
         /// Whole line comment
         /// </summary>

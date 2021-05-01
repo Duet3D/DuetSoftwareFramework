@@ -98,7 +98,7 @@ BINDIR = $(CONFIGDIR)/$(BUILD_ARCH)
 
 # These variables are static and only need to be expanded once
 # so we use the ":=" assignment
-DIRS := DuetControlServer DuetWebServer DuetPluginService CodeConsole CodeLogger CustomHttpEndpoint ModelObserver PluginManager
+DIRS := DuetControlServer DuetWebServer DuetPluginService CodeConsole CodeLogger CodeStream CustomHttpEndpoint ModelObserver PluginManager
 # DIRS_BUILD will expaned to DuetControlServer-build DuetWebServer-build, etc.
 # Same for the following rules.
 DIRS_BUILD := $(addsuffix .build,$(DIRS))
@@ -261,7 +261,7 @@ DuetWebControl.publish: DuetWebControl.build
 # are lower case.
 DuetTools.buildroot: OUTPUTDIR = $(BINDIR)/buildroot/DuetTools
 DuetTools.buildroot: LCTARGET = duettools
-DuetTools.buildroot: CodeConsole.buildroot CodeLogger.buildroot CustomHttpEndpoint.buildroot ModelObserver.buildroot PluginManager.buildroot
+DuetTools.buildroot: CodeConsole.buildroot CodeLogger.buildroot CodeStream.buildroot CustomHttpEndpoint.buildroot ModelObserver.buildroot PluginManager.buildroot
 	$(ECHO_PREFIX)$(TARGET_TITLE)
 	$(CMD_PREFIX)rm -rf $(OUTPUTDIR)
 	$(CMD_PREFIX)mkdir -p $(OUTPUTDIR)

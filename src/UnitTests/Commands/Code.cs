@@ -813,6 +813,42 @@ namespace UnitTests.Commands
                 Assert.AreEqual(3, code.LineNumber);
             }
 
+
+            codeString = "G1 X1 Y5 F3000\nX5 F300\nY40";
+            codeBytes = Encoding.UTF8.GetBytes(codeString);
+            using (MemoryStream memoryStream = new(codeBytes))
+            {
+                using StreamReader reader = new(memoryStream);
+                CodeParserBuffer buffer = new(128, true) { MayRepeatCode = true };
+                DuetAPI.Commands.Code code = new() { LineNumber = 0 };
+
+                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                Assert.AreEqual(1, code.LineNumber);
+                Assert.AreEqual(CodeType.GCode, code.Type);
+                Assert.AreEqual(1, code.MajorNumber);
+                Assert.AreEqual(3, code.Parameters.Count);
+                Assert.AreEqual(1, (int)code.Parameter('X'));
+                Assert.AreEqual(5, (int)code.Parameter('Y'));
+                Assert.AreEqual(3000, (int)code.Parameter('F'));
+
+                code.Reset();
+                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                Assert.AreEqual(CodeType.GCode, code.Type);
+                Assert.AreEqual(1, code.MajorNumber);
+                Assert.AreEqual(2, code.LineNumber);
+                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual(5, (int)code.Parameter('X'));
+                Assert.AreEqual(300, (int)code.Parameter('F'));
+
+                code.Reset();
+                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                Assert.AreEqual(3, code.LineNumber);
+                Assert.AreEqual(CodeType.GCode, code.Type);
+                Assert.AreEqual(1, code.MajorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual(40, (int)code.Parameter('Y'));
+            }
+
             codeString = "G1 X1 Y5 F3000\n  G53 G1 X5 F300\n    G53 G0 Y40 G1 Z50\n  G4 S3\nG1 Z3";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
             using (MemoryStream memoryStream = new(codeBytes))

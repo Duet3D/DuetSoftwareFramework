@@ -60,7 +60,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Socket holding the connection of the UNIX socket
         /// </summary>
-        private readonly Socket _unixSocket;
+        public Socket UnixSocket { get; }
 
         /// <summary>
         /// Constructor for new connections
@@ -68,7 +68,7 @@ namespace DuetControlServer.IPC
         /// <param name="socket">New UNIX socket</param>
         public Connection(Socket socket)
         {
-            _unixSocket = socket;
+            UnixSocket = socket;
             Id = Interlocked.Increment(ref _idCounter);
 
             Logger = NLog.LogManager.GetLogger($"IPC#{Id}");
@@ -80,7 +80,7 @@ namespace DuetControlServer.IPC
         /// <returns>True if permissions could be assigned</returns>
         public async Task<bool> AssignPermissions()
         {
-            _unixSocket.GetPeerCredentials(out int pid, out int uid, out int gid);
+            UnixSocket.GetPeerCredentials(out int pid, out int uid, out int gid);
 
             // Check if the remote program is running as root
             if (uid == 0 || gid == 0)
@@ -178,7 +178,7 @@ namespace DuetControlServer.IPC
                 return;
             }
 
-            _unixSocket.Dispose();
+            UnixSocket.Dispose();
 
             disposed = true;
         }
@@ -186,7 +186,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Indicates if the connection is still available
         /// </summary>
-        public bool IsConnected { get => !disposed && _unixSocket.Connected; }
+        public bool IsConnected { get => !disposed && UnixSocket.Connected; }
 
         /// <summary>
         /// Read a generic JSON object from the socket
@@ -200,7 +200,7 @@ namespace DuetControlServer.IPC
             {
                 try
                 {
-                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, Program.CancellationToken);
+                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
                     Logger.Trace(() => $"Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
                     return await JsonDocument.ParseAsync(jsonStream);
@@ -249,7 +249,7 @@ namespace DuetControlServer.IPC
             {
                 try
                 {
-                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, Program.CancellationToken);
+                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
                     Logger.Trace(() => $"Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
                     using StreamReader reader = new(jsonStream);
@@ -368,18 +368,18 @@ namespace DuetControlServer.IPC
         {
             byte[] toSend = (obj is byte[] byteArray) ? byteArray : JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
             Logger.Trace(() => $"Sending {Encoding.UTF8.GetString(toSend)}");
-            return _unixSocket.SendAsync(toSend, SocketFlags.None);
+            return UnixSocket.SendAsync(toSend, SocketFlags.None);
         }
 
         /// <summary>
         /// Check if the connection is still alive
         /// </summary>
         /// <exception cref="SocketException">Connection is no longer available</exception>
-        public void Poll() => _unixSocket.Send(Array.Empty<byte>());
+        public void Poll() => UnixSocket.Send(Array.Empty<byte>());
 
         /// <summary>
         /// Close the socket before shutting down
         /// </summary>
-        public void Close() => _unixSocket.Shutdown(SocketShutdown.Send);
+        public void Close() => UnixSocket.Shutdown(SocketShutdown.Send);
     }
 }

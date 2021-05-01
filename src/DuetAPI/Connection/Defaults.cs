@@ -29,5 +29,15 @@
         /// Default code channel to use
         /// </summary>
         public const CodeChannel InputChannel = CodeChannel.SBC;
+
+        /// <summary>
+        /// Default number of codes to buffer in <see cref="ConnectionMode.CodeStream"/> mode 
+        /// </summary>
+        public const int CodeBufferSize = 32;
+
+        /// <summary>
+        /// Maximum number of codes to buffer in <see cref="ConnectionMode.CodeStream"/> mode
+        /// </summary>
+        public const int MaxCodeBufferSize = 256;
     }
 }

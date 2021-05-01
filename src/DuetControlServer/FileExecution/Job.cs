@@ -473,7 +473,7 @@ namespace DuetControlServer.FileExecution
                 {
                     _file.Close();
                 }
-                IsCancelled = true;
+                IsCancelled = IsPaused;
                 Resume();
             }
         }

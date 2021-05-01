@@ -551,8 +551,8 @@ namespace DuetControlServer.Commands
             }
 
             // Do not send comments that may not be interpreted by RRF
-            if (Type == CodeType.Comment &&
-                (string.IsNullOrWhiteSpace(Comment) || !Settings.FirmwareComments.Any(chunk => Comment.Contains(chunk))))
+            if ((Type == CodeType.None) ||
+                (Type == CodeType.Comment && (string.IsNullOrWhiteSpace(Comment) || !Settings.FirmwareComments.Any(chunk => Comment.Contains(chunk)))))
             {
                 Result = new CodeResult();
                 InternallyProcessed = true;

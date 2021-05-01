@@ -51,7 +51,7 @@ namespace DuetControlServer.Codes
             {
                 // Validate the keyword and expression first
                 string varName = string.Empty, expression = string.Empty;
-                bool inExpression = false;
+                bool inExpression = false, wantExpression = false;
                 foreach (char c in code.KeywordArgument)
                 {
                     if (inExpression)
@@ -62,13 +62,17 @@ namespace DuetControlServer.Codes
                     {
                         inExpression = true;
                     }
-                    else
+                    else if (!char.IsWhiteSpace(c))
                     {
-                        if (!char.IsLetterOrDigit(c) && !char.IsWhiteSpace(c) && (c != '.' || code.Keyword != KeywordType.Set))
+                        if ((!char.IsLetterOrDigit(c) && (c != '.' || code.Keyword != KeywordType.Set)) || wantExpression)
                         {
                             throw new CodeParserException("expected '='", code);
                         }
                         varName += c;
+                    }
+                    else if (!string.IsNullOrEmpty(varName))
+                    {
+                        wantExpression = true;
                     }
                 }
 

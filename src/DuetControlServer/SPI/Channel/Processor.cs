@@ -64,7 +64,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// This is set to true if all the files have been aborted and RRF has to be notified
         /// </summary>
-        private bool _allFilesAborted { get; set; }
+        private bool _allFilesAborted;
 
         /// <summary>
         /// Prioritised codes that override every other code
@@ -556,6 +556,18 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
+        /// Process code replies that could not be interpreted immediately
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private async Task ResolvePendingReplies()
+        {
+            while (BufferedCodes.Count > 0 && PendingReplies.TryPop(out Tuple<MessageTypeFlags, string> reply))
+            {
+                await HandleReply(reply.Item1, reply.Item2);
+            }
+        }
+
+        /// <summary>
         /// Process pending requests on this channel
         /// </summary>
         /// <returns>Whether a response can be expected from RRF in the next transmission</returns>
@@ -563,14 +575,9 @@ namespace DuetControlServer.SPI.Channel
         {
             bool responseExpected = false;
 
-            // Process code replies that could not be interpreted immediately
-            while (BufferedCodes.Count > 0 && PendingReplies.TryPop(out Tuple<MessageTypeFlags, string> reply))
-            {
-                await HandleReply(reply.Item1, reply.Item2);
-            }
-
-            // 1. Whole line comments
+            // 1. Whole line comments and pending replies
             ResolveCommentCodes();
+            await ResolvePendingReplies();
 
             // 2. Lock/Unlock requests
             if (CurrentState.LockRequests.TryPeek(out LockRequest lockRequest))
@@ -631,6 +638,7 @@ namespace DuetControlServer.SPI.Channel
                                     BytesBuffered += startCode.BinarySize;
                                     BufferedCodes.Insert(0, startCode);
                                     CurrentState.StartCode = null;
+                                    await ResolvePendingReplies();
                                 }
 
                                 // Macro has finished, pop the stack
@@ -1004,9 +1012,10 @@ namespace DuetControlServer.SPI.Channel
                 // Code has not finished yet, need a separate response for it
                 BytesBuffered += startCode.BinarySize;
                 BufferedCodes.Insert(0, startCode);
+                CurrentState.StartCode = null;
+                await ResolvePendingReplies();
             }
 
-            CurrentState.StartCode = null;
             await Pop();
         }
 
@@ -1023,9 +1032,10 @@ namespace DuetControlServer.SPI.Channel
                 Code startCode = CurrentState.StartCode;
                 if (startCode != null)
                 {
-                    BufferedCodes.Insert(0, CurrentState.StartCode);
                     BytesBuffered += CurrentState.StartCode.BinarySize;
+                    BufferedCodes.Insert(0, CurrentState.StartCode);
                     CurrentState.StartCode = null;
+                    await ResolvePendingReplies();
                 }
 
                 await Pop();

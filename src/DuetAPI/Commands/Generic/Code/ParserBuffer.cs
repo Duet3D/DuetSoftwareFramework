@@ -64,6 +64,16 @@ namespace DuetAPI.Commands
         public long? LineNumber;
 
         /// <summary>
+        /// Last major G-code to repeat
+        /// </summary>
+        internal int LastGCode = -1;
+
+        /// <summary>
+        /// Indicates if the last code may be repeated as per Fanuc or LaserWeb style
+        /// </summary>
+        public bool MayRepeatCode;
+
+        /// <summary>
         /// Invalidate the buffer
         /// </summary>
         public void Invalidate()
@@ -71,6 +81,7 @@ namespace DuetAPI.Commands
             InvalidateData();
             BufferSize = 0;
             LineNumber = null;
+            LastGCode = -1;
         }
 
         /// <summary>

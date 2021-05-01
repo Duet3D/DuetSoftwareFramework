@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DuetAPI.ObjectModel;
+using System;
 
 namespace DuetControlServer.Model
 {
@@ -37,6 +38,14 @@ namespace DuetControlServer.Model
             path.CopyTo(newPath, 0);
             toAdd.CopyTo(newPath, path.Length);
             return newPath;
+        }
+
+        /// <summary>
+        /// Notify subscribers that the list of global variables has been reset
+        /// </summary>
+        public static void GlobalVariablesCleared()
+        {
+            OnPropertyPathChanged?.Invoke(new object[] { nameof(ObjectModel.Global) }, PropertyChangeType.Property, null);
         }
     }
 }

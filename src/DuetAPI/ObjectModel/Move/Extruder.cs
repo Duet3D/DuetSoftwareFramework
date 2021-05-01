@@ -98,7 +98,7 @@ namespace DuetAPI.ObjectModel
         private float _pressureAdvance;
 
         /// <summary>
-        /// Raw extruder position without extrusion factor applied (in mm)
+        /// Raw extruder position as commanded by the slicer without extrusion factor applied (in mm)
         /// </summary>
         public float RawPosition
         {

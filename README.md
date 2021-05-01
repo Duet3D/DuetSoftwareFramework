@@ -123,6 +123,20 @@ The following command-line arguments are available:
 - `-q`, `--quiet`: Do not display when a connection has been established (only applicable if `-c` is not set)
 - `-h`, `--help`: Display all available command-line parameters
 
+### CodeStream
+
+This tool can be used to stream codes in order to execute multiple G/M/T-codes without waiting for a response first.
+When a code has finished, the corresponding result is written to the console.
+
+#### Command-Line Options
+
+The following command-line arguments are available:
+
+- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
+- `-b`, `--buffer-size <size>`: Maximum number of codes to execute simultaneously
+- `-q`, `--quiet`: Do not display when a connection has been established (only applicable if `-c` is not set)
+- `-h`, `--help`: Display all available command-line parameters
+
 ### CustomHttpEndpoint
 
 This tool lets you create a custom RESTful HTTP or WebSocket endpoint via `/machine/{namespace}/{path}`. If started without any command-line arguments, it will try to register a new HTTP GET endpoint at `/machine/custom-http-endpoint/demo` that is accessible from a web browser. It is possible to register different HTTP methods at the same endpoint path.

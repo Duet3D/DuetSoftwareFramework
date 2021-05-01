@@ -39,6 +39,9 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Dictionary of global variables vs atomic values (float, int, string)
         /// </summary>
+        /// <remarks>
+        /// When DSF attempts to reconnect to RRF, this may be set to null to clear the contents
+        /// </remarks>
         public ModelDictionary<object> Global { get; set; } = new ModelDictionary<object>();
 
         /// <summary>
@@ -207,11 +210,18 @@ namespace DuetAPI.ObjectModel
 
                 if (key == "global")
                 {
-                    foreach (var jsonProperty in jsonElement.EnumerateObject())
+                    if (jsonElement.ValueKind == JsonValueKind.Null)
                     {
-                        if (!Global.TryGetValue(jsonProperty.Name, out object value) || !value.Equals(jsonProperty.Value))
+                        Global.Clear();
+                    }
+                    else
+                    {
+                        foreach (var jsonProperty in jsonElement.EnumerateObject())
                         {
-                            Global[jsonProperty.Name] = jsonProperty.Value.Clone();
+                            if (!Global.TryGetValue(jsonProperty.Name, out object value) || !value.Equals(jsonProperty.Value))
+                            {
+                                Global[jsonProperty.Name] = jsonProperty.Value.Clone();
+                            }
                         }
                     }
                     return true;

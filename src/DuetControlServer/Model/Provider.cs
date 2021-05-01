@@ -247,6 +247,15 @@ namespace DuetControlServer.Model
         public static Task<IDisposable> AccessReadWriteAsync() => AccessReadWriteAsync(Program.CancellationToken);
 
         /// <summary>
+        /// Reset the global variables when the connection has been lost
+        /// </summary>
+        public static void ClearGlobalVariables()
+        {
+            Get.Global.Clear();
+            Observer.GlobalVariablesCleared();
+        }
+
+        /// <summary>
         /// Wait for an update to occur
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>

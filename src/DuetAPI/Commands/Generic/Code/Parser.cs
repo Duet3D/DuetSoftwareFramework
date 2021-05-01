@@ -24,6 +24,7 @@ namespace DuetAPI.Commands
         /// - does not update the line number unless it is specified using the 'N' character
         /// - does not set the corresponding flag for G53 after the first code on a line
         /// - sets the indentation level only for the first code in a line
+        /// - does not support Fanuc or LaserWeb styles
         /// </remarks>
         public static bool Parse(TextReader reader, Code result)
         {
@@ -368,7 +369,7 @@ namespace DuetAPI.Commands
                                 throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
                             }
                         }
-                        else if (result.Type == CodeType.Comment && result.MajorNumber == null && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
+                        else if (result.Type == CodeType.None && result.MajorNumber == null && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
                         {
                             // Check for conditional G-code
                             if (letter == 'i' && value == "f")
@@ -519,6 +520,12 @@ namespace DuetAPI.Commands
             if (c == '\n')
             {
                 result.Flags |= CodeFlags.IsLastCode;
+            }
+
+            // Check if this is a whole-line comment
+            if (result.Type == CodeType.None && result.Parameters.Count == 0 && result.Comment != null)
+            {
+                result.Type = CodeType.Comment;
             }
 
             // Do not allow malformed codes
