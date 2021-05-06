@@ -33,13 +33,12 @@ namespace UnitTests.File
         }
 
         [TestCase("Thumbnail.gcode", 2)]
+        [TestCase("BenchyIcon.gcode", 1)]
         public async Task TestThumbnails(string fileName, int thumbnailCount)
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes", fileName);
             ParsedFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath);
-          
             TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(ParsedFileInfo), new JsonSerializerOptions { WriteIndented = true }));
-            
             Assert.AreEqual(info.Thumbnails.Count, thumbnailCount);
         }
 
