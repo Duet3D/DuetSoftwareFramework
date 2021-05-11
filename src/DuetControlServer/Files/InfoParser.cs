@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Files.ImageProcessing;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Files
@@ -15,6 +16,11 @@ namespace DuetControlServer.Files
     /// </summary>
     public static class InfoParser
     {
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
         /// <summary>
         /// Parse a G-code file
         /// </summary>
@@ -497,11 +503,7 @@ namespace DuetControlServer.Files
         {
             Code code = new();
             CodeParserBuffer codeParserBuffer = new(Settings.FileBufferSize, true);
-            bool imageFound = false;
-            int encodedLength = 0;
-            StringBuilder encodedImage = new();
             reader.BaseStream.Seek(0, SeekOrigin.Begin);
-            ParsedThumbnail thumbnail = null;
             while (codeParserBuffer.GetPosition(reader) < reader.BaseStream.Length)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
@@ -521,50 +523,17 @@ namespace DuetControlServer.Files
                     continue;
                 }
 
+                //This is the start of a PrusaSlicer Image.
                 if (code.Comment.Contains("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    //Exit if we find another start tag before ending the previous image
-                    if (imageFound)
-                    {
-                        return;
-                    }
-                    string[] thumbnailTokens = code.Comment.Trim().Split(' ');
-                    //Stop processing since the thumbnail may be corrupt.
-                    if (thumbnailTokens.Length != 4)
-                    {
-                        return;
-                    }
-                    string[] dimensions = thumbnailTokens[2].Split('x');
-                    if (dimensions.Length != 2)
-                    {
-                        continue;
-                    }
-                    imageFound = true;
-
-                    thumbnail = new ParsedThumbnail
-                    {
-                        Width = int.Parse(dimensions[0]),
-                        Height = int.Parse(dimensions[1])
-                    };
-
-                    encodedLength = int.Parse(thumbnailTokens[3]);
-                    encodedImage.Clear();
-                    code.Reset();
-                    continue;
+                    _logger.Debug("Found Prusa Slicer Image");
+                    await PrusaSlicerImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code);
                 }
-                else if (code.Comment.Contains("thumbnail end", StringComparison.InvariantCultureIgnoreCase))
+                //Icon Image 
+                else if (code.Comment.Contains("Icon:"))
                 {
-                    if (encodedImage.Length == encodedLength)
-                    {
-                        thumbnail.EncodedImage = "data:image/png;base64," + encodedImage.ToString();
-                        parsedFileInfo.Thumbnails.Add(thumbnail);
-                    }
-                    thumbnail = null;
-                    imageFound = false;
-                }
-                else if (imageFound)
-                {
-                    encodedImage.Append(code.Comment.Trim());
+                    _logger.Debug("Found Icon Image");
+                    await IconImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code);
                 }
                 code.Reset();
             }
