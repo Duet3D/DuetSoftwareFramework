@@ -1,4 +1,8 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Delta kinematics
@@ -59,5 +63,22 @@
 			set => SetPropertyValue(ref _yTilt, value);
         }
         private float _yTilt;
+
+        /// <summary>
+        /// Write the calibration parameters to config-override.g
+        /// </summary>
+        /// <param name="writer">Stream writer for config-override.g</param>
+        /// <returns>Asynchronous task</returns>
+        public override async Task WriteCalibrationParameters(StreamWriter writer)
+        {
+            await writer.WriteLineAsync("; Delta parameters");
+            await writer.WriteLineAsync("M665 " +
+                $"L{string.Join(':', Towers.Select(tower => tower.Diagonal.ToString("F3")))} " +
+                $"R{DeltaRadius:F3} H{HomedHeight:F3} B{PrintRadius:F1} " +
+                $"X{Towers[0].AngleCorrection:F3} Y{Towers[1].AngleCorrection:F3} Z{Towers[2].AngleCorrection:F3}");
+            await writer.WriteLineAsync("M666 " +
+                $"X{Towers[0].EndstopAdjustment:F3} Y{Towers[1].EndstopAdjustment:F3} Z{Towers[2].EndstopAdjustment:F3} " +
+                $"A{XTilt * 100F:F2} B{YTilt * 100F:F2}");
+        }
     }
 }

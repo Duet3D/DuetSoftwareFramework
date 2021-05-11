@@ -469,12 +469,23 @@
             <summary>
             Install or upgrade a plugin
             </summary>
-            <param name="pluginFile">Absolute file path to the plugin ZIP bundle</param>
+            <param name="packageFile">Absolute file path to the plugin ZIP bundle</param>
             <param name="cancellationToken">Optional cancellation token</param>
             <returns>Asynchronous task</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ManagePlugins"/>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.InstallSystemPackage(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Install or upgrade a system package
+            </summary>
+            <param name="packageFile">Absolute file path to the package file</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.SuperUser"/>
         </member>
         <member name="T:DuetAPIClient.BaseCommandConnection.ObjectModelLock">
             <summary>
@@ -709,6 +720,17 @@
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
             <seealso cref="F:DuetAPI.Utility.SbcPermissions.ManagePlugins"/>
+        </member>
+        <member name="M:DuetAPIClient.BaseCommandConnection.UninstallSystemPackage(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Uninstall a system package
+            </summary>
+            <param name="package">Name of the package</param>
+            <param name="cancellationToken">Optional cancellation token</param>
+            <returns>Asynchronous task</returns>
+            <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
+            <seealso cref="F:DuetAPI.Utility.SbcPermissions.SuperUser"/>
         </member>
         <member name="M:DuetAPIClient.BaseCommandConnection.UnlockMachineModel(System.Threading.CancellationToken)">
             <summary>

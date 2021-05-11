@@ -16,6 +16,11 @@
         public float ExtruderPos { get; set; }
 
         /// <summary>
+        /// PWM value of the tool fan (0..1)
+        /// </summary>
+        public float FanPwm { get; set; }
+
+        /// <summary>
         /// Requested feedrate (in mm/s)
         /// </summary>
         public float FeedRate { get; set; }

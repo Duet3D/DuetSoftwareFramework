@@ -744,6 +744,104 @@ namespace DuetWebServer.Controllers
         }
         #endregion
 
+        #region System packages
+        /// <summary>
+        /// PUT /machine/systemPackage
+        /// Install or upgrade a system package
+        /// </summary>
+        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [DisableRequestSizeLimit]
+        [HttpPut("systemPackage")]
+        public async Task<IActionResult> InstallSystemPackage()
+        {
+            string packageFile = Path.GetTempFileName();
+            try
+            {
+                try
+                {
+                    // Write package file
+                    using (FileStream stream = new(packageFile, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await Request.Body.CopyToAsync(stream);
+                    }
+
+                    // Install it
+                    using CommandConnection connection = await BuildConnection();
+                    await connection.InstallSystemPackage(packageFile);
+
+                    return NoContent();
+                }
+                catch (Exception e)
+                {
+                    if (e is AggregateException ae)
+                    {
+                        e = ae.InnerException;
+                    }
+                    if (e is IncompatibleVersionException)
+                    {
+                        _logger.LogError($"[{nameof(InstallSystemPackage)}] Incompatible DCS version");
+                        return StatusCode(502, "Incompatible DCS version");
+                    }
+                    if (e is SocketException)
+                    {
+                        _logger.LogError($"[{nameof(InstallSystemPackage)}] DCS is not started");
+                        return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
+                    }
+                    _logger.LogWarning(e, $"[{nameof(InstallSystemPackage)} Failed to upload package file to {packageFile}");
+                    return StatusCode(500, e.Message);
+                }
+            }
+            finally
+            {
+                System.IO.File.Delete(packageFile);
+            }
+        }
+
+        /// <summary>
+        /// DELETE /machine/systemPackage
+        /// Uninstall a system package
+        /// </summary>
+        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [HttpDelete("systemPackage")]
+        public async Task<IActionResult> UninstallSystemPackage()
+        {
+            try
+            {
+                // Get the plugin name
+                string package;
+                using (StreamReader reader = new(HttpContext.Request.Body))
+                {
+                    package = await reader.ReadToEndAsync();
+                }
+
+                // Uninstall it
+                using CommandConnection connection = await BuildConnection();
+                await connection.UninstallSystemPackage(package);
+
+                return NoContent();
+            }
+            catch (Exception e)
+            {
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is IncompatibleVersionException)
+                {
+                    _logger.LogError($"[{nameof(UninstallPlugin)}] Incompatible DCS version");
+                    return StatusCode(502, "Incompatible DCS version");
+                }
+                if (e is SocketException)
+                {
+                    _logger.LogError($"[{nameof(UninstallPlugin)}] DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
+                }
+                _logger.LogWarning(e, $"[{nameof(UninstallPlugin)} Failed to uninstall system package");
+                return StatusCode(500, e.Message);
+            }
+        }
+        #endregion
+
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new();

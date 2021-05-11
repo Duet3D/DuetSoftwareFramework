@@ -10,6 +10,11 @@ namespace DuetAPI.ObjectModel
     public enum MachineStatus
     {
         /// <summary>
+        /// Not connected to the Duet
+        /// </summary>
+        Disconnected,
+
+        /// <summary>
         /// Processing config.g
         /// </summary>
         Starting,

@@ -5,6 +5,7 @@ After=duetcontrolserver.service multi-user.target
 
 [Service]
 ExecStart=/opt/dsf/bin/DuetPluginService
+KillMode=process
 TimeoutStopSec=15
 Restart=always
 

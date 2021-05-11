@@ -411,7 +411,7 @@ namespace DuetControlServer.Model
                 Provider.Get.Boards.Clear();
                 if (Provider.Get.State.Status != MachineStatus.Halted && Provider.Get.State.Status != MachineStatus.Updating)
                 {
-                    Provider.Get.State.Status = MachineStatus.Off;
+                    Provider.Get.State.Status = MachineStatus.Disconnected;
                 }
                 Provider.ClearGlobalVariables();
             }

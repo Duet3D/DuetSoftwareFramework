@@ -190,15 +190,29 @@ namespace DuetAPIClient
         /// <summary>
         /// Install or upgrade a plugin
         /// </summary>
-        /// <param name="pluginFile">Absolute file path to the plugin ZIP bundle</param>
+        /// <param name="packageFile">Absolute file path to the plugin ZIP bundle</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ManagePlugins"/>
-        public Task InstallPlugin(string pluginFile, CancellationToken cancellationToken = default)
+        public Task InstallPlugin(string packageFile, CancellationToken cancellationToken = default)
         {
-            return PerformCommand(new InstallPlugin { PluginFile = pluginFile }, cancellationToken);
+            return PerformCommand(new InstallPlugin { PluginFile = packageFile }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Install or upgrade a system package
+        /// </summary>
+        /// <param name="packageFile">Absolute file path to the package file</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.SuperUser"/>
+        public Task InstallSystemPackage(string packageFile, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new InstallSystemPackage { PackageFile = packageFile }, cancellationToken);
         }
 
         /// <summary>
@@ -506,6 +520,20 @@ namespace DuetAPIClient
         public Task UninstallPlugin(string plugin, CancellationToken cancellationToken = default)
         {
             return PerformCommand(new UninstallPlugin { Plugin = plugin }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Uninstall a system package
+        /// </summary>
+        /// <param name="package">Name of the package</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.SuperUser"/>
+        public Task UninstallSystemPackage(string package, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new UninstallSystemPackage { Package = package }, cancellationToken);
         }
 
         /// <summary>

@@ -550,9 +550,8 @@ namespace DuetAPI.Commands
                     buffer.LastGCode = result.MajorNumber.Value;
                 }
                 else if (result.Type == CodeType.None && result.Keyword == KeywordType.None &&
-                         buffer.LastGCode >= 0 && buffer.LastGCode <= 3 &&
-                         (result.Parameters.Any(parameter => PossibleAxisLetters.Contains(parameter.Letter)) ||
-                          buffer.LastGCode >= 2 && result.Parameters.Any(parameter => parameter.Letter == 'I' || parameter.Letter == 'J')))
+                         (buffer.LastGCode == 0 || buffer.LastGCode == 1) &&
+                         result.Parameters.Any(parameter => PossibleAxisLetters.Contains(parameter.Letter)))
                 {
                     result.Type = CodeType.GCode;
                     result.MajorNumber = buffer.LastGCode;

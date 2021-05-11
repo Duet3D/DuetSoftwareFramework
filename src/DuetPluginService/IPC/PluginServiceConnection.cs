@@ -26,7 +26,9 @@ namespace DuetPluginService
             typeof(Commands.InstallPlugin),
             typeof(Commands.StartPlugin),
             typeof(Commands.StopPlugin),
-            typeof(Commands.UninstallPlugin)
+            typeof(Commands.UninstallPlugin),
+            typeof(Commands.InstallSystemPackage),
+            typeof(Commands.UninstallSystemPackage),
         };
 
         /// <summary>

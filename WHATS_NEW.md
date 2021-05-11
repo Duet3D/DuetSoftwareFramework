@@ -1,6 +1,22 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.3-rc2
+===============
+
+Compatible versions:
+- RepRapFirmware 3.3-rc2
+- DuetWebControl 3.3-rc2
+
+New features:
+- Added new `Disconnected` state to indicate when DSF/DWC is not connected to RRF
+- .deb packages can be installed over DWC if support for package management and root plugins is enabled (see plugins.json and config.json)
+
+Changed behaviour:
+- Only G0 and G1 are repeated for Fanuc-style G-code to follow RRF implementation
+- M955 P-parameter is passed as a driver identifier like M569 P
+- Added extra fallbacks for main firmware files (`directories.firmware` -> `0:/firmware` -> `0:/sys`)
+
 Version 3.3-rc1
 ===============
 

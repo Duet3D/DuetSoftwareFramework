@@ -923,25 +923,33 @@ namespace DuetControlServer.Codes
                             string physicalIapFile = await FilePath.ToPhysicalAsync(iapFile, FileDirectory.Firmware);
                             if (!File.Exists(physicalIapFile))
                             {
-                                string sysIapFile = await FilePath.ToPhysicalAsync(iapFile, FileDirectory.System);
-                                if (!File.Exists(sysIapFile))
+                                string fallbackIapFile = await FilePath.ToPhysicalAsync($"0:/firmware/{iapFile}");
+                                if (!File.Exists(fallbackIapFile))
                                 {
-                                    return new CodeResult(MessageType.Error, $"Failed to find IAP file {iapFile}");
+                                    fallbackIapFile = await FilePath.ToPhysicalAsync(iapFile, FileDirectory.System);
+                                    if (!File.Exists(fallbackIapFile))
+                                    {
+                                        return new CodeResult(MessageType.Error, $"Failed to find IAP file {iapFile}");
+                                    }
                                 }
-                                _logger.Warn("Using fallback IAP file {0}", sysIapFile);
-                                physicalIapFile = sysIapFile;
+                                _logger.Warn("Using fallback IAP file {0}", fallbackIapFile);
+                                physicalIapFile = fallbackIapFile;
                             }
 
-                            string physicalFrmwareFile = await FilePath.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware);
-                            if (!File.Exists(physicalFrmwareFile))
+                            string physicalFirmwareFile = await FilePath.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware);
+                            if (!File.Exists(physicalFirmwareFile))
                             {
-                                string sysFirmwareFile = await FilePath.ToPhysicalAsync(firmwareFile, FileDirectory.System);
-                                if (!File.Exists(sysFirmwareFile))
+                                string fallbackFirmwareFile = await FilePath.ToPhysicalAsync($"0:/firmware/{firmwareFile}");
+                                if (!File.Exists(fallbackFirmwareFile))
                                 {
-                                    return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
+                                    fallbackFirmwareFile = await FilePath.ToPhysicalAsync(firmwareFile, FileDirectory.System);
+                                    if (!File.Exists(fallbackFirmwareFile))
+                                    {
+                                        return new CodeResult(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
+                                    }
                                 }
-                                _logger.Warn("Using fallback firmware file {0}", sysFirmwareFile);
-                                physicalFrmwareFile = sysFirmwareFile;
+                                _logger.Warn("Using fallback firmware file {0}", fallbackFirmwareFile);
+                                physicalFirmwareFile = fallbackFirmwareFile;
                             }
 
                             // Stop all the plugins
@@ -950,7 +958,7 @@ namespace DuetControlServer.Codes
 
                             // Flash the firmware
                             using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read);
-                            using FileStream firmwareStream = new(physicalFrmwareFile, FileMode.Open, FileAccess.Read);
+                            using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read);
                             if (Path.GetExtension(firmwareFile) == ".uf2")
                             {
                                 using MemoryStream unpackedFirmwareStream = await Utility.UF2.Unpack(firmwareStream);

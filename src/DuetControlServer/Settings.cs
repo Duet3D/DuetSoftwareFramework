@@ -98,6 +98,9 @@ namespace DuetControlServer
         /// <summary>
         /// Directory holding DSF plugins
         /// </summary>
+        /// <remarks>
+        /// This directory is not created by the DCS package. It is provided by DPS
+        /// </remarks>
         public static string PluginDirectory { get; set; } = "/opt/dsf/plugins";
 
         /// <summary>

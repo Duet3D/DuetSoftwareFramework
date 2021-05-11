@@ -1,5 +1,7 @@
 ﻿using System;
+using System.IO;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace DuetAPI.ObjectModel
 {
@@ -23,28 +25,16 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="name">Kinematics name</param>
         /// <returns>Required type</returns>
-        private Type GetKinematicsType(KinematicsName name)
+        private static Type GetKinematicsType(KinematicsName name)
         {
-            switch (name)
+            return name switch
             {
-                case KinematicsName.Cartesian:
-                case KinematicsName.CoreXY:
-                case KinematicsName.CoreXYU:
-                case KinematicsName.CoreXYUV:
-                case KinematicsName.CoreXZ:
-                case KinematicsName.MarkForged:
-                    return typeof(CoreKinematics);
-                case KinematicsName.Delta:
-                case KinematicsName.RotaryDelta:
-                    return typeof(DeltaKinematics);
-                case KinematicsName.Hangprinter:
-                    return typeof(HangprinterKinematics);
-                case KinematicsName.FiveBarScara:
-                case KinematicsName.Scara:
-                    return typeof(ScaraKinematics);
-                default:
-                    return typeof(Kinematics);
-            }
+                KinematicsName.Cartesian or KinematicsName.CoreXY or KinematicsName.CoreXYU or KinematicsName.CoreXYUV or KinematicsName.CoreXZ or KinematicsName.MarkForged => typeof(CoreKinematics),
+                KinematicsName.Delta or KinematicsName.RotaryDelta => typeof(DeltaKinematics),
+                KinematicsName.Hangprinter => typeof(HangprinterKinematics),
+                KinematicsName.FiveBarScara or KinematicsName.Scara => typeof(ScaraKinematics),
+                _ => typeof(Kinematics)
+            };
         }
 
         /// <summary>
@@ -73,5 +63,12 @@ namespace DuetAPI.ObjectModel
             }
             return base.UpdateFromJson(jsonElement, ignoreSbcProperties);
         }
+
+        /// <summary>
+        /// Optional method to override in case a kinematics class supports writing calibration parameters to config-override.g
+        /// </summary>
+        /// <param name="writer">Stream writer for config-override.g</param>
+        /// <returns>Asynchronous task</returns>
+        public virtual Task WriteCalibrationParameters(StreamWriter writer) => Task.CompletedTask;
     }
 }

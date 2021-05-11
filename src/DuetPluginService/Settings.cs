@@ -66,6 +66,11 @@ namespace DuetPluginService
         public static string AppArmorProfileDirectory { get; set; } = "/etc/apparmor.d";
 
         /// <summary>
+        /// Enable or disable custom package installations or uninstallations
+        /// </summary>
+        public static bool PackageManagement { get; set; }
+
+        /// <summary>
         /// Command to install third-party packages
         /// </summary>
         public static string InstallPackageCommand { get; set; } = "/usr/bin/apt-get";
@@ -82,6 +87,26 @@ namespace DuetPluginService
         {
             { "DEBIAN_FRONTEND", "noninteractive"  }
         };
+
+        /// <summary>
+        /// Command to install a local package
+        /// </summary>
+        public static string InstallLocalPackageCommand { get; set; } = "/usr/bin/dpkg";
+
+        /// <summary>
+        /// Command-line arguments to install a local package
+        /// </summary>
+        public static string InstallLocalPackageArguments { get; set; } = "-i {file}";
+
+        /// <summary>
+        /// Command to uninstall a local package
+        /// </summary>
+        public static string UninstallLocalPackageCommand { get; set; } = "/usr/bin/dpkg";
+
+        /// <summary>
+        /// Command-line arguments to uninstall a local package
+        /// </summary>
+        public static string UninstallLocalPackageArguments { get; set; } = "-r {package}";
 
         /// <summary>
         /// Timeout in ms for SIGTERM requests. When it expires plugin processes are forcefully killed

@@ -30,7 +30,7 @@ namespace DuetControlServer.Files
             {
                 await writer.WriteLineAsync($"; config-override.g file generated in response to M500 at {DateTime.Now:yyyy-MM-dd HH:mm}");
                 await writer.WriteLineAsync();
-                await WriteCalibrationParameters(writer);
+                await Model.Provider.Get.Move.Kinematics.WriteCalibrationParameters(writer);
                 await WriteModelParameters(writer);
                 await WriteAxisLimits(writer);
                 if (pParam.Contains(31))
@@ -39,30 +39,6 @@ namespace DuetControlServer.Files
                 }
                 await WriteToolParameters(writer, pParam.Contains(10));
                 await WriteWorkplaceCoordinates(writer);
-            }
-        }
-
-        private static async Task WriteCalibrationParameters(StreamWriter writer)
-        {
-            if (Model.Provider.Get.Move.Kinematics is HangprinterKinematics hangprinterKinematics)
-            {
-                await writer.WriteLineAsync("; Hangprinter parameters");
-                await writer.WriteLineAsync("M669 K6 " +
-                    $"A{hangprinterKinematics.AnchorA[0]:F3}:{hangprinterKinematics.AnchorA[1]:F3}:{hangprinterKinematics.AnchorA[2]:F3} " +
-                    $"B{hangprinterKinematics.AnchorB[0]:F3}:{hangprinterKinematics.AnchorB[1]:F3}:{hangprinterKinematics.AnchorB[2]:F3} " +
-                    $"C{hangprinterKinematics.AnchorC[0]:F3}:{hangprinterKinematics.AnchorC[1]:F3}:{hangprinterKinematics.AnchorC[2]:F3} " +
-                    $"D{hangprinterKinematics.AnchorDz:F3} P{hangprinterKinematics.PrintRadius:F2}");
-            }
-            else if (Model.Provider.Get.Move.Kinematics is DeltaKinematics deltaKinematics)
-            {
-                await writer.WriteLineAsync("; Delta parameters");
-                await writer.WriteLineAsync("M665 " +
-                    $"L{string.Join(':', deltaKinematics.Towers.Select(tower => tower.Diagonal.ToString("F3")))} " +
-                    $"R{deltaKinematics.DeltaRadius:F3} H{deltaKinematics.HomedHeight:F3} B{deltaKinematics.PrintRadius:F1} " +
-                    $"X{deltaKinematics.Towers[0].AngleCorrection:F3} Y{deltaKinematics.Towers[1].AngleCorrection:F3} Z{deltaKinematics.Towers[2].AngleCorrection:F3}");
-                await writer.WriteLineAsync("M666 " +
-                    $"X{deltaKinematics.Towers[0].EndstopAdjustment:F3} Y{deltaKinematics.Towers[1].EndstopAdjustment:F3} Z{deltaKinematics.Towers[2].EndstopAdjustment:F3} " +
-                    $"A{deltaKinematics.XTilt * 100F:F2} B{deltaKinematics.YTilt * 100F:F2}");
             }
         }
 
