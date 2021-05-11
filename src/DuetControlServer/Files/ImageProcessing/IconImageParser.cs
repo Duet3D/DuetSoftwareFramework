@@ -1,11 +1,7 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
-using DuetControlServer.Files.ImageProcessing;
 using System;
-using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SixLabors.ImageSharp;
@@ -26,7 +22,7 @@ namespace DuetControlServer.Files.ImageProcessing
         public static async Task ProcessAsync(StreamReader reader, CodeParserBuffer codeParserBuffer, ParsedFileInfo parsedFileInfo, Code code)
         {
             _logger.Info($"Processing Image {parsedFileInfo.FileName}");
-            StringBuilder imageBuffer = new StringBuilder();
+            StringBuilder imageBuffer = new();
             code.Reset();
 
             //Keep reading the data from the file
@@ -65,32 +61,28 @@ namespace DuetControlServer.Files.ImageProcessing
 
         private static ParsedThumbnail ReadImage(string imageBuffer)
         {
-            ParsedThumbnail thumbnail = new ParsedThumbnail();
+            ParsedThumbnail thumbnail = new();
             //Convert the string into a usable format
             var finalString = imageBuffer.Replace("Icon: ", String.Empty).Replace(";", string.Empty).Replace(" ", string.Empty).Replace("\r\n", string.Empty);
 
-            using (MemoryStream ms = new MemoryStream(Convert.FromBase64String(finalString)))
-            using (MemoryStream bitmapSource = new MemoryStream())
+            using MemoryStream ms = new(Convert.FromBase64String(finalString));
+            using MemoryStream bitmapSource = new();
+            _logger.Debug("Encoding Image");
+            try
             {
-                _logger.Debug("Encoding Image");
-                try
-                {
-                    var image = BinaryToImage(ms, out int width, out int height);
-                    thumbnail.EncodedImage = image.ToBase64String(PngFormat.Instance);
-                    _logger.Debug(thumbnail.EncodedImage);
-                    thumbnail.Width = width;
-                    thumbnail.Height = height;
-                    image?.Dispose(); //Clean up image after getting data from it.
-                    return thumbnail;
-                }
-                catch (Exception ex)
-                {
-                    var imageProcessingException = new ImageProcessingException("Error processing Icon image", ex);
-                    _logger.Error(imageProcessingException);
-                    throw imageProcessingException;
-                }
-                return null;
-
+                var image = BinaryToImage(ms, out int width, out int height);
+                thumbnail.EncodedImage = image.ToBase64String(PngFormat.Instance);
+                _logger.Debug(thumbnail.EncodedImage);
+                thumbnail.Width = width;
+                thumbnail.Height = height;
+                image?.Dispose(); //Clean up image after getting data from it.
+                return thumbnail;
+            }
+            catch (Exception ex)
+            {
+                var imageProcessingException = new ImageProcessingException("Error processing Icon image", ex);
+                _logger.Error(imageProcessingException);
+                throw imageProcessingException;
             }
         }
 

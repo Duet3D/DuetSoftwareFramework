@@ -267,3 +267,7 @@ src/Documentation/api
 !src/Documentation/api/toc.yml
 src/Documentation/obj
 Makefile.local
+
+# XML documentation
+src/DuetAPI/DuetAPI.xml
+src/DuetAPIClient/DuetAPIClient.xml
