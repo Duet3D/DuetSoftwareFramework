@@ -138,9 +138,8 @@ namespace DuetControlServer.IPC.Processors
 
                         try
                         {
-                            // Send it to the client. Reassign it to a different variable first to hide some internal fields
-                            DuetAPI.Commands.Code codeToSend = _codeBeingIntercepted;
-                            await Connection.Send(codeToSend);
+                            // Send it to the client
+                            await Connection.Send<DuetAPI.Commands.Code>(_codeBeingIntercepted);
 
                             // Keep processing incoming commands until a final action for the code has been received
                             BaseCommand command;

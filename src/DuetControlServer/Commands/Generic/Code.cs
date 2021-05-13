@@ -372,14 +372,14 @@ namespace DuetControlServer.Commands
                 catch (InvalidOperationException ioe)
                 {
                     // Some inputs may be disabled in a custom build
-                    Result = new CodeResult(MessageType.Error, $"Code channel {Channel} is disabled");
                     _logger.Debug(ioe, "{0} cannot be executed{1} because its code channel {2} is disabled", this, logSuffix, Channel);
+                    Result = new CodeResult(MessageType.Error, $"Code channel {Channel} is disabled");
                 }
                 catch (NotSupportedException nse)
                 {
                     // Some codes may not be supported yet
-                    Result = new CodeResult(MessageType.Error, "Operation is not supported");
                     _logger.Debug(nse, "{0} is not supported{1}", this, logSuffix);
+                    Result = new CodeResult(MessageType.Error, "Operation is not supported");
                 }
                 catch (Exception e)
                 {
@@ -425,7 +425,7 @@ namespace DuetControlServer.Commands
             // Check if the corresponding code channel has been disabled
             using (await Provider.AccessReadOnlyAsync())
             {
-                if (Provider.Get.Inputs[Channel] == null)
+                if (!Settings.NoSpi && Provider.Get.Inputs[Channel] == null)
                 {
                     throw new InvalidOperationException("Requested code channel has been disabled");
                 }

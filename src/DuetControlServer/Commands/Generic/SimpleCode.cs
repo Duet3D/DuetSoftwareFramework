@@ -71,7 +71,7 @@ namespace DuetControlServer.Commands
             // Check if the corresponding code channel has been disabled
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                if (Model.Provider.Get.Inputs[Channel] == null)
+                if (!Settings.NoSpi && Model.Provider.Get.Inputs[Channel] == null)
                 {
                     throw new InvalidOperationException("Requested code channel has been disabled");
                 }

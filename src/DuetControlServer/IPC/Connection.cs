@@ -357,7 +357,21 @@ namespace DuetControlServer.IPC
             Response<object> response = new(obj);
             return Send(response);
         }
-        
+
+        /// <summary>
+        /// Send a JSON object to the client
+        /// </summary>
+        /// <param name="obj">Object to send</param>
+        /// <returns>Asynchronous task</returns>
+        /// <typeparam name="T">Object type</typeparam>
+        /// <exception cref="SocketException">Message could not be sent</exception>
+        public Task Send<T>(T obj)
+        {
+            byte[] toSend = (obj is byte[] byteArray) ? byteArray : JsonSerializer.SerializeToUtf8Bytes(obj, JsonHelper.DefaultJsonOptions);
+            Logger.Trace(() => $"Sending {Encoding.UTF8.GetString(toSend)}");
+            return UnixSocket.SendAsync(toSend, SocketFlags.None);
+        }
+
         /// <summary>
         /// Send a JSON object to the client
         /// </summary>
