@@ -1022,15 +1022,19 @@ namespace DuetControlServer.Codes
 
             switch (code.MajorNumber)
             {
+                // Stop or Unconditional stop
+                // Sleep or Conditional stop
                 // Resume print
                 // Select file and start SD print
                 // Simulate file
+                case 0:
+                case 1:
                 case 24:
                 case 32:
                 case 37:
                     using (await FileExecution.Job.LockAsync())
                     {
-                        // Start sending file instructions to RepRapFirmware
+                        // Start sending file instructions to RepRapFirmware or finish the cancellation process
                         FileExecution.Job.Resume();
                     }
                     break;

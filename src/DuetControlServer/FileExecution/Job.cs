@@ -174,6 +174,7 @@ namespace DuetControlServer.FileExecution
             if (IsFileSelected)
             {
                 await Cancel();
+                Resume();
                 await _finished.WaitAsync(Program.CancellationToken);
             }
 
@@ -474,7 +475,7 @@ namespace DuetControlServer.FileExecution
                     _file.Close();
                 }
                 IsCancelled = IsPaused;
-                Resume();
+                // Resume() needs to be called manually
             }
         }
 

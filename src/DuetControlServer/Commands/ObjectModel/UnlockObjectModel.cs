@@ -17,10 +17,9 @@ namespace DuetControlServer.Commands
         /// Unlock the machine model again
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public override Task Execute()
+        public override async Task Execute()
         {
-            LockManager.UnlockMachineModel(Connection);
-            return Task.CompletedTask;
+            await LockManager.UnlockMachineModel(Connection);
         }
     }
 }

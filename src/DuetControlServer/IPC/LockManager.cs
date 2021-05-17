@@ -36,13 +36,19 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Unlock the machine model again
         /// </summary>
-        public static void UnlockMachineModel(Connection connection)
+        public static async Task UnlockMachineModel(Connection connection)
         {
             if (_lockConnection == connection)
             {
                 _lockConnection = null;
                 _lock?.Dispose();
                 _lock = null;
+
+                if (Settings.NoSpi)
+                {
+                    // Make sure functions waiting for full model updates don't stall
+                    await Model.Updater.MachineModelFullyUpdated();
+                }
             }
         }
     }

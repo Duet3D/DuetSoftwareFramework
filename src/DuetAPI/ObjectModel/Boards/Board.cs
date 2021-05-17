@@ -160,7 +160,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if this board supports external 12864 displays
         /// </summary>
-        [Obsolete]
+        [Obsolete("Replaced with SupportsDirectDisplay")]
         public bool Supports12864
         {
             get => _supportsDirectDisplay;

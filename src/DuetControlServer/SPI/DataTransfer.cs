@@ -847,11 +847,6 @@ namespace DuetControlServer.SPI
 
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(writeBuffer, readBuffer);
-
-            if (readBuffer[bytesRead - 1] != 0x1A)
-            {
-                throw new Exception("Received invalid response from IAP");
-            }
             return true;
         }
 

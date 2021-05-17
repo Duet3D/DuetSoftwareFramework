@@ -1,6 +1,34 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.3.0
+=============
+
+Compatible versions:
+- RepRapFirmware 3.3.0
+- DuetWebControl 3.3.0
+
+Upgrade notes:
+- Plugin support is now enabled but requires some extra steps before they can be installed. Execute the following commands in a **Linux** terminal:
+  1. Install AppArmor package: `sudo apt install apparmor`
+  2. Enable AppArmor support on boot: `echo "  lsm=apparmor" >> /boot/cmdline.txt`
+  3. Enable new plugin services: `sudo systemctl enable duetpluginservice && sudo systemctl enable duetpluginservice-root`
+  4. Reboot the SBC to apply the changes: `sudo reboot`
+- [DuetPiManagementPlugin](https://github.com/Duet3D/DuetSoftwareFramework/tree/v3.3-dev/src/DuetPiManagementPlugin) is now available for DuetPi to support various M-codes that werre previously supported only in standalone mode
+  1. This plugin is available from the `duetpimanagementplugin` package which comes with the latest DuetPi version
+  2. It can be manually installed via `apt install duetpimanagementplugin`
+  3. Go to the `Machine-Specific -> Third-Party Plugins` page on DWC to enable it after a manual installation
+- There is now a new configuration file `dsf-config.g` which is executed when all previously started plugins have been started by the plugin service(s) after a reboot. Put custom G/M-codes into this file, ideally with a short delay at the start (`G4 S2`) to ensure the plugions are fully started at the time custom actions are executed.
+
+Bug fixes:
+- M0 called `stop.g` instead of `cancel.g` when a print was cancelled
+- DCS does no longer check SPI responses from IAP while upgrading the firmware to lower the risk of upgrade issues
+- Plugins were never started in non-SPI mode
+
+Known limitations:
+- Auto-resume on power loss cannot be configured (M916)
+- Accelerometer profiles cannot be recorded (M956)
+
 Version 3.3-rc2
 ===============
 

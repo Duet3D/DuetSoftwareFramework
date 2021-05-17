@@ -46,6 +46,18 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
+        /// Called in non-SPI mode to notify waiting tasks about a finished model update
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static async Task MachineModelFullyUpdated()
+        {
+            using (await _monitor.EnterAsync(Program.CancellationToken))
+            {
+                _monitor.PulseAll();
+            }
+        }
+
+        /// <summary>
         /// Process a config response (no longer supported or encouraged; for backwards-compatibility)
         /// </summary>
         /// <param name="response">Legacy config response</param>
