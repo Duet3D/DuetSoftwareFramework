@@ -163,7 +163,7 @@ namespace DuetPiManagementPlugin.Network
                     if (line.StartsWith("country="))
                     {
                         // Country code found
-                        return line["country=".Length..].Trim(' ', '\t', '"');
+                        return line["country=".Length..].Trim(' ', '\t');
                     }
                 }
             }
@@ -189,7 +189,7 @@ namespace DuetPiManagementPlugin.Network
 
                 using FileStream configTemplateStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Create, FileAccess.Write);
                 using StreamWriter writer = new(configTemplateStream);
-                await writer.WriteLineAsync($"country=\"{countryCode}\"");
+                await writer.WriteLineAsync($"country={countryCode}");
                 await writer.WriteLineAsync( "ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev");
                 await writer.WriteLineAsync( "update_config=1");
             }
@@ -214,7 +214,7 @@ namespace DuetPiManagementPlugin.Network
                         if (trimmedLine.StartsWith("country=") && !countrySeen)
                         {
                             // Read country code, replace it if requested
-                            await writer.WriteLineAsync(string.IsNullOrWhiteSpace(countryCode) ? line : $"country=\"{countryCode}\"");
+                            await writer.WriteLineAsync(string.IsNullOrWhiteSpace(countryCode) ? line : $"country={countryCode}");
                             countrySeen = true;
                         }
                         else if (networkSection != null)
@@ -280,7 +280,7 @@ namespace DuetPiManagementPlugin.Network
                 if (!countrySeen && !string.IsNullOrWhiteSpace(countryCode))
                 {
                     using StreamWriter countryCodeWriter = new(configStream, leaveOpen: true);
-                    await countryCodeWriter.WriteLineAsync($"country=\"{countryCode}\"");
+                    await countryCodeWriter.WriteLineAsync($"country={countryCode}");
                     countrySeen = true;
                 }
 
