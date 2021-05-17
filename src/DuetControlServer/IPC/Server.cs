@@ -156,7 +156,7 @@ namespace DuetControlServer.IPC
                 connection.Logger.Debug("Connection closed");
 
                 // Unlock the machine model again in case the client application crashed
-                LockManager.UnlockMachineModel(connection);
+                await LockManager.UnlockMachineModel(connection);
             }
         }
 
