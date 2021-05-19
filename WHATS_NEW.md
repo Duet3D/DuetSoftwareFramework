@@ -24,6 +24,7 @@ Bug fixes:
 - M0 called `stop.g` instead of `cancel.g` when a print was cancelled
 - DCS does no longer check SPI responses from IAP while upgrading the firmware to lower the risk of upgrade issues
 - Plugins were never started in non-SPI mode
+- DCS postinst script failed if the service was previously enabled but no Duet was attached at the time of the upgrade
 
 Known limitations:
 - Auto-resume on power loss cannot be configured (M916)

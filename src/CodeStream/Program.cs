@@ -47,7 +47,7 @@ namespace CodeStream
 
             // Create a new connection and connect to DuetControlServer
             using CodeStreamConnection connection = new();
-            await connection.Connect(bufferSize, DuetAPI.CodeChannel.Telnet,  socketPath);
+            await connection.Connect(bufferSize, DuetAPI.CodeChannel.Telnet, socketPath);
 
             // Start streaming
             // This aapplication does not register a console session, see CodeConsole for further details about that

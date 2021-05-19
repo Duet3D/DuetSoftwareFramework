@@ -1,4 +1,5 @@
 #!/bin/sh
+
 # Create gpio group and add dsf to it
 systemd-sysusers duetcontrolserver.conf
 
@@ -21,3 +22,5 @@ if (systemctl -q is-enabled duetcontrolserver); then
     systemctl -q start duetcontrolserver
 fi
 
+# Ignore the return code of the DCS start request in case no board is connected
+exit 0
