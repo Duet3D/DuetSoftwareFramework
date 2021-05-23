@@ -204,7 +204,7 @@ namespace DuetControlServer.SPI
                     }
 
                     // Deal with the first transmission
-                    if (!_started || _resetting)
+                    if (!_started)
                     {
                         _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
                         _started = true;
@@ -229,7 +229,7 @@ namespace DuetControlServer.SPI
                     {
                         _started = _resetting = false;
                         _waitingForFirstTransfer = true;
-                        PerformFullTransfer(connecting);
+                        PerformFullTransfer();
                     }
                     break;
                 }
@@ -242,9 +242,11 @@ namespace DuetControlServer.SPI
 
                     _logger.Debug(e, "Lost connection to Duet");
                     _txHeader.ProtocolVersion = Consts.ProtocolVersion;
+                    _waitingForFirstTransfer = true;
+
                     if (!_hadTimeout && _started)
                     {
-                        _waitingForFirstTransfer = _hadTimeout = true;
+                        _hadTimeout = true;
                         Updater.ConnectionLost();
                         _ = Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
                     }

@@ -376,7 +376,7 @@ namespace DuetControlServer.Model
             Stack<StringBuilder> parsedExpressions = new();
             parsedExpressions.Push(new StringBuilder());
 
-            bool inQuotes = false;
+            bool inQuotes = false, isExistsQuery = false;
             char lastC = '\0';
             foreach (char c in expression)
             {
@@ -395,6 +395,7 @@ namespace DuetControlServer.Model
                 }
                 else if (c == '{' || c == '(' || c == '[')
                 {
+                    isExistsQuery = (c == '(') && parsedExpressions.Peek().ToString().TrimEnd().EndsWith("exists");
                     lastBracketTypes.Push(c);
                     parsedExpressions.Push(new StringBuilder());
                 }
@@ -423,16 +424,27 @@ namespace DuetControlServer.Model
                         }
 
                         string subExpression = parsedExpressions.Pop().ToString();
-                        string evaluationResult = await EvaluateSubExpression(code, subExpression.Trim(), onlyLinuxFields, true);
-                        if (lastBracketType == '(' || lastBracketType == '[' || subExpression == evaluationResult || onlyLinuxFields)
+                        if (isExistsQuery)
                         {
-                            parsedExpressions.Peek().Append(lastBracketType);
-                            parsedExpressions.Peek().Append(evaluationResult);
-                            parsedExpressions.Peek().Append(expectedBracketType);
+                            // Queries that take identifier paths must not be evaluated...
+                            parsedExpressions.Peek().Append('(');
+                            parsedExpressions.Peek().Append(subExpression);
+                            parsedExpressions.Peek().Append(')');
+                            isExistsQuery = false;
                         }
                         else
                         {
-                            parsedExpressions.Peek().Append(evaluationResult);
+                            string evaluationResult = await EvaluateSubExpression(code, subExpression.Trim(), onlyLinuxFields, true);
+                            if (lastBracketType == '(' || lastBracketType == '[' || subExpression == evaluationResult || onlyLinuxFields)
+                            {
+                                parsedExpressions.Peek().Append(lastBracketType);
+                                parsedExpressions.Peek().Append(evaluationResult);
+                                parsedExpressions.Peek().Append(expectedBracketType);
+                            }
+                            else
+                            {
+                                parsedExpressions.Peek().Append(evaluationResult);
+                            }
                         }
                     }
                     else

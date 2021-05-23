@@ -89,16 +89,13 @@ namespace DuetControlServer.Model
                         SubscribeToModelCollection(value, itemType, propertyName, path);
                     }
                 }
-                else if (property.PropertyType.IsGenericType)
+                else if (property.PropertyType == typeof(ModelJsonDictionary))
                 {
-                    if (typeof(ModelDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
-                    {
-                        SubscribeToModelDictionary(value, AddToPath(path, propertyName));
-                    }
-                    if (typeof(ModelObjectDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
-                    {
-                        SubscribeToModelObjectDictionary(value, AddToPath(path, propertyName));
-                    }
+                    SubscribeToModelDictionary(value, AddToPath(path, propertyName));
+                }
+                else if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ModelObjectDictionary<>))
+                {
+                    SubscribeToModelObjectDictionary(value, AddToPath(path, propertyName));
                 }
             }
 
@@ -157,16 +154,13 @@ namespace DuetControlServer.Model
                         UnsubscribeFromModelCollection(value, property.PropertyType.GetGenericArguments()[0]);
                     }
                 }
-                else if (property.PropertyType.IsGenericType)
+                else if (property.PropertyType == typeof(ModelJsonDictionary))
                 {
-                    if (typeof(ModelDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
-                    {
-                        UnsubscribeFromModelDictionary(value);
-                    }
-                    if (typeof(ModelObjectDictionary<>) == property.PropertyType.GetGenericTypeDefinition())
-                    {
-                        UnsubscribeFromModelObjectDictionary(value);
-                    }
+                    UnsubscribeFromModelDictionary(value);
+                }
+                else if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ModelObjectDictionary<>))
+                {
+                    UnsubscribeFromModelObjectDictionary(value);
                 }
             }
 

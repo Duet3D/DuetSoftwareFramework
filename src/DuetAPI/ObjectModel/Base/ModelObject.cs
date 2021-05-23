@@ -12,6 +12,9 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Base class for machine model properties
     /// </summary>
+    /// <remarks>
+    /// Much of this is going to be refactored in v3.4 for better performance and cleaner typing
+    /// </remarks>
     public class ModelObject : ICloneable, INotifyPropertyChanging, INotifyPropertyChanged
     {
         /// <summary>
@@ -135,6 +138,16 @@ namespace DuetAPI.ObjectModel
                         ModelCollectionHelper.Assign(oldModelCollection, itemType, newModelCollection);
                     }
                 }
+                else if (property.PropertyType == typeof(ModelJsonDictionary))
+                {
+                    ModelJsonDictionary oldValue = (ModelJsonDictionary)property.GetValue(this);
+                    ModelJsonDictionary newValue = (ModelJsonDictionary)property.GetValue(from);
+                    oldValue.Clear();
+                    foreach (var kv in oldValue)
+                    {
+                        oldValue.Add(kv.Key, kv.Value);
+                    }
+                }
                 else
                 {
                     object newValue = property.GetValue(from);
@@ -184,6 +197,15 @@ namespace DuetAPI.ObjectModel
                     else
                     {
                         ModelCollectionHelper.Assign(clonedCollection, itemType, collection);
+                    }
+                }
+                else if (property.PropertyType == typeof(ModelJsonDictionary))
+                {
+                    ModelJsonDictionary dictionary = (ModelJsonDictionary)property.GetValue(this);
+                    ModelJsonDictionary clonedDictionary = (ModelJsonDictionary)property.GetValue(clone);
+                    foreach (var kv in dictionary)
+                    {
+                        clonedDictionary.Add(kv.Key, kv.Value);
                     }
                 }
                 else if (property.PropertyType.IsAssignableFrom(typeof(ICloneable)))
@@ -290,6 +312,11 @@ namespace DuetAPI.ObjectModel
                         {
                             ModelCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonProperty.Value, ignoreSbcProperties);
                         }
+                    }
+                    else if (property.PropertyType == typeof(ModelJsonDictionary))
+                    {
+                        ModelJsonDictionary value = (ModelJsonDictionary)property.GetValue(this);
+                        value.UpdateFromJson(jsonProperty.Value);
                     }
                     else if (property.PropertyType == typeof(bool) && jsonProperty.Value.ValueKind == JsonValueKind.Number)
                     {

@@ -159,6 +159,7 @@ namespace DuetControlServer.Model
                             {
                                 Provider.Get.State.Status = MachineStatus.Updating;
                             }
+                            UpdateLayers();
                         }
 
                         // Update object model keys depending on the sequence numbers
@@ -220,9 +221,6 @@ namespace DuetControlServer.Model
                                 }
                             }
                         }
-
-                        // Update the layers
-                        UpdateLayers();
 
                         // Object model is now up-to-date, notify waiting clients
                         using (await _monitor.EnterAsync(Program.CancellationToken))

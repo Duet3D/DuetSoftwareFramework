@@ -220,7 +220,7 @@ namespace DuetAPI.ObjectModel
         /// Before <see cref="Commands.SetPluginData"/> can be used, corresponding properties must be registered via this property first!
         /// </summary>
         /// <seealso cref="Commands.SetPluginData"/>
-        public ModelDictionary<JsonElement> Data { get; set; } = new ModelDictionary<JsonElement>();
+        public ModelJsonDictionary Data { get; } = new ModelJsonDictionary();
 
         /// <summary>
         /// Check if the given version satisfies a required version

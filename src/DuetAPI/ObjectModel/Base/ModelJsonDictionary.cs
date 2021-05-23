@@ -4,29 +4,29 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
-    /// Class for holding dynamic properties. Properties may not be deleted again
+    /// Class for holding string keys and JSON values
     /// </summary>
     /// <remarks>
-    /// In a future version this should implement Assign() and UpdateFromJson() like the other classes.
+    /// Single properties may not be deleted again from this class
     /// </remarks>
-    /// <typeparam name="TValue"></typeparam>
-    public class ModelDictionary<TValue> : INotifyPropertyChanging, INotifyPropertyChanged, IDictionary<string, TValue>
+    public sealed class ModelJsonDictionary : INotifyPropertyChanging, INotifyPropertyChanged, IDictionary<string, JsonElement>
     {
         /// <summary>
         /// Internal storage for key/value pairs
         /// </summary>
-        private readonly Dictionary<string, TValue> _dictionary = new();
+        private readonly Dictionary<string, JsonElement> _dictionary = new();
 
         /// <summary>
         /// Index operator
         /// </summary>
         /// <param name="key">Key</param>
         /// <returns>Value</returns>
-        public TValue this[string key]
+        public JsonElement this[string key]
         {
             get => _dictionary[key];
             set
@@ -45,7 +45,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of values
         /// </summary>
-        public ICollection<TValue> Values => _dictionary.Values;
+        public ICollection<JsonElement> Values => _dictionary.Values;
 
         /// <summary>
         /// Number of added items
@@ -72,7 +72,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="key">Key to add</param>
         /// <param name="value">Value to add</param>
-        public void Add(string key, TValue value)
+        public void Add(string key, JsonElement value)
         {
             PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(key));
             _dictionary.Add(key, value);
@@ -83,7 +83,7 @@ namespace DuetAPI.ObjectModel
         /// Add a new key-value pair
         /// </summary>
         /// <param name="item">Item to add</param>
-        public void Add(KeyValuePair<string, TValue> item)
+        public void Add(KeyValuePair<string, JsonElement> item)
         {
             PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(item.Key));
             _dictionary.Add(item.Key, item.Value);
@@ -101,17 +101,10 @@ namespace DuetAPI.ObjectModel
         /// <returns></returns>
         public object Clone()
         {
-            ModelDictionary<TValue> clone = new();
-            foreach (KeyValuePair<string, TValue> kv in _dictionary)
+            ModelJsonDictionary clone = new();
+            foreach (KeyValuePair<string, JsonElement> kv in _dictionary)
             {
-                if (kv.Value is ICloneable cloneable)
-                {
-                    clone.Add(kv.Key, (TValue)cloneable.Clone());
-                }
-                else
-                {
-                    clone.Add(kv);
-                }
+                clone.Add(kv.Key, kv.Value.Clone());
             }
             return clone;
         }
@@ -121,7 +114,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="item"></param>
         /// <returns>Whether the key-value pair is present</returns>
-        public bool Contains(KeyValuePair<string, TValue> item) => _dictionary.Any(kv => kv.Equals(item));
+        public bool Contains(KeyValuePair<string, JsonElement> item) => _dictionary.Any(kv => kv.Equals(item));
 
         /// <summary>
         /// Check if a key is present
@@ -135,13 +128,13 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="array">Destination array</param>
         /// <param name="arrayIndex">Start index</param>
-        public void CopyTo(KeyValuePair<string, TValue>[] array, int arrayIndex) => throw new NotSupportedException();
+        public void CopyTo(KeyValuePair<string, JsonElement>[] array, int arrayIndex) => throw new NotSupportedException();
 
         /// <summary>
         /// Get an enumerator
         /// </summary>
         /// <returns>Enumerator</returns>
-        public IEnumerator<KeyValuePair<string, TValue>> GetEnumerator() => _dictionary.GetEnumerator();
+        public IEnumerator<KeyValuePair<string, JsonElement>> GetEnumerator() => _dictionary.GetEnumerator();
 
         /// <summary>
         /// Remove a key
@@ -155,7 +148,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="item">Key-value pair</param>
         /// <returns>Whether the key-value pair could be found</returns>
-        public bool Remove(KeyValuePair<string, TValue> item) => throw new NotSupportedException();
+        public bool Remove(KeyValuePair<string, JsonElement> item) => throw new NotSupportedException();
 
         /// <summary>
         /// Try to get a value
@@ -163,12 +156,35 @@ namespace DuetAPI.ObjectModel
         /// <param name="key">Key to look up</param>
         /// <param name="value">Retrieved value</param>
         /// <returns>Whether the key could be found</returns>
-        public bool TryGetValue(string key, [MaybeNullWhen(false)] out TValue value) => _dictionary.TryGetValue(key, out value);
+        public bool TryGetValue(string key, [MaybeNullWhen(false)] out JsonElement value) => _dictionary.TryGetValue(key, out value);
 
         /// <summary>
         /// Get an enumerator
         /// </summary>
         /// <returns>Enumerator</returns>
         IEnumerator IEnumerable.GetEnumerator() => _dictionary.GetEnumerator();
+
+        /// <summary>
+        /// Update this instance from a given JSON element
+        /// </summary>
+        /// <param name="jsonElement">Element to update this intance from</param>
+        /// <returns>Updated instance</returns>
+        public void UpdateFromJson(JsonElement jsonElement)
+        {
+            if (jsonElement.ValueKind == JsonValueKind.Null)
+            {
+                Clear();
+            }
+            else
+            {
+                foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
+                {
+                    if (!TryGetValue(jsonProperty.Name, out JsonElement value) || !value.Equals(jsonProperty.Value))
+                    {
+                        this[jsonProperty.Name] = jsonProperty.Value.Clone();
+                    }
+                }
+            }
+        }
     }
 }

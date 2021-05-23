@@ -1,14 +1,10 @@
 Summary of important changes in recent versions
 ===============================================
 
-Version 3.3.0
+Version 3.3-rc3
 =============
 
-Compatible versions:
-- RepRapFirmware 3.3.0
-- DuetWebControl 3.3.0
-
-Upgrade notes:
+Upgrade notes since version 3.2:
 - Plugin support is now enabled but requires some extra steps before they can be installed. Execute the following commands in a **Linux** terminal:
   1. Install AppArmor package: `sudo apt install apparmor`
   2. Enable AppArmor support on boot: `echo "  lsm=apparmor" >> /boot/cmdline.txt`
@@ -20,11 +16,19 @@ Upgrade notes:
   3. Go to the `Machine-Specific -> Third-Party Plugins` page on DWC to enable it after a manual installation
 - There is now a new configuration file `dsf-config.g` which is executed when all previously started plugins have been started by the plugin service(s) after a reboot. Put custom G/M-codes into this file, ideally with a short delay at the start (`G4 S2`) to ensure the plugions are fully started at the time custom actions are executed.
 
+Compatible versions:
+- RepRapFirmware 3.3-rc3
+- DuetWebControl 3.3-rc3
+
 Bug fixes:
 - M0 called `stop.g` instead of `cancel.g` when a print was cancelled
 - DCS does no longer check SPI responses from IAP while upgrading the firmware to lower the risk of upgrade issues
 - Plugins were never started in non-SPI mode
 - DCS postinst script failed if the service was previously enabled but no Duet was attached at the time of the upgrade
+- When codes were intercepted, the `SourceConnection` property was not always populated
+- When DCS was configured to never terminate on reset, sometimes it failed to establish a connection again
+- Subscribe connection clients failed to clear `global` dictionary on reset
+- Fixed `exists` function in conditional G-code
 
 Known limitations:
 - Auto-resume on power loss cannot be configured (M916)

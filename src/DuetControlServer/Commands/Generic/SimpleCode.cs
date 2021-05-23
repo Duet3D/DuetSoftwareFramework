@@ -51,7 +51,8 @@ namespace DuetControlServer.Commands
                 Code code = new()
                 {
                     Channel = Channel,
-                    Connection = Connection
+                    Connection = Connection,
+                    SourceConnection = (Connection != null) ? Connection.Id : 0
                 };
 
                 if (await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer))

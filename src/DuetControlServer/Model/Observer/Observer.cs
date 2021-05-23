@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using System;
+using System.Text.Json;
 
 namespace DuetControlServer.Model
 {
@@ -45,7 +46,8 @@ namespace DuetControlServer.Model
         /// </summary>
         public static void GlobalVariablesCleared()
         {
-            OnPropertyPathChanged?.Invoke(new object[] { nameof(ObjectModel.Global) }, PropertyChangeType.Property, null);
+            string jsonName = JsonNamingPolicy.CamelCase.ConvertName(nameof(ObjectModel.Global));
+            OnPropertyPathChanged?.Invoke(new object[] { jsonName }, PropertyChangeType.Property, null);
         }
     }
 }

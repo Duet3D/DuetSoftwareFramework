@@ -110,6 +110,8 @@ namespace DuetControlServer.IPC.Processors
                         if (await DuetAPI.Commands.Code.ParseAsync(lineReader, code, parserBuffer))
                         {
                             code.Channel = _channel;
+                            code.Connection = Connection;
+                            code.SourceConnection = Connection.Id;
                             _ = code
                                 .Execute()
                                 .ContinueWith(async task =>

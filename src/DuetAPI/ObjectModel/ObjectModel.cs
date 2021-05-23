@@ -37,12 +37,12 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<Fan> Fans { get; } = new ModelCollection<Fan>();
 
         /// <summary>
-        /// Dictionary of global variables vs atomic values (float, int, string)
+        /// Dictionary of global variables vs JSON values
         /// </summary>
         /// <remarks>
         /// When DSF attempts to reconnect to RRF, this may be set to null to clear the contents
         /// </remarks>
-        public ModelDictionary<object> Global { get; set; } = new ModelDictionary<object>();
+        public ModelJsonDictionary Global { get; } = new ModelJsonDictionary();
 
         /// <summary>
         /// Information about the heat subsystem
@@ -208,22 +208,10 @@ namespace DuetAPI.ObjectModel
                     return true;
                 }
 
-                if (key == "global")
+                if (property.PropertyType == typeof(ModelJsonDictionary))
                 {
-                    if (jsonElement.ValueKind == JsonValueKind.Null)
-                    {
-                        Global.Clear();
-                    }
-                    else
-                    {
-                        foreach (var jsonProperty in jsonElement.EnumerateObject())
-                        {
-                            if (!Global.TryGetValue(jsonProperty.Name, out object value) || !value.Equals(jsonProperty.Value))
-                            {
-                                Global[jsonProperty.Name] = jsonProperty.Value.Clone();
-                            }
-                        }
-                    }
+                    ModelJsonDictionary value = (ModelJsonDictionary)property.GetValue(this);
+                    value.UpdateFromJson(jsonElement);
                     return true;
                 }
 
