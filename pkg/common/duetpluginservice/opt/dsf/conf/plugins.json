@@ -7,10 +7,15 @@
   "AppArmorParser": "/usr/sbin/apparmor_parser",
   "AppArmorTemplate": "/opt/dsf/conf/apparmor.conf",
   "AppArmorProfileDirectory": "/etc/apparmor.d",
+  "PackageManagement": false,
   "InstallPackageCommand": "/usr/bin/apt-get",
   "InstallPackageArguments": "install -y {package}",
   "InstallPackageEnvironment": {
     "DEBIAN_FRONTEND": "noninteractive"
   },
+  "InstallLocalPackageCommand": "/usr/bin/dpkg",
+  "InstallLocalPackageArguments": "-i {file}",
+  "UninstallLocalPackageCommand": "/usr/bin/dpkg",
+  "UninstallLocalPackageArguments": "-r {package}",
   "StopTimeout": 4000
 }

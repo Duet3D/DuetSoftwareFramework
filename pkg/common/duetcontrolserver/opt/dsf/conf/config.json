@@ -36,7 +36,9 @@
     "layer",
     "LAYER",
     "BEGIN_LAYER_OBJECT z=",
-    "HEIGHT"
+    "HEIGHT",
+    "PRINTING",
+    "REMAINING_TIME"
   ],
   "ModelUpdateInterval": 250,
   "MaxMachineModelLockTime": -1,
