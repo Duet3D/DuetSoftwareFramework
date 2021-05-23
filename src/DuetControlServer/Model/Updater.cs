@@ -319,7 +319,7 @@ namespace DuetControlServer.Model
         private static void UpdateLayers()
         {
             // Are we printing?
-            if (Provider.Get.Job.Duration == null || Provider.Get.Job.Layer == null)
+            if (Provider.Get.Job.Duration == null)
             {
                 if (_lastLayer != -1)
                 {
@@ -337,6 +337,12 @@ namespace DuetControlServer.Model
             {
                 _lastLayer = 0;
                 Provider.Get.Job.Layers.Clear();
+            }
+
+            // Don't continue from here unless the layer number is known
+            if (Provider.Get.Job.Layer == null)
+            {
+                return;
             }
 
             int numChangedLayers = Math.Abs(Provider.Get.Job.Layer.Value - _lastLayer);
