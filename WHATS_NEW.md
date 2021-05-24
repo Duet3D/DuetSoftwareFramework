@@ -29,6 +29,8 @@ Bug fixes:
 - When DCS was configured to never terminate on reset, sometimes it failed to establish a connection again
 - Subscribe connection clients failed to clear `global` dictionary on reset
 - Fixed `exists` function in conditional G-code
+- When retrieving file info, DCS returned the simulated time instead of the slicer time
+- Fixed timing issue causing simulation times to be written incorrectly to G-code files
 
 Known limitations:
 - Auto-resume on power loss cannot be configured (M916)

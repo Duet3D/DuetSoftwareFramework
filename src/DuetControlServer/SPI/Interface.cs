@@ -80,11 +80,15 @@ namespace DuetControlServer.SPI
         private static TaskCompletionSource _firmwareHaltRequest;
         private static TaskCompletionSource _firmwareResetRequest;
 
+        // Print handling
+        private static volatile bool _startPrint;
+        private static readonly AsyncLock _stopPrintLock = new();
+        private static PrintStoppedReason _stopPrintReason;
+        private static TaskCompletionSource _stopPrintRequest;
+
         // Miscellaneous requests
+        private static volatile bool _assignFilaments;
         private static readonly Dictionary<int, string> _extruderFilamentMapping = new();
-        private static readonly AsyncLock _printStopppedReasonLock = new();
-        private static PrintStoppedReason? _printStoppedReason;
-        private static volatile bool _printStarted, _assignFilaments;
         private static readonly Queue<Tuple<MessageTypeFlags, string>> _messagesToSend = new();
 
         // Partial incoming message (if any)
@@ -418,33 +422,40 @@ namespace DuetControlServer.SPI
         /// Notify the firmware that a file print has started
         /// </summary>
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-        public static void SetPrintStarted()
+        public static void StartPrint()
         {
             if (Settings.NoSpi)
             {
                 throw new InvalidOperationException("Not connected over SPI");
             }
 
-            _printStarted = true;
+            _startPrint = true;
         }
 
         /// <summary>
         /// Notify the firmware that the file print has been stopped
         /// </summary>
-        /// <param name="stopReason">Reason why the print has stopped</param>
+        /// <param name="reason">Reason why the print has stopped</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-        public static async Task SetPrintStopped(PrintStoppedReason stopReason)
+        public static async Task StopPrint(PrintStoppedReason reason)
         {
             if (Settings.NoSpi)
             {
                 throw new InvalidOperationException("Not connected over SPI");
             }
 
-            using (await _printStopppedReasonLock.LockAsync(Program.CancellationToken))
+            Task onPrintStopped;
+            using (await _stopPrintLock.LockAsync(Program.CancellationToken))
             {
-                _printStoppedReason = stopReason;
+                _stopPrintReason = reason;
+                if (_stopPrintRequest == null)
+                {
+                    _stopPrintRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+                onPrintStopped = _stopPrintRequest.Task;
             }
+            await onPrintStopped;
         }
 
         /// <summary>
@@ -804,20 +815,21 @@ namespace DuetControlServer.SPI
 
                 // Check for changes of the print status.
                 // The packet providing file info has be sent first because it includes a time_t value that must reside on a 64-bit boundary!
-                if (_printStarted)
+                if (_startPrint)
                 {
                     using (await Model.Provider.AccessReadOnlyAsync())
                     {
-                        _printStarted = !DataTransfer.WritePrintStarted(Model.Provider.Get.Job.File);
+                        _startPrint = !DataTransfer.WritePrintStarted(Model.Provider.Get.Job.File);
                     }
                 }
                 else
                 {
-                    using (await _printStopppedReasonLock.LockAsync(Program.CancellationToken))
+                    using (await _stopPrintLock.LockAsync(Program.CancellationToken))
                     {
-                        if (_printStoppedReason != null && DataTransfer.WritePrintStopped(_printStoppedReason.Value))
+                        if (_stopPrintRequest != null && DataTransfer.WritePrintStopped(_stopPrintReason))
                         {
-                            _printStoppedReason = null;
+                            _stopPrintRequest.SetResult();
+                            _stopPrintRequest = null;
                         }
                     }
                 }
@@ -1532,16 +1544,25 @@ namespace DuetControlServer.SPI
                 }
             }
 
+            // No longer stopping a print
+            _startPrint = false;
+            if (_stopPrintRequest != null)
+            {
+                _stopPrintRequest.SetResult();
+                _stopPrintRequest = null;
+            }
+
+            // Clear filament assign requests
+            _assignFilaments = false;
+            lock (_extruderFilamentMapping)
+            {
+                _extruderFilamentMapping.Clear();
+            }
+
             // Clear messages to send to the firmware
             lock (_messagesToSend)
             {
                 _messagesToSend.Clear();
-            }
-
-            // Clear filament assign requests
-            lock (_extruderFilamentMapping)
-            {
-                _extruderFilamentMapping.Clear();
             }
 
             // Notify the updater task

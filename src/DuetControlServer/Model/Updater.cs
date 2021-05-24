@@ -24,7 +24,22 @@ namespace DuetControlServer.Model
         /// <summary>
         /// General-purpose lock for this class
         /// </summary>
-        private static readonly AsyncMonitor _monitor = new();
+        private static readonly AsyncLock _lock = new();
+
+        /// <summary>
+        /// First condition variable for object model updates
+        /// </summary>
+        private static readonly AsyncConditionVariable _updateConditionA = new(_lock);
+
+        /// <summary>
+        /// First condition variable for object model updates
+        /// </summary>
+        private static readonly AsyncConditionVariable _updateConditionB = new(_lock);
+
+        /// <summary>
+        /// Whether a client waiting for an object model update shall use A or B
+        /// </summary>
+        private static bool _useUpdateConditionA;
 
         /// <summary>
         /// Dictionary of main keys vs last sequence numbers
@@ -38,9 +53,9 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task WaitForFullUpdate(CancellationToken cancellationToken)
         {
-            using (await _monitor.EnterAsync(cancellationToken))
+            using (await _lock.LockAsync(cancellationToken))
             {
-                await _monitor.WaitAsync(cancellationToken);
+                await (_useUpdateConditionA ? _updateConditionA : _updateConditionB).WaitAsync(cancellationToken);
                 Program.CancellationToken.ThrowIfCancellationRequested();
             }
         }
@@ -51,9 +66,10 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task MachineModelFullyUpdated()
         {
-            using (await _monitor.EnterAsync(Program.CancellationToken))
+            using (await _lock.LockAsync(Program.CancellationToken))
             {
-                _monitor.PulseAll();
+                _useUpdateConditionA = !_useUpdateConditionA;
+                (_useUpdateConditionA ? _updateConditionA : _updateConditionB).NotifyAll();
             }
         }
 
@@ -65,7 +81,7 @@ namespace DuetControlServer.Model
         public static async Task ProcessLegacyConfigResponse(byte[] response)
         {
             using JsonDocument jsonDocument = JsonDocument.Parse(response);
-            using (await _monitor.EnterAsync(Program.CancellationToken))
+            using (await _lock.LockAsync(Program.CancellationToken))
             {
                 if (jsonDocument.RootElement.TryGetProperty("boardName", out JsonElement boardName))
                 {
@@ -94,7 +110,8 @@ namespace DuetControlServer.Model
                 }
 
                 // Cannot perform any further updates...
-                _monitor.PulseAll();
+                _useUpdateConditionA = !_useUpdateConditionA;
+                (_useUpdateConditionA ? _updateConditionA : _updateConditionB).NotifyAll();
 
                 // Check if the firmware is supposed to be updated
                 if (Settings.UpdateOnly && !_updatingFirmware)
@@ -123,7 +140,7 @@ namespace DuetControlServer.Model
                 try
                 {
                     // Request the limits if no sequence numbers have been set yet
-                    using (await _monitor.EnterAsync(Program.CancellationToken))
+                    using (await _lock.LockAsync(Program.CancellationToken))
                     {
                         if (_lastSeqs.IsEmpty)
                         {
@@ -223,10 +240,8 @@ namespace DuetControlServer.Model
                         }
 
                         // Object model is now up-to-date, notify waiting clients
-                        using (await _monitor.EnterAsync(Program.CancellationToken))
-                        {
-                            _monitor.PulseAll();
-                        }
+                        _useUpdateConditionA = !_useUpdateConditionA;
+                        (_useUpdateConditionA ? _updateConditionA : _updateConditionB).NotifyAll();
 
                         // Check if the firmware is supposed to be updated
                         if (Settings.UpdateOnly && !_updatingFirmware)

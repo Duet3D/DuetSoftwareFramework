@@ -114,11 +114,11 @@ namespace DuetControlServer.Files
                 }
                 else if (!string.IsNullOrWhiteSpace(code.Comment))
                 {
+                    gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
+                    gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime == null) && FindPrintTime(code.Comment, ref partialFileInfo);
                     gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
                     gotNewInfo |= FindFilamentUsed(code.Comment, ref partialFileInfo);
                     gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(code.Comment, ref partialFileInfo);
-                    gotNewInfo |= (partialFileInfo.PrintTime == null) && FindPrintTime(code.Comment, ref partialFileInfo);
-                    gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
                 }
 
                 // Is the file info complete?
@@ -190,11 +190,11 @@ namespace DuetControlServer.Files
                         }
                         else if (!string.IsNullOrWhiteSpace(code.Comment))
                         {
+                            gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
+                            gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime == null) && FindPrintTime(code.Comment, ref partialFileInfo);
                             gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
                             gotNewInfo |= !hadFilament && FindFilamentUsed(code.Comment, ref partialFileInfo);
                             gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(code.Comment, ref partialFileInfo);
-                            gotNewInfo |= (partialFileInfo.PrintTime == null) && FindPrintTime(code.Comment, ref partialFileInfo);
-                            gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
                         }
 
                         // Prepare to read the next code

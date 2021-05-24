@@ -228,7 +228,7 @@ namespace DuetControlServer.FileExecution
                     _logger.Info("Starting file print");
 
                     // Notify RRF
-                    SPI.Interface.SetPrintStarted();
+                    SPI.Interface.StartPrint();
 
                     // Process the file
                     Queue<Code> codes = new();
@@ -369,27 +369,26 @@ namespace DuetControlServer.FileExecution
                         // Notify RepRapFirmware that the print file has been closed
                         if (IsCancelled)
                         {
+                            await SPI.Interface.StopPrint(PrintStoppedReason.UserCancelled);
                             _logger.Info("Cancelled job file");
-                            await SPI.Interface.SetPrintStopped(PrintStoppedReason.UserCancelled);
                         }
                         else if (IsAborted)
                         {
+                            await SPI.Interface.StopPrint(PrintStoppedReason.Abort);
                             _logger.Info("Aborted job file");
-                            await SPI.Interface.SetPrintStopped(PrintStoppedReason.Abort);
                         }
                         else
                         {
+                            await SPI.Interface.StopPrint(PrintStoppedReason.NormalCompletion);
                             _logger.Info("Finished job file");
-                            await SPI.Interface.SetPrintStopped(PrintStoppedReason.NormalCompletion);
                         }
 
-                        // Update the object model again
+                        // Update special fields that are not available in RRF
                         using (await Provider.AccessReadWriteAsync())
                         {
                             Provider.Get.Job.LastFileAborted = IsAborted;
                             Provider.Get.Job.LastFileCancelled = IsCancelled;
                             Provider.Get.Job.LastFileSimulated = IsSimulating;
-                            Provider.Get.Job.LastFileName = Provider.Get.Job.File.FileName;
                         }
 
                         // Update the last simulated time
