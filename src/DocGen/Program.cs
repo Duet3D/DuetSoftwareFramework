@@ -130,7 +130,8 @@ namespace DocGen
                 propertyName += JsonNamingPolicy.CamelCase.ConvertName(property.Name);
                 if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) &&
                     property.PropertyType != typeof(string) &&
-                    property.PropertyType != typeof(ModelJsonDictionary))
+                    property.PropertyType != typeof(ModelJsonDictionary) &&
+                    property.PropertyType != typeof(ModelObjectDictionary<Plugin>))
                 {
                     propertyName += "[]";
                 }
@@ -165,6 +166,11 @@ namespace DocGen
                 {
                     // Instead of this we could check for base classes as well but so far Plugin is an exception
                     relatedTypes = new Type[] { typeof(PluginManifest), typeof(Plugin) };
+                }
+
+                if (property.PropertyType == typeof(ModelObjectDictionary<Plugin>))
+                {
+                    propertyName += @"\{\}";
                 }
 
                 if (relatedTypes.Length == 1)
