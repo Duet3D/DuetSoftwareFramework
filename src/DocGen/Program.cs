@@ -98,14 +98,14 @@ namespace DocGen
         /// <returns>Asynchronous task</returns>
         private static async Task WriteDocumentation(StreamWriter writer)
         {
-            PropertyInfo[] mainProperties = typeof(ObjectModel).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            PropertyInfo[] mainProperties = typeof(ObjectModel).GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
             foreach (PropertyInfo property in mainProperties)
             {
                 await WritePropertyDocumentation(writer, property, null, null, MinDepth);
             }
         }
 
-        private static async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property, string prefix, string suffix, int depth)
+        private static async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property, string path, string className, int depth)
         {
             if (Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
             {
@@ -126,19 +126,22 @@ namespace DocGen
                 }
 
                 // Write title
-                string propertyName = (prefix != null) ? $"{prefix}." : string.Empty;
+                string propertyName = (path != null) ? $"{path}." : string.Empty;
                 propertyName += JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) && property.PropertyType != typeof(string))
+                if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) &&
+                    property.PropertyType != typeof(string) &&
+                    property.PropertyType != typeof(ModelJsonDictionary))
                 {
                     propertyName += "[]";
                 }
-                if (suffix == null)
+
+                if (className == null)
                 {
                     await writer.WriteLineAsync($"{indentation} {propertyName}");
                 }
                 else
                 {
-                    await writer.WriteLineAsync($"{indentation} {propertyName} ({suffix})");
+                    await writer.WriteLineAsync($"{indentation} {propertyName} ({className})");
                 }
 
                 // Write node documentation
@@ -161,27 +164,28 @@ namespace DocGen
 
                 if (relatedTypes.Length == 1)
                 {
-                    await WriteTypeDocumentation(writer, relatedTypes[0], propertyName, suffix, depth + 1);
+                    await WriteTypeDocumentation(writer, relatedTypes[0], propertyName, className, depth + 1, false);
                 }
                 else
                 {
                     foreach (Type type in relatedTypes)
                     {
-                        await WriteTypeDocumentation(writer, type, propertyName, type.Name, depth + 1);
+                        // Only write plain type documentation if this property type does not directly inherit from ModelObject
+                        await WriteTypeDocumentation(writer, type, propertyName, type.Name, depth + 1, property.PropertyType.BaseType != typeof(ModelObject));
                     }
                 }
             }
         }
 
-        private static async Task WriteTypeDocumentation(StreamWriter writer, Type type, string prefix, string suffix, int depth)
+        private static async Task WriteTypeDocumentation(StreamWriter writer, Type type, string path, string className, int depth, bool writeTypeDocs)
         {
             if (depth > MaxDepth)
             {
                 depth = MaxDepth;
             }
 
-            // Write type documentation only for minimum depth, because the property field already describes the type
-            if (depth == MinDepth || suffix != null)
+            // Write type documentation only if needed
+            if (writeTypeDocs)
             {
                 string documentation = type.GetDocumentation();
                 if (!string.IsNullOrEmpty(documentation))
@@ -192,13 +196,13 @@ namespace DocGen
                         indentation += '#';
                     }
 
-                    if (suffix == null)
+                    if (className == null)
                     {
-                        await writer.WriteLineAsync($"{indentation} {prefix}");
+                        await writer.WriteLineAsync($"{indentation} {path}");
                     }
                     else
                     {
-                        await writer.WriteLineAsync($"{indentation} {prefix} ({suffix})");
+                        await writer.WriteLineAsync($"{indentation} {path} ({className})");
                     }
                     await writer.WriteLineAsync(documentation);
                     await writer.WriteLineAsync();
@@ -206,10 +210,10 @@ namespace DocGen
             }
 
             // Write documentation for other properties
-            PropertyInfo[] properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            PropertyInfo[] properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
             foreach (PropertyInfo property in properties)
             {
-                await WritePropertyDocumentation(writer, property, prefix, suffix, depth + 1);
+                await WritePropertyDocumentation(writer, property, path, className, depth + 1);
             }
         }
     }
