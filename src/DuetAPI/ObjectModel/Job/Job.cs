@@ -78,6 +78,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if the last file was aborted (unexpected cancellation)
         /// </summary>
+        [LinuxProperty]
         public bool LastFileAborted
         {
             get => _lastFileAborted;
@@ -88,6 +89,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if the last file was cancelled (user cancelled)
         /// </summary>
+        [LinuxProperty]
         public bool LastFileCancelled
         {
             get => _lastFileCancelled;
@@ -99,6 +101,7 @@ namespace DuetAPI.ObjectModel
         /// Indicates if the last file processed was simulated
         /// </summary>
         /// <remarks>This is not set if the file was aborted or cancelled</remarks>
+        [LinuxProperty]
         public bool LastFileSimulated
         {
             get => _lastFileSimulated;

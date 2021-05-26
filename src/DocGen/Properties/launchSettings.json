@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DocGen": {
+      "commandName": "Project",
+      "workingDirectory": "C:\\Users\\Christian\\source\\repos\\DuetSoftwareFramework\\src\\DocGen"
+    }
+  }
+}
