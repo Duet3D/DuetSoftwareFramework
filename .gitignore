@@ -271,3 +271,4 @@ Makefile.local
 # XML documentation
 src/DuetAPI/DuetAPI.xml
 src/DuetAPIClient/DuetAPIClient.xml
+src/DocGen/documentation.md
