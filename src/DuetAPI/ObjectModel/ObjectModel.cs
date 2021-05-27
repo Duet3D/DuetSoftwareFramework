@@ -52,6 +52,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of registered third-party HTTP endpoints
         /// </summary>
+        [LinuxProperty]
         public ModelCollection<HttpEndpoint> HttpEndpoints { get; } = new ModelCollection<HttpEndpoint>();
 
         /// <summary>

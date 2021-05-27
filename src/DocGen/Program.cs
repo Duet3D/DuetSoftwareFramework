@@ -105,6 +105,15 @@ namespace DocGen
             }
         }
 
+        /// <summary>
+        /// Write documentation for a property
+        /// </summary>
+        /// <param name="writer">Writer to use</param>
+        /// <param name="property">Property to document</param>
+        /// <param name="path">Path to the property</param>
+        /// <param name="classDescription">Description of the class or null if not applicable</param>
+        /// <param name="depth">Current indentation depth</param>
+        /// <returns>Asynchronous task</returns>
         private static async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property, string path, string classDescription, int depth)
         {
             if (Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
@@ -154,42 +163,89 @@ namespace DocGen
                 await writer.WriteLineAsync(documentation);
                 await writer.WriteLineAsync();
 
-                // Write documentation for (inherited) types
                 Type baseType = property.PropertyType.IsGenericType ? property.PropertyType.GetGenericArguments()[0] : property.PropertyType;
-                Type[] relatedTypes = apiTypes.Where(type => baseType.IsSubclassOf(typeof(ModelObject)) && baseType.IsAssignableFrom(type)).ToArray();
-                if (baseType == typeof(Inputs))
+                if (baseType.IsEnum)
                 {
-                    // Inputs is a pseudo-list so it requires special treatment
-                    relatedTypes = new Type[] { typeof(InputChannel) };
-                }
-                else if (baseType == typeof(Plugin))
-                {
-                    // Instead of this we could check for base classes as well but so far Plugin is an exception
-                    relatedTypes = new Type[] { typeof(PluginManifest), typeof(Plugin) };
-                }
+                    // Write enum values
+                    if (Attribute.IsDefined(property, typeof(FlagsAttribute)))
+                    {
+                        await writer.WriteLineAsync("This property may be a combination of the following:");
+                    }
+                    else
+                    {
+                        await writer.WriteLineAsync("This property may be one of the following:");
+                    }
 
-                if (property.PropertyType == typeof(ModelObjectDictionary<Plugin>))
-                {
-                    propertyName += @"\{\}";
-                }
-
-                if (relatedTypes.Length == 1)
-                {
-                    // Need to document the type for inputs[] as well...
-                    await WriteTypeDocumentation(writer, relatedTypes[0], propertyName, classDescription, depth + 1, false);
+                    Array possibleValues = Enum.GetValues(baseType);
+                    foreach (object value in possibleValues)
+                    {
+                        string jsonValue = JsonSerializer.Serialize(value, baseType).Trim('"', '[', ']');
+                        if (!string.IsNullOrEmpty(jsonValue))
+                        {
+                            string memberDocs = XMLHelper.GetEnumDocumentation(baseType, value);
+                            await writer.WriteLineAsync($"- {jsonValue}: {memberDocs}");
+                        }
+                    }
+                    await writer.WriteLineAsync();
                 }
                 else
                 {
-                    foreach (Type type in relatedTypes)
+                    // Write documentation for (inherited) types
+                    Type[] relatedTypes;
+                    if (baseType == typeof(Inputs))
                     {
-                        // Only write plain type documentation if this property type does not directly inherit from ModelObject
-                        classDescription = (type.BaseType != typeof(ModelObject)) ? $"{type.Name} : {type.BaseType.Name}" : type.Name;
-                        await WriteTypeDocumentation(writer, type, propertyName, classDescription, depth + 1, type.BaseType != typeof(ModelObject));
+                        // Inputs is a pseudo-list so it requires special treatment
+                        relatedTypes = new Type[] { typeof(InputChannel) };
+                    }
+                    else if (baseType == typeof(Message))
+                    {
+                        // Message is not inherited from ModelObject
+                        relatedTypes = new Type[] { typeof(Message) };
+                    }
+                    else if (baseType == typeof(Plugin))
+                    {
+                        // Instead of this we could check for base classes as well but so far Plugin is an exception
+                        relatedTypes = new Type[] { typeof(PluginManifest), typeof(Plugin) };
+                    }
+                    else
+                    {
+                        // Find related types
+                        relatedTypes = apiTypes.Where(type => baseType.IsSubclassOf(typeof(ModelObject)) && baseType.IsAssignableFrom(type)).ToArray();
+                    }
+
+                    if (property.PropertyType == typeof(ModelObjectDictionary<Plugin>))
+                    {
+                        propertyName += @"\{\}";
+                    }
+
+                    if (relatedTypes.Length == 1)
+                    {
+                        // Need to document the type for inputs[] as well...
+                        await WriteTypeDocumentation(writer, relatedTypes[0], propertyName, classDescription, depth + 1, false);
+                    }
+                    else
+                    {
+                        foreach (Type type in relatedTypes)
+                        {
+                            // Only write plain type documentation if this property type does not directly inherit from ModelObject
+                            classDescription = (type.BaseType != typeof(ModelObject)) ? $"{type.Name} : {type.BaseType.Name}" : type.Name;
+                            await WriteTypeDocumentation(writer, type, propertyName, classDescription, depth + 1, type.BaseType != typeof(ModelObject));
+                        }
                     }
                 }
             }
         }
 
+        /// <summary>
+        /// Write documentation for an item type
+        /// </summary>
+        /// <param name="writer">Writer to use</param>
+        /// <param name="type">Type to document</param>
+        /// <param name="path">Path to the property</param>
+        /// <param name="classDescription">Description of the class or null if not applicable</param>
+        /// <param name="depth">Current indentation depth</param>
+        /// <param name="writeTypeDocs">Whether the type should be documented too</param>
+        /// <returns>Asynchronous task</returns>
         private static async Task WriteTypeDocumentation(StreamWriter writer, Type type, string path, string classDescription, int depth, bool writeTypeDocs)
         {
             if (depth > MaxDepth)

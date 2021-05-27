@@ -148,5 +148,15 @@ namespace DocGen
             }
             return null;
         }
+
+        public static string GetEnumDocumentation(Type enumType, object value)
+        {
+            string key = "F:" + XmlDocumentationKeyHelper(enumType.FullName, Enum.GetName(enumType, value));
+            if (_loadedXmlDocumentation.TryGetValue(key, out string documentation))
+            {
+                return GenerateDocFromXml(documentation);
+            }
+            return null;
+        }
     }
 }

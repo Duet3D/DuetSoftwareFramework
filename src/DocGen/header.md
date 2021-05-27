@@ -16,6 +16,12 @@ These class names are present for items where different item types may be config
 If a class inherits values from a base type, the inheritance is marked using a colon (`:`) followed by the base class name.
 So, for example, `LaserFilamentMonitor : FilamentMonitor` means that a `LaserFilamentMonitor` inherits all the properties from the `FilamentMonitor` base class.
 
+In standalone mode, each main key (like `boards` or `heat`) has its own sequence number in the `seqs` key which is not documented here.
+Whenever a non-live field is updated (see `M409 F"f"`), this sequence number is increased.
+For clients targeting standalone mode, it can be helpful to check these values to determine when it is time to request a full key from RRF again.
+There is an extra value `seqs.reply` as well which is used notify clients about new messages (see `rr_reply`).
+Note that these sequence numbers are not exposed in SBC mode.
+
 *This page is preliminary and subject to further changes.*
 
 # Object Model Description
