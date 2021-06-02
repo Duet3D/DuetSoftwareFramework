@@ -72,6 +72,11 @@ namespace DuetControlServer.SPI.Communication
         public const int IapBootDelay = 500;
 
         /// <summary>
+        /// Timeout when waiting for a response from IAP
+        /// </summary>
+        public const int IapTimeout = 8000;
+
+        /// <summary>
         /// Size of each transmitted firmware binary segment (must be equal to blockReadSize in the IAP project)
         /// </summary>
         public const int FirmwareSegmentSize = 2048;

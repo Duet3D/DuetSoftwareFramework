@@ -656,7 +656,7 @@ namespace DuetControlServer.Codes
                 case 500:
                     if (await SPI.Interface.Flush(code))
                     {
-                        await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
+                        await Model.Updater.WaitForFullUpdate();
                         await ConfigOverride.Save(code);
                         return new CodeResult();
                     }
@@ -784,7 +784,7 @@ namespace DuetControlServer.Codes
                 case 703:
                     if (await SPI.Interface.Flush(code))
                     {
-                        await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
+                        await Model.Updater.WaitForFullUpdate();
                         break;
                     }
                     throw new OperationCanceledException();
@@ -976,7 +976,7 @@ namespace DuetControlServer.Codes
                             }
                             else
                             {
-                                await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
+                                await Model.Updater.WaitForFullUpdate();
 
                                 Commands.StartPlugins startCommand = new();
                                 await startCommand.Execute();

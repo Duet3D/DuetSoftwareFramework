@@ -123,7 +123,7 @@ namespace DuetControlServer.IPC.Processors
             if (!Settings.UpdateOnly && _serviceConnected && _rootServiceConnected)
             {
                 // First ensure that object model is up-to-date
-                await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
+                await Model.Updater.WaitForFullUpdate();
 
                 Commands.StartPlugins startCommand = new();
                 _ = Task.Run(startCommand.Execute);

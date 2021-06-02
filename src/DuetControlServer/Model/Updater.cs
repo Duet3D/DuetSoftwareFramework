@@ -39,7 +39,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Whether a client waiting for an object model update shall use A or B
         /// </summary>
-        private static bool _useUpdateConditionA;
+        private static bool _waitForConditionA;
 
         /// <summary>
         /// Dictionary of main keys vs last sequence numbers
@@ -55,10 +55,16 @@ namespace DuetControlServer.Model
         {
             using (await _lock.LockAsync(cancellationToken))
             {
-                await (_useUpdateConditionA ? _updateConditionA : _updateConditionB).WaitAsync(cancellationToken);
+                await (_waitForConditionA ? _updateConditionA : _updateConditionB).WaitAsync(cancellationToken);
                 Program.CancellationToken.ThrowIfCancellationRequested();
             }
         }
+
+        /// <summary>
+        /// Wait for the model to be fully updated from RepRapFirmware
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static Task WaitForFullUpdate() => WaitForFullUpdate(Program.CancellationToken);
 
         /// <summary>
         /// Called in non-SPI mode to notify waiting tasks about a finished model update
@@ -68,8 +74,8 @@ namespace DuetControlServer.Model
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
-                _useUpdateConditionA = !_useUpdateConditionA;
-                (_useUpdateConditionA ? _updateConditionA : _updateConditionB).NotifyAll();
+                _waitForConditionA = !_waitForConditionA;
+                (_waitForConditionA ? _updateConditionA : _updateConditionB).NotifyAll();
             }
         }
 
@@ -110,8 +116,8 @@ namespace DuetControlServer.Model
                 }
 
                 // Cannot perform any further updates...
-                _useUpdateConditionA = !_useUpdateConditionA;
-                (_useUpdateConditionA ? _updateConditionA : _updateConditionB).NotifyAll();
+                _waitForConditionA = !_waitForConditionA;
+                (_waitForConditionA ? _updateConditionA : _updateConditionB).NotifyAll();
 
                 // Check if the firmware is supposed to be updated
                 if (Settings.UpdateOnly && !_updatingFirmware)
@@ -139,6 +145,10 @@ namespace DuetControlServer.Model
             {
                 try
                 {
+                    // Starting the next OM update. Waiting clients can be notified after this one,
+                    // but clients requesting an update while the OM is being updated should wait for the next one to complete first
+                    _waitForConditionA = !_waitForConditionA;
+
                     // Request the limits if no sequence numbers have been set yet
                     using (await _lock.LockAsync(Program.CancellationToken))
                     {
@@ -240,8 +250,7 @@ namespace DuetControlServer.Model
                         }
 
                         // Object model is now up-to-date, notify waiting clients
-                        _useUpdateConditionA = !_useUpdateConditionA;
-                        (_useUpdateConditionA ? _updateConditionA : _updateConditionB).NotifyAll();
+                        (_waitForConditionA ? _updateConditionB : _updateConditionA).NotifyAll();
 
                         // Check if the firmware is supposed to be updated
                         if (Settings.UpdateOnly && !_updatingFirmware)
@@ -290,6 +299,7 @@ namespace DuetControlServer.Model
             {
                 Commands.Code updateCode = new()
                 {
+                    Channel = DuetAPI.CodeChannel.Trigger,
                     Type = CodeType.MCode,
                     MajorNumber = 997
                 };

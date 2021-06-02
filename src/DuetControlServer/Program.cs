@@ -299,7 +299,7 @@ namespace DuetControlServer
         }
 
         /// <summary>
-        /// Check if another instance is already running
+        /// Check if another instance is already running and send M997 if DSF is updating
         /// </summary>
         /// <returns>True if another instance is running</returns>
         private static async Task<bool> CheckForAnotherInstance()
@@ -321,9 +321,9 @@ namespace DuetControlServer
                 {
                     await connection.PerformCode(new Code
                     {
+                        Channel = DuetAPI.CodeChannel.Trigger,
                         Type = DuetAPI.Commands.CodeType.MCode,
-                        MajorNumber = 997,
-                        Flags = DuetAPI.Commands.CodeFlags.IsPrioritized
+                        MajorNumber = 997
                     });
                     Console.WriteLine("Done!");
                 }

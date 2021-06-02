@@ -394,16 +394,31 @@ namespace DuetControlServer.FileExecution
                         // Update the last simulated time
                         if (IsSimulating && !IsAborted && !IsCancelled)
                         {
-                            await Updater.WaitForFullUpdate(Program.CancellationToken);
-
-                            int? lastDuration;
-                            using (await Provider.AccessReadOnlyAsync())
+                            // Wait for the simulation time to be available
+                            int? lastDuration = null;
+                            int upTime = 0;
+                            while (!Program.CancellationToken.IsCancellationRequested)
                             {
-                                lastDuration = Provider.Get.Job.LastDuration;
+                                await Updater.WaitForFullUpdate();
+                                using (await Provider.AccessReadOnlyAsync())
+                                {
+                                    if (Provider.Get.State.UpTime < upTime || Provider.Get.Job.LastDuration != null)
+                                    {
+                                        lastDuration = Provider.Get.Job.LastDuration;
+                                        break;
+                                    }
+                                    upTime = Provider.Get.State.UpTime;
+                                }
                             }
+
+                            // Try to update the last simulated time
                             if (lastDuration > 0)
                             {
                                 await InfoParser.UpdateSimulatedTime(_filename, lastDuration.Value);
+                            }
+                            else
+                            {
+                                _logger.Warn("Failed to update simulation time because it was not set in the object model");
                             }
                         }
                     }

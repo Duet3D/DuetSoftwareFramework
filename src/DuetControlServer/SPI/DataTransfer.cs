@@ -1132,43 +1132,30 @@ namespace DuetControlServer.SPI
                 _transferReadyEvent.Reset();
                 if (!_transferReadyPin.Value)
                 {
-                    if (_updating)
+                    // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
+                    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+                    cts.CancelAfter(_updating ? Consts.IapTimeout : Settings.SpiConnectTimeout);
+                    try
                     {
-                        // Ignore shutdown requests and timeouts when an update is in progress
-                        _transferReadyEvent.Wait();
+                        _transferReadyEvent.Wait(cts.Token);
                     }
-                    else
+                    catch (OperationCanceledException)
                     {
-                        // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
-                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                        cts.CancelAfter(Settings.SpiConnectTimeout);
-                        try
+                        if (Program.CancellationToken.IsCancellationRequested)
                         {
-                            _transferReadyEvent.Wait(cts.Token);
+                            throw new OperationCanceledException("Program termination");
                         }
-                        catch (OperationCanceledException)
-                        {
-                            if (Program.CancellationToken.IsCancellationRequested)
-                            {
-                                throw new OperationCanceledException("Program termination");
-                            }
-                            throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
-                        }
+                        throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                     }
                 }
                 _waitingForFirstTransfer = false;
                 _expectedTfrRdyPinValue = false;
             }
-            else if (_updating)
-            {
-                // Ignore shutdown requests and timeouts when an update is in progress
-                _transferReadyEvent.Wait();
-            }
             else
             {
                 // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred.
                 using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                cts.CancelAfter(inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout);
+                cts.CancelAfter(_updating ? Consts.IapTimeout : (inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout));
                 do
                 {
                     try

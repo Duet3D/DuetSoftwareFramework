@@ -484,7 +484,7 @@ namespace DuetControlServer.FileExecution
             {
                 _ = Task.Run(async () =>
                 {
-                    await Model.Updater.WaitForFullUpdate(Program.CancellationToken);
+                    await Model.Updater.WaitForFullUpdate();
                     FilamentManager.RefreshMapping();
                     _runningConfig = false;
                 });
