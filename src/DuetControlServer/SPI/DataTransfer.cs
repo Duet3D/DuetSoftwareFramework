@@ -796,17 +796,17 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="stream">IAP binary</param>
         /// <returns>Whether another segment could be written</returns>
-        public static bool WriteIapSegment(Stream stream)
+        public static async Task<bool> WriteIapSegment(Stream stream)
         {
-            Span<byte> data = stackalloc byte[Consts.IapSegmentSize];
-            int bytesRead = stream.Read(data);
+            byte[] data = new byte[Consts.IapSegmentSize];
+            int bytesRead = await stream.ReadAsync(data);
             if (bytesRead <= 0)
             {
                 return false;
             }
 
             WritePacket(Communication.LinuxRequests.Request.WriteIap, bytesRead);
-            data.Slice(0, bytesRead).CopyTo(GetWriteBuffer(bytesRead));
+            data[..bytesRead].CopyTo(GetWriteBuffer(bytesRead));
             PerformFullTransfer();
             return true;
         }
@@ -830,12 +830,12 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="stream">Stream of the firmware binary</param>
         /// <returns>Whether another segment could be sent</returns>
-        public static bool FlashFirmwareSegment(Stream stream)
+        public static async Task<bool> FlashFirmwareSegment(Stream stream)
         {
-            Span<byte> readBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
-            Span<byte> writeBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
+            byte[] readBuffer = new byte[Consts.FirmwareSegmentSize];
+            byte[] writeBuffer = new byte[Consts.FirmwareSegmentSize];
 
-            int bytesRead = stream.Read(writeBuffer);
+            int bytesRead = await stream.ReadAsync(writeBuffer);
             if (bytesRead <= 0)
             {
                 return false;
@@ -844,7 +844,7 @@ namespace DuetControlServer.SPI
             if (bytesRead != Consts.FirmwareSegmentSize)
             {
                 // Fill up the remaining space with 0xFF. The IAP program does the same once complete
-                writeBuffer[bytesRead..].Fill(0xFF);
+                writeBuffer.AsSpan(bytesRead..).Fill(0xFF);
             }
 
             WaitForTransfer();
@@ -858,11 +858,11 @@ namespace DuetControlServer.SPI
         /// <param name="firmwareLength">Length of the written firmware in bytes</param>
         /// <param name="crc16">CRC16 checksum of the firmware</param>
         /// <returns>Whether the firmware has been written successfully</returns>
-        public static bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
+        public static async Task<bool> VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
         {
             // At this point IAP expects another segment so wait for it to be ready first. After that, wait a moment for IAP to acknowledge we're done
             WaitForTransfer();
-            Thread.Sleep(Consts.FirmwareFinishedDelay);
+            await Task.Delay(Consts.FirmwareFinishedDelay);
 
             // Send the final firmware size plus CRC16 checksum to IAP
             Communication.LinuxRequests.FlashVerify verifyRequest = new()
@@ -870,13 +870,13 @@ namespace DuetControlServer.SPI
                 firmwareLength = (uint)firmwareLength,
                 crc16 = crc16
             };
-            Span<byte> transferData = stackalloc byte[Marshal.SizeOf<Communication.LinuxRequests.FlashVerify>()];
+            byte[] transferData = new byte[Marshal.SizeOf<Communication.LinuxRequests.FlashVerify>()];
             MemoryMarshal.Write(transferData, ref verifyRequest);
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(transferData, transferData);
 
             // Check if the IAP can confirm our CRC16 checksum
-            Span<byte> writeOk = stackalloc byte[1];
+            byte[] writeOk = new byte[1];
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(writeOk, writeOk);
             return (writeOk[0] == 0x0C);

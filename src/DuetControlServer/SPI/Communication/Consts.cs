@@ -84,7 +84,7 @@ namespace DuetControlServer.SPI.Communication
         /// <summary>
         /// Delay to await after the last firmware segment has been written (in ms)
         /// </summary>
-        public const int FirmwareFinishedDelay = 500;
+        public const int FirmwareFinishedDelay = 750;
 
         /// <summary>
         /// Time to wait when the IAP reboots to the main firmware

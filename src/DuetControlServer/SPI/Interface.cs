@@ -591,7 +591,7 @@ namespace DuetControlServer.SPI
             bool dataSent;
             do
             {
-                dataSent = DataTransfer.WriteIapSegment(_iapStream);
+                dataSent = await DataTransfer.WriteIapSegment(_iapStream);
                 if (_logger.IsDebugEnabled)
                 {
                     Console.Write('.');
@@ -620,7 +620,7 @@ namespace DuetControlServer.SPI
 
                 try
                 {
-                    while (DataTransfer.FlashFirmwareSegment(_firmwareStream))
+                    while (await DataTransfer.FlashFirmwareSegment(_firmwareStream))
                     {
                         if (_logger.IsDebugEnabled)
                         {
@@ -632,21 +632,22 @@ namespace DuetControlServer.SPI
                         Console.WriteLine();
                     }
                 }
-                catch
+                catch (Exception e)
                 {
+                    _logger.Error(e);
                     await Logger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
                     throw;
                 }
 
                 _logger.Info("Verifying checksum");
             }
-            while (++numRetries < 3 && !DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16));
+            while (!await DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16) && ++numRetries < 3);
 
             if (numRetries == 3)
             {
                 // Failed to flash the firmware
                 await Logger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
-                throw new OperationCanceledException("Faield to flash firmware after 3 attempts");
+                throw new OperationCanceledException("Failed to flash firmware after 3 attempts");
             }
 
             // Wait for the IAP binary to restart the controller

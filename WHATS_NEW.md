@@ -1,8 +1,8 @@
 Summary of important changes in recent versions
 ===============================================
 
-Version 3.3-rc3
-=============
+Version 3.3
+===========
 
 Upgrade notes since version 3.2:
 - Plugin support is now enabled but requires some extra steps before they can be installed. Execute the following commands in a **Linux** terminal:
@@ -15,6 +15,13 @@ Upgrade notes since version 3.2:
   2. It can be manually installed via `apt install duetpimanagementplugin`
   3. Go to the `Machine-Specific -> Third-Party Plugins` page on DWC to enable it after a manual installation
 - There is now a new configuration file `dsf-config.g` which is executed when all previously started plugins have been started by the plugin service(s) after a reboot. Put custom G/M-codes into this file, ideally with a short delay at the start (`G4 S2`) to ensure the plugions are fully started at the time custom actions are executed.
+
+Bug fixes:
+- When a new firmware build was installed, the final IAP delay was sometimes too short
+- `directories` key was not queried when DCS started in update-only mode
+
+Version 3.3-rc3
+===============
 
 Compatible versions:
 - RepRapFirmware 3.3-rc3
