@@ -1,8 +1,8 @@
 Summary of important changes in recent versions
 ===============================================
 
-Version 3.3
-===========
+Version 3.3.0
+=============
 
 Upgrade notes since version 3.2:
 - Plugin support is now enabled but requires some extra steps before they can be installed. Execute the following commands in a **Linux** terminal:
@@ -19,6 +19,12 @@ Upgrade notes since version 3.2:
 Bug fixes:
 - When a new firmware build was installed, the final IAP delay was sometimes too short
 - `directories` key was not queried when DCS started in update-only mode
+- Remaining plugins were not correctly stopped when a plugin service was shut down
+
+Known limitations:
+- Auto-resume on power loss cannot be configured (M916)
+- Accelerometer profiles cannot be recorded (M956)
+- Password protection has no effect yet (M551)
 
 Version 3.3-rc3
 ===============
@@ -38,10 +44,6 @@ Bug fixes:
 - Fixed `exists` function in conditional G-code
 - When retrieving file info, DCS returned the simulated time instead of the slicer time
 - Fixed timing issue causing simulation times to be written incorrectly to G-code files
-
-Known limitations:
-- Auto-resume on power loss cannot be configured (M916)
-- Accelerometer profiles cannot be recorded (M956)
 
 Version 3.3-rc2
 ===============

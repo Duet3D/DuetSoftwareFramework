@@ -7,6 +7,9 @@ using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Codes
 {
+    /// <summary>
+    /// Functions for interpreting meta G-code keywords
+    /// </summary>
     public static class Keywords
     {
         /// <summary>

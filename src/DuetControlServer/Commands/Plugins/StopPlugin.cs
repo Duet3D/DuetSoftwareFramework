@@ -61,6 +61,9 @@ namespace DuetControlServer.Commands
             }
         }
 
+        /// <summary>
+        /// This is set to true if all the plugins are supposed to be stopped
+        /// </summary>
         [JsonIgnore]
         public bool StoppingAll { get; set; }
     }

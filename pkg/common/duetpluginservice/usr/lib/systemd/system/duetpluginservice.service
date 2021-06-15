@@ -2,6 +2,7 @@
 Description=Duet Plugin Service
 PartOf=duetcontrolserver.service
 After=duetcontrolserver.service multi-user.target
+StartLimitIntervalSec=0
 
 [Service]
 ExecStart=/opt/dsf/bin/DuetPluginService

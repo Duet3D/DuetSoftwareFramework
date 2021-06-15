@@ -10,6 +10,9 @@ using System.Threading.Tasks;
 
 namespace DuetControlServer.IPC.Processors
 {
+    /// <summary>
+    /// IPC processor for plugin services
+    /// </summary>
     public sealed class PluginService : Base
     {
         /// <summary>
@@ -81,6 +84,7 @@ namespace DuetControlServer.IPC.Processors
             await tcs.Task;
         }
 
+        /// <summary>
         /// Constructor of the plugin runner proxy processor
         /// </summary>
         /// <param name="conn">Connection instance</param>
@@ -217,7 +221,7 @@ namespace DuetControlServer.IPC.Processors
                     // Stop the remaining plugins again unless they are already stopped
                     if (stopPlugins)
                     {
-                        StopPlugins stopCommand = new();
+                        Commands.StopPlugins stopCommand = new();
                         _ = Task.Run(stopCommand.Execute);
                     }
                 }
