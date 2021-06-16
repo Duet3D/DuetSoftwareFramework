@@ -269,6 +269,9 @@ src/Documentation/obj
 Makefile.local
 
 # XML documentation
+src/DocGen/documentation.md
 src/DuetAPI/DuetAPI.xml
 src/DuetAPIClient/DuetAPIClient.xml
-src/DocGen/documentation.md
+src/DuetControlServer/DuetControlServer.xml
+src/DuetWebServer/DuetWebServer.xml
+src/LinuxApi/LinuxApi.xml

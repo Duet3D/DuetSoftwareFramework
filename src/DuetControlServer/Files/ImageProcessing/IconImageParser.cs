@@ -10,6 +10,9 @@ using SixLabors.ImageSharp.Formats.Png;
 
 namespace DuetControlServer.Files.ImageProcessing
 {
+    /// <summary>
+    /// Functions for special thumbnail parsing
+    /// </summary>
     public static class IconImageParser
     {
         /// <summary>
@@ -17,8 +20,14 @@ namespace DuetControlServer.Files.ImageProcessing
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
-
-
+        /// <summary>
+        /// Try to extract thumbnails from a given file
+        /// </summary>
+        /// <param name="reader">Stream reader to read from</param>
+        /// <param name="codeParserBuffer">Read buffer</param>
+        /// <param name="parsedFileInfo">File information</param>
+        /// <param name="code">Code instance to reuse</param>
+        /// <returns>Asynchronous task</returns>
         public static async Task ProcessAsync(StreamReader reader, CodeParserBuffer codeParserBuffer, ParsedFileInfo parsedFileInfo, Code code)
         {
             _logger.Info($"Processing Image {parsedFileInfo.FileName}");
@@ -90,7 +99,9 @@ namespace DuetControlServer.Files.ImageProcessing
         /// Takes a memory stream containing the header icon + the 4 size bytes
         /// </summary>
         /// <param name="ms">memory stream containing the header icon + 4 size-bytes</param>
-        /// <returns></returns>
+        /// <param name="width">Width of the thumbnail</param>
+        /// <param name="height">Height of the thumbnail</param>
+        /// <returns>Parsed image</returns>
         public static Image BinaryToImage(MemoryStream ms, out int width, out int height)
         {
             ms.Position = 0;
@@ -128,9 +139,5 @@ namespace DuetControlServer.Files.ImageProcessing
 
             return result;
         }
-
-
-
-
     }
 }

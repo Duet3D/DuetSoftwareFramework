@@ -36,11 +36,10 @@ namespace DuetControlServer.IPC.Processors
         private readonly CodeChannel _channel;
 
         /// <summary>
-        /// Constructor of the command interpreter
+        /// Constructor of the code stream interpreter
         /// </summary>
         /// <param name="conn">Connection instance</param>
-        /// <param name="bufferSize">Maximum number of codes to execute simultaneously</param>
-        /// <param name="channel">Code cchannel for incoming codes</param>
+        /// <param name="initMessage">Initialization message from the client</param>
         public CodeStream(Connection conn, ClientInitMessage initMessage) : base(conn)
         {
             CodeStreamInitMessage codeStreamInitMessage = (CodeStreamInitMessage)initMessage;

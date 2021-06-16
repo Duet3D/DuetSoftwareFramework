@@ -14,7 +14,8 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Function to generate a property change handler for model dictionaries
         /// </summary>
-        /// <param name="path">Property path</param>
+        /// <param name="sender">Dictionary source</param>
+        /// <param name="e">Property change event arguments</param>
         /// <returns>Property change handler</returns>
         private static void ModelDictionaryChanging(object sender, PropertyChangingEventArgs e)
         {

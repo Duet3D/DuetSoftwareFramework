@@ -733,6 +733,7 @@ namespace UnitTests.Commands
             Assert.AreEqual(3, codes.Count);
 
             Assert.AreEqual(CodeType.GCode, codes[0].Type);
+            Assert.AreEqual(CodeFlags.None, codes[0].Flags);
             Assert.AreEqual(4, codes[0].Indent);
             Assert.AreEqual(1, codes[0].MajorNumber);
             Assert.AreEqual(2, codes[0].Parameters.Count);
@@ -742,6 +743,7 @@ namespace UnitTests.Commands
             Assert.AreEqual(5, (int)codes[0].Parameters[1]);
 
             Assert.AreEqual(CodeType.GCode, codes[1].Type);
+            Assert.AreEqual(CodeFlags.IsLastCode, codes[1].Flags);
             Assert.AreEqual(4, codes[1].Indent);
             Assert.AreEqual(1, codes[1].MajorNumber);
             Assert.AreEqual(2, codes[1].Parameters.Count);
@@ -751,6 +753,7 @@ namespace UnitTests.Commands
             Assert.AreEqual(10, (int)codes[1].Parameters[1]);
 
             Assert.AreEqual(CodeType.GCode, codes[2].Type);
+            Assert.AreEqual(CodeFlags.IsLastCode, codes[2].Flags);
             Assert.AreEqual(0, codes[2].Indent);
             Assert.AreEqual(1, codes[2].MajorNumber);
             Assert.AreEqual(2, codes[2].Parameters.Count);

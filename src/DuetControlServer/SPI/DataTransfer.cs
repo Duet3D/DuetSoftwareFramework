@@ -16,6 +16,7 @@ using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Model;
 using System.Threading.Tasks;
 using DuetControlServer.Utility;
+using System.Diagnostics;
 
 namespace DuetControlServer.SPI
 {
@@ -40,6 +41,7 @@ namespace DuetControlServer.SPI
 
         private static DateTime _lastTransferMeasureTime = DateTime.Now, _lastCodesMeasureTime = DateTime.Now;
         private static volatile int _numMeasuredTransfers, _numMeasuredCodes, _maxRxSize, _maxTxSize;
+        private static TimeSpan _maxPinWaitDurationFull = TimeSpan.Zero, _maxPinWaitDuration = TimeSpan.Zero;
 
         // Transfer headers
         private static readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf<TransferHeader>()];
@@ -123,7 +125,7 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Get the number of transferred codes per second
+        /// Get the number of transferred codes per second and reset the counter
         /// </summary>
         /// <returns>Full transfers per second</returns>
         private static decimal GetCodesPerSecond()
@@ -140,13 +142,32 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Get the maximum time to wait for the transfer ready pin to be toggled and reset the counter
+        /// </summary>
+        /// <param name="fullTransferCounter">Query and reset the full transfer duration</param>
+        /// <returns></returns>
+        public static double GetMaxPinWaitDuration(bool fullTransferCounter)
+        {
+            if (fullTransferCounter)
+            {
+                double fullResult = _maxPinWaitDurationFull.TotalMilliseconds;
+                _maxPinWaitDuration = TimeSpan.Zero;
+                return fullResult;
+            }
+
+            double result = _maxPinWaitDuration.TotalMilliseconds;
+            _maxPinWaitDuration = TimeSpan.Zero;
+            return result;
+        }
+
+        /// <summary>
         /// Print diagnostics to the given string builder
         /// </summary>
         /// <param name="builder">Target to write to</param>
         public static void Diagnostics(StringBuilder builder)
         {
-            builder.AppendLine($"Configured SPI speed: {Settings.SpiFrequency} Hz");
-            builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}");
+            builder.AppendLine($"Configured SPI speed: {Settings.SpiFrequency}Hz");
+            builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max wait times: {GetMaxPinWaitDuration(true):0.0}ms/{GetMaxPinWaitDuration(false):0.0}ms");
             builder.AppendLine($"Codes per second: {GetCodesPerSecond():F2}");
             builder.AppendLine($"Maximum length of RX/TX data transfers: {_maxRxSize}/{_maxTxSize}");
         }
@@ -1153,6 +1174,9 @@ namespace DuetControlServer.SPI
             }
             else
             {
+                Stopwatch watch = new();
+                watch.Start();
+
                 // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred.
                 using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
                 cts.CancelAfter(_updating ? Consts.IapTimeout : (inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout));
@@ -1174,6 +1198,23 @@ namespace DuetControlServer.SPI
                 }
                 while (_transferReadyPin.Value != _expectedTfrRdyPinValue);
                 _expectedTfrRdyPinValue = !_expectedTfrRdyPinValue;
+
+                // Keep track of the maximum times to wait for the TfrRdy pin to change
+                watch.Stop();
+                if (inTransfer)
+                {
+                    if (watch.Elapsed > _maxPinWaitDuration)
+                    {
+                        _maxPinWaitDuration = watch.Elapsed;
+                    }
+                }
+                else
+                {
+                    if (watch.Elapsed > _maxPinWaitDurationFull)
+                    {
+                        _maxPinWaitDurationFull = watch.Elapsed;
+                    }
+                }
             }
             _transferReadyEvent.Reset();
         }

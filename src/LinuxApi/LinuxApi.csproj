@@ -4,7 +4,7 @@
       <TargetFramework>net5.0</TargetFramework>
       <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
       <PackageLicenseExpression>LGPL-3.0</PackageLicenseExpression>
-      <Version>3.3-rc3</Version>
+      <Version>3.3.0</Version>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -18,7 +18,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DocumentationFile>LinuxDevices.xml</DocumentationFile>
+    <DocumentationFile>LinuxApi.xml</DocumentationFile>
   </PropertyGroup>
 
 </Project>
