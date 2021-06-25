@@ -16,6 +16,16 @@
         private float _active;
 
         /// <summary>
+        /// Average heater PWM value (0..1)
+        /// </summary>
+        public float AvgPwm
+        {
+            get => _avgPwm;
+            set => SetPropertyValue(ref _avgPwm, value);
+        }
+        private float _avgPwm;
+
+        /// <summary>
         /// Current temperature of the heater (in C)
         /// </summary>
         public float Current

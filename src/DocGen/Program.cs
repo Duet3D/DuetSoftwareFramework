@@ -39,7 +39,7 @@ namespace DocGen
         /// Entry point of this application
         /// </summary>
         /// <param name="args">Command-line arguments</param>
-        static async Task Main(string[] args)
+        static async Task Main()
         {
             Console.WriteLine("Documentation generator for DSF object model v{0}", Version);
             Console.WriteLine("Written by Christian Hammacher for Duet3D");
@@ -139,8 +139,7 @@ namespace DocGen
                 propertyName += JsonNamingPolicy.CamelCase.ConvertName(property.Name);
                 if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) &&
                     property.PropertyType != typeof(string) &&
-                    property.PropertyType != typeof(ModelJsonDictionary) &&
-                    property.PropertyType != typeof(ModelObjectDictionary<Plugin>))
+                    (!property.PropertyType.IsGenericType || property.PropertyType.GetGenericTypeDefinition() != typeof(ModelDictionary<>)))
                 {
                     propertyName += "[]";
                 }
@@ -155,8 +154,10 @@ namespace DocGen
                 }
 
                 // Write node documentation
-                if (Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
+#warning Check for obsolete attribute as well
+                if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                 {
+#warning Need to respect new property here indicating if it's SBC-only or also provided by RRF in standalone mode
                     await writer.WriteLineAsync("*This field is maintained by DSF in SBC mode and might not be available in standalone mode*");
                     await writer.WriteLineAsync();
                 }
@@ -213,7 +214,7 @@ namespace DocGen
                         relatedTypes = apiTypes.Where(type => baseType.IsSubclassOf(typeof(ModelObject)) && baseType.IsAssignableFrom(type)).ToArray();
                     }
 
-                    if (property.PropertyType == typeof(ModelObjectDictionary<Plugin>))
+                    if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ModelDictionary<>))
                     {
                         propertyName += @"\{\}";
                     }

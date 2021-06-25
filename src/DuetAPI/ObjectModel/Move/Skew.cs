@@ -6,7 +6,7 @@
     public sealed class Skew : ModelObject
     {
         /// <summary>
-        /// Indicates if the <see cref="TanXY"/> value is applied to the X or Y axis value
+        /// Indicates if the TanXY value is used to compensate X when Y moves (else Y when X moves)
         /// </summary>
         public bool CompensateXY
         {

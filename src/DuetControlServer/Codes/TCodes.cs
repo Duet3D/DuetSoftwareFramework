@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 
 namespace DuetControlServer.Codes
 {
@@ -13,7 +14,7 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Result of the code if the code completed, else null</returns>
-        public static Task<CodeResult> Process(Code code) => Task.FromResult<CodeResult>(null);
+        public static Task<Message> Process(Code code) => Task.FromResult<Message>(null);
 
         /// <summary>
         /// React to an executed T-code before its result is returend

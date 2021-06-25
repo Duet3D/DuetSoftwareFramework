@@ -1,5 +1,4 @@
-﻿using DuetAPI.Commands;
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using Nito.AsyncEx;
 using System;
@@ -183,15 +182,12 @@ namespace DuetControlServer.Utility
         /// Write messages including timestamp to the log file
         /// </summary>
         /// <param name="result">Message list</param>
-        public static async Task Log(CodeResult result)
+        public static async Task Log(Message message)
         {
-            if (result != null)
+            if (message != null)
             {
-                foreach (Message msg in result)
-                {
-                    LogLevel level = (msg.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
-                    await Log(level, msg);
-                }
+                LogLevel level = (message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
+                await Log(level, message);
             }
         }
 
@@ -204,22 +200,6 @@ namespace DuetControlServer.Utility
         {
             await Model.Provider.Output(msg);
             await Log((msg.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, msg);
-        }
-
-        /// <summary>
-        /// Log and output a code result
-        /// </summary>
-        /// <param name="result">Code result</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task LogOutput(CodeResult result)
-        {
-            if (result != null)
-            {
-                foreach (Message msg in result)
-                {
-                    await LogOutput(msg);
-                }
-            }
         }
 
         /// <summary>

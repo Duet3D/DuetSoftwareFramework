@@ -70,7 +70,7 @@ namespace DuetControlServer.Commands
         /// </summary>
         /// <param name="filename">Path to the UNIX socket file</param>
         /// <returns>True if the socket is still active</returns>
-        private bool IsUnixSocketAlive(string filename)
+        private static bool IsUnixSocketAlive(string filename)
         {
             try
             {

@@ -7,6 +7,14 @@
     public sealed class MinMaxCurrent<T> : ModelObject
     {
         /// <summary>
+        /// Static constructor, required for derived ModelObject types with generic arguments
+        /// </summary>
+        static MinMaxCurrent()
+        {
+            RegisterJsonType(typeof(MinMaxCurrent<T>));
+        }
+
+        /// <summary>
         /// Current value
         /// </summary>
         public T Current

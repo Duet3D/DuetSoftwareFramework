@@ -22,30 +22,22 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Result of the code if the code completed, else null</returns>
-        public static async Task<CodeResult> Process(Code code)
+        public static async Task<Message> Process(Code code)
         {
             if (!await SPI.Interface.Flush(code, false))
             {
                 throw new OperationCanceledException();
             }
 
-            if (code.Keyword == KeywordType.Echo || code.Keyword == KeywordType.Abort ||
-#pragma warning disable CS0618 // Type or member is obsolete
-                code.Keyword == KeywordType.Return)
+            if (code.Keyword == KeywordType.Echo || code.Keyword == KeywordType.Abort)
             {
-                if (code.Keyword == KeywordType.Return)
-                {
-                    await Utility.Logger.LogOutput(MessageType.Warning, "'return' keyword is deprecated and will be removed soon");
-                }
-#pragma warning restore CS0618 // Type or member is obsolete
-
                 string result = string.IsNullOrEmpty(code.KeywordArgument) ? string.Empty : await Expressions.Evaluate(code, true);
 
                 if (code.Keyword == KeywordType.Abort)
                 {
                     await SPI.Interface.AbortAll(code.Channel);
                 }
-                return new CodeResult(MessageType.Success, result);
+                return new Message(MessageType.Success, result);
             }
 
             if (code.Keyword == KeywordType.Global ||
@@ -97,7 +89,7 @@ namespace DuetControlServer.Codes
                 expression = await Expressions.Evaluate(code, false);
                 object varContent = await SPI.Interface.SetVariable(code.Channel, code.Keyword != KeywordType.Set, varName, expression);
                 _logger.Debug("Assigned variable {0} to {1}", varName, varContent);
-                return new CodeResult(MessageType.Success, string.Empty);
+                return new Message();
             }
 
             throw new NotSupportedException($"Unsupported keyword '{code.Keyword}'");

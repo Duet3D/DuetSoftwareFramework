@@ -23,7 +23,7 @@
         /// <summary>
         /// If this is set, the web server will allow cross-origin requests via the Access-Control-Allow-Origin header
         /// </summary>
-        [LinuxProperty]
+        [SbcProperty(true)]
         public string CorsSite
         {
             get =>_corsSite;
@@ -45,7 +45,7 @@
         /// List of available network interfaces
         /// </summary>
         /// <seealso cref="NetworkInterface"/>
-        [LinuxProperty]
+        [SbcProperty(true)]
         public ModelCollection<NetworkInterface> Interfaces { get; } = new ModelCollection<NetworkInterface>();
 
         /// <summary>

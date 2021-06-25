@@ -3,6 +3,7 @@ using DuetAPI.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -97,6 +98,17 @@ namespace DuetControlServer.Commands
                         throw new ArgumentException($"Plugin {Plugin} not found");
                     }
                     throw new ArgumentException($"Dependency {id} of plugin {requiredBy} not found");
+                }
+
+                // Update the plugin execution states
+                using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
+                using StreamWriter writer = new(fileStream);
+                foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                {
+                    if (item.Id == plugin.Id && item.Pid > 0)
+                    {
+                        await writer.WriteLineAsync(item.Id);
+                    }
                 }
             }
 

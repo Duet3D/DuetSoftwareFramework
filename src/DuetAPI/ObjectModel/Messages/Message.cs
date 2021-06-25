@@ -40,6 +40,59 @@ namespace DuetAPI.ObjectModel
         public string Content { get; set; } = string.Empty;
 
         /// <summary>
+        /// Replace the content if empty or append a new line
+        /// </summary>
+        /// <param name="line">Line content</param>
+        public void AppendLine(string line)
+        {
+            if (string.IsNullOrEmpty(Content))
+            {
+                Content = line;
+            }
+            else
+            {
+                if (!Content.EndsWith('\n'))
+                {
+                    Content += '\n';
+                }
+                Content += line;
+            }
+        }
+
+        /// <summary>
+        /// Append another message to this one, potentially overwriting the message type
+        /// </summary>
+        /// <param name="other">Message to append</param>
+        public void Append(Message other)
+        {
+            if (other.Type > Type)
+            {
+                Type = other.Type;
+            }
+            if (!string.IsNullOrEmpty(other.Content))
+            {
+                AppendLine(other.Content);
+            }
+        }
+
+        /// <summary>
+        /// Append another message to this one, potentially overwriting the message type
+        /// </summary>
+        /// <param name="type">Message type</param>
+        /// <param name="content">Message content</param>
+        public void Append(MessageType type, string content)
+        {
+            if (type > Type)
+            {
+                Type = type;
+            }
+            if (!string.IsNullOrEmpty(content))
+            {
+                AppendLine(content);
+            }
+        }
+
+        /// <summary>
         /// Converts this message to a RepRapFirmware-style message
         /// </summary>
         /// <returns>RepRapFirmware-style message</returns>

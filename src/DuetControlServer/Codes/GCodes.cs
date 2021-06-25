@@ -24,7 +24,7 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Result of the code if the code completed, else null</returns>
-        public static async Task<CodeResult> Process(Commands.Code code)
+        public static async Task<Message> Process(Commands.Code code)
         {
             if (code.Channel == CodeChannel.File && FileExecution.Job.IsSimulating)
             {
@@ -63,15 +63,16 @@ namespace DuetControlServer.Codes
                                         Model.Provider.Get.Move.Compensation.File = virtualFile;
                                     }
 
-                                    CodeResult result = new();
+                                    Message result = new();
                                     using (await Model.Provider.AccessReadOnlyAsync())
                                     {
                                         if (Model.Provider.Get.Move.Axes.Any(axis => axis.Letter == 'Z' && !axis.Homed))
                                         {
-                                            result.Add(MessageType.Warning, "The height map was loaded when the current Z=0 datum was not determined. This may result in a height offset.");
+                                            result.Type = MessageType.Warning;
+                                            result.Content = "The height map was loaded when the current Z=0 datum was not determined. This may result in a height offset.";
                                         }
                                     }
-                                    result.Add(MessageType.Success, $"Height map loaded from file {file}");
+                                    result.AppendLine($"Height map loaded from file {file}");
                                     return result;
                                 }
                                 else
@@ -90,9 +91,9 @@ namespace DuetControlServer.Codes
                                         {
                                             Model.Provider.Get.Move.Compensation.File = virtualFile;
                                         }
-                                        return new CodeResult(MessageType.Success, $"Height map saved to file {file}");
+                                        return new Message(MessageType.Success, $"Height map saved to file {file}");
                                     }
-                                    return new CodeResult();
+                                    return new Message();
                                 }
                             }
                             catch (Exception e)
@@ -102,7 +103,7 @@ namespace DuetControlServer.Codes
                                 {
                                     e = ae.InnerException;
                                 }
-                                return new CodeResult(MessageType.Error, $"Failed to {(cp == 1 ? "load" : "save")} height map {(cp == 1 ? "from" : "to")} file {file}: {e.Message}");
+                                return new Message(MessageType.Error, $"Failed to {(cp == 1 ? "load" : "save")} height map {(cp == 1 ? "from" : "to")} file {file}: {e.Message}");
                             }
                         }
                         throw new OperationCanceledException();
@@ -120,7 +121,7 @@ namespace DuetControlServer.Codes
         /// <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
         public static async Task CodeExecuted(Code code)
         {
-            if (!code.Result.IsSuccessful)
+            if (code.Result == null || code.Result.Type != MessageType.Success)
             {
                 return;
             }
@@ -160,7 +161,7 @@ namespace DuetControlServer.Codes
                                 {
                                     Model.Provider.Get.Move.Compensation.File = virtualFile;
                                 }
-                                code.Result.Add(MessageType.Success, $"Height map saved to file {FilePath.DefaultHeightmapFile}");
+                                code.Result.AppendLine($"Height map saved to file {FilePath.DefaultHeightmapFile}");
                             }
                         }
                         catch (Exception e)
@@ -170,7 +171,8 @@ namespace DuetControlServer.Codes
                             {
                                 e = ae.InnerException;
                             }
-                            code.Result.Add(MessageType.Error, $"Failed to save height map to file {FilePath.DefaultHeightmapFile}: {e.Message}");
+                            code.Result.Type = MessageType.Error;
+                            code.Result.AppendLine($"Failed to save height map to file {FilePath.DefaultHeightmapFile}: {e.Message}");
                         }
                     }
                     break;

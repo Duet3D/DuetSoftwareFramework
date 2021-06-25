@@ -8,6 +8,7 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
+using DuetAPI.ObjectModel;
 using Nito.AsyncEx;
 using Code = DuetControlServer.Commands.Code;
 
@@ -269,7 +270,7 @@ namespace DuetControlServer.IPC.Processors
                     // Code is resolved with a given result and the request is acknowledged
                     if (_interceptionResult is Resolve resolveCommand)
                     {
-                        code.Result = (resolveCommand.Content == null) ? new CodeResult() : new CodeResult(resolveCommand.Type, resolveCommand.Content);
+                        code.Result = new Message(resolveCommand.Type, resolveCommand.Content);
                         return true;
                     }
 

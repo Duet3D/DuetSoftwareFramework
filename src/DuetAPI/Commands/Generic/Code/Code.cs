@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using DuetAPI.Connection;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 
 namespace DuetAPI.Commands
@@ -12,7 +13,7 @@ namespace DuetAPI.Commands
     /// A parsed representation of a generic G/M/T-code
     /// </summary>
     [RequiredPermissions(SbcPermissions.CommandExecution)]
-    public partial class Code : Command<CodeResult>
+    public partial class Code : Command<Message>
     {
         /// <summary>
         /// Create an empty Code representation
@@ -42,7 +43,10 @@ namespace DuetAPI.Commands
         /// Result of this code. This property is only set when the code has finished its excution.
         /// It remains null if the code has been cancelled
         /// </summary>
-        public CodeResult Result { get; set; }
+        /// <remarks>
+        /// This used to be of type CodeResult but since v3.2 CodeResult can read Message JSON so it should remain compatible
+        /// </remarks>
+        public Message Result { get; set; }
 
         /// <summary>
         /// Type of the code
@@ -257,7 +261,7 @@ namespace DuetAPI.Commands
             }
 
             // If this code has finished, append the code result
-            if (Result != null && !Result.IsEmpty)
+            if (Result != null && !string.IsNullOrEmpty(Result.Content))
             {
                 builder.Append(" => ");
                 builder.Append(Result.ToString().TrimEnd());

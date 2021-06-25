@@ -14,23 +14,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Dictionary of collections vs change handlers
         /// </summary>
-        private static readonly Dictionary<object, NotifyCollectionChangedEventHandler> _collectionChangeHandlers = new();
-
-        /// <summary>
-        /// Function to generate a value collection change handler
-        /// </summary>
-        /// <param name="collectionName">Name of the collection</param>
-        /// <param name="path">Collection path</param>
-        /// <returns>Property change handler</returns>
-        private static NotifyCollectionChangedEventHandler ValueCollectionChanged(string collectionName, params object[] path)
-        {
-            object[] collectionPath = AddToPath(path, collectionName);
-            return (sender, e) =>
-            {
-                IList senderList = (IList)sender;
-                OnPropertyPathChanged?.Invoke(collectionPath, PropertyChangeType.Property, senderList);
-            };
-        }
+        private static readonly Dictionary<IModelCollection, NotifyCollectionChangedEventHandler> _collectionChangeHandlers = new();
 
         /// <summary>
         /// Function to generate an object collection change handler
@@ -38,7 +22,7 @@ namespace DuetControlServer.Model
         /// <param name="collectionName">Name of the collection</param>
         /// <param name="path">Collection path</param>
         /// <returns>Property change handler</returns>
-        private static NotifyCollectionChangedEventHandler ObjectCollectionChanged(string collectionName, params object[] path)
+        private static NotifyCollectionChangedEventHandler CollectionChanged(string collectionName, params object[] path)
         {
             return (sender, e) =>
             {
@@ -64,8 +48,11 @@ namespace DuetControlServer.Model
                                 itemNeedsPatch[i] = true;
                             }
                         }
-                        nodePath = AddToPath(path, new ItemPathNode(collectionName, e.NewStartingIndex, senderList));
-                        SubscribeToModelObject((ModelObject)e.NewItems[0], nodePath);
+                        if (e.NewItems[0] is ModelObject newObjectItem)
+                        {
+                            nodePath = AddToPath(path, new ItemPathNode(collectionName, e.NewStartingIndex, senderList));
+                            SubscribeToModelObject(newObjectItem, nodePath);
+                        }
                         break;
                     case NotifyCollectionChangedAction.Move:
                         for (int i = Math.Min(e.OldStartingIndex, e.NewStartingIndex); i <= Math.Max(e.OldStartingIndex, e.NewStartingIndex); i++)
@@ -75,9 +62,15 @@ namespace DuetControlServer.Model
                         break;
                     case NotifyCollectionChangedAction.Replace:
                         itemNeedsPatch[e.NewStartingIndex] = true;
-                        UnsubscribeFromModelObject((ModelObject)e.OldItems[0]);
+                        if (e.OldItems[0] is ModelObject oldObjectItem)
+                        {
+                            UnsubscribeFromModelObject(oldObjectItem);
+                        }
                         nodePath = AddToPath(path, new ItemPathNode(collectionName, e.NewStartingIndex, senderList));
-                        SubscribeToModelObject((ModelObject)e.NewItems[0], nodePath);
+                        if (e.NewItems[0] is ModelObject replaceObjectItem)
+                        {
+                            SubscribeToModelObject(replaceObjectItem, nodePath);
+                        }
                         break;
                     case NotifyCollectionChangedAction.Remove:
                         for (int i = Math.Max(0, e.OldStartingIndex); i < senderList.Count; i++)
@@ -86,7 +79,10 @@ namespace DuetControlServer.Model
                         }
                         foreach (object item in e.OldItems)
                         {
-                            UnsubscribeFromModelObject((ModelObject)item);
+                            if (item is ModelObject objectItem)
+                            {
+                                UnsubscribeFromModelObject(objectItem);
+                            }
                         }
                         nodePath = AddToPath(path, new ItemPathNode(collectionName, senderList.Count, senderList));
                         OnPropertyPathChanged?.Invoke(nodePath, PropertyChangeType.ObjectCollection, null);
@@ -109,21 +105,41 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
+        /// Function to generate a growing collection change handler
+        /// </summary>
+        /// <param name="path">Path to the growing collection</param>
+        /// <returns>Change handler</returns>
+        private static NotifyCollectionChangedEventHandler GrowingCollectionChanged(params object[] path)
+        {
+            return (sender, e) =>
+            {
+                if (e.Action == NotifyCollectionChangedAction.Add)
+                {
+                    OnPropertyPathChanged?.Invoke(path, PropertyChangeType.GrowingCollection, e.NewItems);
+                }
+                else if (e.Action == NotifyCollectionChangedAction.Remove && e.OldStartingIndex == -1)
+                {
+                    OnPropertyPathChanged?.Invoke(path, PropertyChangeType.GrowingCollection, null);
+                }
+            };
+        }
+
+        /// <summary>
         /// Subscribe to changes of the given model collection
         /// </summary>
         /// <param name="modelCollection">Collection to subscribe to</param>
         /// <param name="itemType">Type of the items</param>
         /// <param name="collectionName">Name of the collection</param>
         /// <param name="path">Path of the subscription</param>
-        private static void SubscribeToModelCollection(object modelCollection, Type itemType, string collectionName, object[] path)
+        private static void SubscribeToModelCollection(IModelCollection modelCollection, string collectionName, object[] path)
         {
-            INotifyCollectionChanged ncc = (INotifyCollectionChanged)modelCollection;
-            if (itemType.IsSubclassOf(typeof(ModelObject)))
-            {
-                NotifyCollectionChangedEventHandler changeHandler = ObjectCollectionChanged(collectionName, path);
-                ncc.CollectionChanged += changeHandler;
-                _collectionChangeHandlers[modelCollection] = changeHandler;
+            NotifyCollectionChangedEventHandler changeHandler = (modelCollection is IGrowingModelCollection) ? GrowingCollectionChanged(AddToPath(path, collectionName)) : CollectionChanged(collectionName, path);
+            (modelCollection as INotifyCollectionChanged).CollectionChanged += changeHandler;
+            _collectionChangeHandlers[modelCollection] = changeHandler;
 
+            Type itemType = GetItemType(modelCollection.GetType());
+            if (itemType != null && itemType.IsAssignableTo(typeof(IModelObject)))
+            {
                 IList list = (IList)modelCollection;
                 for (int i = 0; i < list.Count; i++)
                 {
@@ -133,12 +149,6 @@ namespace DuetControlServer.Model
                     }
                 }
             }
-            else
-            {
-                NotifyCollectionChangedEventHandler changeHandler = ValueCollectionChanged(collectionName, path);
-                ncc.CollectionChanged += changeHandler;
-                _collectionChangeHandlers[modelCollection] = changeHandler;
-            }
         }
 
         /// <summary>
@@ -146,25 +156,24 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="modelCollection">Collection to unsubscribe from</param>
         /// <param name="itemType">Item type</param>
-        private static void UnsubscribeFromModelCollection(object modelCollection, Type itemType)
+        private static void UnsubscribeFromModelCollection(IModelCollection modelCollection)
         {
-            NotifyCollectionChangedEventHandler changeHandler = _collectionChangeHandlers[modelCollection];
-            if (changeHandler == null)
+            if (modelCollection is INotifyCollectionChanged collectionChangeModel &&
+                _collectionChangeHandlers.TryGetValue(modelCollection, out NotifyCollectionChangedEventHandler changeHandler))
             {
-                return;
+                collectionChangeModel.CollectionChanged -= changeHandler;
+                _collectionChangeHandlers.Remove(modelCollection);
             }
 
-            INotifyCollectionChanged ncc = (INotifyCollectionChanged)modelCollection;
-            ncc.CollectionChanged -= changeHandler;
-            _collectionChangeHandlers.Remove(modelCollection);
-
-            if (itemType.IsSubclassOf(typeof(ModelObject)))
+            Type itemType = GetItemType(modelCollection.GetType());
+            if (itemType != null && itemType.IsAssignableTo(typeof(IModelObject)))
             {
-                foreach (object item in (IList)modelCollection)
+                IList list = (IList)modelCollection;
+                for (int i = 0; i < list.Count; i++)
                 {
-                    if (item != null)
+                    if (list[i] is ModelObject item)
                     {
-                        UnsubscribeFromModelObject((ModelObject)item);
+                        UnsubscribeFromModelObject(item);
                     }
                 }
             }

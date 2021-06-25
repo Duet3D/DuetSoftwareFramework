@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Utility;
 using System;
+using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
 {
@@ -19,6 +20,7 @@ namespace DuetAPI.ObjectModel
             get => _id;
             set
             {
+#warning Check why this isn't propagated...
                 if (string.IsNullOrWhiteSpace(value) || value.Length > 32)
                 {
                     throw new ArgumentException("Invalid plugin identifier");
@@ -219,7 +221,7 @@ namespace DuetAPI.ObjectModel
         /// Before <see cref="Commands.SetPluginData"/> can be used, corresponding properties must be registered via this property first!
         /// </summary>
         /// <seealso cref="Commands.SetPluginData"/>
-        public ModelJsonDictionary Data { get; } = new ModelJsonDictionary();
+        public ModelDictionary<JsonElement> Data { get; } = new ModelDictionary<JsonElement>(false);
 
         /// <summary>
         /// Check if the given version satisfies a required version

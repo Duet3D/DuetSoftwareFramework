@@ -450,11 +450,11 @@ namespace DuetControlServer.Model
             using (Provider.AccessReadWrite())
             {
                 Provider.Get.Boards.Clear();
+                Provider.Get.Global.Clear();
                 if (Provider.Get.State.Status != MachineStatus.Halted && Provider.Get.State.Status != MachineStatus.Updating)
                 {
                     Provider.Get.State.Status = MachineStatus.Disconnected;
                 }
-                Provider.ClearGlobalVariables();
             }
 
             _lastSeqs.Clear();

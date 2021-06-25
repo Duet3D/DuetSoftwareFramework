@@ -38,12 +38,15 @@ namespace DuetControlServer.Commands
                 {
                     foreach (Plugin item in Model.Provider.Get.Plugins.Values)
                     {
-                        if (item.Pid > 0)
+                        if (item.Pid >= 0)
                         {
                             await writer.WriteLineAsync(item.Id);
 
-                            StopPlugin stopCommand = new() { Plugin = item.Id, StoppingAll = true };
-                            stopTasks.Add(Task.Run(stopCommand.Execute));
+                            if (item.Pid > 0)
+                            {
+                                StopPlugin stopCommand = new() { Plugin = item.Id, StoppingAll = true };
+                                stopTasks.Add(Task.Run(stopCommand.Execute));
+                            }
                         }
                     }
                 }

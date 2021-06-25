@@ -118,7 +118,7 @@ namespace DuetWebServer.Services
         /// <param name="configuration">App configuration</param>
         /// <param name="logger">Logger instance</param>
         /// <param name="hostAppLifetime">Host app lifetime provider</param>
-        public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IHostApplicationLifetime hostAppLifetime)
+        public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger)
         {
             _logger = logger;
             _configuration = configuration;
@@ -141,7 +141,7 @@ namespace DuetWebServer.Services
         /// <returns>Asynchronous task</returns>
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _task = Task.Run(Execute);
+            _task = Task.Run(Execute, cancellationToken);
             return Task.CompletedTask;
         }
 
@@ -211,7 +211,7 @@ namespace DuetWebServer.Services
                         {
                             // Wait for more updates
                             using JsonDocument jsonPatch = await subscribeConnection.GetObjectModelPatch(_stopRequest.Token);
-                            model.UpdateFromJson(jsonPatch.RootElement);
+                            model.UpdateFromJson(jsonPatch.RootElement, false);
 
                             // Check for updated CORS site
                             if (jsonPatch.RootElement.TryGetProperty("network", out _))

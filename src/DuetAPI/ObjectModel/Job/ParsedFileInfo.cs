@@ -145,7 +145,7 @@ namespace DuetAPI.ObjectModel
             }
 
             ParsedFileInfo parsedFileInfo = new();
-            parsedFileInfo.UpdateFromJson(jsonDocument.RootElement);
+            parsedFileInfo.UpdateFromJson(jsonDocument.RootElement, false);
             return parsedFileInfo;
         }
 

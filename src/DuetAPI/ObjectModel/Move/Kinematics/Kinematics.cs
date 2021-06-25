@@ -44,7 +44,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        internal override ModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public override IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
@@ -58,7 +58,7 @@ namespace DuetAPI.ObjectModel
                 if (GetType() != requiredType)
                 {
                     Kinematics newInstance = (Kinematics)Activator.CreateInstance(requiredType);
-                    return newInstance.UpdateFromJson(jsonElement);
+                    return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }
             return base.UpdateFromJson(jsonElement, ignoreSbcProperties);

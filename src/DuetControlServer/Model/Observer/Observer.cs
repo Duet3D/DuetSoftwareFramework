@@ -1,6 +1,4 @@
-﻿using DuetAPI.ObjectModel;
-using System;
-using System.Text.Json;
+﻿using System;
 
 namespace DuetControlServer.Model
 {
@@ -39,15 +37,6 @@ namespace DuetControlServer.Model
             path.CopyTo(newPath, 0);
             toAdd.CopyTo(newPath, path.Length);
             return newPath;
-        }
-
-        /// <summary>
-        /// Notify subscribers that the list of global variables has been reset
-        /// </summary>
-        public static void GlobalVariablesCleared()
-        {
-            string jsonName = JsonNamingPolicy.CamelCase.ConvertName(nameof(ObjectModel.Global));
-            OnPropertyPathChanged?.Invoke(new object[] { jsonName }, PropertyChangeType.Property, null);
         }
     }
 }

@@ -216,8 +216,9 @@ namespace DuetControlServer.Model
                 if (partialModel is IList list && itemIndex >= -1 && itemIndex < list.Count)
                 {
                     bool isModelObjectList = false, isListList = false;
-                    if (ModelCollection.GetItemType(partialModel.GetType(), out Type itemType))
+                    if (partialModel.GetType().IsGenericType && partialModel.GetType().GetGenericTypeDefinition() == typeof(ModelCollection<>))
                     {
+                        Type itemType = partialModel.GetType().GetGenericArguments()[0];
                         isModelObjectList = itemType.IsSubclassOf(typeof(ModelObject));
                         isListList = typeof(IList).IsAssignableFrom(itemType);
                     }
@@ -395,7 +396,7 @@ namespace DuetControlServer.Model
                 {
                     if (model.JsonProperties.TryGetValue(propertyName, out PropertyInfo property))
                     {
-                        if (findLinuxProperty && Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
+                        if (findLinuxProperty && Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                         {
                             hadLinuxProperty = true;
                         }

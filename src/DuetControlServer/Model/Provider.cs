@@ -247,15 +247,6 @@ namespace DuetControlServer.Model
         public static Task<IDisposable> AccessReadWriteAsync() => AccessReadWriteAsync(Program.CancellationToken);
 
         /// <summary>
-        /// Reset the global variables when the connection has been lost
-        /// </summary>
-        public static void ClearGlobalVariables()
-        {
-            Get.Global.Clear();
-            Observer.GlobalVariablesCleared();
-        }
-
-        /// <summary>
         /// Wait for an update to occur
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
@@ -353,21 +344,5 @@ namespace DuetControlServer.Model
         /// <param name="content">Content of the message</param>
         /// <returns>Asynchronous task</returns>
         public static Task Output(MessageType type, string content) => Output(new Message(type, content));
-
-        /// <summary>
-        /// Output the result of a G/M/T-code
-        /// </summary>
-        /// <param name="codeResult">Messages to output</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task Output(DuetAPI.Commands.CodeResult codeResult)
-        {
-            if (codeResult != null)
-            {
-                foreach (Message message in codeResult)
-                {
-                    await Output(message);
-                }
-            }
-        }
     }
 }

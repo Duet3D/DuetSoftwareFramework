@@ -196,7 +196,7 @@ namespace DuetControlServer.IPC.Processors
                         {
                             if (item.Pid > 0 && item.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Connection.IsRoot)
                             {
-                                item.Pid = -1;
+                                item.Pid = 0;
                             }
                         }
                     }
@@ -223,6 +223,18 @@ namespace DuetControlServer.IPC.Processors
                     {
                         Commands.StopPlugins stopCommand = new();
                         _ = Task.Run(stopCommand.Execute);
+                    }
+
+                    // Plugins from this service are no longer running
+                    using (await Model.Provider.AccessReadWriteAsync())
+                    {
+                        foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                        {
+                            if (item.Pid > 0 && item.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Connection.IsRoot)
+                            {
+                                item.Pid = -1;
+                            }
+                        }
                     }
                 }
             }

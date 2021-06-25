@@ -56,11 +56,6 @@ namespace DuetControlServer.FileExecution
         public bool IsNested { get; }
 
         /// <summary>
-        /// List of messages written by the codes
-        /// </summary>
-        public CodeResult Result { get; set; } = new CodeResult();
-
-        /// <summary>
         /// Internal cancellation token source used for codes
         /// </summary>
         private readonly CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
@@ -249,27 +244,27 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Internal TCS to resolve when the macro has finished
         /// </summary>
-        private TaskCompletionSource<CodeResult> _finishTCS;
+        private TaskCompletionSource _finishTCS;
 
         /// <summary>
         /// Wait for this macro to finish asynchronously
         /// </summary>
-        /// <returns>Code result of the finished macro</returns>
+        /// <returns>Asynchronous task</returns>
         /// <remarks>
         /// This task is always resolved and never cancelled
         /// </remarks>
-        public Task<CodeResult> FinishAsync()
+        public Task FinishAsync()
         {
             if (!IsExecuting)
             {
-                return Task.FromResult(Result);
+                return Task.CompletedTask;
             }
 
             if (_finishTCS != null)
             {
                 return _finishTCS.Task;
             }
-            _finishTCS = new TaskCompletionSource<CodeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _finishTCS = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             return _finishTCS.Task;
         }
 
@@ -280,7 +275,7 @@ namespace DuetControlServer.FileExecution
         private async Task Run()
         {
             Queue<Code> codes = new();
-            Queue<Task<CodeResult>> codesBeingExecuted = new();
+            Queue<Task<Message>> codesBeingExecuted = new();
 
             do
             {
@@ -329,24 +324,12 @@ namespace DuetControlServer.FileExecution
                 }
 
                 // Wait for the next code to finish
-                if (codes.TryDequeue(out Code code) && codesBeingExecuted.TryDequeue(out Task<CodeResult> codeTask))
+                if (codes.TryDequeue(out Code code) && codesBeingExecuted.TryDequeue(out Task<Message> codeTask))
                 {
                     try
                     {
-                        CodeResult result = await codeTask;
-                        if (!result.IsEmpty)
-                        {
-                            using (await _lock.LockAsync(Program.CancellationToken))
-                            {
-                                Result.AddRange(result);
-                            }
-
-                            if (!IsNested)
-                            {
-                                // When we get here log messages were already handled by the channel processor
-                                await Model.Provider.Output(result);
-                            }
-                        }
+                        Message result = await codeTask;
+                        await Model.Provider.Output(result);
                     }
                     catch (OperationCanceledException)
                     {
@@ -387,7 +370,7 @@ namespace DuetControlServer.FileExecution
                 }
                 if (_finishTCS != null)
                 {
-                    _finishTCS.SetResult(Result);
+                    _finishTCS.SetResult();
                     _finishTCS = null;
                 }
             }

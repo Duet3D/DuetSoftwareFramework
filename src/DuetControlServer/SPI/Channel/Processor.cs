@@ -454,23 +454,22 @@ namespace DuetControlServer.SPI.Channel
                 {
                     using (await CurrentState.Macro.LockAsync())
                     {
-                        // Propagate the macro result to the code that started it
+                        // Resolve potential start codes when the macro file finishes
                         if (startCode != null)
                         {
                             _ = CurrentState.Macro.FinishAsync().ContinueWith(async task =>
                             {
-                                CodeResult macroResult = await task;
-                                if (startCode.Result == null)
+                                try
                                 {
-                                    startCode.Result = macroResult;
+                                    await task;
                                 }
-                                else if (macroResult != null && !macroResult.IsEmpty)
+                                finally
                                 {
-                                    startCode.Result.AddRange(macroResult);
+                                    startCode.FirmwareTCS.SetResult();
                                 }
-                                startCode.FirmwareTCS.SetResult();
                             }, TaskContinuationOptions.RunContinuationsAsynchronously);
                         }
+
 
                         // Abort the macro file
                         await CurrentState.Macro.Abort();
@@ -549,7 +548,7 @@ namespace DuetControlServer.SPI.Channel
             while (BufferedCodes.Count > 0 && BufferedCodes[0].Type == CodeType.Comment)
             {
                 BytesBuffered -= BufferedCodes[0].BinarySize;
-                BufferedCodes[0].Result = new CodeResult();
+                BufferedCodes[0].Result = new Message();
                 BufferedCodes[0].FirmwareTCS.SetResult();
                 BufferedCodes.RemoveAt(0);
             }
@@ -737,30 +736,28 @@ namespace DuetControlServer.SPI.Channel
                 {
                     try
                     {
-                        CodeResult result = await task;
-                        foreach (Message message in result)
-                        {
-                            // Check what kind of message this is
-                            MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel);
-                            if (message.Type != MessageType.Success)
-                            {
-                                flags |= (message.Type == MessageType.Error) ? MessageTypeFlags.ErrorMessageFlag : MessageTypeFlags.WarningMessageFlag;
-                            }
+                        Message result = await task;
 
-                            // Split the message into multiple chunks so RRF can output it
-                            Memory<byte> encodedMessage = Encoding.UTF8.GetBytes(result.ToString());
-                            for (int i = 0; i < encodedMessage.Length; i += Settings.MaxMessageLength)
+                        // Check what kind of message this is
+                        MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel);
+                        if (result.Type != MessageType.Success)
+                        {
+                            flags |= (result.Type == MessageType.Error) ? MessageTypeFlags.ErrorMessageFlag : MessageTypeFlags.WarningMessageFlag;
+                        }
+
+                        // Split the message into multiple chunks so RRF can output it
+                        Memory<byte> encodedMessage = Encoding.UTF8.GetBytes(result.ToString());
+                        for (int i = 0; i < encodedMessage.Length; i += Settings.MaxMessageLength)
+                        {
+                            if (i + Settings.MaxMessageLength >= encodedMessage.Length)
                             {
-                                if (i + Settings.MaxMessageLength >= encodedMessage.Length)
-                                {
-                                    Memory<byte> partialMessage = encodedMessage[i..];
-                                    Interface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
-                                }
-                                else
-                                {
-                                    Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, Settings.MaxMessageLength));
-                                    Interface.SendMessage(flags | MessageTypeFlags.PushFlag, Encoding.UTF8.GetString(partialMessage.ToArray()));
-                                }
+                                Memory<byte> partialMessage = encodedMessage[i..];
+                                Interface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
+                            }
+                            else
+                            {
+                                Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, Settings.MaxMessageLength));
+                                Interface.SendMessage(flags | MessageTypeFlags.PushFlag, Encoding.UTF8.GetString(partialMessage.ToArray()));
                             }
                         }
                     }
@@ -932,17 +929,18 @@ namespace DuetControlServer.SPI.Channel
 
             if (code != null)
             {
-                // Make sure the code has a code reply...
-                if (code.Result == null)
-                {
-                    code.Result = new CodeResult();
-                }
-
                 // Code reply is complete, resolve the code
                 MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                             : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                             : MessageType.Success;
-                code.Result.Add(type, reply.TrimEnd());
+                if (code.Result == null)
+                {
+                    code.Result = new Message(type, reply.TrimEnd());
+                }
+                else
+                {
+                    code.Result.Append(type, reply.TrimEnd());
+                }
                 code.FirmwareTCS.SetResult();
             }
             else
@@ -994,20 +992,6 @@ namespace DuetControlServer.SPI.Channel
             if (startCode != null)
             {
                 _logger.Debug("==> Unfinished starting code: {0}", startCode);
-
-                // Concatenate output from nested macro codes
-                using (await CurrentState.Macro.LockAsync())
-                {
-                    if (CurrentState.StartCode.Result == null)
-                    {
-                        CurrentState.StartCode.Result = CurrentState.Macro.Result;
-                    }
-                    else if (!CurrentState.Macro.Result.IsEmpty)
-                    {
-                        CurrentState.StartCode.Result.AddRange(CurrentState.Macro.Result);
-                    }
-                    CurrentState.Macro.Result = new CodeResult();
-                }
 
                 // Code has not finished yet, need a separate response for it
                 BytesBuffered += startCode.BinarySize;
@@ -1069,17 +1053,6 @@ namespace DuetControlServer.SPI.Channel
                 {
                     _logger.Info("Finished intermediate macro file {0}", CurrentState.Macro.FileName);
                     startCode = CurrentState.StartCode;
-                    if (startCode != null)
-                    {
-                        if (startCode.Result == null)
-                        {
-                            startCode.Result = CurrentState.Macro.Result;
-                        }
-                        else if (!CurrentState.Macro.Result.IsEmpty)
-                        {
-                            startCode.Result.AddRange(CurrentState.Macro.Result);
-                        }
-                    }
                     CurrentState.StartCode = null;     // don't add it back to the buffered codes because it's about to be pushed on the stack again
                     await Pop();
                 }

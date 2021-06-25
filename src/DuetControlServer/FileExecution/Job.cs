@@ -232,7 +232,7 @@ namespace DuetControlServer.FileExecution
 
                     // Process the file
                     Queue<Code> codes = new();
-                    Queue<Task<CodeResult>> codeTasks = new();
+                    Queue<Task<Message>> codeTasks = new();
                     long nextFilePosition = 0;
                     do
                     {
@@ -311,7 +311,7 @@ namespace DuetControlServer.FileExecution
                             {
                                 try
                                 {
-                                    CodeResult result = await codeTasks.Dequeue();
+                                    Message result = await codeTasks.Dequeue();
                                     nextFilePosition = code.FilePosition.Value + code.Length.Value;
                                     await Utility.Logger.LogOutput(result);
                                 }

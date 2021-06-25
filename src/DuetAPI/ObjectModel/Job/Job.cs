@@ -78,7 +78,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if the last file was aborted (unexpected cancellation)
         /// </summary>
-        [LinuxProperty]
+        [SbcProperty(false)]
         public bool LastFileAborted
         {
             get => _lastFileAborted;
@@ -89,7 +89,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if the last file was cancelled (user cancelled)
         /// </summary>
-        [LinuxProperty]
+        [SbcProperty(false)]
         public bool LastFileCancelled
         {
             get => _lastFileCancelled;
@@ -101,7 +101,7 @@ namespace DuetAPI.ObjectModel
         /// Indicates if the last file processed was simulated
         /// </summary>
         /// <remarks>This is not set if the file was aborted or cancelled</remarks>
-        [LinuxProperty]
+        [SbcProperty(false)]
         public bool LastFileSimulated
         {
             get => _lastFileSimulated;
@@ -123,12 +123,12 @@ namespace DuetAPI.ObjectModel
         /// Information about the past layers
         /// </summary>
         /// <remarks>
-        /// In previous API versions this was a <see cref="ModelGrowingCollection"/> but it has been changed to <see cref="ModelCollection"/> to
+        /// In previous API versions this was a <see cref="ModelGrowingCollection{T}"/> but it has been changed to <see cref="ModelCollection{T}"/> to
         /// allow past layers to be modified again when needed. Note that previous plugins subscribing to this property will not receive any more
         /// updates about this property to avoid memory leaks
         /// </remarks>
         /// <seealso cref="Layer"/>
-        [LinuxProperty]
+        [SbcProperty(false)]
         public ModelCollection<Layer> Layers { get; } = new ModelCollection<Layer>();
 
         /// <summary>

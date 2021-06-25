@@ -47,7 +47,7 @@ namespace DuetAPIClient
         public int BufferSize { get; private set; }
 
         /// <summary>
-        /// Destination channel for incoming codes
+        /// Destination channel for incoming codes and source channel for incoming messages
         /// </summary>
         public CodeChannel Channel { get; private set; }
 

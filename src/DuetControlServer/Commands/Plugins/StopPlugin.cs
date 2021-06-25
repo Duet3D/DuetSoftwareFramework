@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using System;
+using System.IO;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -51,6 +52,17 @@ namespace DuetControlServer.Commands
                 else
                 {
                     throw new ArgumentException($"Plugin {Plugin} not found");
+                }
+
+                // Save the plugin execution states
+                using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
+                using StreamWriter writer = new(fileStream);
+                foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                {
+                    if (item.Id != plugin.Id && item.Pid > 0)
+                    {
+                        await writer.WriteLineAsync(item.Id);
+                    }
                 }
             }
 

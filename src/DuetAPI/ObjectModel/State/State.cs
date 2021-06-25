@@ -50,7 +50,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Version of the Duet Software Framework package
         /// </summary>
-        [LinuxProperty]
+        [SbcProperty(false)]
         public string DsfVersion
         {
             get => _dsfVersion;
@@ -61,7 +61,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if DSF allows the installation and usage of third-party plugins
         /// </summary>
-        [LinuxProperty]
+        [SbcProperty(false)]
         public bool DsfPluginSupport
         {
             get => _dsfPluginSupport;
@@ -72,7 +72,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if DSF allows the installation and usage of third-party root plugins (potentially dangerous)
         /// </summary>
-        [LinuxProperty]
+        [SbcProperty(false)]
         public bool DsfRootPluginSupport
         {
             get => _dsfRootPluginSupport;
@@ -99,7 +99,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Log file being written to or null if logging is disabled
         /// </summary>
-        [LinuxProperty]
+        [SbcProperty(true)]
         public string LogFile
         {
             get => _logFile;
@@ -110,7 +110,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Current log level
         /// </summary>
-        [LinuxProperty]
+        [SbcProperty(true)]
         public LogLevel LogLevel
         {
             get => _logLevel;

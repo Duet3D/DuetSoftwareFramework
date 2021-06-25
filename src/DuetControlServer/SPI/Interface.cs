@@ -1176,6 +1176,7 @@ namespace DuetControlServer.SPI
             }
 
             // Deal with generic replies
+#warning output messages depending on their flag
             if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage)
             {
                 await OutputGenericMessage(flags, reply);

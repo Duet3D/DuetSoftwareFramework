@@ -320,9 +320,9 @@ namespace DuetAPIClient
         /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
         /// <seealso cref="Code"/>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
-        public Task<CodeResult> PerformCode(Code code, CancellationToken cancellationToken = default)
+        public Task<Message> PerformCode(Code code, CancellationToken cancellationToken = default)
         {
-            return PerformCommand<CodeResult>(code, cancellationToken);
+            return PerformCommand<Message>(code, cancellationToken);
         }
 
         /// <summary>

@@ -9,6 +9,7 @@ using DuetAPI.Commands;
 using DuetAPI;
 using DuetAPI.Connection.InitMessages;
 using System.Text;
+using DuetAPI.ObjectModel;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -119,8 +120,8 @@ namespace DuetControlServer.IPC.Processors
                                     {
                                         using (await outputLock.LockAsync(Program.CancellationToken))
                                         {
-                                            CodeResult result = await task;
-                                            await streamWriter.WriteLineAsync(result.ToString().TrimEnd());
+                                            Message result = await task;
+                                            await streamWriter.WriteAsync(result.ToString());
                                             await streamWriter.FlushAsync();
                                         }
                                     }

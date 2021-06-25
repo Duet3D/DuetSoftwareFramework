@@ -224,7 +224,7 @@ namespace DuetControlServer.Model
             {
                 if (model.JsonProperties.TryGetValue(pathItem, out PropertyInfo property))
                 {
-                    if (Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
+                    if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                     {
                         return true;
                     }

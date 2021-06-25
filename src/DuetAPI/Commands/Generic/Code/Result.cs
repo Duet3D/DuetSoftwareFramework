@@ -14,6 +14,7 @@ namespace DuetAPI.Commands
     /// <remarks>
     /// This class is now deprecated. It will be replaced with <see cref="Message"/> in foreseeable future
     /// </remarks>
+    [Obsolete("Use Message instead, this type is no longer used except for compatibility")]
     public sealed class CodeResult : List<Message>
     {
         /// <summary>
@@ -55,6 +56,7 @@ namespace DuetAPI.Commands
     /// <summary>
     /// JSON converter for a <see cref="CodeResult"/>
     /// </summary>
+    [Obsolete("See description of CodeResult")]
     public sealed class CodeResultConverter : JsonConverter<CodeResult>
     {
         /// <summary>

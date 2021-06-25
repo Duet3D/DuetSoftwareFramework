@@ -17,7 +17,7 @@ namespace UnitTests.Machine
 
             ObjectModel model = new();
 
-            model.UpdateFromJson(parsedJson.RootElement);
+            model.UpdateFromJson(parsedJson.RootElement, false);
 
             Assert.IsNotNull(model.State.MessageBox);
             Assert.AreEqual(MessageBoxMode.OkOnly, model.State.MessageBox.Mode);
@@ -82,7 +82,7 @@ namespace UnitTests.Machine
             TestContext.Out.Write(patch);
 
             using JsonDocument jsonPatch = JsonDocument.Parse(patch);
-            modelToUpdate.UpdateFromJson(jsonPatch.RootElement);
+            modelToUpdate.UpdateFromJson(jsonPatch.RootElement, false);
 
             Assert.AreEqual("Yum", modelToUpdate.Boards[0].FirmwareName);
             Assert.AreEqual(2, modelToUpdate.Heat.BedHeaters.Count);
@@ -106,7 +106,7 @@ namespace UnitTests.Machine
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
             ObjectModel model = new();
-            model.UpdateFromJson(parsedJson.RootElement);
+            model.UpdateFromJson(parsedJson.RootElement, false);
 
             ObjectModel newModel = new();
             newModel.Assign(model);
@@ -123,7 +123,7 @@ namespace UnitTests.Machine
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
             ObjectModel model = new();
-            model.UpdateFromJson(parsedJson.RootElement);
+            model.UpdateFromJson(parsedJson.RootElement, false);
 
             ObjectModel newModel = (ObjectModel)model.Clone();
 

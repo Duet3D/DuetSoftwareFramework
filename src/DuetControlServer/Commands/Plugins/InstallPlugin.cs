@@ -130,7 +130,7 @@ namespace DuetControlServer.Commands
                 using (FileStream manifestStream = new(manifestFilename, FileMode.Open, FileAccess.Read))
                 {
                     using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-                    plugin.UpdateFromJson(manifestJson.RootElement);
+                    plugin.UpdateFromJson(manifestJson.RootElement, false);
                 }
 
                 using (await Model.Provider.AccessReadWriteAsync())
@@ -159,7 +159,7 @@ namespace DuetControlServer.Commands
             using (Stream manifestStream = manifestFile.Open())
             {
                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-                plugin.UpdateFromJson(manifestJson.RootElement);
+                plugin.UpdateFromJson(manifestJson.RootElement, false);
             }
             plugin.Pid = -1;
 
