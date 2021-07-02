@@ -67,7 +67,7 @@ namespace DuetControlServer.Codes
                     }
                     else if (!char.IsWhiteSpace(c))
                     {
-                        if ((!char.IsLetterOrDigit(c) && (c != '.' || code.Keyword != KeywordType.Set)) || wantExpression)
+                        if ((!char.IsLetterOrDigit(c) && c != '_' && c != '.' || code.Keyword != KeywordType.Set)) || wantExpression)
                         {
                             throw new CodeParserException("expected '='", code);
                         }
