@@ -297,7 +297,7 @@ namespace DuetAPI.ObjectModel
                     else if (reader.TokenType == JsonTokenType.PropertyName)
                     {
                         string key = reader.GetString();
-                        result.Add(key, (TItem)(object)JsonSerializer.Deserialize<T>(ref reader, options));
+                        result.Add(key, (TItem)(object)JsonSerializer.Deserialize<TItem>(ref reader, options));
                     }
                     else if (reader.TokenType == JsonTokenType.EndObject)
                     {
