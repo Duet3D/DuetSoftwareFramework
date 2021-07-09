@@ -90,18 +90,18 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Process requests in the G-code channel processors
         /// </summary>
-        /// <returns>Whether a response can be expected from RRF in the next transmission</returns>
-        public async Task<bool> Run()
+        /// <returns>Asynchronous task</returns>
+        public async Task Run()
         {
             // Iterate over all the available channels
-            bool overlapped = false, dataProcessed = false;
+            bool overlapped = false;
             CodeChannel channel = _nextChannel;
             while (channel != _nextChannel || !overlapped)
             {
                 Processor channelProcessor = this[channel];
                 using (await channelProcessor.LockAsync())
                 {
-                    dataProcessed |= await channelProcessor.Run();
+                    await channelProcessor.Run();
                 }
 
                 channel++;
@@ -118,7 +118,6 @@ namespace DuetControlServer.SPI.Channel
             {
                 _nextChannel = CodeChannel.HTTP;
             }
-            return dataProcessed;
         }
 
         /// <summary>

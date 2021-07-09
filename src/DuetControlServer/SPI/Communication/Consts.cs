@@ -12,7 +12,7 @@ namespace DuetControlServer.SPI.Communication
         public const byte FormatCode = 0x5F;
 
         /// <summary>
-        /// Format code indicating that RRF is generally available but has not processed the last transfer yet
+        /// Format code indicating that RRF is operating in standalone mode
         /// </summary>
         public const byte FormatCodeStandalone = 0x60;
 
@@ -24,7 +24,7 @@ namespace DuetControlServer.SPI.Communication
         /// <summary>
         /// Used protocol version. This is incremented whenever the protocol details change
         /// </summary>
-        public const ushort ProtocolVersion = 5;
+        public const ushort ProtocolVersion = 6;
 
         /// <summary>
         /// Default size of a data transfer buffer
@@ -55,6 +55,11 @@ namespace DuetControlServer.SPI.Communication
         /// Size of the header prefixing a buffered code
         /// </summary>
         public const int BufferedCodeHeaderSize = 4;
+
+        /// <summary>
+        /// Value used by RepRapFirmware to represent an invalid file handle
+        /// </summary>
+        public const uint NoFileHandle = 0;
 
         /// <summary>
         /// Value used by RepRapFirmware to represent an invalid file position

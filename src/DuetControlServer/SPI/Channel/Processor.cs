@@ -569,11 +569,8 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Process pending requests on this channel
         /// </summary>
-        /// <returns>Whether a response can be expected from RRF in the next transmission</returns>
-        public async Task<bool> Run()
+        public async Task Run()
         {
-            bool responseExpected = false;
-
             // 1. Whole line comments and pending replies
             ResolveCommentCodes();
             await ResolvePendingReplies();
@@ -586,9 +583,8 @@ namespace DuetControlServer.SPI.Channel
                     if (!lockRequest.IsLockRequested && DataTransfer.WriteLockMovementAndWaitForStandstill(Channel))
                     {
                         lockRequest.IsLockRequested = true;
-                        return true;
                     }
-                    return responseExpected;
+                    return;
                 }
 
                 if (DataTransfer.WriteUnlock(Channel))
@@ -599,7 +595,7 @@ namespace DuetControlServer.SPI.Channel
                 }
                 else
                 {
-                    return responseExpected;
+                    return;
                 }
             }
 
@@ -607,7 +603,7 @@ namespace DuetControlServer.SPI.Channel
             if (_allFilesAborted)
             {
                 _allFilesAborted = !DataTransfer.WriteFilesAborted(Channel);
-                return responseExpected;
+                return;
             }
 
             // 4. Macro files (must come before any other code)
@@ -617,7 +613,7 @@ namespace DuetControlServer.SPI.Channel
                 if (CurrentState.Macro.JustStarted)
                 {
                     CurrentState.Macro.JustStarted = (DataTransfer.ProtocolVersion >= 3) && !DataTransfer.WriteMacroStarted(Channel);
-                    return true;
+                    return;
                 }
 
                 // Check if the macro file has finished
@@ -651,13 +647,13 @@ namespace DuetControlServer.SPI.Channel
                         else
                         {
                             // Wait for a response first if an older firmware version is used, then pop the stack
-                            return true;
+                            return;
                         }
                     }
                     else
                     {
                         // Still waiting for acknowledgement or failed to write macro complete message, try again ASAP
-                        return true;
+                        return;
                     }
                 }
             }
@@ -667,13 +663,12 @@ namespace DuetControlServer.SPI.Channel
             {
                 if (BufferCode(suspendedCode))
                 {
-                    responseExpected = true;
                     _logger.Debug("-> Resumed suspended code");
                     CurrentState.SuspendedCodes.Dequeue();
                 }
                 else
                 {
-                    return responseExpected;
+                    return;
                 }
             }
 
@@ -682,12 +677,11 @@ namespace DuetControlServer.SPI.Channel
             {
                 if (BufferCode(priorityCode))
                 {
-                    responseExpected = true;
                     PriorityCodes.Dequeue();
                 }
                 else
                 {
-                    return responseExpected;
+                    return;
                 }
             }
 
@@ -696,12 +690,11 @@ namespace DuetControlServer.SPI.Channel
             {
                 if (BufferCode(pendingCode))
                 {
-                    responseExpected = true;
                     CurrentState.PendingCodes.Dequeue();
                 }
                 else
                 {
-                    return responseExpected;
+                    return;
                 }
             }
 
@@ -709,7 +702,7 @@ namespace DuetControlServer.SPI.Channel
             if (BufferedCodes.Count == 0 && CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> flushRequest))
             {
                 flushRequest.SetResult(true);
-                return responseExpected;
+                return;
             }
 
             // Log untracked code replies
@@ -719,7 +712,7 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // End
-            return responseExpected;
+            return;
         }
 
         /// <summary>

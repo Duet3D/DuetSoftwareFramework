@@ -26,9 +26,14 @@ namespace DuetAPI.ObjectModel
         ZVDD,
 
         /// <summary>
-        /// EI2
+        /// EI2 (2-hump)
         /// </summary>
         EI2,
+
+        /// <summary>
+        /// EI3 (3-hump)
+        /// </summary>
+        EI3,
 
         /// <summary>
         /// DAA

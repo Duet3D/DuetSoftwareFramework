@@ -27,6 +27,11 @@
 		private string _file;
 
 		/// <summary>
+		/// Grid settings of the loaded heightmap or null if no heightmap is loaded
+		/// </summary>
+		public ProbeGrid LiveGrid { get; set; }
+
+		/// <summary>
 		/// Deviations of the mesh grid or null if not applicable
 		/// </summary>
 		public MoveDeviations MeshDeviation
@@ -37,7 +42,7 @@
 		private MoveDeviations _meshDeviation;
 
 		/// <summary>
-		/// Settings of the current probe grid
+		/// Probe grid settings as defined by M557
 		/// </summary>
 		public ProbeGrid ProbeGrid { get; } = new ProbeGrid();
 

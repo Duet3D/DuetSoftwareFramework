@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Text.Json;
 
 namespace DuetControlServer.Model
 {
@@ -18,8 +17,7 @@ namespace DuetControlServer.Model
         /// <param name="e">Event arguments</param>
         private static void ModelDictionaryChanging(object sender, PropertyChangingEventArgs e)
         {
-            IDictionary senderDictionary = (IDictionary)sender;
-            if (senderDictionary.Contains(e.PropertyName) && senderDictionary[e.PropertyName] is ModelObject modelItem)
+            if (sender is IDictionary dictionary && dictionary.Contains(e.PropertyName) && dictionary[e.PropertyName] is ModelObject modelItem)
             {
                 // Prevent memory leaks in case variable model objects are replaced
                 UnsubscribeFromModelObject(modelItem);
@@ -41,12 +39,15 @@ namespace DuetControlServer.Model
         {
             return (sender, e) =>
             {
-                object value = (sender as IDictionary)[e.PropertyName];
-                OnPropertyPathChanged?.Invoke(AddToPath(path, e.PropertyName), PropertyChangeType.Property, value);
-
-                if (value is ModelObject modelValue)
+                if (sender is IDictionary dictionary)
                 {
-                    SubscribeToModelObject(modelValue, AddToPath(path, e.PropertyName));
+                    object value = dictionary[e.PropertyName];
+                    OnPropertyPathChanged?.Invoke(AddToPath(path, e.PropertyName), PropertyChangeType.Property, value);
+
+                    if (value is ModelObject modelValue)
+                    {
+                        SubscribeToModelObject(modelValue, AddToPath(path, e.PropertyName));
+                    }
                 }
             };
         }
@@ -58,14 +59,11 @@ namespace DuetControlServer.Model
         /// <param name="path">Collection path</param>
         private static void SubscribeToModelDictionary(IModelDictionary modelDictionary, object[] path)
         {
-            if (modelDictionary is INotifyPropertyChanged propDictionaryChanged)
-            {
-                PropertyChangedEventHandler changeHandler = DictionaryChanged(path);
-                propDictionaryChanged.PropertyChanged += changeHandler;
-                _dictionaryChangedHandlers[modelDictionary] = changeHandler;
-            }
+            PropertyChangedEventHandler changeHandler = DictionaryChanged(path);
+            modelDictionary.PropertyChanged += changeHandler;
+            _dictionaryChangedHandlers[modelDictionary] = changeHandler;
 
-            if (modelDictionary is INotifyPropertyChanging propDictionaryChanging && GetItemType(modelDictionary.GetType()).IsSubclassOf(typeof(ModelObject)))
+            if (GetItemType(modelDictionary.GetType()).IsSubclassOf(typeof(ModelObject)))
             {
                 foreach (object key in modelDictionary)
                 {
@@ -74,7 +72,7 @@ namespace DuetControlServer.Model
                         SubscribeToModelObject(modelItem, AddToPath(path, key));
                     }
                 }
-                propDictionaryChanging.PropertyChanging += ModelDictionaryChanging;
+                modelDictionary.PropertyChanging += ModelDictionaryChanging;
             }
         }
 
@@ -86,11 +84,11 @@ namespace DuetControlServer.Model
         {
             if (_dictionaryChangedHandlers.TryGetValue(modelDictionary, out PropertyChangedEventHandler changeHandler))
             {
-                (modelDictionary as INotifyPropertyChanged).PropertyChanged -= changeHandler;
+                modelDictionary.PropertyChanged -= changeHandler;
                 _dictionaryChangedHandlers.Remove(modelDictionary);
             }
 
-            if (modelDictionary is INotifyPropertyChanging propDictionaryChanging && GetItemType(modelDictionary.GetType()).IsSubclassOf(typeof(ModelObject)))
+            if (GetItemType(modelDictionary.GetType()).IsSubclassOf(typeof(ModelObject)))
             {
                 foreach (object key in modelDictionary)
                 {
@@ -99,7 +97,7 @@ namespace DuetControlServer.Model
                         UnsubscribeFromModelObject(modelItem);
                     }
                 }
-                propDictionaryChanging.PropertyChanging -= ModelDictionaryChanging;
+                modelDictionary.PropertyChanging -= ModelDictionaryChanging;
             }
         }
     }

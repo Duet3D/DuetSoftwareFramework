@@ -432,6 +432,76 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Read a request to check if a file exists
+        /// </summary>
+        /// <param name="filename">Name of the file</param>
+        public static void ReadCheckFileExists(out string filename)
+        {
+            Serialization.Reader.ReadStringRequest(_packetData.Span, out filename);
+        }
+
+        /// <summary>
+        /// Read an open file request
+        /// </summary>
+        /// <param name="filename">Filename to open</param>
+        /// <param name="forWriting">Whether the file is supposed to be written to</param>
+        /// <param name="append">Whether data is supposed to be appended in write mode</param>
+        /// <param name="preAllocSize">How many bytes to allocate if the file is created or overwritten</param>
+        public static void ReadOpenFile(out string filename, out bool forWriting, out bool append, out long preAllocSize)
+        {
+            Serialization.Reader.ReadOpenFile(_packetData.Span, out filename, out forWriting, out append, out preAllocSize);
+        }
+
+        /// <summary>
+        /// Read a request to seek in a file
+        /// </summary>
+        /// <param name="handle">File handle</param>
+        /// <param name="offset">New file position</param>
+        public static void ReadSeekFile(out uint handle, out long offset)
+        {
+            Serialization.Reader.ReadSeekFile(_packetData.Span, out handle, out offset);
+        }
+
+        /// <summary>
+        /// Read a request to truncate a file
+        /// </summary>
+        /// <param name="handle">File handle</param>
+        public static void ReadTruncateFile(out uint handle)
+        {
+            Serialization.Reader.ReadFileHandle(_packetData.Span, out handle);
+        }
+
+        /// <summary>
+        /// Read a request to read data from a file
+        /// </summary>
+        /// <param name="handle">File handle</param>
+        /// <param name="maxLength">Maximum data length</param>
+        public static void ReadFileRequest(out uint handle, out uint maxLength)
+        {
+            Serialization.Reader.ReadFileRequest(_packetData.Span, out handle, out maxLength);
+        }
+
+        /// <summary>
+        /// Read a request to write data to a file
+        /// </summary>
+        /// <param name="handle">File handle</param>
+        /// <param name="data">Data to write</param>
+        public static void ReadWriteRequest(out uint handle, out ReadOnlyMemory<byte> data)
+        {
+            int bytesRead = Serialization.Reader.ReadFileHandle(_packetData.Span, out handle);
+            data = _packetData[bytesRead..];
+        }
+
+        /// <summary>
+        /// Read a request to close a file
+        /// </summary>
+        /// <param name="handle">File hadle</param>
+        public static void ReadCloseFile(out uint handle)
+        {
+            Serialization.Reader.ReadFileHandle(_packetData.Span, out handle);
+        }
+
+        /// <summary>
         /// Write the last packet + content for diagnostic purposes
         /// </summary>
         public static void DumpMalformedPacket()
@@ -1081,7 +1151,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">G-code channel</param>
         /// <param name="varName">Name of the variable excluding var prefix</param>
-        /// <returns>True fi the packet could be written</returns>
+        /// <returns>True if the packet could be written</returns>
         public static bool WriteDeleteLocalVariable(CodeChannel channel, string varName)
         {
             // Serialize the request first to see how much space it requires
@@ -1097,6 +1167,116 @@ namespace DuetControlServer.SPI
             // Write it
             WritePacket(Communication.LinuxRequests.Request.DeleteLocalVariable, dataLength);
             span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            return true;
+        }
+
+        /// <summary>
+        /// Send back whether a file exists or not
+        /// </summary>
+        /// <param name="exists">Whether the file exists</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteCheckFileExistsResult(bool exists)
+        {
+            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.BooleanHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.LinuxRequests.Request.CheckFileExistsResult, dataLength);
+            Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), exists);
+            return true;
+        }
+
+        /// <summary>
+        /// Write the new file handle and file length of the file that has just been opened
+        /// </summary>
+        /// <param name="fileHandle">New file handle or noFileHandle if the file could not be opened</param>
+        /// <param name="length">Length of the file</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteOpenFileResult(uint fileHandle, long length)
+        {
+            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.OpenFileResult>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.LinuxRequests.Request.OpenFileResult, dataLength);
+            Serialization.Writer.WriteOpenFileResult(GetWriteBuffer(dataLength), fileHandle, length);
+            return true;
+        }
+
+        /// <summary>
+        /// Write requested read data from a file
+        /// </summary>
+        /// <param name="data">File data</param>
+        /// <param name="bytesRead">Number of bytes read or negative on error</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteFileReadResult(byte[] data, int bytesRead)
+        {
+            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.OpenFileResult>() + data.Length;
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.LinuxRequests.Request.FileReadResult, dataLength);
+            Serialization.Writer.WriteFileReadResult(GetWriteBuffer(dataLength), data, bytesRead);
+            return true;
+        }
+
+        /// <summary>
+        /// Tell RRF if the last file block could be written
+        /// </summary>
+        /// <param name="success">If the file data could be written</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteFileWriteResult(bool success)
+        {
+            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.BooleanHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.LinuxRequests.Request.FileWriteResult, dataLength);
+            Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), success);
+            return true;
+        }
+
+        /// <summary>
+        /// Tell RRF if the seek operation was successful
+        /// </summary>
+        /// <param name="success">If the seek operation succeeded</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteFileSeekResult(bool success)
+        {
+            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.BooleanHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.LinuxRequests.Request.FileSeekResult, dataLength);
+            Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), success);
+            return true;
+        }
+
+        /// <summary>
+        /// Tell RRF if the seek operation was successful
+        /// </summary>
+        /// <param name="success">If the seek operation succeeded</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteFileTruncateResult(bool success)
+        {
+            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.BooleanHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.LinuxRequests.Request.FileTruncateResult, dataLength);
+            Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), success);
             return true;
         }
 

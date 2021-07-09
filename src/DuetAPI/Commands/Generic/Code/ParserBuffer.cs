@@ -15,7 +15,7 @@ namespace DuetAPI.Commands
         public CodeParserBuffer(int bufferSize, bool lineNumbersValid)
         {
             Buffer = new char[bufferSize];
-            LineNumber = lineNumbersValid ? (long?)1 : null;
+            LineNumber = lineNumbersValid ? 1 : null;
         }
 
         /// <summary>

@@ -162,11 +162,6 @@ namespace DuetControlServer
         public static int MaxSpiRetries { get; set; } = 3;
 
         /// <summary>
-        /// Time to wait after every full transfer (in ms)
-        /// </summary>
-        public static int SpiPollDelay { get; set; } = 25;
-
-        /// <summary>
         /// Path to the GPIO chip device node
         /// </summary>
         public static string GpioChipDevice { get; set; } = "/dev/gpiochip0";

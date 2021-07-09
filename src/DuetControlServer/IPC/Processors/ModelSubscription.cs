@@ -88,12 +88,12 @@ namespace DuetControlServer.IPC.Processors
             {
                 _filters = Filter.ConvertFilters(subscribeInitMessage.Filters);
             }
-#pragma warning disable CS0612 // Type or member is obsolete
+#pragma warning disable CS0618 // Type or member is obsolete
             else if (!string.IsNullOrEmpty(subscribeInitMessage.Filter))
             {
                 _filters = Filter.ConvertFilters(subscribeInitMessage.Filter);
             }
-#pragma warning restore CS0612 // Type or member is obsolete
+#pragma warning restore CS0618 // Type or member is obsolete
             else
             {
                 _filters = Array.Empty<object[]>();

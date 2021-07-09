@@ -102,6 +102,46 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// Response to a variable set request
         /// </summary>
         /// <seealso cref="EvaluationResultHeader"/>
-        VariableResult = 16
+        VariableResult = 16,
+
+        /// <summary>
+        /// Check if a file exists
+        /// </summary>
+        CheckFileExists = 17,
+
+        /// <summary>
+        /// Delete a file or directory
+        /// </summary>
+        DeleteFileOrDirectory = 18,
+
+        /// <summary>
+        /// Open a file on the SBC
+        /// </summary>
+        OpenFile = 19,
+
+        /// <summary>
+        /// Read from a file
+        /// </summary>
+        ReadFile = 20,
+
+        /// <summary>
+        /// Write to a file
+        /// </summary>
+        WriteFile = 21,
+
+        /// <summary>
+        /// Seek in a file
+        /// </summary>
+        SeekFile = 22,
+
+        /// <summary>
+        /// Truncate a file
+        /// </summary>
+        TruncateFile = 23,
+
+        /// <summary>
+        /// Close a file again
+        /// </summary>
+        CloseFile = 24
     }
 }

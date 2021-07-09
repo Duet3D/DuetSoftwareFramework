@@ -762,6 +762,64 @@ namespace DuetControlServer.SPI.Serialization
         }
 
         /// <summary>
+        /// Write an arbitrary boolean value
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="exists"></param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteBoolean(Span<byte> to, bool value)
+        {
+            BooleanHeader header = new()
+            {
+                Value = Convert.ToByte(value)
+            };
+            MemoryMarshal.Write(to, ref header);
+            return Marshal.SizeOf<BooleanHeader>();
+        }
+
+        /// <summary>
+        /// Write the result of an attempt to open a file
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="handle">File handle</param>
+        /// <param name="fileSize">File length</param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteOpenFileResult(Span<byte> to, uint handle, long fileSize)
+        {
+            OpenFileResult header = new()
+            {
+                Handle = handle,
+                FileSize = (uint)fileSize
+            };
+            MemoryMarshal.Write(to, ref header);
+            return Marshal.SizeOf<OpenFileResult>();
+        }
+
+        /// <summary>
+        /// Write read file data
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="data">Read file data</param>
+        /// <param name="bytesRead">Number of bytes read</param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteFileReadResult(Span<byte> to, byte[] data, int bytesRead)
+        {
+            // Write header
+            FileDataHeader header = new()
+            {
+                BytesRead = bytesRead
+            };
+            MemoryMarshal.Write(to, ref header);
+            int bytesWritten = Marshal.SizeOf<FileDataHeader>();
+
+            // Write content
+            data.CopyTo(data.AsSpan(bytesWritten));
+            bytesWritten += data.Length;
+
+            return AddPadding(to, bytesWritten);
+        }
+
+        /// <summary>
         /// Add padding bytes to maintain alignment on a 4-byte boundary
         /// </summary>
         /// <param name="to">Target buffer</param>

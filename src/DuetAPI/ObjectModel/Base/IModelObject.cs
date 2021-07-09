@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
@@ -6,7 +7,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Basic interface for object model classes that have properties
     /// </summary>
-    public interface IModelObject : ICloneable
+    public interface IModelObject : ICloneable, INotifyPropertyChanged
     {
         /// <summary>
         /// Assign the properties from another instance.

@@ -137,6 +137,41 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// Delete an existing local variable at the end of a code block
         /// </summary>
         /// <seealso cref="Shared.StringHeader"/>
-        DeleteLocalVariable = 21
+        DeleteLocalVariable = 21,
+
+        /// <summary>
+        /// Result of a request to check if a given file exists
+        /// </summary>
+        CheckFileExistsResult = 22,
+
+        /// <summary>
+        /// Result of a file deletion request
+        /// </summary>
+        FileDeleteResult = 23,
+
+        /// <summary>
+        /// Result of an attempt to open a file
+        /// </summary>
+        OpenFileResult = 24,
+
+        /// <summary>
+        /// Result of a file read request
+        /// </summary>
+        FileReadResult = 25,
+
+        /// <summary>
+        /// Result of a file write request
+        /// </summary>
+        FileWriteResult = 26,
+
+        /// <summary>
+        /// Result of a file seek request
+        /// </summary>
+        FileSeekResult = 27,
+
+        /// <summary>
+        /// Result of a file seek request
+        /// </summary>
+        FileTruncateResult = 28
     }
 }

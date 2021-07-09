@@ -1,11 +1,12 @@
-﻿using System.Text.Json;
+﻿using System.Collections.Specialized;
+using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Interface that all object model collections must implement
     /// </summary>
-    public interface IModelCollection : IModelObject
+    public interface IModelCollection : IModelObject, INotifyCollectionChanged
     {
         /// <summary>
         /// Update this collection from a given JSON array

@@ -11,7 +11,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Base class for machine model properties
     /// </summary>
-    public class ModelObject : IModelObject, INotifyPropertyChanged, INotifyPropertyChanging
+    public class ModelObject : IModelObject, INotifyPropertyChanging
     {
         /// <summary>
         /// Event that is triggered when a property is being changed
@@ -281,55 +281,32 @@ namespace DuetAPI.ObjectModel
                         continue;
                     }
 
-                    if (property.PropertyType.IsAssignableTo(typeof(IModelObject)))
+                    if (jsonProperty.Value.ValueKind == JsonValueKind.Null)
                     {
-                        IModelObject myValue = (IModelObject)property.GetValue(this);
-                        if (jsonProperty.Value.ValueKind == JsonValueKind.Null)
+                        if (property.SetMethod != null)
                         {
-                            if (myValue != null)
-                            {
-                                if (property.SetMethod != null)
-                                {
-                                    property.SetValue(this, null);
-                                }
-#if VERIFY_OBJECT_MODEL
-                                else
-                                {
-                                    Console.WriteLine("[warn] Tried to set unsettable property {0} to null", jsonProperty.Name);
-                                }
-#endif
-                            }
+                            property.SetValue(this, null);
                         }
+#if VERIFY_OBJECT_MODEL
                         else
                         {
-                            if (myValue == null)
-                            {
-                                myValue = (IModelObject)Activator.CreateInstance(property.PropertyType);
-                            }
-
-                            myValue = myValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
-                            if (property.SetMethod != null)
-                            {
-                                property.SetValue(this, myValue);
-                            }
-#if VERIFY_OBJECT_MODEL
-                            else
-                            {
-                                Console.WriteLine("[warn] Tried to assign unsettable property {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
-                            }
-#endif
+                            Console.WriteLine("[warn] Tried to set unsettable property {0} to null", jsonProperty.Name);
                         }
+#endif
                     }
-                    else if (property.PropertyType == typeof(bool) && jsonProperty.Value.ValueKind == JsonValueKind.Number)
+                    else if (property.PropertyType.IsAssignableTo(typeof(IModelObject)))
                     {
-                        try
+                        object propertyValue = property.GetValue(this), newPropertyValue = propertyValue;
+                        if (propertyValue == null)
+                        {
+                            newPropertyValue = Activator.CreateInstance(property.PropertyType);
+                        }
+                        newPropertyValue = (newPropertyValue as IModelObject).UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                        if (propertyValue != newPropertyValue)
                         {
                             if (property.SetMethod != null)
                             {
-                                property.SetValue(this, Convert.ToBoolean(jsonProperty.Value.GetInt32()));
-#if VERIFY_OBJECT_MODEL
-                                Console.WriteLine("[warn] Updating bool value from number {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
-#endif
+                                property.SetValue(this, newPropertyValue);
                             }
 #if VERIFY_OBJECT_MODEL
                             else
@@ -337,20 +314,16 @@ namespace DuetAPI.ObjectModel
                                 Console.WriteLine("[warn] Tried to assign unsettable property {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
                             }
 #endif
-                        }
-                        catch (FormatException e)
-                        {
-                            throw new JsonException($"Failed to deserialize property [{GetType().Name}].{property.Name} (type bool) from JSON {jsonProperty.Value.GetRawText()}", e);
                         }
                     }
                     else
                     {
                         try
                         {
-                            object newValue = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), property.PropertyType);
+                            object deserializedValue = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), property.PropertyType);
                             if (property.SetMethod != null)
                             {
-                                property.SetValue(this, newValue);
+                                property.SetValue(this, deserializedValue);
 
                             }
 #if VERIFY_OBJECT_MODEL

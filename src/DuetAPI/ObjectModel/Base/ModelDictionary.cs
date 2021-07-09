@@ -12,7 +12,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Class for holding string keys and custom values
     /// </summary>
-    public sealed class ModelDictionary<TValue> : IDictionary<string, TValue>, IModelDictionary, INotifyPropertyChanged, INotifyPropertyChanging
+    public sealed class ModelDictionary<TValue> : IDictionary<string, TValue>, IModelDictionary
     {
         /// <summary>
         /// Flags if keys can be removed again by setting their value to null

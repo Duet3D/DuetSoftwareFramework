@@ -90,6 +90,8 @@ namespace DuetControlServer.SPI
         private static volatile bool _assignFilaments;
         private static readonly Dictionary<int, string> _extruderFilamentMapping = new();
         private static readonly Queue<Tuple<MessageTypeFlags, string>> _messagesToSend = new();
+        private static readonly Dictionary<uint, FileStream> _openFiles = new();
+        private static uint _openFileHandle = Consts.NoFileHandle;
 
         // Partial incoming message (if any)
         private static string _partialGenericMessage;
@@ -853,7 +855,6 @@ namespace DuetControlServer.SPI
                 }
 
                 // Process incoming packets
-                bool skipDelay = false;
                 for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
                     PacketHeader? packet;
@@ -866,7 +867,7 @@ namespace DuetControlServer.SPI
                             _logger.Error("Read invalid packet");
                             break;
                         }
-                        skipDelay |= await ProcessPacket(packet.Value);
+                        await ProcessPacket(packet.Value);
                     }
                     catch (ArgumentOutOfRangeException)
                     {
@@ -879,7 +880,7 @@ namespace DuetControlServer.SPI
                 // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
                 if (!skipChannels)
                 {
-                    skipDelay |= await _channels.Run();
+                    await _channels.Run();
                 }
 
                 // Request object model updates
@@ -904,7 +905,7 @@ namespace DuetControlServer.SPI
                         if (_pendingModelQueries.TryPeek(out PendingModelQuery query) &&
                             !query.QuerySent && DataTransfer.WriteGetObjectModel(query.Key, query.Flags))
                         {
-                            skipDelay = query.QuerySent = true;
+                            query.QuerySent = true;
                         }
                     }
                 }
@@ -919,7 +920,7 @@ namespace DuetControlServer.SPI
                         {
                             if (!request.Written && DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression))
                             {
-                                skipDelay = request.Written = true;
+                                request.Written = true;
 
                                 numEvaluationsSent++;
                                 if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
@@ -940,7 +941,6 @@ namespace DuetControlServer.SPI
                                 if ((request.Expression != null && DataTransfer.WriteSetVariable(request.Channel, request.CreateVariable, request.VariableName, request.Expression)) ||
                                     (request.Expression == null && DataTransfer.WriteDeleteLocalVariable(request.Channel, request.VariableName)))
                                 {
-                                    skipDelay = true;
                                     if (request.Expression == null)
                                     {
                                         request.SetResult(null);
@@ -1000,12 +1000,6 @@ namespace DuetControlServer.SPI
 
                 // Do another full SPI transfe
                 DataTransfer.PerformFullTransfer();
-
-                // Wait a moment unless instructions are being sent rapidly to RRF
-                if (!skipDelay)
-                {
-                    await Task.Delay(Settings.SpiPollDelay, Program.CancellationToken);
-                }
             }
             while (true);
         }
@@ -1031,15 +1025,15 @@ namespace DuetControlServer.SPI
         /// Process a packet from RepRapFirmware
         /// </summary>
         /// <param name="packet">Received packet</param>
-        /// <returns>Whether a response can be expected that is not channel-related</returns>
-        private static async Task<bool> ProcessPacket(PacketHeader packet)
+        /// <returns>Asynchronous task</returns>
+        private static async Task ProcessPacket(PacketHeader packet)
         {
             Request request = (Request)packet.Request;
 
             if (Settings.UpdateOnly && request != Request.ObjectModel)
             {
                 // Don't process any requests except for object model responses if only the firmware is supposed to be updated
-                return false;
+                return;
             }
 
             switch (request)
@@ -1078,7 +1072,7 @@ namespace DuetControlServer.SPI
                     break;
                 case Request.FileChunk:
                     await HandleFileChunkRequest();
-                    return true;
+                    break;
                 case Request.EvaluationResult:
                     HandleEvaluationResult();
                     break;
@@ -1097,8 +1091,28 @@ namespace DuetControlServer.SPI
                 case Request.VariableResult:
                     HandleVariableResult();
                     break;
+                case Request.CheckFileExists:
+                    await HandleCheckFileExists();
+                    break;
+                case Request.OpenFile:
+                    await HandleOpenFile();
+                    break;
+                case Request.ReadFile:
+                    await HandleReadFile();
+                    break;
+                case Request.WriteFile:
+                    await HandleWriteFile();
+                    break;
+                case Request.SeekFile:
+                    HandleSeekFile();
+                    break;
+                case Request.TruncateFile:
+                    HandleTruncateFile();
+                    break;
+                case Request.CloseFile:
+                    HandleCloseFile();
+                    break;
             }
-            return false;
         }
 
         /// <summary>
@@ -1271,7 +1285,7 @@ namespace DuetControlServer.SPI
             {
                 // Do NOT supply a file position if this is a pause request initiated from G-code because that would lead to an endless loop
                 bool filePositionValid = (filePosition != Consts.NoFilePosition) && (pauseReason != PrintPausedReason.GCode) && (pauseReason != PrintPausedReason.FilamentChange);
-                FileExecution.Job.Pause(filePositionValid ? (long?)filePosition : null, pauseReason);
+                FileExecution.Job.Pause(filePositionValid ? filePosition : null, pauseReason);
             }
 
             // Resolve pending and buffered codes on the file channel
@@ -1475,6 +1489,194 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Check if a file exists
+        /// </summary>
+        private static async Task HandleCheckFileExists()
+        {
+            DataTransfer.ReadCheckFileExists(out string filename);
+
+            try
+            {
+                string physicalFile = await FilePath.ToPhysicalAsync(filename);
+                bool exists = File.Exists(physicalFile);
+                DataTransfer.WriteCheckFileExistsResult(exists);
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to check if file {0} exists", filename);
+                DataTransfer.WriteCheckFileExistsResult(false);
+            }
+        }
+
+        /// <summary>
+        /// Try to open a file
+        /// </summary>
+        private static async Task HandleOpenFile()
+        {
+            DataTransfer.ReadOpenFile(out string filename, out bool forWriting, out bool append, out long preAllocSize);
+            _logger.Debug("Opening {0} for {1} ({2}appending), prealloc {3}", filename, forWriting ? "writing" : "reading", append ? string.Empty : "not ", preAllocSize);
+
+            try
+            {
+                // Resolve the path and create the parent directory if necessary
+                string physicalFile = await FilePath.ToPhysicalAsync(filename), parentDirectory = Path.GetDirectoryName(physicalFile);
+                if (!Directory.Exists(parentDirectory))
+                {
+                    Directory.CreateDirectory(parentDirectory);
+                }
+
+                // Try to open the file as requested
+                FileMode fsMode = forWriting ? (append ? FileMode.Append : FileMode.Create) : FileMode.Open;
+                FileStream fs = new(physicalFile, fsMode);
+                if (forWriting && !append && preAllocSize > 0)
+                {
+                    fs.SetLength(preAllocSize);
+                }
+
+                // Register a handle and send it back
+                _openFileHandle++;
+                if (_openFileHandle == Consts.NoFileHandle)
+                {
+                    _openFileHandle++;
+                }
+                _openFiles.Add(_openFileHandle, fs);
+
+                _logger.Debug("File {0} opened with handle #{1}", filename, _openFileHandle);
+                DataTransfer.WriteOpenFileResult(_openFileHandle, fs.Length);
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to open {0} for {1}", filename, forWriting ? "writing" : "reading");
+                DataTransfer.WriteOpenFileResult(Consts.NoFileHandle, 0);
+            }
+        }
+
+        /// <summary>
+        /// Read more from a given file
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private static async Task HandleReadFile()
+        {
+            DataTransfer.ReadFileRequest(out uint handle, out uint maxLength);
+            _logger.Debug("Reading up to {0} bytes from file #{1}", maxLength, handle);
+
+            try
+            {
+                // Read file content as requested
+                FileStream fs = _openFiles[handle];
+                byte[] data = new byte[maxLength];
+                int bytesRead = await fs.ReadAsync(data);
+
+                // Send it back
+                DataTransfer.WriteFileReadResult((bytesRead > 0) ? data[..bytesRead] : Array.Empty<byte>(), bytesRead);
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to read {0} bytes from file #{1}", maxLength, handle);
+                DataTransfer.WriteFileReadResult(Array.Empty<byte>(), -1);
+            }
+        }
+
+        /// <summary>
+        /// Write more to a given file
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private static async Task HandleWriteFile()
+        {
+            DataTransfer.ReadWriteRequest(out uint handle, out ReadOnlyMemory<byte> data);
+            _logger.Debug("Writing {0} bytes to file #{1}", data.Length, handle);
+
+            try
+            {
+                // Write file content as requested
+                FileStream fs = _openFiles[handle];
+                await fs.WriteAsync(data);
+
+                // Send it back
+                DataTransfer.WriteFileWriteResult(true);
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to write {0} bytes to file #{1}", data.Length, handle);
+                DataTransfer.WriteFileWriteResult(false);
+            }
+        }
+
+        /// <summary>
+        /// Go to a specific position in a file
+        /// </summary>
+        private static void HandleSeekFile()
+        {
+            DataTransfer.ReadSeekFile(out uint handle, out long offset);
+            _logger.Debug("Seeking to position {0} in file #{1}", offset, handle);
+
+            try
+            {
+                // Go to the file position as requested
+                FileStream fs = _openFiles[handle];
+                fs.Seek(offset, SeekOrigin.Begin);
+
+                // Send it back
+                DataTransfer.WriteFileSeekResult(true);
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to go to position {0} in file #{1}", offset, handle);
+                DataTransfer.WriteFileSeekResult(false);
+            }
+        }
+
+        /// <summary>
+        /// Go to a specific position in a file
+        /// </summary>
+        private static void HandleTruncateFile()
+        {
+            DataTransfer.ReadTruncateFile(out uint handle);
+            _logger.Debug("Truncating file #{0}", handle);
+
+            try
+            {
+                // Go to the file position as requested
+                FileStream fs = _openFiles[handle];
+                fs.SetLength(fs.Position);
+                _logger.Debug("Truncated file #{0} at byte {1}", handle, fs.Length);
+
+                // Send it back
+                DataTransfer.WriteFileTruncateResult(true);
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to truncate file #{1}", handle);
+                DataTransfer.WriteFileTruncateResult(false);
+            }
+        }
+
+        /// <summary>
+        /// Check if a file exists
+        /// </summary>
+        private static void HandleCloseFile()
+        {
+            DataTransfer.ReadCloseFile(out uint handle);
+            _logger.Debug("Closing file #{0}", handle);
+
+            try
+            {
+                // Close the file stream
+                FileStream fs = _openFiles[handle];
+                fs.Close();
+
+                // Remove it again from the list of open files
+                _openFiles.Remove(handle);
+
+                // RRF doesn't expect a response for this...
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to close file #{0}", handle);
+            }
+        }
+
+        /// <summary>
         /// Invalidate every resource due to a critical event
         /// </summary>
         /// <param name="message">Reason why everything is being invalidated</param>
@@ -1566,6 +1768,13 @@ namespace DuetControlServer.SPI
             {
                 _messagesToSend.Clear();
             }
+
+            // Close all the files
+            foreach (var kv in _openFiles)
+            {
+                kv.Value.Close();
+            }
+            _openFiles.Clear();
 
             // Notify the updater task
             Model.Updater.ConnectionLost();

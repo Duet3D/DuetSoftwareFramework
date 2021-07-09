@@ -253,14 +253,14 @@ namespace DuetControlServer.Model
                                 else
                                 {
                                     // Set placeholder
-                                    results[i] = isModelObjectList ? (object)new Dictionary<string, object>() : new List<object>();
+                                    results[i] = isModelObjectList ? new Dictionary<string, object>() : new List<object>();
                                 }
                             }
                         }
                         else if (item != null)
                         {
                             // Set placeholder
-                            results[i] = isModelObjectList ? (object)new Dictionary<string, object>() : new List<object>();
+                            results[i] = isModelObjectList ? new Dictionary<string, object>() : new List<object>();
                         }
                     }
                     return results;

@@ -254,8 +254,8 @@ namespace DuetControlServer.Model
                     }
                     index++;
 
-                    volume.Capacity = (drive.DriveType == DriveType.Network) ? null : (long?)totalSize;
-                    volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : (long?)drive.AvailableFreeSpace;
+                    volume.Capacity = (drive.DriveType == DriveType.Network) ? null : totalSize;
+                    volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : drive.AvailableFreeSpace;
                     volume.Mounted = drive.IsReady;
                     volume.Path = drive.VolumeLabel;
                 }
