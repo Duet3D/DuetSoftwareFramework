@@ -1,6 +1,20 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.4-b1
+==============
+
+New features:
+- RRF v3.4-b1 and newer can now read and write files on the SBC
+
+Changed behaviour:
+- Replies from macro files are output immediately as they are generated (like in standalone mode)
+- Codes starting macros do not collect the results from the sub-macro codes any more (like in standalone mode)
+- SPI link timing is not controlled by DCS any more, instead RRF does this (see also M576)
+
+Bug fixes:
+- Variable names could not contain underscores
+
 Version 3.3.0
 =============
 
