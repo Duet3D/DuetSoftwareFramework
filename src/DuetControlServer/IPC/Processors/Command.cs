@@ -34,6 +34,7 @@ namespace DuetControlServer.IPC.Processors
             typeof(SyncObjectModel),
             typeof(UnlockObjectModel),
             typeof(InstallPlugin),
+            typeof(ReloadPlugin),
             typeof(SetNetworkProtocol),
             typeof(SetPluginData),
             typeof(SetPluginProcess),

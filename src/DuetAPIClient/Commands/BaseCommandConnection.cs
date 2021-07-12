@@ -344,6 +344,20 @@ namespace DuetAPIClient
         }
 
         /// <summary>
+        /// Reload a plugin manifest
+        /// </summary>
+        /// <param name="plugin">Identifier of the plugin</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.ManagePlugins"/>
+        public Task ReloadPlugin(string plugin, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new ReloadPlugin { Plugin = plugin }, cancellationToken);
+        }
+
+        /// <summary>
         /// Remove an existing HTTP endpoint
         /// </summary>
         /// <param name="endpointType">Type of the endpoint to remove</param>
@@ -423,7 +437,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="key">Key to set</param>
         /// <param name="value">Value to set</param>
-        /// <param name="plugin">Name of the plugin to update (optional)</param>
+        /// <param name="plugin">Identifier of the plugin to update (optional)</param>
         /// <param name="cancellationToken"></param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
@@ -455,7 +469,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Start a plugin
         /// </summary>
-        /// <param name="plugin">Name of the plugin</param>
+        /// <param name="plugin">Identifier of the plugin</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
@@ -469,7 +483,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Stop a plugin
         /// </summary>
-        /// <param name="plugin">Name of the plugin</param>
+        /// <param name="plugin">Identifier of the plugin</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
@@ -511,7 +525,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Uninstall a plugin
         /// </summary>
-        /// <param name="plugin">Name of the plugin</param>
+        /// <param name="plugin">Identifier of the plugin</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
@@ -525,7 +539,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Uninstall a system package
         /// </summary>
-        /// <param name="package">Name of the package</param>
+        /// <param name="package">Identifier of the package</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>

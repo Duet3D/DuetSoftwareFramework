@@ -195,6 +195,23 @@ namespace UnitTests.Machine
             Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
             Assert.AreEqual(customData, recordedValue);
 
+            // global.foo
+            using JsonDocument jsonDoc = JsonDocument.Parse("{\"foobar\":\"test\"}");
+            Provider.Get.Global.Add("foobar", jsonDoc.RootElement);
+
+            Assert.AreEqual(3, numEvents);
+            Assert.AreEqual(new object[] { "global", "foobar" }, recordedPath);
+            Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
+            Assert.AreEqual(jsonDoc.RootElement, recordedValue);
+
+            // clear event
+            Provider.Get.Global.Clear();
+
+            Assert.AreEqual(4, numEvents);
+            Assert.AreEqual(new object[] { "global" }, recordedPath);
+            Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
+            Assert.IsNull(recordedValue);
+
             // End
             DuetControlServer.Model.Observer.OnPropertyPathChanged -= onPropertyChanged;
             Provider.Get.Plugins.Clear();
@@ -219,11 +236,11 @@ namespace UnitTests.Machine
             DuetControlServer.Model.Observer.OnPropertyPathChanged += onPropertyChanged;
 
             // plugins
-            Plugin plugin = new() { Id = "Foobar" };
-            Provider.Get.Plugins.Add("Foobar", plugin);
+            Plugin plugin = new() { Id = "Foobar2" };
+            Provider.Get.Plugins.Add("Foobar2", plugin);
 
             Assert.AreEqual(1, numEvents);
-            Assert.AreEqual(new object[] { "plugins", "Foobar" }, recordedPath);
+            Assert.AreEqual(new object[] { "plugins", "Foobar2" }, recordedPath);
             Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
             Assert.AreSame(plugin, recordedValue);
 
@@ -231,15 +248,15 @@ namespace UnitTests.Machine
             plugin.Pid = 1234;
 
             Assert.AreEqual(2, numEvents);
-            Assert.AreEqual(new object[] { "plugins", "Foobar", "pid" }, recordedPath);
+            Assert.AreEqual(new object[] { "plugins", "Foobar2", "pid" }, recordedPath);
             Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
             Assert.AreEqual(plugin.Pid, recordedValue);
 
             // delete item
-            Provider.Get.Plugins.Remove("Foobar");
+            Provider.Get.Plugins.Remove("Foobar2");
 
             Assert.AreEqual(3, numEvents);
-            Assert.AreEqual(new object[] { "plugins", "Foobar" }, recordedPath);
+            Assert.AreEqual(new object[] { "plugins", "Foobar2" }, recordedPath);
             Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
             Assert.IsNull(recordedValue);
 

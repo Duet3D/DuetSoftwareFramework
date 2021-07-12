@@ -1,6 +1,16 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.4-b2 (TBD)
+==============
+
+New features:
+- Plugin manager can now be used to reload specific plugin manifests
+- Plugin manager may be used to query the installation/runtime status of plugins
+
+Bug fixes:
+- When RRF reset, DCS could terminate when trying to clear the global variables
+
 Version 3.4-b1
 ==============
 

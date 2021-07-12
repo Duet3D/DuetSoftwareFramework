@@ -26,6 +26,11 @@ namespace DuetAPI.ObjectModel
         private readonly Dictionary<string, TValue> _dictionary = new();
 
         /// <summary>
+        /// Event that is called when the entire directory is cleared. Only used if <see cref="NullRemovesItems"/> is false
+        /// </summary>
+        public event EventHandler DictionaryCleared;
+
+        /// <summary>
         /// Event that is called when a key has been changed
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
@@ -221,14 +226,21 @@ namespace DuetAPI.ObjectModel
         }
 
         /// <summary>
-        /// Clear this dictionary. Only supported if <see cref="NullRemovesItems"/> is true
+        /// Clear this dictionary
         /// </summary>
         public void Clear()
         {
-            List<string> keys = new(_dictionary.Keys);
-            foreach (string key in keys)
+            if (NullRemovesItems)
             {
-                Remove(key);
+                List<string> keys = new(_dictionary.Keys);
+                foreach (string key in keys)
+                {
+                    Remove(key);
+                }
+            }
+            else
+            {
+                DictionaryCleared?.Invoke(this, new EventArgs());
             }
         }
 

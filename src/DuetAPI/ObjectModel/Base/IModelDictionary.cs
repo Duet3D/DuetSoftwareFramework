@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.ComponentModel;
 
 namespace DuetAPI.ObjectModel
@@ -6,5 +7,11 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Interface for model dictionaries
     /// </summary>
-    public interface IModelDictionary : IModelObject, IDictionary, INotifyPropertyChanged, INotifyPropertyChanging { }
+    public interface IModelDictionary : IModelObject, IDictionary, INotifyPropertyChanged, INotifyPropertyChanging
+    {
+        /// <summary>
+        /// Event that is called when the entire directory is cleared
+        /// </summary>
+        event EventHandler DictionaryCleared;
+    }
 }

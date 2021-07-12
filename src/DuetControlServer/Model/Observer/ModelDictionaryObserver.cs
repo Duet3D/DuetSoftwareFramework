@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -32,7 +33,6 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Function to generate a property change handler
         /// </summary>
-        /// <param name="hasVariableModelObjects">Whether this instance has any variable model objects</param>
         /// <param name="path">Property path</param>
         /// <returns>Property change handler</returns>
         private static PropertyChangedEventHandler DictionaryChanged(object[] path)
@@ -53,6 +53,24 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
+        /// Dictionary of model objects vs property change handlers
+        /// </summary>
+        private static readonly Dictionary<IModelDictionary, EventHandler> _dictionaryClearedHandlers = new();
+
+        /// <summary>
+        /// Function to generate a dictionary cleared change handler
+        /// </summary>
+        /// <param name="path">Property path</param>
+        /// <returns>Property change handler</returns>
+        private static EventHandler DictionaryCleared(object[] path)
+        {
+            return (sender, e) =>
+            {
+                OnPropertyPathChanged?.Invoke(path, PropertyChangeType.Property, null);
+            };
+        }
+
+        /// <summary>
         /// Subscribe to changes of the given model object
         /// </summary>
         /// <param name="modelObject">Object to subscribe to</param>
@@ -62,6 +80,10 @@ namespace DuetControlServer.Model
             PropertyChangedEventHandler changeHandler = DictionaryChanged(path);
             modelDictionary.PropertyChanged += changeHandler;
             _dictionaryChangedHandlers[modelDictionary] = changeHandler;
+
+            EventHandler clearedHandler = DictionaryCleared(path);
+            modelDictionary.DictionaryCleared += clearedHandler;
+            _dictionaryClearedHandlers[modelDictionary] = clearedHandler;
 
             if (GetItemType(modelDictionary.GetType()).IsSubclassOf(typeof(ModelObject)))
             {
@@ -86,6 +108,12 @@ namespace DuetControlServer.Model
             {
                 modelDictionary.PropertyChanged -= changeHandler;
                 _dictionaryChangedHandlers.Remove(modelDictionary);
+            }
+
+            if (_dictionaryClearedHandlers.TryGetValue(modelDictionary, out EventHandler clearedHandler))
+            {
+                modelDictionary.DictionaryCleared -= clearedHandler;
+                _dictionaryClearedHandlers.Remove(modelDictionary);
             }
 
             if (GetItemType(modelDictionary.GetType()).IsSubclassOf(typeof(ModelObject)))

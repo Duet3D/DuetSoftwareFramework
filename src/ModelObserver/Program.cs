@@ -50,9 +50,9 @@ namespace ModelObserver
 
             // Connect to DCS
             using SubscribeConnection connection = new();
-#pragma warning disable CS0612 // Type or member is obsolete
+#pragma warning disable CS0618 // Type or member is obsolete
             await connection.Connect(SubscriptionMode.Patch, filter, socketPath);
-#pragma warning restore CS0612 // Type or member is obsolete
+#pragma warning restore CS0618 // Type or member is obsolete
 
             if (!quiet)
             {
