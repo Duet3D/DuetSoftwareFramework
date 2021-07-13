@@ -1,8 +1,12 @@
 #!/bin/sh
 
-# Stop DuetPiManagementPlugin
-if (systemctl is-active -q duetpluginservice-root); then
-	/opt/dsf/bin/PluginManager stop DuetPiManagementPlugin
+# Stop the plugin first
+if (systemctl is-active -q duetcontrolserver && /opt/dsf/bin/PluginManager -q is-started DuetPiManagementPlugin); then
+	/opt/dsf/bin/PluginManager -q stop DuetPiManagementPlugin
+	if [[ "$1" == "upgrade" ]]; then
+		# Restart it again when the upgrade is complete
+		touch /opt/dsf/plugins/DuetPiManagementPlugin/.start
+	fi
 fi
 
 # Make manifest writable again
