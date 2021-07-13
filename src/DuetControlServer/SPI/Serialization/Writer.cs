@@ -187,7 +187,7 @@ namespace DuetControlServer.SPI.Serialization
                     {
                         string value = parameter;
                         binaryParam.Type = parameter.IsExpression ? DataType.Expression : DataType.String;
-                        binaryParam.IntValue = value.Length;
+                        binaryParam.IntValue = Encoding.UTF8.GetByteCount(value);
                         extraParameters.Add(value);
                     }
                     // Boolean values are not supported for codes. Use integers instead
