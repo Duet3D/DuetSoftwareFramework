@@ -10,7 +10,7 @@ chmod 755 /opt/dsf/plugins/DuetPiManagementPlugin
 # Reload the plugin manifest
 if (systemctl is-active -q duetcontrolserver && systemctl is-active -q duetpluginservice && systemctl is-active -q duetpluginservice-root); then
 	/opt/dsf/bin/PluginManager -q reload DuetPiManagementPlugin
-	if [[ -f /opt/dsf/plugins/DuetPiManagementPlugin/.start ]]; then
+	if [ -f /opt/dsf/plugins/DuetPiManagementPlugin/.start ]; then
 		rm /opt/dsf/plugins/DuetPiManagementPlugin/.start
 		/opt/dsf/bin/PluginManager -q start DuetPiManagementPlugin
 	fi
