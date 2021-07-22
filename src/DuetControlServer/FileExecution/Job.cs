@@ -193,6 +193,7 @@ namespace DuetControlServer.FileExecution
             }
 
             // Notify RepRapFirmware and start processing the file in the background
+            await SPI.Interface.SetPrintFileInfo();
             _logger.Info("Selected file {0}", _file.FileName);
         }
 
@@ -226,9 +227,6 @@ namespace DuetControlServer.FileExecution
                 if (startingNewPrint)
                 {
                     _logger.Info("Starting file print");
-
-                    // Notify RRF
-                    SPI.Interface.StartPrint();
 
                     // Process the file
                     Queue<Code> codes = new();

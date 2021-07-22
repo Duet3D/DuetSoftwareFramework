@@ -1,15 +1,24 @@
 Summary of important changes in recent versions
 ===============================================
 
-Version 3.4-b2 (TBD)
+Version 3.4-b2
 ==============
 
 New features:
 - Plugin manager can now be used to reload specific plugin manifests
 - Plugin manager may be used to query the installation/runtime status of plugins
+- Added new `cancelling` item to `state.status` enum
+- Subscribers and code stream clients can define what messages they want to receive
+
+Changed behaviour:
+- Web server only sends messages with HTTP target to web clients
 
 Bug fixes:
 - When RRF reset, DCS could terminate when trying to clear the global variables
+- Expression parameters were incorrectly serialized
+- Certain UTF-8 strings could be truncated when sent to RRF
+- Fixed race condition when attempting to save updated filament mapping
+- `GetFileInfo` requests attempted to parse non-GCode files
 
 Version 3.4-b1
 ==============

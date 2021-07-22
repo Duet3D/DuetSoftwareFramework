@@ -10,6 +10,7 @@ using DuetAPI;
 using DuetAPI.Connection.InitMessages;
 using System.Text;
 using DuetAPI.ObjectModel;
+using DuetControlServer.SPI.Communication.Shared;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -27,6 +28,33 @@ namespace DuetControlServer.IPC.Processors
         };
 
         /// <summary>
+        /// List of active subscribers
+        /// </summary>
+        private static readonly List<CodeStream> _streams = new();
+
+        /// <summary>
+        /// Check if there are any clients waiting for generic messages
+        /// </summary>
+        public static bool HasClientsWaitingForMessages
+        {
+            get
+            {
+                lock (_streams)
+                {
+                    foreach (CodeStream stream in _streams)
+                    {
+                        MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)stream._channel);
+                        if (MessageTypeFlags.GenericMessage.HasFlag(channelFlag))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Maximum number of codes to execute simultaneously
         /// </summary>
         private readonly int _bufferSize;
@@ -35,6 +63,16 @@ namespace DuetControlServer.IPC.Processors
         /// Code channel for incoming codes
         /// </summary>
         private readonly CodeChannel _channel;
+
+        /// <summary>
+        /// Lock for outputting data
+        /// </summary>
+        private readonly AsyncLock _outputLock = new();
+
+        /// <summary>
+        /// Stream for writing to a client
+        /// </summary>
+        private StreamWriter _streamWriter;
 
         /// <summary>
         /// Constructor of the code stream interpreter
@@ -63,116 +101,171 @@ namespace DuetControlServer.IPC.Processors
             using StreamReader streamReader = new(stream);
             using StreamWriter streamWriter = new(stream);
 
-            CodeParserBuffer parserBuffer = new(Settings.FileBufferSize, false);
-            using (await Model.Provider.AccessReadOnlyAsync())
+            _streamWriter = streamWriter;
+            lock (_streams)
             {
-                // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
-                parserBuffer.MayRepeatCode = Model.Provider.Get.State.MachineMode == DuetAPI.ObjectModel.MachineMode.CNC ||
-                                             Model.Provider.Get.State.MachineMode == DuetAPI.ObjectModel.MachineMode.Laser;
+                _streams.Add(this);
             }
 
-            AsyncMonitor codeLock = new();
-            Queue<Code> codes = new();
-            for (int i = 0; i < Math.Max(_bufferSize, 1); i++)
+            try
             {
-                codes.Enqueue(new Code());
-            }
-            AsyncLock outputLock = new();
-
-            do
-            {
-                try
+                CodeParserBuffer parserBuffer = new(Settings.FileBufferSize, false);
+                using (await Model.Provider.AccessReadOnlyAsync())
                 {
-                    // Read the next line
-                    string line = await streamReader.ReadLineAsync();
-                    if (line == null)
-                    {
-                        break;
-                    }
-                    using MemoryStream lineStream = new(Encoding.UTF8.GetBytes(line));
-                    using StreamReader lineReader = new(lineStream);
+                    // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
+                    parserBuffer.MayRepeatCode = Model.Provider.Get.State.MachineMode == MachineMode.CNC ||
+                                                 Model.Provider.Get.State.MachineMode == MachineMode.Laser;
+                }
 
-                    do
-                    {
-                        // Get another code instance from the line
-                        Code code;
-                        using (await codeLock.EnterAsync(Program.CancellationToken))
-                        {
-                            if (!codes.TryDequeue(out code))
-                            {
-                                await codeLock.WaitAsync(Program.CancellationToken);
-                                code = codes.Dequeue();
-                            }
-                        }
+                AsyncMonitor codeLock = new();
+                Queue<Code> codes = new();
+                for (int i = 0; i < Math.Max(_bufferSize, 1); i++)
+                {
+                    codes.Enqueue(new Code());
+                }
 
-                        // Read the next code from the stream, execute it, and put the code instance back into the buffer
-                        code.Reset();
-                        if (await DuetAPI.Commands.Code.ParseAsync(lineReader, code, parserBuffer))
+                do
+                {
+                    try
+                    {
+                        // Read the next line
+                        string line = await streamReader.ReadLineAsync();
+                        if (line == null)
                         {
-                            code.Channel = _channel;
-                            code.Connection = Connection;
-                            code.SourceConnection = Connection.Id;
-                            _ = code
-                                .Execute()
-                                .ContinueWith(async task =>
-                                {
-                                    try
-                                    {
-                                        using (await outputLock.LockAsync(Program.CancellationToken))
-                                        {
-                                            Message result = await task;
-                                            await streamWriter.WriteAsync(result.ToString());
-                                            await streamWriter.FlushAsync();
-                                        }
-                                    }
-                                    catch (SocketException)
-                                    {
-                                        // Connection has been terminated
-                                    }
-                                    finally
-                                    {
-                                        using (await codeLock.EnterAsync(Program.CancellationToken))
-                                        {
-                                            codes.Enqueue(code);
-                                            codeLock.Pulse();
-                                        }
-                                    }
-                                }, TaskContinuationOptions.RunContinuationsAsynchronously);
-                        }
-                        else
-                        {
-                            // No more codes available, put back the reserved code
-                            using (await codeLock.EnterAsync(Program.CancellationToken))
-                            {
-                                codes.Enqueue(code);
-                                codeLock.Pulse();
-                            }
                             break;
                         }
-                    } while (!Program.CancellationToken.IsCancellationRequested);
+                        using MemoryStream lineStream = new(Encoding.UTF8.GetBytes(line));
+                        using StreamReader lineReader = new(lineStream);
 
-                    // Shut down the socket if this was the last command
-                    if (Program.CancellationToken.IsCancellationRequested)
+                        do
+                        {
+                            // Get another code instance from the line
+                            Code code;
+                            using (await codeLock.EnterAsync(Program.CancellationToken))
+                            {
+                                if (!codes.TryDequeue(out code))
+                                {
+                                    await codeLock.WaitAsync(Program.CancellationToken);
+                                    code = codes.Dequeue();
+                                }
+                            }
+
+                            // Read the next code from the stream, execute it, and put the code instance back into the buffer
+                            code.Reset();
+                            if (await DuetAPI.Commands.Code.ParseAsync(lineReader, code, parserBuffer))
+                            {
+                                code.Channel = _channel;
+                                code.Connection = Connection;
+                                code.SourceConnection = Connection.Id;
+                                _ = code
+                                    .Execute()
+                                    .ContinueWith(async task =>
+                                    {
+                                        try
+                                        {
+                                            Message result = await task;
+                                            using (await _outputLock.LockAsync(Program.CancellationToken))
+                                            {
+                                                await streamWriter.WriteAsync(result.ToString());
+                                                await streamWriter.FlushAsync();
+                                            }
+                                        }
+                                        catch (SocketException)
+                                        {
+                                            // Connection has been terminated
+                                        }
+                                        finally
+                                        {
+                                            using (await codeLock.EnterAsync(Program.CancellationToken))
+                                            {
+                                                codes.Enqueue(code);
+                                                codeLock.Pulse();
+                                            }
+                                        }
+                                    }, TaskContinuationOptions.RunContinuationsAsynchronously);
+                            }
+                            else
+                            {
+                                // No more codes available, put back the reserved code
+                                using (await codeLock.EnterAsync(Program.CancellationToken))
+                                {
+                                    codes.Enqueue(code);
+                                    codeLock.Pulse();
+                                }
+                                break;
+                            }
+                        } while (!Program.CancellationToken.IsCancellationRequested);
+
+                        // Shut down the socket if this was the last command
+                        if (Program.CancellationToken.IsCancellationRequested)
+                        {
+                            Connection.Close();
+                        }
+                    }
+                    catch (SocketException)
                     {
-                        Connection.Close();
+                        // Connection has been terminated
+                        break;
+                    }
+                    catch (Exception e)
+                    {
+                        // Send errors back to the client
+                        if (!(e is OperationCanceledException))
+                        {
+                            Connection.Logger.Error(e, "Failed to execute code");
+                        }
+                        await Connection.SendResponse(e);
                     }
                 }
-                catch (SocketException)
+                while (!Program.CancellationToken.IsCancellationRequested);
+            }
+            finally
+            {
+                lock (_streams)
                 {
-                    // Connection has been terminated
-                    break;
+                    _streams.Remove(this);
                 }
-                catch (Exception e)
+                _streamWriter = null;
+            }
+        }
+
+        /// <summary>
+        /// Record a new message based on the message flags
+        /// </summary>
+        /// <param name="flags">Message flags</param>
+        /// <param name="message"></param>
+        public static void RecordMessage(MessageTypeFlags flags, Message message)
+        {
+            lock (_streams)
+            {
+                foreach (CodeStream stream in _streams)
                 {
-                    // Send errors back to the client
-                    if (!(e is OperationCanceledException))
+                    MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)stream._channel);
+                    if (flags.HasFlag(channelFlag))
                     {
-                        Connection.Logger.Error(e, "Failed to execute code");
+                        stream.RecordMessage(message);
                     }
-                    await Connection.SendResponse(e);
                 }
             }
-            while (!Program.CancellationToken.IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// Record a new message
+        /// </summary>
+        /// <param name="message"></param>
+        private void RecordMessage(Message message)
+        {
+            _ = _outputLock
+                .LockAsync(Program.CancellationToken)
+                .AsTask()
+                .ContinueWith(async task =>
+                {
+                    using (await task)
+                    {
+                        await _streamWriter?.WriteAsync(message.ToString());
+                        await _streamWriter?.FlushAsync();
+                    }
+                }, TaskContinuationOptions.RunContinuationsAsynchronously);
         }
     }
 }

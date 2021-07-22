@@ -37,11 +37,16 @@ namespace DuetControlServer.Files
                 Size = fileStream.Length
             };
 
-            if (fileStream.Length > 0)
+            if (fileStream.Length > 0 && (
+                    fileName.EndsWith(".gcode", StringComparison.InvariantCultureIgnoreCase) ||
+                    fileName.EndsWith(".g", StringComparison.InvariantCultureIgnoreCase) ||
+                    fileName.EndsWith(".gco", StringComparison.InvariantCultureIgnoreCase) ||
+                    fileName.EndsWith(".gc", StringComparison.InvariantCultureIgnoreCase) ||
+                    fileName.EndsWith(".nc", StringComparison.InvariantCultureIgnoreCase)
+               ))
             {
                 await ParseHeader(reader, result);
                 await ParseFooter(reader, result);
-                await ParseThumbnails(reader, result);      // TODO merge this with ParseHeader
 
                 while (result.Filament.Count > 0 && result.Filament[0] == 0F)
                 {
@@ -75,9 +80,11 @@ namespace DuetControlServer.Files
 
             bool inRelativeMode = false, lastCodeHadInfo = false, gotNewInfo = false;
             long fileReadLimit = Math.Min(Settings.FileInfoReadLimitHeader, reader.BaseStream.Length);
-            while (codeParserBuffer.GetPosition(reader) < fileReadLimit)
+            while (codeParserBuffer.GetPosition(reader) < fileReadLimit || gotNewInfo)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
+
+                gotNewInfo = false;
                 if (!await DuetAPI.Commands.Code.ParseAsync(reader, code, codeParserBuffer))
                 {
                     continue;
@@ -119,6 +126,7 @@ namespace DuetControlServer.Files
                     gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
                     gotNewInfo |= FindFilamentUsed(code.Comment, ref partialFileInfo);
                     gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(code.Comment, ref partialFileInfo);
+                    gotNewInfo |= await ParseThumbnails(reader, code, codeParserBuffer, partialFileInfo);
                 }
 
                 // Is the file info complete?
@@ -491,52 +499,32 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
-        /// Parse the file for thumbnails
+        /// Check if the current code contains thumbnail data
         /// </summary>
+        /// <param name="code">Code being parsed which must have a valid comment</param>
         /// <param name="reader">Stream reader</param>
         /// <param name="parsedFileInfo">G-code file information</param>
-        /// <returns>Asynchronous task</returns>
-        /// <remarks>
-        /// This functionality should be moved to ParseHeader in the long term
-        /// </remarks>
-        private static async Task ParseThumbnails(StreamReader reader, ParsedFileInfo parsedFileInfo)
+        /// <param name="codeParserBuffer">Parser buffer</param>
+        /// <returns>True if the code contains thumbnail data</returns>
+        private static async ValueTask<bool> ParseThumbnails(StreamReader reader, Code code, CodeParserBuffer codeParserBuffer, ParsedFileInfo parsedFileInfo)
         {
-            Code code = new();
-            CodeParserBuffer codeParserBuffer = new(Settings.FileBufferSize, true);
-            reader.BaseStream.Seek(0, SeekOrigin.Begin);
-            while (codeParserBuffer.GetPosition(reader) < reader.BaseStream.Length)
+            // This is the start of a PrusaSlicer Image
+            if (code.Comment.TrimStart().StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
             {
-                Program.CancellationToken.ThrowIfCancellationRequested();
-                if (!await DuetAPI.Commands.Code.ParseAsync(reader, code, codeParserBuffer))
-                {
-                    continue;
-                }
-
-                if (code.Type != CodeType.None && code.Type != CodeType.Comment)
-                {
-                    return;
-                }
-
-                if (string.IsNullOrEmpty(code.Comment))
-                {
-                    code.Reset();
-                    continue;
-                }
-
-                //This is the start of a PrusaSlicer Image.
-                if (code.Comment.Contains("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    _logger.Debug("Found Prusa Slicer Image");
-                    await PrusaSlicerImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code);
-                }
-                //Icon Image 
-                else if (code.Comment.Contains("Icon:"))
-                {
-                    _logger.Debug("Found Icon Image");
-                    await IconImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code);
-                }
-                code.Reset();
+                _logger.Debug("Found Prusa Slicer Image");
+                await PrusaSlicerImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code);
+                return true;
             }
+
+            // Icon Image (proprietary)
+            if (code.Comment.Contains("Icon:"))
+            {
+                _logger.Debug("Found Icon Image");
+                await IconImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code);
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>

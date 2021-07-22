@@ -248,9 +248,8 @@ namespace DuetControlServer.Codes
                             }
                         }
 
-                        // P is not supported yet
-
-                        return new Message();
+                        // P parameter is handled by RRF if present
+                        break;
                     }
                     throw new OperationCanceledException();
 

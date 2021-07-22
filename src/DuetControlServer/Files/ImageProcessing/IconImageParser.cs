@@ -28,22 +28,22 @@ namespace DuetControlServer.Files.ImageProcessing
         /// <param name="parsedFileInfo">File information</param>
         /// <param name="code">Code instance to reuse</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task ProcessAsync(StreamReader reader, CodeParserBuffer codeParserBuffer, ParsedFileInfo parsedFileInfo, Code code)
+        public static async ValueTask ProcessAsync(StreamReader reader, CodeParserBuffer codeParserBuffer, ParsedFileInfo parsedFileInfo, Code code)
         {
             _logger.Info($"Processing Image {parsedFileInfo.FileName}");
             StringBuilder imageBuffer = new();
             code.Reset();
 
-            //Keep reading the data from the file
+            // Keep reading the data from the file
             while (codeParserBuffer.GetPosition(reader) < reader.BaseStream.Length)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
-                if (!await DuetAPI.Commands.Code.ParseAsync(reader, code, codeParserBuffer))
+                if (!await Code.ParseAsync(reader, code, codeParserBuffer))
                 {
                     continue;
                 }
 
-                //Icon data goes until the first line of executable code.
+                // Icon data goes until the first line of executable code.
                 if (code.Type == CodeType.Comment)
                 {
                     imageBuffer.Append(code.Comment.Trim());
@@ -56,7 +56,6 @@ namespace DuetControlServer.Files.ImageProcessing
                         ParsedThumbnail thumbnail = ReadImage(imageBuffer.ToString());
                         parsedFileInfo.Thumbnails.Add(thumbnail);
                         _logger.Error("Icon Thumbnails Found");
-
                     }
                     catch
                     {
@@ -70,22 +69,28 @@ namespace DuetControlServer.Files.ImageProcessing
 
         private static ParsedThumbnail ReadImage(string imageBuffer)
         {
-            ParsedThumbnail thumbnail = new();
-            //Convert the string into a usable format
-            var finalString = imageBuffer.Replace("Icon: ", String.Empty).Replace(";", string.Empty).Replace(" ", string.Empty).Replace("\r\n", string.Empty);
+            // Convert the string into a usable format
+            string finalString = imageBuffer
+                .Replace("Icon: ", string.Empty)
+                .Replace(";", string.Empty)
+                .Replace(" ", string.Empty)
+                .Replace("\r\n", string.Empty);
 
             using MemoryStream ms = new(Convert.FromBase64String(finalString));
             using MemoryStream bitmapSource = new();
             _logger.Debug("Encoding Image");
             try
             {
-                var image = BinaryToImage(ms, out int width, out int height);
-                thumbnail.EncodedImage = image.ToBase64String(PngFormat.Instance);
-                _logger.Debug(thumbnail.EncodedImage);
-                thumbnail.Width = width;
-                thumbnail.Height = height;
-                image?.Dispose(); //Clean up image after getting data from it.
-                return thumbnail;
+                using Image image = BinaryToImage(ms, out int width, out int height);
+                string encodedImage = image.ToBase64String(PngFormat.Instance);
+                _logger.Debug(encodedImage);
+
+                return new()
+                {
+                    EncodedImage = encodedImage,
+                    Height = height,
+                    Width = width,
+                };
             }
             catch (Exception ex)
             {

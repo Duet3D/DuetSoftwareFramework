@@ -160,7 +160,7 @@ namespace DuetControlServer.Utility
         /// </summary>
         public static void RefreshMapping()
         {
-            lock (_filamentMapping)
+            using (_lock.Lock(Program.CancellationToken))
             {
                 foreach (int extruder in _filamentMapping.Keys)
                 {
@@ -174,9 +174,9 @@ namespace DuetControlServer.Utility
         /// </summary>
         private static async void SaveMapping()
         {
+            string filename = await FilePath.ToPhysicalAsync(FilamentsCsvFile, FileDirectory.System);
             using (await _lock.LockAsync(Program.CancellationToken))
             {
-                string filename = await FilePath.ToPhysicalAsync(FilamentsCsvFile, FileDirectory.System);
                 using FileStream fs = new(filename, FileMode.Create, FileAccess.Write);
                 using StreamWriter writer = new(fs);
 

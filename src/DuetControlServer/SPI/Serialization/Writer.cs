@@ -187,7 +187,7 @@ namespace DuetControlServer.SPI.Serialization
                     {
                         string value = parameter;
                         binaryParam.Type = parameter.IsExpression ? DataType.Expression : DataType.String;
-                        binaryParam.IntValue = value.Length;
+                        binaryParam.IntValue = Encoding.UTF8.GetByteCount(value);
                         extraParameters.Add(value);
                     }
                     // Boolean values are not supported for codes. Use integers instead
@@ -421,7 +421,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="info">Information about the file being printed</param>
         /// <returns>Number of bytes written</returns>
         /// <exception cref="ArgumentException">One of the supplied values is too big</exception>
-        public static int WritePrintStarted(Span<byte> to, ParsedFileInfo info)
+        public static int WritePrintFileInfo(Span<byte> to, ParsedFileInfo info)
         {
             Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName);
             if (unicodeFilename.Length > 254)

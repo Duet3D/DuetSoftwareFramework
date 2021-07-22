@@ -92,8 +92,8 @@ namespace DuetControlServer.Model
                             _updateEvent.NotifyAll();
                         }
 
-                        // Clear the messages again if anyone is connected
-                        if (IPC.Processors.ModelSubscription.AreClientsConnected && Get.Messages.Count > 0)
+                        // Clear the messages again if waiting clients could output this message
+                        if (IPC.Processors.CodeStream.HasClientsWaitingForMessages || IPC.Processors.ModelSubscription.HasClientsWaitingForMessages)
                         {
                             Get.Messages.Clear();
                         }

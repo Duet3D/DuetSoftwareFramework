@@ -19,7 +19,7 @@ namespace DuetAPI.ObjectModel
         private Build _build;
 
         /// <summary>
-        /// Total duration of the current job (in s or null)
+        /// Total active duration of the current job file (in s or null)
         /// </summary>
         public int? Duration
         {

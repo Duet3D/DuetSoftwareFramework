@@ -58,7 +58,7 @@ namespace DuetAPI.ObjectModel
         private bool _homed;
 
         /// <summary>
-        /// Motor jerk (in mm/s)
+        /// Motor jerk (in mm/min)
         /// </summary>
         public float Jerk
         {
@@ -133,7 +133,7 @@ namespace DuetAPI.ObjectModel
         private bool _minProbed;
 
         /// <summary>
-        /// Maximum speed (in mm/s)
+        /// Maximum speed (in mm/min)
         /// </summary>
         public float Speed
         {

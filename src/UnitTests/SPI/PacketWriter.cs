@@ -255,7 +255,7 @@ namespace UnitTests.SPI
         }
 
         [Test]
-        public void PrintStarted()
+        public void SetPrintFileInfo()
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
@@ -275,7 +275,7 @@ namespace UnitTests.SPI
             info.Filament.Add(123.45F);
             info.Filament.Add(678.9F);
 
-            int bytesWritten = Writer.WritePrintStarted(span, info);
+            int bytesWritten = Writer.WritePrintFileInfo(span, info);
             Assert.AreEqual(72, bytesWritten);
 
             // Header
@@ -314,7 +314,7 @@ namespace UnitTests.SPI
         }
 
         [Test]
-        public void PrintStarted2()
+        public void SetPrintFileInfo2()
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
@@ -331,7 +331,7 @@ namespace UnitTests.SPI
                 SimulatedTime = 0,
             };
 
-            int bytesWritten = Writer.WritePrintStarted(span, info);
+            int bytesWritten = Writer.WritePrintFileInfo(span, info);
             Assert.AreEqual(60, bytesWritten);
 
             // Header

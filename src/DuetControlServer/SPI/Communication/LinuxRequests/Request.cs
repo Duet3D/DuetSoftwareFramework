@@ -40,7 +40,7 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// Tell the firmware a print has started and set information about the file being processed
         /// </summary>
         /// <seealso cref="PrintStartedHeader"/>
-        PrintStarted = 5,
+        SetPrintFileInfo = 5,
 
         /// <summary>
         /// Tell the firmware a print has been stopped and reset information about the file being processed

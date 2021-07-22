@@ -676,7 +676,7 @@ namespace DuetAPI.Commands
             {
                 writer.WriteBoolean("isDriverId", true);
             }
-            writer.WriteBoolean("isString", value.Type == typeof(string));
+            writer.WriteBoolean("isString", value.Type == typeof(string) && !value.IsExpression);
             writer.WriteEndObject();
         }
     }

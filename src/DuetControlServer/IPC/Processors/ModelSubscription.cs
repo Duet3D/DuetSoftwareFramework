@@ -7,12 +7,14 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Model;
+using DuetControlServer.SPI.Communication.Shared;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -41,17 +43,29 @@ namespace DuetControlServer.IPC.Processors
         private static readonly List<ModelSubscription> _subscriptions = new();
 
         /// <summary>
-        /// True if any subscribers are connected
+        /// Check if there are any clients waiting for generic messages
         /// </summary>
-        public static bool AreClientsConnected
+        public static bool HasClientsWaitingForMessages
         {
             get
             {
                 lock (_subscriptions)
                 {
-                    // TODO here it would be better to check for subscribers waiting to messages
-                    return _subscriptions.Count > 0;
+                    foreach (ModelSubscription subscription in _subscriptions)
+                    {
+                        if (subscription._mode == SubscriptionMode.Full || subscription._channel == null)
+                        {
+                            return true;
+                        }
+
+                        MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)subscription._channel);
+                        if (MessageTypeFlags.GenericMessage.HasFlag(channelFlag))
+                        {
+                            return true;
+                        }
+                    }
                 }
+                return false;
             }
         }
 
@@ -59,6 +73,11 @@ namespace DuetControlServer.IPC.Processors
         /// Mode of this subscriber
         /// </summary>
         private readonly SubscriptionMode _mode;
+
+        /// <summary>
+        /// Optional code channel or null if only generic messages are supposed to be recorded
+        /// </summary>
+        private readonly CodeChannel? _channel;
 
         /// <summary>
         /// List of filters (in Patch mode)
@@ -84,6 +103,7 @@ namespace DuetControlServer.IPC.Processors
         {
             SubscribeInitMessage subscribeInitMessage = (SubscribeInitMessage)initMessage;
             _mode = subscribeInitMessage.SubscriptionMode;
+            _channel = subscribeInitMessage.Channel;
             if (subscribeInitMessage.Filters != null)
             {
                 _filters = Filter.ConvertFilters(subscribeInitMessage.Filters);
@@ -386,10 +406,11 @@ namespace DuetControlServer.IPC.Processors
                     {
                         case PropertyChangeType.Property:
                             // Set new property value
-                            Dictionary<string, object> propertyNode = (Dictionary<string, object>)node;
-                            string propertyName = (string)path[^1];
-
-                            propertyNode[propertyName] = value;
+                            if (node is Dictionary<string, object> propertyNode)
+                            {
+                                string propertyName = (string)path[^1];
+                                propertyNode[propertyName] = value;
+                            }
                             break;
 
                         case PropertyChangeType.ObjectCollection:
@@ -445,10 +466,23 @@ namespace DuetControlServer.IPC.Processors
                             if (node is Dictionary<string, object> parent)
                             {
                                 string collectionName = (string)path[^1];
-                                if (value == null && collectionName.Equals(nameof(ObjectModel.Messages), StringComparison.InvariantCultureIgnoreCase))
+                                if (collectionName.Equals(nameof(ObjectModel.Messages), StringComparison.InvariantCultureIgnoreCase))
                                 {
-                                    // Don't clear messages - they are volatile anyway
-                                    break;
+                                    if (value == null)
+                                    {
+                                        // Don't clear messages - they are volatile anyway
+                                        break;
+                                    }
+
+                                    if (_channel != null)
+                                    {
+                                        MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)_channel);
+                                        if (!MessageTypeFlags.GenericMessage.HasFlag(channelFlag))
+                                        {
+                                            // This message isn't meant for this subscriber, skip it
+                                            break;
+                                        }
+                                    }
                                 }
 
                                 IList growingCollection;
@@ -486,6 +520,38 @@ namespace DuetControlServer.IPC.Processors
                     Connection.Logger.Error(e, "Failed to record {0} = {1} ({2})", string.Join('/', path), value, changeType);
                 }
             }
+        }
+
+        /// <summary>
+        /// Record a new message based on the message flags
+        /// </summary>
+        /// <param name="flags">Message flags</param>
+        /// <param name="message"></param>
+        public static void RecordMessage(MessageTypeFlags flags, Message message)
+        {
+            lock (_subscriptions)
+            {
+                foreach (ModelSubscription subscription in _subscriptions)
+                {
+                    if (subscription._mode == SubscriptionMode.Patch && subscription._channel != null)
+                    {
+                        MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)subscription._channel);
+                        if (flags.HasFlag(channelFlag))
+                        {
+                            subscription.RecordMessage(message);
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Record a new message
+        /// </summary>
+        /// <param name="message"></param>
+        private void RecordMessage(Message message)
+        {
+            MachineModelPropertyChanged(new object[] { "messages" }, PropertyChangeType.GrowingCollection, new Message[] { message });
         }
 
         /// <summary>

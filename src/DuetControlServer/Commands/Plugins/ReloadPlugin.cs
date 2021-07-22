@@ -54,11 +54,11 @@ namespace DuetControlServer.Commands
                     }
                     Model.Provider.Get.Plugins.Remove(Plugin);
                 }
-
-                // Reload the plugin via the plugin services
-                await IPC.Processors.PluginService.PerformCommand(this, true);
-                await IPC.Processors.PluginService.PerformCommand(this, false);
             }
+
+            // Reload the plugin via the plugin services
+            await IPC.Processors.PluginService.PerformCommand(this, true);
+            await IPC.Processors.PluginService.PerformCommand(this, false);
         }
     }
 }

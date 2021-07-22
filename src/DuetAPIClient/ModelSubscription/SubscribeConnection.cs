@@ -28,6 +28,9 @@ namespace DuetAPIClient
         /// <summary>
         /// Code channel to receive messages from. If not set, only generic messages are forwarded (as in v3.3 and earlier)
         /// </summary>
+        /// <remarks>
+        /// This has no effect in <see cref="SubscriptionMode.Full"/> mode
+        /// </remarks>
         public CodeChannel? Channel { get; private set; }
 
         /// <summary>
@@ -100,7 +103,7 @@ namespace DuetAPIClient
         /// Establishes a connection to the given UNIX socket file
         /// </summary>
         /// <param name="mode">Subscription mode</param>
-        /// <param name="channel">Optional code channel to receive messages from</param>
+        /// <param name="channel">Optional code channel to receive messages from (not applicable in Full mode)</param>
         /// <param name="filters">Optional filter strings</param>
         /// <param name="socketPath">Path to the UNIX socket file</param>
         /// <param name="cancellationToken">Optional cancellation token</param>

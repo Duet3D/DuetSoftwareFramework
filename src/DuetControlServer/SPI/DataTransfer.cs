@@ -506,7 +506,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         public static void DumpMalformedPacket()
         {
-            using (FileStream stream = new(Path.Combine(Directory.GetCurrentDirectory(), "transferDump.bin"), FileMode.Create, FileAccess.Write))
+            using (FileStream stream = new(Path.Combine(Settings.BaseDirectory, "sys/transferDump.bin"), FileMode.Create, FileAccess.Write))
             {
                 stream.Write(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
             }
@@ -752,11 +752,11 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="info">Information about the file being printed</param>
         /// <returns>True if the packet could be written</returns>
-        public static bool WritePrintStarted(ParsedFileInfo info)
+        public static bool WritePrintFileInfo(ParsedFileInfo info)
         {
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
-            int dataLength = Serialization.Writer.WritePrintStarted(span, info);
+            int dataLength = Serialization.Writer.WritePrintFileInfo(span, info);
 
             // See if the request fits into the buffer
             if (!CanWritePacket(dataLength))
@@ -765,7 +765,7 @@ namespace DuetControlServer.SPI
             }
 
             // Write it
-            WritePacket(Communication.LinuxRequests.Request.PrintStarted, dataLength);
+            WritePacket(Communication.LinuxRequests.Request.SetPrintFileInfo, dataLength);
             span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
             return true;
         }

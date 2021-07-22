@@ -81,8 +81,8 @@ namespace DuetControlServer.SPI
         private static TaskCompletionSource _firmwareResetRequest;
 
         // Print handling
-        private static volatile bool _startPrint;
-        private static readonly AsyncLock _stopPrintLock = new();
+        private static readonly AsyncLock _printStateLock = new();
+        private static TaskCompletionSource _setPrintInfoRequest;
         private static PrintStoppedReason _stopPrintReason;
         private static TaskCompletionSource _stopPrintRequest;
 
@@ -421,17 +421,27 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Notify the firmware that a file print has started
+        /// Update the print file info in the firmware
         /// </summary>
+        /// <returns>Asynchronous task</returns>
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-        public static void StartPrint()
+        public static async Task SetPrintFileInfo()
         {
             if (Settings.NoSpi)
             {
                 throw new InvalidOperationException("Not connected over SPI");
             }
 
-            _startPrint = true;
+            Task task;
+            using (await _printStateLock.LockAsync(Program.CancellationToken))
+            {
+                if (_setPrintInfoRequest == null)
+                {
+                    _setPrintInfoRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+                task = _setPrintInfoRequest.Task;
+            }
+            await task;
         }
 
         /// <summary>
@@ -448,7 +458,7 @@ namespace DuetControlServer.SPI
             }
 
             Task onPrintStopped;
-            using (await _stopPrintLock.LockAsync(Program.CancellationToken))
+            using (await _printStateLock.LockAsync(Program.CancellationToken))
             {
                 _stopPrintReason = reason;
                 if (_stopPrintRequest == null)
@@ -817,17 +827,15 @@ namespace DuetControlServer.SPI
                 }
 
                 // Check for changes of the print status.
-                // The packet providing file info has be sent first because it includes a time_t value that must reside on a 64-bit boundary!
-                if (_startPrint)
+                using (await _printStateLock.LockAsync(Program.CancellationToken))
                 {
-                    using (await Model.Provider.AccessReadOnlyAsync())
+                    if (_setPrintInfoRequest != null && DataTransfer.WritePrintFileInfo(Model.Provider.Get.Job.File))
                     {
-                        _startPrint = !DataTransfer.WritePrintStarted(Model.Provider.Get.Job.File);
+                        // The packet providing file info has be sent first because it includes a time_t value that must reside on a 64-bit boundary!
+                        _setPrintInfoRequest.SetResult();
+                        _setPrintInfoRequest = null;
                     }
-                }
-                else
-                {
-                    using (await _stopPrintLock.LockAsync(Program.CancellationToken))
+                    else
                     {
                         if (_stopPrintRequest != null && DataTransfer.WritePrintStopped(_stopPrintReason))
                         {
@@ -1189,14 +1197,6 @@ namespace DuetControlServer.SPI
                 }
             }
 
-            // Deal with generic replies
-#warning output messages depending on their flag
-            if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage)
-            {
-                await OutputGenericMessage(flags, reply);
-                return;
-            }
-
             // Check if this is a code reply
             if (flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
             {
@@ -1206,10 +1206,19 @@ namespace DuetControlServer.SPI
                     await OutputGenericMessage(flags, reply);
                 }
             }
+            else if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage)
+            {
+                // Generic messages to the main object model
+                await OutputGenericMessage(flags, reply);
+            }
             else
             {
-                // Unhandled?
-                _logger.Debug(reply);
+                // Targeted messages are hadnled by the IPC processors
+                MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                    : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                        : MessageType.Success;
+                IPC.Processors.CodeStream.RecordMessage(flags, new Message(type, reply));
+                IPC.Processors.ModelSubscription.RecordMessage(flags, new Message(type, reply));
             }
         }
 
@@ -1748,12 +1757,19 @@ namespace DuetControlServer.SPI
                 }
             }
 
-            // No longer stopping a print
-            _startPrint = false;
-            if (_stopPrintRequest != null)
+            // No longer starting or stopping a print
+            using (await _printStateLock.LockAsync(Program.CancellationToken))
             {
-                _stopPrintRequest.SetResult();
-                _stopPrintRequest = null;
+                if (_setPrintInfoRequest != null)
+                {
+                    _setPrintInfoRequest.SetCanceled();
+                    _setPrintInfoRequest = null;
+                }
+                if (_stopPrintRequest != null)
+                {
+                    _stopPrintRequest.SetResult();      // called from the print task so this never throws an exception
+                    _stopPrintRequest = null;
+                }
             }
 
             // Clear filament assign requests

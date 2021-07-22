@@ -24,6 +24,7 @@ namespace DuetPluginService
         public static readonly Type[] SupportedCommands =
         {
             typeof(Commands.InstallPlugin),
+            typeof(Commands.ReloadPlugin),
             typeof(Commands.StartPlugin),
             typeof(Commands.StopPlugin),
             typeof(Commands.UninstallPlugin),

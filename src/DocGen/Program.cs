@@ -116,10 +116,6 @@ namespace DocGen
         /// <returns>Asynchronous task</returns>
         private static async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property, string path, string classDescription, int depth)
         {
-            if (Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
-            {
-                return;
-            }
             if (depth > MaxDepth)
             {
                 depth = MaxDepth;
@@ -154,11 +150,35 @@ namespace DocGen
                 }
 
                 // Write node documentation
-#warning Check for obsolete attribute as well
+                bool writeNL = false;
+                if (Attribute.IsDefined(property, typeof(ObsoleteAttribute)))
+                {
+                    ObsoleteAttribute attribute = (ObsoleteAttribute)Attribute.GetCustomAttribute(property, typeof(ObsoleteAttribute));
+                    if (string.IsNullOrWhiteSpace(attribute.Message))
+                    {
+                        await writer.WriteLineAsync("*This field is obsolete and will be removed from the object model in the future*");
+                    }
+                    else
+                    {
+                        await writer.WriteLineAsync($"*This field is obsolete and will be removed in the future: {attribute.Message}*");
+                    }
+                    writeNL = true;
+                }
                 if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                 {
-#warning Need to respect new property here indicating if it's SBC-only or also provided by RRF in standalone mode
-                    await writer.WriteLineAsync("*This field is maintained by DSF in SBC mode and might not be available in standalone mode*");
+                    SbcPropertyAttribute attribute = (SbcPropertyAttribute)Attribute.GetCustomAttribute(property, typeof(SbcPropertyAttribute));
+                    if (attribute.AvailableInStandaloneMode)
+                    {
+                        await writer.WriteLineAsync("*This field is maintained by DSF in SBC mode*");
+                    }
+                    else
+                    {
+                        await writer.WriteLineAsync("*This field is exclusively maintained by DSF in SBC mode and/or by DWC. It is not available in standalone mode*");
+                    }
+                    writeNL = true;
+                }
+                if (writeNL)
+                {
                     await writer.WriteLineAsync();
                 }
                 await writer.WriteLineAsync(documentation);

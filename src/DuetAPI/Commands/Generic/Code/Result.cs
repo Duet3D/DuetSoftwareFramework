@@ -50,7 +50,7 @@ namespace DuetAPI.Commands
         /// Converts the CodeResult to a string
         /// </summary>
         /// <returns>The CodeResult as a string</returns>
-        public override string ToString() => string.Join(System.Environment.NewLine, this);
+        public override string ToString() => string.Join(Environment.NewLine, this);
     }
 
     /// <summary>
