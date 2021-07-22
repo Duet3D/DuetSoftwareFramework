@@ -180,17 +180,19 @@ build_progs() {
 build_plugins() {
 	echo "Building $DOTNET_ARCH $BUILD_TYPE (DMP $dmpver) to $DEST_DIR,,,"
 
-	rm -rf $DEST_DIR/duetpimanagementplugin_$dmpver
-	mkdir -p $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin
+	rm -rf $DEST_DIR/duetpimanagementplugin_$dmpver/
 	mkdir -p $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE -o $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf $SRC_DIR/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj /p:PublishTrimmed=true
-	[ -d $SRC_DIR/DuetPiManagementPlugin/zip/dsf ] && $RSYNC $SRC_DIR/DuetPiManagementPlugin/zip/dsf/. $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/ || :
+	[ -d $COMMON_DIR/duetpimanagementplugin/ ] && $RSYNC $COMMON_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dmpver/
+	[ -d $PACKAGER_DIR/duetpimanagementplugin/ ] && $RSYNC $PACKAGER_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dmpver/
 	chmod +x $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/gen-https-cert.sh
 
-	SBCFILES=`find $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf -type f -printf '%f\n' | sort | jq -R -s -c 'split("\n")[:-1]'`
-	jq -e ".sbcFiles=$SBCFILES" $SRC_DIR/DuetPiManagementPlugin/zip/plugin.json > $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
+	sed -i "s/DMPVER/$dmpver/g" $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
+	sed -i "s/DCSVER/$dcsver/g" $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
 
-	[ -d $PACKAGER_DIR/duetpimanagementplugin/ ] && $RSYNC $PACKAGER_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dmpver/
+	SBCFILES=`find $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf -type f -printf '%f\n' | sort | jq -R -s -c 'split("\n")[:-1]'`
+	jq -e ".sbcFiles=$SBCFILES" $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json > $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin-new.json
+	mv $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin-new.json $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
 }
 
 build_sd() {
