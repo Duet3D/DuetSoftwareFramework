@@ -928,11 +928,11 @@ namespace DuetControlServer.SPI.Channel
                             : MessageType.Success;
                 if (code.Result == null)
                 {
-                    code.Result = new Message(type, reply.TrimEnd());
+                    code.Result = new Message(type, reply);
                 }
                 else
                 {
-                    code.Result.Append(type, reply.TrimEnd());
+                    code.Result.Append(type, reply);
                 }
                 code.FirmwareTCS.SetResult();
             }

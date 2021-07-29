@@ -139,6 +139,49 @@ namespace UnitTests.IPC
             {
                 Assert.Fail("Missing move");
             }
+
+            // tools[0 of 1]/retraction/length
+            object[] pathD = new object[] { new ItemPathNode("tools", 0, new object[] { new Tool() }), "retraction", "length" };
+            object resultD = DuetControlServer.IPC.Processors.ModelSubscription.GetPathNode(root, pathD);
+
+            Assert.AreEqual(4, root.Count);
+            if (root.TryGetValue("tools", out object toolsObject))
+            {
+                if (toolsObject is List<object> tools)
+                {
+                    Assert.AreEqual(1, tools.Count);
+                    if (tools[0] is Dictionary<string, object> tool)
+                    {
+                        if (tool.TryGetValue("retraction", out object retractionObject))
+                        {
+                            if (retractionObject is Dictionary<string, object> retraction)
+                            {
+                                Assert.AreSame(retraction, resultD);
+                            }
+                            else
+                            {
+                                Assert.Fail("Invalid tools[0].retraction type");
+                            }
+                        }
+                        else
+                        {
+                            Assert.Fail("Missing tools[0].retraction");
+                        }
+                    }
+                    else
+                    {
+                        Assert.Fail("Invalid tools[0] type");
+                    }
+                }
+                else
+                {
+                    Assert.Fail("Invalid tools type");
+                }
+            }
+            else
+            {
+                Assert.Fail("Missing tools");
+            }
         }
     }
 }

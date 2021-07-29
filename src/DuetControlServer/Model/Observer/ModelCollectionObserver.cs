@@ -85,7 +85,7 @@ namespace DuetControlServer.Model
                             }
                         }
                         nodePath = AddToPath(path, new ItemPathNode(collectionName, senderList.Count, senderList));
-                        OnPropertyPathChanged?.Invoke(nodePath, PropertyChangeType.ObjectCollection, null);
+                        OnPropertyPathChanged?.Invoke(nodePath, PropertyChangeType.Collection, null);
                         break;
                     case NotifyCollectionChangedAction.Reset:
                         // This is NOT used because e.OldItems is not populated...
@@ -98,7 +98,7 @@ namespace DuetControlServer.Model
                     if (itemNeedsPatch[i])
                     {
                         nodePath = AddToPath(path, new ItemPathNode(collectionName, i, senderList));
-                        OnPropertyPathChanged?.Invoke(nodePath, PropertyChangeType.ObjectCollection, senderList[i]);
+                        OnPropertyPathChanged?.Invoke(nodePath, PropertyChangeType.Collection, senderList[i]);
                     }
                 }
             };

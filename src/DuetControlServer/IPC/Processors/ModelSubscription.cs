@@ -274,7 +274,7 @@ namespace DuetControlServer.IPC.Processors
         }
 
         /// <summary>
-        /// Get the object from a path node
+        /// Get the dictionary or list object using a path node to record properties
         /// </summary>
         /// <param name="root">Root dictionary</param>
         /// <param name="path">Path node</param>
@@ -289,17 +289,12 @@ namespace DuetControlServer.IPC.Processors
                 object pathItem = path[i];
                 if (pathItem is string pathString)
                 {
+                    // Get the requested dictionary
                     if (currentDictionary.TryGetValue(pathString, out object child))
                     {
                         if (child is Dictionary<string, object> childDictionary)
                         {
-                            currentList = null;
                             currentDictionary = childDictionary;
-                        }
-                        else if (child is List<object> childList)
-                        {
-                            currentList = childList;
-                            currentDictionary = null;
                         }
                         else
                         {
@@ -313,9 +308,11 @@ namespace DuetControlServer.IPC.Processors
                         currentDictionary.Add(pathString, newNode);
                         currentDictionary = newNode;
                     }
+                    currentList = null;
                 }
                 else if (pathItem is ItemPathNode pathNode)
                 {
+                    // Get the requested list
                     if (currentDictionary.TryGetValue(pathNode.Name, out object nodeObject))
                     {
                         if (nodeObject is List<object> nodeList)
@@ -329,7 +326,7 @@ namespace DuetControlServer.IPC.Processors
                         else
                         {
                             // Stop here if the node type is unsupported
-                            return nodeObject;
+                            return null;
                         }
                     }
                     else
@@ -338,34 +335,39 @@ namespace DuetControlServer.IPC.Processors
                         currentDictionary.Add(pathNode.Name, currentList);
                     }
 
-                    Type itemType = (path[i + 1] is string) ? typeof(Dictionary<string, object>) : typeof(List<object>);
+                    // Add missing items to the current list
+                    bool itemsAreObjects = path[i + 1] is string;
                     for (int k = currentList.Count; k < pathNode.List.Count; k++)
                     {
                         if (pathNode.List[k] == null)
                         {
                             currentList.Add(null);
                         }
+                        else if (itemsAreObjects)
+                        {
+                            currentList.Add(new Dictionary<string, object>());
+                        }
                         else
                         {
-                            object newItem = Activator.CreateInstance(itemType);
-                            currentList.Add(newItem);
+                            currentList.Add(new List<object>());
                         }
                     }
 
-                    object currentItem = currentList[pathNode.Index];
-                    if (currentItem is Dictionary<string, object> dictionaryItem)
+                    // Try to move on to the next node
+                    nodeObject = currentList[pathNode.Index];
+                    if (nodeObject is Dictionary<string, object> nextDictionary)
                     {
+                        currentDictionary = nextDictionary;
                         currentList = null;
-                        currentDictionary = dictionaryItem;
                     }
-                    else if (currentItem is List<object> listItem)
+                    else if (nodeObject is List<object> nextList)
                     {
-                        currentList = listItem;
                         currentDictionary = null;
+                        currentList = nextList;
                     }
                     else
                     {
-                        // Stop here if the item type is unsupported
+                        // Stop here if the node type is unsupported
                         return null;
                     }
                 }
@@ -413,8 +415,8 @@ namespace DuetControlServer.IPC.Processors
                             }
                             break;
 
-                        case PropertyChangeType.ObjectCollection:
-                            // Update an object collection
+                        case PropertyChangeType.Collection:
+                            // Update a collection
                             ItemPathNode pathNode = (ItemPathNode)path[^1];
                             if (node is not List<object> objectCollectionList)
                             {

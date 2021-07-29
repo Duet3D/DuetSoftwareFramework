@@ -32,14 +32,14 @@
         /// List of associated fans (indices)
         /// </summary>
         public ModelCollection<int> Fans { get; } = new ModelCollection<int>();
-        
+
         /// <summary>
         /// Extruder drive index for resolving the tool filament (index or -1)
         /// </summary>
         public int FilamentExtruder
         {
             get => _filamentExtruder;
-			set => SetPropertyValue(ref _filamentExtruder, value);
+            set => SetPropertyValue(ref _filamentExtruder, value);
         }
         private int _filamentExtruder = -1;
 
@@ -47,6 +47,11 @@
         /// List of associated heaters (indices)
         /// </summary>
         public ModelCollection<int> Heaters { get; } = new ModelCollection<int>();
+
+        /// <summary>
+        /// True if the filament has been firmware-retracted
+        /// </summary>
+        public bool IsRetracted { get; set; }
 
         /// <summary>
         /// Mix ratios of the associated extruder drives

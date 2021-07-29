@@ -12,10 +12,10 @@
         Property,
 
         /// <summary>
-        /// Object collection has changed
+        /// Collection has changed
         /// </summary>
         /// <remarks>Value is the new item value</remarks>
-        ObjectCollection,
+        Collection,
 
         /// <summary>
         /// Growing collection has changed

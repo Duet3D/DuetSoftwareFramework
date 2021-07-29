@@ -200,11 +200,8 @@ namespace DuetControlServer.Codes
                             await FileExecution.Job.SelectFile(physicalFile);
                         }
 
-                        if (await code.EmulatingMarlin())
-                        {
-                            return new Message(MessageType.Success, "File opened\nFile selected");
-                        }
-                        return new Message(MessageType.Success, $"File {file} selected for printing");
+                        // Let RRF do everything else
+                        break;
                     }
                     throw new OperationCanceledException();
 
@@ -405,6 +402,8 @@ namespace DuetControlServer.Codes
                                 // Simulation is started when M37 has been processed by the firmware
                             }
                         }
+
+                        // Let RRF do everything else
                         break;
                     }
                     throw new OperationCanceledException();
@@ -1066,7 +1065,6 @@ namespace DuetControlServer.Codes
         private static async Task Diagnostics(Message result)
         {
             StringBuilder builder = new();
-            builder.AppendLine();
             builder.AppendLine("=== Duet Control Server ===");
             builder.AppendLine($"Duet Control Server v{Program.Version}");
 
@@ -1074,7 +1072,7 @@ namespace DuetControlServer.Codes
             SPI.DataTransfer.Diagnostics(builder);
             await FileExecution.Job.Diagnostics(builder);
 
-            result.Content += builder.ToString();
+            result.Append(MessageType.Success, builder.ToString());
         }
     }
 }

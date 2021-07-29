@@ -329,6 +329,55 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseM584WithExpressions()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M584 E123:{456}"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(584, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual('E', code.Parameters[0].Letter);
+                Assert.IsTrue(code.Parameters[0].IsExpression);
+                Assert.AreEqual("{123:{456}}", (string)code.Parameters[0]);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("M584 E{123}:{456}:789"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(584, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual('E', code.Parameters[0].Letter);
+                Assert.IsTrue(code.Parameters[0].IsExpression);
+                Assert.AreEqual("{{123}:{456}:789}", (string)code.Parameters[0]);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("M584 E{123}:{456}:{789}"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(584, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual('E', code.Parameters[0].Letter);
+                Assert.IsTrue(code.Parameters[0].IsExpression);
+                Assert.AreEqual("{123}:{456}:{789}", (string)code.Parameters[0]);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("M92 E{123,456}"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(92, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual('E', code.Parameters[0].Letter);
+                Assert.IsTrue(code.Parameters[0].IsExpression);
+                Assert.AreEqual("{123,456}", (string)code.Parameters[0]);
+            }
+
+        }
+
+        [Test]
         public void ParseM586WithComment()
         {
             foreach (DuetAPI.Commands.Code code in Parse(" \t M586 P2 S0                               ; Disable Telnet"))
@@ -412,7 +461,7 @@ namespace UnitTests.Commands
         }
 
         [Test]
-        public void ParseM117Expressino()
+        public void ParseM117Expression()
         {
             foreach (DuetAPI.Commands.Code code in Parse("M117 { \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }"))
             {

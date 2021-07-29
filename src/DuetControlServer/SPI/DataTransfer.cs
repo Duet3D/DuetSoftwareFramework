@@ -151,7 +151,7 @@ namespace DuetControlServer.SPI
             if (fullTransferCounter)
             {
                 double fullResult = _maxPinWaitDurationFull.TotalMilliseconds;
-                _maxPinWaitDuration = TimeSpan.Zero;
+                _maxPinWaitDurationFull = TimeSpan.Zero;
                 return fullResult;
             }
 

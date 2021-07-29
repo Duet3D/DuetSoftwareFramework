@@ -278,8 +278,23 @@ namespace DuetAPI.Commands
                         (!unprecedentedParameter && char.IsWhiteSpace(c)) ||
                         (isNumericParameter && c != ':' && !NumericParameterChars.Contains(c)))
                     {
-                        // Parameter has ended
-                        inChunk = endingChunk = false;
+                        if ((c == '{' && value.TrimEnd().EndsWith(':')) ||
+                            (c == ':' && wasExpression))
+                        {
+                            // Array expression, keep on reading
+                            value += c;
+                            inExpression = true;
+                            isNumericParameter = false;
+                            if (c == '{')
+                            {
+                                numCurlyBraces++;
+                            }
+                        }
+                        else
+                        {
+                            // Parameter has ended
+                            inChunk = endingChunk = false;
+                        }
                     }
                     else
                     {
@@ -492,6 +507,10 @@ namespace DuetAPI.Commands
 
                             if (result.Parameter(letter) == null)
                             {
+                                if (wasExpression && (!value.StartsWith('{') || !value.EndsWith('}')))
+                                {
+                                    value = '{' + value.Trim() + '}';
+                                }
                                 AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
                             }
                             // Ignore duplicate parameters

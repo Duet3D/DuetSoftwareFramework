@@ -9,6 +9,7 @@ New features:
 - Plugin manager may be used to query the installation/runtime status of plugins
 - Added new `cancelling` item to `state.status` enum
 - Subscribers and code stream clients can define what messages they want to receive
+- Added experimental support for array expressions
 
 Changed behaviour:
 - Web server only sends messages with HTTP target to web clients
