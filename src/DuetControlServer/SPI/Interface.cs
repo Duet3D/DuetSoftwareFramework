@@ -98,14 +98,6 @@ namespace DuetControlServer.SPI
         private static string _partialGenericMessage;
 
         /// <summary>
-        /// Initialize the SPI interface but do not connect yet
-        /// </summary>
-        public static void Init()
-        {
-            Program.CancellationToken.Register(() => Invalidate(null));
-        }
-
-        /// <summary>
         /// Print diagnostics of this class
         /// </summary>
         /// <param name="builder">String builder</param>
@@ -755,14 +747,19 @@ namespace DuetControlServer.SPI
             spiThread.Priority = ThreadPriority.Highest;
             spiThread.Start();
             spiThread.Join();
+
             if (_threadException != null)
             {
+                if (_threadException is AggregateException ae)
+                {
+                    throw ae.InnerException;
+                }
                 throw _threadException;
             }
         }
 
         /// <summary>
-        /// Function to rim in an high-priority thread to speed up SPI communication
+        /// Function to run in a high-priority thread to speed up SPI communications
         /// </summary>
         private static void CommunicationThread()
         {
@@ -800,10 +797,7 @@ namespace DuetControlServer.SPI
                                 if (!Settings.NoTerminateOnReset)
                                 {
                                     // Wait for the program to terminate and don't perform any extra transfers
-                                    while (!Program.CancellationToken.IsCancellationRequested)
-                                    {
-                                        Thread.Sleep(100);
-                                    }
+                                    Task.Delay(-1, Program.CancellationToken).Wait();
                                 }
                             }
                             skipChannels = true;
@@ -843,10 +837,7 @@ namespace DuetControlServer.SPI
                     if (blockTask)
                     {
                         // Wait for the requesting task to complete, it will terminate DCS next
-                        while (!Program.CancellationToken.IsCancellationRequested)
-                        {
-                            Thread.Sleep(100);
-                        }
+                        Task.Delay(-1, Program.CancellationToken).Wait();
                     }
 
                     // Invalidate data if a controller reset has been performed
@@ -1718,7 +1709,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="message">Reason why everything is being invalidated</param>
         /// <returns>Asynchronous task</returns>
-        private static void Invalidate(string message)
+        public static void Invalidate(string message)
         {
             // Cancel the file being printed
             bool outputMessage;

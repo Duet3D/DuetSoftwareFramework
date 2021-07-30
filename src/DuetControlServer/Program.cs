@@ -114,7 +114,6 @@ namespace DuetControlServer
             {
                 try
                 {
-                    SPI.Interface.Init();
                     SPI.DataTransfer.Init();
                     _logger.Info("Connection to Duet established");
                 }
@@ -265,6 +264,7 @@ namespace DuetControlServer
                 await stopCommand.Execute();
 
                 // Shut down DCS
+                SPI.Interface.Invalidate(null);
                 _cancelSource.Cancel();
             }
 
@@ -334,6 +334,7 @@ namespace DuetControlServer
                 }
                 finally
                 {
+                    // SPI subsystem is not running at this point
                     _cancelSource.Cancel();
                 }
             }
@@ -363,6 +364,7 @@ namespace DuetControlServer
             }
 
             // Try to shut down this program normally 
+            SPI.Interface.Invalidate(null);
             _cancelSource.Cancel();
 
             // Wait for potential firmware update to finish
