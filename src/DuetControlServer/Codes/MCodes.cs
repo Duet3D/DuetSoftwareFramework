@@ -884,11 +884,11 @@ namespace DuetControlServer.Codes
                                 return new Message(MessageType.Error, "Missing filename in M929 command");
                             }
 
-                            await Utility.Logger.Start(logFile, logLevel);
+                            await Utility.Logger.StartAsync(logFile, logLevel);
                         }
                         else
                         {
-                            await Utility.Logger.Stop();
+                            await Utility.Logger.StopAsync();
                         }
                         return new Message();
                     }

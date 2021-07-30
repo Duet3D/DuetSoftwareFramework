@@ -190,7 +190,7 @@ namespace DuetControlServer.IPC.Processors
                     cts.CancelAfter(Settings.SocketPollInterval);
                     try
                     {
-                        await Provider.WaitForUpdate(cts.Token);
+                        await Provider.WaitForUpdateAsync(cts.Token);
                     }
                     catch (OperationCanceledException)
                     {
@@ -336,20 +336,15 @@ namespace DuetControlServer.IPC.Processors
                     }
 
                     // Add missing items to the current list
-                    bool itemsAreObjects = path[i + 1] is string;
                     for (int k = currentList.Count; k < pathNode.List.Count; k++)
                     {
                         if (pathNode.List[k] == null)
                         {
                             currentList.Add(null);
                         }
-                        else if (itemsAreObjects)
-                        {
-                            currentList.Add(new Dictionary<string, object>());
-                        }
                         else
                         {
-                            currentList.Add(new List<object>());
+                            currentList.Add(new Dictionary<string, object>());
                         }
                     }
 
@@ -359,11 +354,6 @@ namespace DuetControlServer.IPC.Processors
                     {
                         currentDictionary = nextDictionary;
                         currentList = null;
-                    }
-                    else if (nodeObject is List<object> nextList)
-                    {
-                        currentDictionary = null;
-                        currentList = nextList;
                     }
                     else
                     {

@@ -208,7 +208,7 @@ namespace UnitTests.SPI
         {
             Span<byte> blob = GetBlob("fileChunk.bin");
 
-            int bytesRead = Reader.ReadFileChunkRequest(blob, out string filename, out uint offset, out uint maxLength);
+            int bytesRead = Reader.ReadFileChunkRequest(blob, out string filename, out uint offset, out int maxLength);
             Assert.AreEqual(20, bytesRead);
 
             // Header

@@ -221,7 +221,31 @@ namespace DuetControlServer.FileExecution
         /// Abort this macro
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public async Task Abort()
+        public void Abort()
+        {
+            if (IsAborted || disposed)
+            {
+                return;
+            }
+            IsAborted = true;
+            _cts.Cancel();
+
+            if (_file != null)
+            {
+                using (_file.Lock())
+                {
+                    _file.Close();
+                }
+            }
+
+            _logger.Info("Aborted macro file {0}", FileName);
+        }
+
+        /// <summary>
+        /// Abort this macro asynchronously
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public async Task AbortAsync()
         {
             if (IsAborted || disposed)
             {
@@ -298,7 +322,7 @@ namespace DuetControlServer.FileExecution
                     {
                         using (await _lock.LockAsync(Program.CancellationToken))
                         {
-                            await Abort();
+                            await AbortAsync();
                         }
                     }
                     catch (AggregateException ae)
@@ -308,7 +332,7 @@ namespace DuetControlServer.FileExecution
                             _file.Close();
                         }
 
-                        await Logger.LogOutput(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {ae.InnerException.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {ae.InnerException.Message}");
                         _logger.Error(ae.InnerException, "Failed to read code from macro {0}", FileName);
                     }
                     catch (Exception e)
@@ -318,7 +342,7 @@ namespace DuetControlServer.FileExecution
                             _file.Close();
                         }
 
-                        await Logger.LogOutput(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {e.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {e.Message}");
                         _logger.Error(e, "Failed to read code from macro {0}", FileName);
                     }
                 }
@@ -329,7 +353,7 @@ namespace DuetControlServer.FileExecution
                     try
                     {
                         Message result = await codeTask;
-                        await Model.Provider.Output(result);
+                        await Model.Provider.OutputAsync(result);
                     }
                     catch (OperationCanceledException)
                     {
@@ -337,17 +361,17 @@ namespace DuetControlServer.FileExecution
                     }
                     catch (CodeParserException cpe)
                     {
-                        await Logger.LogOutput(MessageType.Error, cpe.Message + " of " + Path.GetFileName(FileName));
+                        await Logger.LogOutputAsync(MessageType.Error, cpe.Message + " of " + Path.GetFileName(FileName));
                         _logger.Debug(cpe);
                     }
                     catch (AggregateException ae)
                     {
-                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
                         _logger.Warn(ae);
                     }
                     catch (Exception e)
                     {
-                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{e.GetType().Name}] {e.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{e.GetType().Name}] {e.Message}");
                         _logger.Warn(e);
                     }
                 }

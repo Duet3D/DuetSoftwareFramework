@@ -802,7 +802,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="data">Read file data</param>
         /// <param name="bytesRead">Number of bytes read</param>
         /// <returns>Number of bytes written</returns>
-        public static int WriteFileReadResult(Span<byte> to, byte[] data, int bytesRead)
+        public static int WriteFileReadResult(Span<byte> to, Span<byte> data, int bytesRead)
         {
             // Write header
             FileDataHeader header = new()
@@ -813,7 +813,7 @@ namespace DuetControlServer.SPI.Serialization
             int bytesWritten = Marshal.SizeOf<FileDataHeader>();
 
             // Write content
-            data.CopyTo(data.AsSpan(bytesWritten));
+            data.CopyTo(data[bytesWritten..]);
             bytesWritten += data.Length;
 
             return AddPadding(to, bytesWritten);

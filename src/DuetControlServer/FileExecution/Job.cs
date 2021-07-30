@@ -287,7 +287,7 @@ namespace DuetControlServer.FileExecution
                                     _file.Close();
                                 }
 
-                                await Utility.Logger.LogOutput(MessageType.Error, $"Failed to read code from job file: {ae.InnerException.Message}");
+                                await Utility.Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file: {ae.InnerException.Message}");
                                 _logger.Error(ae.InnerException);
                             }
                             catch (Exception e)
@@ -297,7 +297,7 @@ namespace DuetControlServer.FileExecution
                                     _file.Close();
                                 }
 
-                                await Utility.Logger.LogOutput(MessageType.Error, $"Failed to read code from job file: {e.Message}");
+                                await Utility.Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file: {e.Message}");
                                 _logger.Error(e);
                             }
                         }
@@ -311,7 +311,7 @@ namespace DuetControlServer.FileExecution
                                 {
                                     Message result = await codeTasks.Dequeue();
                                     nextFilePosition = code.FilePosition.Value + code.Length.Value;
-                                    await Utility.Logger.LogOutput(result);
+                                    await Utility.Logger.LogOutputAsync(result);
                                 }
                                 catch (OperationCanceledException)
                                 {
@@ -320,15 +320,15 @@ namespace DuetControlServer.FileExecution
                                 }
                                 catch (CodeParserException cpe)
                                 {
-                                    await Utility.Logger.LogOutput(MessageType.Error, cpe.Message);
+                                    await Utility.Logger.LogOutputAsync(MessageType.Error, cpe.Message);
                                 }
                                 catch (AggregateException ae)
                                 {
-                                    await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                                    await Utility.Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
                                 }
                                 catch (Exception e)
                                 {
-                                    await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
+                                    await Utility.Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
                                 }
                             }
                             finally
@@ -492,10 +492,31 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Abort the current print. This is called when the print could not complete as expected
+        /// Abort the current print asynchronously. This is called when the print could not complete as expected
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task Abort()
+        public static void Abort()
+        {
+            if (IsFileSelected)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+
+                using (_file.Lock())
+                {
+                    _file.Close();
+                }
+                IsAborted = true;
+                Resume();
+            }
+        }
+
+        /// <summary>
+        /// Abort the current print asynchronously. This is called when the print could not complete as expected
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static async Task AbortAsync()
         {
             if (IsFileSelected)
             {

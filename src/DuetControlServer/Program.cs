@@ -242,7 +242,7 @@ namespace DuetControlServer
                         }
                         catch (Exception e)
                         {
-                            await Model.Provider.Output(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
+                            await Model.Provider.OutputAsync(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
                         }
                     }
                 }
@@ -351,7 +351,7 @@ namespace DuetControlServer
         /// <returns>Asynchronous task</returns>
         public static async Task Shutdown(bool waitForTermination = false)
         {
-            // Shut down the plugins again
+            // Shut down the plugins again. This must happen before the cancellation token is triggered
             try
             {
                 StopPlugins stopCommand = new();
@@ -362,11 +362,11 @@ namespace DuetControlServer
                 _logger.Error(e, "Failed to stop plugins");
             }
 
-            // Wait for potential firmware update to finish
-            await SPI.Interface.WaitForUpdate();
-
             // Try to shut down this program normally 
             _cancelSource.Cancel();
+
+            // Wait for potential firmware update to finish
+            await SPI.Interface.WaitForUpdate();
 
             // If that fails, kill the program forcefully
             Task terminationTask = Task.Delay(4500, _programTerminated.Token).ContinueWith(async task =>

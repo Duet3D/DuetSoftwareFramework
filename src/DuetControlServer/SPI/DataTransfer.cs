@@ -33,9 +33,7 @@ namespace DuetControlServer.SPI
         // General transfer variables
         private static InputGpioPin _transferReadyPin;
         private static bool _expectedTfrRdyPinValue = false;
-        private static volatile bool _transferReadyPinMonitored;
         private static SpiDevice _spiDevice;
-        private static readonly AsyncManualResetEvent _transferReadyEvent = new();
         private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting, _updating;
         private static ushort _lastTransferNumber;
 
@@ -81,12 +79,8 @@ namespace DuetControlServer.SPI
             }
             _txBuffer = _txBuffers.First;
 
-            // Initialize transfer ready pin
+            // Initialize transfer ready pin and SPI device
             _transferReadyPin = new InputGpioPin(Settings.GpioChipDevice, Settings.TransferReadyPin, $"dcs-trp-{Settings.TransferReadyPin}");
-            _transferReadyPin.PinChanged += (sender, pinValue) => _transferReadyEvent.Set();
-            MonitorTransferReadyPin();
-
-            // Initialize SPI device
             _spiDevice = new SpiDevice(Settings.SpiDevice, Settings.SpiFrequency, Settings.SpiTransferMode);
 
             // Check if large transfers can be performed
@@ -214,13 +208,13 @@ namespace DuetControlServer.SPI
                     ProtocolVersion = _rxHeader.ProtocolVersion;
                     if ((_hadTimeout || !_started) && ProtocolVersion != Consts.ProtocolVersion)
                     {
-                        _ = Logger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
+                        Logger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
                     }
 
                     // Deal with timeouts
                     if (_hadTimeout)
                     {
-                        _ = Logger.LogOutput(MessageType.Success, "Connection to Duet established");
+                        Logger.LogOutput(MessageType.Success, "Connection to Duet established");
                         _hadTimeout = _resetting = false;
                     }
 
@@ -269,7 +263,7 @@ namespace DuetControlServer.SPI
                     {
                         _hadTimeout = true;
                         Updater.ConnectionLost();
-                        _ = Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
+                        Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
                     }
                 }
             }
@@ -406,7 +400,7 @@ namespace DuetControlServer.SPI
         /// <param name="filename">Filename</param>
         /// <param name="offset">File offset</param>
         /// <param name="maxLength">Maximum chunk size</param>
-        public static void ReadFileChunkRequest(out string filename, out uint offset, out uint maxLength)
+        public static void ReadFileChunkRequest(out string filename, out uint offset, out int maxLength)
         {
             Serialization.Reader.ReadFileChunkRequest(_packetData.Span, out filename, out offset, out maxLength);
         }
@@ -476,7 +470,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="handle">File handle</param>
         /// <param name="maxLength">Maximum data length</param>
-        public static void ReadFileRequest(out uint handle, out uint maxLength)
+        public static void ReadFileRequest(out uint handle, out int maxLength)
         {
             Serialization.Reader.ReadFileRequest(_packetData.Span, out handle, out maxLength);
         }
@@ -486,10 +480,10 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="handle">File handle</param>
         /// <param name="data">Data to write</param>
-        public static void ReadWriteRequest(out uint handle, out ReadOnlyMemory<byte> data)
+        public static void ReadWriteRequest(out uint handle, out ReadOnlySpan<byte> data)
         {
             int bytesRead = Serialization.Reader.ReadFileHandle(_packetData.Span, out handle);
-            data = _packetData[bytesRead..];
+            data = _packetData[bytesRead..].Span;
         }
 
         /// <summary>
@@ -887,10 +881,10 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="stream">IAP binary</param>
         /// <returns>Whether another segment could be written</returns>
-        public static async Task<bool> WriteIapSegment(Stream stream)
+        public static bool WriteIapSegment(Stream stream)
         {
-            byte[] data = new byte[Consts.IapSegmentSize];
-            int bytesRead = await stream.ReadAsync(data);
+            Span<byte> data = stackalloc byte[Consts.IapSegmentSize];
+            int bytesRead = stream.Read(data);
             if (bytesRead <= 0)
             {
                 return false;
@@ -921,12 +915,12 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="stream">Stream of the firmware binary</param>
         /// <returns>Whether another segment could be sent</returns>
-        public static async Task<bool> FlashFirmwareSegment(Stream stream)
+        public static bool FlashFirmwareSegment(Stream stream)
         {
-            byte[] readBuffer = new byte[Consts.FirmwareSegmentSize];
-            byte[] writeBuffer = new byte[Consts.FirmwareSegmentSize];
+            Span<byte> readBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
+            Span<byte> writeBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
 
-            int bytesRead = await stream.ReadAsync(writeBuffer);
+            int bytesRead = stream.Read(writeBuffer);
             if (bytesRead <= 0)
             {
                 return false;
@@ -935,7 +929,7 @@ namespace DuetControlServer.SPI
             if (bytesRead != Consts.FirmwareSegmentSize)
             {
                 // Fill up the remaining space with 0xFF. The IAP program does the same once complete
-                writeBuffer.AsSpan(bytesRead..).Fill(0xFF);
+                writeBuffer[bytesRead..].Fill(0xFF);
             }
 
             WaitForTransfer();
@@ -949,11 +943,11 @@ namespace DuetControlServer.SPI
         /// <param name="firmwareLength">Length of the written firmware in bytes</param>
         /// <param name="crc16">CRC16 checksum of the firmware</param>
         /// <returns>Whether the firmware has been written successfully</returns>
-        public static async Task<bool> VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
+        public static bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
         {
             // At this point IAP expects another segment so wait for it to be ready first. After that, wait a moment for IAP to acknowledge we're done
             WaitForTransfer();
-            await Task.Delay(Consts.FirmwareFinishedDelay);
+            Thread.Sleep(Consts.FirmwareFinishedDelay);
 
             // Send the final firmware size plus CRC16 checksum to IAP
             Communication.LinuxRequests.FlashVerify verifyRequest = new()
@@ -961,13 +955,13 @@ namespace DuetControlServer.SPI
                 firmwareLength = (uint)firmwareLength,
                 crc16 = crc16
             };
-            byte[] transferData = new byte[Marshal.SizeOf<Communication.LinuxRequests.FlashVerify>()];
+            Span<byte> transferData = stackalloc byte[Marshal.SizeOf<Communication.LinuxRequests.FlashVerify>()];
             MemoryMarshal.Write(transferData, ref verifyRequest);
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(transferData, transferData);
 
             // Check if the IAP can confirm our CRC16 checksum
-            byte[] writeOk = new byte[1];
+            Span<byte> writeOk = stackalloc byte[1];
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(writeOk, writeOk);
             return (writeOk[0] == 0x0C);
@@ -976,10 +970,10 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Wait for the IAP program to reset the controller
         /// </summary>
-        public static async Task WaitForIapReset()
+        public static void WaitForIapReset()
         {
             // Wait a moment for the firmware to start
-            await Task.Delay(Consts.IapRebootDelay);
+            Thread.Sleep(Consts.IapRebootDelay);
 
             // Wait for the first data transfer from the firmware
             _updating = _started = false;
@@ -1213,7 +1207,7 @@ namespace DuetControlServer.SPI
         /// <param name="data">File data</param>
         /// <param name="bytesRead">Number of bytes read or negative on error</param>
         /// <returns>If the packet could be written</returns>
-        public static bool WriteFileReadResult(byte[] data, int bytesRead)
+        public static bool WriteFileReadResult(Span<byte> data, int bytesRead)
         {
             int dataLength = Marshal.SizeOf<Communication.LinuxRequests.OpenFileResult>() + data.Length;
             if (!CanWritePacket(dataLength))
@@ -1293,29 +1287,9 @@ namespace DuetControlServer.SPI
 
         #region Functions for data transfers
         /// <summary>
-        /// Internal function to monitor the transfer ready pin
+        /// Static stopwatch to measure the transfer times with
         /// </summary>
-        public static void MonitorTransferReadyPin()
-        {
-            _transferReadyPinMonitored = true;
-            _transferReadyPin.StartMonitoring(Program.CancellationToken)
-                .ContinueWith(async task =>
-                {
-                    try
-                    {
-                        // Wait for the task to complete
-                        await task;
-                    }
-                    catch (Exception e)
-                    {
-                        if (!(e is OperationCanceledException))
-                        {
-                            _transferReadyPinMonitored = false;
-                            _logger.Error(e, "Failed to monitor transfer ready pin");
-                        }
-                    }
-                });
-        }
+        private static readonly Stopwatch _transferStopwatch = new();
 
         /// <summary>
         /// Wait for the Duet to flag when it is ready to transfer data
@@ -1323,22 +1297,14 @@ namespace DuetControlServer.SPI
         /// <param name="inTransfer">Whether a full transfer is being performed</param>
         private static void WaitForTransfer(bool inTransfer = true)
         {
-            if (!_transferReadyPinMonitored)
-            {
-                throw new InvalidOperationException("Transfer ready pin is not monitored");
-            }
-
             if (_waitingForFirstTransfer)
             {
-                _transferReadyEvent.Reset();
                 if (!_transferReadyPin.Value)
                 {
-                    // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
-                    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                    cts.CancelAfter(_updating ? Consts.IapTimeout : Settings.SpiConnectTimeout);
                     try
                     {
-                        _transferReadyEvent.Wait(cts.Token);
+                        // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
+                        while (!_transferReadyPin.WaitForEvent(_updating ? Consts.IapTimeout : Settings.SpiConnectTimeout)) { }
                     }
                     catch (OperationCanceledException)
                     {
@@ -1354,49 +1320,40 @@ namespace DuetControlServer.SPI
             }
             else
             {
-                Stopwatch watch = new();
-                watch.Start();
-
                 // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred.
-                using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                cts.CancelAfter(_updating ? Consts.IapTimeout : (inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout));
-                do
+                int timeout = _updating ? Consts.IapTimeout : (inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout);
+                _transferStopwatch.Restart();
+                try
                 {
-                    try
-                    {
-                        _transferReadyEvent.Wait(cts.Token);
-                    }
-                    catch
-                    {
-                        if (Program.CancellationToken.IsCancellationRequested)
-                        {
-                            throw new OperationCanceledException("Program termination");
-                        }
-                        throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
-                    }
-                    _transferReadyEvent.Reset();
+                    while (_transferReadyPin.WaitForEvent(timeout) != _expectedTfrRdyPinValue) { }
                 }
-                while (_transferReadyPin.Value != _expectedTfrRdyPinValue);
+                catch (OperationCanceledException)
+                {
+                    if (Program.CancellationToken.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException("Program termination");
+                        }
+                    throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
+                }
                 _expectedTfrRdyPinValue = !_expectedTfrRdyPinValue;
+                _transferStopwatch.Stop();
 
                 // Keep track of the maximum times to wait for the TfrRdy pin to change
-                watch.Stop();
                 if (inTransfer)
                 {
-                    if (watch.Elapsed > _maxPinWaitDuration)
+                    if (_transferStopwatch.Elapsed > _maxPinWaitDuration)
                     {
-                        _maxPinWaitDuration = watch.Elapsed;
+                        _maxPinWaitDuration = _transferStopwatch.Elapsed;
                     }
                 }
                 else
                 {
-                    if (watch.Elapsed > _maxPinWaitDurationFull)
+                    if (_transferStopwatch.Elapsed > _maxPinWaitDurationFull)
                     {
-                        _maxPinWaitDurationFull = watch.Elapsed;
+                        _maxPinWaitDurationFull = _transferStopwatch.Elapsed;
                     }
                 }
             }
-            _transferReadyEvent.Reset();
         }
 
         /// <summary>

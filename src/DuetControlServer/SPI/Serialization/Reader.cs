@@ -195,14 +195,14 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="offset">Offset in the file</param>
         /// <param name="maxLength">Maximum chunk length</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadFileChunkRequest(ReadOnlySpan<byte> from, out string filename, out uint offset, out uint maxLength)
+        public static int ReadFileChunkRequest(ReadOnlySpan<byte> from, out string filename, out uint offset, out int maxLength)
         {
             FileChunkHeader header = MemoryMarshal.Read<FileChunkHeader>(from);
             int bytesRead = Marshal.SizeOf<FileChunkHeader>();
 
             // Read header
             offset = header.Offset;
-            maxLength = header.MaxLength;
+            maxLength = (int)header.MaxLength;
 
             // Read filename
             ReadOnlySpan<byte> unicodeFilename = from.Slice(bytesRead, (int)header.FilenameLength);
@@ -416,11 +416,11 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="handle">File handle</param>
         /// <param name="maxLength">Maximum buffer length</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadFileRequest(ReadOnlySpan<byte> from, out uint handle, out uint maxLength)
+        public static int ReadFileRequest(ReadOnlySpan<byte> from, out uint handle, out int maxLength)
         {
             ReadFileHeader header = MemoryMarshal.Read<ReadFileHeader>(from);
             handle = header.Handle;
-            maxLength = header.MaxLength;
+            maxLength = (int)header.MaxLength;
             return Marshal.SizeOf<ReadFileHeader>();
         }
 

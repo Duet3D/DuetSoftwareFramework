@@ -39,10 +39,10 @@ namespace DuetControlServer.Commands
 #pragma warning restore CS0618 // Type or member is obsolete
 
             Message msg = new(Type, Content);
-            await Utility.Logger.Log(LogLevel.Value, msg);
+            await Utility.Logger.LogAsync(LogLevel.Value, msg);
             if (OutputMessage)
             {
-                await Model.Provider.Output(msg);
+                await Model.Provider.OutputAsync(msg);
             }
 
             if (LogLevel == DuetAPI.ObjectModel.LogLevel.Off && !OutputMessage)

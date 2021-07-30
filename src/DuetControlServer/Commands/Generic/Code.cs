@@ -395,14 +395,14 @@ namespace DuetControlServer.Commands
                 {
                     using (await Macro.LockAsync())
                     {
-                        await Macro.Abort();
+                        await Macro.AbortAsync();
                     }
                 }
                 else if (Channel == CodeChannel.File)
                 {
                     using (await Job.LockAsync())
                     {
-                        await Job.Abort();
+                        await Job.AbortAsync();
                     }
                 }
                 StartNextCode();
@@ -619,7 +619,7 @@ namespace DuetControlServer.Commands
                     // so we only need to log internal code replies that are not part of file prints
                     if (File == null || Channel != CodeChannel.File)
                     {
-                        await Utility.Logger.Log(Result);
+                        await Utility.Logger.LogAsync(Result);
                     }
                 }
 

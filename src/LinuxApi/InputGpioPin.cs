@@ -112,6 +112,58 @@ namespace LinuxApi
         }
 
         /// <summary>
+        /// Size of the event data struct
+        /// </summary>
+        private static readonly int _sizeOfEventData = Marshal.SizeOf(typeof(gpioevent_data));
+
+        /// <summary>
+        /// Wait for a pin event to occur
+        /// </summary>
+        /// <param name="timeout">Timeout in ms</param>
+        /// <returns>New pin level</returns>
+        /// <exception cref="IOException">Generic IO error</exception>
+        /// <exception cref="OperationCanceledException">Timeout occurred</exception>
+        public unsafe bool WaitForEvent(int timeout)
+        {
+            // Wait for an event first
+            pollfd pollData = new()
+            {
+                fd = _reqFd,
+                events = (short)PollFlags.POLLIN,
+                revents = 0
+            };
+
+            int result;
+            do
+            {
+                result = Interop.poll(new IntPtr(&pollData), 1, timeout);
+                if (result < 0)
+                {
+                    // Sometimes we get EINTR but that is benign. Just repeat the operation in that case
+                    int errno = Marshal.GetLastWin32Error();
+                    if (errno != 4)
+                    {
+                        throw new IOException($"Error {errno}. Failed to poll for event.");
+                    }
+                }
+                if (result == 0)
+                {
+                    throw new OperationCanceledException("Timeout while waiting for event");
+                }
+            }
+            while (result <= 0);
+
+            // Read it
+            gpioevent_data eventData = new();
+            if (Interop.read(_reqFd, new IntPtr(&eventData), _sizeOfEventData) == _sizeOfEventData)
+            {
+                Value = (eventData.id == (uint)GpioEvent.GPIOEVENT_EVENT_RISING_EDGE);
+                return Value;
+            }
+            throw new IOException("Read returned invalid size");
+        }
+
+        /// <summary>
         /// Current value of this pin
         /// </summary>
         public bool Value { get; private set; }
@@ -143,11 +195,10 @@ namespace LinuxApi
             return Task.Run(() =>
             {
                 gpioevent_data eventData = new();
-                int sizeOfEventData = Marshal.SizeOf(typeof(gpioevent_data));
 
                 do
                 {
-                    if (Interop.read(_reqFd, new IntPtr(&eventData), sizeOfEventData) == sizeOfEventData)
+                    if (Interop.read(_reqFd, new IntPtr(&eventData), _sizeOfEventData) == _sizeOfEventData)
                     {
                         Value = (eventData.id == (uint)GpioEvent.GPIOEVENT_EVENT_RISING_EDGE);
                         PinChanged?.Invoke(this, Value);
@@ -158,7 +209,7 @@ namespace LinuxApi
                     }
                 }
                 while (!cancellationToken.IsCancellationRequested);
-            });
+            }, cancellationToken);
         }
     }
 }

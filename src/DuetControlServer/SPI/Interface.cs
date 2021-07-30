@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -101,7 +102,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         public static void Init()
         {
-            Program.CancellationToken.Register(() => _ = Invalidate(null));
+            Program.CancellationToken.Register(() => Invalidate(null));
         }
 
         /// <summary>
@@ -588,9 +589,9 @@ namespace DuetControlServer.SPI
         /// Perform the firmware update internally
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        private static async Task PerformFirmwareUpdate()
+        private static void PerformFirmwareUpdate()
         {
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (Model.Provider.AccessReadWrite())
             {
                 Model.Provider.Get.State.Status = MachineStatus.Updating;
             }
@@ -603,7 +604,7 @@ namespace DuetControlServer.SPI
             bool dataSent;
             do
             {
-                dataSent = await DataTransfer.WriteIapSegment(_iapStream);
+                dataSent = DataTransfer.WriteIapSegment(_iapStream);
                 if (_logger.IsDebugEnabled)
                 {
                     Console.Write('.');
@@ -632,7 +633,7 @@ namespace DuetControlServer.SPI
 
                 try
                 {
-                    while (await DataTransfer.FlashFirmwareSegment(_firmwareStream))
+                    while (DataTransfer.FlashFirmwareSegment(_firmwareStream))
                     {
                         if (_logger.IsDebugEnabled)
                         {
@@ -647,23 +648,23 @@ namespace DuetControlServer.SPI
                 catch (Exception e)
                 {
                     _logger.Error(e);
-                    await Logger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
+                    Logger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
                     throw;
                 }
 
                 _logger.Info("Verifying checksum");
             }
-            while (!await DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16) && ++numRetries < 3);
+            while (!DataTransfer.VerifyFirmwareChecksum(_firmwareStream.Length, crc16) && ++numRetries < 3);
 
             if (numRetries == 3)
             {
                 // Failed to flash the firmware
-                await Logger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
+                Logger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
                 throw new OperationCanceledException("Failed to flash firmware after 3 attempts");
             }
 
             // Wait for the IAP binary to restart the controller
-            await DataTransfer.WaitForIapReset();
+            DataTransfer.WaitForIapReset();
             _logger.Info("Firmware update successful");
         }
 
@@ -730,9 +731,14 @@ namespace DuetControlServer.SPI
 
             using (await _channels[channel].LockAsync())
             {
-                await _channels[channel].AbortFiles(true, false);
+                await _channels[channel].AbortFilesAsync(true, false);
             }
         }
+
+        /// <summary>
+        /// Exception to forward from the thread
+        /// </summary>
+        private static Exception _threadException;
 
         /// <summary>
         /// Perform communication with the RepRapFirmware controller over SPI
@@ -745,219 +751,213 @@ namespace DuetControlServer.SPI
                 await Task.Delay(-1, Program.CancellationToken);
             }
 
-            do
+            Thread spiThread = new(CommunicationThread);
+            spiThread.Priority = ThreadPriority.Highest;
+            spiThread.Start();
+            spiThread.Join();
+            if (_threadException != null)
             {
-                bool skipChannels = false;
-                using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
+                throw _threadException;
+            }
+        }
+
+        /// <summary>
+        /// Function to rim in an high-priority thread to speed up SPI communication
+        /// </summary>
+        private static void CommunicationThread()
+        {
+            try
+            {
+                do
                 {
-                    // Check if an emergency stop has been requested
-                    if (_firmwareHaltRequest != null)
+                    bool skipChannels = false;
+                    using (_firmwareActionLock.Lock(Program.CancellationToken))
                     {
-                        await Invalidate("Firmware halted");
-                        if (DataTransfer.WriteEmergencyStop())
+                        // Check if an emergency stop has been requested
+                        if (_firmwareHaltRequest != null)
                         {
-                            _logger.Warn("Emergency stop");
-                            _firmwareHaltRequest.SetResult();
-                            _firmwareHaltRequest = null;
+                            Invalidate("Firmware halted");
+                            if (DataTransfer.WriteEmergencyStop())
+                            {
+                                _logger.Warn("Emergency stop");
+                                _firmwareHaltRequest.SetResult();
+                                _firmwareHaltRequest = null;
+                            }
+                            skipChannels = true;
                         }
-                        skipChannels = true;
+
+                        // Check if a firmware reset has been requested
+                        if (_firmwareResetRequest != null)
+                        {
+                            Invalidate("Firmware reset imminent");
+                            if (DataTransfer.WriteReset())
+                            {
+                                _logger.Warn("Resetting controller");
+                                DataTransfer.PerformFullTransfer();
+                                _firmwareResetRequest.SetResult();
+                                _firmwareResetRequest = null;
+
+                                if (!Settings.NoTerminateOnReset)
+                                {
+                                    // Wait for the program to terminate and don't perform any extra transfers
+                                    while (!Program.CancellationToken.IsCancellationRequested)
+                                    {
+                                        Thread.Sleep(100);
+                                    }
+                                }
+                            }
+                            skipChannels = true;
+                        }
                     }
 
-                    // Check if a firmware reset has been requested
-                    if (_firmwareResetRequest != null)
+                    // Check if a firmware update is supposed to be performed
+                    bool blockTask = false;
+                    using (_firmwareUpdateLock.Lock(Program.CancellationToken))
                     {
-                        await Invalidate("Firmware reset imminent");
-                        if (DataTransfer.WriteReset())
+                        if (_iapStream != null && _firmwareStream != null)
                         {
-                            _logger.Warn("Resetting controller");
-                            DataTransfer.PerformFullTransfer();
-                            _firmwareResetRequest.SetResult();
-                            _firmwareResetRequest = null;
+                            Invalidate("Firmware update imminent");
 
-                            if (!Settings.NoTerminateOnReset)
+                            try
                             {
-                                // Wait for the program to terminate and don't perform any extra transfers
-                                await Task.Delay(-1, Program.CancellationToken);
+                                PerformFirmwareUpdate();
+                                _firmwareUpdateRequest?.SetResult();
+                                _firmwareUpdateRequest = null;
+                            }
+                            catch (Exception e)
+                            {
+                                _firmwareUpdateRequest?.SetException(e);
+                                _firmwareUpdateRequest = null;
+
+                                if (!Settings.UpdateOnly && Settings.NoTerminateOnReset && e is OperationCanceledException)
+                                {
+                                    _logger.Debug(e, "Firmware update cancelled");
+                                }
+                                throw;
+                            }
+
+                            _iapStream = _firmwareStream = null;
+                            blockTask = Settings.UpdateOnly || !Settings.NoTerminateOnReset;
+                        }
+                    }
+                    if (blockTask)
+                    {
+                        // Wait for the requesting task to complete, it will terminate DCS next
+                        while (!Program.CancellationToken.IsCancellationRequested)
+                        {
+                            Thread.Sleep(100);
+                        }
+                    }
+
+                    // Invalidate data if a controller reset has been performed
+                    if (DataTransfer.HadReset())
+                    {
+                        Invalidate("Controller has been reset");
+                    }
+
+                    // Check for changes of the print status.
+                    using (_printStateLock.Lock(Program.CancellationToken))
+                    {
+                        if (_setPrintInfoRequest != null && DataTransfer.WritePrintFileInfo(Model.Provider.Get.Job.File))
+                        {
+                            // The packet providing file info has be sent first because it includes a time_t value that must reside on a 64-bit boundary!
+                            _setPrintInfoRequest.SetResult();
+                            _setPrintInfoRequest = null;
+                        }
+                        else
+                        {
+                            if (_stopPrintRequest != null && DataTransfer.WritePrintStopped(_stopPrintReason))
+                            {
+                                _stopPrintRequest.SetResult();
+                                _stopPrintRequest = null;
                             }
                         }
-                        skipChannels = true;
                     }
-                }
 
-                // Check if a firmware update is supposed to be performed
-                bool blockTask = false;
-                using (await _firmwareUpdateLock.LockAsync(Program.CancellationToken))
-                {
-                    if (_iapStream != null && _firmwareStream != null)
+                    // Deal with heightmap requests
+                    using (_heightmapLock.Lock(Program.CancellationToken))
                     {
-                        await Invalidate("Firmware update imminent");
+                        // Check if the heightmap is supposed to be set
+                        if (_setHeightmapRequest != null && DataTransfer.WriteHeightMap(_heightmapToSet))
+                        {
+                            _setHeightmapRequest.SetResult();
+                            _setHeightmapRequest = null;
+                        }
+
+                        // Check if the heightmap is requested
+                        if (_getHeightmapRequest != null && !_isHeightmapRequested)
+                        {
+                            _isHeightmapRequested = DataTransfer.WriteGetHeightMap();
+                        }
+                    }
+
+                    // Process incoming packets
+                    for (int i = 0; i < DataTransfer.PacketsToRead; i++)
+                    {
+                        PacketHeader? packet;
 
                         try
                         {
-                            await PerformFirmwareUpdate();
-                            _firmwareUpdateRequest?.SetResult();
-                            _firmwareUpdateRequest = null;
-                        }
-                        catch (Exception e)
-                        {
-                            _firmwareUpdateRequest?.SetException(e);
-                            _firmwareUpdateRequest = null;
-
-                            if (!Settings.UpdateOnly && Settings.NoTerminateOnReset && e is OperationCanceledException)
+                            packet = DataTransfer.ReadNextPacket();
+                            if (packet == null)
                             {
-                                _logger.Debug(e, "Firmware update cancelled");
+                                _logger.Error("Read invalid packet");
+                                break;
                             }
+                            ProcessPacket(packet.Value);
+                        }
+                        catch (ArgumentOutOfRangeException)
+                        {
+                            DataTransfer.DumpMalformedPacket();
                             throw;
                         }
-
-                        _iapStream = _firmwareStream = null;
-                        blockTask = Settings.UpdateOnly || !Settings.NoTerminateOnReset;
                     }
-                }
-                if (blockTask)
-                {
-                    // Wait for the requesting task to complete, it will terminate DCS next
-                    await Task.Delay(-1, Program.CancellationToken);
-                }
+                    _bytesReserved = 0;
 
-                // Invalidate data if a controller reset has been performed
-                if (DataTransfer.HadReset())
-                {
-                    await Invalidate("Controller has been reset");
-                }
-
-                // Check for changes of the print status.
-                using (await _printStateLock.LockAsync(Program.CancellationToken))
-                {
-                    if (_setPrintInfoRequest != null && DataTransfer.WritePrintFileInfo(Model.Provider.Get.Job.File))
+                    // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
+                    if (!skipChannels)
                     {
-                        // The packet providing file info has be sent first because it includes a time_t value that must reside on a 64-bit boundary!
-                        _setPrintInfoRequest.SetResult();
-                        _setPrintInfoRequest = null;
+                        _channels.Run();
                     }
-                    else
+
+                    // Request object model updates
+                    if (DataTransfer.ProtocolVersion == 1)
                     {
-                        if (_stopPrintRequest != null && DataTransfer.WritePrintStopped(_stopPrintReason))
+                        if (DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
                         {
-                            _stopPrintRequest.SetResult();
-                            _stopPrintRequest = null;
-                        }
-                    }
-                }
-
-                // Deal with heightmap requests
-                using (await _heightmapLock.LockAsync(Program.CancellationToken))
-                {
-                    // Check if the heightmap is supposed to be set
-                    if (_setHeightmapRequest != null && DataTransfer.WriteHeightMap(_heightmapToSet))
-                    {
-                        _setHeightmapRequest.SetResult();
-                        _setHeightmapRequest = null;
-                    }
-
-                    // Check if the heightmap is requested
-                    if (_getHeightmapRequest != null && !_isHeightmapRequested)
-                    {
-                        _isHeightmapRequested = DataTransfer.WriteGetHeightMap();
-                    }
-                }
-
-                // Process incoming packets
-                for (int i = 0; i < DataTransfer.PacketsToRead; i++)
-                {
-                    PacketHeader? packet;
-
-                    try
-                    {
-                        packet = DataTransfer.ReadNextPacket();
-                        if (packet == null)
-                        {
-                            _logger.Error("Read invalid packet");
-                            break;
-                        }
-                        await ProcessPacket(packet.Value);
-                    }
-                    catch (ArgumentOutOfRangeException)
-                    {
-                        DataTransfer.DumpMalformedPacket();
-                        throw;
-                    }
-                }
-                _bytesReserved = 0;
-
-                // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
-                if (!skipChannels)
-                {
-                    await _channels.Run();
-                }
-
-                // Request object model updates
-                if (DataTransfer.ProtocolVersion == 1)
-                {
-                    if (DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(Settings.ModelUpdateInterval))
-                    {
-                        using (await Model.Provider.AccessReadOnlyAsync())
-                        {
-                            if (Model.Provider.Get.Boards.Count == 0 && DataTransfer.WriteGetLegacyConfigResponse())
+                            using (Model.Provider.AccessReadOnly())
                             {
-                                // We no longer support regular status responses except to obtain the board name for updating the firmware
-                                _lastQueryTime = DateTime.Now;
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    lock (_pendingModelQueries)
-                    {
-                        if (_pendingModelQueries.TryPeek(out PendingModelQuery query) &&
-                            !query.QuerySent && DataTransfer.WriteGetObjectModel(query.Key, query.Flags))
-                        {
-                            query.QuerySent = true;
-                        }
-                    }
-                }
-
-                {
-                    int numEvaluationsSent = 0;
-
-                    // Ask for expressions to be evaluated
-                    lock (_evaluateExpressionRequests)
-                    {
-                        foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
-                        {
-                            if (!request.Written && DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression))
-                            {
-                                request.Written = true;
-
-                                numEvaluationsSent++;
-                                if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
+                                if (Model.Provider.Get.Boards.Count == 0 && DataTransfer.WriteGetLegacyConfigResponse())
                                 {
-                                    break;
+                                    // We no longer support regular status responses except to obtain the board name for updating the firmware
+                                    _lastQueryTime = DateTime.Now;
                                 }
                             }
                         }
                     }
-
-                    // Perform variable updates
-                    lock (_variableRequests)
+                    else
                     {
-                        foreach (VariableRequest request in _variableRequests.ToList())
+                        lock (_pendingModelQueries)
                         {
-                            if (!request.Written)
+                            if (_pendingModelQueries.TryPeek(out PendingModelQuery query) &&
+                                !query.QuerySent && DataTransfer.WriteGetObjectModel(query.Key, query.Flags))
                             {
-                                if ((request.Expression != null && DataTransfer.WriteSetVariable(request.Channel, request.CreateVariable, request.VariableName, request.Expression)) ||
-                                    (request.Expression == null && DataTransfer.WriteDeleteLocalVariable(request.Channel, request.VariableName)))
+                                query.QuerySent = true;
+                            }
+                        }
+                    }
+
+                    {
+                        int numEvaluationsSent = 0;
+
+                        // Ask for expressions to be evaluated
+                        lock (_evaluateExpressionRequests)
+                        {
+                            foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
+                            {
+                                if (!request.Written && DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression))
                                 {
-                                    if (request.Expression == null)
-                                    {
-                                        request.SetResult(null);
-                                        _variableRequests.Remove(request);
-                                    }
-                                    else
-                                    {
-                                        request.Written = true;
-                                    }
+                                    request.Written = true;
 
                                     numEvaluationsSent++;
                                     if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
@@ -967,35 +967,46 @@ namespace DuetControlServer.SPI
                                 }
                             }
                         }
-                    }
-                }
 
-                // Send pending messages
-                lock (_messagesToSend)
-                {
-                    while (_messagesToSend.TryPeek(out Tuple<MessageTypeFlags, string> message))
-                    {
-                        if (DataTransfer.WriteMessage(message.Item1, message.Item2))
+                        // Perform variable updates
+                        lock (_variableRequests)
                         {
-                            _messagesToSend.Dequeue();
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                }
-
-                // Update filament assignment per extruder drive. This must happen when config.g has finished or M701 is requested
-                if (!Macro.RunningConfig || _assignFilaments)
-                {
-                    lock (_extruderFilamentMapping)
-                    {
-                        foreach (int extruder in _extruderFilamentMapping.Keys)
-                        {
-                            if (DataTransfer.WriteAssignFilament(extruder, _extruderFilamentMapping[extruder]))
+                            foreach (VariableRequest request in _variableRequests.ToList())
                             {
-                                _extruderFilamentMapping.Remove(extruder);
+                                if (!request.Written)
+                                {
+                                    if ((request.Expression != null && DataTransfer.WriteSetVariable(request.Channel, request.CreateVariable, request.VariableName, request.Expression)) ||
+                                        (request.Expression == null && DataTransfer.WriteDeleteLocalVariable(request.Channel, request.VariableName)))
+                                    {
+                                        if (request.Expression == null)
+                                        {
+                                            request.SetResult(null);
+                                            _variableRequests.Remove(request);
+                                        }
+                                        else
+                                        {
+                                            request.Written = true;
+                                        }
+
+                                        numEvaluationsSent++;
+                                        if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
+                                        {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Send pending messages
+                    lock (_messagesToSend)
+                    {
+                        while (_messagesToSend.TryPeek(out Tuple<MessageTypeFlags, string> message))
+                        {
+                            if (DataTransfer.WriteMessage(message.Item1, message.Item2))
+                            {
+                                _messagesToSend.Dequeue();
                             }
                             else
                             {
@@ -1003,13 +1014,37 @@ namespace DuetControlServer.SPI
                             }
                         }
                     }
-                    _assignFilaments = false;
-                }
 
-                // Do another full SPI transfe
-                DataTransfer.PerformFullTransfer();
+                    // Update filament assignment per extruder drive. This must happen when config.g has finished or M701 is requested
+                    if (!Macro.RunningConfig || _assignFilaments)
+                    {
+                        lock (_extruderFilamentMapping)
+                        {
+                            foreach (int extruder in _extruderFilamentMapping.Keys)
+                            {
+                                if (DataTransfer.WriteAssignFilament(extruder, _extruderFilamentMapping[extruder]))
+                                {
+                                    _extruderFilamentMapping.Remove(extruder);
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                        _assignFilaments = false;
+                    }
+
+                    // Do another full SPI transfe
+                    DataTransfer.PerformFullTransfer();
+                }
+                while (!Program.CancellationToken.IsCancellationRequested);
             }
-            while (true);
+            catch (Exception e)
+            {
+                // Will be propagated using classical task
+                _threadException = e;
+            }
         }
 
         /// <summary>
@@ -1034,7 +1069,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="packet">Received packet</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task ProcessPacket(PacketHeader packet)
+        private static void ProcessPacket(PacketHeader packet)
         {
             Request request = (Request)packet.Request;
 
@@ -1061,55 +1096,55 @@ namespace DuetControlServer.SPI
                     HandleCodeBufferUpdate();
                     break;
                 case Request.Message:
-                    await HandleMessage();
+                    HandleMessage();
                     break;
                 case Request.ExecuteMacro:
-                    await HandleMacroRequest();
+                    HandleMacroRequest();
                     break;
                 case Request.AbortFile:
-                    await HandleAbortFileRequest();
+                    HandleAbortFileRequest();
                     break;
                 case Request.PrintPaused:
-                    await HandlePrintPaused();
+                    HandlePrintPaused();
                     break;
                 case Request.HeightMap:
-                    await HandleHeightMap();
+                    HandleHeightMap();
                     break;
                 case Request.Locked:
-                    await HandleResourceLocked();
+                    HandleResourceLocked();
                     break;
                 case Request.FileChunk:
-                    await HandleFileChunkRequest();
+                    HandleFileChunkRequest();
                     break;
                 case Request.EvaluationResult:
                     HandleEvaluationResult();
                     break;
                 case Request.DoCode:
-                    await HandleDoCode();
+                    HandleDoCode();
                     break;
                 case Request.WaitForAcknowledgement:
-                    await HandleWaitForAcknowledgement();
+                    HandleWaitForAcknowledgement();
                     break;
                 case Request.MacroFileClosed:
-                    await HandleMacroFileClosed();
+                    HandleMacroFileClosed();
                     break;
                 case Request.MessageAcknowledged:
-                    await HandleMessageAcknowledgement();
+                    HandleMessageAcknowledgement();
                     break;
                 case Request.VariableResult:
                     HandleVariableResult();
                     break;
                 case Request.CheckFileExists:
-                    await HandleCheckFileExists();
+                    HandleCheckFileExists();
                     break;
                 case Request.OpenFile:
-                    await HandleOpenFile();
+                    HandleOpenFile();
                     break;
                 case Request.ReadFile:
-                    await HandleReadFile();
+                    HandleReadFile();
                     break;
                 case Request.WriteFile:
-                    await HandleWriteFile();
+                    HandleWriteFile();
                     break;
                 case Request.SeekFile:
                     HandleSeekFile();
@@ -1170,8 +1205,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Process an incoming message
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static async Task HandleMessage()
+        private static void HandleMessage()
         {
             DataTransfer.ReadMessage(out MessageTypeFlags flags, out string reply);
             _logger.Trace("Received message [{0}] {1}", flags, reply);
@@ -1191,7 +1225,7 @@ namespace DuetControlServer.SPI
                                             : flags.HasFlag(MessageTypeFlags.LogWarn) ? LogLevel.Warn
                                                 : flags.HasFlag(MessageTypeFlags.LogInfo) ? LogLevel.Info
                                                     : LogLevel.Debug;
-                        await Logger.Log(level, type, _partialLogMessage.TrimEnd());
+                        Logger.Log(level, type, _partialLogMessage.TrimEnd());
                     }
                     _partialLogMessage = null;
                 }
@@ -1200,16 +1234,16 @@ namespace DuetControlServer.SPI
             // Check if this is a code reply
             if (flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
             {
-                if (!await _channels.HandleReply(flags, reply))
+                if (!_channels.HandleReply(flags, reply))
                 {
                     // Must be a left-over error message...
-                    await OutputGenericMessage(flags, reply);
+                    OutputGenericMessage(flags, reply);
                 }
             }
             else if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage)
             {
                 // Generic messages to the main object model
-                await OutputGenericMessage(flags, reply);
+                OutputGenericMessage(flags, reply);
             }
             else
             {
@@ -1227,8 +1261,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="flags">Message flags</param>
         /// <param name="reply">Message content</param>
-        /// <returns>Asynchronous task</returns>
-        private static async Task OutputGenericMessage(MessageTypeFlags flags, string reply)
+        private static void OutputGenericMessage(MessageTypeFlags flags, string reply)
         {
             _partialGenericMessage += reply;
             if (!flags.HasFlag(MessageTypeFlags.PushFlag))
@@ -1238,7 +1271,7 @@ namespace DuetControlServer.SPI
                     MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                                         : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                             : MessageType.Success;
-                    await Model.Provider.Output(type, _partialGenericMessage.TrimEnd());
+                    Model.Provider.Output(type, _partialGenericMessage.TrimEnd());
                 }
                 _partialGenericMessage = null;
             }
@@ -1247,30 +1280,28 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Handle a macro request
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static async Task HandleMacroRequest()
+        private static void HandleMacroRequest()
         {
             DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool fromCode, out string filename);
             _logger.Trace("Received macro request for file {0} on channel {1}", filename, channel);
 
-            using (await _channels[channel].LockAsync())
+            using (_channels[channel].Lock())
             {
-                await _channels[channel].DoMacroFile(filename, fromCode);
+                _channels[channel].DoMacroFile(filename, fromCode);
             }
         }
 
         /// <summary>
         /// Handle a file abort request
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static async Task HandleAbortFileRequest()
+        private static void HandleAbortFileRequest()
         {
             DataTransfer.ReadAbortFile(out CodeChannel channel, out bool abortAll);
             _logger.Info("Received file abort request on channel {0} for {1}", channel, abortAll ? "all files" : "the last file");
 
-            using (await _channels[channel].LockAsync())
+            using (_channels[channel].Lock())
             {
-                await _channels[channel].AbortFiles(abortAll, true);
+                _channels[channel].AbortFiles(abortAll, true);
             }
         }
 
@@ -1278,19 +1309,19 @@ namespace DuetControlServer.SPI
         /// Deal with paused print events
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        private static async Task HandlePrintPaused()
+        private static void HandlePrintPaused()
         {
             DataTransfer.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
             _logger.Trace("Received print pause notification for file position {0}, reason {1}", filePosition, pauseReason);
 
             // Update the object model
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (Model.Provider.AccessReadWrite())
             {
                 Model.Provider.Get.State.Status = MachineStatus.Paused;
             }
 
             // Pause the print
-            using (await FileExecution.Job.LockAsync())
+            using (FileExecution.Job.Lock())
             {
                 // Do NOT supply a file position if this is a pause request initiated from G-code because that would lead to an endless loop
                 bool filePositionValid = (filePosition != Consts.NoFilePosition) && (pauseReason != PrintPausedReason.GCode) && (pauseReason != PrintPausedReason.FilamentChange);
@@ -1298,7 +1329,7 @@ namespace DuetControlServer.SPI
             }
 
             // Resolve pending and buffered codes on the file channel
-            using (await _channels[CodeChannel.File].LockAsync())
+            using (_channels[CodeChannel.File].Lock())
             {
                 _channels[CodeChannel.File].InvalidateRegular();
             }
@@ -1308,12 +1339,12 @@ namespace DuetControlServer.SPI
         /// Process a received height map
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        private static async Task HandleHeightMap()
+        private static void HandleHeightMap()
         {
             DataTransfer.ReadHeightMap(out Heightmap map);
             _logger.Trace("Received heightmap");
 
-            using (await _heightmapLock.LockAsync(Program.CancellationToken))
+            using (_heightmapLock.Lock(Program.CancellationToken))
             {
                 _getHeightmapRequest?.SetResult(map);
                 _getHeightmapRequest = null;
@@ -1324,12 +1355,12 @@ namespace DuetControlServer.SPI
         /// Deal with the confirmation that a resource has been locked
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        private static async Task HandleResourceLocked()
+        private static void HandleResourceLocked()
         {
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
             _logger.Trace("Received resource locked notification for channel {0}", channel);
 
-            using (await _channels[channel].LockAsync())
+            using (_channels[channel].Lock())
             {
                 _channels[channel].ResourceLocked();
             }
@@ -1339,9 +1370,9 @@ namespace DuetControlServer.SPI
         /// Process a request for a chunk of a given file
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        private static async Task HandleFileChunkRequest()
+        private static void HandleFileChunkRequest()
         {
-            DataTransfer.ReadFileChunkRequest(out string filename, out uint offset, out uint maxLength);
+            DataTransfer.ReadFileChunkRequest(out string filename, out uint offset, out int maxLength);
             _logger.Debug("Received file chunk request for {0}, offset {1}, maxLength {2}", filename, offset, maxLength);
 
             try
@@ -1349,25 +1380,25 @@ namespace DuetControlServer.SPI
                 string filePath;
                 if (filename.EndsWith(".bin") || filename.EndsWith(".uf2"))
                 {
-                    filePath = await FilePath.ToPhysicalAsync(filename, FileDirectory.Firmware);
+                    filePath = FilePath.ToPhysical(filename, FileDirectory.Firmware);
                     if (!File.Exists(filePath))
                     {
-                        filePath = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
+                        filePath = FilePath.ToPhysical(filename, FileDirectory.System);
                     }
                 }
                 else
                 {
-                    filePath = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
+                    filePath = FilePath.ToPhysical(filename, FileDirectory.System);
                 }
 
                 using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read)
                 {
                     Position = offset
                 };
-                byte[] buffer = new byte[maxLength];
-                int bytesRead = await fs.ReadAsync(buffer);
+                Span<byte> buffer = stackalloc byte[maxLength];
+                int bytesRead = fs.Read(buffer);
 
-                DataTransfer.WriteFileChunk(buffer.AsSpan(0, bytesRead), fs.Length);
+                DataTransfer.WriteFileChunk((bytesRead > 0) ? buffer[..bytesRead] : Span<byte>.Empty, fs.Length);
             }
             catch (Exception e)
             {
@@ -1410,12 +1441,12 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Handle a firmware request to perform a G/M/T-code in DSF
         /// </summary>
-        private static async Task HandleDoCode()
+        private static void HandleDoCode()
         {
             DataTransfer.ReadDoCode(out CodeChannel channel, out string code);
             _logger.Trace("Received firmware code request on channel {0} => {1}", channel, code);
 
-            using (await _channels[channel].LockAsync())
+            using (_channels[channel].Lock())
             {
                 _channels[channel].DoFirmwareCode(code);
             }
@@ -1424,13 +1455,12 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Handle a firmware request to wait for a message to be acknowledged
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static async Task HandleWaitForAcknowledgement()
+        private static void HandleWaitForAcknowledgement()
         {
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
             _logger.Trace("Received wait for message acknowledgement on channel {0}", channel);
 
-            using (await _channels[channel].LockAsync())
+            using (_channels[channel].Lock())
             {
                 _channels[channel].WaitForAcknowledgement();
             }
@@ -1439,30 +1469,28 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Handle a firmwre request that is sent when RRF has internally closed a macro file
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static async Task HandleMacroFileClosed()
+        private static void HandleMacroFileClosed()
         {
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
             _logger.Trace("Received file closal on channel {0}", channel);
 
-            using (await _channels[channel].LockAsync())
+            using (_channels[channel].Lock())
             {
-                await _channels[channel].MacroFileClosed();
+                _channels[channel].MacroFileClosed();
             }
         }
 
         /// <summary>
         /// Handle a firmwre request that is sent when RRF has succesfully acknowledged a blocking message
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static async Task HandleMessageAcknowledgement()
+        private static void HandleMessageAcknowledgement()
         {
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
             _logger.Trace("Received message acknowledgement on channel {0}", channel);
 
-            using (await _channels[channel].LockAsync())
+            using (_channels[channel].Lock())
             {
-                await _channels[channel].MessageAcknowledged();
+                _channels[channel].MessageAcknowledged();
             }
         }
 
@@ -1500,13 +1528,13 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Check if a file exists
         /// </summary>
-        private static async Task HandleCheckFileExists()
+        private static void HandleCheckFileExists()
         {
             DataTransfer.ReadCheckFileExists(out string filename);
 
             try
             {
-                string physicalFile = await FilePath.ToPhysicalAsync(filename);
+                string physicalFile = FilePath.ToPhysical(filename);
                 bool exists = File.Exists(physicalFile);
                 DataTransfer.WriteCheckFileExistsResult(exists);
             }
@@ -1520,7 +1548,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Try to open a file
         /// </summary>
-        private static async Task HandleOpenFile()
+        private static void HandleOpenFile()
         {
             DataTransfer.ReadOpenFile(out string filename, out bool forWriting, out bool append, out long preAllocSize);
             _logger.Debug("Opening {0} for {1} ({2}appending), prealloc {3}", filename, forWriting ? "writing" : "reading", append ? string.Empty : "not ", preAllocSize);
@@ -1528,7 +1556,7 @@ namespace DuetControlServer.SPI
             try
             {
                 // Resolve the path and create the parent directory if necessary
-                string physicalFile = await FilePath.ToPhysicalAsync(filename), parentDirectory = Path.GetDirectoryName(physicalFile);
+                string physicalFile = FilePath.ToPhysical(filename), parentDirectory = Path.GetDirectoryName(physicalFile);
                 if (!Directory.Exists(parentDirectory))
                 {
                     Directory.CreateDirectory(parentDirectory);
@@ -1564,20 +1592,20 @@ namespace DuetControlServer.SPI
         /// Read more from a given file
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        private static async Task HandleReadFile()
+        private static void HandleReadFile()
         {
-            DataTransfer.ReadFileRequest(out uint handle, out uint maxLength);
+            DataTransfer.ReadFileRequest(out uint handle, out int maxLength);
             _logger.Debug("Reading up to {0} bytes from file #{1}", maxLength, handle);
 
             try
             {
                 // Read file content as requested
                 FileStream fs = _openFiles[handle];
-                byte[] data = new byte[maxLength];
-                int bytesRead = await fs.ReadAsync(data);
+                Span<byte> data = stackalloc byte[maxLength];
+                int bytesRead = fs.Read(data);
 
                 // Send it back
-                DataTransfer.WriteFileReadResult((bytesRead > 0) ? data[..bytesRead] : Array.Empty<byte>(), bytesRead);
+                DataTransfer.WriteFileReadResult((bytesRead > 0) ? data[..bytesRead] : Span<byte>.Empty, bytesRead);
             }
             catch (Exception e)
             {
@@ -1590,16 +1618,16 @@ namespace DuetControlServer.SPI
         /// Write more to a given file
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        private static async Task HandleWriteFile()
+        private static void HandleWriteFile()
         {
-            DataTransfer.ReadWriteRequest(out uint handle, out ReadOnlyMemory<byte> data);
+            DataTransfer.ReadWriteRequest(out uint handle, out ReadOnlySpan<byte> data);
             _logger.Debug("Writing {0} bytes to file #{1}", data.Length, handle);
 
             try
             {
                 // Write file content as requested
                 FileStream fs = _openFiles[handle];
-                await fs.WriteAsync(data);
+                fs.Write(data);
 
                 // Send it back
                 DataTransfer.WriteFileWriteResult(true);
@@ -1690,22 +1718,22 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="message">Reason why everything is being invalidated</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task Invalidate(string message)
+        private static void Invalidate(string message)
         {
             // Cancel the file being printed
             bool outputMessage;
-            using (await FileExecution.Job.LockAsync())
+            using (FileExecution.Job.Lock())
             {
                 outputMessage = FileExecution.Job.IsProcessing;
-                await FileExecution.Job.Abort();
+                FileExecution.Job.Abort();
             }
 
             // Resolve pending macros, unbuffered (system) codes and flush requests
             foreach (Channel.Processor channel in _channels)
             {
-                using (await channel.LockAsync())
+                using (channel.Lock())
                 {
-                    outputMessage |= await channel.Invalidate();
+                    outputMessage |= channel.Invalidate();
                 }
             }
             _bytesReserved = _bufferSpace = 0;
@@ -1740,7 +1768,7 @@ namespace DuetControlServer.SPI
             }
 
             // Resolve pending heightmap requests
-            using (await _heightmapLock.LockAsync(Program.CancellationToken))
+            using (_heightmapLock.Lock(Program.CancellationToken))
             {
                 if (_getHeightmapRequest != null)
                 {
@@ -1758,7 +1786,7 @@ namespace DuetControlServer.SPI
             }
 
             // No longer starting or stopping a print
-            using (await _printStateLock.LockAsync(Program.CancellationToken))
+            using (_printStateLock.Lock(Program.CancellationToken))
             {
                 if (_setPrintInfoRequest != null)
                 {
@@ -1800,11 +1828,11 @@ namespace DuetControlServer.SPI
             {
                 if (outputMessage)
                 {
-                    await Logger.LogOutput(MessageType.Warning, message);
+                    Logger.LogOutput(MessageType.Warning, message);
                 }
                 else
                 {
-                    await Logger.Log(MessageType.Warning, message);
+                    Logger.Log(MessageType.Warning, message);
                 }
             }
         }

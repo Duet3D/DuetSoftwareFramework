@@ -250,8 +250,21 @@ namespace DuetControlServer.Model
         /// Wait for an update to occur
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
+        public static void WaitForUpdate(CancellationToken cancellationToken)
+        {
+            using (_updateLock.Lock(cancellationToken))
+            {
+                _updateEvent.Wait(cancellationToken);
+                Program.CancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+
+        /// <summary>
+        /// Wait for an update to occur asynchronously
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task WaitForUpdate(CancellationToken cancellationToken)
+        public static async Task WaitForUpdateAsync(CancellationToken cancellationToken)
         {
             using (await _updateLock.LockAsync(cancellationToken))
             {
@@ -263,8 +276,13 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Wait for an update to occur
         /// </summary>
+        public static void WaitForUpdate() => WaitForUpdate(Program.CancellationToken);
+
+        /// <summary>
+        /// Wait for an update to occur asynchronously
+        /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static Task WaitForUpdate() => WaitForUpdate(Program.CancellationToken);
+        public static Task WaitForUpdateAsync() => WaitForUpdateAsync(Program.CancellationToken);
 
         /// <summary>
         /// Output a generic message
@@ -272,7 +290,48 @@ namespace DuetControlServer.Model
         /// <param name="level">Log level</param>
         /// <param name="message">Message to output</param>
         /// <returns>Whether the message has been written</returns>
-        public static async Task<bool> Output(LogLevel level, Message message)
+        public static bool Output(LogLevel level, Message message)
+        {
+            if (!string.IsNullOrWhiteSpace(message?.Content))
+            {
+                using (AccessReadWrite())
+                {
+                    // Can we output this message?
+                    if (Get.State.LogLevel == LogLevel.Off || (byte)Get.State.LogLevel + (byte)level < 3)
+                    {
+                        return false;
+                    }
+
+                    // Print the message to the DCS log
+                    switch (message.Type)
+                    {
+                        case MessageType.Error:
+                            _logger.Error(message.Content);
+                            break;
+                        case MessageType.Warning:
+                            _logger.Warn(message.Content);
+                            break;
+                        default:
+                            _logger.Info(message.Content);
+                            break;
+                    }
+
+                    // Send it to the object model
+                    Get.Messages.Add(message);
+                }
+
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Output a generic message asynchronously
+        /// </summary>
+        /// <param name="level">Log level</param>
+        /// <param name="message">Message to output</param>
+        /// <returns>Whether the message has been written</returns>
+        public static async Task<bool> OutputAsync(LogLevel level, Message message)
         {
             if (!string.IsNullOrWhiteSpace(message?.Content))
             {
@@ -306,12 +365,44 @@ namespace DuetControlServer.Model
             }
             return false;
         }
+
         /// <summary>
         /// Output a generic message
         /// </summary>
         /// <param name="message">Message to output</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Output(Message message)
+        public static void Output(Message message)
+        {
+            if (!string.IsNullOrWhiteSpace(message?.Content))
+            {
+                // Print the message to the DCS log
+                switch (message.Type)
+                {
+                    case MessageType.Error:
+                        _logger.Error(message.Content);
+                        break;
+                    case MessageType.Warning:
+                        _logger.Warn(message.Content);
+                        break;
+                    default:
+                        _logger.Info(message.Content);
+                        break;
+                }
+
+                // Send it to the object model
+                using (AccessReadWrite())
+                {
+                    Get.Messages.Add(message);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Output a generic message asynchronously
+        /// </summary>
+        /// <param name="message">Message to output</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task OutputAsync(Message message)
         {
             if (!string.IsNullOrWhiteSpace(message?.Content))
             {
@@ -343,6 +434,14 @@ namespace DuetControlServer.Model
         /// <param name="type">Type of the message</param>
         /// <param name="content">Content of the message</param>
         /// <returns>Asynchronous task</returns>
-        public static Task Output(MessageType type, string content) => Output(new Message(type, content));
+        public static void Output(MessageType type, string content) => Output(new Message(type, content));
+
+        /// <summary>
+        /// Output a generic message asynchronously
+        /// </summary>
+        /// <param name="type">Type of the message</param>
+        /// <param name="content">Content of the message</param>
+        /// <returns>Asynchronous task</returns>
+        public static Task OutputAsync(MessageType type, string content) => OutputAsync(new Message(type, content));
     }
 }

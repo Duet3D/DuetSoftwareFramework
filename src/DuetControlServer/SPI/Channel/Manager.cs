@@ -90,8 +90,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Process requests in the G-code channel processors
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public async Task Run()
+        public void Run()
         {
             // Iterate over all the available channels
             bool overlapped = false;
@@ -99,9 +98,9 @@ namespace DuetControlServer.SPI.Channel
             while (channel != _nextChannel || !overlapped)
             {
                 Processor channelProcessor = this[channel];
-                using (await channelProcessor.LockAsync())
+                using (channelProcessor.Lock())
                 {
-                    await channelProcessor.Run();
+                    channelProcessor.Run();
                 }
 
                 channel++;
@@ -126,16 +125,16 @@ namespace DuetControlServer.SPI.Channel
         /// <param name="flags">Message type flags</param>
         /// <param name="reply">Message content</param>
         /// <returns>Whether the reply could be handled</returns>
-        public async Task<bool> HandleReply(MessageTypeFlags flags, string reply)
+        public bool HandleReply(MessageTypeFlags flags, string reply)
         {
             foreach (Processor channel in _channels)
             {
                 MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)channel.Channel);
                 if (flags.HasFlag(channelFlag))
                 {
-                    using (await channel.LockAsync())
+                    using (channel.Lock())
                     {
-                        return await channel.HandleReply(flags, reply);
+                        return channel.HandleReply(flags, reply);
                     }
                 }
             }

@@ -44,7 +44,7 @@ namespace DuetControlServer.Commands
                     catch (Exception e)
                     {
                         _logger.Debug(e);
-                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to start plugin {pluginName}: {e.Message}");
+                        await Utility.Logger.LogOutputAsync(MessageType.Error, $"Failed to start plugin {pluginName}: {e.Message}");
                     }
                 }
             }
