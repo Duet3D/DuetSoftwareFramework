@@ -435,6 +435,15 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Read a request to delete a file or directory
+        /// </summary>
+        /// <param name="filename">Name of the file</param>
+        public static void ReadDeleteFileOrDirectory(out string filename)
+        {
+            Serialization.Reader.ReadStringRequest(_packetData.Span, out filename);
+        }
+
+        /// <summary>
         /// Read an open file request
         /// </summary>
         /// <param name="filename">Filename to open</param>
@@ -1179,6 +1188,24 @@ namespace DuetControlServer.SPI
 
             WritePacket(Communication.LinuxRequests.Request.CheckFileExistsResult, dataLength);
             Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), exists);
+            return true;
+        }
+
+        /// <summary>
+        /// Send back whether a file or directory could be deleted
+        /// </summary>
+        /// <param name="exists">Whether the file exists</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteFileDeleteResult(bool success)
+        {
+            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.BooleanHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.LinuxRequests.Request.FileDeleteResult, dataLength);
+            Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), success);
             return true;
         }
 

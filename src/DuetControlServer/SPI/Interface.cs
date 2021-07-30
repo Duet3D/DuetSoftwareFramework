@@ -1128,6 +1128,9 @@ namespace DuetControlServer.SPI
                 case Request.CheckFileExists:
                     HandleCheckFileExists();
                     break;
+                case Request.DeleteFileOrDirectory:
+                    HandleDeleteFileOrDirectory();
+                    break;
                 case Request.OpenFile:
                     HandleOpenFile();
                     break;
@@ -1522,6 +1525,7 @@ namespace DuetControlServer.SPI
         private static void HandleCheckFileExists()
         {
             DataTransfer.ReadCheckFileExists(out string filename);
+            _logger.Debug("Checking if file {0} exists", filename);
 
             try
             {
@@ -1533,6 +1537,35 @@ namespace DuetControlServer.SPI
             {
                 _logger.Error(e, "Failed to check if file {0} exists", filename);
                 DataTransfer.WriteCheckFileExistsResult(false);
+            }
+        }
+
+        /// <summary>
+        /// Delete a file or directory
+        /// </summary>
+        private static void HandleDeleteFileOrDirectory()
+        {
+            DataTransfer.ReadDeleteFileOrDirectory(out string filename);
+            _logger.Debug("Attempting to delete {0}", filename);
+
+            try
+            {
+                string physicalFile = FilePath.ToPhysical(filename);
+                if (Directory.Exists(physicalFile))
+                {
+                    Directory.Delete(physicalFile);
+                    DataTransfer.WriteFileDeleteResult(true);
+                }
+                else
+                {
+                    File.Delete(physicalFile);
+                    DataTransfer.WriteFileDeleteResult(true);
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Failed to delete file or directory {0}", filename);
+                DataTransfer.WriteFileDeleteResult(false);
             }
         }
 
