@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -140,8 +141,8 @@ namespace DuetControlServer
             // Start main tasks in the background
             Dictionary<Task, string> mainTasks = new()
             {
+                { Utility.PriorityThreadRunner.Start(SPI.Interface.Run, ThreadPriority.Highest), "SPI" },
                 { Task.Factory.StartNew(Model.Updater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Update" },
-                { Task.Factory.StartNew(SPI.Interface.Run, TaskCreationOptions.LongRunning).Unwrap(), "SPI" },
                 { Task.Factory.StartNew(IPC.Server.Run, TaskCreationOptions.LongRunning).Unwrap(), "IPC" },
                 { Task.Factory.StartNew(FileExecution.Job.Run, TaskCreationOptions.LongRunning).Unwrap(), "Job" },
                 { Task.Factory.StartNew(Model.PeriodicUpdater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Periodic updater" }
@@ -264,7 +265,7 @@ namespace DuetControlServer
                 await stopCommand.Execute();
 
                 // Shut down DCS
-                SPI.Interface.Invalidate(null);
+                SPI.Interface.Shutdown();
                 _cancelSource.Cancel();
             }
 
@@ -363,14 +364,10 @@ namespace DuetControlServer
                 _logger.Error(e, "Failed to stop plugins");
             }
 
-            // Try to shut down this program normally 
-            SPI.Interface.Invalidate(null);
-            _cancelSource.Cancel();
-
             // Wait for potential firmware update to finish
             await SPI.Interface.WaitForUpdate();
 
-            // If that fails, kill the program forcefully
+            // Set up a watchdog to kill the program forcefully if anything hangs up
             Task terminationTask = Task.Delay(4500, _programTerminated.Token).ContinueWith(async task =>
             {
                 try
@@ -383,6 +380,10 @@ namespace DuetControlServer
                     // expected
                 }
             }, TaskContinuationOptions.RunContinuationsAsynchronously);
+
+            // Try to shut down this program normally
+            SPI.Interface.Shutdown();
+            _cancelSource.Cancel();
 
             // Wait for program termination if required
             if (waitForTermination)

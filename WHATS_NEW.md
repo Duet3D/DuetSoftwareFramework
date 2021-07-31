@@ -20,6 +20,7 @@ Bug fixes:
 - Certain UTF-8 strings could be truncated when sent to RRF
 - Fixed race condition when attempting to save updated filament mapping
 - `GetFileInfo` requests attempted to parse non-GCode files
+- M-codes could have G-parameters, now only T-parameters are permitted
 
 Version 3.4-b1
 ==============

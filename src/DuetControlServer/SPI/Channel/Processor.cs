@@ -452,7 +452,7 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         /// <param name="code">Optional code for the flush target</param>
         /// <returns>Whether the codes could be flushed</returns>
-        public Task<bool> Flush(Code code = null)
+        public Task<bool> FlushAsync(Code code = null)
         {
             TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 

@@ -28,12 +28,12 @@
         /// <summary>
         /// Minimum acceleration (in mm/s)
         /// </summary>
-        public float MinimumAcceleration
+        public float MinAcceleration
         {
-            get => _minimumAcceleration;
-            set => SetPropertyValue(ref _minimumAcceleration, value);
+            get => _minAcceleration;
+            set => SetPropertyValue(ref _minAcceleration, value);
         }
-        private float _minimumAcceleration = 10F;
+        private float _minAcceleration = 10F;
 
         /// <summary>
         /// Configured input shaping type

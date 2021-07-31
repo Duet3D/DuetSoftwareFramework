@@ -40,22 +40,25 @@ namespace DuetAPI.ObjectModel
         public string Content { get; set; } = string.Empty;
 
         /// <summary>
-        /// Replace the content if empty or append a new line
+        /// Replace the content if empty or append a new line that is not empty
         /// </summary>
         /// <param name="line">Line content</param>
         public void AppendLine(string line)
         {
-            if (string.IsNullOrEmpty(Content))
+            if (!string.IsNullOrWhiteSpace(line))
             {
-                Content = line;
-            }
-            else
-            {
-                if (!Content.EndsWith('\n'))
+                if (string.IsNullOrEmpty(Content))
                 {
-                    Content += '\n';
+                    Content = line;
                 }
-                Content += line;
+                else
+                {
+                    if (!Content.EndsWith('\n'))
+                    {
+                        Content += '\n';
+                    }
+                    Content += line;
+                }
             }
         }
 

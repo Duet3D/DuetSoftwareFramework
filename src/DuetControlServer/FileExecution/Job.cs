@@ -173,7 +173,7 @@ namespace DuetControlServer.FileExecution
             // A file being printed may start another file print
             if (IsFileSelected)
             {
-                await Cancel();
+                await CancelAsync();
                 Resume();
                 await _finished.WaitAsync(Program.CancellationToken);
             }
@@ -338,7 +338,7 @@ namespace DuetControlServer.FileExecution
                         }
                         else
                         {
-                            using (await LockAsync())
+                            using (await _lock.LockAsync(Program.CancellationToken))
                             {
                                 if (IsPaused)
                                 {
@@ -473,8 +473,28 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Cancel the current print (e.g. when M0/M1 is called)
         /// </summary>
+        public static void Cancel()
+        {
+            if (IsFileSelected)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+
+                using (_file.Lock())
+                {
+                    _file.Close();
+                }
+                IsCancelled = IsPaused;
+                // Resume() needs to be called manually
+            }
+        }
+
+        /// <summary>
+        /// Cancel the current print (e.g. when M0/M1 is called)
+        /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task Cancel()
+        public static async Task CancelAsync()
         {
             if (IsFileSelected)
             {

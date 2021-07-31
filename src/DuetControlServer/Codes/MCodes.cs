@@ -61,7 +61,7 @@ namespace DuetControlServer.Codes
                                 }
 
                                 // Invalidate the print file and make sure no more codes are read from it
-                                await FileExecution.Job.Cancel();
+                                await FileExecution.Job.CancelAsync();
                             }
                         }
                         break;

@@ -20,7 +20,6 @@ namespace DuetAPI.ObjectModel
             get => _id;
             set
             {
-#warning Check why this isn't propagated...
                 if (string.IsNullOrWhiteSpace(value) || value.Length > 32)
                 {
                     throw new ArgumentException("Invalid plugin identifier");

@@ -181,12 +181,9 @@ namespace DuetControlServer.Files
 
             if (disposing)
             {
-                using (_lock.Lock())
-                {
-                    IsClosed = true;
-                    _reader.Dispose();
-                    _fileStream.Dispose();
-                }
+                IsClosed = true;
+                _reader.Dispose();
+                _fileStream.Dispose();
             }
 
             disposed = true;

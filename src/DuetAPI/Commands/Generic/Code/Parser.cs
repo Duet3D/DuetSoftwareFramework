@@ -525,10 +525,11 @@ namespace DuetAPI.Commands
                     // Stop if another G/M/T code is coming up and this one is complete
                     int next = reader.Peek();
                     char nextChar = (next == -1) ? '\n' : char.ToUpperInvariant((char)next);
-                    if (result.MajorNumber != null && result.MajorNumber != 53 && (nextChar == 'G' || nextChar == 'M' || nextChar == 'T') &&
-                        (nextChar == 'M' || result.Type != CodeType.MCode || result.Parameters.Any(item => item.Letter == nextChar)))
+                    if ((nextChar == 'G' || nextChar == 'M' || nextChar == 'T') && result.Type != CodeType.None &&
+                        (result.Type != CodeType.GCode || result.MajorNumber != 53) &&
+                        (nextChar != 'T' || result.Type == CodeType.TCode || result.Parameters.Any(item => item.Letter == 'T')))
                     {
-                        // Note that M-codes may have G or T parameters but only one
+                        // Note that G- and M-codes may T parameters
                         break;
                     }
                 }
