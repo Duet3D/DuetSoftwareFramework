@@ -1282,38 +1282,29 @@ namespace DuetControlServer.SPI.Channel
         /// Invalidate every request and buffered code on this channel
         /// </summary>
         /// <returns>If any resource has been invalidated</returns>
-        public bool Invalidate()
+        public void Invalidate()
         {
-            bool resourceInvalidated = false;
-
             // Invalidate the stack
             do
             {
                 while (CurrentState.LockRequests.TryDequeue(out LockRequest lockRequest))
                 {
                     lockRequest.Resolve(false);
-                    resourceInvalidated = true;
                 }
 
                 while (CurrentState.SuspendedCodes.TryDequeue(out Code suspendedCode))
                 {
                     suspendedCode.FirmwareTCS.SetCanceled();
-                    resourceInvalidated = true;
                 }
-
-                // Macro files and their start codes are disposed by Pop()
-                resourceInvalidated |= (CurrentState.Macro != null);
 
                 while (CurrentState.PendingCodes.TryDequeue(out Code pendingCode))
                 {
                     pendingCode.FirmwareTCS.SetCanceled();
-                    resourceInvalidated = true;
                 }
 
                 while (CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
                 {
                     source.SetResult(false);
-                    resourceInvalidated = true;
                 }
 
                 if (Stack.Count == 1)
@@ -1328,7 +1319,6 @@ namespace DuetControlServer.SPI.Channel
             foreach (Code bufferedCode in BufferedCodes)
             {
                 bufferedCode.FirmwareTCS.SetCanceled();
-                resourceInvalidated = true;
             }
             BufferedCodes.Clear();
             BytesBuffered = 0;
@@ -1336,9 +1326,6 @@ namespace DuetControlServer.SPI.Channel
             // Clear codes that are still pending but have not been fed into the SPI interface yet
             Code.CancelPending(Channel);
             _allFilesAborted = false;
-
-            // Done
-            return resourceInvalidated;
         }
     }
 }

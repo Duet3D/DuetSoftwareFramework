@@ -22,6 +22,7 @@ namespace DuetControlServer.Model
         /// <returns>Expression items</returns>
         private static IEnumerable<string> SplitExpression(string expression)
         {
+            int numBraces = 0;
             StringBuilder parsedExpression = new();
             bool inQuotes = false;
             char lastC = '\0';
@@ -40,13 +41,21 @@ namespace DuetControlServer.Model
                     inQuotes = true;
                     parsedExpression.Append(c);
                 }
-                else if (c == ',')
+                else if (c == ',' && numBraces == 0)
                 {
                     yield return parsedExpression.ToString().Trim();
                     parsedExpression.Clear();
                 }
                 else
                 {
+                    if (c == '(')
+                    {
+                        numBraces++;
+                    }
+                    else if (c == ')')
+                    {
+                        numBraces--;
+                    }
                     parsedExpression.Append(c);
                 }
             }
@@ -376,7 +385,7 @@ namespace DuetControlServer.Model
             Stack<StringBuilder> parsedExpressions = new();
             parsedExpressions.Push(new StringBuilder());
 
-            bool inQuotes = false, isExistsQuery = false;
+            bool inQuotes = false, skipEvaluation = false;
             char lastC = '\0';
             foreach (char c in expression)
             {
@@ -395,7 +404,8 @@ namespace DuetControlServer.Model
                 }
                 else if (c == '{' || c == '(' || c == '[')
                 {
-                    isExistsQuery = (c == '(') && parsedExpressions.Peek().ToString().TrimEnd().EndsWith("exists");
+                    // FIXME need better way to deal with functions with more than one parameter
+                    skipEvaluation = (c == '(') && parsedExpressions.Peek().ToString().TrimEnd().EndsWith("exists") || parsedExpressions.Peek().ToString().TrimEnd().EndsWith("mod");
                     lastBracketTypes.Push(c);
                     parsedExpressions.Push(new StringBuilder());
                 }
@@ -424,13 +434,13 @@ namespace DuetControlServer.Model
                         }
 
                         string subExpression = parsedExpressions.Pop().ToString();
-                        if (isExistsQuery)
+                        if (skipEvaluation)
                         {
                             // Queries that take identifier paths must not be evaluated...
                             parsedExpressions.Peek().Append('(');
                             parsedExpressions.Peek().Append(subExpression);
                             parsedExpressions.Peek().Append(')');
-                            isExistsQuery = false;
+                            skipEvaluation = false;
                         }
                         else
                         {

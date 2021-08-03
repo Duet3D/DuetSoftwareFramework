@@ -114,7 +114,7 @@ namespace LinuxApi
         /// <summary>
         /// Size of the event data struct
         /// </summary>
-        private static readonly int _sizeOfEventData = Marshal.SizeOf(typeof(gpioevent_data));
+        private static readonly int _sizeOfEventData = Marshal.SizeOf<gpioevent_data>();
 
         /// <summary>
         /// Wait for a pin event to occur

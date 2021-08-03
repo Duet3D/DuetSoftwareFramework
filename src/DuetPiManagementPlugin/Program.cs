@@ -3,6 +3,7 @@ using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using System;
+using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Text;
@@ -27,6 +28,8 @@ namespace DuetPiManagementPlugin
         /// </summary>
         public static readonly string[] CodesToIntercept =
         {
+            "M21",      // Initialize SD card
+            "M22",      // Release SD card
             "M540",     // Set MAC address
             "M550",     // Set Name
             "M552",     // Set IP address, enable/disable network interface
@@ -42,7 +45,7 @@ namespace DuetPiManagementPlugin
         /// <summary>
         /// Connection used for intecepting codes
         /// </summary>
-        public static InterceptConnection Connection { get; private set; } = new InterceptConnection();
+        public static InterceptConnection Connection { get; } = new();
 
         /// <summary>
         /// Global cancellation source that is triggered when the program is supposed to terminate
@@ -116,8 +119,83 @@ namespace DuetPiManagementPlugin
                     break;
                 }
 
+                if (code.Type != CodeType.MCode)
+                {
+                    // We're only interested in M-codes...
+                    continue;
+                }
+
                 switch (code.MajorNumber)
                 {
+                    // Initialize SD card
+                    case 21:
+                        if (code.Parameter('P').Type == typeof(string))
+                        {
+                            if (await Connection.Flush(CancellationToken))
+                            {
+                                string device = code.Parameter('P'), directory = code.Parameter('S');
+                                string type = code.Parameter('T'), options = code.Parameter('O');
+                                try
+                                {
+                                    if (!string.IsNullOrEmpty(directory))
+                                    {
+                                        directory = await Connection.ResolvePath(directory, CancellationToken);
+                                    }
+                                    Message result = await Mount.MountShare(device, directory, type, options);
+                                    await Connection.ResolveCode(result, CancellationToken);
+                                }
+                                catch (Exception e)
+                                {
+                                    await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
+                                    Console.WriteLine(e);
+                                }
+                            }
+                            else
+                            {
+                                await Connection.CancelCode();
+                            }
+                        }
+                        else
+                        {
+                            await Connection.IgnoreCode();
+                        }
+                        break;
+
+                    // Release SD card
+                    case 22:
+                        if (code.Parameter('P').Type == typeof(string))
+                        {
+                            if (await Connection.Flush(CancellationToken))
+                            {
+                                string node = code.Parameter('P');
+                                try
+                                {
+                                    string directory = await Connection.ResolvePath(node, CancellationToken);
+                                    if (Directory.Exists(directory))
+                                    {
+                                        node = directory;
+                                    }
+
+                                    Message result = await Mount.UnmountShare(node);
+                                    await Connection.ResolveCode(result, CancellationToken);
+                                }
+                                catch (Exception e)
+                                {
+                                    await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
+                                    Console.WriteLine(e);
+                                }
+                            }
+                            else
+                            {
+                                await Connection.CancelCode();
+                            }
+                        }
+                        else
+                        {
+                            await Connection.IgnoreCode();
+                        }
+                        break;
+
                     // Set MAC address
                     case 540:
                         if (await Connection.Flush(CancellationToken))

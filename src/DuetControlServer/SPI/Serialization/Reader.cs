@@ -160,7 +160,7 @@ namespace DuetControlServer.SPI.Serialization
                 NumY = header.NumY
             };
 
-            int headerSize = Marshal.SizeOf<HeightMapHeader>(), dataLength = Marshal.SizeOf<float>() * map.NumX * map.NumY;
+            int headerSize = Marshal.SizeOf<HeightMapHeader>(), dataLength = sizeof(float) * map.NumX * map.NumY;
             if (from.Length > headerSize)
             {
                 ReadOnlySpan<byte> zCoordinates = from.Slice(headerSize, dataLength);
@@ -246,7 +246,7 @@ namespace DuetControlServer.SPI.Serialization
                     for (int i = 0; i < header.IntValue; i++)
                     {
                         intArray[i] = MemoryMarshal.Read<int>(from[bytesRead..]);
-                        bytesRead += Marshal.SizeOf<int>();
+                        bytesRead += sizeof(int);
                     }
                     result = intArray;
                     break;
@@ -255,7 +255,7 @@ namespace DuetControlServer.SPI.Serialization
                     for (int i = 0; i < header.IntValue; i++)
                     {
                         uintArray[i] = MemoryMarshal.Read<uint>(from[bytesRead..]);
-                        bytesRead += Marshal.SizeOf<uint>();
+                        bytesRead += sizeof(uint);
                     }
                     result = uintArray;
                     break;
@@ -264,7 +264,7 @@ namespace DuetControlServer.SPI.Serialization
                     for (int i = 0; i < header.IntValue; i++)
                     {
                         floatArray[i] = MemoryMarshal.Read<float>(from[bytesRead..]);
-                        bytesRead += Marshal.SizeOf<float>();
+                        bytesRead += sizeof(float);
                     }
                     result = floatArray;
                     break;
@@ -280,7 +280,7 @@ namespace DuetControlServer.SPI.Serialization
                     for (int i = 0; i < header.IntValue; i++)
                     {
                         driverIdArray[i] = new DriverId(MemoryMarshal.Read<uint>(from[bytesRead..]));
-                        bytesRead += Marshal.SizeOf<uint>();
+                        bytesRead += sizeof(uint);
                     }
                     result = driverIdArray;
                     break;
@@ -292,7 +292,7 @@ namespace DuetControlServer.SPI.Serialization
                     for (int i = 0; i < header.IntValue; i++)
                     {
                         boolArray[i] = Convert.ToBoolean(MemoryMarshal.Read<byte>(from[bytesRead..]));
-                        bytesRead += Marshal.SizeOf<byte>();
+                        bytesRead += sizeof(byte);
                     }
                     result = boolArray;
                     break;

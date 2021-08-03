@@ -102,7 +102,7 @@ namespace DuetControlServer.SPI.Serialization
             {
                 int lineNumber = (int)(code.LineNumber ?? 0);
                 MemoryMarshal.Write(to[bytesWritten..], ref lineNumber);
-                bytesWritten += Marshal.SizeOf<int>();
+                bytesWritten += sizeof(int);
             }
 
             // Write parameters
@@ -209,7 +209,7 @@ namespace DuetControlServer.SPI.Serialization
                         {
                             int value = val;
                             MemoryMarshal.Write(to[bytesWritten..], ref value);
-                            bytesWritten += Marshal.SizeOf<int>();
+                            bytesWritten += sizeof(int);
                         }
                     }
                     else if (parameter is uint[] uintArray)
@@ -218,7 +218,7 @@ namespace DuetControlServer.SPI.Serialization
                         {
                             uint value = val;
                             MemoryMarshal.Write(to[bytesWritten..], ref value);
-                            bytesWritten += Marshal.SizeOf<uint>();
+                            bytesWritten += sizeof(uint);
                         }
                     }
                     else if (parameter is DriverId[] driverIdArray)
@@ -227,7 +227,7 @@ namespace DuetControlServer.SPI.Serialization
                         {
                             uint value = val;
                             MemoryMarshal.Write(to[bytesWritten..], ref value);
-                            bytesWritten += Marshal.SizeOf<uint>();
+                            bytesWritten += sizeof(uint);
                         }
                     }
                     else if (parameter is float[] floatArray)
@@ -236,7 +236,7 @@ namespace DuetControlServer.SPI.Serialization
                         {
                             float value = val;
                             MemoryMarshal.Write(to[bytesWritten..], ref value);
-                            bytesWritten += Marshal.SizeOf<float>();
+                            bytesWritten += sizeof(float);
                         }
                     }
                     else if (parameter is string value)
@@ -337,7 +337,7 @@ namespace DuetControlServer.SPI.Serialization
                 {
                     intValue = val;
                     MemoryMarshal.Write(to[bytesWritten..], ref intValue);
-                    bytesWritten += Marshal.SizeOf<int>();
+                    bytesWritten += sizeof(int);
                 }
             }
             else if (value is uint[] uintArray)
@@ -348,7 +348,7 @@ namespace DuetControlServer.SPI.Serialization
                 {
                     uintValue = val;
                     MemoryMarshal.Write(to[bytesWritten..], ref uintValue);
-                    bytesWritten += Marshal.SizeOf<uint>();
+                    bytesWritten += sizeof(uint);
                 }
             }
             else if (value is float[] floatArray)
@@ -359,7 +359,7 @@ namespace DuetControlServer.SPI.Serialization
                 {
                     floatValue = val;
                     MemoryMarshal.Write(to[bytesWritten..], ref floatValue);
-                    bytesWritten += Marshal.SizeOf<float>();
+                    bytesWritten += sizeof(float);
                 }
             }
             else if (value is string stringValue)
@@ -384,7 +384,7 @@ namespace DuetControlServer.SPI.Serialization
                 {
                     uintValue = val;
                     MemoryMarshal.Write(to[bytesWritten..], ref uintValue);
-                    bytesWritten += Marshal.SizeOf<uint>();
+                    bytesWritten += sizeof(uint);
                 }
             }
             else if (value is bool boolValue)
@@ -400,7 +400,7 @@ namespace DuetControlServer.SPI.Serialization
                 {
                     byte byteVal = Convert.ToByte(val);
                     MemoryMarshal.Write(to[bytesWritten..], ref byteVal);
-                    bytesWritten += Marshal.SizeOf<byte>();
+                    bytesWritten += sizeof(byte);
                 }
             }
             else
@@ -457,7 +457,7 @@ namespace DuetControlServer.SPI.Serialization
             {
                 float filamentUsage = filament;
                 MemoryMarshal.Write(to[bytesWritten..], ref filamentUsage);
-                bytesWritten += Marshal.SizeOf<float>();
+                bytesWritten += sizeof(float);
             }
             
             // Write filename

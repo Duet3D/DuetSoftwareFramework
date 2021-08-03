@@ -63,7 +63,7 @@ namespace DuetControlServer.Utility
                     throw new IOException("Invalid magic start in UF2 block");
                 }
 
-                uint magicEnd = MemoryMarshal.Read<uint>(blockBuffer.Slice(UF2MagicEndOffset, Marshal.SizeOf<uint>()).Span);
+                uint magicEnd = MemoryMarshal.Read<uint>(blockBuffer.Slice(UF2MagicEndOffset, sizeof(uint)).Span);
                 if (magicEnd != MagicEnd)
                 {
                     throw new IOException("Invalid magic end in UF2 block");

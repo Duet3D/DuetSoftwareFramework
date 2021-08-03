@@ -9,7 +9,8 @@ New features:
 - Plugin manager may be used to query the installation/runtime status of plugins
 - Added new `cancelling` item to `state.status` enum
 - Subscribers and code stream clients can define what messages they want to receive
-- Added experimental support for array expressions
+- Added support for array expressions
+- DuetPiManagementPlugin now supports (un-)mounting of devices via `M21`/`M22`
 
 Changed behaviour:
 - Web server only sends messages with HTTP target to web clients
@@ -21,6 +22,7 @@ Bug fixes:
 - Fixed race condition when attempting to save updated filament mapping
 - `GetFileInfo` requests attempted to parse non-GCode files
 - M-codes could have G-parameters, now only T-parameters are permitted
+- Functions with more than one parameter were not working in `echo` commands
 
 Version 3.4-b1
 ==============

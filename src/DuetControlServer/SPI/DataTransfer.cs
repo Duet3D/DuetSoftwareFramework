@@ -8,13 +8,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using Code = DuetControlServer.Commands.Code;
-using Nito.AsyncEx;
 using LinuxApi;
 using System.Collections.Generic;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Model;
-using System.Threading.Tasks;
 using DuetControlServer.Utility;
 using System.Diagnostics;
 
@@ -687,13 +685,13 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteGetLegacyConfigResponse()
         {
-            if (!CanWritePacket(Marshal.SizeOf<int>()))
+            if (!CanWritePacket(sizeof(int)))
             {
                 return false;
             }
 
             // Write header
-            WritePacket(Communication.LinuxRequests.Request.GetObjectModel, Marshal.SizeOf<int>());
+            WritePacket(Communication.LinuxRequests.Request.GetObjectModel, sizeof(int));
 
             // Write data
             byte[] configModuleRequest = new byte[] { 0, 0, 5, 0 };
@@ -1572,7 +1570,7 @@ namespace DuetControlServer.SPI
         /// <returns>Received response</returns>
         private static uint ExchangeResponse(uint response)
         {
-            Span<byte> txResponseBuffer = stackalloc byte[Marshal.SizeOf<uint>()], rxResponseBuffer = stackalloc byte[Marshal.SizeOf<uint>()];
+            Span<byte> txResponseBuffer = stackalloc byte[sizeof(uint)], rxResponseBuffer = stackalloc byte[sizeof(uint)];
             MemoryMarshal.Write(txResponseBuffer, ref response);
 
             WaitForTransfer();

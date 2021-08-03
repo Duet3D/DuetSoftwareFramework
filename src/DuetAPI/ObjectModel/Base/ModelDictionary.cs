@@ -12,6 +12,10 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Class for holding string keys and custom values
     /// </summary>
+    /// <remarks>
+    /// Key names are NOT converted to camel-case (unlike regular class properties)
+    /// </remarks>
+    [JsonConverter(typeof(ModelDictionaryConverter))]
     public sealed class ModelDictionary<TValue> : IDictionary<string, TValue>, IModelDictionary
     {
         /// <summary>
@@ -451,6 +455,82 @@ namespace DuetAPI.ObjectModel
                 }
             }
             return this;
+        }
+    }
+
+    /// <summary>
+    /// Converter factory class for <see cref="ModelDictionary{TValue}"/> types
+    /// </summary>
+    public sealed class ModelDictionaryConverter : JsonConverterFactory
+    {
+        /// <summary>
+        /// Checks if the given type can be converted from or to JSON
+        /// </summary>
+        /// <param name="typeToConvert"></param>
+        /// <returns></returns>
+        public override bool CanConvert(Type typeToConvert)
+        {
+            return typeToConvert.IsGenericType && typeof(ModelDictionary<>) == typeToConvert.GetGenericTypeDefinition();
+        }
+
+        /// <summary>
+        /// Creates a converter for the given type
+        /// </summary>
+        /// <param name="type">Target type</param>
+        /// <param name="options">Conversion options</param>
+        /// <returns>Converter instance</returns>
+        public override JsonConverter CreateConverter(Type type, JsonSerializerOptions options)
+        {
+            Type itemType = type.GetGenericArguments().First();
+            Type converterType = typeof(ModelDictionaryConverterInner<,>).MakeGenericType(type, itemType);
+            return (JsonConverter)Activator.CreateInstance(converterType);
+        }
+
+        /// <summary>
+        /// Method to create a converter for a specific <see cref="ModelDictionary{TValue}"/> type
+        /// </summary>
+        /// <typeparam name="T">Dictionary type</typeparam>
+        /// <typeparam name="TValue">Value type</typeparam>
+        private sealed class ModelDictionaryConverterInner<T, TValue> : JsonConverter<T> where T : IDictionary<string, TValue>
+        {
+            /// <summary>
+            /// Checks if the given type can be converted
+            /// </summary>
+            /// <param name="typeToConvert">Type to convert</param>
+            /// <returns>Whether the type can be converted</returns>
+            public override bool CanConvert(Type typeToConvert)
+            {
+                return typeToConvert.IsGenericType && typeof(ModelDictionary<>) == typeToConvert.GetGenericTypeDefinition();
+            }
+
+            /// <summary>
+            /// Read from JSON
+            /// </summary>
+            /// <param name="reader">JSON reader</param>
+            /// <param name="typeToConvert">Type to convert</param>
+            /// <param name="options">Read options</param>
+            /// <returns>Read value</returns>
+            public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                throw new NotSupportedException();
+            }
+
+            /// <summary>
+            /// Write a CodeParameter to JSON
+            /// </summary>
+            /// <param name="writer">JSON writer</param>
+            /// <param name="value">Value to serialize</param>
+            /// <param name="options">Write options</param>
+            public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
+            {
+                writer.WriteStartObject();
+                foreach (var kv in value)
+                {
+                    writer.WritePropertyName(kv.Key);
+                    JsonSerializer.Serialize(writer, kv.Value, options);
+                }
+                writer.WriteEndObject();
+            }
         }
     }
 }

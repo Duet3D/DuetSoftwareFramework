@@ -39,7 +39,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetPiManagementPlugin", "D
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeStream", "CodeStream\CodeStream.csproj", "{7DFC5417-CFE4-4047-AF5D-A3B40DBDAB2C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocGen", "DocGen\DocGen.csproj", "{B5D19F18-CC99-4B56-8EEF-932B9884FF11}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DocGen", "DocGen\DocGen.csproj", "{B5D19F18-CC99-4B56-8EEF-932B9884FF11}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
