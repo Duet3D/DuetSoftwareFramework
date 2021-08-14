@@ -44,7 +44,7 @@ Version 3.3.0
 Upgrade notes since version 3.2:
 - Plugin support is now enabled but requires some extra steps before they can be installed. Execute the following commands in a **Linux** terminal:
   1. Install AppArmor package: `sudo apt install apparmor`
-  2. Enable AppArmor support on boot: `echo "  lsm=apparmor" >> /boot/cmdline.txt`
+  2. Enable AppArmor support on boot: `sudo bash -c 'echo "  lsm=apparmor" >> /boot/cmdline.txt'`
   3. Enable new plugin services: `sudo systemctl enable duetpluginservice && sudo systemctl enable duetpluginservice-root`
   4. Reboot the SBC to apply the changes: `sudo reboot`
 - [DuetPiManagementPlugin](https://github.com/Duet3D/DuetSoftwareFramework/tree/v3.3-dev/src/DuetPiManagementPlugin) is now available for DuetPi to support various M-codes that werre previously supported only in standalone mode
