@@ -8,6 +8,11 @@
         /// <summary>
         /// Index of the current object being printed or -1 if unknown
         /// </summary>
+        /// <remarks>
+        /// This value may now be greater than the length of the job.build.objects array.
+        /// This is because the size of job.build.objects is limited to conserve memory (to 20 on Duet 2 or 40 on Duet 3),
+        /// whereas when M486 labelling is used, many more objects can be numbered and the first 64 can be cancelled individually
+        /// </remarks>
         public int CurrentObject
         {
             get => _currentObject;

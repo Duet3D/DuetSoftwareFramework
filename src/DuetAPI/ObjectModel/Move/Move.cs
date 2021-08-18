@@ -68,7 +68,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Parameters for input shaping
         /// </summary>
-        public MoveInputShaping Shaping { get; } = new MoveInputShaping();
+        public InputShaping Shaping { get; } = new InputShaping();
 
         /// <summary>
         /// Speed factor applied to every regular move (0.01..1 or greater)

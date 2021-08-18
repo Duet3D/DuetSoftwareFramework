@@ -50,7 +50,6 @@ namespace DuetAPI.ObjectModel
                 FilamentMonitorType.Laser => typeof(LaserFilamentMonitor),
                 FilamentMonitorType.Pulsed => typeof(PulsedFilamentMonitor),
                 FilamentMonitorType.RotatingMagnet => typeof(RotatingMagnetFilamentMonitor),
-                FilamentMonitorType.Simple => typeof(SimpleFilamentMonitor),
                 _ => typeof(FilamentMonitor)
             };
         }

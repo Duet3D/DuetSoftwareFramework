@@ -3,7 +3,7 @@
     /// <summary>
     /// Parameters describing input shaping
     /// </summary>
-    public sealed class MoveInputShaping : ModelObject
+    public sealed class InputShaping : ModelObject
     {
         /// <summary>
         /// Damping factor
@@ -38,11 +38,11 @@
         /// <summary>
         /// Configured input shaping type
         /// </summary>
-        public MoveInputShapingType Type
+        public InputShapingType Type
         {
             get => _type;
             set => SetPropertyValue(ref _type, value);
         }
-        private MoveInputShapingType _type;
+        private InputShapingType _type;
     }
 }

@@ -68,13 +68,16 @@ namespace DuetAPI.ObjectModel
         /// <param name="other">Message to append</param>
         public void Append(Message other)
         {
-            if (other.Type > Type)
+            if (other != null)
             {
-                Type = other.Type;
-            }
-            if (!string.IsNullOrEmpty(other.Content))
-            {
-                AppendLine(other.Content);
+                if (other.Type > Type)
+                {
+                    Type = other.Type;
+                }
+                if (!string.IsNullOrEmpty(other.Content))
+                {
+                    AppendLine(other.Content);
+                }
             }
         }
 
