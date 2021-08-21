@@ -558,9 +558,14 @@ namespace DuetControlServer.SPI
         /// <returns>Data span</returns>
         private static Span<byte> GetWriteBuffer(int dataLength)
         {
-            Span<byte> result = _txBuffer.Value.Slice(_txPointer, dataLength).Span;
             int padding = 4 - (dataLength % 4);
-            _txPointer += dataLength + ((padding == 4) ? 0 : padding);
+            if (padding != 4)
+            {
+                dataLength += padding;
+            }
+
+            Span<byte> result = _txBuffer.Value.Slice(_txPointer, dataLength).Span;
+            _txPointer += dataLength;
             return result;
         }
 
@@ -1234,7 +1239,7 @@ namespace DuetControlServer.SPI
         /// <returns>If the packet could be written</returns>
         public static bool WriteFileReadResult(Span<byte> data, int bytesRead)
         {
-            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.OpenFileResult>() + data.Length;
+            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.FileDataHeader>() + data.Length;
             if (!CanWritePacket(dataLength))
             {
                 return false;

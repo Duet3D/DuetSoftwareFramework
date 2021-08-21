@@ -147,6 +147,13 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<Volume> Volumes { get; } = new ModelCollection<Volume>();
 
         /// <summary>
+        /// Update this instance from a given JSON element
+        /// </summary>
+        /// <param name="jsonElement">Element to update this intance from</param>
+        /// <returns>Whether the key could be updated</returns>
+        public bool UpdateFromModel(JsonElement jsonElement) => InternalUpdateFromModel(null, jsonElement, false);
+
+        /// <summary>
         /// Update a specific key of this instance from a given JSON element as provided by the firmware
         /// </summary>
         /// <param name="key">Property name to update</param>

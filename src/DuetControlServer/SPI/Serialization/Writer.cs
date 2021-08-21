@@ -813,7 +813,7 @@ namespace DuetControlServer.SPI.Serialization
             int bytesWritten = Marshal.SizeOf<FileDataHeader>();
 
             // Write content
-            data.CopyTo(data[bytesWritten..]);
+            data.CopyTo(to[bytesWritten..]);
             bytesWritten += data.Length;
 
             return AddPadding(to, bytesWritten);

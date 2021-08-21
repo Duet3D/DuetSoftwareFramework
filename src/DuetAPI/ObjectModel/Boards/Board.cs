@@ -8,6 +8,16 @@ namespace DuetAPI.ObjectModel
     public sealed class Board : ModelObject
     {
         /// <summary>
+        /// Accelerometer of this board
+        /// </summary>
+        public Accelerometer Accelerometer
+        {
+            get => _accelerometer;
+            set => SetPropertyValue(ref _accelerometer, value);
+        }
+        private Accelerometer _accelerometer;
+
+        /// <summary>
         /// Filename of the firmware binary
         /// </summary>
         public string BootloaderFileName

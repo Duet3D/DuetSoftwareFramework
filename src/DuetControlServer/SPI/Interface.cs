@@ -1624,7 +1624,7 @@ namespace DuetControlServer.SPI
             catch (Exception e)
             {
                 _logger.Error(e, "Failed to read {0} bytes from file #{1}", maxLength, handle);
-                DataTransfer.WriteFileReadResult(Array.Empty<byte>(), -1);
+                DataTransfer.WriteFileReadResult(Span<byte>.Empty, -1);
             }
         }
 
