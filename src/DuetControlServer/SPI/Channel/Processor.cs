@@ -768,7 +768,7 @@ namespace DuetControlServer.SPI.Channel
             // 3. Abort requests
             if (_allFilesAborted)
             {
-                _allFilesAborted = !DataTransfer.WriteFilesAborted(Channel);
+                _allFilesAborted = !DataTransfer.WriteInvalidateChannel(Channel);
                 return;
             }
 

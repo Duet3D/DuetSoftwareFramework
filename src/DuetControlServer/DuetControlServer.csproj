@@ -6,7 +6,7 @@
     <LangVersion>default</LangVersion>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D Ltd</Company>
-    <Version>3.4-b2</Version>
+    <Version>3.4-b3</Version>
     <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
@@ -31,7 +31,7 @@
   <ItemGroup>
     <PackageReference Include="DynamicExpresso.Core" Version="2.8.1" />
     <PackageReference Include="Nito.AsyncEx" Version="5.1.0" />
-    <PackageReference Include="NLog" Version="4.7.10" />
+    <PackageReference Include="NLog" Version="4.7.11" />
     <PackageReference Include="SixLabors.ImageSharp" Version="1.0.3" />
   </ItemGroup>
 

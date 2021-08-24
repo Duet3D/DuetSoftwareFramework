@@ -379,13 +379,13 @@ namespace DuetControlServer.Model
         /// <param name="encodeResult">Whether the final result shall be encoded</param>
         /// <returns>Replaced expression(s)</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
-        private static async Task<string> EvaluateExpression(Code code, string expression, bool onlyLinuxFields, bool encodeResult)
+        public static async Task<string> EvaluateExpression(Code code, string expression, bool onlyLinuxFields, bool encodeResult)
         {
             Stack<char> lastBracketTypes = new();
             Stack<StringBuilder> parsedExpressions = new();
             parsedExpressions.Push(new StringBuilder());
 
-            bool inQuotes = false, skipEvaluation = false;
+            bool inQuotes = false;
             char lastC = '\0';
             foreach (char c in expression)
             {
@@ -404,8 +404,6 @@ namespace DuetControlServer.Model
                 }
                 else if (c == '{' || c == '(' || c == '[')
                 {
-                    // FIXME need better way to deal with functions with more than one parameter
-                    skipEvaluation = (c == '(') && parsedExpressions.Peek().ToString().TrimEnd().EndsWith("exists") || parsedExpressions.Peek().ToString().TrimEnd().EndsWith("mod");
                     lastBracketTypes.Push(c);
                     parsedExpressions.Push(new StringBuilder());
                 }
@@ -433,28 +431,17 @@ namespace DuetControlServer.Model
                             throw new CodeParserException($"Unexpected square bracket", code);
                         }
 
-                        string subExpression = parsedExpressions.Pop().ToString();
-                        if (skipEvaluation)
+                        string subExpression = parsedExpressions.Pop().ToString().Trim();
+                        string evaluationResult = await EvaluateSubExpression(code, subExpression, lastBracketType == '(' || onlyLinuxFields, true);
+                        if (lastBracketType == '(' || lastBracketType == '[' || subExpression == evaluationResult || onlyLinuxFields)
                         {
-                            // Queries that take identifier paths must not be evaluated...
-                            parsedExpressions.Peek().Append('(');
-                            parsedExpressions.Peek().Append(subExpression);
-                            parsedExpressions.Peek().Append(')');
-                            skipEvaluation = false;
+                            parsedExpressions.Peek().Append(lastBracketType);
+                            parsedExpressions.Peek().Append(evaluationResult);
+                            parsedExpressions.Peek().Append(expectedBracketType);
                         }
                         else
                         {
-                            string evaluationResult = await EvaluateSubExpression(code, subExpression.Trim(), onlyLinuxFields, true);
-                            if (lastBracketType == '(' || lastBracketType == '[' || subExpression == evaluationResult || onlyLinuxFields)
-                            {
-                                parsedExpressions.Peek().Append(lastBracketType);
-                                parsedExpressions.Peek().Append(evaluationResult);
-                                parsedExpressions.Peek().Append(expectedBracketType);
-                            }
-                            else
-                            {
-                                parsedExpressions.Peek().Append(evaluationResult);
-                            }
+                            parsedExpressions.Peek().Append(evaluationResult);
                         }
                     }
                     else

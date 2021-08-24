@@ -1,6 +1,18 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.4-b3
+==============
+
+New features:
+- Implemented file redirections of the `echo` command (see [here](https://duet3d.dozuki.com/Wiki/GCode_Meta_Commands?revisionid=HEAD#Section_Echo_command))
+- Added support for new `InvalidateChannel` command allowing plugins to cancel already queued codes and files
+
+Bug fixes:
+- Resolved race condition for M0/M1 which could cause stop.g to be executed instead of cancel.g
+- Fixed an exception that could occur when codes were cancelled and their result was combined
+- Under certain conditions paused prints could not be cancelled properly
+
 Version 3.4-b2
 ==============
 

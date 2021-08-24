@@ -133,6 +133,26 @@ namespace DuetAPI.ObjectModel
         private bool _minProbed;
 
         /// <summary>
+        /// Percentage applied to the motor current (0..100)
+        /// </summary>
+        public int PercentCurrent
+        {
+            get => _percentCurrent;
+            set => SetPropertyValue(ref _percentCurrent, value);
+        }
+        private int _percentCurrent = 100;
+
+        /// <summary>
+        /// Percentage applied to the motor current during standstill (0..100 or null if not supported)
+        /// </summary>
+        public int? PercentStstCurrent
+        {
+            get => _percentStstCurrent;
+            set => SetPropertyValue(ref _percentStstCurrent, value);
+        }
+        private int? _percentStstCurrent;
+
+        /// <summary>
         /// Maximum speed (in mm/min)
         /// </summary>
         public float Speed

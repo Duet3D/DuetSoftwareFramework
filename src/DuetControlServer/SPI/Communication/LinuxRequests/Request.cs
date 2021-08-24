@@ -122,10 +122,10 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         MacroStarted = 18,
 
         /// <summary>
-        /// All the files have been aborted on a particular channel
+        /// Invalidate all files and codes on a given channel
         /// </summary>
         /// <seealso cref="Shared.CodeChannelHeader"/>
-        FilesAborted = 19,
+        InvalidateChannel = 19,
 
         /// <summary>
         /// Initialize or update a variable (global, var, or set)

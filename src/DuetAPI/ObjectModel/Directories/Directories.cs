@@ -71,6 +71,7 @@
         /// <summary>
         /// Path to the system directory
         /// </summary>
+        [SbcProperty(true)]
         public string System
         {
             get => _system;

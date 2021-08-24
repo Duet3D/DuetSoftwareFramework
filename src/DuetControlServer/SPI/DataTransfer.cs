@@ -1109,11 +1109,11 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Called when all the files have been aborted by DSF (e.g. via abort keyword)
+        /// Called when a code channel is supposed to be invalidated (e.g. via abort keyword)
         /// </summary>
         /// <param name="channel">Code channel that requires the lock</param>
         /// <returns>True if the packet could be written</returns>
-        public static bool WriteFilesAborted(CodeChannel channel)
+        public static bool WriteInvalidateChannel(CodeChannel channel)
         {
             int dataLength = Marshal.SizeOf<CodeChannelHeader>();
             if (!CanWritePacket(dataLength))
@@ -1121,7 +1121,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.FilesAborted, dataLength);
+            WritePacket(Communication.LinuxRequests.Request.InvalidateChannel, dataLength);
             Serialization.Writer.WriteCodeChannel(GetWriteBuffer(dataLength), channel);
             return true;
         }

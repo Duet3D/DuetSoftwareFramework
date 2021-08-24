@@ -364,10 +364,9 @@ namespace DuetControlServer.FileExecution
                     using (await _lock.LockAsync(Program.CancellationToken))
                     {
                         // Notify RepRapFirmware that the print file has been closed
-#warning FIXME Don't call StopPrint unless aborted from DSF
                         if (IsCancelled)
                         {
-                            await SPI.Interface.StopPrint(PrintStoppedReason.UserCancelled);
+                            // Prints are cancelled by M0/M1 which is processed by RRF
                             _logger.Info("Cancelled job file");
                         }
                         else if (IsAborted)

@@ -72,10 +72,10 @@ namespace DuetControlServer.Commands
                         Channel = DuetAPI.CodeChannel.SBC,
                         Type = DuetAPI.Commands.CodeType.MCode,
                         MajorNumber = 98,
-                        Parameters = new List<DuetAPI.Commands.CodeParameter>
-                    {
-                        new DuetAPI.Commands.CodeParameter('P', FilePath.DsfConfigFile)
-                    }
+                        Parameters = new()
+                        {
+                            new DuetAPI.Commands.CodeParameter('P', FilePath.DsfConfigFile)
+                        }
                     };
                     await dsfConfigCode.Execute();
                 }

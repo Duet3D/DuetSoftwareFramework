@@ -1,7 +1,9 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Files;
 using DuetControlServer.Model;
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -31,7 +33,81 @@ namespace DuetControlServer.Codes
 
             if (code.Keyword == KeywordType.Echo || code.Keyword == KeywordType.Abort)
             {
-                string result = string.IsNullOrEmpty(code.KeywordArgument) ? string.Empty : await Expressions.Evaluate(code, true);
+                string result = string.Empty;
+                if (code.Keyword == KeywordType.Echo && !string.IsNullOrEmpty(code.KeywordArgument))
+                {
+                    string keywordArgument = code.KeywordArgument.TrimStart();
+                    if (keywordArgument.StartsWith('>'))
+                    {
+                        // File redirection requested
+                        bool append = keywordArgument.StartsWith(">>");
+                        keywordArgument = keywordArgument.Substring(append ? 2 : 1).TrimStart();
+
+                        // Get the file string or expression to write to
+                        bool inQuotes = false, isComplete = false;
+                        int numCurlyBraces = 0;
+                        string filenameExpression = string.Empty;
+                        for (int i = 0; i < keywordArgument.Length; i++)
+                        {
+                            char c = keywordArgument[i];
+                            if (inQuotes)
+                            {
+                                if (c == '"')
+                                {
+                                    inQuotes = false;
+                                    isComplete = (numCurlyBraces == 0);
+                                }
+                            }
+                            else if (c == '"')
+                            {
+                                inQuotes = true;
+                            }
+                            else if (c == '{')
+                            {
+                                numCurlyBraces++;
+                            }
+                            else if (c == '}')
+                            {
+                                numCurlyBraces--;
+                                isComplete = (numCurlyBraces == 0);
+                            }
+                            else if (char.IsWhiteSpace(c))
+                            {
+                                // Whitespaces after the initial > or >> are not permitted
+                                isComplete = (numCurlyBraces == 0);
+                            }
+
+                            if (isComplete)
+                            {
+                                if (i == 0)
+                                {
+                                    return new Message(MessageType.Error, "Missing filename for file redirection");
+                                }
+
+                                filenameExpression = keywordArgument[..(i + 1)];
+                                code.KeywordArgument = keywordArgument[(i + 1)..];
+                                break;
+                            }
+                        }
+
+                        // Evaluate the filename and result to write
+                        string filename = await Expressions.EvaluateExpression(code, filenameExpression, false, false);
+                        string physicalFilename = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
+                        result = await Expressions.Evaluate(code, true);
+
+                        // Write it to the SD card
+                        _logger.Debug("{0} '{1}' to {2}", append ? "Appending" : "Writing", result, filename);
+                        using (FileStream fs = new(physicalFilename, append ? FileMode.Append : FileMode.Create, FileAccess.Write))
+                        {
+                            using StreamWriter writer = new(fs);
+                            await writer.WriteLineAsync(result);
+                        }
+
+                        // Done
+                        return new Message();
+                    }
+                }
+                result = await Expressions.Evaluate(code, true);
 
                 if (code.Keyword == KeywordType.Abort)
                 {
