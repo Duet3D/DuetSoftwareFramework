@@ -44,6 +44,7 @@ namespace DuetWebServer
                 .ConfigureServices(services =>
                 {
                     services.AddHostedService<Services.ModelObserver>();
+                    services.AddHostedService<Services.SessionExpiry>();
                 });
     }
 }

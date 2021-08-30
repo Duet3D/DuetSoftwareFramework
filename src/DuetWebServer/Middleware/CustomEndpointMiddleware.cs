@@ -3,6 +3,7 @@ using DuetAPI.ObjectModel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 using System.IO;
 using System.Net.WebSockets;
 using System.Text;
@@ -68,24 +69,26 @@ namespace DuetWebServer.Middleware
 
             if (httpEndpoint != null)
             {
-                // Try to connect to the given UNIX socket
+                // Cnnect to the given UNIX socket endpoint
                 using HttpEndpointConnection endpointConnection = new();
                 endpointConnection.Connect(httpEndpoint.UnixSocket);
 
-                // Try to find a user session
-                int sessionId = -1;
-                lock (Services.ModelObserver.UserSessions)
-                {
-                    string ipAddress = context.Connection.RemoteIpAddress.ToString();
-                    if (Services.ModelObserver.UserSessions.TryGetValue(ipAddress, out int foundSessionId))
-                    {
-                        sessionId = foundSessionId;
-                    }
-                }
-
                 // See what to do with this request
+                int sessionId = -1;
                 if (httpEndpoint.EndpointType == HttpEndpointType.WebSocket)
                 {
+                    if (context.Request.Query.TryGetValue("sessionKey", out StringValues sessionKeys))
+                    {
+                        foreach (string sessionKey in sessionKeys)
+                        {
+                            sessionId = Authorization.Sessions.GetSessionId(sessionKey);
+                            if (sessionId != -1)
+                            {
+                                break;
+                            }
+                        }
+                    }
+
                     if (Services.ModelObserver.CheckWebSocketOrigin(context))
                     {
                         using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
@@ -100,6 +103,18 @@ namespace DuetWebServer.Middleware
                 }
                 else
                 {
+                    if (context.Request.Headers.TryGetValue("X-Session-Key", out StringValues sessionKeys))
+                    {
+                        foreach (string sessionKey in sessionKeys)
+                        {
+                            sessionId = Authorization.Sessions.GetSessionId(sessionKey);
+                            if (sessionId != -1)
+                            {
+                                break;
+                            }
+                        }
+                    }
+
                     await ProcessRestRequst(context, httpEndpoint, endpointConnection, sessionId);
                 }
             }

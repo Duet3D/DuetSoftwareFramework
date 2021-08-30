@@ -39,5 +39,10 @@
         /// Maximum number of codes to buffer in <see cref="ConnectionMode.CodeStream"/> mode
         /// </summary>
         public const int MaxCodeBufferSize = 256;
+
+        /// <summary>
+        /// Default password
+        /// </summary>
+        public const string Password = "reprap";
     }
 }

@@ -51,20 +51,19 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="access">Access level of this session</param>
         /// <param name="type">Type of this session</param>
-        /// <param name="origin">Origin of the user session (e.g. IP address)</param>
-        /// <param name="originPort">Origin of the user session (e.g. WebSocket port). Defaults to the current PID</param>
+        /// <param name="origin">Origin of the user session (e.g. IP address or PID)</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>New session ID</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ManageUserSessions"/>
-        public Task<int> AddUserSession(AccessLevel access, SessionType type, string origin, int? originPort = null, CancellationToken cancellationToken = default)
+        public Task<int> AddUserSession(AccessLevel access, SessionType type, string origin = null, CancellationToken cancellationToken = default)
         {
-            if (originPort == null)
+            if (origin == null)
             {
-                originPort = Environment.ProcessId;
+                origin = Environment.ProcessId.ToString();
             }
-            return PerformCommand<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin, OriginPort = originPort.Value }, cancellationToken);
+            return PerformCommand<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin }, cancellationToken);
         }
 
         /// <summary>

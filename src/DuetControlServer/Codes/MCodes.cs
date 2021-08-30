@@ -754,6 +754,22 @@ namespace DuetControlServer.Codes
                     }
                     throw new OperationCanceledException();
 
+                // Set Password
+                case 551:
+                    if (await SPI.Interface.Flush(code))
+                    {
+                        string password = code.Parameter('P');
+                        if (password != null)
+                        {
+                            using (await Model.Provider.AccessReadWriteAsync())
+                            {
+                                Model.Provider.Password = password;
+                            }
+                        }
+                        break;
+                    }
+                    throw new OperationCanceledException();
+
                 // Configure network protocols
                 case 586:
                     if (await SPI.Interface.Flush(code))

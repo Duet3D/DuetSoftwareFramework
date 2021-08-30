@@ -100,7 +100,7 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Response to a <see cref="FirmwareRequests.FileChunkHeader"/>
         /// </summary>
-        /// <seealso cref="LinuxRequests.FileChunkHeader"/>
+        /// <seealso cref="FileChunkHeader"/>
         FileChunk = 15,
 
         /// <summary>

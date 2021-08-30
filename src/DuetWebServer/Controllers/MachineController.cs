@@ -10,6 +10,7 @@ using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,7 @@ namespace DuetWebServer.Controllers
     /// MVC Controller for /machine requests
     /// </summary>
     [ApiController]
+    [Authorize(Policy = Authorization.Policies.ReadOnly)]
     [Route("[controller]")]
     public class MachineController : ControllerBase
     {
@@ -43,6 +45,100 @@ namespace DuetWebServer.Controllers
             _configuration = configuration;
             _logger = logger;
         }
+
+        #region Authorization
+        /// <summary>
+        /// GET /machine/connect
+        /// Check the password and register a new session on success
+        /// </summary>
+        /// <returns>HTTP status code: (200) Session key (403) Forbidden (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [AllowAnonymous]
+        [HttpGet("connect")]
+        public async Task<IActionResult> Connect(string password)
+        {
+            try
+            {
+                using CommandConnection connection = await BuildConnection();
+                if (await connection.CheckPassword(password))
+                {
+                    int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress.ToString());
+                    string sessionKey = Authorization.Sessions.MakeSessionKey(sessionId, true);
+
+                    string jsonResponse = JsonSerializer.Serialize(new
+                    {
+                        SessionKey = sessionKey
+                    }, JsonHelper.DefaultJsonOptions);
+                    return Content(jsonResponse, "application/json");
+                }
+                return Forbid();
+            }
+            catch (Exception e)
+            {
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is IncompatibleVersionException)
+                {
+                    _logger.LogError($"[{nameof(Connect)}] Incompatible DCS version");
+                    return StatusCode(502, "Incompatible DCS version");
+                }
+                if (e is SocketException)
+                {
+                    _logger.LogError($"[{nameof(Connect)}] DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
+                }
+                _logger.LogWarning(e, $"[{nameof(Connect)}] Failed to retrieve status");
+                return StatusCode(500, e.Message);
+            }
+        }
+
+        /// <summary>
+        /// GET /machine/disconnect
+        /// Remove the current HTTP session again
+        /// </summary>
+        /// <returns>HTTP status code: (204) No Content (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [AllowAnonymous]
+        [HttpGet("disconnect")]
+        public async Task<IActionResult> Disconnect()
+        {
+            try
+            {
+                if (HttpContext.User != null)
+                {
+                    // Remove the internal session
+                    int sessionId = Authorization.Sessions.RemoveTicket(HttpContext.User);
+
+                    // Remove the DSF user session again
+                    if (sessionId > 0)
+                    {
+                        using CommandConnection connection = await BuildConnection();
+                        await connection.RemoveUserSession(sessionId);
+                    }
+                }
+                return NoContent();
+            }
+            catch (Exception e)
+            {
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is IncompatibleVersionException)
+                {
+                    _logger.LogError($"[{nameof(Disconnect)}] Incompatible DCS version");
+                    return StatusCode(502, "Incompatible DCS version");
+                }
+                if (e is SocketException)
+                {
+                    _logger.LogError($"[{nameof(Disconnect)}] DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
+                }
+                _logger.LogWarning(e, $"[{nameof(Disconnect)}] Failed to retrieve status");
+                return StatusCode(500, e.Message);
+            }
+        }
+        #endregion
 
         #region General requests
         /// <summary>
@@ -86,6 +182,7 @@ namespace DuetWebServer.Controllers
         /// </summary>
         /// <returns>HTTP status code: (200) G-Code response as text/plain (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
         [HttpPost("code")]
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         public async Task<IActionResult> DoCode()
         {
             string code;
@@ -96,11 +193,17 @@ namespace DuetWebServer.Controllers
 
             try
             {
-                using CommandConnection connection = await BuildConnection();
-                _logger.LogInformation($"[{nameof(DoCode)}] Executing code '{code}'");
-                string result = await connection.PerformSimpleCode(code, CodeChannel.HTTP);
-
-                return Content(result);
+                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
+                try
+                {
+                    using CommandConnection connection = await BuildConnection();
+                    _logger.LogInformation($"[{nameof(DoCode)}] Executing code '{code}'");
+                    return Content(await connection.PerformSimpleCode(code, CodeChannel.HTTP));
+                }
+                finally
+                {
+                    Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
+                }
             }
             catch (Exception e)
             {
@@ -176,6 +279,7 @@ namespace DuetWebServer.Controllers
         /// </summary>
         /// <param name="filename">Destination of the file to upload</param>
         /// <returns>HTTP status code: (201) File created (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPut("file/{*filename}")]
         public async Task<IActionResult> UploadFile(string filename)
@@ -185,21 +289,29 @@ namespace DuetWebServer.Controllers
             string resolvedPath = "n/a";
             try
             {
-                resolvedPath = await ResolvePath(filename);
-
-                // Create directory if necessary
-                string directory = Path.GetDirectoryName(resolvedPath);
-                if (!Directory.Exists(directory))
+                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
+                try
                 {
-                    Directory.CreateDirectory(directory);
-                }
+                    resolvedPath = await ResolvePath(filename);
 
-                // Write file
-                using (FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.Write))
-                {
-                    await Request.Body.CopyToAsync(stream);
+                    // Create directory if necessary
+                    string directory = Path.GetDirectoryName(resolvedPath);
+                    if (!Directory.Exists(directory))
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+
+                    // Write file
+                    using (FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.Write))
+                    {
+                        await Request.Body.CopyToAsync(stream);
+                    }
+                    return Created(HttpUtility.UrlPathEncode(filename), null);
                 }
-                return Created(HttpUtility.UrlPathEncode(filename), null);
+                finally
+                {
+                    Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
+                }
             }
             catch (Exception e)
             {
@@ -278,6 +390,7 @@ namespace DuetWebServer.Controllers
         /// </summary>
         /// <param name="filename">File or directory to delete</param>
         /// <returns>HTTP status code: (204) File or directory deleted (404) File not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpDelete("file/{*filename}")]
         public async Task<IActionResult> DeleteFileOrDirectory(string filename)
         {
@@ -331,6 +444,7 @@ namespace DuetWebServer.Controllers
         /// <param name="to">Destination path</param>
         /// <param name="force">Delete existing file (optional, default false)</param>
         /// <returns>HTTP status code: (204) File or directory moved (404) File or directory not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpPost("file/move")]
         public async Task<IActionResult> MoveFileOrDirectory([FromForm] string from, [FromForm] string to, [FromForm] bool force = false)
         {
@@ -452,6 +566,7 @@ namespace DuetWebServer.Controllers
         /// </summary>
         /// <param name="directory">Directory to create</param>
         /// <returns>HTTP status code: (204) Directory created (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpPut("directory/{*directory}")]
         public async Task<IActionResult> CreateDirectory(string directory)
         {
@@ -492,6 +607,7 @@ namespace DuetWebServer.Controllers
         /// Install or upgrade a plugin ZIP file
         /// </summary>
         /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPut("plugin")]
         public async Task<IActionResult> InstallPlugin()
@@ -499,6 +615,7 @@ namespace DuetWebServer.Controllers
             string zipFile = Path.GetTempFileName();
             try
             {
+                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
                 try
                 {
                     // Write ZIP file
@@ -535,6 +652,7 @@ namespace DuetWebServer.Controllers
             }
             finally
             {
+                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
                 System.IO.File.Delete(zipFile);
             }
         }
@@ -544,23 +662,32 @@ namespace DuetWebServer.Controllers
         /// Uninstall a plugin
         /// </summary>
         /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpDelete("plugin")]
         public async Task<IActionResult> UninstallPlugin()
         {
             try
             {
-                // Get the plugin name
-                string pluginName;
-                using (StreamReader reader = new(HttpContext.Request.Body))
+                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
+                try
                 {
-                    pluginName = await reader.ReadToEndAsync();
+                    // Get the plugin name
+                    string pluginName;
+                    using (StreamReader reader = new(HttpContext.Request.Body))
+                    {
+                        pluginName = await reader.ReadToEndAsync();
+                    }
+
+                    // Uninstall it
+                    using CommandConnection connection = await BuildConnection();
+                    await connection.UninstallPlugin(pluginName);
+
+                    return NoContent();
                 }
-
-                // Uninstall it
-                using CommandConnection connection = await BuildConnection();
-                await connection.UninstallPlugin(pluginName);
-
-                return NoContent();
+                finally
+                {
+                    Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
+                }
             }
             catch (Exception e)
             {
@@ -611,6 +738,7 @@ namespace DuetWebServer.Controllers
         /// Set plugin data in the object model if there is no SBC executable.
         /// </summary>
         /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPatch("plugin")]
         public async Task<IActionResult> SetPluginData()
@@ -660,6 +788,7 @@ namespace DuetWebServer.Controllers
         /// Start a plugin on the SBC
         /// </summary>
         /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpPost("startPlugin")]
         public async Task<IActionResult> StartPlugin()
         {
@@ -704,6 +833,7 @@ namespace DuetWebServer.Controllers
         /// Stop a plugin on the SBC
         /// </summary>
         /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpPost("stopPlugin")]
         public async Task<IActionResult> StopPlugin()
         {
@@ -750,6 +880,7 @@ namespace DuetWebServer.Controllers
         /// Install or upgrade a system package
         /// </summary>
         /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPut("systemPackage")]
         public async Task<IActionResult> InstallSystemPackage()
@@ -757,6 +888,7 @@ namespace DuetWebServer.Controllers
             string packageFile = Path.GetTempFileName();
             try
             {
+                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
                 try
                 {
                     // Write package file
@@ -793,6 +925,7 @@ namespace DuetWebServer.Controllers
             }
             finally
             {
+                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
                 System.IO.File.Delete(packageFile);
             }
         }
@@ -802,23 +935,32 @@ namespace DuetWebServer.Controllers
         /// Uninstall a system package
         /// </summary>
         /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpDelete("systemPackage")]
         public async Task<IActionResult> UninstallSystemPackage()
         {
             try
             {
-                // Get the plugin name
-                string package;
-                using (StreamReader reader = new(HttpContext.Request.Body))
+                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
+                try
                 {
-                    package = await reader.ReadToEndAsync();
+                    // Get the plugin name
+                    string package;
+                    using (StreamReader reader = new(HttpContext.Request.Body))
+                    {
+                        package = await reader.ReadToEndAsync();
+                    }
+
+                    // Uninstall it
+                    using CommandConnection connection = await BuildConnection();
+                    await connection.UninstallSystemPackage(package);
+
+                    return NoContent();
                 }
-
-                // Uninstall it
-                using CommandConnection connection = await BuildConnection();
-                await connection.UninstallSystemPackage(package);
-
-                return NoContent();
+                finally
+                {
+                    Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
+                }
             }
             catch (Exception e)
             {

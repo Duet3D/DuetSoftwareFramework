@@ -51,7 +51,7 @@ namespace DuetAPI.Connection.InitMessages
         /// <summary>
         /// Defines if either regular or priority codes are supposed to be intercepted
         /// </summary>
-        /// <seealso cref="DuetAPI.Commands.CodeFlags.IsPrioritized"/>
+        /// <seealso cref="Commands.CodeFlags.IsPrioritized"/>
         public bool PriortyCodes { get; set; }
     }
 }

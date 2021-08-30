@@ -46,7 +46,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Defines if priority codes may be intercepted (e.g. M122 or M999)
         /// </summary>
-        /// <seealso cref="DuetAPI.Commands.CodeFlags.IsPrioritized"/>
+        /// <seealso cref="CodeFlags.IsPrioritized"/>
         public bool PriortyCodes { get; private set; }
 
         /// <summary>

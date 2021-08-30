@@ -21,26 +21,14 @@ namespace DuetControlServer.Commands
         {
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                // Don't create duplicates, reuse existing items if possible...
-                foreach (UserSession userSession in Model.Provider.Get.UserSessions)
+                UserSession newSession = new()
                 {
-                    if (userSession.AccessLevel == AccessLevel &&
-                        userSession.Origin == Origin && userSession.OriginId == OriginPort &&
-                        userSession.SessionType == SessionType)
-                    {
-                        return userSession.Id;
-                    }
-                }
-
-                // Create a new session
-                UserSession newSession = new();
+                    AccessLevel = AccessLevel,
+                    Id = _idCounter++,
+                    Origin = Origin,
+                    SessionType = SessionType
+                };
                 Model.Provider.Get.UserSessions.Add(newSession);
-
-                newSession.AccessLevel = AccessLevel;
-                newSession.Id = _idCounter++;
-                newSession.Origin = Origin;
-                newSession.OriginId = OriginPort;
-                newSession.SessionType = SessionType;
 
                 return newSession.Id;
             }

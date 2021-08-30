@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
-using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -55,24 +54,86 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
-        /// WS /machine
-        /// Provide WebSocket for continuous model updates. This is primarily used to keep DWC2 up-to-date
+        /// WS /machine?sessionKey=XXX
+        /// Provide WebSocket for continuous model updates. This is primarily used to keep DWC up-to-date
         /// </summary>
         /// <returns>WebSocket, HTTP status code: (400) Bad request</returns>
         [HttpGet]
-        public async Task Get()
+        public async Task Get(string sessionKey)
         {
-            if (HttpContext.WebSockets.IsWebSocketRequest)
+            if (!HttpContext.WebSockets.IsWebSocketRequest)
             {
-                if (Services.ModelObserver.CheckWebSocketOrigin(HttpContext))
+                // Not a WebSocket request
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                _logger.LogWarning("{0} did not send a WebSocket request", HttpContext.Connection.RemoteIpAddress);
+                return;
+            }
+
+            if (!Services.ModelObserver.CheckWebSocketOrigin(HttpContext))
+            {
+                // Origin check failed
+                HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+                _logger.LogWarning("Origin check failed for {0}", HttpContext.Connection.RemoteIpAddress);
+                return;
+            }
+
+            string socketPath = _configuration.GetValue("SocketPath", Defaults.FullSocketPath);
+            if (string.IsNullOrEmpty(sessionKey))
+            {
+                try
                 {
-                    using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-                    await Process(webSocket);
+                    using CommandConnection connection = new();
+                    await connection.Connect(socketPath);
+                    if (!await connection.CheckPassword(Defaults.Password))
+                    {
+                        // Non-default password set and no sessionKey passed
+                        HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        _logger.LogWarning("Machine password is set but WebSocket request from {0} had no session key", HttpContext.Connection.RemoteIpAddress);
+                        return;
+                    }
+                }
+                catch (Exception e)
+                {
+                    if (e is AggregateException ae)
+                    {
+                        e = ae.InnerException;
+                    }
+                    if (e is IncompatibleVersionException)
+                    {
+                        // Incompatible DCS version
+                        HttpContext.Response.StatusCode = StatusCodes.Status502BadGateway;
+                    }
+                    else if (e is SocketException)
+                    {
+                        // DCS is not started
+                        HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                    }
+                    else
+                    {
+                        // Generic error
+                        HttpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                    }
+                    return;
                 }
             }
-            else
+            else if (!Authorization.Sessions.CheckSessionKey(sessionKey, false))
             {
-                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                // Session key passed but it is invalid
+                HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+                _logger.LogWarning("WebSocket request from {0} passed an invalid session key", HttpContext.Connection.RemoteIpAddress);
+                return;
+            }
+
+            // Process the WebSocket request
+            try
+            {
+                Authorization.Sessions.SetWebSocketState(sessionKey, true);
+                using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+                await Process(webSocket, socketPath);
+            }
+            finally
+            {
+                Authorization.Sessions.SetWebSocketState(sessionKey, false);
             }
         }
 
@@ -81,16 +142,10 @@ namespace DuetWebServer.Controllers
         /// A client may receive one of the WS codes: (1001) Endpoint unavailable (1003) Invalid command (1011) Internal error
         /// </summary>
         /// <param name="webSocket">WebSocket connection</param>
+        /// <param name="socketPath">API socket path</param>
         /// <returns>Asynchronous task</returns>
-        public async Task Process(WebSocket webSocket)
+        public async Task Process(WebSocket webSocket, string socketPath)
         {
-            string socketPath = _configuration.GetValue("SocketPath", Defaults.FullSocketPath);
-
-            // 1. Authentification. This will require an extra API command
-            using CommandConnection commandConnection = new();
-            // TODO
-
-            // 2. Connect to DCS
             using SubscribeConnection subscribeConnection = new();
             try
             {
@@ -120,32 +175,27 @@ namespace DuetWebServer.Controllers
                 return;
             }
 
-            // 3. Log this event
+            // Log this event
             string ipAddress = HttpContext.Connection.RemoteIpAddress.ToString();
             int port = HttpContext.Connection.RemotePort;
             _logger.LogInformation("WebSocket connected from {0}:{1}", ipAddress, port);
 
-            // 4. Register this client and keep it up-to-date
+            // Register this client and keep it up-to-date
             using CancellationTokenSource cts = new();
-            int sessionId = -1;
             try
             {
-                // 4a. Register this user session. Once authentification has been implemented, the access level may vary
-                await commandConnection.Connect(socketPath);
-                sessionId = await commandConnection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, ipAddress, port);
-
-                // 4b. Fetch full model copy and send it over initially
+                // Fetch full model copy and send it over initially
                 using (MemoryStream json = await subscribeConnection.GetSerializedObjectModel())
                 {
                     await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, default);
                 }
 
-                // 4c. Deal with this connection in full-duplex mode
+                // Deal with this connection in full-duplex mode
                 AsyncAutoResetEvent dataAcknowledged = new();
                 Task rxTask = ReadFromClient(webSocket, dataAcknowledged, cts.Token);
                 Task txTask = WriteToClient(webSocket, subscribeConnection, dataAcknowledged, cts.Token);
 
-                // 4d. Deal with the tasks' lifecycles
+                // Deal with the tasks' lifecycles
                 Task terminatedTask = await Task.WhenAny(rxTask, txTask);
                 if (terminatedTask.IsFaulted)
                 {
@@ -177,18 +227,6 @@ namespace DuetWebServer.Controllers
             {
                 cts.Cancel();
                 _logger.LogInformation("WebSocket disconnected from {0}:{1}", ipAddress, port);
-                try
-                {
-                    // Try to remove this user session again
-                    await commandConnection.RemoveUserSession(sessionId);
-                }
-                catch (Exception e)
-                {
-                    if (!(e is SocketException))
-                    {
-                        _logger.LogError(e, "Failed to unregister user session");
-                    }
-                }
             }
         }
 
@@ -255,7 +293,7 @@ namespace DuetWebServer.Controllers
         /// <param name="dataAcknowledged">Event that is triggered when the client has acknowledged data</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        private async Task WriteToClient(WebSocket webSocket, SubscribeConnection subscribeConnection, AsyncAutoResetEvent dataAcknowledged, CancellationToken cancellationToken)
+        private static async Task WriteToClient(WebSocket webSocket, SubscribeConnection subscribeConnection, AsyncAutoResetEvent dataAcknowledged, CancellationToken cancellationToken)
         {
             do
             {
@@ -280,7 +318,7 @@ namespace DuetWebServer.Controllers
         /// <param name="status">Close status to transmit</param>
         /// <param name="message">Close message</param>
         /// <returns>Asynchronous task</returns>
-        private async Task CloseConnection(WebSocket webSocket, WebSocketCloseStatus status, string message)
+        private static async Task CloseConnection(WebSocket webSocket, WebSocketCloseStatus status, string message)
         {
             if (webSocket.State == WebSocketState.Open)
             {

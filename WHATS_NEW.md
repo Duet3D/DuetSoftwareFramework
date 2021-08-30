@@ -1,6 +1,12 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.4-b4
+==============
+
+New features:
+- Added HTTP password protection (M551) using new `/machine/connect` and `/machine/disconnect` endpoints
+
 Version 3.4-b3
 ==============
 

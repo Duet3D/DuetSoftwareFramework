@@ -24,11 +24,5 @@ namespace DuetAPI.Commands
         /// Origin of this session. For remote sessions, this equals the remote IP address
         /// </summary>
         public string Origin { get; set; }
-
-        /// <summary>
-        /// Corresponding identifier of the origin.
-        /// If it is a remote session, it is the remote port, else it defaults to the PID of the current process
-        /// </summary>
-        public int OriginPort { get; set; }
     }
 }

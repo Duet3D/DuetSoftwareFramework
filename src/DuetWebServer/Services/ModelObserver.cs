@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -33,11 +34,6 @@ namespace DuetWebServer.Services
         /// Dictionary of registered third-party paths vs third-party HTTP endpoints
         /// </summary>
         public static readonly Dictionary<string, HttpEndpoint> Endpoints = new();
-
-        /// <summary>
-        /// Dictionary holding the current user sessions in the form IP vs Id
-        /// </summary>
-        public static readonly Dictionary<string, int> UserSessions = new();
 
         /// <summary>
         /// Path to the web directory
@@ -117,7 +113,6 @@ namespace DuetWebServer.Services
         /// </summary>
         /// <param name="configuration">App configuration</param>
         /// <param name="logger">Logger instance</param>
-        /// <param name="hostAppLifetime">Host app lifetime provider</param>
         public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger)
         {
             _logger = logger;
@@ -177,8 +172,7 @@ namespace DuetWebServer.Services
                         await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, new string[] {
                             "directories/www",
                             "httpEndpoints/**",
-                            "network/corsSite",
-                            "userSessions/**"
+                            "network/corsSite"
                         }, unixSocket);
                         await commandConnection.Connect(unixSocket);
                         _logger.LogInformation("Connections to DuetControlServer established");
@@ -244,19 +238,6 @@ namespace DuetWebServer.Services
                                     }
                                 }
                             }
-
-                            // Rebuild the list of user sessions on demand
-                            if (jsonPatch.RootElement.TryGetProperty("userSessions", out _))
-                            {
-                                lock (UserSessions)
-                                {
-                                    UserSessions.Clear();
-                                    foreach (UserSession session in model.UserSessions)
-                                    {
-                                        UserSessions[session.Origin] = session.Id;
-                                    }
-                                }
-                            }
                         }
                         while (!_stopRequest.IsCancellationRequested);
                     }
@@ -279,7 +260,7 @@ namespace DuetWebServer.Services
         /// </summary>
         /// <param name="sender">Sender object</param>
         /// <param name="e">Information about the changed property</param>
-        private async void Directories_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private async void Directories_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(Directories.Web))
             {
