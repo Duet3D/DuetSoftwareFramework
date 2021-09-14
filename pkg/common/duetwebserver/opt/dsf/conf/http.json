@@ -12,6 +12,7 @@
     }
   },
   "KeepAliveInterval": 30,
+  "SessionTimeout": 8000,
   "ModelRetryDelay": 5000,
   "UseStaticFiles": true,
   "DefaultWebDirectory": "/opt/dsf/sd/www",
