@@ -43,6 +43,7 @@ namespace DuetWebServer.Services
         /// </summary>
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             _stopRequest.Dispose();
         }
 

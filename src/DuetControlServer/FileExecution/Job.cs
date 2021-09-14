@@ -324,10 +324,12 @@ namespace DuetControlServer.FileExecution
                                 catch (AggregateException ae)
                                 {
                                     await Utility.Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                                    _logger.Error(ae.InnerException);
                                 }
                                 catch (Exception e)
                                 {
                                     await Utility.Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
+                                    _logger.Error(e);
                                 }
                             }
                             finally

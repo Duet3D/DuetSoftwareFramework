@@ -41,7 +41,7 @@ namespace DuetControlServer.Codes
                     {
                         // File redirection requested
                         bool append = keywordArgument.StartsWith(">>");
-                        keywordArgument = keywordArgument.Substring(append ? 2 : 1).TrimStart();
+                        keywordArgument = keywordArgument[(append ? 2 : 1)..].TrimStart();
 
                         // Get the file string or expression to write to
                         bool inQuotes = false, isComplete = false;

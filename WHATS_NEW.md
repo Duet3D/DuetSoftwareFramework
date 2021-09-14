@@ -6,6 +6,8 @@ Version 3.4-b4
 
 New features:
 - Added HTTP password protection (M551) using new `/machine/connect` and `/machine/disconnect` endpoints
+- Implemented new class library for remote management of Duets in standalone or SBC mode
+- Added new HTTP endpoint /machine/noop to keep HTTP sessions alive on demand
 
 Version 3.4-b3
 ==============

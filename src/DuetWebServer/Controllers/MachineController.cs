@@ -47,6 +47,7 @@ namespace DuetWebServer.Controllers
         }
 
         #region Authorization
+#warning Add challenge request here returning remote IP address and allow hashed password for Connect
         /// <summary>
         /// GET /machine/connect
         /// Check the password and register a new session on success
@@ -92,6 +93,14 @@ namespace DuetWebServer.Controllers
                 return StatusCode(500, e.Message);
             }
         }
+
+        /// <summary>
+        /// GET /machine/noop
+        /// Do nothing. May be used to ping the machine or to keep the HTTP session alive
+        /// </summary>
+        /// <returns>HTTP status code: (204) No Content</returns>
+        [HttpGet("noop")]
+        public IActionResult Noop() => NoContent();
 
         /// <summary>
         /// GET /machine/disconnect

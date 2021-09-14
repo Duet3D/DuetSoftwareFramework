@@ -139,6 +139,16 @@ namespace DuetAPI.ObjectModel
         private MachineMode _machineMode = MachineMode.FFF;
 
         /// <summary>
+        /// Indicates if the current macro file was restarted after a pause
+        /// </summary>
+        public bool MacroRestarted
+        {
+            get => _macroRestarted;
+            set => SetPropertyValue(ref _macroRestarted, value);
+        }
+        private bool _macroRestarted;
+
+        /// <summary>
         /// Millisecond fraction of <see cref="UpTime"/>
         /// </summary>
         public int MsUpTime

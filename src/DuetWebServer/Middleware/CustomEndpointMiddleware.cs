@@ -216,7 +216,7 @@ namespace DuetWebServer.Middleware
         /// <param name="endpointConnection">Endpoint connection</param>
         /// <param name="sessionId">Session ID</param>
         /// <returns>Asynchronous task</returns>
-        private async Task ProcessRestRequst(HttpContext context, HttpEndpoint endpoint, HttpEndpointConnection endpointConnection, int sessionId)
+        private static async Task ProcessRestRequst(HttpContext context, HttpEndpoint endpoint, HttpEndpointConnection endpointConnection, int sessionId)
         {
             string body;
             if (endpoint.IsUploadRequest)

@@ -294,6 +294,7 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         private static async Task UpdateFirmware()
         {
+#warning If stdin is available, ask user before every board update. If not, follow default from settings
             Console.Write("Updating firmware... ");
             try
             {
