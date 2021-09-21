@@ -479,6 +479,21 @@ namespace DuetControlServer.Codes
                     }
                     throw new OperationCanceledException();
 
+                // Flag current macro file as (not) pausable
+                case 98:
+                    if (code.Parameter('R') != null)
+                    {
+                        if (await SPI.Interface.Flush(code))
+                        {
+                            await SPI.Interface.SetMacroPausable(code.Channel, code.Parameter('R') != 0);
+                        }
+                        else
+                        {
+                            throw new OperationCanceledException();
+                        }
+                    }
+                    break;
+
                 // Emergency Stop
                 case 112:
                     if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await SPI.Interface.Flush(code))

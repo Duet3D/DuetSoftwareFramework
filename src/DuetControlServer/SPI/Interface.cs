@@ -432,6 +432,20 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Attempt to flag the currently executing macro file as (not) pausable
+        /// </summary>
+        /// <param name="channel">Code channel where the macro is being executed</param>
+        /// <param name="isPausable">Whether or not the macro file is pausable</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task SetMacroPausable(CodeChannel channel, bool isPausable)
+        {
+            using (await _channels[channel].LockAsync())
+            {
+                await _channels[channel].SetMacroPausable(isPausable);
+            }
+        }
+
+        /// <summary>
         /// Update the print file info in the firmware
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -1296,7 +1310,7 @@ namespace DuetControlServer.SPI
         private static void HandlePrintPaused()
         {
             DataTransfer.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
-            _logger.Trace("Received print pause notification for file position {0}, reason {1}", filePosition, pauseReason);
+            _logger.Debug("Received print pause notification for file position {0}, reason {1}", filePosition, pauseReason);
 
             // Update the object model
             using (Model.Provider.AccessReadWrite())
@@ -1315,7 +1329,7 @@ namespace DuetControlServer.SPI
             // Resolve pending and buffered codes on the file channel
             using (_channels[CodeChannel.File].Lock())
             {
-                _channels[CodeChannel.File].InvalidateRegular();
+                _channels[CodeChannel.File].PrintPaused();
             }
         }
 

@@ -5,6 +5,7 @@ using DuetControlServer.Files;
 using DuetControlServer.Model;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
+using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -270,7 +271,17 @@ namespace DuetControlServer.FileExecution
                                 }
 
                                 codes.Enqueue(readCode);
-                                codeTasks.Enqueue(readCode.Execute());
+                                codeTasks.Enqueue(
+                                    readCode
+                                        .Execute()
+                                        .ContinueWith(async task =>
+                                        {
+                                            Message result = await task;
+                                            await Logger.LogOutputAsync(result);
+                                            return result;
+                                        }, TaskContinuationOptions.RunContinuationsAsynchronously)
+                                        .Unwrap()
+                                );
                             }
                             catch (OperationCanceledException)
                             {
@@ -286,7 +297,7 @@ namespace DuetControlServer.FileExecution
                                     _file.Close();
                                 }
 
-                                await Utility.Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file: {ae.InnerException.Message}");
+                                await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file: {ae.InnerException.Message}");
                                 _logger.Error(ae.InnerException);
                             }
                             catch (Exception e)
@@ -296,39 +307,38 @@ namespace DuetControlServer.FileExecution
                                     _file.Close();
                                 }
 
-                                await Utility.Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file: {e.Message}");
+                                await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file: {e.Message}");
                                 _logger.Error(e);
                             }
                         }
 
                         // Is there anything more to do?
-                        if (codes.TryDequeue(out Code code))
+                        if (codes.TryDequeue(out Code code) && codeTasks.TryDequeue(out Task<Message> codeTask))
                         {
                             try
                             {
                                 try
                                 {
-                                    Message result = await codeTasks.Dequeue();
-                                    nextFilePosition = code.FilePosition.Value + code.Length.Value;
-                                    await Utility.Logger.LogOutputAsync(result);
+                                    // Logging is done before we get here...
+                                    await codeTask;
                                 }
                                 catch (OperationCanceledException)
                                 {
-                                    // Code has been cancelled, don't log this. In the future this may terminate the job file
-                                    // Note this can happen as well when the file being printed is exchanged
+                                    // Code has been cancelled, don't log this.
+                                    // Note this can happen as well when the file being printed is exchanged or when a pausable macro is interrupted
                                 }
                                 catch (CodeParserException cpe)
                                 {
-                                    await Utility.Logger.LogOutputAsync(MessageType.Error, cpe.Message);
+                                    await Logger.LogOutputAsync(MessageType.Error, cpe.Message);
                                 }
                                 catch (AggregateException ae)
                                 {
-                                    await Utility.Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                                    await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
                                     _logger.Error(ae.InnerException);
                                 }
                                 catch (Exception e)
                                 {
-                                    await Utility.Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
+                                    await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
                                     _logger.Error(e);
                                 }
                             }

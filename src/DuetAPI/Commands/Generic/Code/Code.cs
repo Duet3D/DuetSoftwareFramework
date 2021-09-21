@@ -203,7 +203,13 @@ namespace DuetAPI.Commands
         {
             if (Keyword != KeywordType.None)
             {
-                return KeywordToString() + ((KeywordArgument == null) ? string.Empty : " " + KeywordArgument);
+                string asString = KeywordToString() + ((KeywordArgument == null) ? string.Empty : " " + KeywordArgument);
+                if (Result != null && !string.IsNullOrEmpty(Result.Content))
+                {
+                    asString += " => ";
+                    asString += Result.ToString().TrimEnd();
+                }
+                return asString;
             }
 
             if (Type == CodeType.Comment)

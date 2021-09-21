@@ -58,7 +58,7 @@ namespace DuetHttpClient.Connector
                 return new RestConnector(baseUri, options, responseObj.SessionKey);
             }
 
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
             {
                 // Invalid password specified
                 throw new InvalidPasswordException();

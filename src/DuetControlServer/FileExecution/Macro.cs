@@ -56,6 +56,11 @@ namespace DuetControlServer.FileExecution
         public bool IsNested { get; }
 
         /// <summary>
+        /// Indicates if this macro can be aborted on a pause request
+        /// </summary>
+        public bool IsPausable { get; set; }
+
+        /// <summary>
         /// Internal cancellation token source used for codes
         /// </summary>
         private readonly CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
@@ -299,7 +304,7 @@ namespace DuetControlServer.FileExecution
         private async Task Run()
         {
             Queue<Code> codes = new();
-            Queue<Task<Message>> codesBeingExecuted = new();
+            Queue<Task<Message>> codeTasks = new();
 
             do
             {
@@ -316,7 +321,17 @@ namespace DuetControlServer.FileExecution
                         }
 
                         codes.Enqueue(readCode);
-                        codesBeingExecuted.Enqueue(readCode.Execute());
+                        codeTasks.Enqueue(
+                            readCode
+                                .Execute()
+                                .ContinueWith(async task =>
+                                {
+                                    Message result = await task;
+                                    await Logger.LogOutputAsync(result);
+                                    return result;
+                                }, TaskContinuationOptions.RunContinuationsAsynchronously)
+                                .Unwrap()
+                        );
                     }
                     catch (OperationCanceledException)
                     {
@@ -348,16 +363,16 @@ namespace DuetControlServer.FileExecution
                 }
 
                 // Wait for the next code to finish
-                if (codes.TryDequeue(out Code code) && codesBeingExecuted.TryDequeue(out Task<Message> codeTask))
+                if (codes.TryDequeue(out Code code) && codeTasks.TryDequeue(out Task<Message> codeTask))
                 {
                     try
                     {
-                        Message result = await codeTask;
-                        await Model.Provider.OutputAsync(result);
+                        // Logging is done before we get here...
+                        await codeTask;
                     }
                     catch (OperationCanceledException)
                     {
-                        // Code has been cancelled, don't log this. In the future this may terminate the macro file
+                        // Code has been cancelled, don't log this. This can happen when a pausable macro is interrupted
                     }
                     catch (CodeParserException cpe)
                     {

@@ -505,6 +505,22 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
+        /// Flag the currently executing macro file as (not) pausable
+        /// </summary>
+        /// <param name="isPausable">Whether the macro is pausable or not</param>
+        /// <returns>Asynchronous task</returns>
+        public async Task SetMacroPausable(bool isPausable)
+        {
+            if (CurrentState.Macro != null)
+            {
+                using (await CurrentState.Macro.LockAsync())
+                {
+                    CurrentState.Macro.IsPausable = isPausable;
+                }
+            }
+        }
+
+        /// <summary>
         /// Abort the last or all files
         /// </summary>
         /// <param name="abortAll">Whether to abort all files</param>
@@ -1238,6 +1254,24 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
+        /// Called when the print has been paused on the file channel
+        /// </summary>
+        public void PrintPaused()
+        {
+            // Invalidate pending requests
+            InvalidateRegular();
+
+            // Clear pausable macros
+            while (CurrentState.Macro != null && CurrentState.Macro.IsPausable)
+            {
+                Pop();
+            }
+
+            // Invalidate everything else
+            InvalidateRegular();
+        }
+
+        /// <summary>
         /// Invalidate buffered and regular codes + requests
         /// </summary>
         public void InvalidateRegular()
@@ -1251,7 +1285,7 @@ namespace DuetControlServer.SPI.Channel
 
             foreach (State state in Stack)
             {
-                if (!state.WaitingForAcknowledgement && state.Macro == null)
+                if (!state.WaitingForAcknowledgement && (state.Macro == null || state.Macro.IsPausable))
                 {
                     while (state.LockRequests.TryDequeue(out LockRequest lockRequest))
                     {

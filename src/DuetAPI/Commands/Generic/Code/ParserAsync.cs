@@ -27,7 +27,7 @@ namespace DuetAPI.Commands
             bool contentRead = false, unprecedentedParameter = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
             bool readingAtStart = buffer.SeenNewLine, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
-            bool wasQuoted = false, wasExpression = false;
+            bool nextCharLowerCase = false, wasQuoted = false, wasExpression = false;
             int numCurlyBraces = 0, numRoundBraces = 0;
             buffer.SeenNewLine = false;
 
@@ -166,7 +166,20 @@ namespace DuetAPI.Commands
                 {
                     if (inQuotes)
                     {
-                        if (c == '"')
+                        if (c == '\'')
+                        {
+                            if (nextCharLowerCase)
+                            {
+                                // Treat subsequent single-quotes as a single-quite char
+                                value += '\'';
+                            }
+                            else
+                            {
+                                // Next letter should be lower-case
+                                nextCharLowerCase = true;
+                            }
+                        }
+                        else if (c == '"')
                         {
                             if (buffer.BufferPointer >= buffer.BufferSize)
                             {
@@ -177,7 +190,7 @@ namespace DuetAPI.Commands
                             char nextC = (buffer.BufferPointer < buffer.BufferSize) ? buffer.Buffer[buffer.BufferPointer] : '\0';
                             if (nextC == '"')
                             {
-                                // Treat subsequent double quotes as a single quote char
+                                // Treat subsequent double quotes as a single double-quote char
                                 value += '"';
                                 buffer.BufferPointer++;
                                 result.Length++;
@@ -185,10 +198,16 @@ namespace DuetAPI.Commands
                             else
                             {
                                 // No longer in an escaped parameter
-                                inQuotes = false;
+                                inQuotes = nextCharLowerCase = false;
                                 wasQuoted = true;
                                 endingChunk = true;
                             }
+                        }
+                        else if (nextCharLowerCase)
+                        {
+                            // Add next lower-case character to the parameter value
+                            value += char.ToLower(c);
+                            nextCharLowerCase = false;
                         }
                         else
                         {

@@ -8,6 +8,13 @@ New features:
 - Added HTTP password protection (M551) using new `/machine/connect` and `/machine/disconnect` endpoints
 - Implemented new class library for remote management of Duets in standalone or SBC mode
 - Added new HTTP endpoint /machine/noop to keep HTTP sessions alive on demand
+- Added support for pausable macro files (see `M98 R1`)
+
+Bug fixes:
+- Pausing near the very end of a job file did not work
+- Single quotes in string parameters to convert letters to lower-case were not supported
+- Keyword results were not properly logged (like from `echo` or `abort`)
+- Under certain conditions messages in conditional blocks were not output instantly
 
 Version 3.4-b3
 ==============
