@@ -12,5 +12,10 @@ namespace DuetAPI.Commands
         /// Identifier of the plugin
         /// </summary>
         public string Plugin { get; set; }
+
+        /// <summary>
+        /// Defines if the list of executing plugins may be saved
+        /// </summary>
+        public bool SaveState { get; set; } = true;
     }
 }

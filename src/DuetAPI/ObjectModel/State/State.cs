@@ -18,6 +18,16 @@ namespace DuetAPI.ObjectModel
         private bool? _atxPower;
 
         /// <summary>
+        /// Port of the ATX power pin or null if not assigned
+        /// </summary>
+        public string AtxPowerPort
+        {
+            get => _atxPowerPort;
+            set => SetPropertyValue(ref _atxPowerPort, value);
+        }
+        private string _atxPowerPort;
+
+        /// <summary>
         /// Information about a requested beep or null if none is requested
         /// </summary>
         public BeepRequest Beep

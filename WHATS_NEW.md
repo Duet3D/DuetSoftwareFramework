@@ -10,11 +10,17 @@ New features:
 - Added new HTTP endpoint /machine/noop to keep HTTP sessions alive on demand
 - Added support for pausable macro files (see `M98 R1`)
 
+Changed behaviour:
+- Filament management is now done exclusively by RRF
+- List of plugins to start on boot is only written when individual plugins are started or stopped
+
 Bug fixes:
 - Pausing near the very end of a job file did not work
 - Single quotes in string parameters to convert letters to lower-case were not supported
 - Keyword results were not properly logged (like from `echo` or `abort`)
 - Under certain conditions messages in conditional blocks were not output instantly
+- M997 did not accept the P-parameter to override a firmware filename
+- Some log calls did not check for `null` messages
 
 Version 3.4-b3
 ==============

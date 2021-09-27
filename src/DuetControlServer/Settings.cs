@@ -23,7 +23,12 @@ namespace DuetControlServer
         private const RegexOptions RegexFlags = RegexOptions.IgnoreCase | RegexOptions.Singleline;
 
         /// <summary>
-        /// Indicates if this program is only launched to update the Duet 3 firmware
+        /// Defines whether the mainboard and expansion boards may be updated automatically during unattended upgrades
+        /// </summary>
+        public static bool AutoUpdateFirmware { get; set; } = true;
+
+        /// <summary>
+        /// Indicates if this program is only launched to update the board firmware
         /// </summary>
         [JsonIgnore]
         public static bool UpdateOnly { get; set; }
@@ -377,6 +382,12 @@ namespace DuetControlServer
                 logConfig.AddRule(LogLevel, LogLevel.Fatal, logConsoleTarget);
                 LogManager.AutoShutdown = false;
                 LogManager.Configuration = logConfig;
+            }
+
+            if (UpdateOnly && Console.IsInputRedirected && !AutoUpdateFirmware)
+            {
+                // Do not start DCS if no firmware updates are supposed to be installed during unattended updates
+                return false;
             }
 
             // Go on

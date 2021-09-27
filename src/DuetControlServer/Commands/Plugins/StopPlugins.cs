@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
+using Nito.AsyncEx;
 using System.Collections.Generic;
-using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -10,6 +11,11 @@ namespace DuetControlServer.Commands
     /// </summary>
     public sealed class StopPlugins : DuetAPI.Commands.StopPlugins
     {
+        /// <summary>
+        /// Indicates if the plugins are being started
+        /// </summary>
+        private static readonly AsyncLock _stopLock = new();
+
         /// <summary>
         /// Stop all the plugins
         /// </summary>
@@ -21,42 +27,48 @@ namespace DuetControlServer.Commands
                 return;
             }
 
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await _stopLock.LockAsync(Program.CancellationToken))
             {
-                if (!Model.Provider.Get.State.PluginsStarted)
+                // Don't proceed if all the plugins have been stopped
+                using (await Model.Provider.AccessReadOnlyAsync())
                 {
-                    // No plugins started before, no need to save the execution state
-                    return;
+                    if (!Model.Provider.Get.State.PluginsStarted)
+                    {
+                        return;
+                    }
                 }
-            }
 
-            List<Task> stopTasks = new();
-            using (FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write))
-            {
-                using StreamWriter writer = new(fileStream);
+                // Stop all plugins
+                StringBuilder startedPlugins = new();
+                List<Task> stopTasks = new();
                 using (await Model.Provider.AccessReadOnlyAsync())
                 {
                     foreach (Plugin item in Model.Provider.Get.Plugins.Values)
                     {
                         if (item.Pid >= 0)
                         {
-                            await writer.WriteLineAsync(item.Id);
+                            startedPlugins.AppendLine(item.Id);
 
                             if (item.Pid > 0)
                             {
-                                StopPlugin stopCommand = new() { Plugin = item.Id, StoppingAll = true };
-                                stopTasks.Add(Task.Run(stopCommand.Execute));
+                                StopPlugin stopCommand = new()
+                                {
+                                    Plugin = item.Id,
+                                    SaveState = false,
+                                    StoppingAll = true
+                                };
+                                stopTasks.Add(stopCommand.Execute());
                             }
                         }
                     }
                 }
-            }
-            await Task.WhenAll(stopTasks);
+                await Task.WhenAll(stopTasks);
 
-            using (await Model.Provider.AccessReadWriteAsync())
-            {
-                // Plugins have been stopped
-                Model.Provider.Get.State.PluginsStarted = false;
+                using (await Model.Provider.AccessReadWriteAsync())
+                {
+                    // Plugins have been stopped
+                    Model.Provider.Get.State.PluginsStarted = false;
+                }
             }
         }
     }

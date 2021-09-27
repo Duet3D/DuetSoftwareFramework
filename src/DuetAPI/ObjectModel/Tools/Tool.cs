@@ -34,6 +34,11 @@
         public ModelCollection<int> Fans { get; } = new ModelCollection<int>();
 
         /// <summary>
+        /// Feedforward coefficient to apply to the mapped heaters during extrusions
+        /// </summary>
+        public ModelCollection<int> FeedForward { get; } = new ModelCollection<int>();
+
+        /// <summary>
         /// Extruder drive index for resolving the tool filament (index or -1)
         /// </summary>
         public int FilamentExtruder

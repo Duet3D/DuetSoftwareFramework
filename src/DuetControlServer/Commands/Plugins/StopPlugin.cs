@@ -53,23 +53,29 @@ namespace DuetControlServer.Commands
                 {
                     throw new ArgumentException($"Plugin {Plugin} not found");
                 }
-
-                // Save the plugin execution states
-                using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
-                using StreamWriter writer = new(fileStream);
-                foreach (Plugin item in Model.Provider.Get.Plugins.Values)
-                {
-                    if (item.Id != plugin.Id && item.Pid > 0)
-                    {
-                        await writer.WriteLineAsync(item.Id);
-                    }
-                }
             }
 
             if (stopPlugin)
             {
                 // Stop it via the plugin service. This will reset the PID to -1 too
                 await IPC.Processors.PluginService.PerformCommand(this, asRoot);
+            }
+
+            // Save the execution state if requested
+            if (SaveState)
+            {
+                using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
+                using StreamWriter writer = new(fileStream);
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                    {
+                        if (item.Pid >= 0 && item.Id != Plugin)
+                        {
+                            await writer.WriteLineAsync(item.Id);
+                        }
+                    }
+                }
             }
         }
 

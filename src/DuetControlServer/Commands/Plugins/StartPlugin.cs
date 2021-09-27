@@ -30,9 +30,27 @@ namespace DuetControlServer.Commands
                 throw new NotSupportedException("Plugin support has been disabled");
             }
 
+            // Start the plugin and its dependencies
             using (await _startLock.LockAsync(Program.CancellationToken))
             {
                 await Start(Plugin);
+            }
+
+            // Save the execution state if requested
+            if (SaveState)
+            {
+                using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
+                using StreamWriter writer = new(fileStream);
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                    {
+                        if (item.Pid >= 0)
+                        {
+                            await writer.WriteLineAsync(item.Id);
+                        }
+                    }
+                }
             }
         }
 
@@ -98,17 +116,6 @@ namespace DuetControlServer.Commands
                         throw new ArgumentException($"Plugin {Plugin} not found");
                     }
                     throw new ArgumentException($"Dependency {id} of plugin {requiredBy} not found");
-                }
-
-                // Update the plugin execution states
-                using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
-                using StreamWriter writer = new(fileStream);
-                foreach (Plugin item in Model.Provider.Get.Plugins.Values)
-                {
-                    if (item.Id == plugin.Id && item.Pid > 0)
-                    {
-                        await writer.WriteLineAsync(item.Id);
-                    }
                 }
             }
 

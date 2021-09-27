@@ -4,6 +4,8 @@ using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -123,7 +125,7 @@ namespace DuetControlServer.Model
                 if (Settings.UpdateOnly && !_updatingFirmware)
                 {
                     _updatingFirmware = true;
-                    _ = Task.Run(UpdateFirmware);
+                    _ = Task.Run(Utility.Firmware.UpdateFirmware);
                 }
             }
         }
@@ -256,7 +258,7 @@ namespace DuetControlServer.Model
                         if (Settings.UpdateOnly && !_updatingFirmware)
                         {
                             _updatingFirmware = true;
-                            _ = Task.Run(UpdateFirmware);
+                            _ = Task.Run(Utility.Firmware.UpdateFirmware);
                         }
                     }
                     else
@@ -287,32 +289,6 @@ namespace DuetControlServer.Model
         /// Indicates if the firmware is being updated
         /// </summary>
         private static bool _updatingFirmware;
-
-        /// <summary>
-        /// Update the firmware internally
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static async Task UpdateFirmware()
-        {
-#warning If stdin is available, ask user before every board update. If not, follow default from settings
-            Console.Write("Updating firmware... ");
-            try
-            {
-                Commands.Code updateCode = new()
-                {
-                    Channel = DuetAPI.CodeChannel.Trigger,
-                    Type = CodeType.MCode,
-                    MajorNumber = 997
-                };
-                await updateCode.Execute();
-                Console.WriteLine("Done!");
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("Error: {0}", e.Message);
-                _logger.Debug(e);
-            }
-        }
 
         /// <summary>
         /// Number of the last layer

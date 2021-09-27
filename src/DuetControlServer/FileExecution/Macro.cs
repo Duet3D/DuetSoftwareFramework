@@ -500,14 +500,12 @@ namespace DuetControlServer.FileExecution
                 return;
             }
 
-            // Synchronize the machine model one last time while config.g or config-override.g is being run.
-            // This makes sure the filaments can be properly assigned
+            // Synchronize the machine model one last time while config.g or config-override.g is being run
             if (IsConfig || IsConfigOverride)
             {
                 _ = Task.Run(async () =>
                 {
                     await Model.Updater.WaitForFullUpdate();
-                    FilamentManager.RefreshMapping();
                     _runningConfig = false;
                 });
             }

@@ -96,7 +96,6 @@ namespace DuetControlServer
             {
                 Model.Provider.Init();
                 Model.Observer.Init();
-                await Utility.FilamentManager.Init();
                 _logger.Info("Environment initialized");
             }
             catch (Exception e)
@@ -304,9 +303,9 @@ namespace DuetControlServer
         /// <returns>True if another instance is running</returns>
         private static async Task<bool> CheckForAnotherInstance()
         {
-            using DuetAPIClient.CommandConnection connection = new();
             try
             {
+                using DuetAPIClient.CommandConnection connection = new();
                 await connection.Connect(Settings.FullSocketPath);
             }
             catch (SocketException)
@@ -316,21 +315,9 @@ namespace DuetControlServer
 
             if (Settings.UpdateOnly)
             {
-                Console.Write("Sending update request to DCS... ");
                 try
                 {
-                    await connection.PerformCode(new Code
-                    {
-                        Channel = DuetAPI.CodeChannel.Trigger,
-                        Type = DuetAPI.Commands.CodeType.MCode,
-                        MajorNumber = 997
-                    });
-                    Console.WriteLine("Done!");
-                }
-                catch
-                {
-                    Console.WriteLine("Error: Failed to send update request");
-                    throw;
+                    await Utility.Firmware.UpdateFirmwareRemotely();
                 }
                 finally
                 {

@@ -1,5 +1,7 @@
-﻿using DuetAPI.ObjectModel;
+﻿using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
+using Nito.AsyncEx;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -19,7 +21,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Indicates if the plugins are being started
         /// </summary>
-        private static volatile bool _startingPlugins;
+        private static readonly AsyncLock _startLock = new();
 
         /// <summary>
         /// Start all the plugins
@@ -27,14 +29,22 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
-            if (!Settings.PluginSupport || _startingPlugins)
+            if (!Settings.PluginSupport)
             {
                 return;
             }
-            _startingPlugins = true;
 
-            try
+            using (await _startLock.LockAsync(Program.CancellationToken))
             {
+                // Don't proceed if all the plugins have been started
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    if (Model.Provider.Get.State.PluginsStarted)
+                    {
+                        return;
+                    }
+                }
+
                 // Start all plugins
                 if (File.Exists(Settings.PluginsFilename))
                 {
@@ -43,9 +53,17 @@ namespace DuetControlServer.Commands
                     while (!reader.EndOfStream)
                     {
                         string pluginName = await reader.ReadLineAsync();
+                        if (pluginName == null)
+                        {
+                            break;
+                        }
+
                         try
                         {
-                            StartPlugin startCommand = new() { Plugin = pluginName };
+                            StartPlugin startCommand = new() {
+                                Plugin = pluginName,
+                                SaveState = false
+                            };
                             await startCommand.Execute();
                         }
                         catch (Exception e)
@@ -69,19 +87,15 @@ namespace DuetControlServer.Commands
                     Code dsfConfigCode = new()
                     {
                         Channel = DuetAPI.CodeChannel.SBC,
-                        Type = DuetAPI.Commands.CodeType.MCode,
+                        Type = CodeType.MCode,
                         MajorNumber = 98,
                         Parameters = new()
                         {
-                            new DuetAPI.Commands.CodeParameter('P', FilePath.DsfConfigFile)
+                            new CodeParameter('P', FilePath.DsfConfigFile)
                         }
                     };
                     await dsfConfigCode.Execute();
                 }
-            }
-            finally
-            {
-                _startingPlugins = false;
             }
         }
     }

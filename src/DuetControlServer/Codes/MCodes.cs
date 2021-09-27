@@ -942,7 +942,7 @@ namespace DuetControlServer.Codes
 
                                 // There are now two different IAP binaries, check which one to use
                                 iapFile = Model.Provider.Get.Boards[0].IapFileNameSBC;
-                                firmwareFile = Model.Provider.Get.Boards[0].FirmwareFileName;
+                                firmwareFile = code.Parameter('P') ?? Model.Provider.Get.Boards[0].FirmwareFileName;
                             }
 
                             if (string.IsNullOrEmpty(iapFile) || string.IsNullOrEmpty(firmwareFile))
@@ -991,7 +991,7 @@ namespace DuetControlServer.Codes
                             using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read);
                             if (Path.GetExtension(firmwareFile) == ".uf2")
                             {
-                                using MemoryStream unpackedFirmwareStream = await Utility.UF2.Unpack(firmwareStream);
+                                using MemoryStream unpackedFirmwareStream = await Utility.Firmware.UnpackUF2(firmwareStream);
                                 await SPI.Interface.UpdateFirmware(iapStream, unpackedFirmwareStream);
                             }
                             else

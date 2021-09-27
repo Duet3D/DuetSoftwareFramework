@@ -212,12 +212,12 @@ namespace DuetControlServer.Utility
         /// Write a message including timestamp to the log file
         /// </summary>
         /// <param name="level">Log level of the message</param>
-        /// <param name="msg">Message to log</param>
-        public static void Log(LogLevel level, Message msg)
+        /// <param name="message">Message to log</param>
+        public static void Log(LogLevel level, Message message)
         {
             using (_lock.Lock(Program.CancellationToken))
             {
-                if (level != LogLevel.Off && _writer != null && !string.IsNullOrWhiteSpace(msg.Content))
+                if (level != LogLevel.Off && _writer != null && !string.IsNullOrWhiteSpace(message?.Content))
                 {
                     using (Model.Provider.AccessReadOnly())
                     {
@@ -229,8 +229,8 @@ namespace DuetControlServer.Utility
 
                     try
                     {
-                        _writer.Write(msg.Time.ToString("yyyy-MM-dd HH:mm:ss "));
-                        _writer.WriteLine(msg.ToString().TrimEnd());
+                        _writer.Write(message.Time.ToString("yyyy-MM-dd HH:mm:ss "));
+                        _writer.WriteLine(message.ToString().TrimEnd());
                     }
                     catch (Exception e)
                     {
@@ -245,13 +245,13 @@ namespace DuetControlServer.Utility
         /// Write a message including timestamp to the log file asynchronously
         /// </summary>
         /// <param name="level">Log level of the message</param>
-        /// <param name="msg">Message to log</param>
+        /// <param name="message">Message to log</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task LogAsync(LogLevel level, Message msg)
+        public static async Task LogAsync(LogLevel level, Message message)
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
-                if (level != LogLevel.Off && _writer != null && !string.IsNullOrWhiteSpace(msg.Content))
+                if (level != LogLevel.Off && _writer != null && !string.IsNullOrWhiteSpace(message?.Content))
                 {
                     using (await Model.Provider.AccessReadOnlyAsync())
                     {
@@ -263,8 +263,8 @@ namespace DuetControlServer.Utility
 
                     try
                     {
-                        await _writer.WriteAsync(msg.Time.ToString("yyyy-MM-dd HH:mm:ss "));
-                        await _writer.WriteLineAsync(msg.ToString().TrimEnd());
+                        await _writer.WriteAsync(message.Time.ToString("yyyy-MM-dd HH:mm:ss "));
+                        await _writer.WriteLineAsync(message.ToString().TrimEnd());
                     }
                     catch (Exception e)
                     {
@@ -345,22 +345,28 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Log and output a message
         /// </summary>
-        /// <param name="msg">Message</param>
-        public static void LogOutput(Message msg)
+        /// <param name="message">Message</param>
+        public static void LogOutput(Message message)
         {
-            Model.Provider.Output(msg);
-            Log((msg.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, msg);
+            if (message != null)
+            {
+                Model.Provider.Output(message);
+                Log((message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, message);
+            }
         }
 
         /// <summary>
         /// Log and output a message asynchronously
         /// </summary>
-        /// <param name="msg">Message</param>
+        /// <param name="message">Message</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task LogOutputAsync(Message msg)
+        public static async Task LogOutputAsync(Message message)
         {
-            await Model.Provider.OutputAsync(msg);
-            await LogAsync((msg.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, msg);
+            if (message != null)
+            {
+                await Model.Provider.OutputAsync(message);
+                await LogAsync((message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, message);
+            }
         }
 
         /// <summary>
