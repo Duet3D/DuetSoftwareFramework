@@ -484,7 +484,7 @@ namespace DuetControlServer.SPI.Channel
                 {
                     if ((state.Macro == null || state.Macro.IsExecuting) && !state.MacroCompleted)
                     {
-                        CurrentState.FlushRequests.Enqueue(tcs);
+                        state.FlushRequests.Enqueue(tcs);
                         return tcs.Task;
                     }
                 }
