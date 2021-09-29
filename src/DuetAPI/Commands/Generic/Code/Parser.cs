@@ -438,14 +438,6 @@ namespace DuetAPI.Commands
                                 result.Keyword = KeywordType.Continue;
                                 inCondition = true;
                             }
-#pragma warning disable CS0618 // Type or member is obsolete
-                            else if (letter == 'r' && value == "eturn")
-                            {
-                                result.Keyword = KeywordType.Return;
-                                result.KeywordArgument = string.Empty;
-                                inCondition = true;
-                            }
-#pragma warning restore CS0618 // Type or member is obsolete
                             else if (letter == 'a' && value == "bort")
                             {
                                 result.Keyword = KeywordType.Abort;

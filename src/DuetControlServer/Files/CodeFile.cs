@@ -68,14 +68,14 @@ namespace DuetControlServer.Files
         private readonly Stack<CodeBlock> _codeBlocks = new();
 
         /// <summary>
+        /// Last code read from the file
+        /// </summary>
+        private Code _lastCode;
+
+        /// <summary>
         /// Last code block
         /// </summary>
         private CodeBlock _lastCodeBlock;
-
-        /// <summary>
-        /// Internal queue of codes read used to determine when pending codes have been processed
-        /// </summary>
-        private readonly Queue<Code> _pendingCodes = new();
 
         /// <summary>
         /// Gets or sets the current file position in bytes
@@ -219,12 +219,6 @@ namespace DuetControlServer.Files
                         return null;
                     }
 
-                    while (_pendingCodes.TryPeek(out Code pendingCode) && pendingCode.IsExecuted)
-                    {
-                        // Clean up the pending codes whenever a new code is read to save memory
-                        _pendingCodes.Dequeue();
-                    }
-
                     do
                     {
                         // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
@@ -265,7 +259,9 @@ namespace DuetControlServer.Files
                                 // End of while loop
                                 if (state.ProcessBlock || state.ContinueLoop)
                                 {
-                                    await WaitForPendingCodes();
+                                    // Wait for pending codes to be fully executed so that "iterations" can be incremented
+                                    await Flush();
+
                                     using (await _lock.LockAsync(Program.CancellationToken))
                                     {
                                         Position = state.StartingCode.FilePosition.Value;
@@ -349,7 +345,7 @@ namespace DuetControlServer.Files
                             }
 
                             // Start a new conditional block if necessary
-                            await WaitForPendingCodes();
+                            await Flush();
                             _logger.Debug("Evaluating {0} block", code.Keyword);
                             if (code.Keyword != KeywordType.While || codeBlock == null || codeBlock.StartingCode.FilePosition != code.FilePosition)
                             {
@@ -404,7 +400,7 @@ namespace DuetControlServer.Files
                             }
 
                             _logger.Debug("Doing {0}", code.Keyword);
-                            await WaitForPendingCodes();
+                            await Flush();
 
                             foreach (CodeBlock state in _codeBlocks)
                             {
@@ -418,19 +414,15 @@ namespace DuetControlServer.Files
                             break;
 
                         case KeywordType.Abort:
-#pragma warning disable CS0618 // Type or member is obsolete
-                        case KeywordType.Return:
-#pragma warning restore CS0618 // Type or member is obsolete
                             _logger.Debug("Doing {0}", code.Keyword);
                             using (await _lock.LockAsync(Program.CancellationToken))
                             {
                                 Close();
+                                _lastCode = code;
                             }
                             return code;
 
-                        case KeywordType.Global:
                         case KeywordType.Var:
-                        case KeywordType.Set:
                             if (codeBlock != null)
                             {
                                 codeBlock.SeenCodes = true;
@@ -449,19 +441,22 @@ namespace DuetControlServer.Files
 
                             using (await _lock.LockAsync(Program.CancellationToken))
                             {
-                                _pendingCodes.Enqueue(code);
+                                _lastCode = code;
                             }
                             return code;
 
                         case KeywordType.Echo:
+                        case KeywordType.Global:
                         case KeywordType.None:
+                        case KeywordType.Set:
                             if (codeBlock != null)
                             {
                                 codeBlock.SeenCodes = true;
                             }
+
                             using (await _lock.LockAsync(Program.CancellationToken))
                             {
-                                _pendingCodes.Enqueue(code);
+                                _lastCode = code;
                             }
                             return code;
 
@@ -479,39 +474,30 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
-        /// Wait for pending codes from the file being read
+        /// Wait for the last code to be fully executed
         /// </summary>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        private async Task WaitForPendingCodes()
+        private async Task Flush()
         {
-            if (_pendingCodes.TryPeek(out _))
+            while (await SPI.Interface.Flush(Channel))
             {
-                while (await SPI.Interface.Flush(Channel))
+                using (await _lock.LockAsync(Program.CancellationToken))
                 {
-                    using (await _lock.LockAsync(Program.CancellationToken))
+                    if (IsClosed)
                     {
-                        if (IsClosed)
-                        {
-                            // Canot continue if the file has been closed
-                            throw new OperationCanceledException();
-                        }
+                        // Cannot continue if the file has been closed
+                        break;
+                    }
 
-                        while (_pendingCodes.TryPeek(out Code pendingCode) && pendingCode.IsExecuted)
-                        {
-                            // Remove executed codes from the internal queue
-                            _pendingCodes.Dequeue();
-                        }
-
-                        if (!_pendingCodes.TryPeek(out _))
-                        {
-                            // No more pending codes, resume normal code execution
-                            return;
-                        }
+                    if (_lastCode == null || _lastCode.IsExecuted)
+                    {
+                        // No more code to await
+                        return;
                     }
                 }
-                throw new OperationCanceledException();
             }
+            throw new OperationCanceledException();
         }
 
         /// <summary>

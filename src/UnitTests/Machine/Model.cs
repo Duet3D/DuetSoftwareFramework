@@ -42,13 +42,11 @@ namespace UnitTests.Machine
             modelToUpdate.Heat.Heaters.Add(null);
             modelToUpdate.Heat.Heaters.Add(new Heater
             {
-                Name = "BED2",
                 Standby = 20F
             });
             modelToUpdate.Heat.Heaters.Add(new Heater
             {
-                Active = 45F,
-                Name = "BED3"
+                Active = 45F
             });
             modelToUpdate.State.Status = MachineStatus.Busy;
 
@@ -62,12 +60,10 @@ namespace UnitTests.Machine
             updatedModel.Heat.Heaters.Add(new Heater
             {
                 Active = 90F,
-                Standby = 21F,
-                Name = "Bed"
+                Standby = 21F
             });
             updatedModel.Heat.Heaters.Add(new Heater
             {
-                Name = "BED2",
                 Standby = 20F
             });
             updatedModel.Fans.Add(new Fan
@@ -86,10 +82,8 @@ namespace UnitTests.Machine
 
             Assert.AreEqual("Yum", modelToUpdate.Boards[0].FirmwareName);
             Assert.AreEqual(2, modelToUpdate.Heat.BedHeaters.Count);
-            Assert.AreEqual("Bed", modelToUpdate.Heat.Heaters[0].Name);
             Assert.AreEqual(90F, modelToUpdate.Heat.Heaters[0].Active);
             Assert.AreEqual(21F, modelToUpdate.Heat.Heaters[0].Standby);
-            Assert.AreEqual("BED2", modelToUpdate.Heat.Heaters[1].Name);
             Assert.AreEqual(20F, modelToUpdate.Heat.Heaters[1].Standby);
             Assert.AreEqual(1, modelToUpdate.Fans.Count);
             Assert.AreEqual(0.5F, modelToUpdate.Fans[0].ActualValue);
@@ -139,7 +133,7 @@ namespace UnitTests.Machine
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
             ObjectModel model = new();
-            bool success = model.UpdateFromFirmwareModel("state", parsedJson.RootElement);
+            bool success = model.UpdateFromFirmwareJson("state", parsedJson.RootElement);
 
             Assert.IsTrue(success);
         }

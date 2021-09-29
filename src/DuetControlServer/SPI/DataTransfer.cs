@@ -995,30 +995,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Assign a filament name to the given extruder drive
-        /// </summary>
-        /// <param name="extruder">Extruder index</param>
-        /// <param name="filamentName">Filament name</param>
-        /// <returns>Whether the firmware has been written successfully</returns>
-        public static bool WriteAssignFilament(int extruder, string filamentName)
-        {
-            // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
-            int dataLength = Serialization.Writer.WriteAssignFilament(span, extruder, filamentName);
-
-            // See if the request fits into the buffer
-            if (!CanWritePacket(dataLength))
-            {
-                return false;
-            }
-
-            // Write it
-            WritePacket(Communication.LinuxRequests.Request.AssignFilament, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
-            return true;
-        }
-
-        /// <summary>
         /// Write another chunk of the file being requested
         /// </summary>
         /// <param name="data">File chunk data</param>

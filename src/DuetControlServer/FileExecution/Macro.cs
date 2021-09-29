@@ -320,18 +320,9 @@ namespace DuetControlServer.FileExecution
                             break;
                         }
 
+                        readCode.LogOutput = true;
                         codes.Enqueue(readCode);
-                        codeTasks.Enqueue(
-                            readCode
-                                .Execute()
-                                .ContinueWith(async task =>
-                                {
-                                    Message result = await task;
-                                    await Logger.LogOutputAsync(result);
-                                    return result;
-                                }, TaskContinuationOptions.RunContinuationsAsynchronously)
-                                .Unwrap()
-                        );
+                        codeTasks.Enqueue(readCode.Execute());
                     }
                     catch (OperationCanceledException oce)
                     {

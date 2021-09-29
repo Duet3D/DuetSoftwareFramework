@@ -1,3 +1,5 @@
+using System;
+
 namespace DuetControlServer.SPI.Communication.LinuxRequests
 {
     /// <summary>
@@ -94,8 +96,9 @@ namespace DuetControlServer.SPI.Communication.LinuxRequests
         /// <summary>
         /// Assign filament to a given extruder drive
         /// </summary>
-        /// <seealso cref="AssignFilamentHeader"/>
-        AssignFilament = 14,
+        /// <seealso cref="AssignFilamentHeader">
+        [Obsolete("No longer used")]
+        AssignFilament_deprecated = 14,
 
         /// <summary>
         /// Response to a <see cref="FirmwareRequests.FileChunkHeader"/>

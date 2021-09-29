@@ -246,7 +246,7 @@ namespace DuetHttpClient.Connector
                                 {
                                     lock (Model)
                                     {
-                                        Model.UpdateFromFirmwareModel("limits", limitsResult);
+                                        Model.UpdateFromFirmwareJson("limits", limitsResult);
                                     }
                                 }
                             }
@@ -259,7 +259,7 @@ namespace DuetHttpClient.Connector
                                 // Update frequently changing properties
                                 lock (Model)
                                 {
-                                    Model.UpdateFromFirmwareModel(string.Empty, statusResult);
+                                    Model.UpdateFromFirmwareJson(string.Empty, statusResult);
                                     UpdateLayers();
                                 }
 
@@ -300,7 +300,7 @@ namespace DuetHttpClient.Connector
 
                                                         lock (Model)
                                                         {
-                                                            if (!Model.UpdateFromFirmwareModel(keyName.GetString(), keyResult, offset, next == 0))
+                                                            if (!Model.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
                                                             {
                                                                 // Invalid key
                                                                 break;

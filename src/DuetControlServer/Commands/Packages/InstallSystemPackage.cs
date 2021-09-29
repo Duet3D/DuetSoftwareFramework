@@ -20,8 +20,24 @@ namespace DuetControlServer.Commands
                 throw new NotSupportedException("Root plugin support has been disabled");
             }
 
-            // Forward this command to the plugin services
-            await IPC.Processors.PluginService.PerformCommand(this, true);
+            // It is compulsory to stop the plugins before system packages are installed.
+            // This is required to avoid deadlocks when M997 is called by the reprapfirmware package
+            StopPlugins stopCommand = new();
+            await stopCommand.Execute();
+
+            try
+            {
+                // Forward this command to the plugin services
+                await IPC.Processors.PluginService.PerformCommand(this, true);
+            }
+            catch (OperationCanceledException)
+            {
+                // This exception can be expected when RRF has been updated
+                if (Settings.NoTerminateOnReset)
+                {
+                    throw;
+                }
+            }
         }
     }
 }

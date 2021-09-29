@@ -72,16 +72,6 @@
         public ModelCollection<HeaterMonitor> Monitors { get; } = new ModelCollection<HeaterMonitor>();
 
         /// <summary>
-        /// Name of the heater or null if unset
-        /// </summary>
-        public string Name
-        {
-            get => _name;
-			set => SetPropertyValue(ref _name, value);
-        }
-        private string _name;
-
-        /// <summary>
         /// Sensor number of this heater or -1 if not configured
         /// </summary>
         public int Sensor

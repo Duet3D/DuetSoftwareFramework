@@ -163,7 +163,7 @@ namespace DuetControlServer.Model
                             {
                                 using (await Provider.AccessReadWriteAsync())
                                 {
-                                    Provider.Get.UpdateFromFirmwareModel("limits", limitsResult);
+                                    Provider.Get.UpdateFromFirmwareJson("limits", limitsResult);
                                     _logger.Debug("Updated key limits");
                                 }
                             }
@@ -183,7 +183,7 @@ namespace DuetControlServer.Model
                         // Update frequently changing properties
                         using (await Provider.AccessReadWriteAsync())
                         {
-                            Provider.Get.UpdateFromFirmwareModel(string.Empty, statusResult);
+                            Provider.Get.UpdateFromFirmwareJson(string.Empty, statusResult);
                             if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
                             {
                                 Provider.Get.State.Status = MachineStatus.Updating;
@@ -217,7 +217,7 @@ namespace DuetControlServer.Model
                                             _lastSeqs[seqProperty.Name] = newSeq;
                                             using (await Provider.AccessReadWriteAsync())
                                             {
-                                                if (Provider.Get.UpdateFromFirmwareModel(keyName.GetString(), keyResult, offset, next == 0))
+                                                if (Provider.Get.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
                                                 {
                                                     _logger.Debug("Updated key {0}{1}", keyName.GetString(), (offset + next != 0) ? $" starting from {offset}, next {next}" : string.Empty);
                                                     if (_logger.IsTraceEnabled)

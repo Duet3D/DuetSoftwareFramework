@@ -132,26 +132,11 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<UserSession> UserSessions { get; } = new ModelCollection<UserSession>();
 
         /// <summary>
-        /// List of user-defined variables
-        /// </summary>
-        /// <seealso cref="UserVariable"/>
-        [JsonIgnore]
-        [Obsolete("Do not use this field. The underlying type may be changed to MutableModelDictionary in a future update")]
-        public ModelCollection<UserVariable> UserVariables { get; } = new ModelCollection<UserVariable>();
-
-        /// <summary>
         /// List of available mass storages
         /// </summary>
         /// <seealso cref="Volume"/>
         [SbcProperty(true)]
         public ModelCollection<Volume> Volumes { get; } = new ModelCollection<Volume>();
-
-        /// <summary>
-        /// Update this instance from a given JSON element
-        /// </summary>
-        /// <param name="jsonElement">Element to update this intance from</param>
-        /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromModel(JsonElement jsonElement) => InternalUpdateFromModel(null, jsonElement, false);
 
         /// <summary>
         /// Update a specific key of this instance from a given JSON element as provided by the firmware
@@ -161,7 +146,14 @@ namespace DuetAPI.ObjectModel
         /// <param name="offset">Index offset</param>
         /// <param name="last">Whether this is the last update</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromFirmwareModel(string key, JsonElement jsonElement, int offset = 0, bool last = true) => InternalUpdateFromModel(key, jsonElement, true, offset, last);
+        public bool UpdateFromFirmwareJson(string key, JsonElement jsonElement, int offset = 0, bool last = true) => InternalUpdateFromJson(key, jsonElement, true, offset, last);
+
+        /// <summary>
+        /// Update this instance from a given JSON element
+        /// </summary>
+        /// <param name="jsonElement">Element to update this intance from</param>
+        /// <returns>Whether the key could be updated</returns>
+        public bool UpdateFromJson(JsonElement jsonElement) => InternalUpdateFromJson(null, jsonElement, false);
 
         /// <summary>
         /// Update a specific key of this instance from a given JSON element
@@ -169,7 +161,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="key">Property name to update</param>
         /// <param name="jsonElement">Element to update this intance from</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromModel(string key, JsonElement jsonElement) => InternalUpdateFromModel(key, jsonElement, false);
+        public bool UpdateFromJson(string key, JsonElement jsonElement) => InternalUpdateFromJson(key, jsonElement, false);
 
         /// <summary>
         /// Update the whole or a specific key of this instance from a given JSON element
@@ -180,7 +172,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="offset">Index offset (collection keys only)</param>
         /// <param name="last">Whether this is the last update (collection keys only)</param>
         /// <returns>Whether the key could be updated</returns>
-        private bool InternalUpdateFromModel(string key, JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
+        private bool InternalUpdateFromJson(string key, JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
         {
             if (string.IsNullOrEmpty(key))
             {

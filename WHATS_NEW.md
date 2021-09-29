@@ -4,7 +4,12 @@ Summary of important changes in recent versions
 Version 3.4-b5pre
 =================
 
+Changed behaviour:
+- Removed unused `return` command from API keywords
+- Removed deprecated `CodeResult` class from API
+
 Bug fixes:
+- Automatic firmware update during unattended updates did not work
 - Under certain circumstances macro files could be stopped too early (thanks Andy)
 
 Version 3.4-b4

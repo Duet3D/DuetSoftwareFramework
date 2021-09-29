@@ -460,17 +460,23 @@ namespace DuetControlServer.SPI.Channel
             {
                 foreach (State state in Stack)
                 {
-                    if (state.WaitingForAcknowledgement && code.IsForAcknowledgement)
+                    if (code.IsForAcknowledgement)
                     {
-                        state.FlushRequests.Enqueue(tcs);
-                        return tcs.Task;
+                        if (state.WaitingForAcknowledgement)
+                        {
+                            state.FlushRequests.Enqueue(tcs);
+                            return tcs.Task;
+                        }
                     }
-                    if (code.Macro != null && code.Macro == state.Macro)
+                    else if (code.Macro != null)
                     {
-                        state.FlushRequests.Enqueue(tcs);
-                        return tcs.Task;
+                        if (code.Macro == state.Macro)
+                        {
+                            state.FlushRequests.Enqueue(tcs);
+                            return tcs.Task;
+                        }
                     }
-                    if (!state.WaitingForAcknowledgement && state.Macro == null)
+                    else if (state.Macro == null)
                     {
                         state.FlushRequests.Enqueue(tcs);
                         return tcs.Task;
@@ -491,7 +497,7 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // Fallback, should not happen
-            _logger.Debug("Failed to find suitable stack level for flush request, falling back to current one");
+            _logger.Warn("Failed to find suitable stack level for flush request, falling back to current one");
             CurrentState.FlushRequests.Enqueue(tcs);
             return tcs.Task;
         }

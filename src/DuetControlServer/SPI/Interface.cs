@@ -87,8 +87,6 @@ namespace DuetControlServer.SPI
         private static TaskCompletionSource _stopPrintRequest;
 
         // Miscellaneous requests
-        private static volatile bool _assignFilaments;
-        private static readonly Dictionary<int, string> _extruderFilamentMapping = new();
         private static readonly Queue<Tuple<MessageTypeFlags, string>> _messagesToSend = new();
         private static readonly Dictionary<uint, FileStream> _openFiles = new();
         private static uint _openFileHandle = Consts.NoFileHandle;
@@ -313,13 +311,6 @@ namespace DuetControlServer.SPI
             if (Settings.NoSpi)
             {
                 throw new InvalidOperationException("Not connected over SPI");
-            }
-
-            if (code.Type == CodeType.MCode && code.MajorNumber == 703)
-            {
-                // It is safe to assume that the tools and extruders have been configured at this point.
-                // Assign the filaments next so that M703 works as intended
-                _assignFilaments = true;
             }
 
             using (await _channels[code.Channel].LockAsync())
@@ -699,29 +690,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Assign the filament to an extruder drive
-        /// </summary>
-        /// <param name="extruder">Extruder drive</param>
-        /// <param name="filament">Loaded filament</param>
-        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-        public static void AssignFilament(int extruder, string filament)
-        {
-            if (Program.CancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException();
-            }
-            if (Settings.NoSpi)
-            {
-                throw new InvalidOperationException("Not connected over SPI");
-            }
-
-            lock (_extruderFilamentMapping)
-            {
-                _extruderFilamentMapping[extruder] = filament;
-            }
-        }
-
-        /// <summary>
         /// Send a message to the firmware
         /// </summary>
         /// <param name="flags">Message flags</param>
@@ -1014,26 +982,6 @@ namespace DuetControlServer.SPI
                             break;
                         }
                     }
-                }
-
-                // Update filament assignment per extruder drive. This must happen when config.g has finished or M701 is requested
-                if (!Macro.RunningConfig || _assignFilaments)
-                {
-                    lock (_extruderFilamentMapping)
-                    {
-                        foreach (int extruder in _extruderFilamentMapping.Keys)
-                        {
-                            if (DataTransfer.WriteAssignFilament(extruder, _extruderFilamentMapping[extruder]))
-                            {
-                                _extruderFilamentMapping.Remove(extruder);
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                    }
-                    _assignFilaments = false;
                 }
 
                 // Do another full SPI transfe
@@ -1831,13 +1779,6 @@ namespace DuetControlServer.SPI
                     _setHeightmapRequest = null;
                     outputMessage = true;
                 }
-            }
-
-            // Clear filament assign requests
-            _assignFilaments = false;
-            lock (_extruderFilamentMapping)
-            {
-                _extruderFilamentMapping.Clear();
             }
 
             // Clear messages to send to the firmware

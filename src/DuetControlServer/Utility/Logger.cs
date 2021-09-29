@@ -321,7 +321,7 @@ namespace DuetControlServer.Utility
         /// <param name="result">Message list</param>
         public static void Log(Message message)
         {
-            if (message != null)
+            if (message != null && !string.IsNullOrEmpty(message.Content))
             {
                 LogLevel level = (message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
                 Log(level, message);
@@ -335,7 +335,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task LogAsync(Message message)
         {
-            if (message != null)
+            if (message != null && !string.IsNullOrEmpty(message.Content))
             {
                 LogLevel level = (message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
                 await LogAsync(level, message);
@@ -348,7 +348,7 @@ namespace DuetControlServer.Utility
         /// <param name="message">Message</param>
         public static void LogOutput(Message message)
         {
-            if (message != null)
+            if (message != null && !string.IsNullOrEmpty(message.Content))
             {
                 Model.Provider.Output(message);
                 Log((message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, message);
@@ -362,7 +362,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task LogOutputAsync(Message message)
         {
-            if (message != null)
+            if (message != null && !string.IsNullOrEmpty(message.Content))
             {
                 await Model.Provider.OutputAsync(message);
                 await LogAsync((message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, message);

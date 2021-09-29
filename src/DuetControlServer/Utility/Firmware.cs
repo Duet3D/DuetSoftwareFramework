@@ -243,47 +243,55 @@ namespace DuetControlServer.Utility
                 return;
             }
 
-            // Clear pending inputs
-            while (Console.KeyAvailable)
-            {
-                Console.ReadKey(true);
-            }
-
-            // Determine which boards are supposed to be updated
             Console.WriteLine((outdatedBoards.Count == 1) ? "There is {0} outdated board:" : "There are {0} outdated boards:", outdatedBoards.Count);
             foreach (Board board in outdatedBoards)
             {
                 string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
                 Console.WriteLine("- {0} ({1} -> {2}){3}", board.Name, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
             }
-            Console.Write("Would you like to update them all (Y/n)? ");
 
+            // Determine which boards are supposed to be updated
             List<Board> boardsToUpdate = new();
-            char key = char.ToUpper(Console.ReadKey().KeyChar);
-            if (key != '\r')
+            if (Console.IsInputRedirected)
             {
-                Console.WriteLine();
-            }
-
-            if (key == '\r' || key == 'Y')
-            {
+                // DCS does not start in update-only mode if Settings.AutoUpdateFirmware is false
                 boardsToUpdate.AddRange(outdatedBoards);
             }
             else
             {
-                foreach (Board board in outdatedBoards)
+                while (Console.KeyAvailable)
                 {
-                    string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
-                    Console.Write("Would you like to update {0} ({1} -> {2}){3} (Y/n)? ", board.Name, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
-                    key = char.ToUpper(Console.ReadKey().KeyChar);
-                    if (key != '\r')
-                    {
-                        Console.WriteLine();
-                    }
+                    Console.ReadKey(true);
+                }
 
-                    if (key == '\r' || key == 'Y')
+                Console.Write("Would you like to update them all (Y/n)? ");
+
+                char key = char.ToUpper(Console.ReadKey().KeyChar);
+                if (key != '\r')
+                {
+                    Console.WriteLine();
+                }
+
+                if (key == '\r' || key == 'Y')
+                {
+                    boardsToUpdate.AddRange(outdatedBoards);
+                }
+                else
+                {
+                    foreach (Board board in outdatedBoards)
                     {
-                        boardsToUpdate.Add(board);
+                        string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
+                        Console.Write("Would you like to update {0} ({1} -> {2}){3} (Y/n)? ", board.Name, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
+                        key = char.ToUpper(Console.ReadKey().KeyChar);
+                        if (key != '\r')
+                        {
+                            Console.WriteLine();
+                        }
+
+                        if (key == '\r' || key == 'Y')
+                        {
+                            boardsToUpdate.Add(board);
+                        }
                     }
                 }
             }
@@ -427,47 +435,50 @@ namespace DuetControlServer.Utility
                 return;
             }
 
-            // Clear pending inputs
-            while (Console.KeyAvailable)
-            {
-                Console.ReadKey(true);
-            }
-
-            // Determine which boards are supposed to be updated
             Console.WriteLine((outdatedBoards.Count == 1) ? "There is {0} outdated board:" : "There are {0} outdated boards:", outdatedBoards.Count);
             foreach (Board board in outdatedBoards)
             {
                 string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
                 Console.WriteLine("- {0} ({1} -> {2}){3}", board.Name, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
             }
-            Console.Write("Would you like to update them all (Y/n)? ");
 
+            // Determine which boards are supposed to be updated
             List<Board> boardsToUpdate = new();
-            char key = char.ToUpper(Console.ReadKey().KeyChar);
-            if (key != '\r')
+            if (Console.IsInputRedirected)
             {
-                Console.WriteLine();
-            }
-
-            if (key == '\r' || key == 'Y')
-            {
+                // DCS does not start in update-only mode if Settings.AutoUpdateFirmware is false
                 boardsToUpdate.AddRange(outdatedBoards);
             }
             else
             {
-                foreach (Board board in outdatedBoards)
-                {
-                    string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
-                    Console.Write("Would you like to update {0} ({1} -> {2}){3} (Y/n)? ", board.Name, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
-                    key = char.ToUpper(Console.ReadKey().KeyChar);
-                    if (key != '\r')
-                    {
-                        Console.WriteLine();
-                    }
+                Console.Write("Would you like to update them all (Y/n)? ");
 
-                    if (key == '\r' || key == 'Y')
+                char key = char.ToUpper(Console.ReadKey().KeyChar);
+                if (key != '\r')
+                {
+                    Console.WriteLine();
+                }
+
+                if (key == '\r' || key == 'Y')
+                {
+                    boardsToUpdate.AddRange(outdatedBoards);
+                }
+                else
+                {
+                    foreach (Board board in outdatedBoards)
                     {
-                        boardsToUpdate.Add(board);
+                        string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
+                        Console.Write("Would you like to update {0} ({1} -> {2}){3} (Y/n)? ", board.Name, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
+                        key = char.ToUpper(Console.ReadKey().KeyChar);
+                        if (key != '\r')
+                        {
+                            Console.WriteLine();
+                        }
+
+                        if (key == '\r' || key == 'Y')
+                        {
+                            boardsToUpdate.Add(board);
+                        }
                     }
                 }
             }
@@ -483,7 +494,6 @@ namespace DuetControlServer.Utility
                         // Start the update process
                         Commands.Code updateCode = new()
                         {
-                            Channel = DuetAPI.CodeChannel.Trigger,
                             Type = CodeType.MCode,
                             MajorNumber = 997,
                             Parameters = new()
@@ -522,7 +532,6 @@ namespace DuetControlServer.Utility
                 {
                     Commands.Code updateCode = new()
                     {
-                        Channel = DuetAPI.CodeChannel.Trigger,
                         Type = CodeType.MCode,
                         MajorNumber = 997
                     };

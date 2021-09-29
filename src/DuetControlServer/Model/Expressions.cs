@@ -291,11 +291,7 @@ namespace DuetControlServer.Model
                     return builder.ToString();
                 }
 
-                if (code.Keyword == KeywordType.Abort ||
-#pragma warning disable CS0618 // Type or member is obsolete
-                    code.Keyword == KeywordType.Return
-#pragma warning restore CS0618 // Type or member is obsolete
-                    )
+                if (code.Keyword == KeywordType.Abort)
                 {
                     string keywordArgument = code.KeywordArgument.Trim();
                     try

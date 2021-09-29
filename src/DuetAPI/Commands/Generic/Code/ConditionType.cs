@@ -39,12 +39,6 @@ namespace DuetAPI.Commands
         Break,
 
         /// <summary>
-        /// Return instruction
-        /// </summary>
-        [Obsolete("Was never supported in RRF, will be removed again")]
-        Return,
-
-        /// <summary>
         /// Abort instruction
         /// </summary>
         Abort,

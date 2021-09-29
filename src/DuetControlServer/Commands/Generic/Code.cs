@@ -316,6 +316,11 @@ namespace DuetControlServer.Commands
         internal bool InternallyProcessed { get; set; }
 
         /// <summary>
+        /// Automatically log and output the code's result
+        /// </summary>
+        internal bool LogOutput { get; set; }
+
+        /// <summary>
         /// File that started this code
         /// </summary>
         internal Files.CodeFile File { get; set; }
@@ -354,6 +359,10 @@ namespace DuetControlServer.Commands
                     // Execute this code
                     _logger.Debug("Processing {0}{1}", this, logSuffix);
                     await Process();
+                    if (LogOutput)
+                    {
+                        await Utility.Logger.LogOutputAsync(Result);
+                    }
                     _logger.Debug("Completed {0}{1}", this, logSuffix);
                 }
                 catch (OperationCanceledException oce)
@@ -477,9 +486,6 @@ namespace DuetControlServer.Commands
             if (Keyword != KeywordType.None &&
                 Keyword != KeywordType.Echo &&
                 Keyword != KeywordType.Abort &&
-#pragma warning disable CS0618 // Type or member is obsolete
-                Keyword != KeywordType.Return &&
-#pragma warning restore CS0618 // Type or member is obsolete
                 Keyword != KeywordType.Global &&
                 Keyword != KeywordType.Var &&
                 Keyword != KeywordType.Set)
