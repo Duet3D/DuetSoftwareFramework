@@ -1,6 +1,12 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 3.4-b5pre
+=================
+
+Bug fixes:
+- Under certain circumstances macro files could be stopped too early (thanks Andy)
+
 Version 3.4-b4
 ==============
 

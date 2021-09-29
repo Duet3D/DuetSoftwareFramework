@@ -333,11 +333,15 @@ namespace DuetControlServer.FileExecution
                                 .Unwrap()
                         );
                     }
-                    catch (OperationCanceledException)
+                    catch (OperationCanceledException oce)
                     {
                         using (await _lock.LockAsync(Program.CancellationToken))
                         {
-                            await AbortAsync();
+                            if (!IsAborted)
+                            {
+                                _logger.Debug(oce, "Cancelling macro file because of cancelled code");
+                                await AbortAsync();
+                            }
                         }
                     }
                     catch (AggregateException ae)

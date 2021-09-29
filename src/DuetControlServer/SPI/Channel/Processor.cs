@@ -477,7 +477,21 @@ namespace DuetControlServer.SPI.Channel
                     }
                 }
             }
+            else
+            {
+                // Flush requests are not meant for temporary macro states...
+                foreach (State state in Stack)
+                {
+                    if ((state.Macro == null || state.Macro.IsExecuting) && !state.MacroCompleted)
+                    {
+                        CurrentState.FlushRequests.Enqueue(tcs);
+                        return tcs.Task;
+                    }
+                }
+            }
 
+            // Fallback, should not happen
+            _logger.Debug("Failed to find suitable stack level for flush request, falling back to current one");
             CurrentState.FlushRequests.Enqueue(tcs);
             return tcs.Task;
         }
