@@ -2,11 +2,28 @@
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
-    <Version>3.4-b4</Version>
+    <Version>3.4-b5</Version>
+    <Authors>Christian Hammacher</Authors>
+    <Description>Official remote HTTP API client for Duet3D boards (supports standalone and SBC mode)</Description>
+    <Copyright>Duet3D Ltd</Copyright>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
+    <PackageIcon>duet_teardrop_wifi_large.png</PackageIcon>
+    <PackageIconUrl />
+    <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>Duet Duet3 DSF DuetSoftwareFramework</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\pkg\common\duet_teardrop_wifi_large.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -200,6 +200,9 @@ Since it relies on a [model subscription](#model-subscriptions), it gives an ide
 #### Command-Line Options
 
 - `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
+- `-f`, `--filter <filter>`: UNIX socket to connect to
+- `-c`, `--confirm`: Confirm every JSON receipt manually
+- `-q`, `--quiet`: Do not display when a connection has been established
 - `-h`, `--help`: Display all available command-line parameters
 
 ### PluginManager

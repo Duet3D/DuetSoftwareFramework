@@ -666,16 +666,6 @@ namespace DuetControlServer.Codes
                     }
                     throw new OperationCanceledException();
 
-                // Store parameters
-                case 500:
-                    if (await SPI.Interface.Flush(code))
-                    {
-                        await Model.Updater.WaitForFullUpdate();
-                        await ConfigOverride.Save(code);
-                        return new Message();
-                    }
-                    throw new OperationCanceledException();
-
                 // Print settings
                 case 503:
                     if (await SPI.Interface.Flush(code))
@@ -704,15 +694,18 @@ namespace DuetControlServer.Codes
                         string directory = code.Parameter('P');
                         if (!string.IsNullOrEmpty(directory))
                         {
-                            string physicalDirectory = await FilePath.ToPhysicalAsync(directory, "sys");
-                            if (Directory.Exists(physicalDirectory))
+                            await using (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
                             {
-                                string virtualDirectory = await FilePath.ToVirtualAsync(physicalDirectory);
-                                using (await Model.Provider.AccessReadWriteAsync())
+                                string physicalDirectory = await FilePath.ToPhysicalAsync(directory, "sys");
+                                if (Directory.Exists(physicalDirectory))
                                 {
-                                    Model.Provider.Get.Directories.System = virtualDirectory;
+                                    string virtualDirectory = await FilePath.ToVirtualAsync(physicalDirectory);
+                                    using (await Model.Provider.AccessReadWriteAsync())
+                                    {
+                                        Model.Provider.Get.Directories.System = virtualDirectory;
+                                    }
+                                    return new Message();
                                 }
-                                return new Message();
                             }
                             return new Message(MessageType.Error, "Directory not found");
                         }
@@ -763,7 +756,7 @@ namespace DuetControlServer.Codes
                                 return new Message(MessageType.Error, "Machine name must consist of the same letters and digits as configured by the Linux hostname");
                             }
 
-                            // Hostname is legit - pretend we didn't see this code so RRF can interpret it
+                            // Hostname is legit - pass this code on to RRF so it can update the name too
                         }
                         break;
                     }
@@ -807,15 +800,6 @@ namespace DuetControlServer.Codes
                             }
                             return new Message(MessageType.Success, $"CORS enabled for site '{Model.Provider.Get.Network.CorsSite}'");
                         }
-                    }
-                    throw new OperationCanceledException();
-
-                // Configure filament
-                case 703:
-                    if (await SPI.Interface.Flush(code))
-                    {
-                        await Model.Updater.WaitForFullUpdate();
-                        break;
                     }
                     throw new OperationCanceledException();
 

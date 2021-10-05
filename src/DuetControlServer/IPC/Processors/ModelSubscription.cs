@@ -167,9 +167,9 @@ namespace DuetControlServer.IPC.Processors
                 Type commandType;
                 do
                 {
-                    // Send new JSON data
                     if (jsonData != null)
                     {
+                        // Send new JSON data
                         await Connection.Send(jsonData);
                         jsonData = null;
 
@@ -186,21 +186,33 @@ namespace DuetControlServer.IPC.Processors
                     }
 
                     // Wait for an object model update to complete
-                    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                    cts.CancelAfter(Settings.SocketPollInterval);
-                    try
+                    bool waitForUpdate = true;
+                    if (_mode != SubscriptionMode.Full)
                     {
-                        await Provider.WaitForUpdateAsync(cts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        if (!Program.CancellationToken.IsCancellationRequested)
+                        lock (_patch)
                         {
-                            Connection.Poll();
-                            continue;
+                            waitForUpdate = (_patch.Count == 0);
                         }
-                        Connection.Logger.Debug("Subscriber connection requested to terminate");
-                        throw;
+                    }
+
+                    if (waitForUpdate)
+                    {
+                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+                        cts.CancelAfter(Settings.SocketPollInterval);
+                        try
+                        {
+                            await Provider.WaitForUpdateAsync(cts.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            if (!Program.CancellationToken.IsCancellationRequested)
+                            {
+                                Connection.Poll();
+                                continue;
+                            }
+                            Connection.Logger.Debug("Subscriber connection requested to terminate");
+                            throw;
+                        }
                     }
 
                     // Get the (diff) JSON

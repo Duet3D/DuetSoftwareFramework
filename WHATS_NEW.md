@@ -5,12 +5,21 @@ Version 3.4-b5pre
 =================
 
 Changed behaviour:
+- `config-override.g` is now written by RepRapFirmware
 - Removed unused `return` command from API keywords
 - Removed deprecated `CodeResult` class from API
+- Added new `-c` parameter to ModelObserver to confirm receipt of data
 
 Bug fixes:
 - Automatic firmware update during unattended updates did not work
+- Automatic expansion board updates did not wait for completion
+- Fixed problem where subscribers received only cached model patches
 - Under certain circumstances macro files could be stopped too early (thanks Andy)
+- Pausing job files was not working if RRF reported no file position
+- `boards[].mcuTemp`, `boards[].v12`, and `boards[].vIn` were not nullable
+- Default firmware directory in the object model was wrong
+- JSON responses in subscriber patch mode were not necessarily live
+- M505 did not lock the movement before changing the sys directory
 
 Version 3.4-b4
 ==============

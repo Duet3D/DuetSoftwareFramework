@@ -517,7 +517,7 @@ namespace DuetControlServer.SPI
         /// Lock the move module and wait for standstill
         /// </summary>
         /// <param name="channel">Code channel acquiring the lock</param>
-        /// <returns>Whether the resource could be locked</returns>
+        /// <returns>Disposable lock object that releases the lock when disposed</returns>
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         /// <exception cref="OperationCanceledException">Failed to get movement lock</exception>
         public static async Task<IAsyncDisposable> LockMovementAndWaitForStandstill(CodeChannel channel)
@@ -1014,15 +1014,7 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         private static void ProcessPacket(PacketHeader packet)
         {
-            Request request = (Request)packet.Request;
-
-            if (Settings.UpdateOnly && request != Request.ObjectModel)
-            {
-                // Don't process any requests except for object model responses if only the firmware is supposed to be updated
-                return;
-            }
-
-            switch (request)
+            switch ((Request)packet.Request)
             {
                 case Request.ResendPacket:
                     DataTransfer.ResendPacket(packet, out Communication.LinuxRequests.Request linuxRequest);

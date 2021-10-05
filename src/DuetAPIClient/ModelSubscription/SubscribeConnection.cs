@@ -139,9 +139,11 @@ namespace DuetAPIClient
         [Obsolete("Use GetObjectModel instead")]
         public async Task<ObjectModel> GetMachineModel(CancellationToken cancellationToken = default)
         {
-            ObjectModel model = await Receive<ObjectModel>(cancellationToken);
-            await Send(new Acknowledge(), cancellationToken);
-            return model;
+            if (Mode == SubscriptionMode.Full)
+            {
+                await Send(new Acknowledge(), cancellationToken);
+            }
+            return await Receive<ObjectModel>(cancellationToken);
         }
 
         /// <summary>
@@ -156,9 +158,11 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         public async Task<ObjectModel> GetObjectModel(CancellationToken cancellationToken = default)
         {
-            ObjectModel model = await Receive<ObjectModel>(cancellationToken);
-            await Send(new Acknowledge(), cancellationToken);
-            return model;
+            if (Mode == SubscriptionMode.Full)
+            {
+                await Send(new Acknowledge(), cancellationToken);
+            }
+            return await Receive<ObjectModel>(cancellationToken);
         }
 
         /// <summary>
@@ -174,9 +178,8 @@ namespace DuetAPIClient
         [Obsolete("Use GetSerializedObjectModel instead")]
         public async Task<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
         {
-            MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
             await Send(new Acknowledge(), cancellationToken);
-            return json;
+            return await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
         }
 
         /// <summary>
@@ -191,9 +194,8 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>g
         public async Task<MemoryStream> GetSerializedObjectModel(CancellationToken cancellationToken = default)
         {
-            MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
             await Send(new Acknowledge(), cancellationToken);
-            return json;
+            return await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
         }
 
         /// <summary>
@@ -211,9 +213,8 @@ namespace DuetAPIClient
         [Obsolete("Use GetObjectModelPatch instead")]
         public async Task<JsonDocument> GetMachineModelPatch(CancellationToken cancellationToken = default)
         {
-            JsonDocument patch = await ReceiveJson(cancellationToken);
             await Send(new Acknowledge(), cancellationToken);
-            return patch;
+            return await ReceiveJson(cancellationToken);
         }
 
         /// <summary>
@@ -230,9 +231,8 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         public async Task<JsonDocument> GetObjectModelPatch(CancellationToken cancellationToken = default)
         {
-            JsonDocument patch = await ReceiveJson(cancellationToken);
             await Send(new Acknowledge(), cancellationToken);
-            return patch;
+            return await ReceiveJson(cancellationToken);
         }
     }
 }

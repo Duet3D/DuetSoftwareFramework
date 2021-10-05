@@ -14,7 +14,7 @@ namespace ModelObserver
         {
             // Parse the command line arguments
             string lastArg = null, socketPath = Defaults.FullSocketPath, filter = null;
-            bool quiet = false;
+            bool confirm = false, quiet = false;
             foreach (string arg in args)
             {
                 if (lastArg == "-s" || lastArg == "--socket")
@@ -25,6 +25,10 @@ namespace ModelObserver
                 {
                     filter = arg;
                 }
+                else if (arg == "-c" || arg == "--confirm")
+                {
+                    confirm = true;
+                }
                 else if (arg == "-q" || arg == "--quiet")
                 {
                     quiet = true;
@@ -34,6 +38,7 @@ namespace ModelObserver
                     Console.WriteLine("Available command line arguments:");
                     Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
                     Console.WriteLine("-f, --filter <filter>: UNIX socket to connect to");
+                    Console.WriteLine("-c, --confirm: Confirm every JSON receipt manually");
                     Console.WriteLine("-q, --quiet: Do not display when a connection has been established");
                     Console.WriteLine("-h, --help: Display this help text");
                     return;
@@ -64,6 +69,10 @@ namespace ModelObserver
             {
                 try
                 {
+                    if (confirm)
+                    {
+                        Console.ReadLine();
+                    }
                     using JsonDocument patch = await connection.GetObjectModelPatch();
                     Console.WriteLine(GetIndentedJson(patch));
                 }

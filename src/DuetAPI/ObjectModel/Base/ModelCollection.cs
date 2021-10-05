@@ -283,7 +283,11 @@ namespace DuetAPI.ObjectModel
                         {
                             item = (IModelObject)Activator.CreateInstance(itemType);
                         }
-                        this[i] = (T)item.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                        T updatedItem = (T)item.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                        if (!ReferenceEquals(this[i], updatedItem))
+                        {
+                            this[i] = updatedItem;
+                        }
                     }
                 }
 
@@ -368,7 +372,7 @@ namespace DuetAPI.ObjectModel
                 }
 
                 // Add missing items
-                for (int i = this.Count; i < offset + arrayLength; i++)
+                for (int i = Count; i < offset + arrayLength; i++)
                 {
                     JsonElement jsonItem = jsonElement[i - offset];
                     if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)

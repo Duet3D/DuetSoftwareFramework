@@ -310,8 +310,8 @@ namespace DuetControlServer.FileExecution
                             {
                                 try
                                 {
-                                    // Logging is done before we get here...
-                                    await codeTask;
+                                    _ = await codeTask;     // Logging is done before we get here...
+                                    nextFilePosition = code.FilePosition.Value + code.Length.Value;
                                 }
                                 catch (OperationCanceledException)
                                 {

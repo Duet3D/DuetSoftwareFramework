@@ -8,7 +8,7 @@ namespace DuetAPI.ObjectModel
     public sealed class Board : ModelObject
     {
         /// <summary>
-        /// Accelerometer of this board
+        /// Accelerometer of this board or null if unknown
         /// </summary>
         public Accelerometer Accelerometer
         {
@@ -128,14 +128,14 @@ namespace DuetAPI.ObjectModel
         private int _maxMotors;
 
         /// <summary>
-        /// Minimum, maximum, and current temperatures of the MCU
+        /// Minimum, maximum, and current temperatures of the MCU or null if unknown
         /// </summary>
-        public MinMaxCurrent<float> McuTemp { get; } = new MinMaxCurrent<float>
+        public MinMaxCurrent<float> McuTemp
         {
-            Current = -273.15F,
-            Min = -273.15F,
-            Max = -273.15F
-        };
+            get => _mcuTemp;
+            set => SetPropertyValue(ref _mcuTemp, value);
+        }
+        private MinMaxCurrent<float> _mcuTemp;
 
         /// <summary>
         /// Full name of the board
@@ -198,13 +198,23 @@ namespace DuetAPI.ObjectModel
         private string _uniqueId;
 
         /// <summary>
-        /// Minimum, maximum, and current voltages on the 12V rail
+        /// Minimum, maximum, and current voltages on the 12V rail or null if unknown
         /// </summary>
-        public MinMaxCurrent<float> V12 { get; } = new MinMaxCurrent<float>();
+        public MinMaxCurrent<float> V12
+        {
+            get => _v12;
+            set => SetPropertyValue(ref _v12, value);
+        }
+        private MinMaxCurrent<float> _v12;
 
         /// <summary>
-        /// Minimum, maximum, and current voltages on the input rail
+        /// Minimum, maximum, and current voltages on the input rail or null if unknown
         /// </summary>
-        public MinMaxCurrent<float> VIn { get; } = new MinMaxCurrent<float>();
+        public MinMaxCurrent<float> VIn
+        {
+            get => _vIn;
+            set => SetPropertyValue(ref _vIn, value);
+        }
+        private MinMaxCurrent<float> _vIn;
     }
 }

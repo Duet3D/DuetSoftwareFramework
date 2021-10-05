@@ -23,7 +23,7 @@
             get => _firmware;
 			set => SetPropertyValue(ref _firmware, value);
         }
-        private string _firmware = "0:/sys";
+        private string _firmware = "0:/firmware";
 
         /// <summary>
         /// Path to the G-Codes directory

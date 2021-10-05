@@ -320,7 +320,8 @@ namespace DuetControlServer.Utility
                         // Unlike with M997, we need to wait for RRF to complete the update process
                         while (true)
                         {
-                            await Model.Provider.WaitForUpdateAsync();
+                            await Task.Delay(2000, Program.CancellationToken);
+
                             using (await Model.Provider.AccessReadOnlyAsync())
                             {
                                 if (Model.Provider.Get.State.Status != MachineStatus.Updating)
@@ -329,7 +330,6 @@ namespace DuetControlServer.Utility
                                     break;
                                 }
                             }
-                            await Task.Delay(Settings.ModelUpdateInterval, Program.CancellationToken);
                         }
 
                         Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
@@ -506,7 +506,11 @@ namespace DuetControlServer.Utility
                         // Unlike with M997, we need to wait for RRF to complete the update process
                         while (true)
                         {
+                            await Task.Delay(2000, Program.CancellationToken);
+
                             using JsonDocument patch = await subscribeConnection.GetObjectModelPatch();
+                            objectModel.UpdateFromJson(patch.RootElement);
+
                             if (objectModel.State.Status != MachineStatus.Updating)
                             {
                                 // Update complete
