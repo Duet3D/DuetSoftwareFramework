@@ -747,13 +747,13 @@ namespace DuetControlServer.SPI.Serialization
             }
 
             // Write header
-            SetVariableHeader request = new()
+            DeleteLocalVariableHeader request = new()
             {
                 Channel = channel,
                 VariableLength = (byte)unicodeVarName.Length
             };
             MemoryMarshal.Write(to, ref request);
-            int bytesWritten = Marshal.SizeOf<SetVariableHeader>();
+            int bytesWritten = Marshal.SizeOf<DeleteLocalVariableHeader>();
 
             // Write variable name
             unicodeVarName.CopyTo(to[bytesWritten..]);

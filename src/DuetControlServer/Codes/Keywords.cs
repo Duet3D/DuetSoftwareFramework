@@ -158,13 +158,25 @@ namespace DuetControlServer.Codes
                 }
 
                 // Replace Linux fields and assign the variable
+                expression = await Expressions.Evaluate(code, false);
+
+                // Assign the variable
+                string fullVarName = varName;
                 if (code.Keyword != KeywordType.Set)
                 {
-                    varName = (code.Keyword == KeywordType.Global ? "global." : "var.") + varName;
+                    fullVarName = (code.Keyword == KeywordType.Global ? "global." : "var.") + varName;
                 }
-                expression = await Expressions.Evaluate(code, false);
-                object varContent = await SPI.Interface.SetVariable(code.Channel, code.Keyword != KeywordType.Set, varName, expression);
-                _logger.Debug("Assigned variable {0} to {1}", varName, varContent);
+                object varContent = await SPI.Interface.SetVariable(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression);
+                _logger.Debug("Set variable {0} to {1}", fullVarName, varContent);
+
+                // Keep track of it
+                if (code.Keyword == KeywordType.Var && code.File != null)
+                {
+                    using (await code.File.LockAsync())
+                    {
+                        code.File.AddLocalVariable(varName);
+                    }
+                }
                 return new Message();
             }
 

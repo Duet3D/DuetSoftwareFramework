@@ -368,6 +368,7 @@ namespace DuetAPI.Commands
                             }
                             else if (letter == 'g' && value == "lobal")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Global;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
@@ -403,60 +404,70 @@ namespace DuetAPI.Commands
                                 throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
                             }
                         }
-                        else if (result.Type == CodeType.None && result.MajorNumber == null && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
+                        else if (result.Type == CodeType.None && result.MajorNumber == null && !wasQuoted && !wasExpression)
                         {
                             // Check for conditional G-code
                             if (letter == 'i' && value == "f")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.If;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (letter == 'e' && value == "lif")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.ElseIf;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (letter == 'e' && value == "lse")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Else;
                             }
                             else if (letter == 'w' && value == "hile")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.While;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (letter == 'b' && value == "reak")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Break;
                                 inCondition = true;
                             }
                             else if (letter == 'c' && value == "ontinue")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Continue;
                                 inCondition = true;
                             }
                             else if (letter == 'a' && value == "bort")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Abort;
                                 inCondition = true;
                             }
                             else if (letter == 'v' && value == "ar")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Var;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (letter == 's' && value == "et")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Set;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (letter == 'e' && value == "cho")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Echo;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;

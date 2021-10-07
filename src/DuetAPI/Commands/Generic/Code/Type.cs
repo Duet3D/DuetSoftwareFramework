@@ -20,6 +20,14 @@ namespace DuetAPI.Commands
         Comment = 'Q',
 
         /// <summary>
+        /// Meta G-code keyword (not sent as a code to RRF)
+        /// </summary>
+        /// <remarks>
+        /// Codes of this type are not sent to RRF in binary representation
+        /// </remarks>
+        Keyword = 'K',
+
+        /// <summary>
         /// G-code
         /// </summary>
         GCode = 'G',

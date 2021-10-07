@@ -1185,7 +1185,7 @@ namespace DuetControlServer.SPI
             }
             else
             {
-                // Targeted messages are hadnled by the IPC processors
+                // Targeted messages are handled by the IPC processors
                 MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                     : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                         : MessageType.Success;

@@ -96,7 +96,7 @@ namespace DuetPluginService
         /// <summary>
         /// Command-line arguments to install a local package
         /// </summary>
-        public static string InstallLocalPackageArguments { get; set; } = "-i {file}";
+        public static string InstallLocalPackageArguments { get; set; } = "--force-confold -i {file}";
 
         /// <summary>
         /// Command to uninstall a local package

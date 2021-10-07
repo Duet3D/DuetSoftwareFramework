@@ -9,6 +9,7 @@ Changed behaviour:
 - Removed unused `return` command from API keywords
 - Removed deprecated `CodeResult` class from API
 - Added new `-c` parameter to ModelObserver to confirm receipt of data
+- Added new `Keyword` code type to DSF API
 
 Bug fixes:
 - Automatic firmware update during unattended updates did not work
@@ -20,6 +21,8 @@ Bug fixes:
 - Default firmware directory in the object model was wrong
 - JSON responses in subscriber patch mode were not necessarily live
 - M505 did not lock the movement before changing the sys directory
+- Local variables were not deleted when their scope was released
+- M105 did not output a NL at the end of Marlin-compatible replies
 
 Version 3.4-b4
 ==============

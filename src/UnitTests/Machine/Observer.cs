@@ -56,11 +56,11 @@ namespace UnitTests.Machine
 
             // Nested item propery
             TestContext.Out.WriteLine("Nested item property");
-            mainBoard.V12.Current = 123F;
+            mainBoard.V12 = new() { Current = 123F };
 
             Assert.AreEqual(1, numEvents);
-            Assert.AreEqual(new object[] { new ItemPathNode("boards", 0, new object[1]), "v12", "current" }, recordedPath);
-            Assert.AreEqual(123F, recordedValue);
+            Assert.AreEqual(new object[] { new ItemPathNode("boards", 0, new object[1]), "v12" }, recordedPath);
+            Assert.AreEqual(mainBoard.V12, recordedValue);
 
             // Reset
             numEvents = 0;

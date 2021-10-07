@@ -642,7 +642,7 @@ namespace DuetControlServer.Commands
                             }
                             else if (Type == CodeType.MCode && MajorNumber == 105)
                             {
-                                Result.Content = "ok " + Result.Content;
+                                Result.Content = "ok " + Result.Content + "\n";
                             }
                             else
                             {
