@@ -245,7 +245,7 @@ namespace DuetControlServer.Files
                 bool readAgain = false;
                 while (_codeBlocks.TryPeek(out CodeBlock state))
                 {
-                    if (!codeRead || (code.Type != CodeType.Comment && code.Indent < state.StartingCode.Indent))
+                    if (!codeRead || (code.Type != CodeType.Comment && code.Indent <= state.StartingCode.Indent))
                     {
                         if (state.HasLocalVariables)
                         {
