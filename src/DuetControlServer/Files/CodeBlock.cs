@@ -25,9 +25,18 @@ namespace DuetControlServer.Files
         public Code StartingCode { get; }
 
         /// <summary>
-        /// Base indentation of codes in this block
+        /// Check if the given indentation level finishes this block
         /// </summary>
-        public int? Indent { get; set; }
+        /// <param name="indent">Current indentation level</param>
+        /// <returns>Whether the block is complete</returns>
+        public bool IsFinished(int indent)
+        {
+            if (StartingCode.Keyword == DuetAPI.Commands.KeywordType.Var)
+            {
+                return indent < StartingCode.Indent;
+            }
+            return indent <= StartingCode.Indent;
+        }
 
         /// <summary>
         /// Last evaluation result of the conditional start code indicating if this block is supposed to be processed

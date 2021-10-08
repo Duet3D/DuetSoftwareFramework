@@ -245,7 +245,7 @@ namespace DuetControlServer.Files
                 bool readAgain = false;
                 while (_codeBlocks.TryPeek(out CodeBlock state))
                 {
-                    if (!codeRead || (code.Type != CodeType.Comment && code.Indent <= state.StartingCode.Indent))
+                    if (!codeRead || (code.Type != CodeType.Comment && state.IsFinished(code.Indent)))
                     {
                         if (state.HasLocalVariables)
                         {
@@ -324,7 +324,6 @@ namespace DuetControlServer.Files
                     if (codeBlock != null && (code.Keyword != KeywordType.While || code.FilePosition != codeBlock.StartingCode.FilePosition))
                     {
                         codeBlock.SeenCodes = true;
-                        codeBlock.Indent ??= code.Indent;
                     }
 
                     switch (code.Keyword)
@@ -425,7 +424,7 @@ namespace DuetControlServer.Files
                             return code;
 
                         case KeywordType.Var:
-                            if (codeBlock == null || code.Indent > codeBlock.Indent)
+                            if (codeBlock == null || code.Indent > codeBlock.StartingCode.Indent)
                             {
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
