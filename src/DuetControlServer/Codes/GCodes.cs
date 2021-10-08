@@ -37,7 +37,12 @@ namespace DuetControlServer.Codes
                 // Save or load heightmap
                 case 29:
                     CodeParameter cp = code.Parameter('S', 0);
-                    if (cp == 1 || cp == 3)
+                    if (cp == 0)
+                    {
+                        // Wait for this code to be fully executed before starting the next one
+                        code.Flags |= CodeFlags.Unbuffered;
+                    }
+                    else if (cp == 1 || cp == 3)
                     {
                         if (await SPI.Interface.Flush(code))
                         {
