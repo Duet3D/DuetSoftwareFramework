@@ -39,18 +39,15 @@ namespace DuetPluginService.Commands
             Plugin plugin = await ExtractManifest(zipArchive);
             _logger = NLog.LogManager.GetLogger($"Plugin {plugin.Id}");
 
-            // Install plugin dependencies as root
             if (Program.IsRoot)
             {
+                // Install plugin dependencies
                 foreach (string package in plugin.SbcPackageDependencies)
                 {
                     _logger.Info("Installing package {0}", package);
                     await InstallPackage(package);
                 }
-            }
 
-            if (Program.IsRoot)
-            {
                 // Apply security profile for this plugin unless it gets root permissions anyway
                 if (!plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser))
                 {
