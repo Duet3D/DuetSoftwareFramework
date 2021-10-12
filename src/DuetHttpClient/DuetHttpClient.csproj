@@ -13,6 +13,8 @@
     <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>Duet Duet3 DSF DuetSoftwareFramework</PackageTags>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 
   <ItemGroup>
