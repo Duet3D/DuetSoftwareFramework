@@ -1,8 +1,14 @@
-#!/bin/sh
+#!/bin/bash
 
 # Stop the plugin first
 if (systemctl is-active -q duetcontrolserver && /opt/dsf/bin/PluginManager -q is-started DuetPiManagementPlugin); then
 	/opt/dsf/bin/PluginManager -q stop DuetPiManagementPlugin
+	if [[ "$1" == "upgrade" ]]; then
+		# Restart it again when the upgrade is complete
+		touch /opt/dsf/plugins/DuetPiManagementPlugin/.start
+	fi
+elif ([[ -e /opt/dsf/conf/plugins.txt ]] && grep -q -e "DuetPiManagementPlugin" /opt/dsf/conf/plugins.txt ); then
+	cat /opt/dsf/conf/plugins.txt | grep -v -e DuetPiManagmentPlugin > /opt/dsf/conf/plugins.txt
 	if [[ "$1" == "upgrade" ]]; then
 		# Restart it again when the upgrade is complete
 		touch /opt/dsf/plugins/DuetPiManagementPlugin/.start
