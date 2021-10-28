@@ -8,6 +8,7 @@ StartLimitIntervalSec=0
 ExecStart=/opt/dsf/bin/DuetPluginService
 TimeoutStopSec=15
 Restart=always
+Type=notify
 User=dsf
 Group=dsf
 UMask=0002

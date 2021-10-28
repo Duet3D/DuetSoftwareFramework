@@ -1,4 +1,5 @@
 {
+  "AutoUpdateFirmware": true,
   "PluginSupport": true,
   "RootPluginSupport": false,
   "PluginsFilename": "/opt/dsf/conf/plugins.txt",
