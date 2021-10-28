@@ -221,7 +221,7 @@ namespace DuetControlServer.Model
         /// Update volume devices
         /// </summary>
         /// <remarks>
-        /// Volume 0 always represents the virtual SD card on Linux. The following code achieves this but it
+        /// Volume 0 always represents the virtual SD card on DuetPi. The following code achieves this but it
         /// might need further adjustments to ensure this on every Linux distribution
         /// </remarks>
         private static void UpdateVolumes()

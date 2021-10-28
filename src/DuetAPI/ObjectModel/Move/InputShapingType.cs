@@ -15,6 +15,11 @@ namespace DuetAPI.ObjectModel
         None,
 
         /// <summary>
+        /// MZV
+        /// </summary>
+        MZV,
+
+        /// <summary>
         /// ZVD
         /// </summary>
         ZVD,
@@ -23,6 +28,11 @@ namespace DuetAPI.ObjectModel
         /// ZVDD
         /// </summary>
         ZVDD,
+
+        /// <summary>
+        /// ZVDDD
+        /// </summary>
+        ZVDDD,
 
         /// <summary>
         /// EI2 (2-hump)

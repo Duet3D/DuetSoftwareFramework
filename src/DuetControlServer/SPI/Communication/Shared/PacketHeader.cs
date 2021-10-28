@@ -12,7 +12,7 @@ namespace DuetControlServer.SPI.Communication.Shared
         /// Identifier of this request
         /// </summary>
         /// <seealso cref="FirmwareRequests.Request"/>
-        /// <seealso cref="LinuxRequests.Request"/>
+        /// <seealso cref="SbcRequests.Request"/>
         public ushort Request;
 
         /// <summary>

@@ -47,7 +47,8 @@ namespace DuetWebServer.Controllers
         }
 
         #region Authorization
-#warning Add challenge request here returning remote IP address and allow hashed password for Connect
+        // TODO Add challenge request here returning remote IP address and allow hashed password for Connect
+
         /// <summary>
         /// GET /machine/connect
         /// Check the password and register a new session on success

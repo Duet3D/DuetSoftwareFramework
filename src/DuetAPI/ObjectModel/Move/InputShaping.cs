@@ -6,6 +6,11 @@
     public sealed class InputShaping : ModelObject
     {
         /// <summary>
+        /// Amplitudes of the input shaper
+        /// </summary>
+        public ModelCollection<float> Amplitudes { get; } = new();
+
+        /// <summary>
         /// Damping factor
         /// </summary>
         public float Damping
@@ -14,6 +19,11 @@
             set => SetPropertyValue(ref _damping, value);
         }
         private float _damping = 0.2F;
+
+        /// <summary>
+        /// Input shaper durations (in s)
+        /// </summary>
+        public ModelCollection<float> Durations { get; } = new();
 
         /// <summary>
         /// Frequency (in Hz)

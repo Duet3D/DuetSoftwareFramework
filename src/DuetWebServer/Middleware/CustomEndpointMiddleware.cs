@@ -2,6 +2,7 @@
 using DuetAPI.ObjectModel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using System.IO;
@@ -33,16 +34,22 @@ namespace DuetWebServer.Middleware
         private readonly ILogger _logger;
 
         /// <summary>
+        /// Host application lifetime
+        /// </summary>
+        private readonly IHostApplicationLifetime _applicationLifetime;
+
+        /// <summary>
         /// Constructor of this middleware
         /// </summary>
         /// <param name="next">Next request delegate</param>
         /// <param name="configuration">Application configuration</param>
         /// <param name="logger">Logger instance</param>
-        public CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger)
+        public CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger, IHostApplicationLifetime applicationLifetime)
         {
             _next = next;
             _configuration = configuration;
             _logger = logger;
+            _applicationLifetime = applicationLifetime;
         }
 
         /// <summary>
@@ -93,7 +100,7 @@ namespace DuetWebServer.Middleware
                     {
                         using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
-                        using CancellationTokenSource cts = new();
+                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_applicationLifetime.ApplicationStopping);
                         Task webSocketTask = ReadFromWebSocket(webSocket, endpointConnection, sessionId, cts.Token);
                         Task unixSocketTask = ReadFromUnixSocket(webSocket, endpointConnection, cts.Token);
 

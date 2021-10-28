@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using DuetAPI;
 
-namespace DuetControlServer.SPI.Communication.LinuxRequests
+namespace DuetControlServer.SPI.Communication.SbcRequests
 {
     /// <summary>
     /// Header for G/M/T-codes

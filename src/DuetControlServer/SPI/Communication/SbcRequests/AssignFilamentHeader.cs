@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace DuetControlServer.SPI.Communication.LinuxRequests
+namespace DuetControlServer.SPI.Communication.SbcRequests
 {
     /// <summary>
     /// Header of a filament assignment. This is followed by the actual filament name

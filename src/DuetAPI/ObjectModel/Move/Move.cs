@@ -63,12 +63,17 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of move queue items (DDA rings)
         /// </summary>
-        public ModelCollection<MoveQueueItem> Queue { get; } = new ModelCollection<MoveQueueItem>();
+        public ModelCollection<MoveQueueItem> Queue { get; } = new();
+
+        /// <summary>
+        /// Parameters for centre rotation
+        /// </summary>
+        public MoveRotation Rotation { get; } = new();
 
         /// <summary>
         /// Parameters for input shaping
         /// </summary>
-        public InputShaping Shaping { get; } = new InputShaping();
+        public InputShaping Shaping { get; } = new();
 
         /// <summary>
         /// Speed factor applied to every regular move (0.01..1 or greater)

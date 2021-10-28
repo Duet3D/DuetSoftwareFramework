@@ -1,9 +1,9 @@
 using System;
 
-namespace DuetControlServer.SPI.Communication.LinuxRequests
+namespace DuetControlServer.SPI.Communication.SbcRequests
 {
     /// <summary>
-    /// Request indices for SPI transfers from the Linux board to the RepRapFirmware controller
+    /// Request indices for SPI transfers from the SBC to the RepRapFirmware controller
     /// </summary>
     public enum Request : ushort
     {

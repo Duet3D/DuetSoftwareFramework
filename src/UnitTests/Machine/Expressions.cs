@@ -8,7 +8,7 @@ namespace UnitTests.Machine
     public class Expressions
     {
         [Test]
-        public void HasLinuxExpressions()
+        public void HasSbcExpressions()
         {
             Assert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G1 Z{move.axes[0].machinePosition -"));
             Assert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G92 Z{{3 + 3} + (volumes[0].freeSpace - 4}"));
@@ -16,26 +16,26 @@ namespace UnitTests.Machine
             Assert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G92 Z{{3 + 3 + (move.axes[0].userPosition - 4)"));
 
             DuetControlServer.Commands.Code code = new("G1 Z{move.axes[2].userPosition - 3}");
-            Assert.IsFalse(DuetControlServer.Model.Expressions.ContainsLinuxFields(code));
+            Assert.IsFalse(DuetControlServer.Model.Expressions.ContainsSbcFields(code));
 
             code = new DuetControlServer.Commands.Code("echo {{3 + 3} + (volumes[0].freeSpace - 4)}");
-            Assert.IsTrue(DuetControlServer.Model.Expressions.ContainsLinuxFields(code));
+            Assert.IsTrue(DuetControlServer.Model.Expressions.ContainsSbcFields(code));
 
             code = new DuetControlServer.Commands.Code("G92 Z{{3 + 3} + (volumes[0].freeSpace - 4)}");
-            Assert.IsTrue(DuetControlServer.Model.Expressions.ContainsLinuxFields(code));
+            Assert.IsTrue(DuetControlServer.Model.Expressions.ContainsSbcFields(code));
 
             code = new DuetControlServer.Commands.Code("G92 Z{{3 + 3} + (move.axes[0].userPosition - 4)}");
-            Assert.IsFalse(DuetControlServer.Model.Expressions.ContainsLinuxFields(code));
+            Assert.IsFalse(DuetControlServer.Model.Expressions.ContainsSbcFields(code));
         }
 
         [Test]
         public void IsLinuxExpression()
         {
-            Assert.IsFalse(DuetControlServer.Model.Expressions.IsLinuxExpression("state"));
-            Assert.IsFalse(DuetControlServer.Model.Expressions.IsLinuxExpression("state.status"));
-            Assert.IsTrue(DuetControlServer.Model.Expressions.IsLinuxExpression("scanner"));
-            Assert.IsTrue(DuetControlServer.Model.Expressions.IsLinuxExpression("network.interfaces"));
-            Assert.IsTrue(DuetControlServer.Model.Expressions.IsLinuxExpression("volumes"));
+            Assert.IsFalse(DuetControlServer.Model.Expressions.IsSbcExpression("state"));
+            Assert.IsFalse(DuetControlServer.Model.Expressions.IsSbcExpression("state.status"));
+            Assert.IsTrue(DuetControlServer.Model.Expressions.IsSbcExpression("scanner"));
+            Assert.IsTrue(DuetControlServer.Model.Expressions.IsSbcExpression("network.interfaces"));
+            Assert.IsTrue(DuetControlServer.Model.Expressions.IsSbcExpression("volumes"));
         }
 
         [Test]

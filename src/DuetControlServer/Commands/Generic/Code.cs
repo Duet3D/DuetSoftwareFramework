@@ -507,8 +507,8 @@ namespace DuetControlServer.Commands
                 }
             }
 
-            // Flush the code channel and populate Linux fields where applicable
-            if (Keyword == KeywordType.None && Expressions.ContainsLinuxFields(this) && !await Interface.Flush(this, true, false))
+            // Flush the code channel and populate SBC fields where applicable
+            if (Keyword == KeywordType.None && Expressions.ContainsSbcFields(this) && !await Interface.Flush(this, true, false))
             {
                 throw new OperationCanceledException();
             }

@@ -1,7 +1,7 @@
 ﻿using DuetAPI;
 using System.Runtime.InteropServices;
 
-namespace DuetControlServer.SPI.Communication.LinuxRequests
+namespace DuetControlServer.SPI.Communication.SbcRequests
 {
     /// <summary>
     /// Header of a variable assignment. This is followed by the variable name and expression

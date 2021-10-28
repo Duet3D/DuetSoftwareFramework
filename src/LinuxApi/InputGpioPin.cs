@@ -164,6 +164,55 @@ namespace LinuxApi
         }
 
         /// <summary>
+        /// Flush pending events
+        /// </summary>
+        public unsafe void FlushEvents()
+        {
+            while (true)
+            {
+                // Wait for an event first
+                pollfd pollData = new()
+                {
+                    fd = _reqFd,
+                    events = (short)PollFlags.POLLIN,
+                    revents = 0
+                };
+
+                int result;
+                do
+                {
+                    result = Interop.poll(new IntPtr(&pollData), 1, 0);
+                    if (result < 0)
+                    {
+                        // Sometimes we get EINTR but that is benign. Just repeat the operation in that case
+                        int errno = Marshal.GetLastWin32Error();
+                        if (errno != 4)
+                        {
+                            throw new IOException($"Error {errno}. Failed to poll for event.");
+                        }
+                    }
+                    if (result == 0)
+                    {
+                        // No more events available
+                        return;
+                    }
+                }
+                while (result <= 0);
+
+                // Read it
+                gpioevent_data eventData = new();
+                if (Interop.read(_reqFd, new IntPtr(&eventData), _sizeOfEventData) == _sizeOfEventData)
+                {
+                    Value = (eventData.id == (uint)GpioEvent.GPIOEVENT_EVENT_RISING_EDGE);
+                }
+                else
+                {
+                    throw new IOException("Read returned invalid size");
+                }
+            }
+        }
+
+        /// <summary>
         /// Current value of this pin
         /// </summary>
         public bool Value { get; private set; }

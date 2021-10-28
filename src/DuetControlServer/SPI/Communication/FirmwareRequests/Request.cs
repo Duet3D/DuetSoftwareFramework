@@ -1,7 +1,7 @@
 namespace DuetControlServer.SPI.Communication.FirmwareRequests
 {
     /// <summary>
-    /// Request indices for SPI transfers from the RepRapFirmware controller to the Linux board
+    /// Request indices for SPI transfers from the RepRapFirmware controller to the SBC
     /// </summary>
     public enum Request : ushort
     {

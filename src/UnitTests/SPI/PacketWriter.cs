@@ -4,12 +4,12 @@ using System.Text;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
-using DuetControlServer.SPI.Communication.LinuxRequests;
+using DuetControlServer.SPI.Communication.SbcRequests;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.SPI.Serialization;
 using NUnit.Framework;
 using Code = DuetControlServer.Commands.Code;
-using CodeFlags = DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags;
+using CodeFlags = DuetControlServer.SPI.Communication.SbcRequests.CodeFlags;
 
 namespace UnitTests.SPI
 {

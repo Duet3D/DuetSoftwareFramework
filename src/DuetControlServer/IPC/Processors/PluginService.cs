@@ -5,6 +5,7 @@ using DuetAPIClient;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -175,6 +176,19 @@ namespace DuetControlServer.IPC.Processors
                         {
                             // Command successfully executed
                             request.Item2.SetResult();
+                        }
+                    }
+                    catch (SocketException se)
+                    {
+                        if (request.Item1 is StopPlugins)
+                        {
+                            // Service may terminate before our own request is fully processed
+                            request.Item2.SetResult();
+                        }
+                        else
+                        {
+                            // Unexpected exception
+                            request.Item2.SetException(se);
                         }
                     }
                     catch (Exception e)

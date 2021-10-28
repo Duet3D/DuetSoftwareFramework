@@ -1,6 +1,6 @@
 using System;
 
-namespace DuetControlServer.SPI.Communication.LinuxRequests
+namespace DuetControlServer.SPI.Communication.SbcRequests
 {
     /// <summary>
     /// Flags of a G/M/T-code

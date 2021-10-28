@@ -1,31 +1,26 @@
 using DuetControlServer.SPI.Communication.Shared;
 using System.Runtime.InteropServices;
 
-namespace DuetControlServer.SPI.Communication.LinuxRequests
+namespace DuetControlServer.SPI.Communication.SbcRequests
 {
     /// <summary>
-    /// Set an arbitrary object model value that is accessible via a field path.
-    /// This struct is followed by the UTF-8 path to the object model value
-    /// and optionally the value as string / expression.
+    /// Binary representation of a code parameter
     /// </summary>
-    /// <remarks>
-    /// This is unused in protocol version 1
-    /// </remarks>
     [StructLayout(LayoutKind.Explicit, Size = 8)]
-    public struct SetObjectModelHeader
+    public struct CodeParameter
     {
         /// <summary>
-        /// Type of the value
+        /// Letter prefix of this parameter
         /// </summary>
         [FieldOffset(0)]
-        public DataType Type;
-        
+        public byte Letter;
+
         /// <summary>
-        /// Length of the payload
+        /// Type of the parameter
         /// </summary>
         [FieldOffset(1)]
-        public byte FieldLength;
-        
+        public DataType Type;
+            
         /// <summary>
         /// Value as integer
         /// </summary>

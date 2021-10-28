@@ -7,11 +7,11 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
-using DuetControlServer.SPI.Communication.LinuxRequests;
+using DuetControlServer.SPI.Communication.SbcRequests;
 using DuetControlServer.SPI.Communication.Shared;
 using Code = DuetControlServer.Commands.Code;
-using CodeFlags = DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags;
-using CodeParameter = DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter;
+using CodeFlags = DuetControlServer.SPI.Communication.SbcRequests.CodeFlags;
+using CodeParameter = DuetControlServer.SPI.Communication.SbcRequests.CodeParameter;
 
 namespace DuetControlServer.SPI.Serialization
 {

@@ -241,6 +241,10 @@ namespace DuetControlServer.SPI.Serialization
                 case DataType.Float:
                     result = header.FloatValue;
                     break;
+                case DataType.ULong:
+                    bytesRead = AddPadding(bytesRead);
+                    result = MemoryMarshal.Read<ulong>(from[bytesRead..]);
+                    break;
                 case DataType.IntArray:
                     int[] intArray = new int[header.IntValue];
                     for (int i = 0; i < header.IntValue; i++)
@@ -300,6 +304,11 @@ namespace DuetControlServer.SPI.Serialization
                     string errorMessage = Encoding.UTF8.GetString(from.Slice(bytesRead, header.IntValue));
                     result = new CodeParserException(errorMessage);
                     break;
+                case DataType.DateTime:
+                    result = DateTime.Parse(Encoding.UTF8.GetString(from.Slice(bytesRead, header.IntValue)));
+                    bytesRead += header.IntValue;
+                    break;
+                case DataType.Null:
                 default:
                     result = null;
                     break;

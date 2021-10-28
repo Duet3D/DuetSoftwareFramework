@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace DuetControlServer.SPI.Communication.LinuxRequests
+namespace DuetControlServer.SPI.Communication.SbcRequests
 {
     /// <summary>
     /// Plain boolean value

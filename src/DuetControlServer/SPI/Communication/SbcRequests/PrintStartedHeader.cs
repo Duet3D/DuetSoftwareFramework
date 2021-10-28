@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace DuetControlServer.SPI.Communication.LinuxRequests
+namespace DuetControlServer.SPI.Communication.SbcRequests
 {
     /// <summary>
     /// Set file print info. This is followed by NumFilament floats representing

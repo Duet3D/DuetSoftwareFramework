@@ -346,7 +346,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="code">Code waiting for the flush</param>
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
-        /// <param name="evaluateAll">Evaluate the expressions or only Linux fields if evaluateExpressions is set to true</param>
+        /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static async Task<bool> Flush(Code code, bool evaluateExpressions = true, bool evaluateAll = true)
         {
@@ -1017,11 +1017,11 @@ namespace DuetControlServer.SPI
             switch ((Request)packet.Request)
             {
                 case Request.ResendPacket:
-                    DataTransfer.ResendPacket(packet, out Communication.LinuxRequests.Request linuxRequest);
-                    if (linuxRequest != Communication.LinuxRequests.Request.LockMovementAndWaitForStandstill)
+                    DataTransfer.ResendPacket(packet, out Communication.SbcRequests.Request sbcRequest);
+                    if (sbcRequest != Communication.SbcRequests.Request.LockMovementAndWaitForStandstill)
                     {
                         // It's expected that RRF will need a moment to lock the movement but report other resend requests
-                        _logger.Warn("Resending packet #{0} (request {1})", packet.Id, linuxRequest);
+                        _logger.Warn("Resending packet #{0} (request {1})", packet.Id, sbcRequest);
                     }
                     break;
                 case Request.ObjectModel:

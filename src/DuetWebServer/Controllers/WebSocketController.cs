@@ -10,6 +10,7 @@ using DuetAPIClient;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 
@@ -43,14 +44,21 @@ namespace DuetWebServer.Controllers
         private readonly ILogger _logger;
 
         /// <summary>
+        /// Host application lifetime
+        /// </summary>
+        private readonly IHostApplicationLifetime _applicationLifetime;
+
+        /// <summary>
         /// Constructor of a new WebSocket controller
         /// </summary>
         /// <param name="configuration">Configuration of this application</param>
         /// <param name="logger">Logger instance</param>
-        public WebSocketController(IConfiguration configuration, ILogger<WebSocketController> logger)
+        /// <param name="applicationLifetime">Application lifecycle instance</param>
+        public WebSocketController(IConfiguration configuration, ILogger<WebSocketController> logger, IHostApplicationLifetime applicationLifetime)
         {
             _configuration = configuration;
             _logger = logger;
+            _applicationLifetime = applicationLifetime;
         }
 
         /// <summary>
@@ -181,7 +189,7 @@ namespace DuetWebServer.Controllers
             _logger.LogInformation("WebSocket connected from {0}:{1}", ipAddress, port);
 
             // Register this client and keep it up-to-date
-            using CancellationTokenSource cts = new();
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_applicationLifetime.ApplicationStopping);
             try
             {
                 // Fetch full model copy and send it over initially

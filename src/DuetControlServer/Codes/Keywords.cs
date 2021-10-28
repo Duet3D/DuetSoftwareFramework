@@ -157,7 +157,7 @@ namespace DuetControlServer.Codes
                     throw new CodeParserException("expected '='", code);
                 }
 
-                // Replace Linux fields and assign the variable
+                // Replace SBC fields and assign the variable
                 expression = await Expressions.Evaluate(code, false);
 
                 // Assign the variable

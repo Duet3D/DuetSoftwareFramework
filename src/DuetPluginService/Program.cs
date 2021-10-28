@@ -104,23 +104,6 @@ namespace DuetPluginService
                 }
             };
 
-            // Notify the service manager that we're up and running.
-            // It might take a while to process runonce.g so do it first
-            string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
-            if (!string.IsNullOrEmpty(notifySocket))
-            {
-                try
-                {
-                    using Socket socket = new(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
-                    socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
-                    socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
-                }
-                catch (Exception e)
-                {
-                    _logger.Warn(e, "Failed to notify systemd about process start");
-                }
-            }
-
             // Register installed plugins
             foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
             {
@@ -143,6 +126,22 @@ namespace DuetPluginService
                     {
                         _logger.Error(e, "Failed to load plugin manifest {0}", Path.GetFileName(file));
                     }
+                }
+            }
+
+            // Notify the service manager that we're up and running
+            string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
+            if (!string.IsNullOrEmpty(notifySocket))
+            {
+                try
+                {
+                    using Socket socket = new(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
+                    socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
+                    socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
+                }
+                catch (Exception e)
+                {
+                    _logger.Warn(e, "Failed to notify systemd about process start");
                 }
             }
 

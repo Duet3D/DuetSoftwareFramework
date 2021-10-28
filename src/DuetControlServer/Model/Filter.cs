@@ -362,12 +362,12 @@ namespace DuetControlServer.Model
         /// Find a specific object in the object model (wildcards are not supported)
         /// </summary>
         /// <param name="filter">Filter for finding a property or a list item</param>
-        /// <param name="findLinuxProperty">Whether the object may be a Linux property</param>
+        /// <param name="findSbcProperty">Whether the object may be an SBC property</param>
         /// <param name="result">Partial object model or null</param>
         /// <returns>Whether the object could be found</returns>
-        public static bool GetSpecific(string filter, bool findLinuxProperty, out object result)
+        public static bool GetSpecific(string filter, bool findSbcProperty, out object result)
         {
-            return InternalGetSpecific(Provider.Get, ConvertFilter(filter, false), findLinuxProperty, false, out result);
+            return InternalGetSpecific(Provider.Get, ConvertFilter(filter, false), findSbcProperty, false, out result);
         }
 
         /// <summary>
@@ -375,11 +375,11 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="partialModel">Partial object model</param>
         /// <param name="partialFilter">Array consisting of item indices or case-insensitive property names</param>
-        /// <param name="findLinuxProperty">Whether the object may be a Linux property</param>
-        /// <param name="hadLinuxProperty">Whether a Linux property is part of the current node path</param>
+        /// <param name="findSbcProperty">Whether the object may be an SBC property</param>
+        /// <param name="hadSbcProperty">Whether an SBC property is part of the current node path</param>
         /// <param name="result">Partial object model or null</param>
         /// <returns>Whether the object could be found</returns>
-        private static bool InternalGetSpecific(object partialModel, object[] partialFilter, bool findLinuxProperty, bool hadLinuxProperty, out object result)
+        private static bool InternalGetSpecific(object partialModel, object[] partialFilter, bool findSbcProperty, bool hadSbcProperty, out object result)
         {
             // Cannot proceed if there is nothing more to do...
             if (partialModel == null || partialFilter.Length == 0)
@@ -396,14 +396,14 @@ namespace DuetControlServer.Model
                 {
                     if (model.JsonProperties.TryGetValue(propertyName, out PropertyInfo property))
                     {
-                        if (findLinuxProperty && Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
+                        if (findSbcProperty && Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                         {
-                            hadLinuxProperty = true;
+                            hadSbcProperty = true;
                         }
 
                         if (partialFilter.Length == 0)
                         {
-                            if (!findLinuxProperty || hadLinuxProperty)
+                            if (!findSbcProperty || hadSbcProperty)
                             {
                                 // This is exactly the property we've been looking for
                                 result = property.GetValue(model);
@@ -414,12 +414,12 @@ namespace DuetControlServer.Model
                         {
                             // Property is somewhere deeper
                             object propertyValue = property.GetValue(model);
-                            return InternalGetSpecific(propertyValue, partialFilter, findLinuxProperty, hadLinuxProperty, out result);
+                            return InternalGetSpecific(propertyValue, partialFilter, findSbcProperty, hadSbcProperty, out result);
                         }
                     }
                 }
             }
-            else if (partialFilter[0] is int itemIndex && (!findLinuxProperty || hadLinuxProperty))
+            else if (partialFilter[0] is int itemIndex && (!findSbcProperty || hadSbcProperty))
             {
                 partialFilter = partialFilter.Skip(1).ToArray();
                 if (partialModel is IList list)
@@ -437,7 +437,7 @@ namespace DuetControlServer.Model
                         if (item is ModelObject || item is IList)
                         {
                             // Property is somewhere deeper
-                            return InternalGetSpecific(item, partialFilter, findLinuxProperty, hadLinuxProperty, out result);
+                            return InternalGetSpecific(item, partialFilter, findSbcProperty, hadSbcProperty, out result);
                         }
                     }
                 }
