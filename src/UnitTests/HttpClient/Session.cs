@@ -28,19 +28,8 @@ namespace UnitTests.HttpClient
         [Test]
         public async Task ObjectModel()
         {
-            // Wait a moment for the object model to be up-to-date
-            for (int i = 0; i < 40; i++)
-            {
-                lock (session.Model)
-                {
-                    if (session.Model.State.Status != MachineStatus.Starting)
-                    {
-                        // Machine model has been updated
-                        break;
-                    }
-                }
-                await Task.Delay(250);
-            }
+            // Wait for the object model to be up-to-date
+            await session.WaitForModelUpdate();
             Assert.AreNotEqual(MachineStatus.Starting, session.Model.State.Status);
 
             // Save the current uptime
@@ -50,19 +39,9 @@ namespace UnitTests.HttpClient
                 now = session.Model.State.UpTime;
             }
 
-            // Wait another moment and for UpTime to change
-            for (int i = 0; i < 40; i++)
-            {
-                lock (session.Model)
-                {
-                    if (session.Model.State.UpTime > now)
-                    {
-                        // Machine model has been updated
-                        break;
-                    }
-                }
-                await Task.Delay(250);
-            }
+            // Wait again for UpTime to change. Because other things may update the OM in SBC mode, we await an extra delay first
+            await Task.Delay(500);
+            await session.WaitForModelUpdate();
 
             // Make sure the object model is updated
             lock (session.Model)

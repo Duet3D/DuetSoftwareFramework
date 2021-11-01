@@ -2,6 +2,7 @@
 using DuetControlServer.Commands;
 using DuetControlServer.FileExecution;
 using DuetControlServer.Files;
+using LinuxApi;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -49,7 +50,8 @@ namespace DuetControlServer
         /// Entry point of the program
         /// </summary>
         /// <param name="args">Command-line arguments</param>
-        private static async Task Main(string[] args)
+        /// <returns>Application return code</returns>
+        private static async Task<int> Main(string[] args)
         {
             // Performing an update implies a reduced log level
             if (args.Contains("-u") && !args.Contains("--update"))
@@ -71,7 +73,8 @@ namespace DuetControlServer
             {
                 if (!Settings.Init(args))
                 {
-                    return;
+                    // This must be a benign termination request
+                    return ExitCode.TempFailure;
                 }
                 _logger.Info("Settings loaded");
                 if (Settings.RootPluginSupport)
@@ -79,16 +82,25 @@ namespace DuetControlServer
                     _logger.Warn("Support for third-party root plugins is enabled");
                 }
             }
+            catch (JsonException je)
+            {
+                await Terminate($"Failed to load settings: {je.Message}");
+                _logger.Debug(je);
+                return ExitCode.Configuration;
+
+            }
             catch (Exception e)
             {
-                _logger.Fatal(e, "Failed to load settings");
-                return;
+                await Terminate($"Failed to initialize settings: {e.Message}");
+                _logger.Debug(e);
+                return ExitCode.Usage;
             }
 
             // Check if another instance is already running
             if (await CheckForAnotherInstance())
             {
-                return;
+                // No need to log the start-up failure here
+                return ExitCode.TempFailure;
             }
 
             // Initialize everything
@@ -100,8 +112,9 @@ namespace DuetControlServer
             }
             catch (Exception e)
             {
-                _logger.Fatal(e, "Failed to initialize environment");
-                return;
+                await Terminate($"Failed to initialize environment: {e.Message}");
+                _logger.Debug(e);
+                return ExitCode.OsError;
             }
 
             // Set up SPI subsystem and connect to RRF controller
@@ -116,11 +129,17 @@ namespace DuetControlServer
                     SPI.DataTransfer.Init();
                     _logger.Info("Connection to Duet established");
                 }
+                catch (IOException ioe)
+                {
+                    await Terminate($"Failed to open IO device: {ioe.Message}");
+                    _logger.Debug(ioe);
+                    return ExitCode.IoError;
+                }
                 catch (Exception e)
                 {
-                    _logger.Fatal("Could not connect to Duet ({0})", e.Message);
+                    await Terminate($"Could not connect to Duet: {e.Message}");
                     _logger.Debug(e);
-                    return;
+                    return ExitCode.ServiceUnavailable;
                 }
             }
 
@@ -132,8 +151,9 @@ namespace DuetControlServer
             }
             catch (Exception e)
             {
-                _logger.Fatal(e, "Failed to initialize IPC socket");
-                return;
+                await Terminate($"Failed to initialize IPC socket ({e.Message})");
+                _logger.Debug(e);
+                return ExitCode.CantCreate;
             }
 
             // Start main tasks in the background
@@ -179,6 +199,12 @@ namespace DuetControlServer
                 {
                     _logger.Warn(e, "Failed to notify systemd about process start");
                 }
+            }
+
+            // Delete the last DCS error file if it exists
+            if (File.Exists(Settings.StartErrorFile))
+            {
+                File.Delete(Settings.StartErrorFile);
             }
 
             if (!Settings.UpdateOnly)
@@ -248,9 +274,11 @@ namespace DuetControlServer
 
             // Wait for the first task to terminate.
             // In case this is an unusual shutdown, log this event and shut down the application
+            bool abnormalTermination = false;
             Task terminatedTask = await Task.WhenAny(mainTasks.Keys);
             if (!_cancelSource.IsCancellationRequested)
             {
+                abnormalTermination = true;
                 _logger.Fatal("Abnormal program termination");
                 if (terminatedTask.IsFaulted)
                 {
@@ -295,6 +323,7 @@ namespace DuetControlServer
             _logger.Info("Application has shut down");
             NLog.LogManager.Shutdown();
             _programTerminated.Cancel();
+            return abnormalTermination ? ExitCode.Software : ExitCode.Success;
         }
 
         /// <summary>
@@ -333,6 +362,17 @@ namespace DuetControlServer
         }
 
         /// <summary>
+        /// Print the reason for the start error and write it to the start error file
+        /// </summary>
+        /// <param name="reason">Reason for the program vtermination</param>
+        /// <returns>Asynchronous task</returns>
+        private static async Task Terminate(string reason)
+        {
+            _logger.Fatal(reason);
+            await File.WriteAllTextAsync(Settings.StartErrorFile, reason);
+        }
+
+        /// <summary>
         /// Terminate this program and kill it forcefully if required
         /// </summary>
         /// <param name="waitForTermination">Wait for program to be fully terminated</param>
@@ -359,7 +399,7 @@ namespace DuetControlServer
                 try
                 {
                     await task;
-                    Environment.Exit(1);
+                    Environment.Exit(ExitCode.Software);
                 }
                 catch (OperationCanceledException)
                 {

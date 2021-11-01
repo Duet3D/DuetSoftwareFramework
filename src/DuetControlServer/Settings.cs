@@ -85,6 +85,11 @@ namespace DuetControlServer
         public static string FullSocketPath { get => Path.Combine(SocketDirectory, SocketFile); }
 
         /// <summary>
+        /// File to contain the last start error of DCS. Once DCS starts successfully, it is deleted
+        /// </summary>
+        public static string StartErrorFile { get; set; } = DuetAPI.Connection.Defaults.StartErrorFile;
+
+        /// <summary>
         /// Maximum number of simultaneously pending IPC connections
         /// </summary>
         public static int Backlog { get; set; } = 4;

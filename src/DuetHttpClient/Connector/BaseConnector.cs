@@ -35,9 +35,9 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// Reconnect when the connection has been reset
         /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        protected abstract Task Reconnect(CancellationToken cancellationToken);
+        protected abstract Task Reconnect(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Send a generic a HTTP request
@@ -73,14 +73,21 @@ namespace DuetHttpClient.Connector
         protected readonly TaskCompletionSource _sessionTaskTerminated = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         /// <summary>
+        /// Options used for communication
+        /// </summary>
+        public DuetHttpOptions Options { get; }
+
+        /// <summary>
         /// Object model of the remote board
         /// </summary>
         public ObjectModel Model { get; } = new();
 
         /// <summary>
-        /// Options used for communication
+        /// Wait for the object model to be up-to-date
         /// </summary>
-        public DuetHttpOptions Options { get; }
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        public abstract Task WaitForModelUpdate(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Send a G/M/T-code and return the G-code reply

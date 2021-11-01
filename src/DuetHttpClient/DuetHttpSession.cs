@@ -83,6 +83,16 @@ namespace DuetHttpClient
         public ValueTask DisposeAsync() => _connector.DisposeAsync();
 
         /// <summary>
+        /// Wait for the object model to be up-to-date
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        public Task WaitForModelUpdate(CancellationToken cancellationToken = default)
+        {
+            return _connector.WaitForModelUpdate(cancellationToken);
+        }
+
+        /// <summary>
         /// Send a G/M/T-code and return the G-code reply
         /// </summary>
         /// <param name="code">Code to send</param>

@@ -53,7 +53,14 @@ namespace DuetWebServer.Controllers
         /// GET /machine/connect
         /// Check the password and register a new session on success
         /// </summary>
-        /// <returns>HTTP status code: (200) Session key (403) Forbidden (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (200) Session key
+        /// (403) Forbidden
+        /// (500) Generic error
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [AllowAnonymous]
         [HttpGet("connect")]
         public async Task<IActionResult> Connect(string password)
@@ -87,6 +94,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(Connect)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(Connect)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -99,7 +114,10 @@ namespace DuetWebServer.Controllers
         /// GET /machine/noop
         /// Do nothing. May be used to ping the machine or to keep the HTTP session alive
         /// </summary>
-        /// <returns>HTTP status code: (204) No Content</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) No Content
+        /// </returns>
         [HttpGet("noop")]
         public IActionResult Noop() => NoContent();
 
@@ -107,7 +125,13 @@ namespace DuetWebServer.Controllers
         /// GET /machine/disconnect
         /// Remove the current HTTP session again
         /// </summary>
-        /// <returns>HTTP status code: (204) No Content (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) No Content
+        /// (500) Generic error
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [AllowAnonymous]
         [HttpGet("disconnect")]
         public async Task<IActionResult> Disconnect()
@@ -141,6 +165,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(Disconnect)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(Disconnect)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -155,7 +187,13 @@ namespace DuetWebServer.Controllers
         /// GET /machine/status
         /// Retrieve the full object model as JSON.
         /// </summary>
-        /// <returns>HTTP status code: (200) Machine object model as application/json (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (200) Machine object model as application/json
+        /// (500) Generic error
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [HttpGet("status")]
         public async Task<IActionResult> Status()
         {
@@ -178,6 +216,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(Status)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(Status)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -190,7 +236,13 @@ namespace DuetWebServer.Controllers
         /// POST /machine/code
         /// Execute plain G/M/T-code(s) from the request body and return the G-code response when done.
         /// </summary>
-        /// <returns>HTTP status code: (200) G-Code response as text/plain (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (200) G-Code response as text/plain
+        /// (500) Generic error
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [HttpPost("code")]
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         public async Task<IActionResult> DoCode()
@@ -228,6 +280,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(DoCode)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(DoCode)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -243,7 +303,14 @@ namespace DuetWebServer.Controllers
         /// Download the specified file.
         /// </summary>
         /// <param name="filename">File to download</param>
-        /// <returns>HTTP status code: (200) File content (404) File not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (200) File content
+        /// (404) File not found
+        /// (500) Generic error
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [HttpGet("file/{*filename}")]
         public async Task<IActionResult> DownloadFile(string filename)
         {
@@ -275,6 +342,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(DownloadFile)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(DownloadFile)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -288,7 +363,13 @@ namespace DuetWebServer.Controllers
         /// Upload a file from the HTTP body and create the subdirectories if necessary.
         /// </summary>
         /// <param name="filename">Destination of the file to upload</param>
-        /// <returns>HTTP status code: (201) File created (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (201) File created
+        /// (500) Generic error occurred
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPut("file/{*filename}")]
@@ -336,6 +417,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(UploadFile)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(UploadFile)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -349,7 +438,14 @@ namespace DuetWebServer.Controllers
         /// Parse a given G-code file and return information about this job file as a JSON object.
         /// </summary>
         /// <param name="filename">G-code file to analyze</param>
-        /// <returns>HTTP status code: (200) File info as application/json (404) File not found (500) Generic error (502) Incompatible DCS (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (200) File info as application/json
+        /// (404) File not found
+        /// (500) Generic error
+        /// (502) Incompatible DCS
+        /// (503) DCS is unavailable
+        /// </returns>
         [HttpGet("fileinfo/{*filename}")]
         public async Task<IActionResult> GetFileInfo(string filename)
         {
@@ -384,6 +480,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(GetFileInfo)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(GetFileInfo)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -399,7 +503,14 @@ namespace DuetWebServer.Controllers
         /// Delete the given file or directory.
         /// </summary>
         /// <param name="filename">File or directory to delete</param>
-        /// <returns>HTTP status code: (204) File or directory deleted (404) File not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) File or directory deleted
+        /// (404) File not found
+        /// (500) Generic error
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpDelete("file/{*filename}")]
         public async Task<IActionResult> DeleteFileOrDirectory(string filename)
@@ -439,6 +550,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(DeleteFileOrDirectory)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(DeleteFileOrDirectory)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -453,7 +572,14 @@ namespace DuetWebServer.Controllers
         /// <param name="from">Source path</param>
         /// <param name="to">Destination path</param>
         /// <param name="force">Delete existing file (optional, default false)</param>
-        /// <returns>HTTP status code: (204) File or directory moved (404) File or directory not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) File or directory moved
+        /// (404) File or directory not found
+        /// (500) Generic error
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpPost("file/move")]
         public async Task<IActionResult> MoveFileOrDirectory([FromForm] string from, [FromForm] string to, [FromForm] bool force = false)
@@ -517,6 +643,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(MoveFileOrDirectory)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(MoveFileOrDirectory)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -532,7 +666,14 @@ namespace DuetWebServer.Controllers
         /// Get a file list of the specified directory
         /// </summary>
         /// <param name="directory">Directory to query</param>
-        /// <returns>HTTP status code: (200) File list as application/json (404) Directory not found (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (200) File list as application/json
+        /// (404) Directory not found
+        /// (500) Generic error
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [HttpGet("directory/{*directory}")]
         public async Task<IActionResult> GetFileList(string directory)
         {
@@ -562,6 +703,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(GetFileList)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(GetFileList)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -575,7 +724,13 @@ namespace DuetWebServer.Controllers
         /// Create the given directory.
         /// </summary>
         /// <param name="directory">Directory to create</param>
-        /// <returns>HTTP status code: (204) Directory created (500) Generic error (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) Directory created
+        /// (500) Generic error
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpPut("directory/{*directory}")]
         public async Task<IActionResult> CreateDirectory(string directory)
@@ -602,6 +757,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(CreateDirectory)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(CreateDirectory)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -616,7 +779,13 @@ namespace DuetWebServer.Controllers
         /// PUT /machine/plugin
         /// Install or upgrade a plugin ZIP file
         /// </summary>
-        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) No content
+        /// (500) Generic error occurred
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPut("plugin")]
@@ -653,6 +822,14 @@ namespace DuetWebServer.Controllers
                     }
                     if (e is SocketException)
                     {
+                        string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                        if (System.IO.File.Exists(startErrorFile))
+                        {
+                            string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                            _logger.LogError($"[{nameof(InstallPlugin)}] {startError}");
+                            return StatusCode(503, startError);
+                        }
+
                         _logger.LogError($"[{nameof(InstallPlugin)}] DCS is not started");
                         return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                     }
@@ -671,7 +848,13 @@ namespace DuetWebServer.Controllers
         /// DELETE /machine/plugin
         /// Uninstall a plugin
         /// </summary>
-        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) No content
+        /// (500) Generic error occurred
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpDelete("plugin")]
         public async Task<IActionResult> UninstallPlugin()
@@ -712,6 +895,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(UninstallPlugin)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(UninstallPlugin)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -747,7 +938,13 @@ namespace DuetWebServer.Controllers
         /// PATCH /machine/plugin
         /// Set plugin data in the object model if there is no SBC executable.
         /// </summary>
-        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) No content
+        /// (500) Generic error occurred
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPatch("plugin")]
@@ -785,6 +982,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(SetPluginData)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(SetPluginData)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -797,7 +1002,13 @@ namespace DuetWebServer.Controllers
         /// POST /machine/startPlugin
         /// Start a plugin on the SBC
         /// </summary>
-        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) No content
+        /// (500) Generic error occurred
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpPost("startPlugin")]
         public async Task<IActionResult> StartPlugin()
@@ -830,6 +1041,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(StartPlugin)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(StartPlugin)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -842,7 +1061,13 @@ namespace DuetWebServer.Controllers
         /// POST /machine/stopPlugin
         /// Stop a plugin on the SBC
         /// </summary>
-        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) No content
+        /// (500) Generic error occurred
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpPost("stopPlugin")]
         public async Task<IActionResult> StopPlugin()
@@ -875,6 +1100,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(StopPlugin)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(StopPlugin)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
@@ -889,7 +1122,13 @@ namespace DuetWebServer.Controllers
         /// PUT /machine/systemPackage
         /// Install or upgrade a system package
         /// </summary>
-        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) No content
+        /// (500) Generic error occurred
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPut("systemPackage")]
@@ -926,6 +1165,14 @@ namespace DuetWebServer.Controllers
                     }
                     if (e is SocketException)
                     {
+                        string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                        if (System.IO.File.Exists(startErrorFile))
+                        {
+                            string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                            _logger.LogError($"[{nameof(InstallSystemPackage)}] {startError}");
+                            return StatusCode(503, startError);
+                        }
+
                         _logger.LogError($"[{nameof(InstallSystemPackage)}] DCS is not started");
                         return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                     }
@@ -944,7 +1191,13 @@ namespace DuetWebServer.Controllers
         /// DELETE /machine/systemPackage
         /// Uninstall a system package
         /// </summary>
-        /// <returns>HTTP status code: (204) No content (500) Generic error occurred (502) Incompatible DCS version (503) DCS is unavailable</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (204) No content
+        /// (500) Generic error occurred
+        /// (502) Incompatible DCS version
+        /// (503) DCS is unavailable
+        /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpDelete("systemPackage")]
         public async Task<IActionResult> UninstallSystemPackage()
@@ -985,6 +1238,14 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(UninstallPlugin)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
                     _logger.LogError($"[{nameof(UninstallPlugin)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }

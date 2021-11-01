@@ -65,7 +65,15 @@ namespace DuetWebServer.Controllers
         /// WS /machine?sessionKey=XXX
         /// Provide WebSocket for continuous model updates. This is primarily used to keep DWC up-to-date
         /// </summary>
-        /// <returns>WebSocket, HTTP status code: (400) Bad request</returns>
+        /// <returns>
+        /// HTTP status code:
+        /// (101) WebSocket upgrade
+        /// (400) Bad request
+        /// (403) Forbidden
+        /// (500) Generic error
+        /// (502) Incompatible DCS version
+        /// (503) DCS is not started
+        /// </returns>
         [HttpGet]
         public async Task Get(string sessionKey)
         {
@@ -147,7 +155,10 @@ namespace DuetWebServer.Controllers
 
         /// <summary>
         /// Deal with a newly opened WebSocket.
-        /// A client may receive one of the WS codes: (1001) Endpoint unavailable (1003) Invalid command (1011) Internal error
+        /// A client may receive one of the WS codes:
+        /// (1001) Endpoint unavailable
+        /// (1003) Invalid command
+        /// (1011) Internal error
         /// </summary>
         /// <param name="webSocket">WebSocket connection</param>
         /// <param name="socketPath">API socket path</param>
@@ -174,6 +185,15 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(WebSocketController)}] {startError}");
+                        await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, startError);
+                        return;
+                    }
+
                     _logger.LogError($"[{nameof(WebSocketController)}] DCS is not started");
                     await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "Failed to connect to Duet, please check your connection (DCS is not started)");
                     return;

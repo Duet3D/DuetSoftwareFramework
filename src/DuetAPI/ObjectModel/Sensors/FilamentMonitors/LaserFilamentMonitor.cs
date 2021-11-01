@@ -62,6 +62,16 @@
     public class LaserFilamentMonitorConfigured : ModelObject
 	{
 		/// <summary>
+		/// Whether all moves and not only printing moves are supposed to be checked
+		/// </summary>
+		public bool AllMoves
+        {
+			get => _allMoves;
+			set => SetPropertyValue(ref _allMoves, value);
+        }
+		private bool _allMoves;
+
+		/// <summary>
 		/// Maximum percentage (0..1 or greater)
 		/// </summary>
 		public float PercentMax

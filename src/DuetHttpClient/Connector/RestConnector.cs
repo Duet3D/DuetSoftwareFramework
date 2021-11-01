@@ -99,7 +99,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// Reconnect to the board when the connection has been reset
         /// </summary>
-        protected override async Task Reconnect(CancellationToken cancellationToken)
+        protected override async Task Reconnect(CancellationToken cancellationToken = default)
         {
             _sessionKey = null;
             HttpClient.DefaultRequestHeaders.Remove("X-Session-Key");
@@ -110,8 +110,8 @@ namespace DuetHttpClient.Connector
             using HttpResponseMessage connectResponse = await HttpClient.GetAsync($"machine/connect?password=${Options.Password}", connectCts.Token);
             if (connectResponse.IsSuccessStatusCode)
             {
-                Stream stream = await connectResponse.Content.ReadAsStreamAsync(cancellationToken);
-                ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(stream, cancellationToken: cancellationToken);
+                using Stream stream = await connectResponse.Content.ReadAsStreamAsync(connectCts.Token);
+                ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(stream, cancellationToken: connectCts.Token);
 
                 _sessionKey = responseObj.SessionKey;
                 HttpClient.DefaultRequestHeaders.Add("X-Session-Key", responseObj.SessionKey);
@@ -142,6 +142,48 @@ namespace DuetHttpClient.Connector
         /// PONG response from the server
         /// </summary>
         private static readonly byte[] pongResponse = Encoding.UTF8.GetBytes("PONG\n");
+
+        /// <summary>
+        /// TCS to complete when the object model is up-to-date
+        /// </summary>
+        private readonly List<TaskCompletionSource> _modelUpdateTCS = new();
+
+        /// <summary>
+        /// Wait for the object model to be up-to-date
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        public override Task WaitForModelUpdate(CancellationToken cancellationToken = default)
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(null);
+            }
+            if (!Options.ObserveObjectModel)
+            {
+                throw new InvalidOperationException("Cannot wait for object model, because the object model is not observed");
+            }
+
+            TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
+            CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
+            lock (_modelUpdateTCS)
+            {
+                _modelUpdateTCS.Add(tcs);
+            }
+
+            return tcs.Task.ContinueWith(async task =>
+            {
+                try
+                {
+                    await task;
+                }
+                finally
+                {
+                    ctsRegistration.Unregister();
+                }
+            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+        }
 
         /// <summary>
         /// Keep receiving object model updates
@@ -255,6 +297,16 @@ namespace DuetHttpClient.Connector
                                 // Timeout while waiting for model update, send a PING request
                                 await webSocket.SendAsync(pingRequest, WebSocketMessageType.Text, true, _terminateSession.Token);
                             }
+
+                            // Object model is up-to-date
+                            lock (_modelUpdateTCS)
+                            {
+                                foreach (TaskCompletionSource tcs in _modelUpdateTCS)
+                                {
+                                    tcs.TrySetResult();
+                                }
+                                _modelUpdateTCS.Clear();
+                            }
                         }
                         while (webSocket.State == WebSocketState.Open);
                     }
@@ -267,10 +319,15 @@ namespace DuetHttpClient.Connector
                         }
                     }
 
-                    if (!_terminateSession.IsCancellationRequested)
+                    // Connection lost, check if we can reconnect after a short delay
+                    try
                     {
-                        // Wait a moment before attempting to reconnect
-                        await Task.Delay(2000);
+                        await Task.Delay(2000, _terminateSession.Token);
+                        await Reconnect();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // expected if the remote end is still offline
                     }
                 }
                 while (!_terminateSession.IsCancellationRequested);

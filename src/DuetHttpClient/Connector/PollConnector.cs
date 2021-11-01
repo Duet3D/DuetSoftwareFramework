@@ -112,7 +112,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// Reconnect to the board when the connection has been reset
         /// </summary>
-        protected override async Task Reconnect(CancellationToken cancellationToken)
+        protected override async Task Reconnect(CancellationToken cancellationToken = default)
         {
             lock (_seqs)
             {
@@ -123,7 +123,7 @@ namespace DuetHttpClient.Connector
             {
                 foreach (TaskCompletionSource<string> tcs in _runningCodes.Keys)
                 {
-                    tcs.SetCanceled();
+                    tcs.SetCanceled(cancellationToken);
                 }
                 _runningCodes.Clear();
             }
@@ -215,6 +215,48 @@ namespace DuetHttpClient.Connector
                 }
             }
             throw new HttpRequestException(errorMessage);
+        }
+
+        /// <summary>
+        /// TCS to complete when the object model is up-to-date
+        /// </summary>
+        private readonly List<TaskCompletionSource> _modelUpdateTCS = new();
+
+        /// <summary>
+        /// Wait for the object model to be up-to-date
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        public override Task WaitForModelUpdate(CancellationToken cancellationToken = default)
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(null);
+            }
+            if (!Options.ObserveObjectModel)
+            {
+                throw new InvalidOperationException("Cannot wait for object model, because the object model is not observed");
+            }
+
+            TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (_modelUpdateTCS)
+            {
+                _modelUpdateTCS.Add(tcs);
+            }
+
+            CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
+            CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
+            return tcs.Task.ContinueWith(async task =>
+            {
+                try
+                {
+                    await task;
+                }
+                finally
+                {
+                    ctsRegistration.Unregister();
+                }
+            }, TaskContinuationOptions.RunContinuationsAsynchronously);
         }
 
         /// <summary>
@@ -315,6 +357,16 @@ namespace DuetHttpClient.Connector
                                             }
                                         }
                                     }
+                                }
+
+                                // Object model is now up-to-date
+                                lock (_modelUpdateTCS)
+                                {
+                                    foreach (TaskCompletionSource tcs in _modelUpdateTCS)
+                                    {
+                                        tcs.TrySetResult();
+                                    }
+                                    _modelUpdateTCS.Clear();
                                 }
                             }
                             else

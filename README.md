@@ -25,6 +25,19 @@ The following command-line arguments are available:
 
 Note that all the command-line options are case-sensitive.
 
+### Return Codes
+
+This application may return the following codes (derived from `sysexists.h`):
+- `0`: Successful termination
+- `64`: Failed to initialize settings (usage error)
+- `69`: Could not connect to Duet (service unavailable)
+- `70`: Internal software error
+- `71`: Failed to initialize environment (OS error)
+- `73`: Failed to initialize IPC socket (Cannot create file)
+- `74`: Could not open SPI or GPIO device (IO error)
+- `75`: Auto-update disabled or other instance already running (temporary failure)
+- `78`: Bad settings file (configuration error)
+
 ### SPI Link
 
 In order to connect to the firmware, a binary data protocol is used. DuetControlServer attaches to the Duet using an SPI connection (typically `/dev/spidev0.0`) in master mode.
@@ -73,6 +86,8 @@ The `Kestrel` section specifies the default configuration of the underlying webs
 
 Apart from these two sections, you can also customize the following settings:
 
+- `SocketPath`: Path to the UNIX socket provided by DCS
+- `StartErrorFile`: Optional file containing the last start error from DCS
 - `KeepAliveInterval`: Default keep-alive interval for WebSocket connections. This is useful if DWS is operating as a reverse proxy
 - `SessionTimeout`: Default timeout for inactive HTTP sessions
 - `ModelRetryDelay`: If DuetControlServer is not running, this specifies the delay between reconnect attempts in milliseconds
