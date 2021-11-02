@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -39,17 +40,31 @@ namespace DuetWebServer.Middleware
         private readonly IHostApplicationLifetime _applicationLifetime;
 
         /// <summary>
+        /// Object model provider
+        /// </summary>
+        private readonly IModelProvider _modelProvider;
+
+        /// <summary>
+        /// Session storage singleton
+        /// </summary>
+        private readonly ISessionStorage _sessionStorage;
+
+        /// <summary>
         /// Constructor of this middleware
         /// </summary>
         /// <param name="next">Next request delegate</param>
         /// <param name="configuration">Application configuration</param>
         /// <param name="logger">Logger instance</param>
-        public CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger, IHostApplicationLifetime applicationLifetime)
+        /// <param name="applicationLifetime">Host application lifetime</param>
+        /// <param name="modelProvider">Object model provider</param>
+        public CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger, IHostApplicationLifetime applicationLifetime, IModelProvider modelProvider, ISessionStorage sessionStorage)
         {
             _next = next;
             _configuration = configuration;
             _logger = logger;
             _applicationLifetime = applicationLifetime;
+            _modelProvider = modelProvider;
+            _sessionStorage = sessionStorage;
         }
 
         /// <summary>
@@ -61,16 +76,16 @@ namespace DuetWebServer.Middleware
         {
             // Check if this endpoint is reserved for any route
             HttpEndpoint httpEndpoint = null;
-            lock (Services.ModelObserver.Endpoints)
+            lock (_modelProvider.Endpoints)
             {
                 string method = context.WebSockets.IsWebSocketRequest ? "WebSocket" : context.Request.Method.ToString();
-                if (Services.ModelObserver.Endpoints.TryGetValue($"{method}{context.Request.Path.Value}", out HttpEndpoint ep))
+                if (_modelProvider.Endpoints.TryGetValue($"{method}{context.Request.Path.Value}", out HttpEndpoint ep))
                 {
                     httpEndpoint = ep;
                 }
                 else
                 {
-                    _logger.LogInformation("No endpoint found for {0} request via {1}", method, context.Request.Path.Value);
+                    _logger.LogDebug("No endpoint found for {0} request via {1}", method, context.Request.Path.Value);
                 }
             }
 
@@ -88,7 +103,7 @@ namespace DuetWebServer.Middleware
                     {
                         foreach (string sessionKey in sessionKeys)
                         {
-                            sessionId = Authorization.Sessions.GetSessionId(sessionKey);
+                            sessionId = _sessionStorage.GetSessionId(sessionKey);
                             if (sessionId != -1)
                             {
                                 break;
@@ -114,7 +129,7 @@ namespace DuetWebServer.Middleware
                     {
                         foreach (string sessionKey in sessionKeys)
                         {
-                            sessionId = Authorization.Sessions.GetSessionId(sessionKey);
+                            sessionId = _sessionStorage.GetSessionId(sessionKey);
                             if (sessionId != -1)
                             {
                                 break;

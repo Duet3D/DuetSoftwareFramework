@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPIClient;
+using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -7,7 +8,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
@@ -31,35 +31,24 @@ namespace DuetWebServer.Services
             .Build();
 
         /// <summary>
-        /// Dictionary of registered third-party paths vs third-party HTTP endpoints
-        /// </summary>
-        public static readonly Dictionary<string, HttpEndpoint> Endpoints = new();
-
-        /// <summary>
-        /// Path to the web directory
-        /// </summary>
-        public static string WebDirectory { get; private set; }
-
-        /// <summary>
-        /// Delegate for an event that is triggered when the path of the web directory changes
-        /// </summary>
-        /// <param name="webDirectory">New web directory</param>
-        public delegate void WebDirectoryChanged(string webDirectory);
-
-        /// <summary>
         /// Conenction to resolve file paths
         /// </summary>
         private static CommandConnection _commandConnection;
 
         /// <summary>
-        /// Event that is triggered whenever the web directory path changes
-        /// </summary>
-        public static event WebDirectoryChanged OnWebDirectoryChanged;
-
-        /// <summary>
         /// Configuration of this application
         /// </summary>
         private readonly IConfiguration _configuration;
+
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private readonly ILogger _logger;
+
+        /// <summary>
+        /// Model provider singleton
+        /// </summary>
+        private readonly IModelProvider _modelProvider;
 
         /// <summary>
         /// Check the origin of an incoming WebSocket request and set the status on error
@@ -94,11 +83,6 @@ namespace DuetWebServer.Services
         }
 
         /// <summary>
-        /// Logger instance
-        /// </summary>
-        private readonly ILogger _logger;
-
-        /// <summary>
         /// Task representing the lifecycle of this service
         /// </summary>
         private Task _task;
@@ -113,12 +97,12 @@ namespace DuetWebServer.Services
         /// </summary>
         /// <param name="configuration">App configuration</param>
         /// <param name="logger">Logger instance</param>
-        public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger)
+        /// <param name="modelProvider">Model provider singleton</param>
+        public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IModelProvider modelProvider)
         {
             _logger = logger;
             _configuration = configuration;
-
-            WebDirectory = configuration.GetValue("DefaultWebDirectory", "/opt/dsf/sd/www");
+            _modelProvider = modelProvider;
         }
 
         /// <summary>
@@ -184,13 +168,13 @@ namespace DuetWebServer.Services
                             _logger.LogInformation("Changing CORS policy to accept site '{0}'", model.Network.CorsSite);
                             CorsPolicy.Origins.Add(model.Network.CorsSite);
                         }
-                        lock (Endpoints)
+                        lock (_modelProvider.Endpoints)
                         {
-                            Endpoints.Clear();
+                            _modelProvider.Endpoints.Clear();
                             foreach (HttpEndpoint ep in model.HttpEndpoints)
                             {
                                 string fullPath = (ep.Namespace == HttpEndpoint.RepRapFirmwareNamespace) ? $"{ep.EndpointType}/rr_{ep.Path}" : $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
-                                Endpoints[fullPath] = ep;
+                                _modelProvider.Endpoints[fullPath] = ep;
                                 _logger.LogInformation("Registered HTTP endpoint {0}", fullPath);
                             }
                         }
@@ -198,8 +182,7 @@ namespace DuetWebServer.Services
                         // Keep track of the web directory
                         _commandConnection = commandConnection;
                         model.Directories.PropertyChanged += Directories_PropertyChanged;
-                        string wwwDirectory = await commandConnection.ResolvePath(model.Directories.Web);
-                        OnWebDirectoryChanged?.Invoke(wwwDirectory);
+                        _modelProvider.WebDirectory = await commandConnection.ResolvePath(model.Directories.Web);
 
                         do
                         {
@@ -227,13 +210,13 @@ namespace DuetWebServer.Services
                             {
                                 _logger.LogInformation("New number of custom HTTP endpoints: {0}", model.HttpEndpoints.Count);
 
-                                lock (Endpoints)
+                                lock (_modelProvider.Endpoints)
                                 {
-                                    Endpoints.Clear();
+                                    _modelProvider.Endpoints.Clear();
                                     foreach (HttpEndpoint ep in model.HttpEndpoints)
                                     {
                                         string fullPath = $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
-                                        Endpoints[fullPath] = ep;
+                                        _modelProvider.Endpoints[fullPath] = ep;
                                         _logger.LogInformation("Registered HTTP {0} endpoint via /machine/{1}/{2}", ep.EndpointType, ep.Namespace, ep.Path);
                                     }
                                 }
@@ -265,8 +248,7 @@ namespace DuetWebServer.Services
             if (e.PropertyName == nameof(Directories.Web))
             {
                 Directories directories = (Directories)sender;
-                string path = await _commandConnection.ResolvePath(directories.Web);
-                OnWebDirectoryChanged?.Invoke(path);
+                _modelProvider.WebDirectory = await _commandConnection.ResolvePath(directories.Web);
             }
         }
     }

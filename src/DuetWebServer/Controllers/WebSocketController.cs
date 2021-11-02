@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection;
 using DuetAPIClient;
+using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -65,6 +66,7 @@ namespace DuetWebServer.Controllers
         /// WS /machine?sessionKey=XXX
         /// Provide WebSocket for continuous model updates. This is primarily used to keep DWC up-to-date
         /// </summary>
+        /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
         /// (101) WebSocket upgrade
@@ -75,7 +77,7 @@ namespace DuetWebServer.Controllers
         /// (503) DCS is not started
         /// </returns>
         [HttpGet]
-        public async Task Get(string sessionKey)
+        public async Task Get(string sessionKey, [FromServices] ISessionStorage sessionStorage)
         {
             if (!HttpContext.WebSockets.IsWebSocketRequest)
             {
@@ -132,7 +134,7 @@ namespace DuetWebServer.Controllers
                     return;
                 }
             }
-            else if (!Authorization.Sessions.CheckSessionKey(sessionKey, false))
+            else if (!sessionStorage.CheckSessionKey(sessionKey, false))
             {
                 // Session key passed but it is invalid
                 HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -143,13 +145,13 @@ namespace DuetWebServer.Controllers
             // Process the WebSocket request
             try
             {
-                Authorization.Sessions.SetWebSocketState(sessionKey, true);
+                sessionStorage.SetWebSocketState(sessionKey, true);
                 using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
                 await Process(webSocket, socketPath);
             }
             finally
             {
-                Authorization.Sessions.SetWebSocketState(sessionKey, false);
+                sessionStorage.SetWebSocketState(sessionKey, false);
             }
         }
 

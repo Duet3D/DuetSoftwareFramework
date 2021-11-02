@@ -287,6 +287,11 @@ namespace DuetAPI.ObjectModel
                         {
                             property.SetValue(this, null);
                         }
+                        else if (property.PropertyType.IsAssignableTo(typeof(IModelObject)))
+                        {
+                            IModelObject propertyValue = (IModelObject)property.GetValue(this);
+                            propertyValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                        }
 #if VERIFY_OBJECT_MODEL
                         else
                         {

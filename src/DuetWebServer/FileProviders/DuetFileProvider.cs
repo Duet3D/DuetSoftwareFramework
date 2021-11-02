@@ -1,3 +1,4 @@
+using DuetWebServer.Singletons;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Primitives;
 
@@ -9,24 +10,23 @@ namespace DuetWebServer.FileProviders
     public class DuetFileProvider : IFileProvider
     {
         /// <summary>
-        /// Singleton to the file provider
-        /// </summary>
-        public static DuetFileProvider Instance { get; private set; }
-
-        /// <summary>
         /// Physical file provider
         /// </summary>
         private PhysicalFileProvider _provider;
 
         /// <summary>
+        /// Object model provider
+        /// </summary>
+        private readonly IModelProvider _modelProvider;
+
+        /// <summary>
         /// Creates a new file resolver instance
         /// </summary>
-        public DuetFileProvider()
+        public DuetFileProvider(IModelProvider modelProvider)
         {
-            Instance = this;
-
-            Services.ModelObserver.OnWebDirectoryChanged += SetWebDirectory;
-            _provider = new PhysicalFileProvider(Services.ModelObserver.WebDirectory);
+            _modelProvider = modelProvider;
+            _modelProvider.OnWebDirectoryChanged += SetWebDirectory;
+            _provider = new PhysicalFileProvider(_modelProvider.WebDirectory);
         }
 
         /// <summary>
@@ -34,7 +34,7 @@ namespace DuetWebServer.FileProviders
         /// </summary>
         ~DuetFileProvider()
         {
-            Services.ModelObserver.OnWebDirectoryChanged -= SetWebDirectory;
+            _modelProvider.OnWebDirectoryChanged -= SetWebDirectory;
         }
 
         /// <summary>

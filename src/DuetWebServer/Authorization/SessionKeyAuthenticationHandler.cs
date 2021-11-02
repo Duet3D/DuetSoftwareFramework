@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Connection;
 using DuetAPIClient;
+using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -31,14 +32,24 @@ namespace DuetWebServer.Authorization
         private readonly IConfiguration _configuration;
 
         /// <summary>
+        /// Session storage singleton
+        /// </summary>
+        private readonly ISessionStorage _sessionStorage;
+
+        /// <summary>
         /// Create a new controller instance
         /// </summary>
-        /// <param name="configuration">Launch configuration</param>
+        /// <param name="options">Options</param>
         /// <param name="logger">Logger instance</param>
-        public SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, IConfiguration configuration)
+        /// <param name="encoder">URL encoder</param>
+        /// <param name="clock">System clock</param>
+        /// <param name="configuration">Launch configuration</param>
+        /// <param name="sessionStorage">Session storage singleton</param>
+        public SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, IConfiguration configuration, ISessionStorage sessionStorage)
             : base(options, logger, encoder, clock)
         {
             _configuration = configuration;
+            _sessionStorage = sessionStorage;
         }
 
         /// <summary>
@@ -51,7 +62,7 @@ namespace DuetWebServer.Authorization
             {
                 foreach (string sessionKey in sessionKeys)
                 {
-                    AuthenticationTicket ticket = Sessions.GetTicket(sessionKey);
+                    AuthenticationTicket ticket = _sessionStorage.GetTicket(sessionKey);
                     if (ticket != null)
                     {
                         // Got a ticket, success!
@@ -63,11 +74,11 @@ namespace DuetWebServer.Authorization
             {
                 try
                 {
-                    CommandConnection connection = await BuildConnection();
+                    using CommandConnection connection = await BuildConnection();
                     if (await connection.CheckPassword(Defaults.Password))
                     {
                         // No password set - assign an anonymous ticket
-                        return AuthenticateResult.Success(Sessions.AnonymousTicket);
+                        return AuthenticateResult.Success(_sessionStorage.AnonymousTicket);
                     }
                 }
                 catch

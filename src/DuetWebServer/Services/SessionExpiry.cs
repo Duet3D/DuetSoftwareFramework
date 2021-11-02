@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Connection;
+using DuetWebServer.Singletons;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -13,9 +14,15 @@ namespace DuetWebServer.Services
     /// </summary>
     public class SessionExpiry : IHostedService, IDisposable
     {
+        /// <summary>
         /// Configuration of this application
         /// </summary>
         private readonly IConfiguration _configuration;
+
+        /// <summary>
+        /// Session storage singleton
+        /// </summary>
+        private readonly ISessionStorage _sessionStorage;
 
         /// <summary>
         /// Task representing the lifecycle of this service
@@ -31,11 +38,11 @@ namespace DuetWebServer.Services
         /// Constructor of this service class
         /// </summary>
         /// <param name="configuration">App configuration</param>
-        /// <param name="logFactory">Log factory</param>
-        public SessionExpiry(IConfiguration configuration, ILoggerFactory logFactory)
+        /// <param name="sessionStorage">Session storage</param>
+        public SessionExpiry(IConfiguration configuration, ISessionStorage sessionStorage)
         {
             _configuration = configuration;
-            Authorization.Sessions.SetLogFactory(logFactory);
+            _sessionStorage = sessionStorage;
         }
 
         /// <summary>
@@ -79,7 +86,7 @@ namespace DuetWebServer.Services
             {
                 do
                 {
-                    Authorization.Sessions.MaintainSessions(sessionTimeout, _configuration.GetValue("SocketPath", Defaults.FullSocketPath));
+                    _sessionStorage.MaintainSessions(sessionTimeout, _configuration.GetValue("SocketPath", Defaults.FullSocketPath));
                     await Task.Delay(1000, _stopRequest.Token);
                 }
                 while (!_stopRequest.IsCancellationRequested);

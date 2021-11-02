@@ -310,7 +310,7 @@ namespace DuetHttpClient.Connector
                         }
                         while (webSocket.State == WebSocketState.Open);
                     }
-                    catch (Exception e) when (!(e is OperationCanceledException))
+                    catch (Exception e) when (e is not OperationCanceledException)
                     {
                         lock (Model)
                         {
@@ -325,9 +325,9 @@ namespace DuetHttpClient.Connector
                         await Task.Delay(2000, _terminateSession.Token);
                         await Reconnect();
                     }
-                    catch (OperationCanceledException)
+                    catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
                     {
-                        // expected if the remote end is still offline
+                        // expected when the remote end is still offline or unavailable
                     }
                 }
                 while (!_terminateSession.IsCancellationRequested);

@@ -1,4 +1,5 @@
 ﻿using DuetAPIClient;
+using DuetWebServer.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using System;
@@ -6,24 +7,106 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
-namespace DuetWebServer.Authorization
+namespace DuetWebServer.Singletons
 {
     /// <summary>
-    /// Storage class for internal HTTP sessions
+    /// Interface for accessing the session storage singleton
     /// </summary>
-    public static class Sessions
+    public interface ISessionStorage
     {
         /// <summary>
         /// Anonymous ticket that is used in case no password is set
         /// </summary>
-        public static readonly AuthenticationTicket AnonymousTicket = new(new ClaimsPrincipal(new ClaimsIdentity(new[] {
+        public AuthenticationTicket AnonymousTicket { get; }
+
+        /// <summary>
+        /// Check if the given session key provides the requested access to the given policy
+        /// </summary>
+        /// <param name="key">Session key</param>
+        /// <param name="readWrite">If readWrite or readOnly policy is requested</param>
+        /// <returns>True if access is granted</returns>
+        public bool CheckSessionKey(string key, bool readWrite);
+
+        /// <summary>
+        /// Make a new session key and register it if the session ID is valid
+        /// </summary>
+        /// <param name="sessionId">DSF session ID</param>
+        /// <param name="readWrite">Whether the client has read-write or read-only access</param>
+        /// <returns>Authentication ticket</returns>
+        public string MakeSessionKey(int sessionId, bool readWrite);
+
+        /// <summary>
+        /// Get a session ID from the given key
+        /// </summary>
+        /// <param name="key">Key to query</param>
+        /// <returns>Session ID or -1</returns>
+        public int GetSessionId(string key);
+
+        /// <summary>
+        /// Get a ticket from the given key
+        /// </summary>
+        /// <param name="key">Key to query</param>
+        /// <returns>Authentication ticket or null</returns>
+        public AuthenticationTicket GetTicket(string key);
+
+        /// <summary>
+        /// Remove a session ticket returning the corresponding session ID
+        /// </summary>
+        /// <returns>Session ID or 0 if none was found</returns>
+        public int RemoveTicket(ClaimsPrincipal user);
+
+        /// <summary>
+        /// Set whether a given socket is connected over WebSocket
+        /// </summary>
+        /// <param name="key">Session key</param>
+        /// <param name="webSocketConnected">Whether a WebSocket is connected</param>
+        public void SetWebSocketState(string key, bool webSocketConnected);
+
+        /// <summary>
+        /// Set whether a potentially long-running HTTP request has started or finished
+        /// </summary>
+        /// <param name="key">Session key</param>
+        /// <param name="requestStarted">Whether a WebSocket is connected</param>
+        public void SetLongRunningHttpRequest(ClaimsPrincipal user, bool requestStarted);
+
+        /// <summary>
+        /// Remove sessions that are no longer active
+        /// </summary>
+        /// <param name="sessionTimeout">Timeout for HTTP sessions</param>
+        /// <param name="socketPath">API socket path</param>
+        public void MaintainSessions(TimeSpan sessionTimeout, string socketPath);
+    }
+
+    /// <summary>
+    /// Storage singleton for internal HTTP sessions
+    /// </summary>
+    public class SessionStorage : ISessionStorage
+    {
+        /// <summary>
+        /// Anonymous ticket that is used in case no password is set
+        /// </summary>
+        public AuthenticationTicket AnonymousTicket { get; } = new(new ClaimsPrincipal(new ClaimsIdentity(new[] {
             new Claim("access", Policies.ReadWrite)
         })), SessionKeyAuthenticationHandler.SchemeName);
 
         /// <summary>
+        /// Internal logger instance
+        /// </summary>
+        private readonly ILogger<SessionStorage> _logger;
+
+        /// <summary>
+        /// Constructor of the session storage singleton
+        /// </summary>
+        /// <param name="logger">Logger instance</param>
+        public SessionStorage(ILogger<SessionStorage> logger)
+        {
+            _logger = logger;
+        }
+
+        /// <summary>
         /// Internal session wrapper around auth tickets
         /// </summary>
-        private class Session
+        private sealed class Session
         {
             public AuthenticationTicket Ticket { get; }
 
@@ -44,20 +127,9 @@ namespace DuetWebServer.Authorization
         }
 
         /// <summary>
-        /// Internal logger instance
-        /// </summary>
-        private static ILogger _logger;
-
-        /// <summary>
-        /// Set the log factory initially so logging can be used in this static context
-        /// </summary>
-        /// <param name="logFactory">Logger factory</param>
-        public static void SetLogFactory(ILoggerFactory logFactory) => _logger = logFactory.CreateLogger(nameof(Sessions));
-
-        /// <summary>
         /// List of active sessions
         /// </summary>
-        private static readonly List<Session> _sessions = new();
+        private readonly List<Session> _sessions = new();
 
         /// <summary>
         /// Check if the given session key provides the requested access to the given policy
@@ -65,7 +137,7 @@ namespace DuetWebServer.Authorization
         /// <param name="key">Session key</param>
         /// <param name="readWrite">If readWrite or readOnly policy is requested</param>
         /// <returns>True if access is granted</returns>
-        public static bool CheckSessionKey(string key, bool readWrite)
+        public bool CheckSessionKey(string key, bool readWrite)
         {
             lock (_sessions)
             {
@@ -92,7 +164,7 @@ namespace DuetWebServer.Authorization
         /// <param name="sessionId">DSF session ID</param>
         /// <param name="readWrite">Whether the client has read-write or read-only access</param>
         /// <returns>Authentication ticket</returns>
-        public static string MakeSessionKey(int sessionId, bool readWrite)
+        public string MakeSessionKey(int sessionId, bool readWrite)
         {
             lock (_sessions)
             {
@@ -117,7 +189,7 @@ namespace DuetWebServer.Authorization
         /// </summary>
         /// <param name="key">Key to query</param>
         /// <returns>Session ID or -1</returns>
-        public static int GetSessionId(string key)
+        public int GetSessionId(string key)
         {
             lock (_sessions)
             {
@@ -138,7 +210,7 @@ namespace DuetWebServer.Authorization
         /// </summary>
         /// <param name="key">Key to query</param>
         /// <returns>Authentication ticket or null</returns>
-        public static AuthenticationTicket GetTicket(string key)
+        public AuthenticationTicket GetTicket(string key)
         {
             lock (_sessions)
             {
@@ -158,7 +230,7 @@ namespace DuetWebServer.Authorization
         /// Remove a session ticket returning the corresponding session ID
         /// </summary>
         /// <returns>Session ID or 0 if none was found</returns>
-        public static int RemoveTicket(ClaimsPrincipal user)
+        public int RemoveTicket(ClaimsPrincipal user)
         {
             lock (_sessions)
             {
@@ -180,7 +252,7 @@ namespace DuetWebServer.Authorization
         /// </summary>
         /// <param name="key">Session key</param>
         /// <param name="webSocketConnected">Whether a WebSocket is connected</param>
-        public static void SetWebSocketState(string key, bool webSocketConnected)
+        public void SetWebSocketState(string key, bool webSocketConnected)
         {
             lock (_sessions)
             {
@@ -209,7 +281,7 @@ namespace DuetWebServer.Authorization
         /// </summary>
         /// <param name="key">Session key</param>
         /// <param name="requestStarted">Whether a WebSocket is connected</param>
-        public static void SetLongRunningHttpRequest(ClaimsPrincipal user, bool requestStarted)
+        public void SetLongRunningHttpRequest(ClaimsPrincipal user, bool requestStarted)
         {
             lock (_sessions)
             {
@@ -238,7 +310,7 @@ namespace DuetWebServer.Authorization
         /// </summary>
         /// <param name="sessionTimeout">Timeout for HTTP sessions</param>
         /// <param name="socketPath">API socket path</param>
-        public static void MaintainSessions(TimeSpan sessionTimeout, string socketPath)
+        public void MaintainSessions(TimeSpan sessionTimeout, string socketPath)
         {
             lock (_sessions)
             {
@@ -264,7 +336,7 @@ namespace DuetWebServer.Authorization
         /// <param name="sessionId">Session ID</param>
         /// <param name="socketPath">API socket path</param>
         /// <returns></returns>
-        private static async Task UnregisterExpiredSession(int sessionId, string socketPath)
+        private async Task UnregisterExpiredSession(int sessionId, string socketPath)
         {
             try
             {

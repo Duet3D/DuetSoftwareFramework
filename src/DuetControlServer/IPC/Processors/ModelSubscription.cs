@@ -354,9 +354,17 @@ namespace DuetControlServer.IPC.Processors
                         {
                             currentList.Add(null);
                         }
-                        else
+                        else if (pathNode.List[k] is IModelObject)
                         {
                             currentList.Add(new Dictionary<string, object>());
+                        }
+                        else if (pathNode.List[k] is IModelCollection)
+                        {
+                            currentList.Add(new List<object>());
+                        }
+                        else
+                        {
+                            currentList.Add(pathNode.List[k]);
                         }
                     }
 
@@ -420,7 +428,7 @@ namespace DuetControlServer.IPC.Processors
                         case PropertyChangeType.Collection:
                             // Update a collection
                             ItemPathNode pathNode = (ItemPathNode)path[^1];
-                            if (node is not List<object> objectCollectionList)
+                            if (node is not List<object> collection)
                             {
                                 if (pathNode.Name.Equals(nameof(ObjectModel.Job.Layers)) && Connection.ApiVersion < 11)
                                 {
@@ -431,37 +439,43 @@ namespace DuetControlServer.IPC.Processors
                                 Dictionary<string, object> objectCollectionNode = (Dictionary<string, object>)node;
                                 if (objectCollectionNode.TryGetValue(pathNode.Name, out object objectCollection))
                                 {
-                                    objectCollectionList = (List<object>)objectCollection;
+                                    collection = (List<object>)objectCollection;
 
-                                    for (int k = objectCollectionList.Count; k > pathNode.List.Count; k--)
+                                    for (int k = collection.Count; k > pathNode.List.Count; k--)
                                     {
-                                        objectCollectionList.RemoveAt(k - 1);
+                                        collection.RemoveAt(k - 1);
                                     }
                                 }
                                 else
                                 {
-                                    objectCollectionList = new List<object>(pathNode.List.Count);
-                                    objectCollectionNode.Add(pathNode.Name, objectCollectionList);
+                                    collection = new List<object>(pathNode.List.Count);
+                                    objectCollectionNode.Add(pathNode.Name, collection);
                                 }
                             }
 
-                            Type itemType = (value is IList) ? typeof(List<object>) : typeof(Dictionary<string, object>);
-                            for (int k = objectCollectionList.Count; k < pathNode.List.Count; k++)
+                            for (int k = collection.Count; k < pathNode.List.Count; k++)
                             {
                                 if (pathNode.List[k] == null)
                                 {
-                                    objectCollectionList.Add(null);
+                                    collection.Add(null);
+                                }
+                                else if (pathNode.List[k] is IModelObject)
+                                {
+                                    collection.Add(new Dictionary<string, object>());
+                                }
+                                else if (pathNode.List[k] is IModelCollection)
+                                {
+                                    collection.Add(new List<object>());
                                 }
                                 else
                                 {
-                                    object newItem = Activator.CreateInstance(itemType);
-                                    objectCollectionList.Add(newItem);
+                                    collection.Add(pathNode.List[k]);
                                 }
                             }
 
                             if (pathNode.Index < pathNode.List.Count)
                             {
-                                objectCollectionList[pathNode.Index] = value;
+                                collection[pathNode.Index] = value;
                             }
                             break;
 

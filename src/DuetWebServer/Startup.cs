@@ -51,7 +51,8 @@ namespace DuetWebServer
         /// </summary>
         /// <param name="app">Application builder</param>
         /// <param name="env">Hosting environment</param>
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        /// <param name="serviceProvider">Service provider</param>
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IServiceProvider serviceProvider)
         {
             if (env.IsDevelopment())
             {
@@ -104,7 +105,7 @@ namespace DuetWebServer
                 });
                 app.UseFileServer(new FileServerOptions
                 {
-                    FileProvider = new FileProviders.DuetFileProvider()
+                    FileProvider = ActivatorUtilities.CreateInstance<FileProviders.DuetFileProvider>(serviceProvider)
                 });
             }
         }

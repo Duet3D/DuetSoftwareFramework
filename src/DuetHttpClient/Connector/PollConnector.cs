@@ -390,15 +390,19 @@ namespace DuetHttpClient.Connector
                             }
                         }
                     }
-                    catch (Exception e) when (!(e is OperationCanceledException))
+                    catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
                     {
-                        // Something went wrong
+                        // expected when the remote end is still offline or unavailable
                     }
 
-                    if (!_terminateSession.IsCancellationRequested)
+                    // Wait a moment before attempting to reconnect
+                    try
                     {
-                        // Wait a moment before attempting to reconnect
-                        await Task.Delay(2000);
+                        await Task.Delay(2000, _terminateSession.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // can only occur if the session is disposed
                     }
                 }
                 while (!_terminateSession.IsCancellationRequested);

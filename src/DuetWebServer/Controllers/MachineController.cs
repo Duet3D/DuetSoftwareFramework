@@ -10,6 +10,7 @@ using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
+using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -53,6 +54,8 @@ namespace DuetWebServer.Controllers
         /// GET /machine/connect
         /// Check the password and register a new session on success
         /// </summary>
+        /// <param name="password">Password to check</param>
+        /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
         /// (200) Session key
@@ -63,7 +66,7 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [AllowAnonymous]
         [HttpGet("connect")]
-        public async Task<IActionResult> Connect(string password)
+        public async Task<IActionResult> Connect(string password, [FromServices] ISessionStorage sessionStorage)
         {
             try
             {
@@ -71,7 +74,7 @@ namespace DuetWebServer.Controllers
                 if (await connection.CheckPassword(password))
                 {
                     int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress.ToString());
-                    string sessionKey = Authorization.Sessions.MakeSessionKey(sessionId, true);
+                    string sessionKey = sessionStorage.MakeSessionKey(sessionId, true);
 
                     string jsonResponse = JsonSerializer.Serialize(new
                     {
@@ -125,6 +128,7 @@ namespace DuetWebServer.Controllers
         /// GET /machine/disconnect
         /// Remove the current HTTP session again
         /// </summary>
+        /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
         /// (204) No Content
@@ -134,14 +138,14 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [AllowAnonymous]
         [HttpGet("disconnect")]
-        public async Task<IActionResult> Disconnect()
+        public async Task<IActionResult> Disconnect([FromServices] ISessionStorage sessionStorage)
         {
             try
             {
                 if (HttpContext.User != null)
                 {
                     // Remove the internal session
-                    int sessionId = Authorization.Sessions.RemoveTicket(HttpContext.User);
+                    int sessionId = sessionStorage.RemoveTicket(HttpContext.User);
 
                     // Remove the DSF user session again
                     if (sessionId > 0)
@@ -236,6 +240,7 @@ namespace DuetWebServer.Controllers
         /// POST /machine/code
         /// Execute plain G/M/T-code(s) from the request body and return the G-code response when done.
         /// </summary>
+        /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
         /// (200) G-Code response as text/plain
@@ -245,7 +250,7 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [HttpPost("code")]
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
-        public async Task<IActionResult> DoCode()
+        public async Task<IActionResult> DoCode([FromServices] ISessionStorage sessionStorage)
         {
             string code;
             using (StreamReader reader = new(Request.Body, Encoding.UTF8))
@@ -255,7 +260,7 @@ namespace DuetWebServer.Controllers
 
             try
             {
-                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
+                sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
                 try
                 {
                     using CommandConnection connection = await BuildConnection();
@@ -264,7 +269,7 @@ namespace DuetWebServer.Controllers
                 }
                 finally
                 {
-                    Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
+                    sessionStorage.SetLongRunningHttpRequest(HttpContext.User, false);
                 }
             }
             catch (Exception e)
@@ -363,6 +368,7 @@ namespace DuetWebServer.Controllers
         /// Upload a file from the HTTP body and create the subdirectories if necessary.
         /// </summary>
         /// <param name="filename">Destination of the file to upload</param>
+        /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
         /// (201) File created
@@ -373,14 +379,14 @@ namespace DuetWebServer.Controllers
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPut("file/{*filename}")]
-        public async Task<IActionResult> UploadFile(string filename)
+        public async Task<IActionResult> UploadFile(string filename, [FromServices] ISessionStorage sessionStorage)
         {
             filename = HttpUtility.UrlDecode(filename);
 
             string resolvedPath = "n/a";
             try
             {
-                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
+                sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
                 try
                 {
                     resolvedPath = await ResolvePath(filename);
@@ -401,7 +407,7 @@ namespace DuetWebServer.Controllers
                 }
                 finally
                 {
-                    Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
+                    sessionStorage.SetLongRunningHttpRequest(HttpContext.User, false);
                 }
             }
             catch (Exception e)
@@ -779,6 +785,7 @@ namespace DuetWebServer.Controllers
         /// PUT /machine/plugin
         /// Install or upgrade a plugin ZIP file
         /// </summary>
+        /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
         /// (204) No content
@@ -789,12 +796,12 @@ namespace DuetWebServer.Controllers
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPut("plugin")]
-        public async Task<IActionResult> InstallPlugin()
+        public async Task<IActionResult> InstallPlugin([FromServices] ISessionStorage sessionStorage)
         {
             string zipFile = Path.GetTempFileName();
             try
             {
-                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
+                sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
                 try
                 {
                     // Write ZIP file
@@ -839,7 +846,7 @@ namespace DuetWebServer.Controllers
             }
             finally
             {
-                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
+                sessionStorage.SetLongRunningHttpRequest(HttpContext.User, false);
                 System.IO.File.Delete(zipFile);
             }
         }
@@ -848,6 +855,7 @@ namespace DuetWebServer.Controllers
         /// DELETE /machine/plugin
         /// Uninstall a plugin
         /// </summary>
+        /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
         /// (204) No content
@@ -857,11 +865,11 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpDelete("plugin")]
-        public async Task<IActionResult> UninstallPlugin()
+        public async Task<IActionResult> UninstallPlugin([FromServices] ISessionStorage sessionStorage)
         {
             try
             {
-                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
+                sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
                 try
                 {
                     // Get the plugin name
@@ -879,7 +887,7 @@ namespace DuetWebServer.Controllers
                 }
                 finally
                 {
-                    Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
+                    sessionStorage.SetLongRunningHttpRequest(HttpContext.User, false);
                 }
             }
             catch (Exception e)
@@ -1122,6 +1130,7 @@ namespace DuetWebServer.Controllers
         /// PUT /machine/systemPackage
         /// Install or upgrade a system package
         /// </summary>
+        /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
         /// (204) No content
@@ -1132,12 +1141,12 @@ namespace DuetWebServer.Controllers
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPut("systemPackage")]
-        public async Task<IActionResult> InstallSystemPackage()
+        public async Task<IActionResult> InstallSystemPackage([FromServices] ISessionStorage sessionStorage)
         {
             string packageFile = Path.GetTempFileName();
             try
             {
-                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
+                sessionStorage. SetLongRunningHttpRequest(HttpContext.User, true);
                 try
                 {
                     // Write package file
@@ -1182,7 +1191,7 @@ namespace DuetWebServer.Controllers
             }
             finally
             {
-                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
+                sessionStorage.SetLongRunningHttpRequest(HttpContext.User, false);
                 System.IO.File.Delete(packageFile);
             }
         }
@@ -1191,6 +1200,7 @@ namespace DuetWebServer.Controllers
         /// DELETE /machine/systemPackage
         /// Uninstall a system package
         /// </summary>
+        /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
         /// (204) No content
@@ -1200,11 +1210,11 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpDelete("systemPackage")]
-        public async Task<IActionResult> UninstallSystemPackage()
+        public async Task<IActionResult> UninstallSystemPackage([FromServices] ISessionStorage sessionStorage)
         {
             try
             {
-                Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, true);
+                sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
                 try
                 {
                     // Get the plugin name
@@ -1222,7 +1232,7 @@ namespace DuetWebServer.Controllers
                 }
                 finally
                 {
-                    Authorization.Sessions.SetLongRunningHttpRequest(HttpContext.User, false);
+                    sessionStorage.SetLongRunningHttpRequest(HttpContext.User, false);
                 }
             }
             catch (Exception e)
