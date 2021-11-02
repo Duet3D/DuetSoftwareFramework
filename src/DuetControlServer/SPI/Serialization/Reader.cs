@@ -139,42 +139,6 @@ namespace DuetControlServer.SPI.Serialization
         }
 
         /// <summary>
-        /// Read a heightmap report
-        /// </summary>
-        /// <param name="from">Origin</param>
-        /// <param name="map">Deserialized heightmap</param>
-        /// <returns>Number of bytes read</returns>
-        public static int ReadHeightMap(ReadOnlySpan<byte> from, out Heightmap map)
-        {
-            HeightMapHeader header = MemoryMarshal.Read<HeightMapHeader>(from);
-            map = new Heightmap
-            {
-                XMin = header.XMin,
-                XMax = header.XMax,
-                XSpacing = header.XSpacing,
-                YMin = header.YMin,
-                YMax = header.YMax,
-                YSpacing = header.YSpacing,
-                Radius = header.Radius,
-                NumX = header.NumX,
-                NumY = header.NumY
-            };
-
-            int headerSize = Marshal.SizeOf<HeightMapHeader>(), dataLength = sizeof(float) * map.NumX * map.NumY;
-            if (from.Length > headerSize)
-            {
-                ReadOnlySpan<byte> zCoordinates = from.Slice(headerSize, dataLength);
-                map.ZCoordinates = MemoryMarshal.Cast<byte, float>(zCoordinates).ToArray();
-            }
-            else
-            {
-                map.NumX = map.NumY = dataLength = 0;
-                map.ZCoordinates = Array.Empty<float>();
-            }
-            return headerSize + dataLength;
-        }
-
-        /// <summary>
         /// Read a G-code channel
         /// </summary>
         /// <param name="from">Origin</param>

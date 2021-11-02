@@ -399,63 +399,6 @@ namespace UnitTests.SPI
             Assert.AreEqual(0, span[3]);
         }
 
-
-        [Test]
-        public void SetHeightmap()
-        {
-            Span<byte> span = new byte[128];
-            span.Fill(0xFF);
-
-            Heightmap map = new()
-            {
-                XMin = 20,
-                XMax = 180,
-                XSpacing = 40,
-                YMin = 50,
-                YMax = 150,
-                YSpacing = 50,
-                Radius = 0,
-                NumX = 3,
-                NumY = 4,
-                ZCoordinates = new float[] {
-                    10, 20, 30,
-                    40, 50, 60,
-                    70, 80, 90,
-                    100, 110, 120
-                }
-            };
-
-            int bytesWritten = Writer.WriteHeightMap(span, map);
-            Assert.AreEqual(80, bytesWritten);
-
-            // Header
-            float xMin = MemoryMarshal.Read<float>(span);
-            Assert.AreEqual(20, xMin, 0.0001);
-            float xMax = MemoryMarshal.Read<float>(span.Slice(4, 4));
-            Assert.AreEqual(180, xMax, 0.0001);
-            float xSpacing = MemoryMarshal.Read<float>(span.Slice(8, 4));
-            Assert.AreEqual(40, xSpacing, 0.0001);
-            float yMin = MemoryMarshal.Read<float>(span.Slice(12, 4));
-            Assert.AreEqual(50, yMin, 0.0001);
-            float yMax = MemoryMarshal.Read<float>(span.Slice(16, 4));
-            Assert.AreEqual(150, yMax, 0.0001);
-            float ySpacing = MemoryMarshal.Read<float>(span.Slice(20, 4));
-            Assert.AreEqual(50, ySpacing, 0.0001);
-            float radius = MemoryMarshal.Read<float>(span.Slice(24, 4));
-            Assert.AreEqual(0, radius, 0.0001);
-            ushort numX = MemoryMarshal.Read<ushort>(span.Slice(28, 2));
-            Assert.AreEqual(3, numX);
-            ushort numY = MemoryMarshal.Read<ushort>(span.Slice(30, 2));
-            Assert.AreEqual(4, numY);
-
-            // Points
-            Span<float> zCoordinates = MemoryMarshal.Cast<byte, float>(span[32..]);
-            for (int i = 0; i < map.ZCoordinates.Length; i++)
-            {
-                Assert.AreEqual(zCoordinates[i], 10 * i + 10, 0.0001);
-            }
-        }
-
         [Test]
         public void CodeChannel()
         {

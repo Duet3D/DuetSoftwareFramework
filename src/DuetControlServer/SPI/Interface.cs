@@ -63,13 +63,6 @@ namespace DuetControlServer.SPI
         private static readonly List<EvaluateExpressionRequest> _evaluateExpressionRequests = new();
         private static readonly List<VariableRequest> _variableRequests = new();
 
-        // Heightmap requests
-        private static readonly AsyncLock _heightmapLock = new();
-        private static TaskCompletionSource<Heightmap> _getHeightmapRequest;
-        private static bool _isHeightmapRequested;
-        private static TaskCompletionSource _setHeightmapRequest;
-        private static Heightmap _heightmapToSet;
-
         // Firmware updates
         private static readonly AsyncLock _firmwareUpdateLock = new();
         private static Stream _iapStream, _firmwareStream;
@@ -223,67 +216,6 @@ namespace DuetControlServer.SPI
                 }
             }
             return request.Task;
-        }
-
-        /// <summary>
-        /// Retrieve the current heightmap from the firmware
-        /// </summary>
-        /// <returns>Heightmap in use</returns>
-        /// <exception cref="OperationCanceledException">Operation could not finish</exception>
-        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-        public static async Task<Heightmap> GetHeightmap()
-        {
-            Program.CancellationToken.ThrowIfCancellationRequested();
-            if (Settings.NoSpi)
-            {
-                throw new InvalidOperationException("Not connected over SPI");
-            }
-
-            TaskCompletionSource<Heightmap> tcs;
-            using (await _heightmapLock.LockAsync(Program.CancellationToken))
-            {
-                if (_getHeightmapRequest == null)
-                {
-                    tcs = new TaskCompletionSource<Heightmap>(TaskCreationOptions.RunContinuationsAsynchronously);
-                    _getHeightmapRequest = tcs;
-                    _isHeightmapRequested = false;
-                }
-                else
-                {
-                    tcs = _getHeightmapRequest;
-                }
-            }
-            return await tcs.Task;
-        }
-
-        /// <summary>
-        /// Set the current heightmap to use
-        /// </summary>
-        /// <param name="map">Heightmap to set</param>
-        /// <returns>Asynchronous task</returns>
-        /// <exception cref="OperationCanceledException">Operation could not finish</exception>
-        /// <exception cref="InvalidOperationException">Heightmap is already being set or not connected over SPI</exception>
-        public static async Task SetHeightmap(Heightmap map)
-        {
-            Program.CancellationToken.ThrowIfCancellationRequested();
-            if (Settings.NoSpi)
-            {
-                throw new InvalidOperationException("Not connected over SPI");
-            }
-
-            TaskCompletionSource tcs;
-            using (await _heightmapLock.LockAsync(Program.CancellationToken))
-            {
-                if (_setHeightmapRequest != null)
-                {
-                    throw new InvalidOperationException("Heightmap is already being set");
-                }
-
-                tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                _heightmapToSet = map;
-                _setHeightmapRequest = tcs;
-            }
-            await tcs.Task;
         }
 
         /// <summary>
@@ -843,23 +775,6 @@ namespace DuetControlServer.SPI
                     }
                 }
 
-                // Deal with heightmap requests
-                using (_heightmapLock.Lock(Program.CancellationToken))
-                {
-                    // Check if the heightmap is supposed to be set
-                    if (_setHeightmapRequest != null && DataTransfer.WriteHeightMap(_heightmapToSet))
-                    {
-                        _setHeightmapRequest.SetResult();
-                        _setHeightmapRequest = null;
-                    }
-
-                    // Check if the heightmap is requested
-                    if (_getHeightmapRequest != null && !_isHeightmapRequested)
-                    {
-                        _isHeightmapRequested = DataTransfer.WriteGetHeightMap();
-                    }
-                }
-
                 // Process incoming packets
                 for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
@@ -1041,9 +956,6 @@ namespace DuetControlServer.SPI
                     break;
                 case Request.PrintPaused:
                     HandlePrintPaused();
-                    break;
-                case Request.HeightMap:
-                    HandleHeightMap();
                     break;
                 case Request.Locked:
                     HandleResourceLocked();
@@ -1270,22 +1182,6 @@ namespace DuetControlServer.SPI
             using (_channels[CodeChannel.File].Lock())
             {
                 _channels[CodeChannel.File].PrintPaused();
-            }
-        }
-
-        /// <summary>
-        /// Process a received height map
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static void HandleHeightMap()
-        {
-            DataTransfer.ReadHeightMap(out Heightmap map);
-            _logger.Trace("Received heightmap");
-
-            using (_heightmapLock.Lock(Program.CancellationToken))
-            {
-                _getHeightmapRequest?.SetResult(map);
-                _getHeightmapRequest = null;
             }
         }
 
@@ -1753,24 +1649,6 @@ namespace DuetControlServer.SPI
                     request.SetCanceled();
                 }
                 _variableRequests.Clear();
-            }
-
-            // Resolve pending heightmap requests
-            using (_heightmapLock.Lock(Program.CancellationToken))
-            {
-                if (_getHeightmapRequest != null)
-                {
-                    _getHeightmapRequest.SetCanceled();
-                    _getHeightmapRequest = null;
-                    outputMessage = true;
-                }
-
-                if (_setHeightmapRequest != null)
-                {
-                    _setHeightmapRequest.SetCanceled();
-                    _setHeightmapRequest = null;
-                    outputMessage = true;
-                }
             }
 
             // Clear messages to send to the firmware

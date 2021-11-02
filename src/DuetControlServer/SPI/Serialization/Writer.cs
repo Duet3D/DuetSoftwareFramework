@@ -505,37 +505,6 @@ namespace DuetControlServer.SPI.Serialization
         }
 
         /// <summary>
-        /// Write a heightmap as read by G29 S1
-        /// </summary>
-        /// <param name="to">Destination</param>
-        /// <param name="map">Heightmap to write</param>
-        /// <returns>Number of bytes written</returns>
-        public static int WriteHeightMap(Span<byte> to, Heightmap map)
-        {
-            HeightMapHeader header = new()
-            {
-                XMin = map.XMin,
-                XMax = map.XMax,
-                XSpacing = map.XSpacing,
-                YMin = map.YMin,
-                YMax = map.YMax,
-                YSpacing = map.YSpacing,
-                Radius = map.Radius,
-                NumX = (ushort)map.NumX,
-                NumY = (ushort)map.NumY
-            };
-            MemoryMarshal.Write(to, ref header);
-
-            Span<float> coords = MemoryMarshal.Cast<byte, float>(to[Marshal.SizeOf<HeightMapHeader>()..]);
-            for (int i = 0; i < map.NumX * map.NumY; i++)
-            {
-                coords[i] = map.ZCoordinates[i];
-            }
-
-            return Marshal.SizeOf<HeightMapHeader>() + Marshal.SizeOf<float>() * map.NumX * map.NumY;
-        }
-
-        /// <summary>
         /// Write a G-code channel
         /// </summary>
         /// <param name="to">Destination</param>

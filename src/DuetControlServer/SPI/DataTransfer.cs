@@ -374,15 +374,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Read the result of a <see cref="Communication.SbcRequests.Request.GetHeightMap"/> request
-        /// </summary>
-        /// <param name="map">Received heightmap</param>
-        public static void ReadHeightMap(out Heightmap map)
-        {
-            Serialization.Reader.ReadHeightMap(_packetData.Span, out map);
-        }
-
-        /// <summary>
         /// Read a code channel
         /// </summary>
         /// <param name="channel">Code channel that has acquired the lock</param>
@@ -811,44 +802,6 @@ namespace DuetControlServer.SPI
 
             WritePacket(Communication.SbcRequests.Request.MacroCompleted, dataLength);
             Serialization.Writer.WriteMacroCompleted(GetWriteBuffer(dataLength), channel, error);
-            return true;
-        }
-
-        /// <summary>
-        /// Request the heightmap from the firmware
-        /// </summary>
-        /// <returns>True if the packet could be written</returns>
-        public static bool WriteGetHeightMap()
-        {
-            if (!CanWritePacket())
-            {
-                return false;
-            }
-
-            WritePacket(Communication.SbcRequests.Request.GetHeightMap);
-            return true;
-        }
-        
-        /// <summary>
-        /// Write a heightmap to the firmware
-        /// </summary>
-        /// <param name="map">Heightmap to send</param>
-        /// <returns>True if the packet could be written</returns>
-        public static bool WriteHeightMap(Heightmap map)
-        {
-            // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
-            int dataLength = Serialization.Writer.WriteHeightMap(span, map);
-
-            // See if the request fits into the buffer
-            if (!CanWritePacket(dataLength))
-            {
-                return false;
-            }
-
-            // Write it
-            WritePacket(Communication.SbcRequests.Request.SetHeightMap, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 

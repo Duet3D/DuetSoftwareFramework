@@ -18,7 +18,6 @@
 		/// <summary>
 		/// Full path to the currently used height map file or null if none is in use
 		/// </summary>
-		[SbcProperty(true)]
 		public string File
 		{
 			get => _file;

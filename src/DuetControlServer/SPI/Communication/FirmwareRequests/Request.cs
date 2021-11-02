@@ -53,10 +53,10 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         PrintPaused = 7,
         
         /// <summary>
-        /// Response to a heightmap request
+        /// Response to a heightmap request. This is no longer used
         /// </summary>
         /// <seealso cref="Shared.HeightMapHeader"/>
-        HeightMap = 8,
+        HeightMap_Obsolete = 8,
 
         /// <summary>
         /// Ressource locked
