@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace DuetAPI.Commands
+﻿namespace DuetAPI.Commands
 {
     /// <summary>
     /// Enumeration of conditional G-code keywords

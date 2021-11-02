@@ -1,11 +1,8 @@
-﻿using DuetAPI.Commands;
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;

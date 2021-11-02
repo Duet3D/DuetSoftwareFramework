@@ -7,8 +7,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
-using DuetAPI.Utility;
-using DuetControlServer.FileExecution;
 using DuetControlServer.Files;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
