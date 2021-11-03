@@ -40,7 +40,7 @@ namespace UnitTests.HttpClient
             }
 
             // Wait again for UpTime to change. Because other things may update the OM in SBC mode, we await an extra delay first
-            await Task.Delay(500);
+            await Task.Delay(1000);
             await session.WaitForModelUpdate();
 
             // Make sure the object model is updated
