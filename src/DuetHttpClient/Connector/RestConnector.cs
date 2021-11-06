@@ -312,10 +312,11 @@ namespace DuetHttpClient.Connector
                     }
                     catch (Exception e) when (e is not OperationCanceledException)
                     {
+                        // Something went wrong, the remote end is offline or unavailable
                         lock (Model)
                         {
-                            // Something went wrong, no longer connected
                             Model.State.Status = MachineStatus.Disconnected;
+                            Model.Global.Clear();
                         }
                     }
 

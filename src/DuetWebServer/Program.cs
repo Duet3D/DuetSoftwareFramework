@@ -44,8 +44,9 @@ namespace DuetWebServer
                 })
                 .ConfigureServices(services =>
                 {
-                    services.AddSingleton(typeof(IModelProvider), typeof(ModelProvider));
-                    services.AddSingleton(typeof(ISessionStorage), typeof(SessionStorage));
+                    services.AddSingleton<IModelProvider, ModelProvider>();
+                    services.AddSingleton<ISessionStorage, SessionStorage>();
+
                     services.AddHostedService<Services.ModelObserver>();
                     services.AddHostedService<Services.SessionExpiry>();
                 });

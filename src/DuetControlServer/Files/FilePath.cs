@@ -64,7 +64,7 @@ namespace DuetControlServer.Files
         /// <returns>Resolved file path</returns>
         public static string ToPhysical(string filePath, FileDirectory directory)
         {
-            Match match = Regex.Match(filePath, "^(\\d+):?/?(.*)");
+            Match match = Regex.Match(filePath, @"^(\d+):/(.*)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
                 if (driveNumber == 0)
@@ -101,7 +101,7 @@ namespace DuetControlServer.Files
                         _ => Model.Provider.Get.Directories.System,
                     };
 
-                    match = Regex.Match(directoryPath, "^(\\d+):?/?(.*)");
+                    match = Regex.Match(directoryPath, @"^(\d+):/(.*)");
                     if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                     {
                         if (driveNumber == 0)
@@ -129,7 +129,7 @@ namespace DuetControlServer.Files
         /// <returns>Resolved file path</returns>
         public static async Task<string> ToPhysicalAsync(string filePath, FileDirectory directory)
         {
-            Match match = Regex.Match(filePath, "^(\\d+):?/?(.*)");
+            Match match = Regex.Match(filePath, @"^(\d+):/(.*)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
                 if (driveNumber == 0)
@@ -166,7 +166,7 @@ namespace DuetControlServer.Files
                         _ => Model.Provider.Get.Directories.System,
                     };
 
-                    match = Regex.Match(directoryPath, "^(\\d+):?/?(.*)");
+                    match = Regex.Match(directoryPath, @"^(\d+):/(.*)");
                     if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                     {
                         if (driveNumber == 0)
@@ -194,7 +194,7 @@ namespace DuetControlServer.Files
         /// <returns>Resolved file path</returns>
         public static string ToPhysical(string filePath, string directory = null)
         {
-            Match match = Regex.Match(filePath, "^(\\d+):?/?(.*)");
+            Match match = Regex.Match(filePath, @"^(\d+):/(.*)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
                 if (driveNumber == 0)
@@ -215,7 +215,7 @@ namespace DuetControlServer.Files
 
             if (directory != null && !filePath.StartsWith('/'))
             {
-                match = Regex.Match(directory, "^(\\d+):?/?(.*)");
+                match = Regex.Match(directory, @"^(\d+):/(.*)");
                 if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                 {
                     if (driveNumber == 0)
@@ -246,7 +246,7 @@ namespace DuetControlServer.Files
         /// <returns>Resolved file path</returns>
         public static async Task<string> ToPhysicalAsync(string filePath, string directory = null)
         {
-            Match match = Regex.Match(filePath, "^(\\d+):?/?(.*)");
+            Match match = Regex.Match(filePath, @"^(\d+):/(.*)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
                 if (driveNumber == 0)
@@ -267,7 +267,7 @@ namespace DuetControlServer.Files
 
             if (directory != null && !filePath.StartsWith('/'))
             {
-                match = Regex.Match(directory, "^(\\d+):?/?(.*)");
+                match = Regex.Match(directory, @"^(\d+):/(.*)");
                 if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                 {
                     if (driveNumber == 0)

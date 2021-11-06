@@ -108,7 +108,7 @@ namespace DuetControlServer.Files
                     {
                         // G0/G1 is a move, see if there is a Z parameter present
                         CodeParameter zParam = code.Parameter('Z');
-                        if (zParam != null)
+                        if (zParam != null && zParam.Type == typeof(float))
                         {
                             float z = zParam;
                             if (z <= Settings.MaxLayerHeight)
@@ -189,7 +189,8 @@ namespace DuetControlServer.Files
                             {
                                 // G0/G1 is an absolute move, see if there is a Z parameter present
                                 CodeParameter zParam = code.Parameter('Z');
-                                if (zParam != null && (code.Comment == null || !code.Comment.TrimStart().StartsWith("E")))
+                                if (zParam != null && zParam.Type == typeof(float) &&
+                                    (code.Comment == null || !code.Comment.TrimStart().StartsWith("E", StringComparison.InvariantCultureIgnoreCase)))
                                 {
                                     gotNewInfo = true;
                                     partialFileInfo.Height = zParam;

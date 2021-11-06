@@ -392,7 +392,12 @@ namespace DuetHttpClient.Connector
                     }
                     catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
                     {
-                        // expected when the remote end is still offline or unavailable
+                        // This happens when the remote end is offline or unavailable
+                        lock (Model)
+                        {
+                            Model.State.Status = MachineStatus.Disconnected;
+                            Model.Global.Clear();
+                        }
                     }
 
                     // Wait a moment before attempting to reconnect

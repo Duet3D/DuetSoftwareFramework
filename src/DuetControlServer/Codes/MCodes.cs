@@ -996,9 +996,8 @@ namespace DuetControlServer.Codes
             builder.AppendLine("=== Duet Control Server ===");
             builder.AppendLine($"Duet Control Server v{Program.Version}");
 
-            await SPI.Interface.Diagnostics(builder);
-            SPI.DataTransfer.Diagnostics(builder);
             await FileExecution.Job.Diagnostics(builder);
+            await SPI.Interface.Diagnostics(builder);
 
             result.Append(MessageType.Success, builder.ToString());
         }

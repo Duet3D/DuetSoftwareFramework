@@ -21,6 +21,16 @@ namespace DuetAPI.ObjectModel
         private KinematicsName _name = KinematicsName.Unknown;
 
         /// <summary>
+        /// Segmentation parameters or null if not configured
+        /// </summary>
+        public MoveSegmentation Segmentation
+        {
+            get => _segmentation;
+            set => SetPropertyValue(ref _segmentation, value);
+        }
+        private MoveSegmentation _segmentation;
+
+        /// <summary>
         /// Figure out the required type for the given kinematics name
         /// </summary>
         /// <param name="name">Kinematics name</param>

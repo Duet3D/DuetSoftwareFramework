@@ -244,6 +244,7 @@ namespace DuetAPI.ObjectModel
             }
             else
             {
+                _dictionary.Clear();
                 DictionaryCleared?.Invoke(this, new EventArgs());
             }
         }

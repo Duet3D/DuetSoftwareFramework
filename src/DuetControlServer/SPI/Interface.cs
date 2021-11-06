@@ -94,6 +94,7 @@ namespace DuetControlServer.SPI
         {
             await _channels.Diagnostics(builder);
             builder.AppendLine($"Code buffer space: {_bufferSpace}");
+            DataTransfer.Diagnostics(builder);
         }
 
         /// <summary>

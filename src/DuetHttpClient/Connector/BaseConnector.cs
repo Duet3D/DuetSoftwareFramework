@@ -28,7 +28,7 @@ namespace DuetHttpClient.Connector
         }
 
         /// <summary>
-        /// HTTP cient of this connector
+        /// HTTP client of this connector
         /// </summary>
         public HttpClient HttpClient { get; } = new();
 
