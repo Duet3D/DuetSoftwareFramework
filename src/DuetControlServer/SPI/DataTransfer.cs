@@ -36,7 +36,7 @@ namespace DuetControlServer.SPI
 
         private static DateTime _lastTransferMeasureTime = DateTime.Now, _lastCodesMeasureTime = DateTime.Now;
         private static volatile int _numMeasuredTransfers, _numMeasuredCodes, _maxRxSize, _maxTxSize, _numTfrPinGlitches;
-        private static TimeSpan _maxPinWaitDurationFull = TimeSpan.Zero, _maxPinWaitDuration = TimeSpan.Zero;
+        private static TimeSpan _maxFullTransferDelay = TimeSpan.Zero, _maxPinWaitDurationFull = TimeSpan.Zero, _maxPinWaitDuration = TimeSpan.Zero;
 
         // Transfer headers
         private static readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf<TransferHeader>()];
@@ -133,10 +133,21 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Get the maximum time between two full transfers
+        /// </summary>
+        /// <returns>Time in ms</returns>
+        public static double GetMaxFullTransferDelay()
+        {
+            double result = _maxFullTransferDelay.TotalMilliseconds;
+            _maxFullTransferDelay = TimeSpan.Zero;
+            return result;
+        }
+
+        /// <summary>
         /// Get the maximum time to wait for the transfer ready pin to be toggled and reset the counter
         /// </summary>
         /// <param name="fullTransferCounter">Query and reset the full transfer duration</param>
-        /// <returns></returns>
+        /// <returns>Time in ms</returns>
         public static double GetMaxPinWaitDuration(bool fullTransferCounter)
         {
             if (fullTransferCounter)
@@ -158,10 +169,15 @@ namespace DuetControlServer.SPI
         public static void Diagnostics(StringBuilder builder)
         {
             builder.AppendLine($"Configured SPI speed: {Settings.SpiFrequency}Hz, TfrRdy pin glitches: {_numTfrPinGlitches}");
-            builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max wait times: {GetMaxPinWaitDuration(true):0.0}ms/{GetMaxPinWaitDuration(false):0.0}ms");
+            builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max delay between transfers: {GetMaxFullTransferDelay():0.0}ms, wait times: {GetMaxPinWaitDuration(true):0.0}ms/{GetMaxPinWaitDuration(false):0.0}ms");
             builder.AppendLine($"Codes per second: {GetCodesPerSecond():F2}");
             builder.AppendLine($"Maximum length of RX/TX data transfers: {_maxRxSize}/{_maxTxSize}");
         }
+
+        /// <summary>
+        /// Static stopwatch to measure the times between full transfers with
+        /// </summary>
+        private static readonly Stopwatch _fullTransferStopwatch = new();
 
         /// <summary>
         /// Perform a full data transfer synchronously
@@ -189,6 +205,28 @@ namespace DuetControlServer.SPI
             {
                 try
                 {
+                    // Keep track of the maximum times between regular full transfers
+                    if (!connecting && !_waitingForFirstTransfer && _started && !_hadTimeout && !_updating && !_resetting)
+                    {
+                        if (_fullTransferStopwatch.IsRunning)
+                        {
+                            TimeSpan timeElapsed = _fullTransferStopwatch.Elapsed;
+                            if (timeElapsed > _maxFullTransferDelay)
+                            {
+                                _maxFullTransferDelay = timeElapsed;
+                            }
+                            _fullTransferStopwatch.Reset();
+                        }
+                        else
+                        {
+                            _fullTransferStopwatch.Start();
+                        }
+                    }
+                    else if (_transferStopwatch.IsRunning)
+                    {
+                        _fullTransferStopwatch.Stop();
+                    }
+
                     // Exchange transfer headers. This also deals with transfer responses
                     if (!ExchangeHeader())
                     {
