@@ -169,7 +169,7 @@ namespace DuetControlServer.SPI
         public static void Diagnostics(StringBuilder builder)
         {
             builder.AppendLine($"Configured SPI speed: {Settings.SpiFrequency}Hz, TfrRdy pin glitches: {_numTfrPinGlitches}");
-            builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max delay between transfers: {GetMaxFullTransferDelay():0.0}ms, wait times: {GetMaxPinWaitDuration(true):0.0}ms/{GetMaxPinWaitDuration(false):0.0}ms");
+            builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max time between full transfers: {GetMaxFullTransferDelay():0.0}ms, max pin wait times: {GetMaxPinWaitDuration(true):0.0}ms/{GetMaxPinWaitDuration(false):0.0}ms");
             builder.AppendLine($"Codes per second: {GetCodesPerSecond():F2}");
             builder.AppendLine($"Maximum length of RX/TX data transfers: {_maxRxSize}/{_maxTxSize}");
         }

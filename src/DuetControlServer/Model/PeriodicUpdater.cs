@@ -3,12 +3,14 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -74,23 +76,28 @@ namespace DuetControlServer.Model
         /// This function updates host properties like network interfaces and storage devices
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task Run()
+        public static void Run()
         {
             DateTime lastUpdateTime = DateTime.Now;
+            DriveInfo[] drives;
+            System.Net.NetworkInformation.NetworkInterface[] networkInterfaces;
             string lastHostname = Environment.MachineName;
             do
             {
+                // Prefetch the network and volume devices because this can take quite a while (> 1.5s)
+                networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
+                drives = DriveInfo.GetDrives();
+
                 // Run another update cycle
-                using (await Provider.AccessReadWriteAsync())
+                using (Provider.AccessReadWrite())
                 {
-                    await UpdateNetwork();
-                    UpdateVolumes();
+                    UpdateNetwork(networkInterfaces);
+                    UpdateVolumes(drives);
                     CleanMessages();
                 }
 
                 // Check if the system time has to be updated
-                if (DateTime.Now - lastUpdateTime > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 5000) &&
-                    !System.Diagnostics.Debugger.IsAttached)
+                if (DateTime.Now - lastUpdateTime > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 5000) && Debugger.IsAttached)
                 {
                     _logger.Info("System time has been changed");
                     Code code = new()
@@ -99,11 +106,14 @@ namespace DuetControlServer.Model
                         Flags = CodeFlags.Asynchronous,
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
-                        MajorNumber = 905
+                        MajorNumber = 905,
+                        Parameters = new()
+                        {
+                            new('P', DateTime.Now.ToString("yyyy-MM-dd")),
+                            new('S', DateTime.Now.ToString("HH:mm:ss"))
+                        }
                     };
-                    code.Parameters.Add(new CodeParameter('P', DateTime.Now.ToString("yyyy-MM-dd")));
-                    code.Parameters.Add(new CodeParameter('S', DateTime.Now.ToString("HH:mm:ss")));
-                    await code.Execute();
+                    code.Execute().Wait();
                 }
 
                 // Check if the hostname has to be updated
@@ -117,15 +127,18 @@ namespace DuetControlServer.Model
                         Flags = CodeFlags.Asynchronous,
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
-                        MajorNumber = 550
+                        MajorNumber = 550,
+                        Parameters = new()
+                        {
+                            new('P', lastHostname)
+                        }
                     };
-                    code.Parameters.Add(new CodeParameter('P', lastHostname));
-                    await code.Execute();
+                    code.Execute().Wait();
                 }
 
                 // Wait for next scheduled update check
                 lastUpdateTime = DateTime.Now;
-                await Task.Delay(Settings.HostUpdateInterval, Program.CancellationToken);
+                Program.CancellationToken.WaitHandle.WaitOne(Settings.HostUpdateInterval);
             }
             while (!Program.CancellationToken.IsCancellationRequested);
         }
@@ -133,10 +146,10 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Update network interfaces
         /// </summary>
-        private static async Task UpdateNetwork()
+        private static void UpdateNetwork(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces)
         {
             int index = 0;
-            foreach (var iface in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+            foreach (System.Net.NetworkInformation.NetworkInterface iface in networkInterfaces)
             {
                 if (iface.NetworkInterfaceType != NetworkInterfaceType.Loopback)
                 {
@@ -188,7 +201,7 @@ namespace DuetControlServer.Model
                     {
                         try
                         {
-                            string wifiData = await File.ReadAllTextAsync("/proc/net/wireless", Program.CancellationToken);
+                            string wifiData = File.ReadAllText("/proc/net/wireless");
                             Regex signalRegex = new(iface.Name + @".*(-\d+)\.");
                             Match signalMatch = signalRegex.Match(wifiData);
                             if (signalMatch.Success)
@@ -224,10 +237,12 @@ namespace DuetControlServer.Model
         /// Volume 0 always represents the virtual SD card on DuetPi. The following code achieves this but it
         /// might need further adjustments to ensure this on every Linux distribution
         /// </remarks>
-        private static void UpdateVolumes()
+        private static void UpdateVolumes(DriveInfo[] drives)
         {
+            // Note: Since NetworkInterface.GetAllNetworkInterfaces() can take up to 1.5s, we query the drives outside the object model, too 
+
             int index = 0;
-            foreach (DriveInfo drive in DriveInfo.GetDrives())
+            foreach (DriveInfo drive in drives)
             {
                 long totalSize;
                 try
