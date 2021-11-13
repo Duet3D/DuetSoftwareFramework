@@ -29,3 +29,5 @@ Requires: duetwebcontrol
 Duet Software Framework
 
 %files
+%defattr(0644,root,root,-)
+/usr/lib/sysusers.d/duetsoftwareframework.conf

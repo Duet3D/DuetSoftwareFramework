@@ -50,8 +50,11 @@ fi
 %files
 %defattr(-,root,root,-)
 %{_unitdir}/duetcontrolserver.service
-%config(noreplace) %{dsfoptdir}/conf/config.json
-%{dsfoptdir}/bin/DuetControlServer*
 %config(noreplace) %{_sysconfdir}/udev/rules.d/99-dsf-gpio.rules
 %{_exec_prefix}/lib/sysusers.d/duetcontrolserver.conf
 %{_exec_prefix}/lib/tmpfiles.d/duetcontrolserver.conf
+
+%defattr(-,dsf,dsf,-)
+%{dsfoptdir}/bin/DuetControlServer
+%{dsfoptdir}/bin/DuetControlServer.*
+%config(noreplace) %{dsfoptdir}/conf/config.json

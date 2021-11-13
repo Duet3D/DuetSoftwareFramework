@@ -25,14 +25,18 @@ AutoReq:  0
 DSF Tools
 
 %files
-%defattr(0664,root,root,-)
-%attr(0755, root, root) %{dsfoptdir}/bin/CodeLogger
+%defattr(0755,dsf, dsf,-)
+%{dsfoptdir}/bin/CodeLogger
+%{dsfoptdir}/bin/CodeConsole
+%{dsfoptdir}/bin/CustomHttpEndpoint
+%{dsfoptdir}/bin/ModelObserver
+%{dsfoptdir}/bin/PluginManager
+%{dsfoptdir}/bin/CodeStream
+
+%defattr(0664,dsf, dsf,-)
 %{dsfoptdir}/bin/CodeLogger.*
-%attr(0755, root, root) %{dsfoptdir}/bin/CodeConsole
 %{dsfoptdir}/bin/CodeConsole.*
-%attr(0755, root, root) %{dsfoptdir}/bin/CustomHttpEndpoint
 %{dsfoptdir}/bin/CustomHttpEndpoint.*
-%attr(0755, root, root) %{dsfoptdir}/bin/ModelObserver
 %{dsfoptdir}/bin/ModelObserver.*
-%attr(0755, root, root) %{dsfoptdir}/bin/PluginManager
 %{dsfoptdir}/bin/PluginManager.*
+%{dsfoptdir}/bin/CodeStream.*

@@ -31,9 +31,10 @@ DSF Pi Management Plugin
 systemctl restart duetcontrolserver duetpluginservice >/dev/null 2>&1 || :
 
 %files
-%defattr(-,root,root,-)
-%attr(0755,dsf,dsf) %{dsfoptdir}/bin/DuetPiManagementPlugin
-%{dsfoptdir}/bin/DuetPiManagementPlugin.deps.json
-%{dsfoptdir}/bin/DuetPiManagementPlugin.dll
-%{dsfoptdir}/bin/DuetPiManagementPlugin.pdb
-%config(noreplace) %{dsfoptdir}/bin/DuetPiManagementPlugin.runtimeconfig.json
+%defattr(-,dsf,dsf,-)
+%{dsfoptdir}/bin/DuetPiManagementPlugin
+%{dsfoptdir}/bin/DuetPiManagementPlugin.*
+%{dsfoptdir}/plugins/DuetPiManagementPlugin.json
+%config(noreplace) %{dsfoptdir}/plugins/DuetPiManagementPlugin/dsf/*
+%dir %{dsfoptdir}/plugins/DuetPiManagementPlugin
+%dir %{dsfoptdir}/plugins/DuetPiManagementPlugin/dsf

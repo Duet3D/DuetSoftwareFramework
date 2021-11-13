@@ -47,10 +47,11 @@ if [ $1 -eq 1 ] && systemctl -q is-enabled %{name}.service ; then
 fi
 
 %files
-%defattr(-,root,root,-)
-%{_unitdir}/duetwebserver.service
+%attr(-,root,root) %{_unitdir}/duetwebserver.service
+
+%defattr(-,dsf,dsf,-)
 %config(noreplace) %{dsfoptdir}/conf/http.json
-%{dsfoptdir}/bin/DuetWebServer*
-%{dsfoptdir}/bin/web.config
+%{dsfoptdir}/bin/DuetWebServer
+%{dsfoptdir}/bin/DuetWebServer.*
 %{dsfoptdir}/bin/appsettings.json
 %{dsfoptdir}/bin/appsettings.Development.json
