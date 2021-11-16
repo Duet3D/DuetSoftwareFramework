@@ -974,7 +974,7 @@ namespace DuetWebServer.Controllers
                 {
                     if (!string.IsNullOrEmpty(plugin.SbcExecutable))
                     {
-                        _logger.LogWarning("Tried to set plugin data for {0} but it has an SBC executable set");
+                        _logger.LogWarning("Tried to set plugin data for {0} but it has an SBC executable set", plugin.Id);
                         return Forbid();
                     }
 

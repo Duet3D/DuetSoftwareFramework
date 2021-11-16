@@ -224,7 +224,7 @@ namespace DuetWebServer.Services
                         }
                         while (!_stopRequest.IsCancellationRequested);
                     }
-                    catch (Exception e) when (!(e is OperationCanceledException))
+                    catch (Exception e) when (e is not OperationCanceledException)
                     {
                         _logger.LogWarning(e, "Failed to synchronize machine model");
                         await Task.Delay(retryDelay, _stopRequest.Token);

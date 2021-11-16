@@ -397,7 +397,7 @@ namespace DuetControlServer.Commands
                     throw;
                 }
             }
-            catch (Exception e) when (!(e is OperationCanceledException))
+            catch (Exception e) when (e is not OperationCanceledException)
             {
                 // Cancel the running file and then start the next code if an exception has occurred
                 if (Macro != null)

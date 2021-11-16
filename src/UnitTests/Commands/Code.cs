@@ -173,6 +173,34 @@ namespace UnitTests.Commands
             }
         }
 
+#if false
+        [Test]
+        public void ParseM260()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M260 A0xF1 B0"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(260, code.MajorNumber);
+                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual('A', code.Parameters[0].Letter);
+                Assert.AreEqual(0xF1, (int)code.Parameters[0]);
+                Assert.AreEqual('B', code.Parameters[1].Letter);
+                Assert.AreEqual(0, (int)code.Parameters[1]);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("M260 A0XF1 B0"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(260, code.MajorNumber);
+                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual('A', code.Parameters[0].Letter);
+                Assert.AreEqual(0xF1, (int)code.Parameters[0]);
+                Assert.AreEqual('B', code.Parameters[1].Letter);
+                Assert.AreEqual(0, (int)code.Parameters[1]);
+            }
+        }
+#endif
+
         [Test]
         public void ParseM302Compact()
         {
@@ -671,6 +699,18 @@ namespace UnitTests.Commands
                 Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.Echo, code.Keyword);
                 Assert.AreEqual("{{3 + 3} + (volumes[0].freeSpace - 4)}", code.KeywordArgument);
+            }
+        }
+
+        [Test]
+        public void ParseEchoWithSemicolon()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("echo \"; this should work\""))
+            {
+                Assert.AreEqual(0, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
+                Assert.AreEqual(KeywordType.Echo, code.Keyword);
+                Assert.AreEqual("\"; this should work\"", code.KeywordArgument);
             }
         }
 

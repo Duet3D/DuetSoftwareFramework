@@ -97,6 +97,31 @@ namespace DuetPluginService.Commands
                     throw;
                 }
 
+                // Run update script if it exists
+                string updateScript = Path.Combine(packageDirectory, "update.sh");
+                if (File.Exists(updateScript))
+                {
+                    LinuxApi.Commands.Chmod(updateScript,
+                        LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
+                        LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
+                        LinuxApi.UnixPermissions.None);
+
+                    try
+                    {
+                        using Process updateScriptProcess = Process.Start(updateScript);
+                        await updateScriptProcess.WaitForExitAsync(Program.CancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        if (Program.CancelSource.IsCancellationRequested)
+                        {
+                            // Probably updating DPS as well so stop here
+                            return;
+                        }
+                        throw;
+                    }
+                }
+
                 // Clean up again
                 if (packageDirectory != null)
                 {

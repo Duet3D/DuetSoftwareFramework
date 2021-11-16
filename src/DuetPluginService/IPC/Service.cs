@@ -59,7 +59,7 @@ namespace DuetPluginService.IPC
                 catch (Exception e)
                 {
                     // Send errors back to the client
-                    if (!(e is OperationCanceledException))
+                    if (e is not OperationCanceledException)
                     {
                         if (e is UnauthorizedAccessException)
                         {

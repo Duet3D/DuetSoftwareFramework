@@ -56,7 +56,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 AspNetConfig config;
                 using (FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Open, FileAccess.Read))
                 {
-                    config = await JsonSerializer.DeserializeAsync<AspNetConfig>(configStream, null, Program.CancellationToken);
+                    config = await JsonSerializer.DeserializeAsync<AspNetConfig>(configStream, cancellationToken: Program.CancellationToken);
                 }
 
                 bool dwsEnabled = await Command.ExecQuery("/usr/bin/systemctl", "is-enabled -q duetwebserver.service");

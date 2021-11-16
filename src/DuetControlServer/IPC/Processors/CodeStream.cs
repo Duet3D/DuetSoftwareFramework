@@ -210,7 +210,7 @@ namespace DuetControlServer.IPC.Processors
                     catch (Exception e)
                     {
                         // Send errors back to the client
-                        if (!(e is OperationCanceledException))
+                        if (e is not OperationCanceledException)
                         {
                             Connection.Logger.Error(e, "Failed to execute code");
                         }

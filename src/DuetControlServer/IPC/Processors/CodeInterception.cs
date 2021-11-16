@@ -276,7 +276,7 @@ namespace DuetControlServer.IPC.Processors
 
                     // Code is ignored. Don't do anything
                 }
-                catch (Exception e) when (!(e is OperationCanceledException))
+                catch (Exception e) when (e is not OperationCanceledException)
                 {
                     Connection.Logger.Error(e, "Interception processor caught an exception");
                 }

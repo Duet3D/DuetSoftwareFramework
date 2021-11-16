@@ -112,7 +112,7 @@ namespace DuetPiManagementPlugin
                 }
                 catch (Exception e)
                 {
-                    if (!(e is OperationCanceledException))
+                    if (e is not OperationCanceledException)
                     {
                         throw;
                     }
@@ -525,6 +525,10 @@ namespace DuetPiManagementPlugin
                             {
                                 await Connection.CancelCode(CancellationToken);
                             }
+                        }
+                        else
+                        {
+                            await Connection.IgnoreCode(CancellationToken);
                         }
                         break;
                 }

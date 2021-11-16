@@ -27,7 +27,7 @@ Note that all the command-line options are case-sensitive.
 
 ### Return Codes
 
-This application may return the following codes (derived from `sysexists.h`):
+This application may return the following codes (derived from `sysexits.h`):
 - `0`: Successful termination
 - `64`: Failed to initialize settings (usage error)
 - `69`: Could not connect to Duet (service unavailable)

@@ -359,7 +359,7 @@ namespace DuetHttpClient.Connector
                         // Wait a moment
                         await Task.Delay(Options.SessionKeepAliveInterval, _terminateSession.Token);
                     }
-                    catch (Exception e) when (!(e is OperationCanceledException))
+                    catch (Exception e) when (e is not OperationCanceledException)
                     {
                         // Something went wrong
                     }
@@ -604,7 +604,7 @@ namespace DuetHttpClient.Connector
         /// </summary>
         /// <param name="filename">Name of the file to download</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Download response</returns>
+        /// <returns>Disposable download response</returns>
         public override async Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
         {
             using HttpRequestMessage request = new(HttpMethod.Get, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");

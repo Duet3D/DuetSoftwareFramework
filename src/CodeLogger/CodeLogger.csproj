@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <TrimUnusedDependencies>true</TrimUnusedDependencies>
     <Version>3.4-b6</Version>
     <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>

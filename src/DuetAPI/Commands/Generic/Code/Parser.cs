@@ -93,45 +93,74 @@ namespace DuetAPI.Commands
 
                 if (inCondition)
                 {
-                    switch (c)
+                    if (inQuotes)
                     {
-                        case '\n':
-                            // Ignore final NL
-                            break;
-                        case ';':
-                            inCondition = false;
-                            inFinalComment = true;
-                            break;
-                        case '{':
-                            result.KeywordArgument += '{';
-                            numCurlyBraces++;
-                            break;
-                        case '}':
-                            result.KeywordArgument += '}';
-                            numCurlyBraces--;
-                            break;
-                        case '(':
-                            result.KeywordArgument += '(';
-                            numRoundBraces++;
-                            break;
-                        case ')':
-                            if (numRoundBraces > 0)
+                        // Add next character to the parameter value
+                        result.KeywordArgument += c;
+                        result.Length++;
+
+                        if (c == '"')
+                        {
+                            if (reader.Peek() == '"')
                             {
-                                result.KeywordArgument += ')';
-                                numRoundBraces--;
+                                // Subsequent double quotes are treated as a single quote char
+                                reader.Read();
+                                result.KeywordArgument += c;
+                                result.Length++;
                             }
                             else
                             {
-                                throw new CodeParserException("Unexpected closing round brace", result);
+                                // No longer in an escaped parameter
+                                inQuotes = false;
                             }
-                            break;
-                        default:
-                            if (!char.IsWhiteSpace(c) || !string.IsNullOrEmpty(result.KeywordArgument))
-                            {
-                                // In fact, it should be possible to leave out whitespaces here but we here don't check for quoted strings yet
-                                result.KeywordArgument += c;
-                            }
-                            break;
+                        }
+                    }
+                    else
+                    {
+                        switch (c)
+                        {
+                            case '\n':
+                                // Ignore final NL
+                                break;
+                            case '"':
+                                result.KeywordArgument += '"';
+                                inQuotes = true;
+                                break;
+                            case ';':
+                                inCondition = false;
+                                inFinalComment = true;
+                                break;
+                            case '{':
+                                result.KeywordArgument += '{';
+                                numCurlyBraces++;
+                                break;
+                            case '}':
+                                result.KeywordArgument += '}';
+                                numCurlyBraces--;
+                                break;
+                            case '(':
+                                result.KeywordArgument += '(';
+                                numRoundBraces++;
+                                break;
+                            case ')':
+                                if (numRoundBraces > 0)
+                                {
+                                    result.KeywordArgument += ')';
+                                    numRoundBraces--;
+                                }
+                                else
+                                {
+                                    throw new CodeParserException("Unexpected closing round brace", result);
+                                }
+                                break;
+                            default:
+                                if (!char.IsWhiteSpace(c) || !string.IsNullOrEmpty(result.KeywordArgument))
+                                {
+                                    // In fact, it should be possible to leave out whitespaces here but we here don't check for quoted strings yet
+                                    result.KeywordArgument += c;
+                                }
+                                break;
+                        }
                     }
 
                     if (inCondition)

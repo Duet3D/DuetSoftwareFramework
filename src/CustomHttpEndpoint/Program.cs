@@ -206,7 +206,7 @@ namespace CustomHttpEndpoint
                 }
                 catch (Exception e)
                 {
-                    if (!(e is OperationCanceledException) && !(e is SocketException))
+                    if (e is not OperationCanceledException && e is not SocketException)
                     {
                         Console.WriteLine("Unexpected error:");
                         Console.WriteLine(e);

@@ -60,6 +60,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Version of the Duet Software Framework package
         /// </summary>
+        [Obsolete("This field will be removed in favour of a new dsf main key in v3.5")]
         [SbcProperty(false)]
         public string DsfVersion
         {
@@ -71,6 +72,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if DSF allows the installation and usage of third-party plugins
         /// </summary>
+        [Obsolete("This field will be removed in favour of a new dsf main key in v3.5")]
         [SbcProperty(false)]
         public bool DsfPluginSupport
         {
@@ -82,6 +84,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if DSF allows the installation and usage of third-party root plugins (potentially dangerous)
         /// </summary>
+        [Obsolete("This field will be removed in favour of a new dsf main key in v3.5")]
         [SbcProperty(false)]
         public bool DsfRootPluginSupport
         {
