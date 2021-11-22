@@ -363,7 +363,14 @@ namespace DuetControlServer.Files
                             }
                             else
                             {
-                                fileInfo.Filament.Add(filamentUsage);
+                                foreach (Capture capture in mmGroup.Captures)
+                                {
+                                    if (float.TryParse(capture.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out filamentUsage) &&
+                                        float.IsFinite(filamentUsage))
+                                    {
+                                        fileInfo.Filament.Add(filamentUsage);
+                                    }
+                                }
                             }
                         }
                         return true;
@@ -384,7 +391,14 @@ namespace DuetControlServer.Files
                             }
                             else
                             {
-                                fileInfo.Filament.Add(filamentUsage * 1000F);
+                                foreach (Capture capture in mGroup.Captures)
+                                {
+                                    if (float.TryParse(capture.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out filamentUsage) &&
+                                        float.IsFinite(filamentUsage))
+                                    {
+                                        fileInfo.Filament.Add(filamentUsage * 1000F);
+                                    }
+                                }
                             }
                         }
                         return true;
