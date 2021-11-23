@@ -1,6 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
 # Reload systemd services
 systemctl -q daemon-reload
 
-echo "To delete \"gpio\" group run as root: groupdel gpio"
+# Show group info only on package removal
+if [[ "$1" == "remove" ]]; then
+	echo "To delete \"gpio\" group run as root: groupdel gpio"
+fi
+

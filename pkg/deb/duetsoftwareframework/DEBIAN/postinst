@@ -1,6 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
 # Add dsf user and group
 systemd-sysusers duetsoftwareframework.conf
 
-echo "To modify config files consider adding yourself to the dsf groupd: # usermod -a -G dsf <username>"
+# Display config file note only on first installation
+if [[ -z "$2" ]]; then
+	echo "To modify config files consider adding yourself to the dsf groupd: # usermod -a -G dsf <username>"
+fi
+
