@@ -45,16 +45,20 @@ namespace DuetPluginService.Commands
                 // Try to stop the process
                 if (Plugins.Processes.TryGetValue(plugin.Id, out Process process) && !process.HasExited)
                 {
-                    // Ask process to terminate and wait a moment
-                    LinuxApi.Commands.Kill(process.Id, LinuxApi.Signal.SIGTERM);
-                    using (CancellationTokenSource timeoutCts = new(Settings.StopTimeout))
+                    try
                     {
-                        // Do not link this CTS to the main CTS because we may be shutting down at this point
+                        // Ask process to terminate
+                        LinuxApi.Commands.Kill(process.Id, LinuxApi.Signal.SIGTERM);
+
+                        // Wait a moment. Do not link this CTS to the main CTS because we may be shutting down at this point
+                        using CancellationTokenSource timeoutCts = new(Settings.StopTimeout);
                         await process.WaitForExitAsync(timeoutCts.Token);
                     }
-
-                    // Kill it and any potentially left-over child processes
-                    process.Kill(true);
+                    catch (OperationCanceledException)
+                    {
+                        // Kill it and any potentially left-over child processes
+                        process.Kill(true);
+                    }
                 }
             }
         }

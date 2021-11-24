@@ -62,6 +62,9 @@ namespace DuetPluginService.Permissions
                             includes.AppendLine("  #include <abstractions/nameservice>");
                             rules.AppendLine("  network,");
                             break;
+                        case SbcPermissions.WebcamAccess:
+                            rules.AppendLine("  /dev/video* rwmlk,");
+                            break;
                         case SbcPermissions.ReadFilaments:
                             rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "filaments")}/ r,");
                             rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "filaments")}/** r,");

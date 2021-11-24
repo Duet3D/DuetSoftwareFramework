@@ -66,14 +66,19 @@ namespace DuetPluginService
         public static string AppArmorProfileDirectory { get; set; } = "/etc/apparmor.d";
 
         /// <summary>
-        /// Enable or disable custom package installations or uninstallations
+        /// Command to run before installing third-party packages
         /// </summary>
-        public static bool PackageManagement { get; set; }
+        public static string PreinstallPackageCommand { get; set; } = "/usr/bin/apt";
+
+        /// <summary>
+        /// Command-line arguments to use before installing third-party packages
+        /// </summary>
+        public static string PreinstallPackageArguments { get; set; } = "update";
 
         /// <summary>
         /// Command to install third-party packages
         /// </summary>
-        public static string InstallPackageCommand { get; set; } = "/usr/bin/apt-get";
+        public static string InstallPackageCommand { get; set; } = "/usr/bin/apt";
 
         /// <summary>
         /// Command-line arguments to install third-party packages

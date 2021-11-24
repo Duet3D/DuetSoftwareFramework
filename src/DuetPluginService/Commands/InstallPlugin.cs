@@ -41,6 +41,14 @@ namespace DuetPluginService.Commands
 
             if (Program.IsRoot)
             {
+                // Run preinstall routine if needed
+                if (plugin.SbcPackageDependencies.Count > 0 && !string.IsNullOrEmpty(Settings.PreinstallPackageCommand))
+                {
+                    _logger.Info("Running preinstall command");
+                    using Process process = Process.Start(Settings.PreinstallPackageCommand, Settings.PreinstallPackageArguments);
+                    await process.WaitForExitAsync(Program.CancellationToken);
+                }
+
                 // Install plugin dependencies
                 foreach (string package in plugin.SbcPackageDependencies)
                 {
