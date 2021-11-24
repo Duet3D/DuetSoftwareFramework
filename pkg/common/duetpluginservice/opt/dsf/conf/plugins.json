@@ -1,5 +1,5 @@
 {
-  "SocketPath": "/var/run/dsf/dcs.sock",
+  "SocketPath": "/run/dsf/dcs.sock",
   "LogLevel": "info",
   "PluginDirectory": "/opt/dsf/plugins",
   "BaseDirectory": "/opt/dsf/sd",
@@ -7,8 +7,9 @@
   "AppArmorParser": "/usr/sbin/apparmor_parser",
   "AppArmorTemplate": "/opt/dsf/conf/apparmor.conf",
   "AppArmorProfileDirectory": "/etc/apparmor.d",
-  "PackageManagement": false,
-  "InstallPackageCommand": "/usr/bin/apt-get",
+  "PreinstallPackageCommand": "/usr/bin/apt",
+  "PreinstallPackageArguments": "update",
+  "InstallPackageCommand": "/usr/bin/apt",
   "InstallPackageArguments": "install -y {package}",
   "InstallPackageEnvironment": {
     "DEBIAN_FRONTEND": "noninteractive"
