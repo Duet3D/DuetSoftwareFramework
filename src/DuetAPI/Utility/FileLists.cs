@@ -172,7 +172,7 @@ namespace DuetAPI.Utility
             }
             catch
             {
-                if (startAt < 0)
+                if (startAt >= 0)
                 {
                     // Something went wrong...
                     return "{\"err\":2}";

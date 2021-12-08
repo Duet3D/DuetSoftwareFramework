@@ -464,8 +464,8 @@ namespace DuetControlServer.Files
                     if (seconds > 0)
                     {
                         fileInfo.PrintTime = seconds;
+                        return true;
                     }
-                    return true;
                 }
             }
             return false;
@@ -506,8 +506,8 @@ namespace DuetControlServer.Files
                     if (seconds > 0)
                     {
                         fileInfo.SimulatedTime = seconds;
+                        return true;
                     }
-                    return true;
                 }
             }
             return false;

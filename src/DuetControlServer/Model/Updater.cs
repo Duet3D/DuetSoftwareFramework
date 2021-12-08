@@ -344,10 +344,10 @@ namespace DuetControlServer.Model
                 return;
             }
 
-            int numChangedLayers = Math.Abs(Provider.Get.Job.Layer.Value - _lastLayer);
-            if (numChangedLayers > 0 && Provider.Get.Job.Layer.Value > 0 && _lastLayer > 0)
+            if (Provider.Get.Job.Layer.Value > 0 && Provider.Get.Job.Layer.Value != _lastLayer)
             {
-                // Compute average stats per changed layer
+                // Compute layer usage stats first
+                int numChangedLayers = (Provider.Get.Job.Layer.Value > _lastLayer) ? Math.Abs(Provider.Get.Job.Layer.Value - _lastLayer) : 1;
                 int printDuration = Provider.Get.Job.Duration.Value - (Provider.Get.Job.WarmUpDuration != null ? Provider.Get.Job.WarmUpDuration.Value : 0);
                 float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
                 List<float> totalFilamentUsage = new(), avgFilamentUsage = new();
@@ -362,6 +362,8 @@ namespace DuetControlServer.Model
                         avgFilamentUsage.Add((Provider.Get.Move.Extruders[i].RawPosition - lastFilamentUsage) / numChangedLayers);
                     }
                 }
+
+                // Get layer height
                 float currentHeight = 0F;
                 foreach (Axis axis in Provider.Get.Move.Axes)
                 {
@@ -371,40 +373,66 @@ namespace DuetControlServer.Model
                         break;
                     }
                 }
-                float avgHeight = Math.Abs(currentHeight - _lastHeight) / numChangedLayers;
+                float avgLayerHeight = Math.Abs(currentHeight - _lastHeight) / Math.Abs(Provider.Get.Job.Layer.Value - _lastLayer);
 
-                // Add missing layers
-                for (int i = Provider.Get.Job.Layers.Count; i < Provider.Get.Job.Layer.Value - 1; i++)
+                if (Provider.Get.Job.Layer > _lastLayer)
                 {
-                    Layer newLayer = new();
-                    foreach (AnalogSensor sensor in Provider.Get.Sensors.Analog)
+                    // Add new layers
+                    for (int i = Provider.Get.Job.Layers.Count; i < Provider.Get.Job.Layer.Value - 1; i++)
                     {
-                        if (sensor != null)
+                        Layer newLayer = new();
+                        newLayer.Duration = avgLayerDuration;
+                        foreach (float filamentUsage in avgFilamentUsage)
                         {
-                            newLayer.Temperatures.Add(sensor.LastReading);
+                            newLayer.Filament.Add(filamentUsage);
                         }
-                    }
-                    newLayer.Height = avgHeight;
-                    Provider.Get.Job.Layers.Add(newLayer);
-                }
-
-                // Merge data
-                for (int i = Math.Min(_lastLayer, Provider.Get.Job.Layer.Value); i < Math.Max(_lastLayer, Provider.Get.Job.Layer.Value); i++)
-                {
-                    Layer layer = Provider.Get.Job.Layers[i - 1];
-                    layer.Duration += avgLayerDuration;
-                    for (int k = 0; k < avgFilamentUsage.Count; k++)
-                    {
-                        if (k >= layer.Filament.Count)
+                        newLayer.FractionPrinted = avgFractionPrinted;
+                        newLayer.Height = avgLayerHeight;
+                        foreach (AnalogSensor sensor in Provider.Get.Sensors.Analog)
                         {
-                            layer.Filament.Add(avgFilamentUsage[k]);
+                            if (sensor != null)
+                            {
+                                newLayer.Temperatures.Add(sensor.LastReading);
+                            }
+                        }
+                        Provider.Get.Job.Layers.Add(newLayer);
+                    }
+                }
+                else if (Provider.Get.Job.Layer < _lastLayer)
+                {
+                    // Layer count went down (probably printing sequentially), update the last layer
+                    Layer lastLayer;
+                    if (Provider.Get.Job.Layers.Count < _lastLayer)
+                    {
+                        lastLayer = new();
+                        lastLayer.Height = avgLayerHeight;
+                        foreach (AnalogSensor sensor in Provider.Get.Sensors.Analog)
+                        {
+                            if (sensor != null)
+                            {
+                                lastLayer.Temperatures.Add(sensor.LastReading);
+                            }
+                        }
+                        Provider.Get.Job.Layers.Add(lastLayer);
+                    }
+                    else
+                    {
+                        lastLayer = Provider.Get.Job.Layers[_lastLayer];
+                    }
+
+                    lastLayer.Duration += avgLayerDuration;
+                    for (int i = 0; i < avgFilamentUsage.Count; i++)
+                    {
+                        if (i >= lastLayer.Filament.Count)
+                        {
+                            lastLayer.Filament.Add(avgFilamentUsage[i]);
                         }
                         else
                         {
-                            layer.Filament[k] += avgFilamentUsage[k];
+                            lastLayer.Filament[i] += avgFilamentUsage[i];
                         }
                     }
-                    layer.FractionPrinted += avgFractionPrinted;
+                    lastLayer.FractionPrinted += avgFractionPrinted;
                 }
 
                 // Record values for the next layer change
@@ -412,8 +440,8 @@ namespace DuetControlServer.Model
                 _lastFilamentUsage = totalFilamentUsage;
                 _lastFilePosition = Provider.Get.Job.FilePosition ?? 0L;
                 _lastHeight = currentHeight;
+                _lastLayer = Provider.Get.Job.Layer.Value;
             }
-            _lastLayer = Provider.Get.Job.Layer.Value;
         }
 
         /// <summary>

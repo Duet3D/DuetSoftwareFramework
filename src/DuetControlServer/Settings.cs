@@ -307,7 +307,8 @@ namespace DuetControlServer
             new Regex(@"Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?", RegexFlags),  // Simplify3D, KISSlicer, Canvas, IceSL
             new Regex(@"print time:\s+(?<s>(\d+\.?\d*))(s)?", RegexFlags),                                                                              // Kiri:Moto, and IdeaMaker v4
             new Regex(@"Total estimated \(pre-cool\) minutes: ((?<m>\d+\.?\d*))", RegexFlags),                                                          // KISSlicer v2.0
-            new Regex(@"total print time \(s\) = (?<s>(\d+\.?\d*))", RegexFlags)                                                                        // MatterControl v2
+            new Regex(@"total print time \(s\) = (?<s>(\d+\.?\d*))", RegexFlags),                                                                       // MatterControl v2
+            new Regex(@"Build time:\s+(?<h>(\d+\.?\d*)):(?<m>(\d+\.?\d*)):(?<s>(\d+\.?\d*))", RegexFlags)                                               // REACTOR
         };
 
         /// <summary>
