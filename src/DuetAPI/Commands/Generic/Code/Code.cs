@@ -144,11 +144,7 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="c">Letter of the parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
-        public CodeParameter Parameter(char c)
-        {
-            c = char.ToUpperInvariant(c);
-            return Parameters.FirstOrDefault(p => char.ToUpperInvariant(p.Letter) == c);
-        }
+        public CodeParameter Parameter(char c) => Parameters.FirstOrDefault(p => p.Letter == c);
 
         /// <summary>
         /// Retrieve the parameter whose letter equals c or generate a default parameter

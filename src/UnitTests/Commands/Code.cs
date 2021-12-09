@@ -445,16 +445,22 @@ namespace UnitTests.Commands
         [Test]
         public void ParseG1Absolute()
         {
-            foreach (DuetAPI.Commands.Code code in Parse("G53 G1 X3 Y1.25"))
+            foreach (DuetAPI.Commands.Code code in Parse("G53 G1 X3 Y1.25 A2 'a3 b4"))
             {
                 Assert.AreEqual(CodeFlags.EnforceAbsolutePosition | CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(1, code.MajorNumber);
                 Assert.IsNull(code.MinorNumber);
-                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual(5, code.Parameters.Count);
                 Assert.AreEqual('X', code.Parameters[0].Letter);
                 Assert.AreEqual(3, (int)code.Parameters[0]);
                 Assert.AreEqual('Y', code.Parameters[1].Letter);
                 Assert.AreEqual(1.25, code.Parameters[1], 0.0001);
+                Assert.AreEqual('A', code.Parameters[2].Letter);
+                Assert.AreEqual(2, code.Parameters[2], 0.0001);
+                Assert.AreEqual('a', code.Parameters[3].Letter);
+                Assert.AreEqual(3, code.Parameters[3], 0.0001);
+                Assert.AreEqual('B', code.Parameters[4].Letter);
+                Assert.AreEqual(4, code.Parameters[4], 0.0001);
             }
         }
 

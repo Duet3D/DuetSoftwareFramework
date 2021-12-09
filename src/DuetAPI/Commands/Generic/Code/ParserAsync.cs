@@ -388,7 +388,6 @@ namespace DuetAPI.Commands
                     if (letter != '\0' || !string.IsNullOrEmpty(value) || wasQuoted)
                     {
                         // Chunk is complete
-                        char upperLetter = char.ToUpperInvariant(letter);
                         if (isLineNumber)
                         {
                             // Process line number
@@ -400,7 +399,7 @@ namespace DuetAPI.Commands
                             isLineNumber = false;
                             hadLineNumber = true;
                         }
-                        else if ((upperLetter == 'G' || upperLetter == 'M' || upperLetter == 'T') &&
+                        else if (((letter == 'G' && value != "lobal") || letter == 'M' || letter == 'T') &&
                                  (result.MajorNumber == null || (result.Type == CodeType.GCode && result.MajorNumber == 53)))
                         {
                             // Process G/M/T identifier(s)
@@ -411,7 +410,7 @@ namespace DuetAPI.Commands
                                 buffer.EnforcingAbsolutePosition = true;
                             }
 
-                            result.Type = (CodeType)upperLetter;
+                            result.Type = (CodeType)letter;
                             if (wasExpression)
                             {
                                 if (result.Type == CodeType.TCode)
@@ -422,13 +421,6 @@ namespace DuetAPI.Commands
                                 {
                                     throw new CodeParserException("Dynamic command numbers are only supported for T-codes");
                                 }
-                            }
-                            else if (letter == 'g' && value == "lobal")
-                            {
-                                result.Type = CodeType.Keyword;
-                                result.Keyword = KeywordType.Global;
-                                result.KeywordArgument = string.Empty;
-                                inCondition = true;
                             }
                             else if (value.Contains('.'))
                             {
@@ -454,7 +446,7 @@ namespace DuetAPI.Commands
                             else if (int.TryParse(value, out int majorNumber))
                             {
                                 result.MajorNumber = majorNumber;
-                                unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 28 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
+                                unprecedentedParameter = (letter == 'M') && (majorNumber == 23 || majorNumber == 28 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
                             }
                             else if (!string.IsNullOrWhiteSpace(value) || result.Type != CodeType.TCode)
                             {
@@ -464,65 +456,73 @@ namespace DuetAPI.Commands
                         else if (result.Type == CodeType.None && result.MajorNumber == null && !wasQuoted && !wasExpression)
                         {
                             // Check for conditional G-code
-                            if (letter == 'i' && value == "f")
+                            string keyword = char.ToLowerInvariant(letter) + value;
+                            if (keyword == "if")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.If;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (letter == 'e' && value == "lif")
+                            else if (keyword == "elif")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.ElseIf;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (letter == 'e' && value == "lse")
+                            else if (keyword == "else")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Else;
                             }
-                            else if (letter == 'w' && value == "hile")
+                            else if (keyword == "while")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.While;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (letter == 'b' && value == "reak")
+                            else if (keyword == "break")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Break;
                                 inCondition = true;
                             }
-                            else if (letter == 'c' && value == "ontinue")
+                            else if (keyword == "continue")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Continue;
                                 inCondition = true;
                             }
-                            else if (letter == 'a' && value == "bort")
+                            else if (keyword == "abort")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Abort;
                                 inCondition = true;
                             }
-                            else if (letter == 'v' && value == "ar")
+                            else if (keyword == "var")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Var;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (letter == 's' && value == "et")
+                            else if (keyword == "global")
+                            {
+                                result.Type = CodeType.Keyword;
+                                result.Keyword = KeywordType.Global;
+                                result.KeywordArgument = string.Empty;
+                                inCondition = true;
+                            }
+                            else if (keyword == "set")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Set;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (letter == 'e' && value == "cho")
+                            else if (keyword == "echo")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Echo;
@@ -531,7 +531,7 @@ namespace DuetAPI.Commands
                             }
                             else if (result.Parameter(letter) == null)
                             {
-                                AddParameter(result, char.ToUpperInvariant(letter), value, false, buffer.MayRepeatCode);
+                                AddParameter(result, letter, value, false, buffer.MayRepeatCode);
                             }
                             // Ignore duplicate parameters
                         }
@@ -573,6 +573,10 @@ namespace DuetAPI.Commands
                         // Starting encapsulated comment
                         contentRead = inEncapsulatedComment = true;
                     }
+                    else if (c == '\'')
+                    {
+                        contentRead = nextCharLowerCase = true;
+                    }
                     else if (!char.IsWhiteSpace(c))
                     {
                         // Starting a new parameter
@@ -587,6 +591,15 @@ namespace DuetAPI.Commands
                         else if (c == '"')
                         {
                             inQuotes = true;
+                        }
+                        else if (nextCharLowerCase)
+                        {
+                            letter = char.ToLowerInvariant(c);
+                            nextCharLowerCase = false;
+                        }
+                        else if (!unprecedentedParameter)
+                        {
+                            letter = char.ToUpperInvariant(c);
                         }
                         else
                         {
