@@ -518,10 +518,6 @@ namespace DuetAPI.Commands
                                 value = letter + value;
                                 letter = '@';
                             }
-                            else
-                            {
-                                letter = char.ToUpperInvariant(letter);
-                            }
 
                             if (result.Parameter(letter) == null)
                             {
@@ -686,8 +682,7 @@ namespace DuetAPI.Commands
                     case 584:
                         foreach (CodeParameter parameter in Parameters)
                         {
-                            char upper = char.ToUpperInvariant(parameter.Letter);
-                            if (!parameter.IsExpression && (ObjectModel.Axis.Letters.Contains(upper) || upper == 'E'))
+                            if (!parameter.IsExpression && (ObjectModel.Axis.Letters.Contains(parameter.Letter) || char.ToUpperInvariant(parameter.Letter) == 'E'))
                             {
                                 ConvertDriverIds(parameter);
                             }

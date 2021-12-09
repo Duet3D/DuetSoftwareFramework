@@ -7,11 +7,6 @@ namespace DuetAPI.Commands
     public partial class Code
     {
         /// <summary>
-        /// Array of possible axis letters for Fanuc CNC and LaserWeb G-code styles
-        /// </summary>
-        private static readonly char[] PossibleAxisLetters = { 'X', 'Y', 'Z', 'U', 'V', 'W', 'A', 'B', 'C', 'D' };
-
-        /// <summary>
         /// Parse the next available G/M/T-code from the given stream asynchronously
         /// </summary>
         /// <param name="reader">Input to read from</param>
@@ -551,10 +546,6 @@ namespace DuetAPI.Commands
                                 value = letter + value;
                                 letter = '@';
                             }
-                            else
-                            {
-                                letter = char.ToUpperInvariant(letter);
-                            }
 
                             if (result.Parameter(letter) == null)
                             {
@@ -621,7 +612,7 @@ namespace DuetAPI.Commands
                 }
                 else if (result.Type == CodeType.None &&
                          (buffer.LastGCode == 0 || buffer.LastGCode == 1) &&
-                         result.Parameters.Any(parameter => PossibleAxisLetters.Contains(parameter.Letter)))
+                         result.Parameters.Any(parameter => ObjectModel.Axis.Letters.Contains(parameter.Letter)))
                 {
                     result.Type = CodeType.GCode;
                     result.MajorNumber = buffer.LastGCode;

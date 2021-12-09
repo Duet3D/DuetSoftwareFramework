@@ -18,7 +18,7 @@ namespace DuetAPI.ObjectModel
         private Accelerometer _accelerometer;
 
         /// <summary>
-        /// Filename of the firmware binary
+        /// Filename of the bootloader binary or null if unknown
         /// </summary>
         public string BootloaderFileName
         {
@@ -90,6 +90,9 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Filename of the IAP binary that is used for updates from the SBC or null if unsupported
         /// </summary>
+        /// <remarks>
+        /// This is only available for the mainboard (first board item)
+        /// </remarks>
         public string IapFileNameSBC
         {
             get => _iapFileNameSBC;
@@ -100,6 +103,9 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Filename of the IAP binary that is used for updates from the SD card or null if unsupported
         /// </summary>
+        /// <remarks>
+        /// This is only available for the mainboard (first board item)
+        /// </remarks>
         public string IapFileNameSD
         {
             get => _iapFileNameSD;
@@ -188,7 +194,7 @@ namespace DuetAPI.ObjectModel
         private bool _supportsDirectDisplay;
 
         /// <summary>
-        /// Unique identifier of the board
+        /// Unique identifier of the board or null if unknown
         /// </summary>
         public string UniqueId
         {

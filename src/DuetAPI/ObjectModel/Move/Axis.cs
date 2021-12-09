@@ -10,7 +10,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of supported axis letters
         /// </summary>
-        public static readonly char[] Letters = new char[] { 'X', 'Y', 'Z', 'U', 'V', 'W', 'A', 'B', 'C' };
+        public static readonly char[] Letters = new char[] {
+            'X', 'Y', 'Z',
+            'U', 'V', 'W',
+            'A', 'B', 'C', 'D',
+            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'
+        };
 
         /// <summary>
         /// Acceleration of this axis (in mm/s^2)
