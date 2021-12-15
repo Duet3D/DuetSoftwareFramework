@@ -79,7 +79,7 @@
             get => _sensor;
 			set => SetPropertyValue(ref _sensor, value);
         }
-        private int _sensor;
+        private int _sensor = -1;
 
         /// <summary>
         /// Standby temperature of the heater (in C)
@@ -94,11 +94,11 @@
         /// <summary>
         /// State of the heater
         /// </summary>
-        public HeaterState? State
+        public HeaterState State
         {
             get => _state;
 			set => SetPropertyValue(ref _state, value);
         }
-        private HeaterState? _state;
+        private HeaterState _state = HeaterState.Off;
     }
 }

@@ -107,7 +107,7 @@ namespace DuetAPI.ObjectModel
             get => _laserPwm;
             set => SetPropertyValue(ref _laserPwm, value);
         }
-        private float? _laserPwm = null;
+        private float? _laserPwm;
 
         /// <summary>
         /// Log file being written to or null if logging is disabled
@@ -184,6 +184,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if at least one plugin has been started
         /// </summary>
+        [SbcProperty(false)]
         public bool PluginsStarted
         {
             get => _pluginsStarted;

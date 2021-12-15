@@ -33,6 +33,6 @@
             get => _type;
 			set => SetPropertyValue(ref _type, value);
         }
-        private EndstopType _type;
+        private EndstopType _type = EndstopType.Unknown;
     }
 }

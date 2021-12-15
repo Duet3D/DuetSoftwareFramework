@@ -8,7 +8,7 @@
     public sealed class HttpEndpoint : ModelObject
     {
         /// <summary>
-        /// Namespace used for rr_ requests
+        /// Namespace prefix used for RepRapFirmware HTTP requests
         /// </summary>
         public const string RepRapFirmwareNamespace = "rr_";
 
@@ -33,7 +33,7 @@
             get => _namespace;
 			set => SetPropertyValue(ref _namespace, value);
         }
-        private string _namespace;
+        private string _namespace = string.Empty;
 
         /// <summary>
         /// Path to the endpoint
@@ -43,7 +43,7 @@
             get => _path;
 			set => SetPropertyValue(ref _path, value);
         }
-        private string _path;
+        private string _path = string.Empty;
 
         /// <summary>
         /// Whether this is a upload request
@@ -66,6 +66,6 @@
             get => _unixSocket;
 			set => SetPropertyValue(ref _unixSocket, value);
         }
-        private string _unixSocket;
+        private string _unixSocket = string.Empty;
     }
 }

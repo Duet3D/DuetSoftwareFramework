@@ -28,7 +28,12 @@
 		/// <summary>
 		/// Grid settings of the loaded heightmap or null if no heightmap is loaded
 		/// </summary>
-		public ProbeGrid LiveGrid { get; set; }
+		public ProbeGrid LiveGrid
+        {
+			get => _liveGrid;
+			set => SetPropertyValue(ref _liveGrid, value);
+        }
+		private ProbeGrid _liveGrid;
 
 		/// <summary>
 		/// Deviations of the mesh grid or null if not applicable

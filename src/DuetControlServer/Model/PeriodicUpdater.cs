@@ -10,8 +10,6 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Model
@@ -151,7 +149,7 @@ namespace DuetControlServer.Model
             int index = 0;
             foreach (System.Net.NetworkInformation.NetworkInterface iface in networkInterfaces)
             {
-                if (iface.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                if (iface.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
                 {
                     DuetAPI.ObjectModel.NetworkInterface networkInterface;
                     if (index >= Provider.Get.Network.Interfaces.Count)
@@ -193,7 +191,7 @@ namespace DuetControlServer.Model
                     networkInterface.DnsServer = dnsServer?.ToString();
                     networkInterface.Mac = BitConverter.ToString(iface.GetPhysicalAddress().GetAddressBytes()).Replace('-', ':');
                     networkInterface.Speed = (int?)(iface.Speed / 1000000);
-                    networkInterface.Type = iface.Name.StartsWith("w") ? InterfaceType.WiFi : InterfaceType.LAN;
+                    networkInterface.Type = iface.Name.StartsWith("w") ? DuetAPI.ObjectModel.NetworkInterfaceType.WiFi : DuetAPI.ObjectModel.NetworkInterfaceType.LAN;
 
                     // Get WiFi-specific values.
                     // Note that iface.NetworkInterfaceType is broken on Unix and cannot be used (.NET 5)
@@ -214,12 +212,12 @@ namespace DuetControlServer.Model
                             networkInterface.Signal = null;
                             _logger.Debug(e);
                         }
-                        networkInterface.Type = InterfaceType.WiFi;
+                        networkInterface.Type = DuetAPI.ObjectModel.NetworkInterfaceType.WiFi;
                     }
                     else
                     {
                         networkInterface.Signal = null;
-                        networkInterface.Type = InterfaceType.LAN;
+                        networkInterface.Type = DuetAPI.ObjectModel.NetworkInterfaceType.LAN;
                     }
                 }
             }

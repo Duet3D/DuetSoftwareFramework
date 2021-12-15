@@ -5,7 +5,7 @@
     <TargetFrameworks>net6.0</TargetFrameworks>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D Ltd</Company>
-    <Version>3.4-b6</Version>
+    <Version>3.4-b7</Version>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>

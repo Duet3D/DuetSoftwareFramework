@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <Version>3.4-b6</Version>
+    <Version>3.4-b7</Version>
     <Authors>Christian Hammacher</Authors>
     <Description>Official remote HTTP API client for Duet3D boards (supports standalone and SBC mode)</Description>
     <Copyright>Duet3D Ltd</Copyright>

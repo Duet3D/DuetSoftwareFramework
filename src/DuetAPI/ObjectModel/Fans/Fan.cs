@@ -23,7 +23,7 @@
             get => _blip;
 			set => SetPropertyValue(ref _blip, value);
         }
-        private float _blip;
+        private float _blip = 0.1F;
 
         /// <summary>
         /// Configured frequency of this fan (in Hz)
@@ -33,7 +33,7 @@
             get => _frequency;
 			set => SetPropertyValue(ref _frequency, value);
         }
-        private float _frequency;
+        private float _frequency = 250;
 
         /// <summary>
         /// Maximum value of this fan (0..1)

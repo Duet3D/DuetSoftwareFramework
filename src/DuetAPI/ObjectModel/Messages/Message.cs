@@ -24,6 +24,12 @@ namespace DuetAPI.ObjectModel
         }
 
         /// <summary>
+        /// Content of this message
+        /// </summary>
+        /// <remarks>May be empty but not null</remarks>
+        public string Content { get; set; } = string.Empty;
+
+        /// <summary>
         /// Time at which the message was generated
         /// </summary>
         public DateTime Time { get; set; } = DateTime.Now;
@@ -32,12 +38,6 @@ namespace DuetAPI.ObjectModel
         /// Type of this message
         /// </summary>
         public MessageType Type { get; set; } = MessageType.Success;
-
-        /// <summary>
-        /// Content of this message
-        /// </summary>
-        /// <remarks>May be empty but not null</remarks>
-        public string Content { get; set; } = string.Empty;
 
         /// <summary>
         /// Replace the content if empty or append a new line that is not empty

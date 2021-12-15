@@ -34,7 +34,7 @@
         public ModelCollection<int> Fans { get; } = new ModelCollection<int>();
 
         /// <summary>
-        /// Feedforward coefficient to apply to the mapped heaters during extrusions
+        /// Feedforward coefficients to apply to the mapped heaters during extrusions
         /// </summary>
         public ModelCollection<int> FeedForward { get; } = new ModelCollection<int>();
 

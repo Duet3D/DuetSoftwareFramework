@@ -73,6 +73,6 @@
             get => _state;
             set => SetPropertyValue(ref _state, value);
         }
-        private SpindleState _state;
+        private SpindleState _state = SpindleState.Unconfigured;
     }
 }

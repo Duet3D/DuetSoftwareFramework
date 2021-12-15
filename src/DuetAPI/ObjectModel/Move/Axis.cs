@@ -73,12 +73,12 @@ namespace DuetAPI.ObjectModel
         private float _jerk = 15F;
 
         /// <summary>
-        /// Letter of the axis (always upper-case)
+        /// Letter of this axis
         /// </summary>
         public char Letter
         {
             get => _letter;
-			set => SetPropertyValue(ref _letter, char.ToUpper(value));
+			set => SetPropertyValue(ref _letter, value);
         }
         private char _letter;
 

@@ -1,7 +1,5 @@
 ﻿using System;
-using System.IO;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace DuetAPI.ObjectModel
 {
@@ -43,6 +41,7 @@ namespace DuetAPI.ObjectModel
                 KinematicsName.Delta or KinematicsName.RotaryDelta => typeof(DeltaKinematics),
                 KinematicsName.Hangprinter => typeof(HangprinterKinematics),
                 KinematicsName.FiveBarScara or KinematicsName.Scara => typeof(ScaraKinematics),
+                KinematicsName.Polar => typeof(PolarKinematics),
                 _ => typeof(Kinematics)
             };
         }
@@ -73,12 +72,5 @@ namespace DuetAPI.ObjectModel
             }
             return base.UpdateFromJson(jsonElement, ignoreSbcProperties);
         }
-
-        /// <summary>
-        /// Optional method to override in case a kinematics class supports writing calibration parameters to config-override.g
-        /// </summary>
-        /// <param name="writer">Stream writer for config-override.g</param>
-        /// <returns>Asynchronous task</returns>
-        public virtual Task WriteCalibrationParameters(StreamWriter writer) => Task.CompletedTask;
     }
 }

@@ -7,16 +7,16 @@ namespace DuetAPI.ObjectModel
     /// Supported types of network interfaces
     /// </summary>
     [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
-    public enum InterfaceType
+    public enum NetworkInterfaceType
     {
-        /// <summary>
-        /// Wireless network interface
-        /// </summary>
-        WiFi,
-
         /// <summary>
         /// Wired network interface
         /// </summary>
-        LAN
+        LAN,
+
+        /// <summary>
+        /// Wireless network interface
+        /// </summary>
+        WiFi
     }
 }

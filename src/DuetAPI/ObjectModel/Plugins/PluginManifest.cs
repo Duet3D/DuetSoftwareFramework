@@ -161,11 +161,6 @@ namespace DuetAPI.ObjectModel
         private string _sbcExecutable;
 
         /// <summary>
-        /// List of other filenames in the dsf directory that should be executable
-        /// </summary>
-        public ModelCollection<string> SbcExtraExecutables { get; } = new ModelCollection<string>();
-
-        /// <summary>
         /// Command-line arguments for the executable
         /// </summary>
         public string SbcExecutableArguments
@@ -174,6 +169,11 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _sbcExecutableArguments, value);
         }
         private string _sbcExecutableArguments;
+
+        /// <summary>
+        /// List of other filenames in the dsf directory that should be executable
+        /// </summary>
+        public ModelCollection<string> SbcExtraExecutables { get; } = new ModelCollection<string>();
 
         /// <summary>
         /// Defines if messages from stdout/stderr are output as generic messages

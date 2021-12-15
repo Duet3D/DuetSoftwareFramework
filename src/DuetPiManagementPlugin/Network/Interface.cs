@@ -28,7 +28,7 @@ namespace DuetPiManagementPlugin.Network
             int i = 0;
             foreach (NetworkInterface iface in NetworkInterface.GetAllNetworkInterfaces())
             {
-                if (iface.NetworkInterfaceType != NetworkInterfaceType.Loopback && i++ == index)
+                if (iface.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback && i++ == index)
                 {
                     return iface;
                 }
@@ -291,7 +291,7 @@ namespace DuetPiManagementPlugin.Network
                 int i = 0;
                 foreach (NetworkInterface item in NetworkInterface.GetAllNetworkInterfaces())
                 {
-                    if (item.NetworkInterfaceType != NetworkInterfaceType.Loopback && (index < 0 || index == i))
+                    if (item.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback && (index < 0 || index == i))
                     {
                         await Report(builder, item, i++);
                     }
@@ -299,7 +299,7 @@ namespace DuetPiManagementPlugin.Network
             }
             else
             {
-                if (NetworkInterface.GetAllNetworkInterfaces().Count(item => item.NetworkInterfaceType != NetworkInterfaceType.Loopback) > 1)
+                if (NetworkInterface.GetAllNetworkInterfaces().Count(item => item.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback) > 1)
                 {
                     // Add labels if there is more than one available network interface
                     builder.Append($"Interface {index}: ");
