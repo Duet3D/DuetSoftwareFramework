@@ -18,7 +18,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         protected override void ClearItems()
         {
-            List<T> removed = new(this);
+            List<T> removed = new List<T>(this);
             base.ClearItems();
             base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
         }
@@ -50,7 +50,7 @@ namespace DuetAPI.ObjectModel
             }
 
             // Validate the types
-            if (from is not ModelCollection<T> other)
+            if (!(from is ModelCollection<T> other))
             {
                 throw new ArgumentException("Types do not match", nameof(from));
             }
@@ -63,7 +63,7 @@ namespace DuetAPI.ObjectModel
 
             // Update common items
             Type itemType = typeof(T);
-            if (itemType.IsAssignableTo(typeof(IModelObject)))
+            if (typeof(IModelObject).IsAssignableFrom(itemType))
             {
                 for (int i = 0; i < Math.Min(Count, other.Count); i++)
                 {
@@ -136,7 +136,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            ModelCollection<T> clone = new();
+            ModelCollection<T> clone = new ModelCollection<T>();
             foreach (T item in this)
             {
                 if (item is ICloneable cloneableItem)
@@ -161,7 +161,7 @@ namespace DuetAPI.ObjectModel
         public object FindDifferences(IModelObject other)
         {
             // Check the types
-            if (other is not ModelCollection<T> otherList)
+            if (!(other is ModelCollection<T> otherList))
             {
                 // Types differ, return the entire instance
                 return this;
@@ -171,7 +171,7 @@ namespace DuetAPI.ObjectModel
             // Compare the collections
             bool hadDiffs = (Count != otherList.Count);
             IList diffs = new object[Count];
-            if (itemType.IsAssignableTo(typeof(IModelObject)))
+            if (typeof(IModelObject).IsAssignableFrom(itemType))
             {
                 for (int i = 0; i < Count; i++)
                 {
@@ -263,7 +263,7 @@ namespace DuetAPI.ObjectModel
             }
 
             Type itemType = typeof(T);
-            if (itemType.IsAssignableTo(typeof(IModelObject)))
+            if (typeof(IModelObject).IsAssignableFrom(itemType))
             {
                 // Update model items
                 for (int i = offset; i < Math.Min(Count, offset + arrayLength); i++)

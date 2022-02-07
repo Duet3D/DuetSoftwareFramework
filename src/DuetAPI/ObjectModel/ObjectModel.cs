@@ -246,7 +246,7 @@ namespace DuetAPI.ObjectModel
                 return null;
             }
 
-            ObjectModel machineModel = new();
+            ObjectModel machineModel = new ObjectModel();
             machineModel.UpdateFromJson(jsonDocument.RootElement, false);
             return machineModel;
         }

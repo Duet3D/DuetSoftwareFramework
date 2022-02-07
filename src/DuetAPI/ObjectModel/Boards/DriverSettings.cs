@@ -13,6 +13,6 @@
         /// <summary>
         /// Stall detection settings
         /// </summary>
-        public StallDetectSettings StallDetect { get; } = new();
+        public StallDetectSettings StallDetect { get; } = new StallDetectSettings();
     }
 }

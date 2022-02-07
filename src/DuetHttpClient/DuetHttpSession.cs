@@ -31,7 +31,7 @@ namespace DuetHttpClient
             if (options == null)
             {
                 // Use default settings if none are passed
-                options = new();
+                options = new DuetHttpOptions();
             }
 
             try
@@ -179,9 +179,21 @@ namespace DuetHttpClient
         /// <param name="filename">File to query</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>G-code file info</returns>
-        public Task<ParsedFileInfo> GetFileInfo(string filename, CancellationToken cancellationToken = default)
+        public Task<GCodeFileInfo> GetFileInfo(string filename, CancellationToken cancellationToken = default)
         {
-            return _connector.GetFileInfo(filename, cancellationToken);
+            return _connector.GetFileInfo(filename, false, cancellationToken);
+        }
+
+        /// <summary>
+        /// Get G-code file info
+        /// </summary>
+        /// <param name="filename">File to query</param>
+        /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>G-code file info</returns>
+        public Task<GCodeFileInfo> GetFileInfo(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
+        {
+            return _connector.GetFileInfo(filename, readThumbnailContent, cancellationToken);
         }
 
         // ** Plugin and system package calls are not supported (yet) **

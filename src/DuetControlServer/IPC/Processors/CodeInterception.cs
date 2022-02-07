@@ -232,7 +232,7 @@ namespace DuetControlServer.IPC.Processors
                     }
 
                     int asteriskIndex = filter.IndexOf('*');
-                    if (asteriskIndex >= 0 && filter.Substring(0, asteriskIndex).Equals(shortCodeString.Substring(0, asteriskIndex), StringComparison.InvariantCultureIgnoreCase))
+                    if (asteriskIndex >= 0 && filter[..asteriskIndex].Equals(shortCodeString[..asteriskIndex], StringComparison.InvariantCultureIgnoreCase))
                     {
                         return true;
                     }

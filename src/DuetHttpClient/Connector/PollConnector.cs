@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -56,7 +57,7 @@ namespace DuetHttpClient.Connector
         /// <exception cref="InvalidVersionException">Unsupported DSF version</exception>
         public static async Task<PollConnector> ConnectAsync(Uri baseUri, DuetHttpOptions options, CancellationToken cancellationToken)
         {
-            using HttpClient client = new()
+            using HttpClient client = new HttpClient()
             {
                 Timeout = options.Timeout
             };
@@ -64,7 +65,7 @@ namespace DuetHttpClient.Connector
             using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, "rr_connect?password={HttpUtility.UrlPathEncode(password)}&time={DateTime.Now:s}"), cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using Stream responseStream = await response.Content.ReadAsStreamAsync();
             ConnectResponse connectResponse = await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
             switch (connectResponse.Err)
             {
@@ -102,12 +103,12 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// Dictionary of keys vs sequence numbers
         /// </summary>
-        private readonly Dictionary<string, int> _seqs = new();
+        private readonly Dictionary<string, int> _seqs = new Dictionary<string, int>();
 
         /// <summary>
         /// Dictionary of running codes vs sequence numbers
         /// </summary>
-        private readonly Dictionary<TaskCompletionSource<string>, int> _runningCodes = new();
+        private readonly Dictionary<TaskCompletionSource<string>, int> _runningCodes = new Dictionary<TaskCompletionSource<string>, int>();
 
         /// <summary>
         /// Reconnect to the board when the connection has been reset
@@ -123,16 +124,16 @@ namespace DuetHttpClient.Connector
             {
                 foreach (TaskCompletionSource<string> tcs in _runningCodes.Keys)
                 {
-                    tcs.SetCanceled(cancellationToken);
+                    tcs.SetCanceled();
                 }
                 _runningCodes.Clear();
             }
 
-            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_connect?password={HttpUtility.UrlPathEncode(Options.Password)}&time={DateTime.Now:s}");
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_connect?password={HttpUtility.UrlPathEncode(Options.Password)}&time={DateTime.Now:s}");
             using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            using JsonDocument document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+            using JsonDocument document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(), cancellationToken: cancellationToken);
             if (document.RootElement.TryGetProperty("err", out JsonElement errProperty) && errProperty.TryGetInt32(out int errValue))
             {
                 switch (errValue)
@@ -191,11 +192,11 @@ namespace DuetHttpClient.Connector
                 try
                 {
                     string query = string.IsNullOrEmpty(key) ? $"rr_model?flags={flags}" : $"rr_model?key={key}&flags={flags}";
-                    using HttpRequestMessage request = new(HttpMethod.Get, query);
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, query);
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token);
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream stream = await response.Content.ReadAsStreamAsync(_terminateSession.Token);
+                        using Stream stream = await response.Content.ReadAsStreamAsync();
                         return await JsonDocument.ParseAsync(stream, cancellationToken: _terminateSession.Token);
                     }
 
@@ -220,7 +221,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// TCS to complete when the object model is up-to-date
         /// </summary>
-        private readonly List<TaskCompletionSource> _modelUpdateTCS = new();
+        private readonly List<TaskCompletionSource<object>> _modelUpdateTCS = new List<TaskCompletionSource<object>>();
 
         /// <summary>
         /// Wait for the object model to be up-to-date
@@ -238,7 +239,7 @@ namespace DuetHttpClient.Connector
                 throw new InvalidOperationException("Cannot wait for object model, because the object model is not observed");
             }
 
-            TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<object> tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             lock (_modelUpdateTCS)
             {
                 _modelUpdateTCS.Add(tcs);
@@ -254,10 +255,15 @@ namespace DuetHttpClient.Connector
                 }
                 finally
                 {
-                    ctsRegistration.Unregister();
+                    ctsRegistration.Dispose();
                 }
             }, TaskContinuationOptions.RunContinuationsAsynchronously);
         }
+
+        /// <summary>
+        /// Filename of the thumbnail collection
+        /// </summary>
+        private string _thumbnailFile = string.Empty;
 
         /// <summary>
         /// Maintain the HTTP session
@@ -340,12 +346,31 @@ namespace DuetHttpClient.Connector
                                                             _seqs[seqProperty.Name] = newSeq;
                                                         }
 
+                                                        GCodeFileInfo fileInfoToUpdate = null;
                                                         lock (Model)
                                                         {
-                                                            if (!Model.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
+                                                            if (Model.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
+                                                            {
+                                                                if (keyName.GetString() == "job" &&
+                                                                    Model.Job.File.Thumbnails.Count != 0 && _thumbnailFile != Model.Job.File.FileName)
+                                                                {
+                                                                    _thumbnailFile = Model.Job.File.FileName;
+                                                                    fileInfoToUpdate = (GCodeFileInfo)Model.Job.File.Clone();
+                                                                }
+                                                            }
+                                                            else
                                                             {
                                                                 // Invalid key
                                                                 break;
+                                                            }
+                                                        }
+
+                                                        if (fileInfoToUpdate != null)
+                                                        {
+                                                            await GetThumbnails(fileInfoToUpdate, _terminateSession.Token);
+                                                            lock (Model)
+                                                            {
+                                                                Model.Job.File.Thumbnails.Assign(fileInfoToUpdate.Thumbnails);
                                                             }
                                                         }
                                                     }
@@ -362,9 +387,9 @@ namespace DuetHttpClient.Connector
                                 // Object model is now up-to-date
                                 lock (_modelUpdateTCS)
                                 {
-                                    foreach (TaskCompletionSource tcs in _modelUpdateTCS)
+                                    foreach (TaskCompletionSource<object> tcs in _modelUpdateTCS)
                                     {
-                                        tcs.TrySetResult();
+                                        tcs.TrySetResult(null);
                                     }
                                     _modelUpdateTCS.Clear();
                                 }
@@ -414,7 +439,7 @@ namespace DuetHttpClient.Connector
             }
             finally
             {
-                _sessionTaskTerminated.SetResult();
+                _sessionTaskTerminated.SetResult(null);
             }
         }
 
@@ -431,7 +456,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// Filament usage at the time of the last layer change
         /// </summary>
-        private List<float> _lastFilamentUsage = new();
+        private List<float> _lastFilamentUsage = new List<float>();
 
         /// <summary>
         /// Last file position at the time of the last layer change
@@ -481,7 +506,7 @@ namespace DuetHttpClient.Connector
                 // Compute average stats per changed layer
                 int printDuration = Model.Job.Duration.Value - (Model.Job.WarmUpDuration != null ? Model.Job.WarmUpDuration.Value : 0);
                 float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
-                List<float> totalFilamentUsage = new(), avgFilamentUsage = new();
+                List<float> totalFilamentUsage = new List<float>(), avgFilamentUsage = new List<float>();
                 long bytesPrinted = (Model.Job.FilePosition != null) ? (Model.Job.FilePosition.Value - _lastFilePosition) : 0L;
                 float avgFractionPrinted = (Model.Job.File.Size > 0) ? (float)bytesPrinted / (Model.Job.File.Size * numChangedLayers) : 0F;
                 for (int i = 0; i < Model.Move.Extruders.Count; i++)
@@ -507,7 +532,7 @@ namespace DuetHttpClient.Connector
                 // Add missing layers
                 for (int i = Model.Job.Layers.Count; i < Model.Job.Layer.Value - 1; i++)
                 {
-                    Layer newLayer = new();
+                    Layer newLayer = new Layer();
                     foreach (AnalogSensor sensor in Model.Sensors.Analog)
                     {
                         if (sensor != null)
@@ -584,7 +609,7 @@ namespace DuetHttpClient.Connector
             // Disconnect if possible
             try
             {
-                using CancellationTokenSource cts = new(Options.Timeout);
+                using CancellationTokenSource cts = new CancellationTokenSource(Options.Timeout);
                 await HttpClient.GetAsync("rr_disconnect", cts.Token);
             }
             catch
@@ -614,9 +639,9 @@ namespace DuetHttpClient.Connector
         {
             // Check if we can expect a code reply at all
             bool canAwaitCode = false;
-            using (StringReader codeStream = new(code))
+            using (StringReader codeStream = new StringReader(code))
             {
-                Code codeObj = new();
+                Code codeObj = new Code();
                 while (Code.Parse(codeStream, codeObj))
                 {
                     if (codeObj.Type != CodeType.Comment &&
@@ -658,13 +683,13 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
 
                     if (response.IsSuccessStatusCode)
                     {
                         // Make sure the full G-code could be stored
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         GcodeReply responseObj = await JsonSerializer.DeserializeAsync<GcodeReply>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                         if (responseObj.Buff == 0)
                         {
@@ -678,7 +703,7 @@ namespace DuetHttpClient.Connector
                         }
 
                         // Enqueue this code request
-                        TaskCompletionSource<string> codeRequest = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                        TaskCompletionSource<string> codeRequest = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
                         lock (_runningCodes)
                         {
                             _runningCodes.Add(codeRequest, replySeq);
@@ -726,12 +751,12 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, "rr_reply");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "rr_reply");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token);
                     if (response.IsSuccessStatusCode)
                     {
                         // Get the reply and update the sequence number
-                        string gcodeReply = await response.Content.ReadAsStringAsync(_terminateSession.Token);
+                        string gcodeReply = await response.Content.ReadAsStringAsync();
                         lock (_seqs)
                         {
                             _seqs["reply"] = seq;
@@ -810,7 +835,7 @@ namespace DuetHttpClient.Connector
         public override async Task Upload(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
         {
             // Compute the CRC32 checksum
-            Crc32 crc32 = new();
+            Crc32 crc32 = new Crc32();
             string checksum = string.Empty;
             foreach (byte b in crc32.ComputeHash(content))
             {
@@ -820,14 +845,14 @@ namespace DuetHttpClient.Connector
 
             // Try to upload it
             string query = (lastModified != null) ? $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&time={lastModified:s}&crc32={checksum}" : $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&crc32={checksum}";
-            using HttpRequestMessage request = new(HttpMethod.Post, query);
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, query);
             request.Content = new StreamContent(content);
 
             // Check if that worked
             using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using Stream responseStream = await response.Content.ReadAsStreamAsync();
             ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
             if (responseObj.Err != 0)
             {
@@ -848,12 +873,12 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlPathEncode(filename)}");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlPathEncode(filename)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                         if (responseObj.Err == 0)
                         {
@@ -902,12 +927,12 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlPathEncode(from)}&new={HttpUtility.UrlPathEncode(to)}&deleteexisting={(force ? "yes" : "no")}");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlPathEncode(from)}&new={HttpUtility.UrlPathEncode(to)}&deleteexisting={(force ? "yes" : "no")}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                         if (responseObj.Err == 0)
                         {
@@ -954,12 +979,12 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlPathEncode(directory)}");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlPathEncode(directory)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                         if (responseObj.Err == 0)
                         {
@@ -997,7 +1022,7 @@ namespace DuetHttpClient.Connector
         /// <returns>Disposable download response</returns>
         public override async Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
         {
-            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlPathEncode(filename)}");
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlPathEncode(filename)}");
 
             HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
             if (response.StatusCode == HttpStatusCode.NotFound)
@@ -1039,7 +1064,7 @@ namespace DuetHttpClient.Connector
         /// <returns>List of all files and directories</returns>
         public override async Task<IList<FileListItem>> GetFileList(string directory, CancellationToken cancellationToken = default)
         {
-            List<FileListItem> result = new();
+            List<FileListItem> result = new List<FileListItem>();
 
             int nextIndex = 0;
             do
@@ -1049,18 +1074,18 @@ namespace DuetHttpClient.Connector
                 {
                     try
                     {
-                        using HttpRequestMessage request = new(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlPathEncode(directory)}&first={nextIndex}");
+                        using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlPathEncode(directory)}&first={nextIndex}");
                         using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
 
                         if (response.IsSuccessStatusCode)
                         {
-                            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                            using Stream responseStream = await response.Content.ReadAsStreamAsync();
                             FileListResponse responseObj = await JsonSerializer.DeserializeAsync<FileListResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                             if (responseObj.Err == 0)
                             {
                                 foreach (FileItem item in responseObj.Files)
                                 {
-                                    result.Add(new()
+                                    result.Add(new FileListItem()
                                     {
                                         Filename = item.Name,
                                         IsDirectory = item.Type == 'd',
@@ -1111,29 +1136,37 @@ namespace DuetHttpClient.Connector
         /// Get G-code file info
         /// </summary>
         /// <param name="filename">File to query</param>
+        /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>G-code file info</returns>
-        public override async Task<ParsedFileInfo> GetFileInfo(string filename, CancellationToken cancellationToken = default)
+        public override async Task<GCodeFileInfo> GetFileInfo(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
         {
             string errorMessage = "Invalid number of maximum retries configured";
+            string encodedFilename = HttpUtility.UrlPathEncode(filename);
             for (int i = 0; i <= Options.MaxRetries; i++)
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_fileinfo?name={HttpUtility.UrlPathEncode(filename)}");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_fileinfo?name={encodedFilename}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
                         if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
                         {
                             int err = errValue.GetInt32();
                             if (err == 0)
                             {
-                                ParsedFileInfo result = new();
+                                GCodeFileInfo result = new GCodeFileInfo();
                                 result.UpdateFromJson(responseJson.RootElement, false);
+
+                                if (readThumbnailContent)
+                                {
+                                    await GetThumbnails(result, cancellationToken);
+                                }
+
                                 return result;
                             }
                             else if (err == 1)
@@ -1167,6 +1200,57 @@ namespace DuetHttpClient.Connector
                 }
             }
             throw new HttpRequestException(errorMessage);
+        }
+
+        private async Task GetThumbnails(GCodeFileInfo fileinfo, CancellationToken cancellationToken)
+        {
+            foreach (ThumbnailInfo thumbnail in fileinfo.Thumbnails)
+            {
+                if (thumbnail.Offset > 0)
+                {
+                    for (int k = 0; thumbnail.Data == null && k <= Options.MaxRetries; k++)
+                    {
+                        try
+                        {
+                            long offset = thumbnail.Offset;
+                            StringBuilder thumbnailData = new StringBuilder();
+
+                            do
+                            {
+                                using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_thumbnail?name={fileinfo.FileName}&offset={offset}");
+                                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+
+                                if (response.IsSuccessStatusCode)
+                                {
+                                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                                    using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+                                    if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
+                                    {
+                                        int err = errValue.GetInt32();
+                                        if (err != 0)
+                                        {
+                                            throw new ArgumentException($"err {err}");
+                                        }
+
+                                        offset = responseJson.RootElement.GetProperty("next").GetInt32();
+                                        thumbnailData.Append(responseJson.RootElement.GetProperty("data").GetString());
+                                    }
+                                }
+                            } while (offset != 0);
+                            thumbnail.Data = thumbnailData.ToString();
+                        }
+                        catch (Exception e)
+                        {
+                            thumbnail.Data = null;
+                            if (!(e is HttpRequestException))
+                            {
+                                // Retries only apply to HTTP exceptions
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // ** Plugin and system package calls are not supported (yet) **

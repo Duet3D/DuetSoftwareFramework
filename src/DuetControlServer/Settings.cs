@@ -271,6 +271,17 @@ namespace DuetControlServer
         };
 
         /// <summary>
+        /// Regular expressions for finding the total number of layers
+        /// </summary>]
+        /// <remarks>
+        /// If the number of layers cannot be found, the total number of layers is calculated from the layer and object heights (if applicable)
+        /// </remarks>
+        public static List<Regex> NumLayersFilters { get; set; } = new List<Regex>
+        {
+            new Regex(@"NUM_LAYERS\D+(\d+)", RegexFlags)
+        };
+
+        /// <summary>
         /// Regular expressions for finding the filament consumption (case insensitive, single line)
         /// </summary>
         public static List<Regex> FilamentFilters { get; set; } = new List<Regex>

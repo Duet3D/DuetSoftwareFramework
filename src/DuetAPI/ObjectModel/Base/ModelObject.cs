@@ -42,7 +42,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Cached dictionary of derived types vs JSON property names vs property descriptors
         /// </summary>
-        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = new();
+        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
 
         /// <summary>
         /// Static constructor that caches the JSON properties of each derived type
@@ -65,7 +65,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="type">Type to register</param>
         static protected void RegisterJsonType(Type type)
         {
-            Dictionary<string, PropertyInfo> jsonProperties = new();
+            Dictionary<string, PropertyInfo> jsonProperties = new Dictionary<string, PropertyInfo>();
             foreach (PropertyInfo property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
                 if (!Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
@@ -115,7 +115,7 @@ namespace DuetAPI.ObjectModel
             IEnumerable<PropertyInfo> properties = _propertyInfos[myType].Values;
             foreach (PropertyInfo property in properties)
             {
-                if (property.PropertyType.IsAssignableTo(typeof(IModelObject)))
+                if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                 {
                     IModelObject myValue = (IModelObject)property.GetValue(this);
                     IModelObject otherValue = (IModelObject)property.GetValue(from);
@@ -149,7 +149,7 @@ namespace DuetAPI.ObjectModel
             IEnumerable<PropertyInfo> properties = _propertyInfos[myType].Values;
             foreach (PropertyInfo property in properties)
             {
-                if (property.PropertyType.IsAssignableTo(typeof(IModelObject)))
+                if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                 {
                     IModelObject myValue = (IModelObject)property.GetValue(this);
                     if (property.SetMethod != null)
@@ -167,7 +167,7 @@ namespace DuetAPI.ObjectModel
                 }
                 else if (property.SetMethod != null)
                 {
-                    if (property.PropertyType.IsAssignableTo(typeof(ICloneable)))
+                    if (typeof(ICloneable).IsAssignableFrom(property.PropertyType))
                     {
                         ICloneable myValue = (ICloneable)property.GetValue(this);
                         property.SetValue(clone, myValue?.Clone());
@@ -215,7 +215,7 @@ namespace DuetAPI.ObjectModel
                         diffs.Add(jsonProperty.Key, myValue);
                     }
                 }
-                else if (jsonProperty.Value.PropertyType.IsAssignableTo(typeof(IModelObject)))
+                else if (typeof(IModelObject).IsAssignableFrom(jsonProperty.Value.PropertyType))
                 {
                     object diff = ((IModelObject)myValue).FindDifferences((IModelObject)otherValue);
                     if (diff != null)
@@ -287,7 +287,7 @@ namespace DuetAPI.ObjectModel
                         {
                             property.SetValue(this, null);
                         }
-                        else if (property.PropertyType.IsAssignableTo(typeof(IModelObject)))
+                        else if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                         {
                             IModelObject propertyValue = (IModelObject)property.GetValue(this);
                             propertyValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
@@ -299,7 +299,7 @@ namespace DuetAPI.ObjectModel
                         }
 #endif
                     }
-                    else if (property.PropertyType.IsAssignableTo(typeof(IModelObject)))
+                    else if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                     {
                         object propertyValue = property.GetValue(this), newPropertyValue = propertyValue;
                         if (propertyValue == null)

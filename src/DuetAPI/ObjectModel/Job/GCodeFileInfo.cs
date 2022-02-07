@@ -7,10 +7,10 @@ using System.Text.Json.Serialization;
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
-    /// Holds information about a parsed G-code file
+    /// Holds information about a G-code file
     /// </summary>
-    [JsonConverter(typeof(ParsedFileInfoConverter))]
-    public sealed class ParsedFileInfo : ModelObject
+    [JsonConverter(typeof(GCodeFileInfoConverter))]
+    public sealed class GCodeFileInfo : ModelObject
     {
         /// <summary>
         /// Filament consumption per extruder drive (in mm)
@@ -26,16 +26,6 @@ namespace DuetAPI.ObjectModel
 			set => SetPropertyValue(ref _fileName, value);
         }
         private string _fileName;
-
-        /// <summary>
-        /// Height of the first layer or 0 if not found (in mm)
-        /// </summary>
-        public float FirstLayerHeight
-        {
-            get => _firstLayerHeight;
-			set => SetPropertyValue(ref _firstLayerHeight, value);
-        }
-        private float _firstLayerHeight;
 
         /// <summary>
         /// Name of the application that generated this file
@@ -121,13 +111,14 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Collection of thumbnails parsed from Gcode
         /// </summary>
-        public ModelCollection<ParsedThumbnail> Thumbnails { get; } = new ModelCollection<ParsedThumbnail>();
+        [SbcProperty(true)]
+        public ModelCollection<ThumbnailInfo> Thumbnails { get; } = new ModelCollection<ThumbnailInfo>();
     }
 
     /// <summary>
-    /// Class used to convert parsed file info to and from JSON
+    /// Class used to convert G-code file info to and from JSON
     /// </summary>
-    public class ParsedFileInfoConverter : JsonConverter<ParsedFileInfo>
+    public class GCodeFileInfoConverter : JsonConverter<GCodeFileInfo>
     {
         /// <summary>
         /// Read a parsed file info object from a JSON reader
@@ -136,7 +127,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="typeToConvert">Target type</param>
         /// <param name="options">JSON options</param>
         /// <returns>Parsed file info object</returns>
-        public override ParsedFileInfo Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override GCodeFileInfo Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             using JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader);
             if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
@@ -144,7 +135,7 @@ namespace DuetAPI.ObjectModel
                 return null;
             }
 
-            ParsedFileInfo parsedFileInfo = new();
+            GCodeFileInfo parsedFileInfo = new GCodeFileInfo();
             parsedFileInfo.UpdateFromJson(jsonDocument.RootElement, false);
             return parsedFileInfo;
         }
@@ -155,7 +146,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="writer">JSON writer</param>
         /// <param name="value">Machine model</param>
         /// <param name="options">JSON options</param>
-        public override void Write(Utf8JsonWriter writer, ParsedFileInfo value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, GCodeFileInfo value, JsonSerializerOptions options)
         {
             if (value == null)
             {

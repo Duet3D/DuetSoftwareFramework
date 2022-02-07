@@ -8,6 +8,6 @@
         /// <summary>
         /// Configured settings of the driver
         /// </summary>
-        public DriverSettings Settings { get; } = new();
+        public DriverSettings Settings { get; } = new DriverSettings();
     }
 }

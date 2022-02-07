@@ -82,16 +82,16 @@ namespace DuetControlServer.Model
         /// Process a config response (no longer supported or encouraged; for backwards-compatibility)
         /// </summary>
         /// <param name="response">Legacy config response</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task ProcessLegacyConfigResponse(byte[] response)
+        public static void ProcessLegacyConfigResponse(byte[] response)
         {
             using JsonDocument jsonDocument = JsonDocument.Parse(response);
-            using (await _lock.LockAsync(Program.CancellationToken))
+            using (_lock.Lock(Program.CancellationToken))
             {
                 if (jsonDocument.RootElement.TryGetProperty("boardName", out JsonElement boardName))
                 {
-                    using (await Provider.AccessReadWriteAsync())
+                    using (Provider.AccessReadWrite())
                     {
+                        Provider.Get.Boards.Clear();
                         Provider.Get.Boards.Add(new Board
                         {
                             IapFileNameSBC = $"Duet3_SBCiap_{boardName.GetString()}.bin",
@@ -103,15 +103,16 @@ namespace DuetControlServer.Model
                 else
                 {
                     // boardName field is not present - this must be a really old firmware version
-                    using (await Provider.AccessReadWriteAsync())
+                    using (Provider.AccessReadWrite())
                     {
+                        Provider.Get.Boards.Clear();
                         Provider.Get.Boards.Add(new Board
                         {
-                            IapFileNameSBC = $"Duet3_SDiap_MB6HC.bin",
+                            IapFileNameSBC = $"Duet3_SBCiap_MB6HC.bin",
                             FirmwareFileName = "Duet3Firmware_MB6HC.bin"
                         });
                     }
-                    _logger.Warn("Deprecated firmware detected, assuming legacy firmware files. You may have to use bossa to update it");
+                    _logger.Warn("Deprecated firmware detected, assuming legacy firmware files for MB6HC. You may have to use bossa to update it");
                 }
 
                 // Cannot perform any further updates...

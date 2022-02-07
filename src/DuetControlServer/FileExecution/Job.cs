@@ -168,7 +168,7 @@ namespace DuetControlServer.FileExecution
         public static async Task SelectFile(string fileName, bool simulating = false)
         {
             // Analyze and open the file
-            ParsedFileInfo info = await InfoParser.Parse(fileName);
+            GCodeFileInfo info = await InfoParser.Parse(fileName, true);
             CodeFile file = new(fileName, CodeChannel.File);
 
             // A file being printed may start another file print

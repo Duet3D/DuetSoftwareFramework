@@ -48,6 +48,19 @@ namespace DuetAPI.ObjectModel
         private int _currentTool = -1;
 
         /// <summary>
+        /// When provided it normally has value 0 normally and 1 when a deferred power down is pending
+        /// </summary>
+        /// <remarks>
+        /// It is only available after power switching has been enabled by M80 or M81
+        /// </remarks>
+        public bool? DeferredPowerDown
+        {
+            get => _deferredPowerDown;
+            set => SetPropertyValue(ref _deferredPowerDown, value);
+        }
+        private bool? _deferredPowerDown;
+
+        /// <summary>
         /// Persistent message to display (see M117)
         /// </summary>
         public string DisplayMessage
@@ -226,6 +239,20 @@ namespace DuetAPI.ObjectModel
 			set => SetPropertyValue(ref _status, value);
         }
         private MachineStatus _status = MachineStatus.Starting;
+
+        /// <summary>
+        /// Index of the current G-code input channel (see <see cref="ObjectModel.Inputs"/>)
+        /// </summary>
+        /// <remarks>
+        /// This is primarily intended for macro files to determine on which G-code channel it is running.
+        /// The value of this property is always null in object model queries
+        /// </remarks>
+        public int? ThisInput
+        {
+            get => _thisInput;
+            set => SetPropertyValue(ref _thisInput, value);
+        }
+        private int? _thisInput;
 
         /// <summary>
         /// Internal date and time in RepRapFirmware or null if unknown

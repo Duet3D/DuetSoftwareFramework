@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -61,7 +62,7 @@ namespace DuetAPIClient
         {
             if (origin == null)
             {
-                origin = Environment.ProcessId.ToString();
+                origin = Process.GetCurrentProcess().Id.ToString();
             }
             return PerformCommand<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin }, cancellationToken);
         }
@@ -119,13 +120,31 @@ namespace DuetAPIClient
         /// <returns>Information about the parsed file</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
-        /// <seealso cref="GetFileInfo"/>
+        /// <seealso cref="GetFileInfo.GetFileInfo"/>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
         /// <seealso cref="SbcPermissions.FileSystemAccess"/>
         /// <seealso cref="SbcPermissions.ReadGCodes"/>
-        public Task<ParsedFileInfo> GetFileInfo(string fileName, CancellationToken cancellationToken = default)
+        public Task<GCodeFileInfo> GetFileInfo(string fileName, CancellationToken cancellationToken = default)
         {
-            return PerformCommand<ParsedFileInfo>(new GetFileInfo { FileName = fileName }, cancellationToken);
+            return PerformCommand<GCodeFileInfo>(new GetFileInfo { FileName = fileName }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Parse a G-code file and returns file information about it
+        /// </summary>
+        /// <param name="fileName">The file to parse</param>
+        /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Information about the parsed file</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="GetFileInfo.GetFileInfo"/>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        /// <seealso cref="SbcPermissions.FileSystemAccess"/>
+        /// <seealso cref="SbcPermissions.ReadGCodes"/>
+        public Task<GCodeFileInfo> GetFileInfo(string fileName, bool readThumbnailContent, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand<GCodeFileInfo>(new GetFileInfo { FileName = fileName, ReadThumbnailContent = readThumbnailContent }, cancellationToken);
         }
 
         /// <summary>

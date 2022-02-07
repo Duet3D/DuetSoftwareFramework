@@ -46,7 +46,7 @@ namespace DuetHttpClient.Connector
         /// <exception cref="InvalidVersionException">Unsupported DSF version</exception>
         public static async Task<RestConnector> ConnectAsync(Uri baseUri, DuetHttpOptions options, CancellationToken cancellationToken)
         {
-            using HttpClient client = new()
+            using HttpClient client = new HttpClient()
             {
                 Timeout = options.Timeout
             };
@@ -54,7 +54,7 @@ namespace DuetHttpClient.Connector
 
             if (response.IsSuccessStatusCode)
             {
-                ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(await response.Content.ReadAsStreamAsync(cancellationToken), JsonHelper.DefaultJsonOptions, cancellationToken);
+                ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(await response.Content.ReadAsStreamAsync(), JsonHelper.DefaultJsonOptions, cancellationToken);
                 return new RestConnector(baseUri, options, responseObj.SessionKey);
             }
 
@@ -110,7 +110,7 @@ namespace DuetHttpClient.Connector
             using HttpResponseMessage connectResponse = await HttpClient.GetAsync($"machine/connect?password=${Options.Password}", connectCts.Token);
             if (connectResponse.IsSuccessStatusCode)
             {
-                using Stream stream = await connectResponse.Content.ReadAsStreamAsync(connectCts.Token);
+                using Stream stream = await connectResponse.Content.ReadAsStreamAsync();
                 ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(stream, cancellationToken: connectCts.Token);
 
                 _sessionKey = responseObj.SessionKey;
@@ -146,7 +146,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// TCS to complete when the object model is up-to-date
         /// </summary>
-        private readonly List<TaskCompletionSource> _modelUpdateTCS = new();
+        private readonly List<TaskCompletionSource<object>> _modelUpdateTCS = new List<TaskCompletionSource<object>>();
 
         /// <summary>
         /// Wait for the object model to be up-to-date
@@ -164,7 +164,7 @@ namespace DuetHttpClient.Connector
                 throw new InvalidOperationException("Cannot wait for object model, because the object model is not observed");
             }
 
-            TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<object> tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
             CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
             lock (_modelUpdateTCS)
@@ -180,7 +180,7 @@ namespace DuetHttpClient.Connector
                 }
                 finally
                 {
-                    ctsRegistration.Unregister();
+                    ctsRegistration.Dispose();
                 }
             }, TaskContinuationOptions.RunContinuationsAsynchronously);
         }
@@ -195,18 +195,18 @@ namespace DuetHttpClient.Connector
             {
                 do
                 {
-                    using ClientWebSocket webSocket = new();
+                    using ClientWebSocket webSocket = new ClientWebSocket();
                     webSocket.Options.KeepAliveInterval = Options.KeepAliveInterval;
 
                     string wsScheme = (HttpClient.BaseAddress.Scheme == "https") ? "wss" : "ws";
-                    Uri wsUri = new($"{wsScheme}://{HttpClient.BaseAddress.Host}:{HttpClient.BaseAddress.Port}/machine?sessionKey={HttpUtility.UrlPathEncode(_sessionKey)}");
+                    Uri wsUri = new Uri($"{wsScheme}://{HttpClient.BaseAddress.Host}:{HttpClient.BaseAddress.Port}/machine?sessionKey={HttpUtility.UrlPathEncode(_sessionKey)}");
 
                     try
                     {
                         await webSocket.ConnectAsync(wsUri, _terminateSession.Token);
 
                         // Read the full object model first
-                        using (MemoryStream modelStream = new())
+                        using (MemoryStream modelStream = new MemoryStream())
                         {
                             byte[] modelChunk = new byte[8192];
                             do
@@ -254,7 +254,7 @@ namespace DuetHttpClient.Connector
 
                             try
                             {
-                                using MemoryStream patchStream = new();
+                                using MemoryStream patchStream = new MemoryStream();
                                 byte[] patchChunk = new byte[8192];
 
                                 do
@@ -301,16 +301,16 @@ namespace DuetHttpClient.Connector
                             // Object model is up-to-date
                             lock (_modelUpdateTCS)
                             {
-                                foreach (TaskCompletionSource tcs in _modelUpdateTCS)
+                                foreach (TaskCompletionSource<object> tcs in _modelUpdateTCS)
                                 {
-                                    tcs.TrySetResult();
+                                    tcs.TrySetResult(null);
                                 }
                                 _modelUpdateTCS.Clear();
                             }
                         }
                         while (webSocket.State == WebSocketState.Open);
                     }
-                    catch (Exception e) when (e is not OperationCanceledException)
+                    catch (Exception e) when (!(e is OperationCanceledException))
                     {
                         // Something went wrong, the remote end is offline or unavailable
                         lock (Model)
@@ -335,7 +335,7 @@ namespace DuetHttpClient.Connector
             }
             finally
             {
-                _sessionTaskTerminated.SetResult();
+                _sessionTaskTerminated.SetResult(null);
             }
         }
 
@@ -352,14 +352,14 @@ namespace DuetHttpClient.Connector
                     try
                     {
                         // Perform a NOOP request
-                        using HttpRequestMessage request = new(HttpMethod.Get, "machine/noop");
+                        using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "machine/noop");
                         using HttpResponseMessage response = await SendRequest(request, Options.Timeout);
                         response.EnsureSuccessStatusCode();
 
                         // Wait a moment
                         await Task.Delay(Options.SessionKeepAliveInterval, _terminateSession.Token);
                     }
-                    catch (Exception e) when (e is not OperationCanceledException)
+                    catch (Exception e) when (!(e is OperationCanceledException))
                     {
                         // Something went wrong
                     }
@@ -374,7 +374,7 @@ namespace DuetHttpClient.Connector
             }
             finally
             {
-                _sessionTaskTerminated.SetResult();
+                _sessionTaskTerminated.SetResult(null);
             }
         }
 
@@ -407,7 +407,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using CancellationTokenSource cts = new(Options.Timeout);
+                    using CancellationTokenSource cts = new CancellationTokenSource(Options.Timeout);
                     await HttpClient.GetAsync("machine/disconnect", cts.Token);
                 }
                 catch
@@ -431,13 +431,13 @@ namespace DuetHttpClient.Connector
             string errorMessage = "Invalid number of maximum retries configured";
             for (int i = 0; i <= Options.MaxRetries; i++)
             {
-                using HttpRequestMessage request = new(HttpMethod.Post, "machine/code");
+                using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "machine/code");
                 request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(code));
 
                 using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
-                    byte[] responseData = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                    byte[] responseData = await response.Content.ReadAsByteArrayAsync();
                     return Encoding.UTF8.GetString(responseData);
                 }
 
@@ -460,7 +460,7 @@ namespace DuetHttpClient.Connector
         /// <returns>Asynchronous task</returns>
         public override async Task Upload(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
         {
-            using HttpRequestMessage request = new(HttpMethod.Put, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Put, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
             request.Content = new StreamContent(content);
 
             using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
@@ -480,7 +480,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Delete, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Delete, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                     if (response.IsSuccessStatusCode)
                     {
@@ -525,11 +525,13 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Post, $"machine/file/move");
-                    using MultipartFormDataContent formData = new();
-                    formData.Add(new StringContent(from), "from");
-                    formData.Add(new StringContent(to), "to");
-                    formData.Add(new StringContent(force ? "true" : "false"), "force");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, $"machine/file/move");
+                    using MultipartFormDataContent formData = new MultipartFormDataContent
+                    {
+                        { new StringContent(from), "from" },
+                        { new StringContent(to), "to" },
+                        { new StringContent(force ? "true" : "false"), "force" }
+                    };
                     request.Content = formData;
 
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
@@ -574,7 +576,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Put, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Put, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                     if (response.IsSuccessStatusCode)
                     {
@@ -607,7 +609,7 @@ namespace DuetHttpClient.Connector
         /// <returns>Disposable download response</returns>
         public override async Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
         {
-            using HttpRequestMessage request = new(HttpMethod.Get, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
 
             HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
             if (response.StatusCode == HttpStatusCode.NotFound)
@@ -643,12 +645,12 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         return (await JsonSerializer.DeserializeAsync<List<FileNode>>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))
                             .Select(item => new FileListItem()
                             {
@@ -687,22 +689,23 @@ namespace DuetHttpClient.Connector
         /// Get G-code file info
         /// </summary>
         /// <param name="filename">File to query</param>
+        /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>G-code file info</returns>
-        public override async Task<ParsedFileInfo> GetFileInfo(string filename, CancellationToken cancellationToken = default)
+        public override async Task<GCodeFileInfo> GetFileInfo(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
         {
             string errorMessage = "Invalid number of maximum retries configured";
             for (int i = 0; i <= Options.MaxRetries; i++)
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"machine/fileinfo/{HttpUtility.UrlPathEncode(filename)}");
+                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"machine/fileinfo/{HttpUtility.UrlPathEncode(filename)}?readThumbnailContent={(readThumbnailContent ? "true" : "false")}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                        return await JsonSerializer.DeserializeAsync<ParsedFileInfo>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
+                        Stream responseStream = await response.Content.ReadAsStreamAsync();
+                        return await JsonSerializer.DeserializeAsync<GCodeFileInfo>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                     }
 
                     if (response.StatusCode == HttpStatusCode.NotFound)

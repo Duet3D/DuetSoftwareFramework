@@ -35,15 +35,28 @@ namespace DuetAPI.ObjectModel
         /// <returns>Required type</returns>
         private static Type GetKinematicsType(KinematicsName name)
         {
-            return name switch
+            switch (name)
             {
-                KinematicsName.Cartesian or KinematicsName.CoreXY or KinematicsName.CoreXYU or KinematicsName.CoreXYUV or KinematicsName.CoreXZ or KinematicsName.MarkForged => typeof(CoreKinematics),
-                KinematicsName.Delta or KinematicsName.RotaryDelta => typeof(DeltaKinematics),
-                KinematicsName.Hangprinter => typeof(HangprinterKinematics),
-                KinematicsName.FiveBarScara or KinematicsName.Scara => typeof(ScaraKinematics),
-                KinematicsName.Polar => typeof(PolarKinematics),
-                _ => typeof(Kinematics)
-            };
+                case KinematicsName.Cartesian:
+                case KinematicsName.CoreXY:
+                case KinematicsName.CoreXYU:
+                case KinematicsName.CoreXYUV:
+                case KinematicsName.CoreXZ:
+                case KinematicsName.MarkForged:
+                    return typeof(CoreKinematics);
+                case KinematicsName.Delta:
+                case KinematicsName.RotaryDelta:
+                    return typeof(DeltaKinematics);
+                case KinematicsName.Hangprinter:
+                    return typeof(HangprinterKinematics);
+                case KinematicsName.FiveBarScara:
+                case KinematicsName.Scara:
+                    return typeof(ScaraKinematics);
+                case KinematicsName.Polar:
+                    return typeof(PolarKinematics);
+                default:
+                    return typeof(Kinematics);
+            }
         }
 
         /// <summary>

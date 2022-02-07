@@ -53,7 +53,7 @@ namespace DuetAPI.ObjectModel
                 }
                 else
                 {
-                    if (!Content.EndsWith('\n'))
+                    if (!Content.EndsWith("\n"))
                     {
                         Content += '\n';
                     }

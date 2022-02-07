@@ -115,7 +115,7 @@ namespace UnitTests.HttpClient
         public async Task FileInfo()
         {
             // Get fileinfo for 0:/sys/config.g
-            ParsedFileInfo info = await session.GetFileInfo("0:/sys/config.g");
+            GCodeFileInfo info = await session.GetFileInfo("0:/sys/config.g");
             Assert.Greater(info.Size, 0);
             Assert.Less(info.Size, 192_000);
         }

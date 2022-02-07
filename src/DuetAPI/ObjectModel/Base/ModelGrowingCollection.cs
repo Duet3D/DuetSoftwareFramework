@@ -18,7 +18,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         protected override void ClearItems()
         {
-            List<T> removed = new(this);
+            List<T> removed = new List<T>(this);
             base.ClearItems();
             base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
         }
@@ -85,7 +85,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            ModelGrowingCollection<T> clone = new();
+            ModelGrowingCollection<T> clone = new ModelGrowingCollection<T>();
             foreach (T item in this)
             {
                 if (item is ICloneable cloneableItem)
@@ -123,7 +123,7 @@ namespace DuetAPI.ObjectModel
 
             bool hadDiffs = (Count != otherList.Count);
             IList diffs = new object[Count];
-            if (itemType.IsAssignableTo(typeof(IModelObject)))
+            if (typeof(IModelObject).IsAssignableFrom(itemType))
             {
                 for (int i = 0; i < Count; i++)
                 {

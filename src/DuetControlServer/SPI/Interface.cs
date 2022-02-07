@@ -441,7 +441,11 @@ namespace DuetControlServer.SPI
             /// Called when this instance is being disposed
             /// </summary>
             /// <returns>Asynchronous task</returns>
-            public async ValueTask DisposeAsync() => await UnlockAll(_channel);
+            public async ValueTask DisposeAsync()
+            {
+                GC.SuppressFinalize(this);
+                await UnlockAll(_channel);
+            }
         }
 
         /// <summary>
@@ -1032,7 +1036,7 @@ namespace DuetControlServer.SPI
             else
             {
                 DataTransfer.ReadLegacyConfigResponse(out ReadOnlySpan<byte> json);
-                _ = Model.Updater.ProcessLegacyConfigResponse(json.ToArray());
+                Model.Updater.ProcessLegacyConfigResponse(json.ToArray());
             }
         }
 

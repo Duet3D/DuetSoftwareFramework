@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
+#pragma warning disable IDE1006 // Naming Styles
 internal partial class Interop
 {
     [DllImport(LibcLibrary, SetLastError = true)]
@@ -103,3 +104,5 @@ internal enum GpioEvent : uint
     GPIOEVENT_EVENT_RISING_EDGE = 0x01,
     GPIOEVENT_EVENT_FALLING_EDGE = 0x02
 }
+
+#pragma warning restore IDE1006 // Naming Styles

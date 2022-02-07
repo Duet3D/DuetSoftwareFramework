@@ -30,7 +30,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// HTTP client of this connector
         /// </summary>
-        public HttpClient HttpClient { get; } = new();
+        public HttpClient HttpClient { get; } = new HttpClient();
 
         /// <summary>
         /// Reconnect when the connection has been reset
@@ -65,12 +65,12 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// Cancellation token to terminate the session on demand
         /// </summary>
-        protected readonly CancellationTokenSource _terminateSession = new();
+        protected readonly CancellationTokenSource _terminateSession = new CancellationTokenSource();
 
         /// <summary>
         /// TCS to complete when the session task has been termianted
         /// </summary>
-        protected readonly TaskCompletionSource _sessionTaskTerminated = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected readonly TaskCompletionSource<object> _sessionTaskTerminated = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         /// <summary>
         /// Options used for communication
@@ -80,7 +80,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// Object model of the remote board
         /// </summary>
-        public ObjectModel Model { get; } = new();
+        public ObjectModel Model { get; } = new ObjectModel();
 
         /// <summary>
         /// Wait for the object model to be up-to-date
@@ -153,9 +153,10 @@ namespace DuetHttpClient.Connector
         /// Get G-code file info
         /// </summary>
         /// <param name="filename">File to query</param>
+        /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>G-code file info</returns>
-        public abstract Task<ParsedFileInfo> GetFileInfo(string filename, CancellationToken cancellationToken = default);
+        public abstract Task<GCodeFileInfo> GetFileInfo(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default);
 
         // ** Plugin and system package calls are not supported (yet) **
 

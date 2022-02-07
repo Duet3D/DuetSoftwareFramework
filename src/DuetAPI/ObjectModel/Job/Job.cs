@@ -31,8 +31,8 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Information about the file being processed
         /// </summary>
-        public ParsedFileInfo File { get; } = new ParsedFileInfo();
-        
+        public GCodeFileInfo File { get; } = new GCodeFileInfo();
+
         /// <summary>
         /// Current position in the file being processed (in bytes or null)
         /// </summary>

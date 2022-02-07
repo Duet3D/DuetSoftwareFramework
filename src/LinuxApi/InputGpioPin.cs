@@ -104,7 +104,11 @@ namespace LinuxApi
 
             if (_deviceFileDescriptor >= 0)
             {
-                Interop.close(_deviceFileDescriptor);
+                int result = Interop.close(_deviceFileDescriptor);
+                if (result != 0)
+                {
+                    throw new IOException($"Failed to close GPIO file (error {result})");
+                }
                 _deviceFileDescriptor = _reqFd = -1;
             }
 

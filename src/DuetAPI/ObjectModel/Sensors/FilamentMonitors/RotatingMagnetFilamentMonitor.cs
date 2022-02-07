@@ -123,7 +123,7 @@
             get => _calibrated;
             set => SetPropertyValue(ref _calibrated, value);
         }
-        private RotatingMagnetFilamentMonitorCalibrated _calibrated = new();
+        private RotatingMagnetFilamentMonitorCalibrated _calibrated = new RotatingMagnetFilamentMonitorCalibrated();
 
         /// <summary>
         /// Configured properties of this filament monitor

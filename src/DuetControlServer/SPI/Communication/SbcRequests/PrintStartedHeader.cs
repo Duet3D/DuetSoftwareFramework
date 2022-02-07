@@ -36,9 +36,9 @@ namespace DuetControlServer.SPI.Communication.SbcRequests
         public uint FileSize;
 
         /// <summary>
-        /// Height of the first layer in mm
+        /// Total number of layers
         /// </summary>
-        public float FirstLayerHeight;
+        public uint NumLayers;
 
         /// <summary>
         /// Height of the layers in mm

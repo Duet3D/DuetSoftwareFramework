@@ -459,7 +459,7 @@ namespace DuetWebServer.Controllers
         /// (503) DCS is unavailable
         /// </returns>
         [HttpGet("fileinfo/{*filename}")]
-        public async Task<IActionResult> GetFileInfo(string filename)
+        public async Task<IActionResult> GetFileInfo(string filename, bool readThumbnailContent)
         {
             filename = HttpUtility.UrlDecode(filename);
 
@@ -474,7 +474,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 using CommandConnection connection = await BuildConnection();
-                var info = await connection.GetFileInfo(resolvedPath);
+                var info = await connection.GetFileInfo(resolvedPath, readThumbnailContent);
 
                 string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
                 return Content(json, "application/json");

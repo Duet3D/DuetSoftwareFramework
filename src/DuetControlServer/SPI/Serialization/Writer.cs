@@ -120,7 +120,7 @@ namespace DuetControlServer.SPI.Serialization
                 MemoryMarshal.Write(to[bytesWritten..], ref binaryParam);
                 bytesWritten += Marshal.SizeOf<CodeParameter>();
 
-                Span<byte> asUnicode = Encoding.UTF8.GetBytes(comment.Substring(0, commentLength));
+                Span<byte> asUnicode = Encoding.UTF8.GetBytes(comment[..commentLength]);
                 asUnicode.CopyTo(to[bytesWritten..]);
                 bytesWritten += asUnicode.Length;
                 bytesWritten = AddPadding(to, bytesWritten);
@@ -421,7 +421,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="info">Information about the file being printed</param>
         /// <returns>Number of bytes written</returns>
         /// <exception cref="ArgumentException">One of the supplied values is too big</exception>
-        public static int WritePrintFileInfo(Span<byte> to, ParsedFileInfo info)
+        public static int WritePrintFileInfo(Span<byte> to, GCodeFileInfo info)
         {
             Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName);
             if (unicodeFilename.Length > 254)
@@ -443,7 +443,7 @@ namespace DuetControlServer.SPI.Serialization
                 NumFilaments = (ushort)info.Filament.Count,
                 FileSize = (uint)info.Size,
                 LastModifiedTime = (info.LastModified != null) ? (ulong)(info.LastModified.Value - new DateTime(1970, 1, 1)).TotalSeconds : 0,
-                FirstLayerHeight = info.FirstLayerHeight,
+                NumLayers = (uint)info.NumLayers,
                 LayerHeight = info.LayerHeight,
                 ObjectHeight = info.Height,
                 PrintTime = (uint)(info.PrintTime ?? 0),

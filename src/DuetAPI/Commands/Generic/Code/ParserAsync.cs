@@ -36,7 +36,7 @@ namespace DuetAPI.Commands
                 // Check if the buffer needs to be filled
                 if (buffer.BufferPointer >= buffer.BufferSize)
                 {
-                    buffer.BufferSize = await reader.ReadAsync(buffer.Buffer);
+                    buffer.BufferSize = await reader.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
                     buffer.BufferPointer = 0;
                 }
 
@@ -206,7 +206,7 @@ namespace DuetAPI.Commands
                         {
                             if (buffer.BufferPointer >= buffer.BufferSize)
                             {
-                                buffer.BufferSize = await reader.ReadAsync(buffer.Buffer);
+                                buffer.BufferSize = await reader.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
                                 buffer.BufferPointer = 0;
                             }
 
@@ -321,7 +321,7 @@ namespace DuetAPI.Commands
                         (!unprecedentedParameter && char.IsWhiteSpace(c)) ||
                         (isNumericParameter && c != ':' && !NumericParameterChars.Contains(c)))
                     {
-                        if ((c == '{' && value.TrimEnd().EndsWith(':')) ||
+                        if ((c == '{' && value.TrimEnd().EndsWith(":")) ||
                             (c == ':' && wasExpression))
                         {
                             // Array expression, keep on reading
@@ -549,7 +549,7 @@ namespace DuetAPI.Commands
 
                             if (result.Parameter(letter) == null)
                             {
-                                if (wasExpression && (!value.StartsWith('{') || !value.EndsWith('}')))
+                                if (wasExpression && (!value.StartsWith("{") || !value.EndsWith("}")))
                                 {
                                     value = '{' + value.Trim() + '}';
                                 }

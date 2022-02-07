@@ -537,7 +537,7 @@ namespace DuetControlServer.SPI
         {
             using (FileStream stream = new(Path.Combine(Settings.BaseDirectory, "sys/transferDump.bin"), FileMode.Create, FileAccess.Write))
             {
-                stream.Write(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+                stream.Write(_rxBuffer[.._rxHeader.DataLength].Span);
             }
 
             string dump = "Received malformed packet:\n";
@@ -708,7 +708,7 @@ namespace DuetControlServer.SPI
 
             // Write it
             WritePacket(Communication.SbcRequests.Request.Code, codeLength);
-            span.Slice(0, codeLength).CopyTo(GetWriteBuffer(codeLength));
+            span[..codeLength].CopyTo(GetWriteBuffer(codeLength));
             return true;
         }
 
@@ -753,7 +753,7 @@ namespace DuetControlServer.SPI
 
             // Write it
             WritePacket(Communication.SbcRequests.Request.GetObjectModel, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -777,7 +777,7 @@ namespace DuetControlServer.SPI
 
             // Write it
             WritePacket(Communication.SbcRequests.Request.SetObjectModel, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -786,7 +786,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="info">Information about the file being printed</param>
         /// <returns>True if the packet could be written</returns>
-        public static bool WritePrintFileInfo(ParsedFileInfo info)
+        public static bool WritePrintFileInfo(GCodeFileInfo info)
         {
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
@@ -800,7 +800,7 @@ namespace DuetControlServer.SPI
 
             // Write it
             WritePacket(Communication.SbcRequests.Request.SetPrintFileInfo, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -1004,7 +1004,7 @@ namespace DuetControlServer.SPI
 
             // Write it
             WritePacket(Communication.SbcRequests.Request.FileChunk, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -1028,7 +1028,7 @@ namespace DuetControlServer.SPI
 
             // Write it
             WritePacket(Communication.SbcRequests.Request.EvaluateExpression, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -1052,7 +1052,7 @@ namespace DuetControlServer.SPI
 
             // Write it
             WritePacket(Communication.SbcRequests.Request.Message, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -1114,7 +1114,7 @@ namespace DuetControlServer.SPI
 
             // Write it
             WritePacket(Communication.SbcRequests.Request.SetVariable, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -1138,7 +1138,7 @@ namespace DuetControlServer.SPI
 
             // Write it
             WritePacket(Communication.SbcRequests.Request.DeleteLocalVariable, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -1363,16 +1363,16 @@ namespace DuetControlServer.SPI
         {
             if (_txHeader.ProtocolVersion >= 4)
             {
-                _txHeader.ChecksumData32 = CRC32.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
+                _txHeader.ChecksumData32 = CRC32.Calculate(_txBuffer.Value[.._txPointer].Span);
                 MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-                _txHeader.ChecksumHeader32 = CRC32.Calculate(_txHeaderBuffer.Slice(0, 12).Span);
+                _txHeader.ChecksumHeader32 = CRC32.Calculate(_txHeaderBuffer[..12].Span);
                 MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
             }
             else
             {
-                _txHeader.ChecksumData16 = CRC16.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
+                _txHeader.ChecksumData16 = CRC16.Calculate(_txBuffer.Value[.._txPointer].Span);
                 MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-                _txHeader.ChecksumHeader16 = CRC16.Calculate(_txHeaderBuffer.Slice(0, 10).Span);
+                _txHeader.ChecksumHeader16 = CRC16.Calculate(_txHeaderBuffer[..10].Span);
                 MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
             }
         }
@@ -1393,7 +1393,7 @@ namespace DuetControlServer.SPI
                 }
                 else
                 {
-                    _spiDevice.TransferFullDuplex(_txHeaderBuffer.Slice(0, 12).Span, _rxHeaderBuffer.Slice(0, 12).Span);
+                    _spiDevice.TransferFullDuplex(_txHeaderBuffer[..12].Span, _rxHeaderBuffer[..12].Span);
                 }
 
                 // Check for possible response code
@@ -1426,7 +1426,7 @@ namespace DuetControlServer.SPI
                 // Verify header checksum
                 if (_rxHeader.ProtocolVersion >= 4)
                 {
-                    uint crc32 = CRC32.Calculate(_rxHeaderBuffer.Slice(0, 12).Span);
+                    uint crc32 = CRC32.Calculate(_rxHeaderBuffer[..12].Span);
                     if (_rxHeader.ChecksumHeader32 != crc32)
                     {
                         _logger.Warn("Bad header CRC32 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader32.ToString("x8"), crc32.ToString("x8"));
@@ -1445,7 +1445,7 @@ namespace DuetControlServer.SPI
                 }
                 else
                 {
-                    ushort crc16 = CRC16.Calculate(_rxHeaderBuffer.Slice(0, 10).Span);
+                    ushort crc16 = CRC16.Calculate(_rxHeaderBuffer[..10].Span);
                     if (_rxHeader.ChecksumHeader16 != crc16)
                     {
                         _logger.Warn("Bad header CRC16 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader16.ToString("x4"), crc16.ToString("x4"));
@@ -1564,7 +1564,7 @@ namespace DuetControlServer.SPI
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
                 WaitForTransfer();
-                _spiDevice.TransferFullDuplex(_txBuffer.Value.Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
+                _spiDevice.TransferFullDuplex(_txBuffer.Value[..bytesToTransfer].Span, _rxBuffer[..bytesToTransfer].Span);
 
                 // Check for possible response code
                 uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);
@@ -1577,7 +1577,7 @@ namespace DuetControlServer.SPI
                 // Inspect received data
                 if (_rxHeader.ProtocolVersion >= 4)
                 {
-                    uint crc32 = CRC32.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+                    uint crc32 = CRC32.Calculate(_rxBuffer[.._rxHeader.DataLength].Span);
                     if (crc32 != _rxHeader.ChecksumData32)
                     {
                         _logger.Warn("Bad data CRC32 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData32.ToString("x8"), crc32.ToString("x8"));
@@ -1596,7 +1596,7 @@ namespace DuetControlServer.SPI
                 }
                 else
                 {
-                    ushort crc16 = CRC16.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+                    ushort crc16 = CRC16.Calculate(_rxBuffer[.._rxHeader.DataLength].Span);
                     if (crc16 != _rxHeader.ChecksumData16)
                     {
                         _logger.Warn("Bad data CRC16 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData16.ToString("x4"), crc16.ToString("x4"));

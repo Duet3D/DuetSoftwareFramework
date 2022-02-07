@@ -45,7 +45,7 @@ namespace UnitTests.SPI
             Writer.WritePacketHeader(span, Request.Reset, 12, 1054);
 
             // Header
-            ushort request = MemoryMarshal.Read<ushort>(span.Slice(0, 2));
+            ushort request = MemoryMarshal.Read<ushort>(span[..2]);
             Assert.AreEqual((ushort)Request.Reset, request);
             ushort packetId = MemoryMarshal.Read<ushort>(span.Slice(2, 2));
             Assert.AreEqual(12, packetId);
@@ -259,14 +259,13 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            ParsedFileInfo info = new()
+            GCodeFileInfo info = new()
             {
                 Size = 452432,
                 FileName = "0:/gcodes/test.g",
-                FirstLayerHeight = 0.3F,
                 GeneratedBy = "Slic3r",
                 Height = 53.4F,
-                NumLayers = 343,
+                NumLayers = 16,
                 LayerHeight = 0.2F,
                 PrintTime = 12355,
                 SimulatedTime = 10323
@@ -278,7 +277,7 @@ namespace UnitTests.SPI
             Assert.AreEqual(72, bytesWritten);
 
             // Header
-            ushort filenameLength = MemoryMarshal.Read<ushort>(span.Slice(0, 2));
+            ushort filenameLength = MemoryMarshal.Read<ushort>(span[..2]);
             Assert.AreEqual(info.FileName.Length, filenameLength);
             ushort generatedByLength = MemoryMarshal.Read<ushort>(span.Slice(2, 2));
             Assert.AreEqual(6, generatedByLength);
@@ -286,8 +285,8 @@ namespace UnitTests.SPI
             Assert.AreEqual(2, numFilaments);
             uint fileSize = MemoryMarshal.Read<uint>(span.Slice(16, 4));
             Assert.AreEqual(452432, fileSize);
-            float firstLayerHeight = MemoryMarshal.Read<float>(span.Slice(20, 4));
-            Assert.AreEqual(0.3, firstLayerHeight, 0.00001);
+            uint numLayers = MemoryMarshal.Read<uint>(span.Slice(20, 4));
+            Assert.AreEqual(16, numLayers);
             float layerHeight = MemoryMarshal.Read<float>(span.Slice(24, 4));
             Assert.AreEqual(0.2, layerHeight, 0.00001);
             float objectHeight = MemoryMarshal.Read<float>(span.Slice(28, 4));
@@ -318,11 +317,11 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            ParsedFileInfo info = new()
+            GCodeFileInfo info = new()
             {
                 Size = 4180,
                 FileName = "0:/gcodes/circle.g",
-                FirstLayerHeight = 0.5F,
+                NumLayers = 0,
                 GeneratedBy = string.Empty,
                 Height = 0,
                 LayerHeight = 0,
@@ -334,7 +333,7 @@ namespace UnitTests.SPI
             Assert.AreEqual(60, bytesWritten);
 
             // Header
-            ushort filenameLength = MemoryMarshal.Read<ushort>(span.Slice(0, 2));
+            ushort filenameLength = MemoryMarshal.Read<ushort>(span[..2]);
             Assert.AreEqual(info.FileName.Length, filenameLength);
             ushort generatedByLength = MemoryMarshal.Read<ushort>(span.Slice(2, 2));
             Assert.AreEqual(info.GeneratedBy.Length, generatedByLength);
@@ -342,8 +341,8 @@ namespace UnitTests.SPI
             Assert.AreEqual(0, numFilaments);
             uint fileSize = MemoryMarshal.Read<uint>(span.Slice(16, 4));
             Assert.AreEqual(4180, fileSize);
-            float firstLayerHeight = MemoryMarshal.Read<float>(span.Slice(20, 4));
-            Assert.AreEqual(0.5, firstLayerHeight, 0.00001);
+            uint numLayers = MemoryMarshal.Read<uint>(span.Slice(20, 4));
+            Assert.AreEqual(0, numLayers);
             float layerHeight = MemoryMarshal.Read<float>(span.Slice(24, 4));
             Assert.AreEqual(0, layerHeight, 0.00001);
             float objectHeight = MemoryMarshal.Read<float>(span.Slice(28, 4));
@@ -426,7 +425,7 @@ namespace UnitTests.SPI
             Assert.AreEqual(16, bytesWritten);
 
             // Header
-            int extruder = MemoryMarshal.Read<int>(span.Slice(0, 4));
+            int extruder = MemoryMarshal.Read<int>(span[..4]);
             Assert.AreEqual(12, extruder);
             int filamentLength = MemoryMarshal.Read<int>(span.Slice(4, 4));
             Assert.AreEqual(7, filamentLength);

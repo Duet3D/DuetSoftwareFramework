@@ -8,7 +8,7 @@ namespace DuetAPI.Utility
     /// Class representing a driver identifier
     /// </summary>
     [JsonConverter(typeof(DriverIdJsonConverter))]
-    public sealed record DriverId
+    public sealed class DriverId
     {
         /// <summary>
         /// Default constructor of this class
@@ -109,13 +109,20 @@ namespace DuetAPI.Utility
         /// Compute a hash code for this instance
         /// </summary>
         /// <returns>Hash code</returns>
-        public override int GetHashCode() => HashCode.Combine(Board.GetHashCode(), Port.GetHashCode());
+        public override int GetHashCode() => Board.GetHashCode() ^ Port.GetHashCode();
 
         /// <summary>
         /// Convert this instance to a string
         /// </summary>
         /// <returns>String representation</returns>
         public override string ToString() => $"{Board}.{Port}";
+
+        /// <summary>
+        /// Checks whether this instance is equal to another
+        /// </summary>
+        /// <param name="obj">Other instance</param>
+        /// <returns>Whether this and the other instance are equal</returns>
+        public override bool Equals(object obj) => obj is DriverId other && Board == other.Board && Port == other.Port;
     }
 
     /// <summary>
@@ -134,13 +141,10 @@ namespace DuetAPI.Utility
         {
             switch (reader.TokenType)
             {
-                case JsonTokenType.Null:
-                    return null;
-                case JsonTokenType.String:
-                    return new DriverId(reader.GetString());
-                default:
-                    throw new JsonException("Invalid token type for DriverId");
-            }
+                case JsonTokenType.Null: return null;
+                case JsonTokenType.String: return new DriverId(reader.GetString());
+                default: throw new JsonException("Invalid token type for DriverId");
+            };
         }
 
         /// <summary>

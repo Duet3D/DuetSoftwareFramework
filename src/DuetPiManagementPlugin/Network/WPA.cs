@@ -184,7 +184,7 @@ namespace DuetPiManagementPlugin.Network
             {
                 if (string.IsNullOrWhiteSpace(countryCode))
                 {
-                    return new Message(MessageType.Error, "WiFi country is unset. Please use M587 L to specify your country code (e.g. M587 L\"US\")");
+                    return new Message(MessageType.Error, "WiFi country is unset. Please use M587 C to specify your country code (e.g. M587 C\"US\")");
                 }
 
                 using FileStream configTemplateStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Create, FileAccess.Write);

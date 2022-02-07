@@ -298,7 +298,7 @@ namespace DuetAPI.Commands
                         (!unprecedentedParameter && char.IsWhiteSpace(c)) ||
                         (isNumericParameter && c != ':' && !NumericParameterChars.Contains(c)))
                     {
-                        if ((c == '{' && value.TrimEnd().EndsWith(':')) ||
+                        if ((c == '{' && value.TrimEnd().EndsWith(":")) ||
                             (c == ':' && wasExpression))
                         {
                             // Array expression, keep on reading
@@ -524,7 +524,7 @@ namespace DuetAPI.Commands
 
                             if (result.Parameter(letter) == null)
                             {
-                                if (wasExpression && (!value.StartsWith('{') || !value.EndsWith('}')))
+                                if (wasExpression && (!value.StartsWith("{") || !value.EndsWith("}")))
                                 {
                                     value = '{' + value.Trim() + '}';
                                 }
@@ -716,14 +716,14 @@ namespace DuetAPI.Commands
         {
             if (!parameter.IsExpression)
             {
-                List<DriverId> drivers = new();
+                List<DriverId> drivers = new List<DriverId>();
 
                 string[] parameters = parameter.StringValue.Split(':');
                 foreach (string value in parameters)
                 {
                     try
                     {
-                        DriverId id = new(value);
+                        DriverId id = new DriverId(value);
                         drivers.Add(id);
                     }
                     catch (ArgumentException e)

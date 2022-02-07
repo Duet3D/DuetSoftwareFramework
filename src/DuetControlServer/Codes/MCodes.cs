@@ -354,13 +354,32 @@ namespace DuetControlServer.Codes
                     {
                         if (await SPI.Interface.Flush(code))
                         {
-                            string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), FileDirectory.GCodes);
                             try
                             {
-                                ParsedFileInfo info = await InfoParser.Parse(file);
+                                // Get fileinfo
+                                if (code.MinorNumber != 1)
+                                {
+                                    string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), FileDirectory.GCodes);
+                                    GCodeFileInfo info = await InfoParser.Parse(file, false);
 
-                                string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
-                                return new Message(MessageType.Success, "{\"err\":0," + json[1..]);
+                                    string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
+                                    return new Message(MessageType.Success, "{\"err\":0," + json[1..]);
+                                }
+
+                                // Get thumbnail
+                                string pParam = code.Parameter('P');
+                                if (pParam == null)
+                                {
+                                    return new Message(MessageType.Error, "Missing parameter 'P'");
+                                }
+                                if (code.Parameter('S') == null)
+                                {
+                                    return new Message(MessageType.Error, "Missing parameter 'S'");
+                                }
+
+                                string filename = await FilePath.ToPhysicalAsync(pParam, FileDirectory.GCodes);
+                                string thumbnailJson = await InfoParser.ParseThumbnail(filename, code.Parameter('S'));
+                                return new Message(MessageType.Success, thumbnailJson);
                             }
                             catch (Exception e)
                             {

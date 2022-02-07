@@ -65,11 +65,11 @@ namespace DuetAPI.Commands
             else if (isDriverId)
             {
                 // Value is a (list of) driver identifier(s)
-                List<DriverId> driverIds = new();
+                List<DriverId> driverIds = new List<DriverId>();
 
                 foreach (string item in value.Split(':'))
                 {
-                    DriverId driverId = new(item);
+                    DriverId driverId = new DriverId(item);
                     driverIds.Add(driverId);
                 }
 
@@ -92,7 +92,7 @@ namespace DuetAPI.Commands
                     // Empty parameters are repesented as integers with the value 0 (e.g. G92 XY => G92 X0 Y0)
                     ParsedValue = 0;
                 }
-                else if (value.StartsWith('{') && value.EndsWith('}'))
+                else if (value.StartsWith("{") && value.EndsWith("}"))
                 {
                     // It is an expression
                     IsExpression = true;
@@ -164,7 +164,7 @@ namespace DuetAPI.Commands
             if (value is string stringValue)
             {
                 StringValue = stringValue;
-                if (stringValue.StartsWith('{') && stringValue.EndsWith('}'))
+                if (stringValue.StartsWith("{") && stringValue.EndsWith("}"))
                 {
                     IsExpression = true;
                 }
@@ -577,10 +577,7 @@ namespace DuetAPI.Commands
         /// Returns the hash code of this instance
         /// </summary>
         /// <returns>Computed hash code</returns>
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Letter, ParsedValue);
-        }
+        public override int GetHashCode() => Letter.GetHashCode() ^ ParsedValue.GetHashCode();
 
         /// <summary>
         /// Converts this parameter to a string

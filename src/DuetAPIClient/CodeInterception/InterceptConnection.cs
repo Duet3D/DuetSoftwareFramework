@@ -33,7 +33,7 @@ namespace DuetAPIClient
         /// <summary>
         /// List of input channels where codes may be intercepted. If the list is empty, all available channels are used
         /// </summary>
-        public List<CodeChannel> Channels { get; init; } = new List<CodeChannel>();
+        public List<CodeChannel> Channels { get; set; } = new List<CodeChannel>();
 
         /// <summary>
         /// List of G/M/T-codes to filter or Q0 for comments
@@ -41,7 +41,7 @@ namespace DuetAPIClient
         /// <remarks>
         /// This may only specify the code type and major/minor number (e.g. G1)
         /// </remarks>
-        public List<string> Filters { get; init; } = new List<string>();
+        public List<string> Filters { get; set; } = new List<string>();
 
         /// <summary>
         /// Defines if priority codes may be intercepted (e.g. M122 or M999)
@@ -69,7 +69,7 @@ namespace DuetAPIClient
             Filters.Clear();
             PriortyCodes = false;
 
-            InterceptInitMessage initMessage = new() { InterceptionMode = mode };
+            InterceptInitMessage initMessage = new InterceptInitMessage() { InterceptionMode = mode };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -106,7 +106,12 @@ namespace DuetAPIClient
             }
             PriortyCodes = priortyCodes;
 
-            InterceptInitMessage initMessage = new() { InterceptionMode = mode, Channels = Channels, Filters = Filters, PriortyCodes = priortyCodes };
+            InterceptInitMessage initMessage = new InterceptInitMessage() {
+                InterceptionMode = mode,
+                Channels = Channels,
+                Filters = Filters,
+                PriortyCodes = priortyCodes
+            };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 

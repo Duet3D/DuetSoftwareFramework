@@ -27,14 +27,17 @@ namespace DuetControlServer.Files.ImageProcessing
         /// <param name="codeParserBuffer">Read buffer</param>
         /// <param name="parsedFileInfo">File information</param>
         /// <param name="code">Code instance to reuse</param>
+        /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
         /// <returns>Asynchronous task</returns>
-        public static async ValueTask ProcessAsync(StreamReader reader, CodeParserBuffer codeParserBuffer, ParsedFileInfo parsedFileInfo, Code code)
+        public static async ValueTask ProcessAsync(StreamReader reader, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent)
         {
             _logger.Info($"Processing Image {parsedFileInfo.FileName}");
-            StringBuilder imageBuffer = new();
+            bool offsetAdjusted = false;
+            long offset = codeParserBuffer.GetPosition(reader);
             code.Reset();
 
             // Keep reading the data from the file
+            StringBuilder imageBuffer = new();
             while (codeParserBuffer.GetPosition(reader) < reader.BaseStream.Length)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
@@ -46,6 +49,22 @@ namespace DuetControlServer.Files.ImageProcessing
                 // Icon data goes until the first line of executable code.
                 if (code.Type == CodeType.Comment)
                 {
+                    if (!offsetAdjusted)
+                    {
+                        offset++;     // for leading semicolon
+                        foreach (char c in code.Comment)
+                        {
+                            if (char.IsWhiteSpace(c))
+                            {
+                                offset++;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        offsetAdjusted = true;
+                    }
                     imageBuffer.Append(code.Comment.Trim());
                     code.Reset();
                 }
@@ -53,7 +72,8 @@ namespace DuetControlServer.Files.ImageProcessing
                 {
                     try
                     {
-                        ParsedThumbnail thumbnail = ReadImage(imageBuffer.ToString());
+                        ThumbnailInfo thumbnail = ReadImage(imageBuffer.ToString(), readThumbnailContent);
+                        thumbnail.Offset = offset;
                         parsedFileInfo.Thumbnails.Add(thumbnail);
                         _logger.Error("Icon Thumbnails Found");
                     }
@@ -67,7 +87,7 @@ namespace DuetControlServer.Files.ImageProcessing
             }
         }
 
-        private static ParsedThumbnail ReadImage(string imageBuffer)
+        private static ThumbnailInfo ReadImage(string imageBuffer, bool readThumbnailContent)
         {
             // Convert the string into a usable format
             string finalString = imageBuffer
@@ -82,14 +102,23 @@ namespace DuetControlServer.Files.ImageProcessing
             try
             {
                 using Image image = BinaryToImage(ms, out int width, out int height);
-                string encodedImage = image.ToBase64String(PngFormat.Instance);
-                _logger.Debug(encodedImage);
+                string data = null;
+                if (readThumbnailContent)
+                {
+                    using MemoryStream memoryStream = new();
+                    image.Save(memoryStream, PngFormat.Instance);
+                    memoryStream.TryGetBuffer(out ArraySegment<byte> buffer);
+                    data = Convert.ToBase64String(buffer.Array, 0, (int)memoryStream.Length);
+                }
+                _logger.Debug(data);
 
                 return new()
                 {
-                    EncodedImage = encodedImage,
+                    Data = data,
+                    Format = ThumbnailInfoFormat.PNG,
                     Height = height,
                     Width = width,
+                    Size = finalString.Length
                 };
             }
             catch (Exception ex)
