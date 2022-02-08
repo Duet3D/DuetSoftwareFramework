@@ -525,21 +525,22 @@ namespace DuetControlServer.Files
         private static async ValueTask<bool> ParseThumbnails(StreamReader reader, Code code, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, bool readThumbnailContent)
         {
             // This is the start of a PrusaSlicer Image
-            if (code.Comment.TrimStart().StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
+            string trimmedComment = code.Comment.TrimStart();
+            if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
             {
                 _logger.Debug("Found Prusa Slicer Image");
                 await PrusaSlicerImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG);
                 return true;
             }
-            if (code.Comment.TrimStart().StartsWith("QOI thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
+            if (trimmedComment.StartsWith("thumbnail_QOI", StringComparison.InvariantCultureIgnoreCase))
             {
-                _logger.Debug("Found Prusa Slicer Image");
+                _logger.Debug("Found Prusa Slicer QOI Image");
                 await PrusaSlicerImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI);
                 return true;
             }
 
             // Icon Image (proprietary)
-            if (code.Comment.Contains("Icon:"))
+            if (trimmedComment.Contains("Icon:"))
             {
                 _logger.Debug("Found Icon Image");
                 await IconImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent);

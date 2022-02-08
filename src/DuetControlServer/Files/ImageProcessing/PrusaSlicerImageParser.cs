@@ -26,7 +26,7 @@ namespace DuetControlServer.Files.ImageProcessing
         {
             // Read the image header info that is currently in the code
             string[] thumbnailTokens = code.Comment.Trim().Split(' ');
-            if (thumbnailTokens.Length != 4 && thumbnailTokens.Length != 5)
+            if (thumbnailTokens.Length != 4)
             {
                 throw new ImageProcessingException();
             }
@@ -71,7 +71,7 @@ namespace DuetControlServer.Files.ImageProcessing
 
                 string trimmedComment = code.Comment.Trim();
                 if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase) ||
-                    trimmedComment.StartsWith("QOI thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
+                    trimmedComment.StartsWith("thumbnail_QOI begin", StringComparison.InvariantCultureIgnoreCase))
                 {
                     // Exit if we find another start tag before ending the previous image
                     throw new ImageProcessingException();
