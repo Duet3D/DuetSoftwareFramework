@@ -46,6 +46,7 @@ pkg_plugins() {
 	echo "- Packaging plugins..."
 
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/control
+	sed -i "s/DCSVER/$dcsver/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/control
 	sed -i "s/DMPVER/$dmpver/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/control
 	sed -i "s/DPSVER/$dpsver/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/control
 	sed -i "s/DMPVER/$dmpver/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/changelog

@@ -73,6 +73,12 @@
       "Options": 17
     }
   ],
+  "NumLayersFilters": [
+    {
+      "Pattern": "NUM_LAYERS\\D+(\\d+)",
+      "Options": 17
+    }
+  ],
   "FilamentFilters": [
     {
       "Pattern": "filament used\\D+(((?<mm>\\d+\\.?\\d*)\\s*mm)(\\D+)?)+",
@@ -152,6 +158,10 @@
     },
     {
       "Pattern": "total print time \\(s\\) = (?<s>(\\d+\\.?\\d*))",
+      "Options": 17
+    },
+    {
+      "Pattern": "Build time:\\s+(?<h>(\\d+\\.?\\d*)):(?<m>(\\d+\\.?\\d*)):(?<s>(\\d+\\.?\\d*))",
       "Options": 17
     }
   ],

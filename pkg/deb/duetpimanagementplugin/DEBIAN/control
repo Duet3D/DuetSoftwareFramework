@@ -3,7 +3,7 @@ Version: DMPVER
 Section: electronics
 Priority: standard
 Architecture: TARGET_ARCH
-Depends: duetpluginservice (= DPSVER), openssl
+Depends: duetpluginservice (= DPSVER), duettools (= DCSVER), openssl
 Recommends: proftpd, ssh, telnetd, dnsmasq, hostapd, wpa_supplicant
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
