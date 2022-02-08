@@ -19,7 +19,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             if (File.Exists("/etc/inetd.conf"))
             {
                 // Although inetd may be used for other purposes, we don't explicitly check if the telnet option is enabled or not
-                bool serviceEnabled = await Command.ExecQuery("/usr/bin/systemctl", "is-enabled -q inetd.service");
+                bool serviceEnabled = await Command.ExecQuery("systemctl", "is-enabled -q inetd.service");
                 await Manager.SetProtocol(NetworkProtocol.Telnet, serviceEnabled);
             }
         }
@@ -40,8 +40,8 @@ namespace DuetPiManagementPlugin.Network.Protocols
             // Enable Telnet
             if (enabled.Value && !Manager.IsEnabled(NetworkProtocol.Telnet))
             {
-                string startOutput = await Command.Execute("/usr/bin/systemctl", "start inetd.service");
-                string enableOutput = await Command.Execute("/usr/bin/systemctl", "enable -q inetd.service");
+                string startOutput = await Command.Execute("systemctl", "start inetd.service");
+                string enableOutput = await Command.Execute("systemctl", "enable -q inetd.service");
                 await Manager.SetProtocol(NetworkProtocol.Telnet, true);
                 return new Message(MessageType.Success, string.Join('\n', startOutput, enableOutput).Trim());
             }
@@ -49,8 +49,8 @@ namespace DuetPiManagementPlugin.Network.Protocols
             // Disable Telnet
             if (!enabled.Value && Manager.IsEnabled(NetworkProtocol.Telnet))
             {
-                string stopOutput = await Command.Execute("/usr/bin/systemctl", "stop inetd.service");
-                string disableOutput = await Command.Execute("/usr/bin/systemctl", "disable -q inetd.service");
+                string stopOutput = await Command.Execute("systemctl", "stop inetd.service");
+                string disableOutput = await Command.Execute("systemctl", "disable -q inetd.service");
                 await Manager.SetProtocol(NetworkProtocol.Telnet, false);
                 return new Message(MessageType.Success, string.Join('\n', stopOutput, disableOutput).Trim());
             }

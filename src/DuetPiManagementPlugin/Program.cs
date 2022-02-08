@@ -243,7 +243,7 @@ namespace DuetPiManagementPlugin
                                 }
                                 else
                                 {
-                                    string setResult = await Command.Execute("/usr/bin/hostnamectl", $"set-hostname \"{newHostname}\"");
+                                    string setResult = await Command.Execute("hostnamectl", $"set-hostname \"{newHostname}\"");
                                     if (string.IsNullOrWhiteSpace(setResult))
                                     {
                                         // Success, let DSF/RRF process this code too
@@ -518,7 +518,7 @@ namespace DuetPiManagementPlugin
                         {
                             if (await Connection.Flush(CancellationToken))
                             {
-                                string rebootResult = await Command.Execute("/usr/bin/systemctl", "reboot");
+                                string rebootResult = await Command.Execute("systemctl", "reboot");
                                 await Connection.ResolveCode(MessageType.Success, rebootResult);
                             }
                             else

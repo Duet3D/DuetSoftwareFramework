@@ -43,7 +43,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                     }
                 }
 
-                bool serviceEnabled = await Command.ExecQuery("/usr/bin/systemctl", "is-enabled -q proftpd.service");
+                bool serviceEnabled = await Command.ExecQuery("systemctl", "is-enabled -q proftpd.service");
                 await Manager.SetProtocol(NetworkProtocol.FTP, serviceEnabled);
             }
         }
@@ -111,8 +111,8 @@ namespace DuetPiManagementPlugin.Network.Protocols
             // Enable FTP
             if (enabled != null && enabled.Value && !Manager.IsEnabled(NetworkProtocol.FTP))
             {
-                string startOutput = await Command.Execute("/usr/bin/systemctl", "start proftpd.service");
-                string enableOutput = await Command.Execute("/usr/bin/systemctl", "enable -q proftpd.service");
+                string startOutput = await Command.Execute("systemctl", "start proftpd.service");
+                string enableOutput = await Command.Execute("systemctl", "enable -q proftpd.service");
                 await Manager.SetProtocol(NetworkProtocol.FTP, true);
                 return new Message(MessageType.Success, string.Join('\n', startOutput, enableOutput).Trim());
             }
@@ -120,8 +120,8 @@ namespace DuetPiManagementPlugin.Network.Protocols
             // Disable FTP
             if (enabled != null && !enabled.Value && Manager.IsEnabled(NetworkProtocol.FTP))
             {
-                string stopOutput = await Command.Execute("/usr/bin/systemctl", "stop proftpd.service");
-                string disableOutput = await Command.Execute("/usr/bin/systemctl", "disable -q proftpd.service");
+                string stopOutput = await Command.Execute("systemctl", "stop proftpd.service");
+                string disableOutput = await Command.Execute("systemctl", "disable -q proftpd.service");
                 await Manager.SetProtocol(NetworkProtocol.FTP, false);
                 return new Message(MessageType.Success, string.Join('\n', stopOutput, disableOutput).Trim());
             }
@@ -129,7 +129,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             // Restart FTP service
             if (portChanged)
             {
-                string restartOutput = await Command.Execute("/usr/bin/systemctl", "restart proftpd.service");
+                string restartOutput = await Command.Execute("systemctl", "restart proftpd.service");
                 return new Message(MessageType.Success, restartOutput);
             }
 

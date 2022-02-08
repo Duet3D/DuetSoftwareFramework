@@ -383,14 +383,14 @@ namespace DuetPiManagementPlugin.Network
             StringBuilder builder = new();
             if (forAP != null)
             {
-                builder.Append(await Command.Execute("/usr/bin/systemctl", "restart dhcpcd.service"));
+                builder.Append(await Command.Execute("systemctl", "restart dhcpcd.service"));
             }
 
             // Restart Ethernet adapter if it is up to apply the new configuration
             if (NetworkInterface.GetAllNetworkInterfaces().Any(item => item.Name == iface && item.OperationalStatus == OperationalStatus.Up) && forAP == null)
             {
-                builder.AppendLine(await Command.Execute("/usr/sbin/ip", $"link set {iface} down"));
-                builder.AppendLine(await Command.Execute("/usr/sbin/ip", $"link set {iface} up"));
+                builder.AppendLine(await Command.Execute("ip", $"link set {iface} down"));
+                builder.AppendLine(await Command.Execute("ip", $"link set {iface} up"));
             }
 
             // Done

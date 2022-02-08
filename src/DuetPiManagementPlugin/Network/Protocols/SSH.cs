@@ -78,7 +78,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 }
 
                 // Register active protocols if the service is enabled
-                if (await Command.ExecQuery("/usr/bin/systemctl", "is-enabled -q ssh.service"))
+                if (await Command.ExecQuery("systemctl", "is-enabled -q ssh.service"))
                 {
                     if (sshEnabled)
                     {
@@ -240,18 +240,18 @@ namespace DuetPiManagementPlugin.Network.Protocols
             {
                 if (serviceWasDisabled)
                 {
-                    string startOutput = await Command.Execute("/usr/bin/systemctl", "start ssh.service");
-                    string enableOutput = await Command.Execute("/usr/bin/systemctl", "enable -q ssh.service");
+                    string startOutput = await Command.Execute("systemctl", "start ssh.service");
+                    string enableOutput = await Command.Execute("systemctl", "enable -q ssh.service");
                     return new Message(MessageType.Success, string.Join('\n', startOutput, enableOutput).Trim());
                 }
 
-                string restartOutput = await Command.Execute("/usr/bin/systemctl", "restart ssh.service");
+                string restartOutput = await Command.Execute("systemctl", "restart ssh.service");
                 return new Message(MessageType.Success, restartOutput);
             }
             else if (!serviceWasDisabled)
             {
-                string stopOutput = await Command.Execute("/usr/bin/systemctl", "stop ssh.service");
-                string disableOutput = await Command.Execute("/usr/bin/systemctl", "disable -q ssh.service");
+                string stopOutput = await Command.Execute("systemctl", "stop ssh.service");
+                string disableOutput = await Command.Execute("systemctl", "disable -q ssh.service");
                 return new Message(MessageType.Success, string.Join('\n', stopOutput, disableOutput).Trim());
             }
 

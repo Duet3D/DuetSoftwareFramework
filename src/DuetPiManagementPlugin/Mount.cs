@@ -38,7 +38,7 @@ namespace DuetPiManagementPlugin
 
             string typeParam = string.IsNullOrWhiteSpace(type) ? string.Empty : $"-t {type} ";
             string optParam = string.IsNullOrWhiteSpace(options) ? string.Empty : $" -o {options}";
-            string result = await Command.Execute("/usr/bin/mount", $"{typeParam}{device} {physicalDirectory}{optParam}");
+            string result = await Command.Execute("mount", $"{typeParam}{device} {physicalDirectory}{optParam}");
             return new Message(MessageType.Success, result);
         }
 
@@ -54,7 +54,7 @@ namespace DuetPiManagementPlugin
                 return new Message(MessageType.Error, "Invalid characters in the specified mount device");
             }
 
-            string result = await Command.Execute("/usr/bin/umount", node);
+            string result = await Command.Execute("umount", node);
             return new Message(MessageType.Success, result);
         }
     }
