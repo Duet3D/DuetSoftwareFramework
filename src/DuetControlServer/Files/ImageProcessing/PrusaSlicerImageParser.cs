@@ -77,7 +77,8 @@ namespace DuetControlServer.Files.ImageProcessing
                     throw new ImageProcessingException();
                 }
 
-                if (trimmedComment.StartsWith("thumbnail end", StringComparison.InvariantCultureIgnoreCase))
+                if (trimmedComment.StartsWith("thumbnail end", StringComparison.InvariantCultureIgnoreCase) ||
+                    trimmedComment.StartsWith("thumbnail_QOI end", StringComparison.InvariantCultureIgnoreCase))
                 {
                     if (readThumbnailContent)
                     {
@@ -114,4 +115,3 @@ namespace DuetControlServer.Files.ImageProcessing
         }
     }
 }
-
