@@ -524,18 +524,18 @@ namespace DuetControlServer.Files
         /// <returns>True if the code contains thumbnail data</returns>
         private static async ValueTask<bool> ParseThumbnails(StreamReader reader, Code code, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, bool readThumbnailContent)
         {
-            // This is the start of a PrusaSlicer Image
+            // This is the start of an embedded thumbnail image
             string trimmedComment = code.Comment.TrimStart();
             if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
             {
-                _logger.Debug("Found Prusa Slicer Image");
-                await PrusaSlicerImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG);
+                _logger.Debug("Found embedded thumbnail image");
+                await ImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG);
                 return true;
             }
             if (trimmedComment.StartsWith("thumbnail_QOI", StringComparison.InvariantCultureIgnoreCase))
             {
-                _logger.Debug("Found Prusa Slicer QOI Image");
-                await PrusaSlicerImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI);
+                _logger.Debug("Found embedded thumbnail QOI Image");
+                await ImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI);
                 return true;
             }
 
