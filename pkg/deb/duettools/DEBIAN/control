@@ -3,7 +3,7 @@ Version: DCSVER
 Section: electronics
 Priority: optional
 Architecture: TARGET_ARCH
-Depends: duetcontrolserver (= DCSVER)
+Depends: duetcontrolserver (= DCSVER), duetruntime (= DCSVER)
 Conflicts: duettools (<< 1.1.0.0)
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
