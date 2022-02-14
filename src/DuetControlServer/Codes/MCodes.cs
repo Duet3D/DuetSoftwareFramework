@@ -478,6 +478,7 @@ namespace DuetControlServer.Codes
                                         slot = index,
                                         present = 1,
                                         capacity = storage.Capacity,
+                                        partitionSize = storage.PartitionSize,
                                         free = storage.FreeSpace,
                                         speed = storage.Speed
                                     }
@@ -492,7 +493,7 @@ namespace DuetControlServer.Codes
                                 }
 
                                 Volume storage = Model.Provider.Get.Volumes[index];
-                                return new Message(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / (1000 * 1000 * 1000):F2}Gb, free space {storage.FreeSpace / (1000 * 1000 * 1000):F2}Gb, speed {storage.Speed / (1000 * 1000):F2}MBytes/sec");
+                                return new Message(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / (1000 * 1000 * 1000):F2}Gb, partition size {storage.PartitionSize / (1000 * 1000 * 1000):F2}Gb,free space {storage.FreeSpace / (1000 * 1000 * 1000):F2}Gb, speed {storage.Speed / (1000 * 1000):F2}MBytes/sec");
                             }
                         }
                     }

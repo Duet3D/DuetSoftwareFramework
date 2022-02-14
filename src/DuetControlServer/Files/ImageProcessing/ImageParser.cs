@@ -71,6 +71,7 @@ namespace DuetControlServer.Files.ImageProcessing
 
                 string trimmedComment = code.Comment.Trim();
                 if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase) ||
+                    trimmedComment.StartsWith("thumbnail_JPG begin", StringComparison.InvariantCultureIgnoreCase) ||
                     trimmedComment.StartsWith("thumbnail_QOI begin", StringComparison.InvariantCultureIgnoreCase))
                 {
                     // Exit if we find another start tag before ending the previous image
@@ -78,6 +79,7 @@ namespace DuetControlServer.Files.ImageProcessing
                 }
 
                 if (trimmedComment.StartsWith("thumbnail end", StringComparison.InvariantCultureIgnoreCase) ||
+                    trimmedComment.StartsWith("thumbnail_JPG end", StringComparison.InvariantCultureIgnoreCase) ||
                     trimmedComment.StartsWith("thumbnail_QOI end", StringComparison.InvariantCultureIgnoreCase))
                 {
                     if (readThumbnailContent)

@@ -579,7 +579,6 @@ namespace DuetControlServer.SPI.Channel
                             }, TaskContinuationOptions.RunContinuationsAsynchronously);
                         }
 
-
                         // Abort the macro file
                         CurrentState.Macro.Abort();
                     }
@@ -672,7 +671,6 @@ namespace DuetControlServer.SPI.Channel
                                 }
                             }, TaskContinuationOptions.RunContinuationsAsynchronously);
                         }
-
 
                         // Abort the macro file
                         await CurrentState.Macro.AbortAsync();

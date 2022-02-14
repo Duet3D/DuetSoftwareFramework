@@ -10,6 +10,11 @@ namespace DuetAPI.ObjectModel
     public enum ThumbnailInfoFormat
     {
         /// <summary>
+        /// Joint Photographic Experts Group
+        /// </summary>
+        JPEG,
+
+        /// <summary>
         /// Portable Network Graphics
         /// </summary>
         PNG,

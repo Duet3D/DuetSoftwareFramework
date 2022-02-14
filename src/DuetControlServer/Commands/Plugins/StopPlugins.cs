@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using Nito.AsyncEx;
 using System.Collections.Generic;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -62,7 +63,15 @@ namespace DuetControlServer.Commands
                         }
                     }
                 }
-                await Task.WhenAll(stopTasks);
+
+                try
+                {
+                    await Task.WhenAll(stopTasks);
+                }
+                catch (SocketException)
+                {
+                    // Can be expected when the remote service is terminated too early
+                }
 
                 using (await Model.Provider.AccessReadWriteAsync())
                 {

@@ -10,6 +10,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Model
@@ -74,7 +75,7 @@ namespace DuetControlServer.Model
         /// This function updates host properties like network interfaces and storage devices
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static void Run()
+        public static async Task Run()
         {
             DateTime lastUpdateTime = DateTime.Now;
             DriveInfo[] drives;
@@ -87,7 +88,7 @@ namespace DuetControlServer.Model
                 drives = DriveInfo.GetDrives();
 
                 // Run another update cycle
-                using (Provider.AccessReadWrite())
+                using (await Provider.AccessReadWriteAsync())
                 {
                     UpdateNetwork(networkInterfaces);
                     UpdateVolumes(drives);
@@ -111,7 +112,7 @@ namespace DuetControlServer.Model
                             new('S', DateTime.Now.ToString("HH:mm:ss"))
                         }
                     };
-                    code.Execute().Wait();
+                    await code.Execute();
                 }
 
                 // Check if the hostname has to be updated
@@ -131,12 +132,12 @@ namespace DuetControlServer.Model
                             new('P', lastHostname)
                         }
                     };
-                    code.Execute().Wait();
+                    await code.Execute();
                 }
 
                 // Wait for next scheduled update check
                 lastUpdateTime = DateTime.Now;
-                Program.CancellationToken.WaitHandle.WaitOne(Settings.HostUpdateInterval);
+                await Task.Delay(Settings.HostUpdateInterval, Program.CancellationToken);
             }
             while (!Program.CancellationToken.IsCancellationRequested);
         }
@@ -237,8 +238,6 @@ namespace DuetControlServer.Model
         /// </remarks>
         private static void UpdateVolumes(DriveInfo[] drives)
         {
-            // Note: Since NetworkInterface.GetAllNetworkInterfaces() can take up to 1.5s, we query the drives outside the object model, too 
-
             int index = 0;
             foreach (DriveInfo drive in drives)
             {
@@ -270,6 +269,7 @@ namespace DuetControlServer.Model
                     volume.Capacity = (drive.DriveType == DriveType.Network) ? null : totalSize;
                     volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : drive.AvailableFreeSpace;
                     volume.Mounted = drive.IsReady;
+                    volume.PartitionSize = (drive.DriveType == DriveType.Network) ? null : totalSize;
                     volume.Path = drive.VolumeLabel;
                 }
             }

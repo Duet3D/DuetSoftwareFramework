@@ -56,6 +56,17 @@
         private int? _openFiles;
 
         /// <summary>
+        /// Total size of this volume (in bytes or null)
+        /// </summary>
+
+        public long? PartitionSize
+        {
+            get => _partitionSize;
+            set => SetPropertyValue(ref _partitionSize, value);
+        }
+        private long? _partitionSize;
+
+        /// <summary>
         /// Logical path of the storage device
         /// </summary>
         public string Path

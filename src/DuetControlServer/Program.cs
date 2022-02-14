@@ -163,7 +163,7 @@ namespace DuetControlServer
                 { Task.Factory.StartNew(Model.Updater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Update" },
                 { Task.Factory.StartNew(IPC.Server.Run, TaskCreationOptions.LongRunning).Unwrap(), "IPC" },
                 { Task.Factory.StartNew(FileExecution.Job.Run, TaskCreationOptions.LongRunning).Unwrap(), "Job" },
-                { Utility.PriorityThreadRunner.Start(Model.PeriodicUpdater.Run, ThreadPriority.BelowNormal), "Periodic updater" }
+                { Task.Factory.StartNew(Model.PeriodicUpdater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Periodic updater" }
             };
 
             // Deal with program termination requests (SIGTERM and Ctrl+C)

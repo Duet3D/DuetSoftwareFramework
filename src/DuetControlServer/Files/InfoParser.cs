@@ -165,7 +165,7 @@ namespace DuetControlServer.Files
                             {
                                 // G0/G1 is an absolute move, see if there is a Z parameter present
                                 CodeParameter zParam = code.Parameter('Z');
-                                if (zParam != null && zParam.Type == typeof(float) &&
+                                if (zParam != null && (zParam.Type == typeof(int) || zParam.Type == typeof(float)) &&
                                     (code.Comment == null || !code.Comment.TrimStart().StartsWith("E", StringComparison.InvariantCultureIgnoreCase)))
                                 {
                                     gotNewInfo = true;
@@ -528,8 +528,14 @@ namespace DuetControlServer.Files
             string trimmedComment = code.Comment.TrimStart();
             if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
             {
-                _logger.Debug("Found embedded thumbnail image");
+                _logger.Debug("Found embedded thumbnail PNG image");
                 await ImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG);
+                return true;
+            }
+            if (trimmedComment.StartsWith("thumbnail_JPG", StringComparison.InvariantCultureIgnoreCase))
+            {
+                _logger.Debug("Found embedded thumbnail JPG Image");
+                await ImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.JPEG);
                 return true;
             }
             if (trimmedComment.StartsWith("thumbnail_QOI", StringComparison.InvariantCultureIgnoreCase))
@@ -620,7 +626,10 @@ namespace DuetControlServer.Files
 
                         // Is it the end of this thumbnail?
                         string content = Encoding.ASCII.GetString(data, lineStart, lineLength);
-                        if ((charsWritten + lineLength < MaxThumbnailLength && lineLength == 0) || content.StartsWith("thumbnail end"))
+                        if ((charsWritten + lineLength < MaxThumbnailLength && lineLength == 0) ||
+                            content.StartsWith("thumbnail end") ||
+                            content.StartsWith("thumbnail_JPG end") ||
+                            content.StartsWith("thumbnail_QOI end"))
                         {
                             offset = 0;
                             break;

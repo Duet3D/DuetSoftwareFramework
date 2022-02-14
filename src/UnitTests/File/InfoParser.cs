@@ -33,6 +33,7 @@ namespace UnitTests.File
         }
 
         [TestCase("Thumbnail.gcode", 2)]
+        [TestCase("Thumbnail_JPG.gcode", 1)]
         [TestCase("Thumbnail_QOI.gcode", 2)]
         [TestCase("BenchyIcon.gcode", 1)]
         public async Task TestThumbnails(string fileName, int thumbnailCount)

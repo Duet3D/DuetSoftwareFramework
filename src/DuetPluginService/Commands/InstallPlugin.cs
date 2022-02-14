@@ -177,7 +177,7 @@ namespace DuetPluginService.Commands
 
                     if (!File.Exists(sbcExecutable))
                     {
-                        throw new ArgumentException("SBC executable {0} not found", plugin.SbcExecutable);
+                        throw new ArgumentException($"SBC executable {plugin.SbcExecutable} not found");
                     }
                 }
 
@@ -194,6 +194,7 @@ namespace DuetPluginService.Commands
                         Directory.CreateDirectory(directory);
                     }
 
+#warning check if this is fixed in ASP.NET 6
 #if true
                     // Copy the file. ASP.NET 5 does not perform lstat on symlinks so files served from symlinks are always truncated
                     _logger.Debug("Copying {0} -> {1}", pluginWwwPath, installWwwPath);
