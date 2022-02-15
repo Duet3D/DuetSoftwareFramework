@@ -25,5 +25,5 @@ Official web interface for Duet electronics
 
 %files
 %defattr(-,dsf,dsf,-)
-%{dsfoptdir}/dwc2
+%{dsfoptdir}/dwc
 %{dsfoptdir}/sd/www
