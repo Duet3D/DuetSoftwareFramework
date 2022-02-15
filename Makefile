@@ -119,7 +119,7 @@ DuetRuntime-version := $(DuetControlServer-version)
 DuetSD-version := $(shell sed -n -r -e "s/^Version:\s+([0-9.]+)$$/\1/p" pkg/deb/duetsd/DEBIAN/control)
 DuetSoftwareFramework-version := $(DuetControlServer-version)
 DuetTools-version := $(DuetControlServer-version)
-DuetWebControl-repo := https://github.com/chrishamm/DuetWebControl.git
+DuetWebControl-repo := https://github.com/Duet3D/DuetWebControl.git
 # Exception...  This variable has to be dynamically expanded because
 # at the time the Makefile is parsed, DWC may not have been
 # downloaded or updated yet.
@@ -188,14 +188,22 @@ DuetWebControl.%: BUILD_ARCH = all
 # been updated.  Building it take a while so there's
 # no need to do it if it hasn't changed.
 #
+
 FORCE:
+
 $(CONFIGDIR)/all/publish/DuetWebControl/package.json: FORCE
 	$(CMD_PREFIX)mkdir -p $(dir $(OUTPUTDIR))
-	$(CMD_PREFIX)if [ ! -d $(OUTPUTDIR) ] ; then \
+	$(CMD_PREFIX)RECLONE=$$(git -C bin/Debug/all/publish/DuetWebControl remote -v 2>/dev/null | grep -q "chrishamm" && echo true || echo false) ;\
+	if [ ! -d $(OUTPUTDIR) ] || $${RECLONE} ; then \
+		if [ -d $(OUTPUTDIR) ] ; then \
+			$(TARGET_PRINTF) CLEAN DuetWebControl "" $(CONFIG) "$(BUILD_ARCH)" ;\
+			rm -rf $(OUTPUTDIR) || : ;\
+		fi ;\
 		$(TARGET_PRINTF) CLONE DuetWebControl "" $(CONFIG) "$(BUILD_ARCH)" ;\
 		git clone -q --single-branch --branch master $(DuetWebControl-repo) $(OUTPUTDIR) ;\
 	else \
-		$(TARGET_PRINTF) PULL DuetWebControl "" $(CONFIG) "all" ;\
+		$(TARGET_PRINTF) UPDATE DuetWebControl "" $(CONFIG) "all" ;\
+		git -C $(OUTPUTDIR) reset -q --hard HEAD ;\
 		git -C $(OUTPUTDIR) pull -q ;\
 	fi
 

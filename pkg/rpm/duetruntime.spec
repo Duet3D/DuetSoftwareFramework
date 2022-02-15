@@ -26,6 +26,5 @@ AutoReq:  0
 DSF Common Runtime Components
 
 %files
-%defattr(0644,root,root,-)
+%defattr(-,dsf,dsf,-)
 %{dsfoptdir}/bin/*
-%attr(0755,root,root) %{dsfoptdir}/bin/createdump
