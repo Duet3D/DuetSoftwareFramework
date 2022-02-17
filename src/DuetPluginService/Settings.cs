@@ -70,6 +70,7 @@ namespace DuetPluginService
         /// </summary>
         public static string PreinstallPackageCommand { get; set; } = "/usr/bin/apt";
 
+
         /// <summary>
         /// Command-line arguments to use before installing third-party packages
         /// </summary>
@@ -84,6 +85,16 @@ namespace DuetPluginService
         /// Command-line arguments to install third-party packages
         /// </summary>
         public static string InstallPackageArguments { get; set; } = "install -y {package}";
+
+        /// <summary>
+        /// Command to install third-party Python packages
+        /// </summary>
+        public static string InstallPythonPackageCommand { get; set; } = "/usr/bin/pip";
+
+        /// <summary>
+        /// Command-line arguments to install third-party Python packages
+        /// </summary>
+        public static string InstallPythonPackageArguments { get; set; } = "install {package}";
 
         /// <summary>
         /// Environment variables for the installation command

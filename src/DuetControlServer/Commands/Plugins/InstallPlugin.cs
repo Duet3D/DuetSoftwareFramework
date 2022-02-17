@@ -107,6 +107,17 @@ namespace DuetControlServer.Commands
                 }
             }
 
+            foreach (string package in plugin.SbcPythonDependencies)
+            {
+                foreach (char c in package)
+                {
+                    if (!char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '+' && c != '<' && c != '>' && c != '=' && c != ',')
+                    {
+                        throw new ArgumentException($"Illegal characters in required Python package {package}");
+                    }
+                }
+            }
+
             // Uninstall the old plugin (if applicable)
             using (await Model.Provider.AccessReadOnlyAsync())
             {

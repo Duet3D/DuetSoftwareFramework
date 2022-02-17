@@ -247,7 +247,8 @@ namespace DuetControlServer.Utility
             foreach (Board board in outdatedBoards)
             {
                 string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
-                Console.WriteLine("- {0} ({1} -> {2}){3}", board.Name, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
+                string boardName = board.Name ?? $"Duet 3 Expansion {board.ShortName}";
+                Console.WriteLine("- {0} ({1} -> {2}){3}", boardName, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
             }
 
             // Determine which boards are supposed to be updated

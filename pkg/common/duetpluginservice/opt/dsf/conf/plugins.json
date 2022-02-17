@@ -11,6 +11,8 @@
   "PreinstallPackageArguments": "update",
   "InstallPackageCommand": "/usr/bin/apt",
   "InstallPackageArguments": "install -y {package}",
+  "InstallPythonPackageCommand": "/usr/bin/pip",
+  "InstallPythonPackageArguments": "install {package}",
   "InstallPackageEnvironment": {
     "DEBIAN_FRONTEND": "noninteractive"
   },

@@ -56,6 +56,12 @@ namespace DuetPluginService.Commands
                     await InstallPackage(package);
                 }
 
+                foreach (string package in plugin.SbcPythonDependencies)
+                {
+                    _logger.Info("Installing Python package {0}", package);
+                    await InstallPythonPackage(package);
+                }
+
                 // Apply security profile for this plugin unless it gets root permissions anyway
                 if (!plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser))
                 {
@@ -290,6 +296,38 @@ namespace DuetPluginService.Commands
                 {
                     FileName = Settings.InstallPackageCommand,
                     Arguments = Settings.InstallPackageArguments.Replace("{package}", package)
+                };
+                foreach (var kv in Settings.InstallPackageEnvironment)
+                {
+                    startInfo.EnvironmentVariables.Add(kv.Key, kv.Value);
+                }
+
+                using Process process = Process.Start(startInfo);
+                await process.WaitForExitAsync(Program.CancellationToken);
+                if (process.ExitCode != 0)
+                {
+                    throw new ArgumentException($"Failed to install package {package}, package manager exited with code {process.ExitCode}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Install a Python package
+        /// </summary>
+        /// <param name="package">Name of the package to install</param>
+        private static async Task InstallPythonPackage(string package)
+        {
+            if (!Program.IsRoot)
+            {
+                throw new ArgumentException("Cannot install packages as regular user");
+            }
+
+            using (await _packageLock.LockAsync(Program.CancellationToken))
+            {
+                ProcessStartInfo startInfo = new()
+                {
+                    FileName = Settings.InstallPythonPackageCommand,
+                    Arguments = Settings.InstallPythonPackageArguments.Replace("{package}", package)
                 };
                 foreach (var kv in Settings.InstallPackageEnvironment)
                 {

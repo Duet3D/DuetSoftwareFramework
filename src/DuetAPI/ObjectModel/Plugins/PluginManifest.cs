@@ -201,6 +201,11 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<string> SbcPackageDependencies { get; } = new ModelCollection<string>();
 
         /// <summary>
+        /// List of Python packages this plugin depends on
+        /// </summary>
+        public ModelCollection<string> SbcPythonDependencies { get; } = new ModelCollection<string>();
+
+        /// <summary>
         /// List of SBC plugins this plugin depends on. Circular dependencies are not supported
         /// </summary>
         public ModelCollection<string> SbcPluginDependencies { get; } = new ModelCollection<string>();
