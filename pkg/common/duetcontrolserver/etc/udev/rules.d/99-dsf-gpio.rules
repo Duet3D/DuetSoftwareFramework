@@ -1,2 +1,3 @@
 SUBSYSTEM=="gpio", KERNEL=="gpio*", GROUP="gpio", MODE="0660"
+SUBSYSTEM=="i2c-dev", KERNEL=="i2c*", GROUP="gpio", MODE="0660"
 SUBSYSTEM=="spidev", KERNEL=="spidev*", GROUP="gpio", MODE="0660"
