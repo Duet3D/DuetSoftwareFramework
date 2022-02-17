@@ -425,7 +425,7 @@ Compatible files:
 - DuetWebControl 2.1.4
 
 Changed behaviour:
-- Implemented conditional G-code according to https://duet3d.dozuki.com/Wiki/GCode_Meta_Commands (same command set as supported by RRF)
+- Implemented conditional G-code according to https://docs.duet3d.com/en/User_manual/Reference/Gcode_meta_commands (same command set as supported by RRF)
 - DuetAPI version number has been increased, however the previous one is still accepted
 - DuetAPI uses relaxed JSON escaping like in the DCS settings file
 - Added new fields stepsPerMm and microstepping to Axis amd Extruder items to DuetAPI
