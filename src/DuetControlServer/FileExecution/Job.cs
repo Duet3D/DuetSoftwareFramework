@@ -9,6 +9,7 @@ using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,17 +35,46 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         private static readonly AsyncLock _lock = new();
 
+        // Temporary to resolve current deadlock problems
+        private static StackTrace _lockingStackTrace;
+        private static StackTrace _lockedStackTrace;
+
+        public class LockWrapper : IDisposable
+        {
+            private IDisposable actualLock;
+
+            public LockWrapper(IDisposable l) => actualLock = l;
+
+            public void Dispose()
+            {
+                _lockedStackTrace = null;
+                actualLock.Dispose();
+            }
+        }
+
         /// <summary>
         /// Lock this class
         /// </summary>
         /// <returns>Disposable lock</returns>
-        public static IDisposable Lock() => _lock.Lock(Program.CancellationToken);
+        public static IDisposable Lock()
+        {
+            _lockingStackTrace = new StackTrace(true);
+            IDisposable l = _lock.Lock(Program.CancellationToken);
+            _lockedStackTrace = _lockingStackTrace;
+            return new LockWrapper(l);
+        }
 
         /// <summary>
         /// Lock this class asynchronously
         /// </summary>
         /// <returns>Disposable lock</returns>
-        public static AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
+        public static async Task<IDisposable> LockAsync()
+        {
+            _lockingStackTrace = new StackTrace(true);
+            IDisposable l = await _lock.LockAsync(Program.CancellationToken);
+            _lockedStackTrace = _lockingStackTrace;
+            return new LockWrapper(l);
+        }
 
         /// <summary>
         /// Condition to trigger when the print is supposed to resume
@@ -215,7 +245,7 @@ namespace DuetControlServer.FileExecution
                 // Wait for the next print to start
                 CancellationToken cancellationToken;
                 bool startingNewPrint;
-                using (await _lock.LockAsync(Program.CancellationToken))
+                using (await LockAsync())
                 {
                     await _resume.WaitAsync(Program.CancellationToken);
                     startingNewPrint = !_file.IsClosed;
@@ -240,7 +270,7 @@ namespace DuetControlServer.FileExecution
                             sharedCode.Reset();
 
                             // Stop reading codes if the print has been paused or aborted
-                            using (await _lock.LockAsync(Program.CancellationToken))
+                            using (await LockAsync())
                             {
                                 if (IsPaused)
                                 {
@@ -293,7 +323,7 @@ namespace DuetControlServer.FileExecution
                             }
                             catch (Exception e)
                             {
-                                using (await _lock.LockAsync(Program.CancellationToken))
+                                using (await LockAsync())
                                 {
                                     _file.Close();
                                 }
@@ -340,7 +370,7 @@ namespace DuetControlServer.FileExecution
                         }
                         else
                         {
-                            using (await _lock.LockAsync(Program.CancellationToken))
+                            using (await LockAsync())
                             {
                                 if (IsPaused)
                                 {
@@ -364,7 +394,7 @@ namespace DuetControlServer.FileExecution
                     }
                     while (!Program.CancellationToken.IsCancellationRequested);
 
-                    using (await _lock.LockAsync(Program.CancellationToken))
+                    using (await LockAsync())
                     {
                         // Notify RepRapFirmware that the print file has been closed
                         if (IsCancelled)
@@ -424,7 +454,7 @@ namespace DuetControlServer.FileExecution
                     }
                 }
 
-                using (await _lock.LockAsync(Program.CancellationToken))
+                using (await LockAsync())
                 {
                     // We are no longer printing a file...
                     _finished.NotifyAll();
@@ -562,6 +592,12 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public static async Task Diagnostics(StringBuilder builder)
         {
+            Console.WriteLine("Locking stack trace:");
+            Console.WriteLine(_lockingStackTrace);
+            Console.WriteLine("Locked stack trace:");
+            Console.WriteLine(_lockedStackTrace);
+            Console.WriteLine("END");
+
             using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
             IDisposable lockObject = null;
             try
