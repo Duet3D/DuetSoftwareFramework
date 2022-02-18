@@ -38,6 +38,16 @@ namespace DuetAPI.ObjectModel
         private int? _canAddress;
 
         /// <summary>
+        /// Closed loop data of this board or null if unknown
+        /// </summary>
+        public ClosedLoop ClosedLoop
+        {
+            get => _closedLoop;
+            set => SetPropertyValue(ref _closedLoop, value);
+        }
+        private ClosedLoop _closedLoop;
+
+        /// <summary>
         /// Details about a connected display or null if none is connected
         /// </summary>
         public DirectDisplay DirectDisplay
