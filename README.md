@@ -37,7 +37,7 @@ More technical documentation about this can be found [here](https://duet3d.githu
 DuetControlServer provides a UNIX socket for inter-process commmunication. This socket usually resides in `/var/run/dsf/dcs.sock` .
 For .NET, DSF provides the `DuetAPIClient` class library which is also used internally by the DSF core applications.
 
-Technical information about the way the communication over the UNIX socket works can be found in the [API description](#api).
+Technical information about the way the communication over the UNIX socket works can be found in the [API Overview](https://github.com/Duet3D/DuetSoftwareFramework/wiki/API-Overview).
 
 ### Object Model
 
