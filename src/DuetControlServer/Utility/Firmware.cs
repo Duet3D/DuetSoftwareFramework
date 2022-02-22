@@ -247,7 +247,7 @@ namespace DuetControlServer.Utility
             foreach (Board board in outdatedBoards)
             {
                 string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
-                string boardName = board.Name ?? $"Duet 3 Expansion {board.ShortName}";
+                string boardName = string.IsNullOrEmpty(board.Name) ? $"Duet 3 Expansion {board.ShortName}" : board.Name;
                 Console.WriteLine("- {0} ({1} -> {2}){3}", boardName, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
             }
 
@@ -282,7 +282,7 @@ namespace DuetControlServer.Utility
                     foreach (Board board in outdatedBoards)
                     {
                         string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
-                        string boardName = board.Name ?? $"Duet 3 Expansion {board.ShortName}";
+                        string boardName = string.IsNullOrEmpty(board.Name) ? $"Duet 3 Expansion {board.ShortName}" : board.Name;
                         Console.Write("Would you like to update {0} ({1} -> {2}){3} (Y/n)? ", boardName, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
                         key = char.ToUpper(Console.ReadKey().KeyChar);
                         if (key != '\r')
@@ -365,6 +365,7 @@ namespace DuetControlServer.Utility
                     _logger.Debug(e);
                 }
             }
+#warning else check if expansison boards were updated and ask for reset (but remember unattended mode)
 
             // Done
             await Program.Shutdown();
@@ -441,7 +442,7 @@ namespace DuetControlServer.Utility
             foreach (Board board in outdatedBoards)
             {
                 string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
-                string boardName = board.Name ?? $"Duet 3 Expansion {board.ShortName}";
+                string boardName = string.IsNullOrEmpty(board.Name) ? $"Duet 3 Expansion {board.ShortName}" : board.Name;
                 Console.WriteLine("- {0} ({1} -> {2}){3}", boardName, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
             }
 
@@ -471,7 +472,7 @@ namespace DuetControlServer.Utility
                     foreach (Board board in outdatedBoards)
                     {
                         string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
-                        string boardName = board.Name ?? $"Duet 3 Expansion {board.ShortName}";
+                        string boardName = string.IsNullOrEmpty(board.Name) ? $"Duet 3 Expansion {board.ShortName}" : board.Name;
                         Console.Write("Would you like to update {0} ({1} -> {2}){3} (Y/n)? ", boardName, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
                         key = char.ToUpper(Console.ReadKey().KeyChar);
                         if (key != '\r')
@@ -553,6 +554,7 @@ namespace DuetControlServer.Utility
                     _logger.Debug(e);
                 }
             }
+#warning else check if expansison boards were updated and ask for reset (but remember unattended mode)
         }
     }
 }
