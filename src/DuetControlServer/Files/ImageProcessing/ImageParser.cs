@@ -3,6 +3,7 @@ using DuetAPI.ObjectModel;
 using System;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Files.ImageProcessing
@@ -12,6 +13,11 @@ namespace DuetControlServer.Files.ImageProcessing
     /// </summary>
     public static class ImageParser
     {
+        /// <summary>
+        /// Regex to test if a string is valid base64 data
+        /// </summary>
+        private static readonly Regex Base64Regex = new(@"^[A-Za-z0-9+/=]+$", RegexOptions.Compiled);
+
         /// <summary>
         /// Extract thumbnails images from a file
         /// </summary>
@@ -84,7 +90,8 @@ namespace DuetControlServer.Files.ImageProcessing
                 {
                     if (readThumbnailContent)
                     {
-                        thumbnail.Data = data.ToString();
+                        string dataContent = data.ToString();
+                        thumbnail.Data = Base64Regex.IsMatch(dataContent) ? dataContent : null;
                     }
                     parsedFileInfo.Thumbnails.Add(thumbnail);
                     return;

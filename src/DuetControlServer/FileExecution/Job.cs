@@ -35,46 +35,17 @@ namespace DuetControlServer.FileExecution
         /// </summary>
         private static readonly AsyncLock _lock = new();
 
-        // Temporary to resolve current deadlock problems
-        private static StackTrace _lockingStackTrace;
-        private static StackTrace _lockedStackTrace;
-
-        public class LockWrapper : IDisposable
-        {
-            private IDisposable actualLock;
-
-            public LockWrapper(IDisposable l) => actualLock = l;
-
-            public void Dispose()
-            {
-                _lockedStackTrace = null;
-                actualLock.Dispose();
-            }
-        }
-
         /// <summary>
         /// Lock this class
         /// </summary>
         /// <returns>Disposable lock</returns>
-        public static IDisposable Lock()
-        {
-            _lockingStackTrace = new StackTrace(true);
-            IDisposable l = _lock.Lock(Program.CancellationToken);
-            _lockedStackTrace = _lockingStackTrace;
-            return new LockWrapper(l);
-        }
+        public static IDisposable Lock() => _lock.Lock(Program.CancellationToken);
 
         /// <summary>
         /// Lock this class asynchronously
         /// </summary>
         /// <returns>Disposable lock</returns>
-        public static async Task<IDisposable> LockAsync()
-        {
-            _lockingStackTrace = new StackTrace(true);
-            IDisposable l = await _lock.LockAsync(Program.CancellationToken);
-            _lockedStackTrace = _lockingStackTrace;
-            return new LockWrapper(l);
-        }
+        public static Task<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
 
         /// <summary>
         /// Condition to trigger when the print is supposed to resume
@@ -592,12 +563,6 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public static async Task Diagnostics(StringBuilder builder)
         {
-            Console.WriteLine("Locking stack trace:");
-            Console.WriteLine(_lockingStackTrace);
-            Console.WriteLine("Locked stack trace:");
-            Console.WriteLine(_lockedStackTrace);
-            Console.WriteLine("END");
-
             using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
             IDisposable lockObject = null;
             try

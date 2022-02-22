@@ -291,7 +291,7 @@ namespace DuetControlServer.Commands
         public override Task<Message> Execute()
         {
             // Wait until this code can be executed and then start it
-            Task<Message> executingTask = WaitForExecution()
+            CodeTask = WaitForExecution()
                 .ContinueWith(async task =>
                 {
                     try
@@ -307,7 +307,7 @@ namespace DuetControlServer.Commands
                 .Unwrap();
 
             // Return either the task itself or null and let it finish in the background
-            return Flags.HasFlag(CodeFlags.Asynchronous) ? Task.FromResult<Message>(null) : executingTask;
+            return Flags.HasFlag(CodeFlags.Asynchronous) ? Task.FromResult<Message>(null) : CodeTask;
         }
 
         /// <summary>
@@ -578,6 +578,11 @@ namespace DuetControlServer.Commands
         /// TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
         /// </summary>
         internal TaskCompletionSource FirmwareTCS { get; private set; }
+
+        /// <summary>
+        /// Actual task of this code
+        /// </summary>
+        internal Task<Message> CodeTask { get; private set; }
 
         /// <summary>
         /// Indicates if the code has been fully executed (including the Executed interceptor if applicable)

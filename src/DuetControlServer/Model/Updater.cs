@@ -46,6 +46,11 @@ namespace DuetControlServer.Model
         private static readonly ConcurrentDictionary<string, int> _lastSeqs = new();
 
         /// <summary>
+        /// Last invalid JSON response. This should always be null
+        /// </summary>
+        private static string _lastInvalidJsonResponse;
+
+        /// <summary>
         /// Wait for the model to be fully updated from RepRapFirmware
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
@@ -270,7 +275,12 @@ namespace DuetControlServer.Model
                 }
                 catch (JsonException e)
                 {
-                    _logger.Error(e, "Failed to merge JSON: {0}", Encoding.UTF8.GetString(jsonData));
+                    string jsonResponse = Encoding.UTF8.GetString(jsonData);
+                    _logger.Error(e, "Failed to merge JSON: {0}", jsonResponse);
+                    using (await _lock.LockAsync(Program.CancellationToken))
+                    {
+                        _lastInvalidJsonResponse = jsonResponse;
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -461,6 +471,23 @@ namespace DuetControlServer.Model
             }
 
             _lastSeqs.Clear();
+        }
+
+        /// <summary>
+        /// Print diagnostics of this class
+        /// </summary>
+        /// <param name="builder">String builder</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task Diagnostics(StringBuilder builder)
+        {
+            using (await _lock.LockAsync(Program.CancellationToken))
+            {
+                if (_lastInvalidJsonResponse != null)
+                {
+                    builder.AppendLine("Last invalid JSON response:");
+                    builder.AppendLine(_lastInvalidJsonResponse);
+                }
+            }
         }
     }
 }

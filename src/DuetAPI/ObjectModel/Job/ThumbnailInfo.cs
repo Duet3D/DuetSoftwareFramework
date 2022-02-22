@@ -6,7 +6,7 @@
     public sealed class ThumbnailInfo : ModelObject
     {
         /// <summary>
-        /// Base64-encoded thumbnail
+        /// Base64-encoded thumbnail or null if invalid or not requested
         /// </summary>
         /// <remarks>
         /// This property is not provided by RepRapFirmware fileinfo results and it may be null if no thumbnail content is requested

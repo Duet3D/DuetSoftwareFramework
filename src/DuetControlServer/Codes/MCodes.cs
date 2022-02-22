@@ -919,7 +919,11 @@ namespace DuetControlServer.Codes
                             // Terminate the program - or - restart the plugins when done
                             if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
                             {
-                                await Program.Shutdown();
+                                _ = code.CodeTask.ContinueWith(async task =>
+                                {
+                                    await task;
+                                    await Program.Shutdown();
+                                }, TaskContinuationOptions.RunContinuationsAsynchronously);
                             }
                             else
                             {
@@ -960,7 +964,7 @@ namespace DuetControlServer.Codes
         /// <param name="code">Code processed by RepRapFirmware</param>
         /// <returns>Result to output</returns>
         /// <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
-        public static async Task CodeExecuted(Code code)
+        public static async Task CodeExecuted(Commands.Code code)
         {
             if (code.Result == null || code.Result.Type != MessageType.Success)
             {
@@ -999,7 +1003,11 @@ namespace DuetControlServer.Codes
                     if (!Settings.NoTerminateOnReset && code.Parameters.Count == 0)
                     {
                         // DCS is supposed to terminate via M999 unless this option is explicitly disabled
-                        await Program.Shutdown();
+                        _ = code.CodeTask.ContinueWith(async task =>
+                        {
+                            await task;
+                            await Program.Shutdown();
+                        }, TaskContinuationOptions.RunContinuationsAsynchronously);
                     }
                     break;
             }
@@ -1017,6 +1025,7 @@ namespace DuetControlServer.Codes
             builder.AppendLine($"Duet Control Server v{Program.Version}");
 
             await FileExecution.Job.Diagnostics(builder);
+            await Model.Updater.Diagnostics(builder);
             await SPI.Interface.Diagnostics(builder);
 
             result.Append(MessageType.Success, builder.ToString());
