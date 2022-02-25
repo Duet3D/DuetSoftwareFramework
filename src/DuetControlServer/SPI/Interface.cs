@@ -228,7 +228,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Channel to query</param>
         /// <returns>Whether the channel is awaiting acknowledgement</returns>
-        public static bool IsWaitingForAcknowledgement(CodeChannel channel) => _channels[channel].IsWaitingForAcknowledgement;
+        public static bool IsWaitingForAcknowledgment(CodeChannel channel) => _channels[channel].IsWaitingForAcknowledgement;
 
         /// <summary>
         /// Enqueue a G/M/T-code for execution by RepRapFirmware
@@ -1318,7 +1318,7 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Handle a firmwre request that is sent when RRF has succesfully acknowledged a blocking message
+        /// Handle a firmware request that is sent when RRF has successfully acknowledged a blocking message
         /// </summary>
         private static void HandleMessageAcknowledgement()
         {

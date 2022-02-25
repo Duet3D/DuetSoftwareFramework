@@ -31,29 +31,9 @@ namespace DuetControlServer.Files
         public const string DsfConfigFile = "dsf-config.g";
 
         /// <summary>
-        /// Daemon file used to perform periodic tasks
-        /// </summary>
-        public const string DaemonFile = "daemon.g";
-
-        /// <summary>
-        /// Default heightmap file
-        /// </summary>
-        public const string DefaultHeightmapFile = "heightmap.csv";
-
-        /// <summary>
-        /// Macro to be called when G29 is invoked without an S parameter
-        /// </summary>
-        public const string MeshFile = "mesh.g";
-
-        /// <summary>
         /// File to run once after start if it exists, then deleted again
         /// </summary>
         public const string RunOnceFile = "runonce.g";
-
-        /// <summary>
-        /// File holding the filaments mapping
-        /// </summary>
-        public const string FilamentsFile = "filaments.csv";
 
         /// <summary>
         /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path.
@@ -64,6 +44,8 @@ namespace DuetControlServer.Files
         /// <returns>Resolved file path</returns>
         public static string ToPhysical(string filePath, FileDirectory directory)
         {
+            filePath = filePath.Replace('\\', '/');
+
             Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
@@ -129,6 +111,8 @@ namespace DuetControlServer.Files
         /// <returns>Resolved file path</returns>
         public static async Task<string> ToPhysicalAsync(string filePath, FileDirectory directory)
         {
+            filePath = filePath.Replace('\\', '/');
+
             Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
@@ -194,6 +178,8 @@ namespace DuetControlServer.Files
         /// <returns>Resolved file path</returns>
         public static string ToPhysical(string filePath, string directory = null)
         {
+            filePath = filePath.Replace('\\', '/');
+
             Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
@@ -246,6 +232,8 @@ namespace DuetControlServer.Files
         /// <returns>Resolved file path</returns>
         public static async Task<string> ToPhysicalAsync(string filePath, string directory = null)
         {
+            filePath = filePath.Replace('\\', '/');
+
             Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {

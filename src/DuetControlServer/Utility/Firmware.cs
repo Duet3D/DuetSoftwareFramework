@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 namespace DuetControlServer.Utility
 {
     /// <summary>
-    /// Helper class for the firmware fiels
+    /// Helper class for the firmware fields
     /// </summary>
     public static class Firmware
     {
@@ -114,7 +114,7 @@ namespace DuetControlServer.Utility
         /// </summary>
         /// <param name="filename">Firmware file</param>
         /// <returns>Firmware version or null if not found</returns>
-        public static async Task<string> GetFirmwareVersion(string filename)
+        private static async Task<string> GetFirmwareVersion(string filename)
         {
             Stream firmwareFile = null;
             try
@@ -365,7 +365,26 @@ namespace DuetControlServer.Utility
                     _logger.Debug(e);
                 }
             }
-#warning else check if expansison boards were updated and ask for reset (but remember unattended mode)
+            else if (boardsToUpdate.Count > 0)
+            {
+                Console.WriteLine("Resetting mainboard... ");
+                try
+                {
+                    Commands.Code updateCode = new()
+                    {
+                        Channel = DuetAPI.CodeChannel.Trigger,
+                        Type = CodeType.MCode,
+                        MajorNumber = 999
+                    };
+                    Message result = await updateCode.Execute();
+                    Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Error: {0}", e.Message);
+                    _logger.Debug(e);
+                }
+            }
 
             // Done
             await Program.Shutdown();
@@ -554,7 +573,26 @@ namespace DuetControlServer.Utility
                     _logger.Debug(e);
                 }
             }
-#warning else check if expansison boards were updated and ask for reset (but remember unattended mode)
+            else if (boardsToUpdate.Count > 0)
+            {
+                Console.WriteLine("Resetting mainboard... ");
+                try
+                {
+                    Commands.Code updateCode = new()
+                    {
+                        Type = CodeType.MCode,
+                        MajorNumber = 999
+                    };
+
+                    Message result = await commandConnection.PerformCode(updateCode);
+                    Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Error: {0}", e.Message);
+                    _logger.Debug(e);
+                }
+            }
         }
     }
 }

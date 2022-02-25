@@ -182,9 +182,9 @@ namespace DuetControlServer.Commands
                 return (Macro == null) ? _codeStartLocks[(int)Channel, (int)InternalCodeType.Macro].LockAsync(CancellationToken) : Macro.WaitForCodeStart();
             }
 
-            // Wait for pending codes for message acknowledgements
+            // Wait for pending codes for message acknowledgments
             // FIXME M0/M1 are not meant to be used while a message box is open
-            if (!Flags.HasFlag(CodeFlags.IsFromFirmware) && Interface.IsWaitingForAcknowledgement(Channel) &&
+            if (!Flags.HasFlag(CodeFlags.IsFromFirmware) && Interface.IsWaitingForAcknowledgment(Channel) && File == null &&
                 (Type != CodeType.MCode || (MajorNumber != 0 && MajorNumber != 1)))
             {
                 _codeType = InternalCodeType.Acknowledgement;
