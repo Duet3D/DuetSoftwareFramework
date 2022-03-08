@@ -29,7 +29,7 @@ namespace DuetControlServer.SPI
 
         // General transfer variables
         private static InputGpioPin _transferReadyPin;
-        private static bool _expectedTfrRdyPinValue = false;
+        private static bool _expectedTfrRdyPinValue;
         private static SpiDevice _spiDevice;
         private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting, _updating;
         private static ushort _lastTransferNumber;
@@ -318,7 +318,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Returns the number of packets to read
         /// </summary>
-        public static int PacketsToRead { get => _rxHeader.NumPackets; }
+        public static int PacketsToRead => _rxHeader.NumPackets;
 
         /// <summary>
         /// Read the next packet
@@ -524,7 +524,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Read a request to close a file
         /// </summary>
-        /// <param name="handle">File hadle</param>
+        /// <param name="handle">File handle</param>
         public static void ReadCloseFile(out uint handle)
         {
             Serialization.Reader.ReadFileHandle(_packetData.Span, out handle);
@@ -580,7 +580,7 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Get a span on a 4-byte bounary for writing packet data
+        /// Get a span on a 4-byte boundary for writing packet data
         /// </summary>
         /// <param name="dataLength">Required data length</param>
         /// <returns>Data span</returns>
@@ -737,7 +737,7 @@ namespace DuetControlServer.SPI
         /// Request the key of a object module of a specific module
         /// </summary>
         /// <param name="key">Object model key to query</param>
-        /// <param name="flags">Objecvt model flags to query</param>
+        /// <param name="flags">Object model flags to query</param>
         /// <returns>True if the packet could be written</returns>
         public static bool WriteGetObjectModel(string key, string flags)
         {
@@ -1163,7 +1163,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Send back whether a file or directory could be deleted
         /// </summary>
-        /// <param name="exists">Whether the file exists</param>
+        /// <param name="success">Whether the file operation was successful</param>
         /// <returns>If the packet could be written</returns>
         public static bool WriteFileDeleteResult(bool success)
         {
@@ -1408,7 +1408,7 @@ namespace DuetControlServer.SPI
                 _rxHeader = MemoryMarshal.Read<TransferHeader>(_rxHeaderBuffer.Span);
                 if (_rxHeader.FormatCode == 0 || _rxHeader.FormatCode == 0xFF)
                 {
-                    throw new OperationCanceledException($"Board is not available (no header)");
+                    throw new OperationCanceledException("Board is not available (no header)");
                 }
 
                 // Change the protocol version if necessary
@@ -1429,7 +1429,7 @@ namespace DuetControlServer.SPI
                     uint crc32 = CRC32.Calculate(_rxHeaderBuffer[..12].Span);
                     if (_rxHeader.ChecksumHeader32 != crc32)
                     {
-                        _logger.Warn("Bad header CRC32 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader32.ToString("x8"), crc32.ToString("x8"));
+                        _logger.Warn("Bad header CRC32 (expected 0x{0:x8}, got 0x{1:x8})", _rxHeader.ChecksumHeader32, crc32);
                         responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
@@ -1438,7 +1438,7 @@ namespace DuetControlServer.SPI
                         }
                         if (responseCode != TransferResponse.Success)
                         {
-                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                         }
                         continue;
                     }
@@ -1448,7 +1448,7 @@ namespace DuetControlServer.SPI
                     ushort crc16 = CRC16.Calculate(_rxHeaderBuffer[..10].Span);
                     if (_rxHeader.ChecksumHeader16 != crc16)
                     {
-                        _logger.Warn("Bad header CRC16 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader16.ToString("x4"), crc16.ToString("x4"));
+                        _logger.Warn("Bad header CRC16 (expected 0x{0:x4}, got 0x{1:x4})", _rxHeader.ChecksumHeader16, crc16);
                         responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
@@ -1457,7 +1457,7 @@ namespace DuetControlServer.SPI
                         }
                         if (responseCode != TransferResponse.Success)
                         {
-                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                         }
                         continue;
                     }
@@ -1488,14 +1488,8 @@ namespace DuetControlServer.SPI
 
                 if (lastProtocolVersion != _txHeader.ProtocolVersion)
                 {
-                    if (_txHeader.ProtocolVersion < Consts.ProtocolVersion)
-                    {
-                        _logger.Warn("Downgrading protocol version {0} to {1}", lastProtocolVersion, _txHeader.ProtocolVersion);
-                    }
-                    else
-                    {
-                        _logger.Warn("Upgrading protocol version {0} to {1}", lastProtocolVersion, _txHeader.ProtocolVersion);
-                    }
+                    _logger.Warn(_txHeader.ProtocolVersion < Consts.ProtocolVersion ? "Downgrading protocol version {0} to {1}" : "Upgrading protocol version {0} to {1}",
+                        lastProtocolVersion, _txHeader.ProtocolVersion);
                 }
 
                 // Check the data length
@@ -1527,7 +1521,7 @@ namespace DuetControlServer.SPI
                     case TransferResponse.HighPin:
                         throw new OperationCanceledException("Board is not available (no header response)");
                     default:
-                        _logger.Warn("Restarting transfer because a bad header response was received (0x{0})", response.ToString("x8"));
+                        _logger.Warn("Restarting transfer because a bad header response was received (0x{0:x8})", response);
                         ExchangeResponse(TransferResponse.BadResponse);
                         return false;
                 }
@@ -1580,7 +1574,7 @@ namespace DuetControlServer.SPI
                     uint crc32 = CRC32.Calculate(_rxBuffer[.._rxHeader.DataLength].Span);
                     if (crc32 != _rxHeader.ChecksumData32)
                     {
-                        _logger.Warn("Bad data CRC32 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData32.ToString("x8"), crc32.ToString("x8"));
+                        _logger.Warn("Bad data CRC32 (expected 0x{0:x8}, got 0x{1:x8})", _rxHeader.ChecksumData32, crc32);
                         responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
@@ -1589,7 +1583,7 @@ namespace DuetControlServer.SPI
                         }
                         if (responseCode != TransferResponse.Success)
                         {
-                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                         }
                         continue;
                     }
@@ -1599,7 +1593,7 @@ namespace DuetControlServer.SPI
                     ushort crc16 = CRC16.Calculate(_rxBuffer[.._rxHeader.DataLength].Span);
                     if (crc16 != _rxHeader.ChecksumData16)
                     {
-                        _logger.Warn("Bad data CRC16 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData16.ToString("x4"), crc16.ToString("x4"));
+                        _logger.Warn("Bad data CRC16 (expected 0x{0:x4}, got 0x{1:x4})", _rxHeader.ChecksumData16, crc16);
                         responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
@@ -1608,7 +1602,7 @@ namespace DuetControlServer.SPI
                         }
                         if (responseCode != TransferResponse.Success)
                         {
-                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                         }
                         continue;
                     }
@@ -1630,7 +1624,7 @@ namespace DuetControlServer.SPI
                     case TransferResponse.HighPin:
                         throw new OperationCanceledException("Board is not available (no data response)");
                     default:
-                        _logger.Warn("Restarting transfer because a bad data response was received (0x{0})", response.ToString("x8"));
+                        _logger.Warn("Restarting transfer because a bad data response was received (0x{0:x8})", response);
                         ExchangeResponse(TransferResponse.BadResponse);
                         return false;
                 }

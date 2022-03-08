@@ -33,7 +33,7 @@ namespace DuetControlServer.Codes
 
             if (code.Keyword == KeywordType.Echo || code.Keyword == KeywordType.Abort)
             {
-                string result = string.Empty;
+                string result;
                 if (code.Keyword == KeywordType.Echo && !string.IsNullOrEmpty(code.KeywordArgument))
                 {
                     string keywordArgument = code.KeywordArgument.TrimStart();
@@ -97,9 +97,9 @@ namespace DuetControlServer.Codes
 
                         // Write it to the SD card
                         _logger.Debug("{0} '{1}' to {2}", append ? "Appending" : "Writing", result, filename);
-                        using (FileStream fs = new(physicalFilename, append ? FileMode.Append : FileMode.Create, FileAccess.Write))
+                        await using (FileStream fs = new(physicalFilename, append ? FileMode.Append : FileMode.Create, FileAccess.Write))
                         {
-                            using StreamWriter writer = new(fs);
+                            await using StreamWriter writer = new(fs);
                             await writer.WriteLineAsync(result);
                         }
 

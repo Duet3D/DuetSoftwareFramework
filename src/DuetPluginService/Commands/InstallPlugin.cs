@@ -155,8 +155,8 @@ namespace DuetPluginService.Commands
 
                     // Extract the file
                     _logger.Debug("Extracting {0} to {1}", entry.FullName, fileName);
-                    using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
-                    using Stream zipFileStream = entry.Open();
+                    await using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
+                    await using Stream zipFileStream = entry.Open();
                     await zipFileStream.CopyToAsync(fileStream);
 
                     // Make program binaries executable
@@ -227,7 +227,7 @@ namespace DuetPluginService.Commands
                 // Install refreshed plugin manifest
                 _logger.Debug("Installing plugin manifest");
                 string manifestFilename = Path.Combine(Settings.PluginDirectory, $"{plugin.Id}.json");
-                using (FileStream manifestFile = new(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (FileStream manifestFile = new(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
                     await JsonSerializer.SerializeAsync(manifestFile, plugin, JsonHelper.DefaultJsonOptions);
                 }
@@ -257,7 +257,7 @@ namespace DuetPluginService.Commands
             }
 
             Plugin plugin = new();
-            using (Stream manifestStream = manifestFile.Open())
+            await using (Stream manifestStream = manifestFile.Open())
             {
                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
                 plugin.UpdateFromJson(manifestJson.RootElement, false);

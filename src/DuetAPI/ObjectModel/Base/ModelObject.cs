@@ -90,7 +90,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <returns>Properties of this type</returns>
         [JsonIgnore]
-        public Dictionary<string, PropertyInfo> JsonProperties { get => _propertyInfos[GetType()]; }
+        public Dictionary<string, PropertyInfo> JsonProperties => _propertyInfos[GetType()];
 
         /// <summary>
         /// Assign the properties from another instance

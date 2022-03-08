@@ -405,7 +405,7 @@ namespace DuetWebServer.Controllers
                     }
 
                     // Write file
-                    using (FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.Write))
+                    await using (FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.Write))
                     {
                         await Request.Body.CopyToAsync(stream);
                     }
@@ -446,10 +446,11 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
-        /// GET /machine/fileinfo/{filename}
+        /// GET /machine/fileinfo/{filename}?readThumbnailContent=true/false
         /// Parse a given G-code file and return information about this job file as a JSON object.
         /// </summary>
         /// <param name="filename">G-code file to analyze</param>
+        /// <param name="readThumbnailContent">Whether thumbnail content may be read</param>
         /// <returns>
         /// HTTP status code:
         /// (200) File info as application/json
@@ -459,7 +460,7 @@ namespace DuetWebServer.Controllers
         /// (503) DCS is unavailable
         /// </returns>
         [HttpGet("fileinfo/{*filename}")]
-        public async Task<IActionResult> GetFileInfo(string filename, bool readThumbnailContent)
+        public async Task<IActionResult> GetFileInfo(string filename, bool readThumbnailContent = false)
         {
             filename = HttpUtility.UrlDecode(filename);
 
@@ -811,7 +812,7 @@ namespace DuetWebServer.Controllers
                 try
                 {
                     // Write ZIP file
-                    using (FileStream stream = new(zipFile, FileMode.Create, FileAccess.Write, FileShare.None))
+                    await using (FileStream stream = new(zipFile, FileMode.Create, FileAccess.Write, FileShare.None))
                     {
                         await Request.Body.CopyToAsync(stream);
                     }
@@ -1156,7 +1157,7 @@ namespace DuetWebServer.Controllers
                 try
                 {
                     // Write package file
-                    using (FileStream stream = new(packageFile, FileMode.Create, FileAccess.Write, FileShare.None))
+                    await using (FileStream stream = new(packageFile, FileMode.Create, FileAccess.Write, FileShare.None))
                     {
                         await Request.Body.CopyToAsync(stream);
                     }

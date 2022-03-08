@@ -111,7 +111,7 @@ namespace DuetPluginService
                 {
                     try
                     {
-                        using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
                         using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
                         Plugin plugin = new();
                         plugin.UpdateFromJson(manifestJson.RootElement, false);

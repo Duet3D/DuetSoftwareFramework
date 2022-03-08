@@ -42,7 +42,7 @@ namespace DuetControlServer.Commands
         /// <returns>Parsed G/M/T-codes</returns>
         public async IAsyncEnumerable<Code> ParseAsync()
         {
-            using MemoryStream stream = new(Encoding.UTF8.GetBytes(Code));
+            await using MemoryStream stream = new(Encoding.UTF8.GetBytes(Code));
             using StreamReader reader = new(stream);
             CodeParserBuffer buffer = new((int)stream.Length, Code.Contains('\n'));
 
@@ -52,7 +52,7 @@ namespace DuetControlServer.Commands
                 {
                     Channel = Channel,
                     Connection = Connection,
-                    SourceConnection = (Connection != null) ? Connection.Id : 0
+                    SourceConnection = Connection?.Id ?? 0
                 };
 
                 if (await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer))

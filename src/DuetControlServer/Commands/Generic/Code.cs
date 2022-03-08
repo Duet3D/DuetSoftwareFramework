@@ -259,7 +259,7 @@ namespace DuetControlServer.Commands
             get => _connection;
             set
             {
-                SourceConnection = (value != null) ? value.Id : 0;
+                SourceConnection = value?.Id ?? 0;
                 _connection = value;
             }
         }
@@ -281,7 +281,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Indicates if this code is supposed to deal with a message box awaiting acknowledgement
         /// </summary>
-        internal bool IsForAcknowledgement { get => _codeType == InternalCodeType.Acknowledgement; }
+        internal bool IsForAcknowledgement => _codeType == InternalCodeType.Acknowledgement;
 
         /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish

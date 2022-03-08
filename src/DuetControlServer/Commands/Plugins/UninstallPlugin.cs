@@ -71,8 +71,8 @@ namespace DuetControlServer.Commands
             await IPC.Processors.PluginService.PerformCommand(stopCommand, plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser));
 
             // Make sure we don't attempt to start it again once it's uninstalled
-            using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
-            using StreamWriter writer = new(fileStream);
+            await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
+            await using StreamWriter writer = new(fileStream);
             using (await Model.Provider.AccessReadOnlyAsync())
             {
                 foreach (Plugin item in Model.Provider.Get.Plugins.Values)

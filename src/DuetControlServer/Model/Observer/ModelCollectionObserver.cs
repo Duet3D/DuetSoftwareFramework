@@ -111,7 +111,7 @@ namespace DuetControlServer.Model
         /// <returns>Change handler</returns>
         private static NotifyCollectionChangedEventHandler GrowingCollectionChanged(params object[] path)
         {
-            return (sender, e) =>
+            return (_, e) =>
             {
                 if (e.Action == NotifyCollectionChangedAction.Add)
                 {
@@ -128,7 +128,6 @@ namespace DuetControlServer.Model
         /// Subscribe to changes of the given model collection
         /// </summary>
         /// <param name="modelCollection">Collection to subscribe to</param>
-        /// <param name="itemType">Type of the items</param>
         /// <param name="collectionName">Name of the collection</param>
         /// <param name="path">Path of the subscription</param>
         private static void SubscribeToModelCollection(IModelCollection modelCollection, string collectionName, object[] path)
@@ -155,7 +154,6 @@ namespace DuetControlServer.Model
         /// Unsubscribe from changes of a model collection
         /// </summary>
         /// <param name="modelCollection">Collection to unsubscribe from</param>
-        /// <param name="itemType">Item type</param>
         private static void UnsubscribeFromModelCollection(IModelCollection modelCollection)
         {
             if (_collectionChangeHandlers.TryGetValue(modelCollection, out NotifyCollectionChangedEventHandler changeHandler))
@@ -168,9 +166,9 @@ namespace DuetControlServer.Model
             if (itemType != null && itemType.IsAssignableTo(typeof(IModelObject)))
             {
                 IList list = (IList)modelCollection;
-                for (int i = 0; i < list.Count; i++)
+                foreach (object listItem in list)
                 {
-                    if (list[i] is ModelObject item)
+                    if (listItem is ModelObject item)
                     {
                         UnsubscribeFromModelObject(item);
                     }

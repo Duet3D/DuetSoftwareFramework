@@ -48,7 +48,7 @@ namespace DuetControlServer.Commands
                 // Start all plugins
                 if (File.Exists(Settings.PluginsFilename))
                 {
-                    using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Open, FileAccess.Read);
+                    await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Open, FileAccess.Read);
                     using StreamReader reader = new(fileStream);
                     while (!reader.EndOfStream)
                     {

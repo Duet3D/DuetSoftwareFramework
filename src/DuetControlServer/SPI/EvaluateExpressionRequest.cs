@@ -43,7 +43,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Task that completes when the request has been fulfilled
         /// </summary>
-        public Task<object> Task { get => _tcs.Task; }
+        public Task<object> Task => _tcs.Task;
 
         /// <summary>
         /// Set the result of the evaluated expression

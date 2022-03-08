@@ -143,13 +143,11 @@ namespace DuetControlServer.IPC.Processors
                             await Connection.Send<DuetAPI.Commands.Code>(_codeBeingIntercepted);
 
                             // Keep processing incoming commands until a final action for the code has been received
-                            BaseCommand command;
-                            Type commandType;
                             do
                             {
                                 // Read another command from the IPC connection
-                                command = await Connection.ReceiveCommand();
-                                commandType = command.GetType();
+                                BaseCommand command = await Connection.ReceiveCommand();
+                                Type commandType = command.GetType();
                                 if (Command.SupportedCommands.Contains(commandType))
                                 {
                                     // Make sure it is permitted
@@ -176,12 +174,6 @@ namespace DuetControlServer.IPC.Processors
                                 }
                             }
                             while (!Program.CancellationToken.IsCancellationRequested);
-
-                            // Stop if the connection has been terminated
-                            if (command == null)
-                            {
-                                break;
-                            }
                         }
                         catch (SocketException)
                         {

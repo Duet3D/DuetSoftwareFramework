@@ -16,7 +16,7 @@ namespace DuetControlServer.Model
         public delegate void PropertyPathChanged(object[] path, PropertyChangeType changeType, object value);
 
         /// <summary>
-        /// Event to call when an objet model value has been changed
+        /// Event to call when an object model value has been changed
         /// </summary>
         public static event PropertyPathChanged OnPropertyPathChanged;
 

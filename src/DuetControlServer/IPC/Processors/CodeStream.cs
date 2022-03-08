@@ -97,9 +97,9 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Asynchronous task</returns>
         public override async Task Process()
         {
-            using NetworkStream stream = new(Connection.UnixSocket);
+            await using NetworkStream stream = new(Connection.UnixSocket);
             using StreamReader streamReader = new(stream);
-            using StreamWriter streamWriter = new(stream);
+            await using StreamWriter streamWriter = new(stream);
 
             _streamWriter = streamWriter;
             lock (_streams)
@@ -134,7 +134,8 @@ namespace DuetControlServer.IPC.Processors
                         {
                             break;
                         }
-                        using MemoryStream lineStream = new(Encoding.UTF8.GetBytes(line));
+
+                        await using MemoryStream lineStream = new(Encoding.UTF8.GetBytes(line));
                         using StreamReader lineReader = new(lineStream);
 
                         do

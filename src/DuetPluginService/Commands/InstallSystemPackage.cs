@@ -30,7 +30,7 @@ namespace DuetPluginService.Commands
         /// <returns></returns>
         private static async Task<bool> IsZipFile(string fileName)
         {
-            using FileStream fs = new(fileName, FileMode.Open, FileAccess.Read);
+            await using FileStream fs = new(fileName, FileMode.Open, FileAccess.Read);
             byte[] firstBytes = new byte[ZipSignature.Length];
 
             if (await fs.ReadAsync(firstBytes, Program.CancellationToken) == ZipSignature.Length)

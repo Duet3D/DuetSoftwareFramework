@@ -42,7 +42,7 @@ namespace DuetControlServer.SPI.Communication
         public const int MaxExpressionLength = 256;
 
         /// <summary>
-        /// Maximum lenght of a variable name
+        /// Maximum length of a variable name
         /// </summary>
         public const int MaxVariableLength = 120;
 
@@ -70,11 +70,6 @@ namespace DuetControlServer.SPI.Communication
         /// Size of each transmitted IAP binary segment (must be a multiple of IFLASH_PAGE_SIZE)
         /// </summary>
         public const int IapSegmentSize = 1536;
-
-        /// <summary>
-        /// Time to wait when the IAP reboots to the main firmware
-        /// </summary>
-        public const int IapBootDelay = 500;
 
         /// <summary>
         /// Timeout when waiting for a response from IAP

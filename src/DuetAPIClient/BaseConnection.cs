@@ -118,10 +118,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Returns true if the socket is still connected
         /// </summary>
-        public bool IsConnected
-        {
-            get => !disposed && _unixSocket.Connected;
-        }
+        public bool IsConnected => !disposed && _unixSocket.Connected;
 
         /// <summary>
         /// Closes the current connection and disposes it
@@ -197,7 +194,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Connection has been closed</exception>
         protected async ValueTask<T> Receive<T>(CancellationToken cancellationToken)
         {
-            using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
             return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken);
         }
 
@@ -259,7 +256,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Connection has been closed</exception>
         protected async ValueTask<JsonDocument> ReceiveJson(CancellationToken cancellationToken)
         {
-            using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
             return await JsonDocument.ParseAsync(json, cancellationToken: cancellationToken);
         }
 

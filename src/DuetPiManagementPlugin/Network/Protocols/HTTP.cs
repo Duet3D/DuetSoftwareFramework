@@ -54,7 +54,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             if (File.Exists("/opt/dsf/conf/http.json"))
             {
                 AspNetConfig config;
-                using (FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Open, FileAccess.Read))
+                await using (FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Open, FileAccess.Read))
                 {
                     config = await JsonSerializer.DeserializeAsync<AspNetConfig>(configStream, cancellationToken: Program.CancellationToken);
                 }
@@ -154,11 +154,11 @@ namespace DuetPiManagementPlugin.Network.Protocols
             }
 
             // Copy the template file and replace the port variables
-            using (FileStream templateStream = new(templateFile, FileMode.Open, FileAccess.Read))
+            await using (FileStream templateStream = new(templateFile, FileMode.Open, FileAccess.Read))
             {
                 using StreamReader reader = new(templateStream);
-                using FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Create, FileAccess.Write);
-                using StreamWriter writer = new(configStream);
+                await using FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Create, FileAccess.Write);
+                await using StreamWriter writer = new(configStream);
 
                 while (!reader.EndOfStream)
                 {

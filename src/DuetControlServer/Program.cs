@@ -167,7 +167,7 @@ namespace DuetControlServer
             };
 
             // Deal with program termination requests (SIGTERM and Ctrl+C)
-            AssemblyLoadContext.Default.Unloading += (obj) =>
+            AssemblyLoadContext.Default.Unloading += _ =>
             {
                 if (!_cancelSource.IsCancellationRequested)
                 {
@@ -175,7 +175,7 @@ namespace DuetControlServer
                     Shutdown(true).Wait();
                 }
             };
-            Console.CancelKeyPress += (sender, e) =>
+            Console.CancelKeyPress += (_, e) =>
             {
                 if (!_cancelSource.IsCancellationRequested)
                 {
@@ -192,7 +192,7 @@ namespace DuetControlServer
                 try
                 {
                     using Socket socket = new(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
-                    socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
+                    await socket.ConnectAsync(new UnixDomainSocketEndPoint(notifySocket));
                     socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
                 }
                 catch (Exception e)
@@ -218,7 +218,7 @@ namespace DuetControlServer
                         {
                             try
                             {
-                                using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
                                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
                                 Plugin plugin = new();
                                 plugin.UpdateFromJson(manifestJson.RootElement, false);
@@ -364,7 +364,7 @@ namespace DuetControlServer
         /// <summary>
         /// Print the reason for the start error and write it to the start error file
         /// </summary>
-        /// <param name="reason">Reason for the program vtermination</param>
+        /// <param name="reason">Reason for the program termination</param>
         /// <returns>Asynchronous task</returns>
         private static async Task Terminate(string reason)
         {

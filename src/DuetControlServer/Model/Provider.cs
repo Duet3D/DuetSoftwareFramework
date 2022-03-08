@@ -72,7 +72,7 @@ namespace DuetControlServer.Model
             }
 
             /// <summary>
-            /// Dipose method that is called when the lock is released
+            /// Dispose method that is called when the lock is released
             /// </summary>
             public void Dispose()
             {
@@ -130,7 +130,7 @@ namespace DuetControlServer.Model
         /// <seealso cref="AccessReadWriteAsync()"/>
         /// <seealso cref="WaitForUpdate(CancellationToken)"/>
         /// <seealso cref="Updater.WaitForFullUpdate(CancellationToken)"/>
-        public static ObjectModel Get { get; } = new ObjectModel();
+        public static ObjectModel Get { get; } = new();
 
         /// <summary>
         /// Configured password (see M551)

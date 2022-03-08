@@ -66,6 +66,7 @@ namespace DuetWebServer.Controllers
         /// WS /machine?sessionKey=XXX
         /// Provide WebSocket for continuous model updates. This is primarily used to keep DWC up-to-date
         /// </summary>
+        /// <param name="sessionKey">Session key for authentication</param>
         /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
@@ -215,7 +216,7 @@ namespace DuetWebServer.Controllers
             try
             {
                 // Fetch full model copy and send it over initially
-                using (MemoryStream json = await subscribeConnection.GetSerializedObjectModel())
+                await using (MemoryStream json = await subscribeConnection.GetSerializedObjectModel())
                 {
                     await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, default);
                 }
@@ -335,7 +336,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Wait for another object model update and send it to the client
-                using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedObjectModel(cancellationToken);
+                await using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedObjectModel(cancellationToken);
                 await webSocket.SendAsync(objectModelPatch.ToArray(), WebSocketMessageType.Text, true, cancellationToken);
             }
             while (webSocket.State == WebSocketState.Open);

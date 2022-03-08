@@ -130,11 +130,11 @@ namespace LinuxApi
         public unsafe bool WaitForEvent(int timeout)
         {
             // Wait for an event first
-            pollfd pollData = new()
+            PollFd pollData = new()
             {
-                fd = _reqFd,
-                events = (short)PollFlags.POLLIN,
-                revents = 0
+                Fd = _reqFd,
+                Events = (short)PollFlags.POLLIN,
+                REvents = 0
             };
 
             int result;
@@ -175,11 +175,11 @@ namespace LinuxApi
             while (true)
             {
                 // Wait for an event first
-                pollfd pollData = new()
+                PollFd pollData = new()
                 {
-                    fd = _reqFd,
-                    events = (short)PollFlags.POLLIN,
-                    revents = 0
+                    Fd = _reqFd,
+                    Events = (short)PollFlags.POLLIN,
+                    REvents = 0
                 };
 
                 int result;

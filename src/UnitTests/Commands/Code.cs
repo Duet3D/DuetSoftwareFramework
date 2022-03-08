@@ -895,7 +895,7 @@ namespace UnitTests.Commands
         {
             string codeString = "G53 G1 X0 Y5 F3000 G0 X5 Y10";
             byte[] codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new(codeBytes))
+            await using (MemoryStream memoryStream = new(codeBytes))
             {
                 using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);
@@ -924,7 +924,7 @@ namespace UnitTests.Commands
 
             codeString = "G1 X1 Y5 F3000\nG1 X5 F300\nG0 Y40";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new(codeBytes))
+            await using (MemoryStream memoryStream = new(codeBytes))
             {
                 using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);
@@ -946,7 +946,7 @@ namespace UnitTests.Commands
 
             codeString = "G1 X1 Y5 F3000\nX5 F300\nY40";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new(codeBytes))
+            await using (MemoryStream memoryStream = new(codeBytes))
             {
                 using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true) { MayRepeatCode = true };
@@ -981,7 +981,7 @@ namespace UnitTests.Commands
 
             codeString = "G1 X1 Y5 F3000\n  G53 G1 X5 F300\n    G53 G0 Y40 G1 Z50\n  G4 S3\nG1 Z3";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new(codeBytes))
+            await using (MemoryStream memoryStream = new(codeBytes))
             {
                 using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);
@@ -1025,7 +1025,7 @@ namespace UnitTests.Commands
 
             codeString = "M291 P\"Please go to <a href=\"\"https://www.duet3d.com/StartHere\"\" target=\"\"_blank\"\">this</a> page for further instructions on how to set it up.\" R\"Welcome to your new Duet 3!\" S1 T0";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new(codeBytes))
+            await using (MemoryStream memoryStream = new(codeBytes))
             {
                 using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);

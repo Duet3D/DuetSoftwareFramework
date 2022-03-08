@@ -71,6 +71,6 @@ namespace DuetControlServer.Files
         /// <summary>
         /// List of local variables
         /// </summary>
-        public List<string> LocalVariables { get; } = new List<string>();
+        public List<string> LocalVariables { get; } = new();
     }
 }

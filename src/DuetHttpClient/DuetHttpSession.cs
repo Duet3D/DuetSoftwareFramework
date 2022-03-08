@@ -66,7 +66,7 @@ namespace DuetHttpClient
         /// <summary>
         /// HTTP port of this machine
         /// </summary>
-        public DuetHttpOptions Options { get => _connector.Options; }
+        public DuetHttpOptions Options => _connector.Options;
 
         /// <summary>
         /// Object model of the remote machine
@@ -74,7 +74,7 @@ namespace DuetHttpClient
         /// <remarks>
         /// This is only kept up-to-date if <see cref="DuetHttpOptions.ObserveMessages"/> or <see cref="DuetHttpOptions.ObserveObjectModel"/> is set
         /// </remarks>
-        public ObjectModel Model { get => _connector.Model; }
+        public ObjectModel Model => _connector.Model;
 
         /// <summary>
         /// Dispose this instance and the corresponding session

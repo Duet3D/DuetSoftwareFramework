@@ -16,12 +16,12 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Indicates if a third-party application has locked the object model for writing
         /// </summary>
-        public static bool IsLocked { get => _lockConnection != null; }
+        public static bool IsLocked => _lockConnection != null;
 
         /// <summary>
         /// Read/write lock held by a third-party plugins
         /// </summary>
-        private static IDisposable _lock = null;
+        private static IDisposable _lock;
 
         /// <summary>
         /// Function to create a read/write lock to the object model

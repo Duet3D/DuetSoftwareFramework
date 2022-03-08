@@ -312,9 +312,9 @@ namespace DuetControlServer.Codes
                             if (Commands.Code.FilesBeingWritten[numChannel] != null)
                             {
                                 Stream stream = Commands.Code.FilesBeingWritten[numChannel].BaseStream;
-                                Commands.Code.FilesBeingWritten[numChannel].Dispose();
+                                await Commands.Code.FilesBeingWritten[numChannel].DisposeAsync();
                                 Commands.Code.FilesBeingWritten[numChannel] = null;
-                                stream.Dispose();
+                                await stream.DisposeAsync();
 
                                 if (await code.EmulatingMarlin())
                                 {
@@ -436,11 +436,10 @@ namespace DuetControlServer.Codes
 
                         try
                         {
-                            using FileStream stream = new(file, FileMode.Open, FileAccess.Read);
+                            await using FileStream stream = new(physicalFile, FileMode.Open, FileAccess.Read);
 
-                            byte[] hash;
                             using System.Security.Cryptography.SHA1 sha1 = System.Security.Cryptography.SHA1.Create();
-                            hash = await Task.Run(() => sha1.ComputeHash(stream), code.CancellationToken);
+                            byte[] hash = await Task.Run(() => sha1.ComputeHash(stream), code.CancellationToken);
 
                             return new Message(MessageType.Success, BitConverter.ToString(hash).Replace("-", string.Empty));
                         }
@@ -844,7 +843,7 @@ namespace DuetControlServer.Codes
 
                 // Update the firmware
                 case 997:
-                    if (((int[])code.Parameter('S', new int[] { 0 })).Contains(0) && code.Parameter('B', 0) == 0)
+                    if (((int[])code.Parameter('S', new[] { 0 })).Contains(0) && code.Parameter('B', 0) == 0)
                     {
                         if (await SPI.Interface.Flush(code))
                         {
@@ -904,11 +903,11 @@ namespace DuetControlServer.Codes
                             await stopCommand.Execute();
 
                             // Flash the firmware
-                            using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read);
-                            using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read);
+                            await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read);
+                            await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read);
                             if (Path.GetExtension(firmwareFile) == ".uf2")
                             {
-                                using MemoryStream unpackedFirmwareStream = await Utility.Firmware.UnpackUF2(firmwareStream);
+                                await using MemoryStream unpackedFirmwareStream = await Utility.Firmware.UnpackUF2(firmwareStream);
                                 await SPI.Interface.UpdateFirmware(iapStream, unpackedFirmwareStream);
                             }
                             else
@@ -959,7 +958,7 @@ namespace DuetControlServer.Codes
         }
 
         /// <summary>
-        /// React to an executed M-code before its result is returend
+        /// React to an executed M-code before its result is returned
         /// </summary>
         /// <param name="code">Code processed by RepRapFirmware</param>
         /// <returns>Result to output</returns>

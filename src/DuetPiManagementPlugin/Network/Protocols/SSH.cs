@@ -56,7 +56,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             {
                 // Get the port and check if SSH and SFTP are enabled in the config
                 bool sshEnabled = true, sftpEnabled = false;
-                using FileStream sshdConfig = new("/etc/ssh/sshd_config", FileMode.Open, FileAccess.Read);
+                await using FileStream sshdConfig = new("/etc/ssh/sshd_config", FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new(sshdConfig);
                 while (!reader.EndOfStream)
                 {
@@ -147,12 +147,12 @@ namespace DuetPiManagementPlugin.Network.Protocols
             bool serviceEnabled = Manager.IsEnabled(NetworkProtocol.SSH) || Manager.IsEnabled(NetworkProtocol.SFTP);
 
             // Modify the config file
-            using (FileStream configStream = new("/etc/ssh/sshd_config", FileMode.Open, FileAccess.ReadWrite))
+            await using (FileStream configStream = new("/etc/ssh/sshd_config", FileMode.Open, FileAccess.ReadWrite))
             {
-                using MemoryStream newConfigStream = new();
+                await using MemoryStream newConfigStream = new();
                 using (StreamReader reader = new(configStream, leaveOpen: true))
                 {
-                    using StreamWriter writer = new(newConfigStream, leaveOpen: true);
+                    await using StreamWriter writer = new(newConfigStream, leaveOpen: true);
 
                     // Read the old config line by line and modify it as needed
                     bool portWritten = false, sshDisabled = false, sftpEnabled = false;

@@ -64,7 +64,7 @@ namespace DuetControlServer.Model
         /// <returns>Property change handler</returns>
         private static EventHandler DictionaryCleared(object[] path)
         {
-            return (sender, e) =>
+            return (_, _) =>
             {
                 OnPropertyPathChanged?.Invoke(path, PropertyChangeType.Property, null);
             };
@@ -73,7 +73,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Subscribe to changes of the given model object
         /// </summary>
-        /// <param name="modelObject">Object to subscribe to</param>
+        /// <param name="modelDictionary">Model dictionary to subscribe to</param>
         /// <param name="path">Collection path</param>
         private static void SubscribeToModelDictionary(IModelDictionary modelDictionary, object[] path)
         {
@@ -101,7 +101,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Unsubscribe from model object changes
         /// </summary>
-        /// <param name="modelObject">Model object to unsubscribe from</param>
+        /// <param name="modelDictionary">Model dictionary to unsubscribe from</param>
         private static void UnsubscribeFromModelDictionary(IModelDictionary modelDictionary)
         {
             if (_dictionaryChangedHandlers.TryGetValue(modelDictionary, out PropertyChangedEventHandler changeHandler))

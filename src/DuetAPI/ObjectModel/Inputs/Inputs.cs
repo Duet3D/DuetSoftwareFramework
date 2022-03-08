@@ -33,109 +33,73 @@ namespace DuetAPI.ObjectModel
         /// G/M/T-code channel for HTTP requests
         /// </summary>
         [JsonIgnore]
-        public InputChannel HTTP
-        {
-            get => this[CodeChannel.HTTP];
-        }
+        public InputChannel HTTP => this[CodeChannel.HTTP];
 
         /// <summary>
         /// G/M/T-code channel for Telnet requests
         /// </summary>
         [JsonIgnore]
-        public InputChannel Telnet
-        {
-            get => this[CodeChannel.Telnet];
-        }
+        public InputChannel Telnet => this[CodeChannel.Telnet];
 
         /// <summary>
         /// G/M/T-code channel for file prints
         /// </summary>
         [JsonIgnore]
-        public InputChannel File
-        {
-            get => this[CodeChannel.File];
-        }
+        public InputChannel File => this[CodeChannel.File];
 
         /// <summary>
         /// G/M/T-code channel for USB
         /// </summary>
         [JsonIgnore]
-        public InputChannel USB
-        {
-            get => this[CodeChannel.USB];
-        }
+        public InputChannel USB => this[CodeChannel.USB];
 
         /// <summary>
         /// G/M/T-code channel for AUX (UART/PanelDue)
         /// </summary>
         [JsonIgnore]
-        public InputChannel Aux
-        {
-            get => this[CodeChannel.Aux];
-        }
+        public InputChannel Aux => this[CodeChannel.Aux];
 
         /// <summary>
         /// G/M/T-code channel for running triggers or config.g
         /// </summary>
         [JsonIgnore]
-        public InputChannel Trigger
-        {
-            get => this[CodeChannel.Trigger];
-        }
+        public InputChannel Trigger => this[CodeChannel.Trigger];
 
         /// <summary>
         /// G/M/T-code channel for the code queue
         /// </summary>
         [JsonIgnore]
-        public InputChannel Queue
-        {
-            get => this[CodeChannel.Queue];
-        }
+        public InputChannel Queue => this[CodeChannel.Queue];
 
         /// <summary>
         /// G/M/T-code channel for AUX (UART/PanelDue)
         /// </summary>
         [JsonIgnore]
-        public InputChannel LCD
-        {
-            get => this[CodeChannel.LCD];
-        }
+        public InputChannel LCD => this[CodeChannel.LCD];
 
         /// <summary>
         /// Default G/M/T-code channel for generic codes
         /// </summary>
         [JsonIgnore]
-        public InputChannel SBC
-        {
-            get => this[CodeChannel.SBC];
-        }
+        public InputChannel SBC => this[CodeChannel.SBC];
 
         /// <summary>
         /// Code channel that executes the daemon process
         /// </summary>
         [JsonIgnore]
-        public InputChannel Daemon
-        {
-            get => this[CodeChannel.Daemon];
-        }
+        public InputChannel Daemon => this[CodeChannel.Daemon];
 
         /// <summary>
         /// G/M/T-code chanel for auto pause events
         /// </summary>
         [JsonIgnore]
-        public InputChannel Autopause
-        {
-            get => this[CodeChannel.Autopause];
-        }
+        public InputChannel Autopause => this[CodeChannel.Autopause];
 
         /// <summary>
         /// Index operator for easy access via an <see cref="CodeChannel"/> value
         /// </summary>
         /// <param name="channel">Channel to retrieve information about</param>
         /// <returns>Information about the code channel</returns>
-        public InputChannel this[CodeChannel channel]
-        {
-            get => this.FirstOrDefault(inputChannel => inputChannel != null && inputChannel.Name == channel);
-        }
+        public InputChannel this[CodeChannel channel] => this.FirstOrDefault(inputChannel => inputChannel != null && inputChannel.Name == channel);
     }
 }

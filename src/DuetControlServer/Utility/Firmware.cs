@@ -122,7 +122,7 @@ namespace DuetControlServer.Utility
                 // Get a stream containing the binary content
                 if (Path.GetExtension(filename) == ".uf2")
                 {
-                    using FileStream fs = new(filename, FileMode.Open, FileAccess.Read);
+                    await using FileStream fs = new(filename, FileMode.Open, FileAccess.Read);
                     firmwareFile = await UnpackUF2(fs);
                 }
                 else
@@ -178,7 +178,10 @@ namespace DuetControlServer.Utility
             }
             finally
             {
-                firmwareFile?.Dispose();
+                if (firmwareFile != null)
+                {
+                    await firmwareFile.DisposeAsync();
+                }
             }
             return null;
         }
@@ -405,7 +408,7 @@ namespace DuetControlServer.Utility
                 await commandConnection.Connect(Settings.FullSocketPath);
                 await commandConnection.SyncObjectModel();
 
-                await subscribeConnection.Connect(SubscriptionMode.Patch, new string[] { "boards/**", "directories/**", "state/status" }, Settings.FullSocketPath);
+                await subscribeConnection.Connect(SubscriptionMode.Patch, new[] { "boards/**", "directories/**", "state/status" }, Settings.FullSocketPath);
                 objectModel = await subscribeConnection.GetObjectModel();
             }
             catch (Exception e)

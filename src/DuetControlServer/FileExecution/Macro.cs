@@ -68,7 +68,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Cancellation token that is triggered when the file is cancelled/aborted
         /// </summary>
-        public CancellationToken CancellationToken { get => _cts.Token; }
+        public CancellationToken CancellationToken => _cts.Token;
 
         /// <summary>
         /// Internal lock used for starting codes in the right order
@@ -107,12 +107,6 @@ namespace DuetControlServer.FileExecution
         /// Name of the file being executed
         /// </summary>
         public string FileName { get; }
-
-        /// <summary>
-        /// Indicates if config.g is being processed
-        /// </summary>
-        public static bool RunningConfig { get => _runningConfig; }
-        private static volatile bool _runningConfig;
 
         /// <summary>
         /// Whether this file is config.g or config.g.bak
@@ -162,7 +156,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Indicates if the macro file could be opened
         /// </summary>
-        public bool FileOpened { get => _file != null; }
+        public bool FileOpened => _file != null;
 
         /// <summary>
         /// Constructor of a macro
@@ -188,7 +182,6 @@ namespace DuetControlServer.FileExecution
             else if (name == FilePath.ConfigFile || name == FilePath.ConfigFileFallback)
             {
                 IsConfig = true;
-                _runningConfig = true;
             }
 
             // Try to start the macro file
@@ -228,7 +221,7 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public void Abort()
         {
-            if (IsAborted || disposed)
+            if (IsAborted || _disposed)
             {
                 return;
             }
@@ -252,7 +245,7 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         public async Task AbortAsync()
         {
-            if (IsAborted || disposed)
+            if (IsAborted || _disposed)
             {
                 return;
             }
@@ -273,7 +266,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Internal TCS to resolve when the macro has finished
         /// </summary>
-        private TaskCompletionSource _finishTCS;
+        private TaskCompletionSource _finishTcs;
 
         /// <summary>
         /// Wait for this macro to finish asynchronously
@@ -289,12 +282,12 @@ namespace DuetControlServer.FileExecution
                 return Task.CompletedTask;
             }
 
-            if (_finishTCS != null)
+            if (_finishTcs != null)
             {
-                return _finishTCS.Task;
+                return _finishTcs.Task;
             }
-            _finishTCS = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            return _finishTCS.Task;
+            _finishTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            return _finishTcs.Task;
         }
 
         /// <summary>
@@ -402,10 +395,10 @@ namespace DuetControlServer.FileExecution
                 {
                     _logger.Info("Finished macro file {0}", FileName);
                 }
-                if (_finishTCS != null)
+                if (_finishTcs != null)
                 {
-                    _finishTCS.SetResult();
-                    _finishTCS = null;
+                    _finishTcs.SetResult();
+                    _finishTcs = null;
                 }
             }
 
@@ -480,9 +473,9 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Indicates if this instance has been disposed
+        /// Indicates if this instance has been _disposed
         /// </summary>
-        private bool disposed = false;
+        private bool _disposed;
 
         /// <summary>
         /// Dispose this instance
@@ -490,26 +483,16 @@ namespace DuetControlServer.FileExecution
         public void Dispose()
         {
             // Don't dispose this instance twice...
-            if (disposed)
+            if (_disposed)
             {
                 return;
-            }
-
-            // Synchronize the machine model one last time while config.g or config-override.g is being run
-            if (IsConfig || IsConfigOverride)
-            {
-                _ = Task.Run(async () =>
-                {
-                    await Model.Updater.WaitForFullUpdate();
-                    _runningConfig = false;
-                });
             }
 
             // Dispose the used resources
             _cts.Dispose();
             _file?.Dispose();
-            _finishTCS?.SetCanceled();
-            disposed = true;
+            _finishTcs?.SetCanceled();
+            _disposed = true;
         }
     }
 }

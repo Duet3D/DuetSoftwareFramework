@@ -65,7 +65,7 @@ namespace DuetHttpClient.Connector
             using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, "rr_connect?password={HttpUtility.UrlPathEncode(password)}&time={DateTime.Now:s}"), cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            using Stream responseStream = await response.Content.ReadAsStreamAsync();
+            await using Stream responseStream = await response.Content.ReadAsStreamAsync();
             ConnectResponse connectResponse = await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
             switch (connectResponse.Err)
             {
@@ -196,7 +196,7 @@ namespace DuetHttpClient.Connector
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token);
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream stream = await response.Content.ReadAsStreamAsync();
+                        await using Stream stream = await response.Content.ReadAsStreamAsync();
                         return await JsonDocument.ParseAsync(stream, cancellationToken: _terminateSession.Token);
                     }
 
@@ -689,7 +689,7 @@ namespace DuetHttpClient.Connector
                     if (response.IsSuccessStatusCode)
                     {
                         // Make sure the full G-code could be stored
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         GcodeReply responseObj = await JsonSerializer.DeserializeAsync<GcodeReply>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                         if (responseObj.Buff == 0)
                         {
@@ -852,7 +852,7 @@ namespace DuetHttpClient.Connector
             using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            using Stream responseStream = await response.Content.ReadAsStreamAsync();
+            await using Stream responseStream = await response.Content.ReadAsStreamAsync();
             ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
             if (responseObj.Err != 0)
             {
@@ -878,7 +878,7 @@ namespace DuetHttpClient.Connector
 
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                         if (responseObj.Err == 0)
                         {
@@ -932,7 +932,7 @@ namespace DuetHttpClient.Connector
 
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                         if (responseObj.Err == 0)
                         {
@@ -984,7 +984,7 @@ namespace DuetHttpClient.Connector
 
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                         if (responseObj.Err == 0)
                         {
@@ -1079,7 +1079,7 @@ namespace DuetHttpClient.Connector
 
                         if (response.IsSuccessStatusCode)
                         {
-                            using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                            await using Stream responseStream = await response.Content.ReadAsStreamAsync();
                             FileListResponse responseObj = await JsonSerializer.DeserializeAsync<FileListResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                             if (responseObj.Err == 0)
                             {
@@ -1152,7 +1152,7 @@ namespace DuetHttpClient.Connector
 
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
                         if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
                         {
@@ -1222,7 +1222,7 @@ namespace DuetHttpClient.Connector
 
                                 if (response.IsSuccessStatusCode)
                                 {
-                                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                                    await using Stream responseStream = await response.Content.ReadAsStreamAsync();
                                     using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
                                     if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
                                     {

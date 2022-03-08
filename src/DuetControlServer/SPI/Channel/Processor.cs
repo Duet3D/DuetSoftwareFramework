@@ -67,14 +67,14 @@ namespace DuetControlServer.SPI.Channel
         private bool _allFilesAborted;
 
         /// <summary>
-        /// Prioritised codes that override every other code
+        /// Prioritized codes that override every other code
         /// </summary>
-        public Queue<Code> PriorityCodes { get; } = new Queue<Code>();
+        public Queue<Code> PriorityCodes { get; } = new();
 
         /// <summary>
         /// Stack of the different channel states
         /// </summary>
-        public Stack<State> Stack { get; } = new Stack<State>();
+        public Stack<State> Stack { get; } = new();
 
         /// <summary>
         /// Get the current state from the stack
@@ -132,7 +132,7 @@ namespace DuetControlServer.SPI.Channel
             // Pop the stack
             State oldState = Stack.Pop();
             CurrentState = Stack.Peek();
-            _isWaitingForAcknowledgement = CurrentState.WaitingForAcknowledgement;
+            _isWaitingForAcknowledgment = CurrentState.WaitingForAcknowledgement;
 
             // Invalidate obsolete lock requests and supended codes
             while (oldState.LockRequests.TryDequeue(out LockRequest lockRequest))
@@ -206,7 +206,7 @@ namespace DuetControlServer.SPI.Channel
             // Pop the stack
             State oldState = Stack.Pop();
             CurrentState = Stack.Peek();
-            _isWaitingForAcknowledgement = CurrentState.WaitingForAcknowledgement;
+            _isWaitingForAcknowledgment = CurrentState.WaitingForAcknowledgement;
 
             // Invalidate obsolete lock requests and supended codes
             while (oldState.LockRequests.TryDequeue(out LockRequest lockRequest))
@@ -268,7 +268,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// List of buffered G/M/T-codes that are being processed by the firmware
         /// </summary>
-        public List<Code> BufferedCodes { get; } = new List<Code>();
+        public List<Code> BufferedCodes { get; } = new();
 
         /// <summary>
         /// Occupied space for buffered codes in bytes
@@ -278,7 +278,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Stack of code replies for codes that pushed the stack (e.g. macro files or blocking messages)
         /// </summary>
-        public Stack<Tuple<MessageTypeFlags, string>> PendingReplies { get; } = new Stack<Tuple<MessageTypeFlags, string>>();
+        public Stack<Tuple<MessageTypeFlags, string>> PendingReplies { get; } = new();
 
         /// <summary>
         /// Write channel diagnostics to the given string builder
@@ -362,11 +362,9 @@ namespace DuetControlServer.SPI.Channel
         /// <remarks>
         /// This is volatile to allow fast access without locking this instance first
         /// </remarks>
-        public bool IsWaitingForAcknowledgement
-        {
-            get => _isWaitingForAcknowledgement;
-        }
-        private volatile bool _isWaitingForAcknowledgement;
+        public bool IsWaitingForAcknowledgment => _isWaitingForAcknowledgment;
+
+        private volatile bool _isWaitingForAcknowledgment;
 
         /// <summary>
         /// Process another code
@@ -404,7 +402,6 @@ namespace DuetControlServer.SPI.Channel
                 {
                     // Trying to execute a G/M/T-code on a macro that has been closed while the code was being processed internally
                     code.FirmwareTCS.SetCanceled();
-                    return;
                 }
             }
             else if (code.IsForAcknowledgement)
@@ -910,9 +907,6 @@ namespace DuetControlServer.SPI.Channel
             {
                 _logger.Warn("Pending out-of-order reply: '{0}'", reply.Item2);
             }
-
-            // End
-            return;
         }
 
         /// <summary>
@@ -1171,7 +1165,7 @@ namespace DuetControlServer.SPI.Channel
                 State newState = Push();
                 newState.StartCode = startCode;
                 newState.WaitingForAcknowledgement = true;
-                _isWaitingForAcknowledgement = true;
+                _isWaitingForAcknowledgment = true;
             }
         }
 
@@ -1264,7 +1258,7 @@ namespace DuetControlServer.SPI.Channel
             string physicalFile = FilePath.ToPhysical(fileName, FileDirectory.System);
             State newState = Push();
             newState.StartCode = startCode;
-            newState.Macro = new Macro(fileName, physicalFile, Channel, startCode != null, (startCode != null) ? startCode.SourceConnection : 0);
+            newState.Macro = new Macro(fileName, physicalFile, Channel, startCode != null, startCode?.SourceConnection ?? 0);
             if (startCode != null)
             {
                 _logger.Debug("==> Starting code {0}", startCode);
@@ -1280,7 +1274,7 @@ namespace DuetControlServer.SPI.Channel
             InvalidateRegular();
 
             // Clear pausable macros
-            while (CurrentState.Macro != null && CurrentState.Macro.IsPausable)
+            while (CurrentState.Macro is { IsPausable: true })
             {
                 Pop();
             }

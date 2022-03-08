@@ -18,7 +18,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Split an echo expression separated by commas
         /// </summary>
-        /// <param name="expression">Expression to spli</param>
+        /// <param name="expression">Expression to split</param>
         /// <returns>Expression items</returns>
         private static IEnumerable<string> SplitExpression(string expression)
         {
@@ -148,13 +148,13 @@ namespace DuetControlServer.Model
                         {
                             if (c == '}')
                             {
-                                throw new CodeParserException($"Unexpected curly bracket", code);
+                                throw new CodeParserException("Unexpected curly bracket", code);
                             }
                             if (c == ')')
                             {
-                                throw new CodeParserException($"Unexpected round bracket", code);
+                                throw new CodeParserException("Unexpected round bracket", code);
                             }
-                            throw new CodeParserException($"Unexpected square bracket", code);
+                            throw new CodeParserException("Unexpected square bracket", code);
                         }
 
                         string subExpression = parsedExpressions.Pop().ToString();
@@ -167,13 +167,13 @@ namespace DuetControlServer.Model
                     {
                         if (c == '}')
                         {
-                            throw new CodeParserException($"Unexpected curly bracket", code);
+                            throw new CodeParserException("Unexpected curly bracket", code);
                         }
                         if (c == ')')
                         {
-                            throw new CodeParserException($"Unexpected round bracket", code);
+                            throw new CodeParserException("Unexpected round bracket", code);
                         }
-                        throw new CodeParserException($"Unexpected square bracket", code);
+                        throw new CodeParserException("Unexpected square bracket", code);
                     }
                 }
                 else if (c == '.' || char.IsLetter(c))
@@ -201,13 +201,13 @@ namespace DuetControlServer.Model
             {
                 if (lastBracket == '{')
                 {
-                    throw new CodeParserException($"Unterminated curly bracket", code);
+                    throw new CodeParserException("Unterminated curly bracket", code);
                 }
                 if (lastBracket == '(')
                 {
-                    throw new CodeParserException($"Unterminated round bracket", code);
+                    throw new CodeParserException("Unterminated round bracket", code);
                 }
-                throw new CodeParserException($"Unterminated square bracket", code);
+                throw new CodeParserException("Unterminated square bracket", code);
             }
 
             return IsSbcExpression(parsedExpressions.Peek().ToString());
@@ -418,13 +418,13 @@ namespace DuetControlServer.Model
                         {
                             if (c == '}')
                             {
-                                throw new CodeParserException($"Unexpected curly bracket", code);
+                                throw new CodeParserException("Unexpected curly bracket", code);
                             }
                             if (c == ')')
                             {
-                                throw new CodeParserException($"Unexpected round bracket", code);
+                                throw new CodeParserException("Unexpected round bracket", code);
                             }
-                            throw new CodeParserException($"Unexpected square bracket", code);
+                            throw new CodeParserException("Unexpected square bracket", code);
                         }
 
                         string subExpression = parsedExpressions.Pop().ToString().Trim();
@@ -461,13 +461,13 @@ namespace DuetControlServer.Model
             {
                 if (lastBracket == '{')
                 {
-                    throw new CodeParserException($"Unterminated curly bracket", code);
+                    throw new CodeParserException("Unterminated curly bracket", code);
                 }
                 if (lastBracket == '(')
                 {
-                    throw new CodeParserException($"Unterminated round bracket", code);
+                    throw new CodeParserException("Unterminated round bracket", code);
                 }
-                throw new CodeParserException($"Unterminated square bracket", code);
+                throw new CodeParserException("Unterminated square bracket", code);
             }
 
             return await EvaluateSubExpression(code, parsedExpressions.Pop().ToString().Trim(), onlySbcFields, encodeResult);
@@ -476,11 +476,11 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Evaluate a sub-expression
         /// </summary>
-        /// <param name="code">Code holdng the sub-expression</param>
+        /// <param name="code">Code holding the sub-expression</param>
         /// <param name="expression">Expression to evaluate</param>
         /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
         /// <param name="encodeResult">Whether the final result shall be encoded</param>
-        /// <returns>String result or the expresion</returns>
+        /// <returns>String result or the expression</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
         private static async Task<string> EvaluateSubExpression(Code code, string expression, bool onlySbcFields, bool encodeResult)
         {

@@ -29,7 +29,7 @@ namespace DuetControlServer.SPI
 
         // Information about the code channels
         private static readonly Channel.Manager _channels = new();
-        private static int _bytesReserved = 0, _bufferSpace = 0;
+        private static int _bytesReserved, _bufferSpace;
 
         // Object model queries
         private sealed class PendingModelQuery
@@ -37,12 +37,12 @@ namespace DuetControlServer.SPI
             /// <summary>
             /// Key to query
             /// </summary>
-            public string Key { get; set; }
+            public string Key { get; init; }
 
             /// <summary>
             /// Flags to query
             /// </summary>
-            public string Flags { get; set; }
+            public string Flags { get; init; }
 
             /// <summary>
             /// Whether the model query has been sent
@@ -52,7 +52,7 @@ namespace DuetControlServer.SPI
             /// <summary>
             /// Task to complete when the query has finished
             /// </summary>
-            public TaskCompletionSource<byte[]> TCS { get; } = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TaskCompletionSource<byte[]> Tcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
         private static readonly Queue<PendingModelQuery> _pendingModelQueries = new();
         private static DateTime _lastQueryTime = DateTime.Now;
@@ -119,7 +119,7 @@ namespace DuetControlServer.SPI
             {
                 _pendingModelQueries.Enqueue(query);
             }
-            return query.TCS.Task;
+            return query.Tcs.Task;
         }
 
         /// <summary>
@@ -228,7 +228,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Channel to query</param>
         /// <returns>Whether the channel is awaiting acknowledgement</returns>
-        public static bool IsWaitingForAcknowledgment(CodeChannel channel) => _channels[channel].IsWaitingForAcknowledgement;
+        public static bool IsWaitingForAcknowledgment(CodeChannel channel) => _channels[channel].IsWaitingForAcknowledgment;
 
         /// <summary>
         /// Enqueue a G/M/T-code for execution by RepRapFirmware
@@ -273,7 +273,7 @@ namespace DuetControlServer.SPI
 
         /// <summary>
         /// Wait for all pending codes on the same stack level as the given code to finish.
-        /// By default this replaces all expressions as well for convinient parsing by the code processors.
+        /// By default this replaces all expressions as well for convenient parsing by the code processors.
         /// </summary>
         /// <param name="code">Code waiting for the flush</param>
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
@@ -320,10 +320,7 @@ namespace DuetControlServer.SPI
             Task onFirmwareHalted;
             using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
             {
-                if (_firmwareHaltRequest == null)
-                {
-                    _firmwareHaltRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                }
+                _firmwareHaltRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 onFirmwareHalted = _firmwareHaltRequest.Task;
             }
             await onFirmwareHalted;
@@ -344,10 +341,7 @@ namespace DuetControlServer.SPI
             Task onFirmwareReset;
             using (await _firmwareActionLock.LockAsync(Program.CancellationToken))
             {
-                if (_firmwareResetRequest == null)
-                {
-                    _firmwareResetRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                }
+                _firmwareResetRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 onFirmwareReset = _firmwareResetRequest.Task;
             }
             await onFirmwareReset;
@@ -383,10 +377,7 @@ namespace DuetControlServer.SPI
             Task task;
             using (await _printStateLock.LockAsync(Program.CancellationToken))
             {
-                if (_setPrintInfoRequest == null)
-                {
-                    _setPrintInfoRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                }
+                _setPrintInfoRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 task = _setPrintInfoRequest.Task;
             }
             await task;
@@ -411,10 +402,7 @@ namespace DuetControlServer.SPI
                 using (await _printStateLock.LockAsync(Program.CancellationToken))
                 {
                     _stopPrintReason = reason;
-                    if (_stopPrintRequest == null)
-                    {
-                        _stopPrintRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                    }
+                    _stopPrintRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     onPrintStopped = _stopPrintRequest.Task;
                 }
                 await onPrintStopped;
@@ -781,11 +769,9 @@ namespace DuetControlServer.SPI
                 // Process incoming packets
                 for (int i = 0; i < DataTransfer.PacketsToRead; i++)
                 {
-                    PacketHeader? packet;
-
                     try
                     {
-                        packet = DataTransfer.ReadNextPacket();
+                        PacketHeader? packet = DataTransfer.ReadNextPacket();
                         if (packet == null)
                         {
                             _logger.Error("Read invalid packet");
@@ -902,7 +888,7 @@ namespace DuetControlServer.SPI
                     }
                 }
 
-                // Do another full SPI transfe
+                // Do another full SPI transfer
                 DataTransfer.PerformFullTransfer();
             }
             while (!Program.CancellationToken.IsCancellationRequested);
@@ -1025,7 +1011,7 @@ namespace DuetControlServer.SPI
                 {
                     if (_pendingModelQueries.TryDequeue(out PendingModelQuery query))
                     {
-                        query.TCS.SetResult(json.ToArray());
+                        query.Tcs.SetResult(json.ToArray());
                     }
                     else if (!Program.CancellationToken.IsCancellationRequested)
                     {
@@ -1304,7 +1290,7 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Handle a firmwre request that is sent when RRF has internally closed a macro file
+        /// Handle a firmware request that is sent when RRF has internally closed a macro file
         /// </summary>
         private static void HandleMacroFileClosed()
         {
@@ -1550,7 +1536,7 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to truncate file #{1}", handle);
+                _logger.Error(e, "Failed to truncate file #{0}", handle);
                 DataTransfer.WriteFileTruncateResult(false);
             }
         }
@@ -1588,7 +1574,6 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Invalidate every resource due to a critical event
         /// </summary>
-        /// <param name="message">Reason why everything is being invalidated</param>
         /// <returns>Asynchronous task</returns>
         private static void Invalidate()
         {
@@ -1608,10 +1593,8 @@ namespace DuetControlServer.SPI
             }
 
             // Cancel the file being printed
-            bool outputMessage;
             using (FileExecution.Job.Lock())
             {
-                outputMessage = FileExecution.Job.IsProcessing;
                 FileExecution.Job.Abort();
             }
 
@@ -1630,7 +1613,7 @@ namespace DuetControlServer.SPI
             {
                 foreach (PendingModelQuery query in _pendingModelQueries)
                 {
-                    query.TCS.SetCanceled();
+                    query.Tcs.SetCanceled();
                 }
                 _pendingModelQueries.Clear();
             }

@@ -26,7 +26,7 @@ namespace DuetControlServer.SPI.Channel
         /// Awaitable task returning true if the lock could be acquired.
         /// It returns false if the controller is reset or an emergency stop occurs
         /// </summary>
-        public Task<bool> Task { get => _tcs.Task; }
+        public Task<bool> Task => _tcs.Task;
 
         /// <summary>
         /// Creates a new queued lock/unlock request instance

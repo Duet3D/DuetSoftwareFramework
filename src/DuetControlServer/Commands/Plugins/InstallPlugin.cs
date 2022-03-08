@@ -140,7 +140,7 @@ namespace DuetControlServer.Commands
             string manifestFilename = Path.Combine(Settings.PluginDirectory, plugin.Id + ".json");
             if (File.Exists(manifestFilename))
             {
-                using (FileStream manifestStream = new(manifestFilename, FileMode.Open, FileAccess.Read))
+                await using (FileStream manifestStream = new(manifestFilename, FileMode.Open, FileAccess.Read))
                 {
                     using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
                     plugin.UpdateFromJson(manifestJson.RootElement, false);
@@ -169,7 +169,7 @@ namespace DuetControlServer.Commands
             }
 
             Plugin plugin = new();
-            using (Stream manifestStream = manifestFile.Open())
+            await using (Stream manifestStream = manifestFile.Open())
             {
                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
                 plugin.UpdateFromJson(manifestJson.RootElement, false);

@@ -128,7 +128,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Returns the length of the file in bytes
         /// </summary>
-        public long Length { get => _fileStream.Length; }
+        public long Length => _fileStream.Length;
 
         /// <summary>
         /// Indicates if this file is closed
@@ -166,7 +166,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Indicates if this instance has been disposed
         /// </summary>
-        private bool disposed;
+        private bool _disposed;
 
         /// <summary>
         /// Dispose this instance internally
@@ -174,7 +174,7 @@ namespace DuetControlServer.Files
         /// <param name="disposing">True if this instance is being disposed</param>
         private void Dispose(bool disposing)
         {
-            if (disposed)
+            if (_disposed)
             {
                 return;
             }
@@ -186,7 +186,7 @@ namespace DuetControlServer.Files
                 _fileStream.Dispose();
             }
 
-            disposed = true;
+            _disposed = true;
         }
 
         /// <summary>
@@ -537,8 +537,8 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Called to finish the current code block
         /// </summary>
-        /// <returns>True if the last code block could be disposed of</returns>
-        private async Task<bool> EndCodeBlock()
+        /// <returns>Asynchronous task</returns>
+        private async Task EndCodeBlock()
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
@@ -554,7 +554,7 @@ namespace DuetControlServer.Files
                     }
                     else
                     {
-                        _logger.Debug("End of generic block", codeBlock.StartingCode.Keyword);
+                        _logger.Debug("End of generic block");
                     }
 
                     // Delete previously created local variables
@@ -562,10 +562,8 @@ namespace DuetControlServer.Files
 
                     // End
                     _lastCodeBlock = codeBlock;
-                    return true;
                 }
             }
-            return false;
         }
 
         /// <summary>

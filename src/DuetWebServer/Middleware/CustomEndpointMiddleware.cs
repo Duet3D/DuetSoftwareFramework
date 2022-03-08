@@ -245,7 +245,7 @@ namespace DuetWebServer.Middleware
             {
                 // Write to a temporary file
                 string filename = Path.GetTempFileName();
-                using (FileStream fileStream = new(filename, FileMode.Create, FileAccess.Write, FileShare.Read))
+                await using (FileStream fileStream = new(filename, FileMode.Create, FileAccess.Write, FileShare.Read))
                 {
                     await context.Request.Body.CopyToAsync(fileStream);
                 }
@@ -293,7 +293,7 @@ namespace DuetWebServer.Middleware
             {
                 context.Response.ContentType = "application/octet-stream";
 
-                using FileStream fs = new(httpResponse.Response, FileMode.Open, FileAccess.Read);
+                await using FileStream fs = new(httpResponse.Response, FileMode.Open, FileAccess.Read);
                 await fs.CopyToAsync(context.Response.Body);
             }
             else

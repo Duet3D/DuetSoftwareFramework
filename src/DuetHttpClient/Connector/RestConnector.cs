@@ -110,7 +110,7 @@ namespace DuetHttpClient.Connector
             using HttpResponseMessage connectResponse = await HttpClient.GetAsync($"machine/connect?password=${Options.Password}", connectCts.Token);
             if (connectResponse.IsSuccessStatusCode)
             {
-                using Stream stream = await connectResponse.Content.ReadAsStreamAsync();
+                await using Stream stream = await connectResponse.Content.ReadAsStreamAsync();
                 ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(stream, cancellationToken: connectCts.Token);
 
                 _sessionKey = responseObj.SessionKey;
@@ -206,7 +206,7 @@ namespace DuetHttpClient.Connector
                         await webSocket.ConnectAsync(wsUri, _terminateSession.Token);
 
                         // Read the full object model first
-                        using (MemoryStream modelStream = new MemoryStream())
+                        await using (MemoryStream modelStream = new MemoryStream())
                         {
                             byte[] modelChunk = new byte[8192];
                             do
@@ -254,7 +254,7 @@ namespace DuetHttpClient.Connector
 
                             try
                             {
-                                using MemoryStream patchStream = new MemoryStream();
+                                await using MemoryStream patchStream = new MemoryStream();
                                 byte[] patchChunk = new byte[8192];
 
                                 do
@@ -650,7 +650,7 @@ namespace DuetHttpClient.Connector
 
                     if (response.IsSuccessStatusCode)
                     {
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
                         return (await JsonSerializer.DeserializeAsync<List<FileNode>>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))
                             .Select(item => new FileListItem()
                             {

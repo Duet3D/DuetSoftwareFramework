@@ -14,7 +14,7 @@ namespace DuetControlServer.Model
     public static class Filter
     {
         /// <summary>
-        /// Regular expressinon to extract name and index from a filter item
+        /// Regular expression to extract name and index from a filter item
         /// </summary>
         private static readonly Regex _indexRegex = new(@"(.*)\[([\d,*]+)\]");
 
@@ -100,7 +100,7 @@ namespace DuetControlServer.Model
         public static bool PathMatches(object[] path, object[] filter)
         {
             int filterIndex = 0;
-            for (int i = 0; i < path.Length; i++)
+            foreach (object pathItem in path)
             {
                 if (filterIndex >= filter.Length)
                 {
@@ -116,7 +116,7 @@ namespace DuetControlServer.Model
                         return true;
                     }
 
-                    if (path[i] is string pathString)
+                    if (pathItem is string pathString)
                     {
                         if (filterString != "*" && !filterString.Equals(pathString, StringComparison.InvariantCultureIgnoreCase))
                         {
@@ -124,7 +124,7 @@ namespace DuetControlServer.Model
                             return false;
                         }
                     }
-                    else if (path[i] is ItemPathNode pathNode)
+                    else if (pathItem is ItemPathNode pathNode)
                     {
                         int itemIndex = -1;
                         if (filterIndex < filter.Length && filter[filterIndex] is int intFilter)
@@ -188,7 +188,7 @@ namespace DuetControlServer.Model
                         if (propertyName == "*" || property.Key == propertyName)
                         {
                             if (partialFilter.Length == 0 ||
-                                (partialFilter.Length == 1 && partialFilter[0] is string partialStringFilter && partialStringFilter == "**"))
+                                (partialFilter.Length == 1 && partialFilter[0] is "**"))
                             {
                                 // This is a property we've been looking for
                                 result.Add(property.Key, property.Value.GetValue(model));

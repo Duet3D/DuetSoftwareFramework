@@ -9,7 +9,6 @@ using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,7 +20,7 @@ namespace DuetControlServer.FileExecution
     /// Main class dealing with a file job
     /// </summary>
     /// <remarks>
-    /// Lock this class whenver it is accessed (except for <see cref="Diagnostics(StringBuilder)"/>)
+    /// Lock this class whenever it is accessed (except for <see cref="Diagnostics(StringBuilder)"/>)
     /// </remarks>
     public static class Job
     {
@@ -75,7 +74,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Indicates if a file has been selected for printing
         /// </summary>
-        public static bool IsFileSelected { get => _file != null; }
+        public static bool IsFileSelected => _file != null;
 
         /// <summary>
         /// Indicates if a print is live
@@ -155,7 +154,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Returns the length of the file being printed in bytes
         /// </summary>
-        public static long FileLength { get => _file.Length; }
+        public static long FileLength => _file.Length;
 
         /// <summary>
         /// Start a new file print
@@ -346,7 +345,7 @@ namespace DuetControlServer.FileExecution
                                 if (IsPaused)
                                 {
                                     // Adjust the file position
-                                    long newFilePosition = (_pausePosition != null) ? _pausePosition.Value : nextFilePosition;
+                                    long newFilePosition = _pausePosition ?? nextFilePosition;
                                     await SetFilePosition(newFilePosition);
                                     _logger.Info("Job has been paused at byte {0}, reason {1}", newFilePosition, _pauseReason);
 

@@ -40,7 +40,8 @@ namespace DuetPluginService.Commands
                         plugin = new();
                         Plugins.List.Add(plugin);
                     }
-                    using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+                    await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
                     using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
                     plugin.UpdateFromJson(manifestJson.RootElement, false);
                     plugin.Pid = -1;

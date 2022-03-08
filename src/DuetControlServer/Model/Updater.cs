@@ -113,7 +113,7 @@ namespace DuetControlServer.Model
                         Provider.Get.Boards.Clear();
                         Provider.Get.Boards.Add(new Board
                         {
-                            IapFileNameSBC = $"Duet3_SBCiap_MB6HC.bin",
+                            IapFileNameSBC = "Duet3_SBCiap_MB6HC.bin",
                             FirmwareFileName = "Duet3Firmware_MB6HC.bin"
                         });
                     }
@@ -205,13 +205,13 @@ namespace DuetControlServer.Model
                                 {
                                     _logger.Debug("Requesting update of key {0}, seq {1} -> {2}", seqProperty.Name, lastSeq, newSeq);
 
-                                    int next = 0, offset = 0;
+                                    int next = 0;
                                     do
                                     {
                                         // Request the next model chunk
                                         jsonData = await SPI.Interface.RequestObjectModel(seqProperty.Name, (next == 0) ? "d99vn" : $"d99vna{next}");
                                         using JsonDocument keyDocument = JsonDocument.Parse(jsonData);
-                                        offset = next;
+                                        int offset = next;
                                         next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
 
                                         if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
@@ -245,9 +245,6 @@ namespace DuetControlServer.Model
                                             _logger.Warn("Received invalid object model key response without key and/or result field(s)");
                                             break;
                                         }
-
-                                        // Check the index of the next element
-                                        offset = next;
                                     }
                                     while (next != 0);
                                 }
@@ -378,7 +375,7 @@ namespace DuetControlServer.Model
                 float currentHeight = 0F;
                 foreach (Axis axis in Provider.Get.Move.Axes)
                 {
-                    if (axis != null && axis.Letter == 'Z' && axis.UserPosition != null)
+                    if (axis is { Letter: 'Z', UserPosition: {} })
                     {
                         currentHeight = axis.UserPosition.Value;
                         break;
@@ -391,8 +388,10 @@ namespace DuetControlServer.Model
                     // Add new layers
                     for (int i = Provider.Get.Job.Layers.Count; i < Provider.Get.Job.Layer.Value - 1; i++)
                     {
-                        Layer newLayer = new();
-                        newLayer.Duration = avgLayerDuration;
+                        Layer newLayer = new()
+                        {
+                            Duration = avgLayerDuration
+                        };
                         foreach (float filamentUsage in avgFilamentUsage)
                         {
                             newLayer.Filament.Add(filamentUsage);
@@ -415,8 +414,10 @@ namespace DuetControlServer.Model
                     Layer lastLayer;
                     if (Provider.Get.Job.Layers.Count < _lastLayer)
                     {
-                        lastLayer = new();
-                        lastLayer.Height = avgLayerHeight;
+                        lastLayer = new()
+                        {
+                            Height = avgLayerHeight
+                        };
                         foreach (AnalogSensor sensor in Provider.Get.Sensors.Analog)
                         {
                             if (sensor != null)

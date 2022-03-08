@@ -7,11 +7,11 @@ internal partial class Interop
     internal static extern int poll(IntPtr fds, int nfds, int timeout);
 }
 
-public unsafe struct pollfd
+internal struct PollFd
 {
-    public int fd { get; set; }
-    public short events { get; set; }
-    public short revents { get; set; }
+    public int Fd { get; set; }
+    public short Events { get; set; }
+    public short REvents { get; set; }
 }
 
 internal enum PollFlags : short

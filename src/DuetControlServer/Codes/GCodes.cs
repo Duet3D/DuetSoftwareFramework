@@ -17,7 +17,7 @@ namespace DuetControlServer.Codes
         public static Task<Message> Process(Code code) => Task.FromResult<Message>(null);
 
         /// <summary>
-        /// React to an executed G-code before its result is returend
+        /// React to an executed G-code before its result is returned
         /// </summary>
         /// <param name="code">Code processed by RepRapFirmware</param>
         /// <returns>Result to output</returns>

@@ -1,5 +1,8 @@
 ﻿namespace DuetWebServer.Authorization
 {
+    /// <summary>
+    /// Access policies (TBD)
+    /// </summary>
     public static class Policies
     {
         /// <summary>

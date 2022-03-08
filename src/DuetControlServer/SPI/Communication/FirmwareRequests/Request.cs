@@ -59,7 +59,7 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         HeightMap_Obsolete = 8,
 
         /// <summary>
-        /// Ressource locked
+        /// Resource locked
         /// </summary>
         /// <seealso cref="Shared.CodeChannelHeader"/>
         Locked = 9,

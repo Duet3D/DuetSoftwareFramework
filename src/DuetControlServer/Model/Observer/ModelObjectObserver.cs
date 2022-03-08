@@ -119,7 +119,6 @@ namespace DuetControlServer.Model
                 {
                     continue;
                 }
-                string propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
                 object value = property.GetValue(modelObject);
 
                 if (value is ModelObject objectValue)

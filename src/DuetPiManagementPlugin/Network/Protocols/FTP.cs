@@ -29,7 +29,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
         {
             if (File.Exists("/etc/proftpd/proftpd.conf"))
             {
-                using FileStream inetdConfig = new("/etc/proftpd/proftpd.conf", FileMode.Open, FileAccess.Read);
+                await using FileStream inetdConfig = new("/etc/proftpd/proftpd.conf", FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new(inetdConfig);
 
                 while (!reader.EndOfStream)
@@ -66,11 +66,11 @@ namespace DuetPiManagementPlugin.Network.Protocols
             bool portChanged = false;
             if (port > 0 && port != _port)
             {
-                using FileStream configStream = new("/etc/proftpd/proftpd.conf", FileMode.Open, FileAccess.ReadWrite);
-                using MemoryStream newConfigStream = new();
+                await using FileStream configStream = new("/etc/proftpd/proftpd.conf", FileMode.Open, FileAccess.ReadWrite);
+                await using MemoryStream newConfigStream = new();
                 using (StreamReader reader = new(configStream, leaveOpen: true))
                 {
-                    using StreamWriter writer = new(newConfigStream, leaveOpen: true);
+                    await using StreamWriter writer = new(newConfigStream, leaveOpen: true);
 
                     // Read the old config line by line and replace the Port argument
                     bool portWritten = false;

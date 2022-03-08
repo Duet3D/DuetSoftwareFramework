@@ -57,10 +57,9 @@ namespace DuetControlServer.Utility
         public static ushort Calculate(ReadOnlySpan<byte> buffer)
         {
             ushort Crc = 65535;
-            ushort x;
             for (int i = 0; i < buffer.Length; i++)
             {
-                x = (ushort)(Crc ^ buffer[i]);
+                ushort x = (ushort)(Crc ^ buffer[i]);
                 Crc = (ushort)((Crc >> 8) ^ CrcTable[x & 0x00FF]);
             }
             return Crc;
@@ -74,7 +73,6 @@ namespace DuetControlServer.Utility
         public static ushort Calculate(Stream stream)
         {
             ushort Crc = 65535;
-            ushort x;
             while (true)
             {
                 int nextByte = stream.ReadByte();
@@ -83,7 +81,7 @@ namespace DuetControlServer.Utility
                     break;
                 }
 
-                x = (ushort)(Crc ^ nextByte);
+                ushort x = (ushort)(Crc ^ nextByte);
                 Crc = (ushort)((Crc >> 8) ^ CrcTable[x & 0x00FF]);
             }
             return Crc;

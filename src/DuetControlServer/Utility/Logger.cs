@@ -28,7 +28,7 @@ namespace DuetControlServer.Utility
         private static readonly AsyncLock _lock = new();
 
         /// <summary>
-        /// Filestream of the log file
+        /// File stream of the log file
         /// </summary>
         private static FileStream _fileStream;
 
@@ -318,7 +318,7 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Write messages including timestamp to the log file
         /// </summary>
-        /// <param name="result">Message list</param>
+        /// <param name="message">Message to log</param>
         public static void Log(Message message)
         {
             if (message != null && !string.IsNullOrEmpty(message.Content))
@@ -331,7 +331,7 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Write messages including timestamp to the log file asynchronously
         /// </summary>
-        /// <param name="result">Message list</param>
+        /// <param name="message">Message to log</param>
         /// <returns>Asynchronous task</returns>
         public static async Task LogAsync(Message message)
         {
@@ -345,7 +345,7 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Log and output a message
         /// </summary>
-        /// <param name="message">Message</param>
+        /// <param name="message">Message to log and output</param>
         public static void LogOutput(Message message)
         {
             if (message != null && !string.IsNullOrEmpty(message.Content))
@@ -358,7 +358,7 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// Log and output a message asynchronously
         /// </summary>
-        /// <param name="message">Message</param>
+        /// <param name="message">Message to log and output</param>
         /// <returns>Asynchronous task</returns>
         public static async Task LogOutputAsync(Message message)
         {

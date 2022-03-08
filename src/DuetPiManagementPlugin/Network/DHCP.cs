@@ -125,7 +125,7 @@ namespace DuetPiManagementPlugin.Network
 
             if (File.Exists("/etc/dhcpcd.conf"))
             {
-                using FileStream configStream = new("/etc/dhcpcd.conf", FileMode.Open, FileAccess.Read);
+                await using FileStream configStream = new("/etc/dhcpcd.conf", FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new(configStream);
 
                 IPConfig item = null;
@@ -211,11 +211,11 @@ namespace DuetPiManagementPlugin.Network
                 throw new ArgumentNullException(nameof(iface));
             }
 
-            using FileStream configStream = new("/etc/dhcpcd.conf", FileMode.Open, FileAccess.ReadWrite);
-            using MemoryStream newConfigStream = new();
+            await using FileStream configStream = new("/etc/dhcpcd.conf", FileMode.Open, FileAccess.ReadWrite);
+            await using MemoryStream newConfigStream = new();
             using (StreamReader reader = new(configStream, leaveOpen: true))
             {
-                using StreamWriter writer = new(newConfigStream, leaveOpen: true);
+                await using StreamWriter writer = new(newConfigStream, leaveOpen: true);
                 async Task WriteProfile(bool writeEmptyLine)
                 {
                     // Write the interface section only if it isn't meant to be configured by DHCP

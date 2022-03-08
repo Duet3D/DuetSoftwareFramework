@@ -96,7 +96,7 @@ namespace DuetControlServer.SPI.Communication.SbcRequests
         /// <summary>
         /// Assign filament to a given extruder drive
         /// </summary>
-        /// <seealso cref="AssignFilamentHeader">
+        /// <seealso cref="AssignFilamentHeader"/>
         [Obsolete("No longer used")]
         AssignFilament_deprecated = 14,
 

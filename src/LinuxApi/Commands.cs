@@ -119,8 +119,9 @@ namespace LinuxApi
         /// Get the permissions of a file
         /// </summary>
         /// <param name="pathname">Name of the file</param>
-        /// <param name="uid">User ID</param>
-        /// <param name="gid">Group ID</param>
+        /// <param name="user">User permissions</param>
+        /// <param name="group">Group permissions</param>
+        /// <param name="any">Any permissions</param>
         public static void GetPermissions(string pathname, out UnixPermissions user, out UnixPermissions group, out UnixPermissions any)
         {
             statbuf buffer = new();

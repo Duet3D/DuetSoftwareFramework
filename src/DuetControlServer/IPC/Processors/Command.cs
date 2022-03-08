@@ -68,14 +68,13 @@ namespace DuetControlServer.IPC.Processors
         public override async Task Process()
         {
             DuetAPI.Commands.BaseCommand command = null;
-            Type commandType;
             do
             {
                 try
                 {
                     // Read another command from the IPC connection
                     command = await Connection.ReceiveCommand();
-                    commandType = command.GetType();
+                    Type commandType = command.GetType();
 
                     // Make sure it is actually supported and permitted
                     if (!SupportedCommands.Contains(commandType))

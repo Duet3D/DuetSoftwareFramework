@@ -18,12 +18,12 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Queue of pending lock/unlock requests
         /// </summary>
-        public Queue<LockRequest> LockRequests { get; } = new Queue<LockRequest>();
+        public Queue<LockRequest> LockRequests { get; } = new();
 
         /// <summary>
         /// Queue of suspended G/M/T-codes to resend when this state becomes active again
         /// </summary>
-        public Queue<Code> SuspendedCodes { get; } = new Queue<Code>();
+        public Queue<Code> SuspendedCodes { get; } = new();
 
         /// <summary>
         /// Macro being executed on this state
@@ -46,11 +46,11 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Queue of pending G/M/T-codes that have not been buffered yet
         /// </summary>
-        public Queue<Code> PendingCodes { get; } = new Queue<Code>();
+        public Queue<Code> PendingCodes { get; } = new();
 
         /// <summary>
         /// Queue of pending flush requests
         /// </summary>
-        public Queue<TaskCompletionSource<bool>> FlushRequests { get; } = new Queue<TaskCompletionSource<bool>>();
+        public Queue<TaskCompletionSource<bool>> FlushRequests { get; } = new();
     }
 }

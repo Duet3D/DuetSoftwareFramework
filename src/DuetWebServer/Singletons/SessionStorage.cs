@@ -65,7 +65,7 @@ namespace DuetWebServer.Singletons
         /// <summary>
         /// Set whether a potentially long-running HTTP request has started or finished
         /// </summary>
-        /// <param name="key">Session key</param>
+        /// <param name="user">Principal user</param>
         /// <param name="requestStarted">Whether a WebSocket is connected</param>
         public void SetLongRunningHttpRequest(ClaimsPrincipal user, bool requestStarted);
 
@@ -110,9 +110,9 @@ namespace DuetWebServer.Singletons
         {
             public AuthenticationTicket Ticket { get; }
 
-            public string Key { get => Ticket.Principal.FindFirst("key").Value; }
+            public string Key => Ticket.Principal.FindFirst("key").Value;
 
-            public int SessionId { get => Convert.ToInt32(Ticket.Principal.FindFirst("sessionId").Value); }
+            public int SessionId => Convert.ToInt32(Ticket.Principal.FindFirst("sessionId").Value);
 
             public DateTime LastQueryTime { get; set; } = DateTime.Now;
 
@@ -279,7 +279,7 @@ namespace DuetWebServer.Singletons
         /// <summary>
         /// Set whether a potentially long-running HTTP request has started or finished
         /// </summary>
-        /// <param name="key">Session key</param>
+        /// <param name="user">Principal user</param>
         /// <param name="requestStarted">Whether a WebSocket is connected</param>
         public void SetLongRunningHttpRequest(ClaimsPrincipal user, bool requestStarted)
         {

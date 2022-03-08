@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files.ImageProcessing;
-using Nito.AsyncEx;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Files
@@ -31,7 +30,7 @@ namespace DuetControlServer.Files
         /// <returns>Information about the file</returns>
         public static async Task<GCodeFileInfo> Parse(string fileName, bool readThumbnailContent)
         {
-            using FileStream fileStream = new(fileName, FileMode.Open);
+            await using FileStream fileStream = new(fileName, FileMode.Open);
             using StreamReader reader = new(fileStream, null, true, Settings.FileBufferSize);
             GCodeFileInfo result = new()
             {
@@ -580,7 +579,7 @@ namespace DuetControlServer.Files
 
             try
             {
-                using FileStream fs = new(filename, FileMode.Open, FileAccess.Read);
+                await using FileStream fs = new(filename, FileMode.Open, FileAccess.Read);
                 fs.Seek(offset, SeekOrigin.Begin);
 
                 byte[] data = new byte[4096];
@@ -672,7 +671,7 @@ namespace DuetControlServer.Files
             DateTime lastWriteTime = File.GetLastWriteTime(filename);
 
             // Update the simulated time in the file
-            using (FileStream fileStream = new(filename, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+            await using (FileStream fileStream = new(filename, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
             {
                 // Check if we need to truncate the file before the last simulated time
                 bool truncate = false;
@@ -684,7 +683,7 @@ namespace DuetControlServer.Files
                     if (bytesRead > 0)
                     {
                         string bufferString = Encoding.UTF8.GetString(buffer[..bytesRead].Span);
-                        int simulationMarkerPosition = bufferString.IndexOf(SimulatedTimeString);
+                        int simulationMarkerPosition = bufferString.IndexOf(SimulatedTimeString, StringComparison.InvariantCultureIgnoreCase);
                         if (simulationMarkerPosition >= 0)
                         {
                             offset = bytesRead - simulationMarkerPosition;
@@ -695,7 +694,7 @@ namespace DuetControlServer.Files
                 }
 
                 // Write the simulated time
-                using (StreamWriter writer = new(fileStream, leaveOpen: true))
+                await using (StreamWriter writer = new(fileStream, leaveOpen: true))
                 {
                     await writer.WriteLineAsync(SimulatedTimeString + ": " + totalSeconds.ToString());
                 }

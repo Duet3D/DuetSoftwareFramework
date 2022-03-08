@@ -7,7 +7,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -78,14 +77,12 @@ namespace DuetControlServer.Model
         public static async Task Run()
         {
             DateTime lastUpdateTime = DateTime.Now;
-            DriveInfo[] drives;
-            System.Net.NetworkInformation.NetworkInterface[] networkInterfaces;
             string lastHostname = Environment.MachineName;
             do
             {
                 // Prefetch the network and volume devices because this can take quite a while (> 1.5s)
-                networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
-                drives = DriveInfo.GetDrives();
+                System.Net.NetworkInformation.NetworkInterface[] networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
+                DriveInfo[] drives = DriveInfo.GetDrives();
 
                 // Run another update cycle
                 using (await Provider.AccessReadWriteAsync())
@@ -96,7 +93,7 @@ namespace DuetControlServer.Model
                 }
 
                 // Check if the system time has to be updated
-                if (DateTime.Now - lastUpdateTime > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 5000) && Debugger.IsAttached)
+                if (DateTime.Now - lastUpdateTime > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 5000) && !Debugger.IsAttached)
                 {
                     _logger.Info("System time has been changed");
                     Code code = new()

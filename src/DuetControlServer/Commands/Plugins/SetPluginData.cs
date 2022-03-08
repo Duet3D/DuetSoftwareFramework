@@ -39,11 +39,11 @@ namespace DuetControlServer.Commands
             {
                 if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin plugin))
                 {
-                    if (!Model.Provider.Get.Plugins[Plugin].Data.ContainsKey(Key))
+                    if (!plugin.Data.ContainsKey(Key))
                     {
                         throw new ArgumentException($"Key {Key} not found in the plugin data");
                     }
-                    Model.Provider.Get.Plugins[Plugin].Data[Key] = Value.Clone();        // create a clone so that the instance can be used even after the JsonDocument is disposed
+                    plugin.Data[Key] = Value.Clone();        // create a clone so that the instance can be used even after the JsonDocument is disposed
                 }
                 else
                 {

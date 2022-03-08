@@ -56,7 +56,7 @@ namespace DuetPiManagementPlugin.Network
             List<string> ssids = new();
             if (File.Exists("/etc/wpa_supplicant/wpa_supplicant.conf"))
             {
-                using FileStream configStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Open, FileAccess.Read);
+                await using FileStream configStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new(configStream);
 
                 bool inNetworkSection = false;
@@ -154,7 +154,7 @@ namespace DuetPiManagementPlugin.Network
         {
             if (File.Exists("/etc/wpa_supplicant/wpa_supplicant.conf"))
             {
-                using FileStream configStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Open, FileAccess.Read);
+                await using FileStream configStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new(configStream);
 
                 while (!reader.EndOfStream)
@@ -187,8 +187,8 @@ namespace DuetPiManagementPlugin.Network
                     return new Message(MessageType.Error, "WiFi country is unset. Please use M587 C to specify your country code (e.g. M587 C\"US\")");
                 }
 
-                using FileStream configTemplateStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Create, FileAccess.Write);
-                using StreamWriter writer = new(configTemplateStream);
+                await using FileStream configTemplateStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Create, FileAccess.Write);
+                await using StreamWriter writer = new(configTemplateStream);
                 await writer.WriteLineAsync($"country={countryCode}");
                 await writer.WriteLineAsync( "ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev");
                 await writer.WriteLineAsync( "update_config=1");
@@ -196,13 +196,13 @@ namespace DuetPiManagementPlugin.Network
 
             // Rewrite wpa_supplicant.conf as requested
             bool countrySeen = false;
-            using (FileStream configStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Open, FileAccess.ReadWrite))
+            await using (FileStream configStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Open, FileAccess.ReadWrite))
             {
                 // Parse the existing config file
-                using MemoryStream newConfigStream = new();
+                await using MemoryStream newConfigStream = new();
                 {
                     using StreamReader reader = new(configStream, leaveOpen: true);
-                    using StreamWriter writer = new(newConfigStream, leaveOpen: true);
+                    await using StreamWriter writer = new(newConfigStream, leaveOpen: true);
 
                     StringBuilder networkSection = null;
                     string parsedSsid = null;
@@ -279,7 +279,7 @@ namespace DuetPiManagementPlugin.Network
                 // Insert the country code at the start if it was missing before
                 if (!countrySeen && !string.IsNullOrWhiteSpace(countryCode))
                 {
-                    using StreamWriter countryCodeWriter = new(configStream, leaveOpen: true);
+                    await using StreamWriter countryCodeWriter = new(configStream, leaveOpen: true);
                     await countryCodeWriter.WriteLineAsync($"country={countryCode}");
                     countrySeen = true;
                 }

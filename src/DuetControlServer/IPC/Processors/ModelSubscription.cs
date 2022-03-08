@@ -163,8 +163,6 @@ namespace DuetControlServer.IPC.Processors
                     }
                 }
 
-                BaseCommand command;
-                Type commandType;
                 do
                 {
                     if (jsonData != null)
@@ -174,8 +172,8 @@ namespace DuetControlServer.IPC.Processors
                         jsonData = null;
 
                         // Wait for an acknowledgement from the client
-                        command = await Connection.ReceiveCommand();
-                        commandType = command.GetType();
+                        BaseCommand command = await Connection.ReceiveCommand();
+                        Type commandType = command.GetType();
 
                         // Make sure the command is supported and permitted
                         if (!SupportedCommands.Contains(commandType))
@@ -241,7 +239,7 @@ namespace DuetControlServer.IPC.Processors
             }
             catch (Exception e)
             {
-                // Don't throw this exception if the connection has been termianted
+                // Don't throw this exception if the connection has been terminated
                 if (e is not SocketException)
                 {
                     throw;
@@ -569,7 +567,7 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="message"></param>
         private void RecordMessage(Message message)
         {
-            MachineModelPropertyChanged(new object[] { "messages" }, PropertyChangeType.GrowingCollection, new Message[] { message });
+            MachineModelPropertyChanged(new object[] { "messages" }, PropertyChangeType.GrowingCollection, new[] { message });
         }
 
         /// <summary>

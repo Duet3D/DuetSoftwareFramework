@@ -62,22 +62,22 @@ namespace DocGen
             Console.Write("Generating documentation.md... ");
             try
             {
-                using FileStream fs = new("./documentation.md", FileMode.Create, FileAccess.Write);
+                await using FileStream fs = new("./documentation.md", FileMode.Create, FileAccess.Write);
 
                 // Copy header
-                using (FileStream headerFs = new("./header.md", FileMode.Open, FileAccess.Read))
+                await using (FileStream headerFs = new("./header.md", FileMode.Open, FileAccess.Read))
                 {
                     await headerFs.CopyToAsync(fs);
                 }
 
                 // Generate documentation
-                using (StreamWriter writer = new(fs, leaveOpen: true))
+                await using (StreamWriter writer = new(fs, leaveOpen: true))
                 {
                     await WriteDocumentation(writer);
                 }
 
                 // Copy footer
-                using (FileStream footerFs = new("./footer.md", FileMode.Open, FileAccess.Read))
+                await using (FileStream footerFs = new("./footer.md", FileMode.Open, FileAccess.Read))
                 {
                     await footerFs.CopyToAsync(fs);
                 }

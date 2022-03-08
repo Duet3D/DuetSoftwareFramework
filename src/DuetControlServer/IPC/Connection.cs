@@ -11,7 +11,6 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
-using DuetControlServer.Utility;
 using LinuxApi;
 
 namespace DuetControlServer.IPC
@@ -119,7 +118,7 @@ namespace DuetControlServer.IPC
             Logger.Debug("Granting full DSF permissions to external plugin");
             foreach (Enum permission in Enum.GetValues(typeof(SbcPermissions)))
             {
-                if (permission != (Enum)SbcPermissions.SuperUser)
+                if (!permission.Equals(SbcPermissions.SuperUser))
                 {
                     Permissions |= (SbcPermissions)permission;
                 }
@@ -186,7 +185,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Indicates if the connection is still available
         /// </summary>
-        public bool IsConnected { get => !disposed && UnixSocket.Connected; }
+        public bool IsConnected => !disposed && UnixSocket.Connected;
 
         /// <summary>
         /// Read a generic JSON object from the socket
@@ -200,7 +199,7 @@ namespace DuetControlServer.IPC
             {
                 try
                 {
-                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
+                    await using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
                     Logger.Trace(() => $"Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
                     return await JsonDocument.ParseAsync(jsonStream);
@@ -249,7 +248,7 @@ namespace DuetControlServer.IPC
             {
                 try
                 {
-                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
+                    await using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
                     Logger.Trace(() => $"Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
                     using StreamReader reader = new(jsonStream);

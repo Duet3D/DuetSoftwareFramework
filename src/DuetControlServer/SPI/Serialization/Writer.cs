@@ -734,7 +734,7 @@ namespace DuetControlServer.SPI.Serialization
         /// Write an arbitrary boolean value
         /// </summary>
         /// <param name="to">Destination</param>
-        /// <param name="exists"></param>
+        /// <param name="value">Boolean value</param>
         /// <returns>Number of bytes written</returns>
         public static int WriteBoolean(Span<byte> to, bool value)
         {

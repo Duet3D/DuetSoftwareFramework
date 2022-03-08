@@ -67,7 +67,7 @@ namespace UnitTests.HttpClient
             string uploadContent = Guid.NewGuid().ToString();
 
             // Upload a test file
-            using (MemoryStream uploadStream = new())
+            await using (MemoryStream uploadStream = new())
             {
                 uploadStream.Write(Encoding.UTF8.GetBytes(uploadContent));
                 uploadStream.Seek(0, SeekOrigin.Begin);
