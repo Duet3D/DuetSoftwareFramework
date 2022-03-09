@@ -212,7 +212,7 @@ namespace DuetWebServer.Controllers
             _logger.LogInformation("WebSocket connected from {0}:{1}", ipAddress, port);
 
             // Register this client and keep it up-to-date
-            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_applicationLifetime.ApplicationStopping);
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_applicationLifetime.ApplicationStopped);
             try
             {
                 // Fetch full model copy and send it over initially

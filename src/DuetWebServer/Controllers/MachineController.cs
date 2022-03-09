@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using DuetAPI;
@@ -14,6 +15,7 @@ using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DuetWebServer.Controllers
@@ -37,14 +39,21 @@ namespace DuetWebServer.Controllers
         private readonly ILogger _logger;
 
         /// <summary>
+        /// Host application lifetime
+        /// </summary>
+        private readonly IHostApplicationLifetime _applicationLifetime;
+
+        /// <summary>
         /// Create a new controller instance
         /// </summary>
         /// <param name="configuration">Launch configuration</param>
         /// <param name="logger">Logger instance</param>
-        public MachineController(IConfiguration configuration, ILogger<MachineController> logger)
+        /// <param name="applicationLifetime">Application lifecycle instance</param>
+        public MachineController(IConfiguration configuration, ILogger<MachineController> logger, IHostApplicationLifetime applicationLifetime)
         {
             _configuration = configuration;
             _logger = logger;
+            _applicationLifetime = applicationLifetime;
         }
 
         #region Authorization
@@ -1153,7 +1162,7 @@ namespace DuetWebServer.Controllers
             string packageFile = Path.GetTempFileName();
             try
             {
-                sessionStorage. SetLongRunningHttpRequest(HttpContext.User, true);
+                sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
                 try
                 {
                     // Write package file
@@ -1163,9 +1172,15 @@ namespace DuetWebServer.Controllers
                     }
 
                     // Install it
-                    using CommandConnection connection = await BuildConnection();
-                    await connection.InstallSystemPackage(packageFile);
-
+                    try
+                    {
+                        using CommandConnection connection = await BuildConnection();
+                        await connection.InstallSystemPackage(packageFile, _applicationLifetime.ApplicationStopping);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger.LogWarning("Application is shutting down due to system package update");
+                    }
                     return NoContent();
                 }
                 catch (Exception e)
