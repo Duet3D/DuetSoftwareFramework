@@ -101,9 +101,9 @@ namespace DuetControlServer.Commands
             lock (_cancellationTokenSources)
             {
                 // Cancel and dispose the existing CTS
-                CancellationTokenSource oldCTS = _cancellationTokenSources[(int)channel];
-                oldCTS.Cancel();
-                oldCTS.Dispose();
+                CancellationTokenSource oldTcs = _cancellationTokenSources[(int)channel];
+                oldTcs.Cancel();
+                oldTcs.Dispose();
 
                 // Create a new one
                 _cancellationTokenSources[(int)channel] = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);

@@ -67,9 +67,9 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Asynchronous task</returns>
         public override async Task Process()
         {
-            DuetAPI.Commands.BaseCommand command = null;
             do
             {
+                DuetAPI.Commands.BaseCommand command = null;
                 try
                 {
                     // Read another command from the IPC connection
@@ -103,17 +103,20 @@ namespace DuetControlServer.IPC.Processors
                     // Send errors back to the client
                     if (e is not OperationCanceledException)
                     {
-                        if (e is UnauthorizedAccessException)
+                        if (command != null)
                         {
-                            Connection.Logger.Error("Insufficient permissions to execute {0}", command.Command);
-                        }
-                        else if (command != null)
-                        {
-                            Connection.Logger.Error(e, "Failed to execute {0}", command.Command);
+                            if (e is UnauthorizedAccessException)
+                            {
+                                Connection.Logger.Error("Insufficient permissions to execute {0}", command.Command);
+                            }
+                            else
+                            {
+                                Connection.Logger.Error(e, "Failed to execute {0}", command.Command);
+                            }
                         }
                         else
                         {
-                            Connection.Logger.Error(e, "Failed to execute command");
+                            Connection.Logger.Error(e, "Failed to receive command");
                         }
                     }
                     await Connection.SendResponse(e);

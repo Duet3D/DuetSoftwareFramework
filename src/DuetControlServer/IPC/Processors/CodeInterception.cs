@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -370,6 +371,27 @@ namespace DuetControlServer.IPC.Processors
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// Print diagnostics
+        /// </summary>
+        /// <param name="builder">String builder to write to</param>
+        public static void Diagnostics(StringBuilder builder)
+        {
+            foreach (List<CodeInterception> processorList in _connections.Values)
+            {
+                lock (processorList)
+                {
+                    foreach (CodeInterception processor in processorList)
+                    {
+                        if (processor._codeBeingIntercepted != null)
+                        {
+                            builder.AppendLine($"IPC connection #{processor.Connection.Id} is intercepting {processor._codeBeingIntercepted} ({processor._mode})");
+                        }
+                    }
+                }
+            }
         }
     }
 }

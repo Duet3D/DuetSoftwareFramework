@@ -172,16 +172,25 @@ namespace DuetControlServer
                 if (!_cancelSource.IsCancellationRequested)
                 {
                     _logger.Warn("Received SIGTERM, shutting down...");
-                    Shutdown(true).Wait();
+                    try
+                    {
+                        using CancellationTokenSource cts = new(4500);
+                        ShutdownAsync(true).Wait(cts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger.Fatal("Regular shutdown failed, proceeding with unconditional program termination");
+                        NLog.LogManager.Shutdown();
+                    }
                 }
             };
-            Console.CancelKeyPress += (_, e) =>
+            Console.CancelKeyPress += (sender, e) =>
             {
                 if (!_cancelSource.IsCancellationRequested)
                 {
                     _logger.Warn("Received SIGINT, shutting down...");
                     e.Cancel = true;
-                    Shutdown().Wait();
+                    _  = ShutdownAsync();
                 }
             };
 
@@ -291,7 +300,7 @@ namespace DuetControlServer
                 await stopCommand.Execute();
 
                 // Shut down DCS
-                SPI.Interface.Shutdown();
+                await SPI.Interface.ShutdownAsync();
                 _cancelSource.Cancel();
             }
 
@@ -373,12 +382,35 @@ namespace DuetControlServer
         }
 
         /// <summary>
+        /// Don't attempt to shut down multiple times at once
+        /// </summary>
+        private static bool _shuttingDown;
+
+        /// <summary>
         /// Terminate this program and kill it forcefully if required
         /// </summary>
         /// <param name="waitForTermination">Wait for program to be fully terminated</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Shutdown(bool waitForTermination = false)
+        public static async Task ShutdownAsync(bool waitForTermination = false)
         {
+            // Are we already shutting down?
+            if (_shuttingDown)
+            {
+                if (waitForTermination)
+                {
+                    try
+                    {
+                        await Task.Delay(-1, _programTerminated.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // expected
+                    }
+                }
+                return;
+            }
+            _shuttingDown = true;
+
             // Shut down the plugins again. This must happen before the cancellation token is triggered
             try
             {
@@ -393,28 +425,28 @@ namespace DuetControlServer
             // Wait for potential firmware update to finish
             await SPI.Interface.WaitForUpdate();
 
-            // Set up a watchdog to kill the program forcefully if anything hangs up
-            Task terminationTask = Task.Delay(4500, _programTerminated.Token).ContinueWith(async task =>
+            // Make sure the program is terminated within 5s
+            Task watchdogTask = Task.Run(async delegate
             {
                 try
                 {
-                    await task;
+                    await Task.Delay(5000, _programTerminated.Token);
                     Environment.Exit(ExitCode.Software);
                 }
                 catch (OperationCanceledException)
                 {
                     // expected
                 }
-            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+            });
 
             // Try to shut down this program normally
-            SPI.Interface.Shutdown();
+            await SPI.Interface.ShutdownAsync();
             _cancelSource.Cancel();
 
             // Wait for program termination if required
             if (waitForTermination)
             {
-                await terminationTask;
+                await watchdogTask;
             }
         }
     }

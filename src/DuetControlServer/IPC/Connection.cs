@@ -296,7 +296,7 @@ namespace DuetControlServer.IPC
 
                     // Map it in case we need to retain backwards-compatibility
                     string commandName = item.Value.GetString();
-                    if (ApiVersion <= 8 && _legacyCommandMapping.TryGetValue(commandName.ToLowerInvariant(), out string newCommandName))
+                    if (ApiVersion <= 8 && _legacyCommandMapping.TryGetValue(commandName?.ToLowerInvariant() ?? string.Empty, out string newCommandName))
                     {
                         commandName = newCommandName;
                     }

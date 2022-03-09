@@ -517,7 +517,15 @@ namespace DuetControlServer.Codes
                 case 112:
                     if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await SPI.Interface.Flush(code))
                     {
-                        await SPI.Interface.EmergencyStop();
+                        Task stopTask = SPI.Interface.EmergencyStop();
+                        Task completedTask = await Task.WhenAny(stopTask, Task.Delay(4500, Program.CancellationToken));
+                        if (stopTask != completedTask)
+                        {
+                            // Halt timed out, kill this program
+                            await Program.ShutdownAsync(true);
+                            return new Message(MessageType.Error, "Halt timed out, killing DCS");
+                        }
+
                         using (await Model.Provider.AccessReadWriteAsync())
                         {
                             Model.Provider.Get.State.Status = MachineStatus.Halted;
@@ -921,7 +929,7 @@ namespace DuetControlServer.Codes
                                 _ = code.CodeTask.ContinueWith(async task =>
                                 {
                                     await task;
-                                    await Program.Shutdown();
+                                    await Program.ShutdownAsync();
                                 }, TaskContinuationOptions.RunContinuationsAsynchronously);
                             }
                             else
@@ -947,7 +955,15 @@ namespace DuetControlServer.Codes
                     {
                         if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await SPI.Interface.Flush(code))
                         {
-                            await SPI.Interface.ResetFirmware();
+                            Task resetTask = SPI.Interface.ResetFirmware();
+                            Task completedTask = await Task.WhenAny(resetTask, Task.Delay(4500, Program.CancellationToken));
+                            if (resetTask != completedTask)
+                            {
+                                // Reset timed out, kill this program
+                                await Program.ShutdownAsync(true);
+                                return new Message(MessageType.Error, "Reset timed out, killing DCS");
+                            }
+
                             return new Message();
                         }
                         throw new OperationCanceledException();
@@ -1005,7 +1021,7 @@ namespace DuetControlServer.Codes
                         _ = code.CodeTask.ContinueWith(async task =>
                         {
                             await task;
-                            await Program.Shutdown();
+                            await Program.ShutdownAsync();
                         }, TaskContinuationOptions.RunContinuationsAsynchronously);
                     }
                     break;
@@ -1024,6 +1040,7 @@ namespace DuetControlServer.Codes
             builder.AppendLine($"Duet Control Server v{Program.Version}");
 
             await FileExecution.Job.Diagnostics(builder);
+            IPC.Processors.CodeInterception.Diagnostics(builder);
             await Model.Updater.Diagnostics(builder);
             await SPI.Interface.Diagnostics(builder);
 

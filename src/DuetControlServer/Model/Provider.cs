@@ -61,7 +61,7 @@ namespace DuetControlServer.Model
                         {
                             await Task.Delay(Settings.MaxMachineModelLockTime, _releaseCts.Token);
                             _logger.Fatal("{0} deadlock detected, stack trace of the deadlock:\n{1}", isWriteLock ? "Writer" : "Reader", stackTrace);
-                            await Program.Shutdown();
+                            await Program.ShutdownAsync();
                         }
                         finally
                         {

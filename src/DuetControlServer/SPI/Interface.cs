@@ -1567,11 +1567,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Called to shut down the SPI subsystem
-        /// </summary>
-        public static void Shutdown() => Invalidate();
-
-        /// <summary>
         /// Invalidate every resource due to a critical event
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -1652,6 +1647,86 @@ namespace DuetControlServer.SPI
 
             // Notify the updater task
             Model.Updater.ConnectionLost();
+        }
+
+        /// <summary>
+        /// Called to shut down the SPI subsystem asynchronously
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static async Task ShutdownAsync()
+        {
+            // No longer starting or stopping a print. Must do this before aborting the print
+            using (await _printStateLock.LockAsync(Program.CancellationToken))
+            {
+                if (_setPrintInfoRequest != null)
+                {
+                    _setPrintInfoRequest.SetCanceled();
+                    _setPrintInfoRequest = null;
+                }
+                if (_stopPrintRequest != null)
+                {
+                    _stopPrintRequest.SetResult();      // called from the print task so this never throws an exception
+                    _stopPrintRequest = null;
+                }
+            }
+
+            // Cancel the file being printed
+            using (await FileExecution.Job.LockAsync())
+            {
+                await FileExecution.Job.AbortAsync();
+            }
+
+            // Resolve pending macros, unbuffered (system) codes and flush requests
+            foreach (Channel.Processor channel in _channels)
+            {
+                using (await channel.LockAsync())
+                {
+                    channel.Invalidate();
+                }
+            }
+            _bytesReserved = _bufferSpace = 0;
+
+            // Resolve pending object model requests
+            lock (_pendingModelQueries)
+            {
+                foreach (PendingModelQuery query in _pendingModelQueries)
+                {
+                    query.Tcs.SetCanceled();
+                }
+                _pendingModelQueries.Clear();
+            }
+
+            // Resolve pending expression evaluation and variable requests
+            lock (_evaluateExpressionRequests)
+            {
+                foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
+                {
+                    request.SetCanceled();
+                }
+                _evaluateExpressionRequests.Clear();
+            }
+
+            lock (_variableRequests)
+            {
+                foreach (VariableRequest request in _variableRequests)
+                {
+                    request.SetCanceled();
+                }
+                _variableRequests.Clear();
+            }
+
+            // Clear messages to send to the firmware
+            lock (_messagesToSend)
+            {
+                _messagesToSend.Clear();
+            }
+
+            // Close all the files
+            foreach (var kv in _openFiles)
+            {
+                await kv.Value.DisposeAsync();
+            }
+            _openFiles.Clear();
         }
     }
 }

@@ -242,7 +242,7 @@ namespace DuetControlServer.Utility
             if (outdatedBoards.Count == 0)
             {
                 Console.WriteLine("All boards are up-to-date!");
-                await Program.Shutdown();
+                await Program.ShutdownAsync();
                 return;
             }
 
@@ -390,7 +390,7 @@ namespace DuetControlServer.Utility
             }
 
             // Done
-            await Program.Shutdown();
+            await Program.ShutdownAsync();
         }
 
         /// <summary>
