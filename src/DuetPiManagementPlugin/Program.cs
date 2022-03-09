@@ -43,7 +43,7 @@ namespace DuetPiManagementPlugin
         };
 
         /// <summary>
-        /// Connection used for intecepting codes
+        /// Connection used for intercepting codes
         /// </summary>
         public static InterceptConnection Connection { get; } = new();
 
