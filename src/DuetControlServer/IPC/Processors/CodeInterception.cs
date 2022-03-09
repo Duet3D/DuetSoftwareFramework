@@ -250,7 +250,7 @@ namespace DuetControlServer.IPC.Processors
                 _codeBeingIntercepted = code;
                 _codeMonitor.Pulse();
                 await _codeMonitor.WaitAsync(Program.CancellationToken);
-                _codeBeingIntercepted = null;
+                //_codeBeingIntercepted = null;     // TODO check this when the code pipeline is reworked; with this line something goes wrong in the interceptors
 
                 try
                 {
@@ -385,7 +385,7 @@ namespace DuetControlServer.IPC.Processors
                 {
                     foreach (CodeInterception processor in processorList)
                     {
-                        if (processor._codeBeingIntercepted != null)
+                        if (processor._codeBeingIntercepted is { IsExecuted: false })
                         {
                             builder.AppendLine($"IPC connection #{processor.Connection.Id} is intercepting {processor._codeBeingIntercepted} ({processor._mode})");
                         }
