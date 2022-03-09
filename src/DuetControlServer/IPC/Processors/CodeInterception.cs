@@ -246,12 +246,12 @@ namespace DuetControlServer.IPC.Processors
         {
             using (await _codeMonitor.EnterAsync(Program.CancellationToken))
             {
-                // Send it to the IPC client
+                // Send it to the IPC client and wait for a result
                 _codeBeingIntercepted = code;
                 _codeMonitor.Pulse();
-
-                // Wait for a code result to be set by the interceptor
                 await _codeMonitor.WaitAsync(Program.CancellationToken);
+                _codeBeingIntercepted = null;
+
                 try
                 {
                     // Code is cancelled. This invokes an OperationCanceledException on the code's task.
