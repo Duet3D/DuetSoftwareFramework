@@ -84,6 +84,12 @@ namespace DuetControlServer.Commands
             {
                 await foreach (Code code in ParseAsync())
                 {
+                    // Check for async execution
+                    if (ExecuteAsynchronously)
+                    {
+                        code.Flags |= CodeFlags.Asynchronous;
+                    }
+
                     // M108, M112, M122, and M999 (B0) always go to an idle channel so we (hopefully) get a low-latency response
                     if (code.Type == CodeType.MCode &&
                         (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || (code.MajorNumber == 999 && code.Parameter('B', 0) == 0)))
@@ -146,7 +152,10 @@ namespace DuetControlServer.Commands
                         try
                         {
                             Message codeResult = await codeTask;
-                            result.Append(codeResult);
+                            if (codeResult != null)
+                            {
+                                result.Append(codeResult);
+                            }
                         }
                         catch (OperationCanceledException)
                         {

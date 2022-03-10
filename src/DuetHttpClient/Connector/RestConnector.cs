@@ -426,12 +426,21 @@ namespace DuetHttpClient.Connector
         /// <param name="code">Code to send</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Code reply</returns>
-        public override async Task<string> SendCode(string code, CancellationToken cancellationToken = default)
+        public override Task<string> SendCode(string code, CancellationToken cancellationToken = default) => SendCode(code, false, cancellationToken);
+
+        /// <summary>
+        /// Send a G/M/T-code and return the G-code reply
+        /// </summary>
+        /// <param name="code">Code to send</param>
+        /// <param name="executeAsynchronously">Don't wait for the code to finish</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Code reply</returns>
+        public override async Task<string> SendCode(string code, bool executeAsynchronously, CancellationToken cancellationToken = default)
         {
             string errorMessage = "Invalid number of maximum retries configured";
             for (int i = 0; i <= Options.MaxRetries; i++)
             {
-                using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "machine/code");
+                using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, $"machine/code?async={(executeAsynchronously ? "true" : "false")}");
                 request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(code));
 
                 using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);

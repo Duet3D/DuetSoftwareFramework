@@ -25,5 +25,10 @@ namespace DuetAPI.Commands
         /// Destination channel
         /// </summary>
         public CodeChannel Channel { get; set; } = Defaults.InputChannel;
+
+        /// <summary>
+        /// Whether this code may be executed asynchronously. If set, the code reply is output as a generic message
+        /// </summary>
+        public bool ExecuteAsynchronously { get; set; }
     }
 }

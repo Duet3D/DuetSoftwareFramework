@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
@@ -250,6 +251,7 @@ namespace DuetWebServer.Controllers
         /// Execute plain G/M/T-code(s) from the request body and return the G-code response when done.
         /// </summary>
         /// <param name="sessionStorage">Session storage singleton</param>
+        /// <param name="async">Execute code asynchronously (don't wait for a code result)</param>
         /// <returns>
         /// HTTP status code:
         /// (200) G-Code response as text/plain
@@ -259,7 +261,7 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [HttpPost("code")]
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
-        public async Task<IActionResult> DoCode([FromServices] ISessionStorage sessionStorage)
+        public async Task<IActionResult> DoCode([FromServices] ISessionStorage sessionStorage, bool async = false)
         {
             string code;
             if (Request.HasFormContentType)
@@ -275,16 +277,23 @@ namespace DuetWebServer.Controllers
 
             try
             {
-                sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
+                if (!async)
+                {
+                    sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
+                }
+
                 try
                 {
                     using CommandConnection connection = await BuildConnection();
                     _logger.LogInformation($"[{nameof(DoCode)}] Executing code '{code}'");
-                    return Content(await connection.PerformSimpleCode(code, CodeChannel.HTTP));
+                    return Content(await connection.PerformSimpleCode(code, CodeChannel.HTTP, async));
                 }
                 finally
                 {
-                    sessionStorage.SetLongRunningHttpRequest(HttpContext.User, false);
+                    if (!async)
+                    {
+                        sessionStorage.SetLongRunningHttpRequest(HttpContext.User, false);
+                    }
                 }
             }
             catch (Exception e)

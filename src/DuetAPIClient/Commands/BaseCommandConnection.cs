@@ -362,6 +362,25 @@ namespace DuetAPIClient
         }
 
         /// <summary>
+        /// Execute an arbitrary G/M/T-code in text form and return the result as a string
+        /// </summary>
+        /// <param name="code">The code to execute</param>
+        /// <param name="channel">Optional destination channel of this code</param>
+        /// <param name="executeAsynchronously">Execute this code asynchronously in the background</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Result of the given code converted to a string</returns>
+        /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
+        /// <exception cref="OperationCanceledException">Code or operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
+        /// <seealso cref="SimpleCode"/>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        public Task<string> PerformSimpleCode(string code, CodeChannel channel, bool executeAsynchronously, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand<string>(new SimpleCode { Code = code, Channel = channel, ExecuteAsynchronously = executeAsynchronously }, cancellationToken);
+        }
+
+        /// <summary>
         /// Reload a plugin manifest
         /// </summary>
         /// <param name="plugin">Identifier of the plugin</param>

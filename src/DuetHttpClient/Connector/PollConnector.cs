@@ -221,7 +221,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// TCS to complete when the object model is up-to-date
         /// </summary>
-        private readonly List<TaskCompletionSource<object>> _modelUpdateTCS = new List<TaskCompletionSource<object>>();
+        private readonly List<TaskCompletionSource<object>> _modelUpdateTcs = new List<TaskCompletionSource<object>>();
 
         /// <summary>
         /// Wait for the object model to be up-to-date
@@ -240,9 +240,9 @@ namespace DuetHttpClient.Connector
             }
 
             TaskCompletionSource<object> tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-            lock (_modelUpdateTCS)
+            lock (_modelUpdateTcs)
             {
-                _modelUpdateTCS.Add(tcs);
+                _modelUpdateTcs.Add(tcs);
             }
 
             CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
@@ -385,13 +385,13 @@ namespace DuetHttpClient.Connector
                                 }
 
                                 // Object model is now up-to-date
-                                lock (_modelUpdateTCS)
+                                lock (_modelUpdateTcs)
                                 {
-                                    foreach (TaskCompletionSource<object> tcs in _modelUpdateTCS)
+                                    foreach (TaskCompletionSource<object> tcs in _modelUpdateTcs)
                                     {
                                         tcs.TrySetResult(null);
                                     }
-                                    _modelUpdateTCS.Clear();
+                                    _modelUpdateTcs.Clear();
                                 }
                             }
                             else
@@ -635,7 +635,16 @@ namespace DuetHttpClient.Connector
         /// <param name="code">Code to send</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Code reply</returns>
-        public override async Task<string> SendCode(string code, CancellationToken cancellationToken = default)
+        public override Task<string> SendCode(string code, CancellationToken cancellationToken = default) => SendCode(code, false, cancellationToken);
+
+        /// <summary>
+        /// Send a G/M/T-code and return the G-code reply
+        /// </summary>
+        /// <param name="code">Code to send</param>
+        /// <param name="executeAsynchronously">Don't wait for the code to finish</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Code reply</returns>
+        public override async Task<string> SendCode(string code, bool executeAsynchronously, CancellationToken cancellationToken = default)
         {
             // Check if we can expect a code reply at all
             bool canAwaitCode = false;
@@ -647,7 +656,7 @@ namespace DuetHttpClient.Connector
                     if (codeObj.Type != CodeType.Comment &&
                         (codeObj.Type != CodeType.MCode || (codeObj.MajorNumber != 997 && codeObj.MajorNumber != 999)))
                     {
-                        canAwaitCode = true;
+                        canAwaitCode = !executeAsynchronously;
                         break;
                     }
                     codeObj.Reset();
