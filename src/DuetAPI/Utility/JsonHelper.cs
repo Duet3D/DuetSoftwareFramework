@@ -1,6 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
@@ -33,7 +32,7 @@ namespace DuetAPI.Utility
         {
             if (reader.TokenType == JsonTokenType.StartArray)
             {
-                List<Regex> regexList = new();
+                List<Regex> regexList = new List<Regex>();
 
                 string pattern = null;
                 int optionsValue = 0;
@@ -108,7 +107,7 @@ namespace DuetAPI.Utility
         /// <summary>
         /// Default JSON (de-)serialization options
         /// </summary>
-        public static readonly JsonSerializerOptions DefaultJsonOptions = new()
+        public static readonly JsonSerializerOptions DefaultJsonOptions = new JsonSerializerOptions()
         {
             Converters = {
                 new JsonPolymorphicWriteOnlyConverter<Kinematics>(),
@@ -130,7 +129,7 @@ namespace DuetAPI.Utility
         /// <exception cref="SocketException">Connection has been closed</exception>
         public static async ValueTask<MemoryStream> ReceiveUtf8Json(Socket socket, CancellationToken cancellationToken = default)
         {
-            MemoryStream jsonStream = new();
+            MemoryStream jsonStream = new MemoryStream();
             bool inJson = false, inQuotes = false, isEscaped = false;
             int numBraces = 0;
 
@@ -197,12 +196,15 @@ namespace DuetAPI.Utility
         /// </remarks>
         public static T ToObject<T>(this JsonElement element, JsonSerializerOptions options = null)
         {
-            ArrayBufferWriter<byte> bufferWriter = new();
-            using (Utf8JsonWriter writer = new(bufferWriter))
+            using (MemoryStream stream = new MemoryStream())
             {
-                element.WriteTo(writer);
+                using (Utf8JsonWriter writer = new Utf8JsonWriter(stream))
+                {
+                    element.WriteTo(writer);
+                }
+                stream.Seek(0, SeekOrigin.Begin);
+                return JsonSerializer.Deserialize<T>(stream, options);
             }
-            return JsonSerializer.Deserialize<T>(bufferWriter.WrittenSpan, options);
         }
 
         /// <summary>
@@ -218,12 +220,15 @@ namespace DuetAPI.Utility
         /// </remarks>
         public static object ToObject(this JsonElement element, Type type, JsonSerializerOptions options = null)
         {
-            ArrayBufferWriter<byte> bufferWriter = new();
-            using (Utf8JsonWriter writer = new(bufferWriter))
+            using (MemoryStream stream = new MemoryStream())
             {
-                element.WriteTo(writer);
+                using (Utf8JsonWriter writer = new Utf8JsonWriter(stream))
+                {
+                    element.WriteTo(writer);
+                }
+                stream.Seek(0, SeekOrigin.Begin);
+                return JsonSerializer.Deserialize(stream, type, options);
             }
-            return JsonSerializer.Deserialize(bufferWriter.WrittenSpan, type, options);
         }
 
         /// <summary>

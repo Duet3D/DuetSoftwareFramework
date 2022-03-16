@@ -18,10 +18,11 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Split an echo expression separated by commas
         /// </summary>
-        /// <param name="expression">Expression to spli</param>
+        /// <param name="expression">Expression to split</param>
         /// <returns>Expression items</returns>
         private static IEnumerable<string> SplitExpression(string expression)
         {
+            int numBraces = 0;
             StringBuilder parsedExpression = new();
             bool inQuotes = false;
             char lastC = '\0';
@@ -40,13 +41,21 @@ namespace DuetControlServer.Model
                     inQuotes = true;
                     parsedExpression.Append(c);
                 }
-                else if (c == ',')
+                else if (c == ',' && numBraces == 0)
                 {
                     yield return parsedExpression.ToString().Trim();
                     parsedExpression.Clear();
                 }
                 else
                 {
+                    if (c == '(')
+                    {
+                        numBraces++;
+                    }
+                    else if (c == ')')
+                    {
+                        numBraces--;
+                    }
                     parsedExpression.Append(c);
                 }
             }
@@ -58,19 +67,19 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
-        /// Checks if the given code contains any Linux object model fields
+        /// Checks if the given code contains any SBC object model fields
         /// </summary>
         /// <param name="code">Code to check</param>
-        /// <returns>Whether the code contains any Linux object model fields</returns>
+        /// <returns>Whether the code contains any SBC object model fields</returns>
         /// <exception cref="CodeParserException">Failed to parse expression</exception>
-        public static bool ContainsLinuxFields(Code code)
+        public static bool ContainsSbcFields(Code code)
         {
             // echo command
             if (code.Keyword == KeywordType.Echo)
             {
                 foreach (string expression in SplitExpression(code.KeywordArgument))
                 {
-                    if (ContainsLinuxFields(expression, code))
+                    if (ContainsSbcFields(expression, code))
                     {
                         return true;
                     }
@@ -81,13 +90,13 @@ namespace DuetControlServer.Model
             // Conditional code
             if (code.Keyword != KeywordType.None && code.KeywordArgument != null)
             {
-                return ContainsLinuxFields(code.KeywordArgument, code);
+                return ContainsSbcFields(code.KeywordArgument, code);
             }
 
             // Regular G/M/T-code
             foreach (CodeParameter parameter in code.Parameters)
             {
-                if (parameter.IsExpression && ContainsLinuxFields(parameter, code))
+                if (parameter.IsExpression && ContainsSbcFields(parameter, code))
                 {
                     return true;
                 }
@@ -96,13 +105,13 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
-        /// Checks if the given expression string contains any Linux object model fields
+        /// Checks if the given expression string contains any SBC object model fields
         /// </summary>
         /// <param name="expression">Expression to check</param>
         /// <param name="code">Code for providing potential exception details</param>
-        /// <returns>Whether the expressions contains any Linux object model fields</returns>
+        /// <returns>Whether the expressions contains any SBC object model fields</returns>
         /// <exception cref="CodeParserException">Failed to parse expression</exception>
-        private static bool ContainsLinuxFields(string expression, Code code)
+        private static bool ContainsSbcFields(string expression, Code code)
         {
             Stack<char> lastBracketTypes = new();
             Stack<StringBuilder> parsedExpressions = new();
@@ -139,17 +148,17 @@ namespace DuetControlServer.Model
                         {
                             if (c == '}')
                             {
-                                throw new CodeParserException($"Unexpected curly bracket", code);
+                                throw new CodeParserException("Unexpected curly bracket", code);
                             }
                             if (c == ')')
                             {
-                                throw new CodeParserException($"Unexpected round bracket", code);
+                                throw new CodeParserException("Unexpected round bracket", code);
                             }
-                            throw new CodeParserException($"Unexpected square bracket", code);
+                            throw new CodeParserException("Unexpected square bracket", code);
                         }
 
                         string subExpression = parsedExpressions.Pop().ToString();
-                        if (IsLinuxExpression(subExpression))
+                        if (IsSbcExpression(subExpression))
                         {
                             return true;
                         }
@@ -158,13 +167,13 @@ namespace DuetControlServer.Model
                     {
                         if (c == '}')
                         {
-                            throw new CodeParserException($"Unexpected curly bracket", code);
+                            throw new CodeParserException("Unexpected curly bracket", code);
                         }
                         if (c == ')')
                         {
-                            throw new CodeParserException($"Unexpected round bracket", code);
+                            throw new CodeParserException("Unexpected round bracket", code);
                         }
-                        throw new CodeParserException($"Unexpected square bracket", code);
+                        throw new CodeParserException("Unexpected square bracket", code);
                     }
                 }
                 else if (c == '.' || char.IsLetter(c))
@@ -174,7 +183,7 @@ namespace DuetControlServer.Model
                 else if (!char.IsDigit(c) && parsedExpressions.Peek().Length > 0)
                 {
                     string subExpression = parsedExpressions.Peek().ToString();
-                    if (IsLinuxExpression(subExpression))
+                    if (IsSbcExpression(subExpression))
                     {
                         return true;
                     }
@@ -192,24 +201,24 @@ namespace DuetControlServer.Model
             {
                 if (lastBracket == '{')
                 {
-                    throw new CodeParserException($"Unterminated curly bracket", code);
+                    throw new CodeParserException("Unterminated curly bracket", code);
                 }
                 if (lastBracket == '(')
                 {
-                    throw new CodeParserException($"Unterminated round bracket", code);
+                    throw new CodeParserException("Unterminated round bracket", code);
                 }
-                throw new CodeParserException($"Unterminated square bracket", code);
+                throw new CodeParserException("Unterminated square bracket", code);
             }
 
-            return IsLinuxExpression(parsedExpressions.Peek().ToString());
+            return IsSbcExpression(parsedExpressions.Peek().ToString());
         }
 
         /// <summary>
-        /// Checks if the given expression without indices is a Linux object model field
+        /// Checks if the given expression without indices is a SBC object model field
         /// </summary>
         /// <param name="expression">Expression without indices to check</param>
-        /// <returns>Whether the given expression is a Linux object model field</returns>
-        public static bool IsLinuxExpression(string expression)
+        /// <returns>Whether the given expression is a SBC object model field</returns>
+        public static bool IsSbcExpression(string expression)
         {
             // Check for special variables
             if (expression == "iterations" || expression == "line" || expression == "result")
@@ -224,7 +233,7 @@ namespace DuetControlServer.Model
             {
                 if (model.JsonProperties.TryGetValue(pathItem, out PropertyInfo property))
                 {
-                    if (Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
+                    if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                     {
                         return true;
                     }
@@ -254,7 +263,7 @@ namespace DuetControlServer.Model
         /// Evaluate a conditional code
         /// </summary>
         /// <param name="code">Code holding expressions</param>
-        /// <param name="evaluateAll">Whether all or only Linux fields are supposed to be evaluated</param>
+        /// <param name="evaluateAll">Whether all or only SBC fields are supposed to be evaluated</param>
         /// <returns>Evaluation result or null</returns>
         public static async Task<string> Evaluate(Code code, bool evaluateAll)
         {
@@ -282,11 +291,7 @@ namespace DuetControlServer.Model
                     return builder.ToString();
                 }
 
-                if (code.Keyword == KeywordType.Abort ||
-#pragma warning disable CS0618 // Type or member is obsolete
-                    code.Keyword == KeywordType.Return
-#pragma warning restore CS0618 // Type or member is obsolete
-                    )
+                if (code.Keyword == KeywordType.Abort)
                 {
                     string keywordArgument = code.KeywordArgument.Trim();
                     try
@@ -324,7 +329,7 @@ namespace DuetControlServer.Model
                     keywordExpression = code.KeywordArgument;
                 }
 
-                // Evaluate Linux properties
+                // Evaluate SBC properties
                 try
                 {
                     string result = await EvaluateExpression(code, keywordExpression.Trim(), !evaluateAll, false);
@@ -366,17 +371,17 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="code">Code holding the expression(s)</param>
         /// <param name="expression">Expression(s) to replace</param>
-        /// <param name="onlyLinuxFields">Whether to replace only Linux fields</param>
+        /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
         /// <param name="encodeResult">Whether the final result shall be encoded</param>
         /// <returns>Replaced expression(s)</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
-        private static async Task<string> EvaluateExpression(Code code, string expression, bool onlyLinuxFields, bool encodeResult)
+        public static async Task<string> EvaluateExpression(Code code, string expression, bool onlySbcFields, bool encodeResult)
         {
             Stack<char> lastBracketTypes = new();
             Stack<StringBuilder> parsedExpressions = new();
             parsedExpressions.Push(new StringBuilder());
 
-            bool inQuotes = false, isExistsQuery = false;
+            bool inQuotes = false;
             char lastC = '\0';
             foreach (char c in expression)
             {
@@ -395,7 +400,6 @@ namespace DuetControlServer.Model
                 }
                 else if (c == '{' || c == '(' || c == '[')
                 {
-                    isExistsQuery = (c == '(') && parsedExpressions.Peek().ToString().TrimEnd().EndsWith("exists");
                     lastBracketTypes.Push(c);
                     parsedExpressions.Push(new StringBuilder());
                 }
@@ -414,37 +418,26 @@ namespace DuetControlServer.Model
                         {
                             if (c == '}')
                             {
-                                throw new CodeParserException($"Unexpected curly bracket", code);
+                                throw new CodeParserException("Unexpected curly bracket", code);
                             }
                             if (c == ')')
                             {
-                                throw new CodeParserException($"Unexpected round bracket", code);
+                                throw new CodeParserException("Unexpected round bracket", code);
                             }
-                            throw new CodeParserException($"Unexpected square bracket", code);
+                            throw new CodeParserException("Unexpected square bracket", code);
                         }
 
-                        string subExpression = parsedExpressions.Pop().ToString();
-                        if (isExistsQuery)
+                        string subExpression = parsedExpressions.Pop().ToString().Trim();
+                        string evaluationResult = await EvaluateSubExpression(code, subExpression, lastBracketType == '(' || onlySbcFields, true);
+                        if (lastBracketType == '(' || lastBracketType == '[' || subExpression == evaluationResult || onlySbcFields)
                         {
-                            // Queries that take identifier paths must not be evaluated...
-                            parsedExpressions.Peek().Append('(');
-                            parsedExpressions.Peek().Append(subExpression);
-                            parsedExpressions.Peek().Append(')');
-                            isExistsQuery = false;
+                            parsedExpressions.Peek().Append(lastBracketType);
+                            parsedExpressions.Peek().Append(evaluationResult);
+                            parsedExpressions.Peek().Append(expectedBracketType);
                         }
                         else
                         {
-                            string evaluationResult = await EvaluateSubExpression(code, subExpression.Trim(), onlyLinuxFields, true);
-                            if (lastBracketType == '(' || lastBracketType == '[' || subExpression == evaluationResult || onlyLinuxFields)
-                            {
-                                parsedExpressions.Peek().Append(lastBracketType);
-                                parsedExpressions.Peek().Append(evaluationResult);
-                                parsedExpressions.Peek().Append(expectedBracketType);
-                            }
-                            else
-                            {
-                                parsedExpressions.Peek().Append(evaluationResult);
-                            }
+                            parsedExpressions.Peek().Append(evaluationResult);
                         }
                     }
                     else
@@ -468,28 +461,28 @@ namespace DuetControlServer.Model
             {
                 if (lastBracket == '{')
                 {
-                    throw new CodeParserException($"Unterminated curly bracket", code);
+                    throw new CodeParserException("Unterminated curly bracket", code);
                 }
                 if (lastBracket == '(')
                 {
-                    throw new CodeParserException($"Unterminated round bracket", code);
+                    throw new CodeParserException("Unterminated round bracket", code);
                 }
-                throw new CodeParserException($"Unterminated square bracket", code);
+                throw new CodeParserException("Unterminated square bracket", code);
             }
 
-            return await EvaluateSubExpression(code, parsedExpressions.Pop().ToString().Trim(), onlyLinuxFields, encodeResult);
+            return await EvaluateSubExpression(code, parsedExpressions.Pop().ToString().Trim(), onlySbcFields, encodeResult);
         }
 
         /// <summary>
         /// Evaluate a sub-expression
         /// </summary>
-        /// <param name="code">Code holdng the sub-expression</param>
+        /// <param name="code">Code holding the sub-expression</param>
         /// <param name="expression">Expression to evaluate</param>
-        /// <param name="onlyLinuxFields">Whether to replace only Linux fields</param>
+        /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
         /// <param name="encodeResult">Whether the final result shall be encoded</param>
-        /// <returns>String result or the expresion</returns>
+        /// <returns>String result or the expression</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
-        private static async Task<string> EvaluateSubExpression(Code code, string expression, bool onlyLinuxFields, bool encodeResult)
+        private static async Task<string> EvaluateSubExpression(Code code, string expression, bool onlySbcFields, bool encodeResult)
         {
             StringBuilder result = new(), partialExpression = new();
             bool inQuotes = false;
@@ -555,13 +548,13 @@ namespace DuetControlServer.Model
                         {
                             subFilter = subExpression[1..];
                         }
-                        if (Filter.GetSpecific(subFilter, true, out object linuxField))
+                        if (Filter.GetSpecific(subFilter, true, out object sbcField))
                         {
                             if (subExpression == expression)
                             {
-                                return ObjectToString(linuxField, wantsCount, encodeResult, code);
+                                return ObjectToString(sbcField, wantsCount, encodeResult, code);
                             }
-                            string subResult = ObjectToString(linuxField, wantsCount, true, code);
+                            string subResult = ObjectToString(sbcField, wantsCount, true, code);
                             result.Append(subResult);
                         }
                         else
@@ -617,13 +610,13 @@ namespace DuetControlServer.Model
             {
                 finalFilter = finalExpression[1..];
             }
-            if (Filter.GetSpecific(finalFilter, true, out object finalLinuxField))
+            if (Filter.GetSpecific(finalFilter, true, out object finalSbcField))
             {
-                return ObjectToString(finalLinuxField, wantsFinalCount, encodeResult, code);
+                return ObjectToString(finalSbcField, wantsFinalCount, encodeResult, code);
             }
 
             // If that failed, try to evaluate the expression in RRF as the final step
-            if (!onlyLinuxFields)
+            if (!onlySbcFields)
             {
                 object firmwareField = await SPI.Interface.EvaluateExpression(code.Channel, finalExpression);
                 return ObjectToString(firmwareField, false, encodeResult, code);

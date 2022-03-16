@@ -6,7 +6,27 @@
     public sealed class HeaterModel : ModelObject
     {
         /// <summary>
-        /// Dead time
+        /// Cooling rate exponent
+        /// </summary>
+        public float CoolingExp
+        {
+            get => _coolingExp;
+            set => SetPropertyValue(ref _coolingExp, value);
+        }
+        private float _coolingExp = 1.35F;
+
+        /// <summary>
+        /// Cooling rate (in K/s)
+        /// </summary>
+        public float CoolingRate
+        {
+            get => _coolingRate;
+            set => SetPropertyValue(ref _coolingRate, value);
+        }
+        private float _coolingRate = 0.56F;
+
+        /// <summary>
+        /// Dead time (in s)
         /// </summary>
         public float DeadTime
         {
@@ -26,14 +46,14 @@
         private bool _enabled;
 
         /// <summary>
-        /// Gain value
+        /// Cooling rate with the fan on (in K/s)
         /// </summary>
-        public float Gain
+        public float FanCoolingRate
         {
-            get => _gain;
-			set => SetPropertyValue(ref _gain, value);
+            get => _fanCoolingRate;
+            set => SetPropertyValue(ref _fanCoolingRate, value);
         }
-        private float _gain = 340F;
+        private float _fanCoolingRate = 0.56F;
 
         /// <summary>
         /// Heating rate (in K/s)
@@ -43,7 +63,7 @@
             get => _heatingRate;
             set => SetPropertyValue(ref _heatingRate, value);
         }
-        private float _heatingRate;
+        private float _heatingRate = 2.43F;
 
         /// <summary>
         /// Indicates if the heater PWM signal is inverted
@@ -79,25 +99,5 @@
 			set => SetPropertyValue(ref _standardVoltage, value);
         }
         private float? _standardVoltage;
-
-        /// <summary>
-        /// Time constant
-        /// </summary>
-        public float TimeConstant
-        {
-            get => _timeConstant;
-			set => SetPropertyValue(ref _timeConstant, value);
-        }
-        private float _timeConstant = 140F;
-
-        /// <summary>
-        /// Time constant with the fans on
-        /// </summary>
-        public float TimeConstantFansOn
-        {
-            get => _timeConstantFanOn;
-            set => SetPropertyValue(ref _timeConstantFanOn, value);
-        }
-        private float _timeConstantFanOn = 140F;
     }
 }

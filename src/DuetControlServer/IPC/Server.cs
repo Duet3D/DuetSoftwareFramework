@@ -145,7 +145,7 @@ namespace DuetControlServer.IPC
             }
             catch (Exception e)
             {
-                if (!(e is OperationCanceledException) && !(e is SocketException))
+                if (e is not OperationCanceledException && e is not SocketException)
                 {
                     // Log unexpected errors
                     connection.Logger.Error(e, "Terminating connection due to unexpected exception");
@@ -230,7 +230,7 @@ namespace DuetControlServer.IPC
                         throw new ArgumentException("Invalid connection mode");
                 }
             }
-            catch (Exception e)
+            catch (Exception e) when (e is not OperationCanceledException && e is not SocketException)
             {
                 conn.Logger.Error(e, "Failed to assign connection processor");
                 await conn.SendResponse(e);

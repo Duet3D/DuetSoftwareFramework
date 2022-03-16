@@ -15,23 +15,14 @@ namespace DuetPiManagementPlugin
         /// <param name="fileName">File to execute</param>
         /// <param name="arguments">Command-line arguments</param>
         /// <returns>Command output</returns>
-        public static Task<string> Execute(string fileName, string arguments)
+        public static async Task<string> Execute(string fileName, string arguments)
         {
             ProcessStartInfo startInfo = new()
             {
                 FileName = fileName,
                 Arguments = arguments
             };
-            return Execute(startInfo);
-        }
 
-        /// <summary>
-        /// Execute a process, wait for it to exit, and return the stdout/stderr output
-        /// </summary>
-        /// <param name="startInfo">Process start info</param>
-        /// <returns>Command output</returns>
-        public static async Task<string> Execute(ProcessStartInfo startInfo)
-        {
             StringBuilder output = new();
             void OutputReceived(object sender, DataReceivedEventArgs e)
             {

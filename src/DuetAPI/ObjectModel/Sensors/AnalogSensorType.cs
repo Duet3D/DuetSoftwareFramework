@@ -102,7 +102,7 @@ namespace DuetAPI.ObjectModel
         {
             if (reader.TokenType == JsonTokenType.String)
             {
-                return (reader.GetString().ToLowerInvariant()) switch
+                return reader.GetString().ToLowerInvariant() switch
                 {
                     "thermistor" => AnalogSensorType.Thermistor,
                     "pt1000" => AnalogSensorType.PT1000,

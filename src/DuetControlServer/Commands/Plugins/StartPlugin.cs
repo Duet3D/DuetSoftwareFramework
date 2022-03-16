@@ -3,6 +3,7 @@ using DuetAPI.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -29,9 +30,27 @@ namespace DuetControlServer.Commands
                 throw new NotSupportedException("Plugin support has been disabled");
             }
 
+            // Start the plugin and its dependencies
             using (await _startLock.LockAsync(Program.CancellationToken))
             {
                 await Start(Plugin);
+            }
+
+            // Save the execution state if requested
+            if (SaveState)
+            {
+                await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
+                await using StreamWriter writer = new(fileStream);
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                    {
+                        if (item.Pid >= 0)
+                        {
+                            await writer.WriteLineAsync(item.Id);
+                        }
+                    }
+                }
             }
         }
 
@@ -43,7 +62,7 @@ namespace DuetControlServer.Commands
         /// <returns>Whether the plugin could be found</returns>
         private async Task Start(string id, string requiredBy = null)
         {
-            bool rootPlugin = false;
+            bool rootPlugin;
             List<string> dependencies = new();
             using (await Model.Provider.AccessReadOnlyAsync())
             {

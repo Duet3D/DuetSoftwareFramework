@@ -32,8 +32,16 @@ namespace DuetWebServer
         /// Configure web services and add service to the container
         /// </summary>
         /// <param name="services">Service collection</param>
-        public static void ConfigureServices(IServiceCollection services)
+        public void ConfigureServices(IServiceCollection services)
         {
+            services
+                .AddAuthentication(Authorization.SessionKeyAuthenticationHandler.SchemeName)
+                .AddScheme<Authorization.SessionKeyAuthenticationSchemeOptions, Authorization.SessionKeyAuthenticationHandler>(Authorization.SessionKeyAuthenticationHandler.SchemeName, options => {});
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy(Authorization.Policies.ReadOnly, policy => policy.RequireClaim("access", "readOnly", "readWrite"));
+                options.AddPolicy(Authorization.Policies.ReadWrite, policy => policy.RequireClaim("access", "readWrite"));
+            });
             services.AddCors(options => options.AddDefaultPolicy(Services.ModelObserver.CorsPolicy));
             services.AddControllers();
         }
@@ -43,7 +51,8 @@ namespace DuetWebServer
         /// </summary>
         /// <param name="app">Application builder</param>
         /// <param name="env">Hosting environment</param>
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        /// <param name="serviceProvider">Service provider</param>
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IServiceProvider serviceProvider)
         {
             if (env.IsDevelopment())
             {
@@ -59,6 +68,10 @@ namespace DuetWebServer
 
             // Enable CORS policy
             app.UseCors();
+
+            // Enable support for authentication and authorization
+            app.UseAuthentication();
+            app.UseAuthorization();
 
             // Define a keep-alive interval for operation as a reverse proxy
             app.UseWebSockets(new WebSocketOptions
@@ -92,7 +105,7 @@ namespace DuetWebServer
                 });
                 app.UseFileServer(new FileServerOptions
                 {
-                    FileProvider = new FileProviders.DuetFileProvider()
+                    FileProvider = ActivatorUtilities.CreateInstance<FileProviders.DuetFileProvider>(serviceProvider)
                 });
             }
         }

@@ -20,16 +20,13 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
-            if (LogLevel == null)
+            LogLevel ??= Type switch
             {
-                LogLevel = Type switch
-                {
-                    MessageType.Error => DuetAPI.ObjectModel.LogLevel.Warn,
-                    MessageType.Warning => DuetAPI.ObjectModel.LogLevel.Warn,
-                    MessageType.Success => DuetAPI.ObjectModel.LogLevel.Info,
-                    _ => throw new NotImplementedException()
-                };
-            }
+                MessageType.Error => DuetAPI.ObjectModel.LogLevel.Warn,
+                MessageType.Warning => DuetAPI.ObjectModel.LogLevel.Warn,
+                MessageType.Success => DuetAPI.ObjectModel.LogLevel.Info,
+                _ => throw new NotImplementedException()
+            };
 
 #pragma warning disable CS0618 // Type or member is obsolete
             if (LogMessage)
@@ -39,10 +36,10 @@ namespace DuetControlServer.Commands
 #pragma warning restore CS0618 // Type or member is obsolete
 
             Message msg = new(Type, Content);
-            await Utility.Logger.Log(LogLevel.Value, msg);
+            await Utility.Logger.LogAsync(LogLevel.Value, msg);
             if (OutputMessage)
             {
-                await Model.Provider.Output(msg);
+                await Model.Provider.OutputAsync(msg);
             }
 
             if (LogLevel == DuetAPI.ObjectModel.LogLevel.Off && !OutputMessage)

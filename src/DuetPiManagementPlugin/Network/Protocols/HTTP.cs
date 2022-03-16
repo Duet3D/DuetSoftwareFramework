@@ -54,12 +54,12 @@ namespace DuetPiManagementPlugin.Network.Protocols
             if (File.Exists("/opt/dsf/conf/http.json"))
             {
                 AspNetConfig config;
-                using (FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Open, FileAccess.Read))
+                await using (FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Open, FileAccess.Read))
                 {
-                    config = await JsonSerializer.DeserializeAsync<AspNetConfig>(configStream, null, Program.CancellationToken);
+                    config = await JsonSerializer.DeserializeAsync<AspNetConfig>(configStream, cancellationToken: Program.CancellationToken);
                 }
 
-                bool dwsEnabled = await Command.ExecQuery("/usr/bin/systemctl", "is-enabled -q duetwebserver.service");
+                bool dwsEnabled = await Command.ExecQuery("systemctl", "is-enabled -q duetwebserver.service");
                 if (config?.Kestrel?.Endpoints?.Http?.Url != null && Uri.TryCreate(config.Kestrel.Endpoints.Http.Url.Replace('*', 'x'), UriKind.Absolute, out Uri url))
                 {
                     _httpPort = url.Port;
@@ -133,8 +133,8 @@ namespace DuetPiManagementPlugin.Network.Protocols
             // Do we need to disable DWS?
             if (disableService)
             {
-                string stopOutput = await Command.Execute("/usr/bin/systemctl", "stop duetwebserver.service");
-                string disableOutput = await Command.Execute("/usr/bin/systemctl", "disable duetwebserver.service");
+                string stopOutput = await Command.Execute("systemctl", "stop duetwebserver.service");
+                string disableOutput = await Command.Execute("systemctl", "disable duetwebserver.service");
                 return new Message(MessageType.Success, string.Join('\n', stopOutput, disableOutput).Trim());
             }
 
@@ -154,11 +154,11 @@ namespace DuetPiManagementPlugin.Network.Protocols
             }
 
             // Copy the template file and replace the port variables
-            using (FileStream templateStream = new(templateFile, FileMode.Open, FileAccess.Read))
+            await using (FileStream templateStream = new(templateFile, FileMode.Open, FileAccess.Read))
             {
                 using StreamReader reader = new(templateStream);
-                using FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Create, FileAccess.Write);
-                using StreamWriter writer = new(configStream);
+                await using FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Create, FileAccess.Write);
+                await using StreamWriter writer = new(configStream);
 
                 while (!reader.EndOfStream)
                 {
@@ -172,13 +172,13 @@ namespace DuetPiManagementPlugin.Network.Protocols
             // Enable the service if it was disabled before
             if (enableService)
             {
-                string enableOutput = await Command.Execute("/usr/bin/systemctl", "enable -q duetwebserver.service");
-                string startOutput = await Command.Execute("/usr/bin/systemctl", "start duetwebserver.service");
+                string enableOutput = await Command.Execute("systemctl", "enable -q duetwebserver.service");
+                string startOutput = await Command.Execute("systemctl", "start duetwebserver.service");
                 return new Message(MessageType.Success, string.Join('\n', enableOutput, startOutput).Trim());
             }
 
             // Restart the service
-            string restartOutput = await Command.Execute("/usr/bin/systemctl", "restart duetwebserver.service");
+            string restartOutput = await Command.Execute("systemctl", "restart duetwebserver.service");
             return new Message(MessageType.Success, restartOutput.TrimEnd());
         }
 

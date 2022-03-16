@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Wait for DWS to be started
+while (systemctl -q is-enabled duetwebserver.service) && !(systemctl -q is-active duetwebserver.service); do
+	sleep 1
+done
+
+# Start Chromium
+sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' ~/.config/chromium/'Local State'
+sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[^"]\+"/"exit_type":"Normal"/' ~/.config/chromium/Default/Preferences
+chromium-browser --app=http://$(hostname) --app-auto-launched --start-fullscreen --in-process-gpu &
+pid=$!
+
+# Wait for DWC to be started
+while [ -z "$(wmctrl -l | cut -d ' ' -f 5- | grep -e "Duet Web Control" -e "$(hostname)")" ]; do
+        sleep 1
+done
+sleep 2
+
+# Focus other windows
+wmctrl -l | cut -d ' ' -f 5- | grep -v -e "Duet Web Control" -e "$(hostname)" | while read window; do
+        if [ ! -z "$window" ]; then
+                echo "Focusing $window"
+                wmctrl -R "$window"
+        fi
+done
+
+# Wait for Chromium to be closed again
+wait $pid

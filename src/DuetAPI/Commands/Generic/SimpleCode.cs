@@ -8,7 +8,7 @@ namespace DuetAPI.Commands
     /// </summary>
     /// <remarks>
     /// Internally the code passed is populated as a full <see cref="Code"/> instance and on completion
-    /// its <see cref="CodeResult"/> is transformed back into a basic string. This is useful for minimal
+    /// its <see cref="Code.Result"/> is transformed back into a basic string. This is useful for minimal
     /// extensions that do not require granular control of the code details. Except for certain cases, it
     /// is NOT recommended for usage in <see cref="InterceptionMode"/> because it renders the
     /// internal code buffer useless.
@@ -25,5 +25,10 @@ namespace DuetAPI.Commands
         /// Destination channel
         /// </summary>
         public CodeChannel Channel { get; set; } = Defaults.InputChannel;
+
+        /// <summary>
+        /// Whether this code may be executed asynchronously. If set, the code reply is output as a generic message
+        /// </summary>
+        public bool ExecuteAsynchronously { get; set; }
     }
 }

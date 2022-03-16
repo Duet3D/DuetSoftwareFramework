@@ -31,29 +31,76 @@ namespace DuetControlServer.Files
         public const string DsfConfigFile = "dsf-config.g";
 
         /// <summary>
-        /// Daemon file used to perform periodic tasks
-        /// </summary>
-        public const string DaemonFile = "daemon.g";
-
-        /// <summary>
-        /// Default heightmap file
-        /// </summary>
-        public const string DefaultHeightmapFile = "heightmap.csv";
-
-        /// <summary>
-        /// Macro to be called when G29 is invoked without an S parameter
-        /// </summary>
-        public const string MeshFile = "mesh.g";
-
-        /// <summary>
         /// File to run once after start if it exists, then deleted again
         /// </summary>
         public const string RunOnceFile = "runonce.g";
 
         /// <summary>
-        /// File holding the filaments mapping
+        /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path.
+        /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings
         /// </summary>
-        public const string FilamentsFile = "filaments.csv";
+        /// <param name="filePath">File path to resolve</param>
+        /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
+        /// <returns>Resolved file path</returns>
+        public static string ToPhysical(string filePath, FileDirectory directory)
+        {
+            filePath = filePath.Replace('\\', '/');
+
+            Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
+            if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
+            {
+                if (driveNumber == 0)
+                {
+                    return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
+                }
+
+                using (Model.Provider.AccessReadOnly())
+                {
+                    if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
+                    {
+                        return Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                    }
+                }
+
+                throw new ArgumentException("Invalid drive index");
+            }
+
+            if (!filePath.StartsWith('/'))
+            {
+                string directoryPath;
+                using (Model.Provider.AccessReadOnly())
+                {
+                    directoryPath = directory switch
+                    {
+                        FileDirectory.Filaments => Model.Provider.Get.Directories.Filaments,
+                        FileDirectory.Firmware => Model.Provider.Get.Directories.Firmware,
+                        FileDirectory.GCodes => Model.Provider.Get.Directories.GCodes,
+                        FileDirectory.Macros => Model.Provider.Get.Directories.Macros,
+                        FileDirectory.Menu => Model.Provider.Get.Directories.Menu,
+                        FileDirectory.Scans => Model.Provider.Get.Directories.Scans,
+                        FileDirectory.System => Model.Provider.Get.Directories.System,
+                        FileDirectory.Web => Model.Provider.Get.Directories.Web,
+                        _ => Model.Provider.Get.Directories.System,
+                    };
+
+                    match = Regex.Match(directoryPath, @"^(\d+):/*(.*)");
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
+                    {
+                        if (driveNumber == 0)
+                        {
+                            directoryPath = Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
+                        }
+
+                        if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
+                        {
+                            directoryPath = Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                        }
+                    }
+                }
+                return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directoryPath, filePath);
+            }
+            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
+        }
 
         /// <summary>
         /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path asynchronously.
@@ -64,7 +111,9 @@ namespace DuetControlServer.Files
         /// <returns>Resolved file path</returns>
         public static async Task<string> ToPhysicalAsync(string filePath, FileDirectory directory)
         {
-            Match match = Regex.Match(filePath, "^(\\d+):?/?(.*)");
+            filePath = filePath.Replace('\\', '/');
+
+            Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
                 if (driveNumber == 0)
@@ -101,7 +150,7 @@ namespace DuetControlServer.Files
                         _ => Model.Provider.Get.Directories.System,
                     };
 
-                    match = Regex.Match(directoryPath, "^(\\d+):?/?(.*)");
+                    match = Regex.Match(directoryPath, @"^(\d+):/*(.*)");
                     if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                     {
                         if (driveNumber == 0)
@@ -121,6 +170,60 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
+        /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path.
+        /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
+        /// </summary>
+        /// <param name="filePath">File path to resolve</param>
+        /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
+        /// <returns>Resolved file path</returns>
+        public static string ToPhysical(string filePath, string directory = null)
+        {
+            filePath = filePath.Replace('\\', '/');
+
+            Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
+            if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
+            {
+                if (driveNumber == 0)
+                {
+                    return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
+                }
+
+                using (Model.Provider.AccessReadOnly())
+                {
+                    if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
+                    {
+                        return Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                    }
+                }
+
+                throw new ArgumentException("Invalid drive index");
+            }
+
+            if (directory != null && !filePath.StartsWith('/'))
+            {
+                match = Regex.Match(directory, @"^(\d+):/*(.*)");
+                if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
+                {
+                    if (driveNumber == 0)
+                    {
+                        directory = Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
+                    }
+
+                    using (Model.Provider.AccessReadOnly())
+                    {
+                        if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
+                        {
+                            directory = Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                        }
+                    }
+                }
+
+                return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directory, filePath);
+            }
+            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
+        }
+
+        /// <summary>
         /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path asynchronously.
         /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
         /// </summary>
@@ -129,7 +232,9 @@ namespace DuetControlServer.Files
         /// <returns>Resolved file path</returns>
         public static async Task<string> ToPhysicalAsync(string filePath, string directory = null)
         {
-            Match match = Regex.Match(filePath, "^(\\d+):?/?(.*)");
+            filePath = filePath.Replace('\\', '/');
+
+            Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
                 if (driveNumber == 0)
@@ -150,7 +255,7 @@ namespace DuetControlServer.Files
 
             if (directory != null && !filePath.StartsWith('/'))
             {
-                match = Regex.Match(directory, "^(\\d+):?/?(.*)");
+                match = Regex.Match(directory, @"^(\d+):/*(.*)");
                 if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                 {
                     if (driveNumber == 0)
@@ -170,6 +275,34 @@ namespace DuetControlServer.Files
                 return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directory, filePath);
             }
             return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
+        }
+
+        /// <summary>
+        /// Convert a physical ile path to a RRF-style file path.
+        /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
+        /// </summary>
+        /// <param name="filePath">File path to convert</param>
+        /// <returns>Resolved file path</returns>
+        public static string ToVirtual(string filePath)
+        {
+            if (filePath.StartsWith(Settings.BaseDirectory))
+            {
+                filePath = filePath[(Settings.BaseDirectory.EndsWith('/') ? Settings.BaseDirectory.Length : (Settings.BaseDirectory.Length + 1))..];
+                return Path.Combine("0:/", filePath);
+            }
+
+            using (Model.Provider.AccessReadOnly())
+            {
+                foreach (DuetAPI.ObjectModel.Volume storage in Model.Provider.Get.Volumes)
+                {
+                    if (filePath.StartsWith(storage.Path))
+                    {
+                        return Path.Combine("0:/", filePath[storage.Path.Length..]);
+                    }
+                }
+            }
+
+            return Path.Combine("0:/", filePath);
         }
 
         /// <summary>

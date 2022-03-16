@@ -13,6 +13,6 @@ namespace DuetControlServer.Commands
         /// Retrieves file information from the given filename
         /// </summary>
         /// <returns>File info</returns>
-        public override Task<ParsedFileInfo> Execute() => InfoParser.Parse(FileName);
+        public override Task<GCodeFileInfo> Execute() => InfoParser.Parse(FileName, ReadThumbnailContent);
     }
 }

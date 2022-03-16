@@ -1,8 +1,11 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 using System.IO;
 using System.Net.WebSockets;
 using System.Text;
@@ -32,16 +35,37 @@ namespace DuetWebServer.Middleware
         private readonly ILogger _logger;
 
         /// <summary>
+        /// Host application lifetime
+        /// </summary>
+        private readonly IHostApplicationLifetime _applicationLifetime;
+
+        /// <summary>
+        /// Object model provider
+        /// </summary>
+        private readonly IModelProvider _modelProvider;
+
+        /// <summary>
+        /// Session storage singleton
+        /// </summary>
+        private readonly ISessionStorage _sessionStorage;
+
+        /// <summary>
         /// Constructor of this middleware
         /// </summary>
         /// <param name="next">Next request delegate</param>
         /// <param name="configuration">Application configuration</param>
         /// <param name="logger">Logger instance</param>
-        public CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger)
+        /// <param name="applicationLifetime">Host application lifetime</param>
+        /// <param name="modelProvider">Object model provider</param>
+        /// <param name="sessionStorage">Session storage</param>
+        public CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger, IHostApplicationLifetime applicationLifetime, IModelProvider modelProvider, ISessionStorage sessionStorage)
         {
             _next = next;
             _configuration = configuration;
             _logger = logger;
+            _applicationLifetime = applicationLifetime;
+            _modelProvider = modelProvider;
+            _sessionStorage = sessionStorage;
         }
 
         /// <summary>
@@ -53,44 +77,46 @@ namespace DuetWebServer.Middleware
         {
             // Check if this endpoint is reserved for any route
             HttpEndpoint httpEndpoint = null;
-            lock (Services.ModelObserver.Endpoints)
+            lock (_modelProvider.Endpoints)
             {
                 string method = context.WebSockets.IsWebSocketRequest ? "WebSocket" : context.Request.Method.ToString();
-                if (Services.ModelObserver.Endpoints.TryGetValue($"{method}{context.Request.Path.Value}", out HttpEndpoint ep))
+                if (_modelProvider.Endpoints.TryGetValue($"{method}{context.Request.Path.Value}", out HttpEndpoint ep))
                 {
                     httpEndpoint = ep;
                 }
                 else
                 {
-                    _logger.LogInformation("No endpoint found for {0} request via {1}", method, context.Request.Path.Value);
+                    _logger.LogDebug("No endpoint found for {0} request via {1}", method, context.Request.Path.Value);
                 }
             }
 
             if (httpEndpoint != null)
             {
-                // Try to connect to the given UNIX socket
+                // Cnnect to the given UNIX socket endpoint
                 using HttpEndpointConnection endpointConnection = new();
                 endpointConnection.Connect(httpEndpoint.UnixSocket);
 
-                // Try to find a user session
-                int sessionId = -1;
-                lock (Services.ModelObserver.UserSessions)
-                {
-                    string ipAddress = context.Connection.RemoteIpAddress.ToString();
-                    if (Services.ModelObserver.UserSessions.TryGetValue(ipAddress, out int foundSessionId))
-                    {
-                        sessionId = foundSessionId;
-                    }
-                }
-
                 // See what to do with this request
+                int sessionId = -1;
                 if (httpEndpoint.EndpointType == HttpEndpointType.WebSocket)
                 {
+                    if (context.Request.Query.TryGetValue("sessionKey", out StringValues sessionKeys))
+                    {
+                        foreach (string sessionKey in sessionKeys)
+                        {
+                            sessionId = _sessionStorage.GetSessionId(sessionKey);
+                            if (sessionId != -1)
+                            {
+                                break;
+                            }
+                        }
+                    }
+
                     if (Services.ModelObserver.CheckWebSocketOrigin(context))
                     {
                         using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
-                        using CancellationTokenSource cts = new();
+                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_applicationLifetime.ApplicationStopping);
                         Task webSocketTask = ReadFromWebSocket(webSocket, endpointConnection, sessionId, cts.Token);
                         Task unixSocketTask = ReadFromUnixSocket(webSocket, endpointConnection, cts.Token);
 
@@ -100,6 +126,18 @@ namespace DuetWebServer.Middleware
                 }
                 else
                 {
+                    if (context.Request.Headers.TryGetValue("X-Session-Key", out StringValues sessionKeys))
+                    {
+                        foreach (string sessionKey in sessionKeys)
+                        {
+                            sessionId = _sessionStorage.GetSessionId(sessionKey);
+                            if (sessionId != -1)
+                            {
+                                break;
+                            }
+                        }
+                    }
+
                     await ProcessRestRequst(context, httpEndpoint, endpointConnection, sessionId);
                 }
             }
@@ -201,14 +239,14 @@ namespace DuetWebServer.Middleware
         /// <param name="endpointConnection">Endpoint connection</param>
         /// <param name="sessionId">Session ID</param>
         /// <returns>Asynchronous task</returns>
-        private async Task ProcessRestRequst(HttpContext context, HttpEndpoint endpoint, HttpEndpointConnection endpointConnection, int sessionId)
+        private static async Task ProcessRestRequst(HttpContext context, HttpEndpoint endpoint, HttpEndpointConnection endpointConnection, int sessionId)
         {
             string body;
             if (endpoint.IsUploadRequest)
             {
                 // Write to a temporary file
                 string filename = Path.GetTempFileName();
-                using (FileStream fileStream = new(filename, FileMode.Create, FileAccess.Write, FileShare.Read))
+                await using (FileStream fileStream = new(filename, FileMode.Create, FileAccess.Write, FileShare.Read))
                 {
                     await context.Request.Body.CopyToAsync(fileStream);
                 }
@@ -256,7 +294,7 @@ namespace DuetWebServer.Middleware
             {
                 context.Response.ContentType = "application/octet-stream";
 
-                using FileStream fs = new(httpResponse.Response, FileMode.Open, FileAccess.Read);
+                await using FileStream fs = new(httpResponse.Response, FileMode.Open, FileAccess.Read);
                 await fs.CopyToAsync(context.Response.Body);
             }
             else

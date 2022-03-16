@@ -59,10 +59,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Indicates if the socket is still connected
         /// </summary>
-        public bool IsConnected
-        {
-            get => !disposed && _socket.Connected;
-        }
+        public bool IsConnected => !disposed && _socket.Connected;
 
         /// <summary>
         /// Close this connection
@@ -96,7 +93,7 @@ namespace DuetAPIClient
         {
             try
             {
-                SendHttpResponse httpResponse = new()
+                SendHttpResponse httpResponse = new SendHttpResponse()
                 {
                     StatusCode = statusCode,
                     Response = response,
@@ -124,7 +121,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Connection has been closed</exception>
         private async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
-            using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_socket, cancellationToken);
+            await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_socket, cancellationToken);
             return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken);
         }
 

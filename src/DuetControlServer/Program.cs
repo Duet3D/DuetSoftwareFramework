@@ -2,6 +2,7 @@
 using DuetControlServer.Commands;
 using DuetControlServer.FileExecution;
 using DuetControlServer.Files;
+using LinuxApi;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -49,7 +50,8 @@ namespace DuetControlServer
         /// Entry point of the program
         /// </summary>
         /// <param name="args">Command-line arguments</param>
-        private static async Task Main(string[] args)
+        /// <returns>Application return code</returns>
+        private static async Task<int> Main(string[] args)
         {
             // Performing an update implies a reduced log level
             if (args.Contains("-u") && !args.Contains("--update"))
@@ -71,7 +73,8 @@ namespace DuetControlServer
             {
                 if (!Settings.Init(args))
                 {
-                    return;
+                    // This must be a benign termination request
+                    return ExitCode.TempFailure;
                 }
                 _logger.Info("Settings loaded");
                 if (Settings.RootPluginSupport)
@@ -79,16 +82,25 @@ namespace DuetControlServer
                     _logger.Warn("Support for third-party root plugins is enabled");
                 }
             }
+            catch (JsonException je)
+            {
+                await Terminate($"Failed to load settings: {je.Message}");
+                _logger.Debug(je);
+                return ExitCode.Configuration;
+
+            }
             catch (Exception e)
             {
-                _logger.Fatal(e, "Failed to load settings");
-                return;
+                await Terminate($"Failed to initialize settings: {e.Message}");
+                _logger.Debug(e);
+                return ExitCode.Usage;
             }
 
             // Check if another instance is already running
             if (await CheckForAnotherInstance())
             {
-                return;
+                // No need to log the start-up failure here
+                return ExitCode.TempFailure;
             }
 
             // Initialize everything
@@ -96,13 +108,13 @@ namespace DuetControlServer
             {
                 Model.Provider.Init();
                 Model.Observer.Init();
-                await Utility.FilamentManager.Init();
                 _logger.Info("Environment initialized");
             }
             catch (Exception e)
             {
-                _logger.Fatal(e, "Failed to initialize environment");
-                return;
+                await Terminate($"Failed to initialize environment: {e.Message}");
+                _logger.Debug(e);
+                return ExitCode.OsError;
             }
 
             // Set up SPI subsystem and connect to RRF controller
@@ -114,15 +126,20 @@ namespace DuetControlServer
             {
                 try
                 {
-                    SPI.Interface.Init();
                     SPI.DataTransfer.Init();
                     _logger.Info("Connection to Duet established");
                 }
+                catch (IOException ioe)
+                {
+                    await Terminate($"Failed to open IO device: {ioe.Message}");
+                    _logger.Debug(ioe);
+                    return ExitCode.IoError;
+                }
                 catch (Exception e)
                 {
-                    _logger.Fatal("Could not connect to Duet ({0})", e.Message);
+                    await Terminate($"Could not connect to Duet: {e.Message}");
                     _logger.Debug(e);
-                    return;
+                    return ExitCode.ServiceUnavailable;
                 }
             }
 
@@ -134,27 +151,37 @@ namespace DuetControlServer
             }
             catch (Exception e)
             {
-                _logger.Fatal(e, "Failed to initialize IPC socket");
-                return;
+                await Terminate($"Failed to initialize IPC socket ({e.Message})");
+                _logger.Debug(e);
+                return ExitCode.CantCreate;
             }
 
             // Start main tasks in the background
             Dictionary<Task, string> mainTasks = new()
             {
+                { Utility.PriorityThreadRunner.Start(SPI.Interface.Run, ThreadPriority.Highest), "SPI" },
                 { Task.Factory.StartNew(Model.Updater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Update" },
-                { Task.Factory.StartNew(SPI.Interface.Run, TaskCreationOptions.LongRunning).Unwrap(), "SPI" },
                 { Task.Factory.StartNew(IPC.Server.Run, TaskCreationOptions.LongRunning).Unwrap(), "IPC" },
                 { Task.Factory.StartNew(FileExecution.Job.Run, TaskCreationOptions.LongRunning).Unwrap(), "Job" },
                 { Task.Factory.StartNew(Model.PeriodicUpdater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Periodic updater" }
             };
 
             // Deal with program termination requests (SIGTERM and Ctrl+C)
-            AssemblyLoadContext.Default.Unloading += (obj) =>
+            AssemblyLoadContext.Default.Unloading += _ =>
             {
                 if (!_cancelSource.IsCancellationRequested)
                 {
                     _logger.Warn("Received SIGTERM, shutting down...");
-                    Shutdown(true).Wait();
+                    try
+                    {
+                        using CancellationTokenSource cts = new(4500);
+                        ShutdownAsync(true).Wait(cts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger.Fatal("Regular shutdown failed, proceeding with unconditional program termination");
+                        NLog.LogManager.Shutdown();
+                    }
                 }
             };
             Console.CancelKeyPress += (sender, e) =>
@@ -163,7 +190,7 @@ namespace DuetControlServer
                 {
                     _logger.Warn("Received SIGINT, shutting down...");
                     e.Cancel = true;
-                    Shutdown().Wait();
+                    _  = ShutdownAsync();
                 }
             };
 
@@ -174,13 +201,19 @@ namespace DuetControlServer
                 try
                 {
                     using Socket socket = new(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
-                    socket.Connect(new UnixDomainSocketEndPoint(notifySocket));
+                    await socket.ConnectAsync(new UnixDomainSocketEndPoint(notifySocket));
                     socket.Send(System.Text.Encoding.UTF8.GetBytes("READY=1"));
                 }
                 catch (Exception e)
                 {
                     _logger.Warn(e, "Failed to notify systemd about process start");
                 }
+            }
+
+            // Delete the last DCS error file if it exists
+            if (File.Exists(Settings.StartErrorFile))
+            {
+                File.Delete(Settings.StartErrorFile);
             }
 
             if (!Settings.UpdateOnly)
@@ -194,10 +227,10 @@ namespace DuetControlServer
                         {
                             try
                             {
-                                using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
                                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
                                 Plugin plugin = new();
-                                plugin.UpdateFromJson(manifestJson.RootElement);
+                                plugin.UpdateFromJson(manifestJson.RootElement, false);
                                 plugin.Pid = -1;
                                 using (await Model.Provider.AccessReadWriteAsync())
                                 {
@@ -242,7 +275,7 @@ namespace DuetControlServer
                         }
                         catch (Exception e)
                         {
-                            await Model.Provider.Output(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
+                            await Model.Provider.OutputAsync(MessageType.Error, $"Failed to delete {FilePath.RunOnceFile}: {e.Message}");
                         }
                     }
                 }
@@ -250,9 +283,11 @@ namespace DuetControlServer
 
             // Wait for the first task to terminate.
             // In case this is an unusual shutdown, log this event and shut down the application
+            bool abnormalTermination = false;
             Task terminatedTask = await Task.WhenAny(mainTasks.Keys);
             if (!_cancelSource.IsCancellationRequested)
             {
+                abnormalTermination = true;
                 _logger.Fatal("Abnormal program termination");
                 if (terminatedTask.IsFaulted)
                 {
@@ -265,6 +300,7 @@ namespace DuetControlServer
                 await stopCommand.Execute();
 
                 // Shut down DCS
+                await SPI.Interface.ShutdownAsync();
                 _cancelSource.Cancel();
             }
 
@@ -296,6 +332,7 @@ namespace DuetControlServer
             _logger.Info("Application has shut down");
             NLog.LogManager.Shutdown();
             _programTerminated.Cancel();
+            return abnormalTermination ? ExitCode.Software : ExitCode.Success;
         }
 
         /// <summary>
@@ -304,9 +341,9 @@ namespace DuetControlServer
         /// <returns>True if another instance is running</returns>
         private static async Task<bool> CheckForAnotherInstance()
         {
-            using DuetAPIClient.CommandConnection connection = new();
             try
             {
+                using DuetAPIClient.CommandConnection connection = new();
                 await connection.Connect(Settings.FullSocketPath);
             }
             catch (SocketException)
@@ -316,24 +353,13 @@ namespace DuetControlServer
 
             if (Settings.UpdateOnly)
             {
-                Console.Write("Sending update request to DCS... ");
                 try
                 {
-                    await connection.PerformCode(new Code
-                    {
-                        Channel = DuetAPI.CodeChannel.Trigger,
-                        Type = DuetAPI.Commands.CodeType.MCode,
-                        MajorNumber = 997
-                    });
-                    Console.WriteLine("Done!");
-                }
-                catch
-                {
-                    Console.WriteLine("Error: Failed to send update request");
-                    throw;
+                    await Utility.Firmware.UpdateFirmwareRemotely();
                 }
                 finally
                 {
+                    // SPI subsystem is not running at this point
                     _cancelSource.Cancel();
                 }
             }
@@ -345,13 +371,47 @@ namespace DuetControlServer
         }
 
         /// <summary>
+        /// Print the reason for the start error and write it to the start error file
+        /// </summary>
+        /// <param name="reason">Reason for the program termination</param>
+        /// <returns>Asynchronous task</returns>
+        private static async Task Terminate(string reason)
+        {
+            _logger.Fatal(reason);
+            await File.WriteAllTextAsync(Settings.StartErrorFile, reason);
+        }
+
+        /// <summary>
+        /// Don't attempt to shut down multiple times at once
+        /// </summary>
+        private static bool _shuttingDown;
+
+        /// <summary>
         /// Terminate this program and kill it forcefully if required
         /// </summary>
         /// <param name="waitForTermination">Wait for program to be fully terminated</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Shutdown(bool waitForTermination = false)
+        public static async Task ShutdownAsync(bool waitForTermination = false)
         {
-            // Shut down the plugins again
+            // Are we already shutting down?
+            if (_shuttingDown)
+            {
+                if (waitForTermination)
+                {
+                    try
+                    {
+                        await Task.Delay(-1, _programTerminated.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // expected
+                    }
+                }
+                return;
+            }
+            _shuttingDown = true;
+
+            // Shut down the plugins again. This must happen before the cancellation token is triggered
             try
             {
                 StopPlugins stopCommand = new();
@@ -365,27 +425,28 @@ namespace DuetControlServer
             // Wait for potential firmware update to finish
             await SPI.Interface.WaitForUpdate();
 
-            // Try to shut down this program normally 
-            _cancelSource.Cancel();
-
-            // If that fails, kill the program forcefully
-            Task terminationTask = Task.Delay(4500, _programTerminated.Token).ContinueWith(async task =>
+            // Make sure the program is terminated within 5s
+            Task watchdogTask = Task.Run(async delegate
             {
                 try
                 {
-                    await task;
-                    Environment.Exit(1);
+                    await Task.Delay(5000, _programTerminated.Token);
+                    Environment.Exit(ExitCode.Software);
                 }
                 catch (OperationCanceledException)
                 {
                     // expected
                 }
-            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+            });
+
+            // Try to shut down this program normally
+            await SPI.Interface.ShutdownAsync();
+            _cancelSource.Cancel();
 
             // Wait for program termination if required
             if (waitForTermination)
             {
-                await terminationTask;
+                await watchdogTask;
             }
         }
     }

@@ -58,11 +58,13 @@ namespace DuetControlServer.Commands
             // Validate the current DSF/RRF versions
             using (await Model.Provider.AccessReadOnlyAsync())
             {
+#pragma warning disable CS0618 // Type or member is obsolete
                 // Check the required DSF version
                 if (!PluginManifest.CheckVersion(Model.Provider.Get.State.DsfVersion, plugin.SbcDsfVersion))
                 {
                     throw new ArgumentException($"Incompatible DSF version (requires {plugin.SbcDsfVersion}, got {Model.Provider.Get.State.DsfVersion})");
                 }
+#pragma warning restore CS0618 // Type or member is obsolete
 
                 // Check the required RRF version
                 if (!string.IsNullOrEmpty(plugin.RrfVersion))
@@ -105,6 +107,17 @@ namespace DuetControlServer.Commands
                 }
             }
 
+            foreach (string package in plugin.SbcPythonDependencies)
+            {
+                foreach (char c in package)
+                {
+                    if (!char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '+' && c != '<' && c != '>' && c != '=' && c != ',')
+                    {
+                        throw new ArgumentException($"Illegal characters in required Python package {package}");
+                    }
+                }
+            }
+
             // Uninstall the old plugin (if applicable)
             using (await Model.Provider.AccessReadOnlyAsync())
             {
@@ -127,10 +140,10 @@ namespace DuetControlServer.Commands
             string manifestFilename = Path.Combine(Settings.PluginDirectory, plugin.Id + ".json");
             if (File.Exists(manifestFilename))
             {
-                using (FileStream manifestStream = new(manifestFilename, FileMode.Open, FileAccess.Read))
+                await using (FileStream manifestStream = new(manifestFilename, FileMode.Open, FileAccess.Read))
                 {
                     using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-                    plugin.UpdateFromJson(manifestJson.RootElement);
+                    plugin.UpdateFromJson(manifestJson.RootElement, false);
                 }
 
                 using (await Model.Provider.AccessReadWriteAsync())
@@ -156,10 +169,10 @@ namespace DuetControlServer.Commands
             }
 
             Plugin plugin = new();
-            using (Stream manifestStream = manifestFile.Open())
+            await using (Stream manifestStream = manifestFile.Open())
             {
                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-                plugin.UpdateFromJson(manifestJson.RootElement);
+                plugin.UpdateFromJson(manifestJson.RootElement, false);
             }
             plugin.Pid = -1;
 

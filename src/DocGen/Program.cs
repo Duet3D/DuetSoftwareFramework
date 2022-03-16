@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace DocGen
@@ -39,7 +38,7 @@ namespace DocGen
         /// Entry point of this application
         /// </summary>
         /// <param name="args">Command-line arguments</param>
-        static async Task Main(string[] args)
+        static async Task Main()
         {
             Console.WriteLine("Documentation generator for DSF object model v{0}", Version);
             Console.WriteLine("Written by Christian Hammacher for Duet3D");
@@ -63,22 +62,22 @@ namespace DocGen
             Console.Write("Generating documentation.md... ");
             try
             {
-                using FileStream fs = new("./documentation.md", FileMode.Create, FileAccess.Write);
+                await using FileStream fs = new("./documentation.md", FileMode.Create, FileAccess.Write);
 
                 // Copy header
-                using (FileStream headerFs = new("./header.md", FileMode.Open, FileAccess.Read))
+                await using (FileStream headerFs = new("./header.md", FileMode.Open, FileAccess.Read))
                 {
                     await headerFs.CopyToAsync(fs);
                 }
 
                 // Generate documentation
-                using (StreamWriter writer = new(fs, leaveOpen: true))
+                await using (StreamWriter writer = new(fs, leaveOpen: true))
                 {
                     await WriteDocumentation(writer);
                 }
 
                 // Copy footer
-                using (FileStream footerFs = new("./footer.md", FileMode.Open, FileAccess.Read))
+                await using (FileStream footerFs = new("./footer.md", FileMode.Open, FileAccess.Read))
                 {
                     await footerFs.CopyToAsync(fs);
                 }
@@ -116,10 +115,6 @@ namespace DocGen
         /// <returns>Asynchronous task</returns>
         private static async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property, string path, string classDescription, int depth)
         {
-            if (Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
-            {
-                return;
-            }
             if (depth > MaxDepth)
             {
                 depth = MaxDepth;
@@ -139,8 +134,7 @@ namespace DocGen
                 propertyName += JsonNamingPolicy.CamelCase.ConvertName(property.Name);
                 if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) &&
                     property.PropertyType != typeof(string) &&
-                    property.PropertyType != typeof(ModelJsonDictionary) &&
-                    property.PropertyType != typeof(ModelObjectDictionary<Plugin>))
+                    (!property.PropertyType.IsGenericType || property.PropertyType.GetGenericTypeDefinition() != typeof(ModelDictionary<>)))
                 {
                     propertyName += "[]";
                 }
@@ -155,9 +149,35 @@ namespace DocGen
                 }
 
                 // Write node documentation
-                if (Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
+                bool writeNL = false;
+                if (Attribute.IsDefined(property, typeof(ObsoleteAttribute)))
                 {
-                    await writer.WriteLineAsync("*This field is maintained by DSF in SBC mode and might not be available in standalone mode*");
+                    ObsoleteAttribute attribute = (ObsoleteAttribute)Attribute.GetCustomAttribute(property, typeof(ObsoleteAttribute));
+                    if (string.IsNullOrWhiteSpace(attribute.Message))
+                    {
+                        await writer.WriteLineAsync("*This field is obsolete and will be removed from the object model in the future*");
+                    }
+                    else
+                    {
+                        await writer.WriteLineAsync($"*This field is obsolete and will be removed in the future: {attribute.Message}*");
+                    }
+                    writeNL = true;
+                }
+                if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
+                {
+                    SbcPropertyAttribute attribute = (SbcPropertyAttribute)Attribute.GetCustomAttribute(property, typeof(SbcPropertyAttribute));
+                    if (attribute.AvailableInStandaloneMode)
+                    {
+                        await writer.WriteLineAsync("*This field is maintained by DSF in SBC mode*");
+                    }
+                    else
+                    {
+                        await writer.WriteLineAsync("*This field is exclusively maintained by DSF in SBC mode and/or by DWC. It is not available in standalone mode*");
+                    }
+                    writeNL = true;
+                }
+                if (writeNL)
+                {
                     await writer.WriteLineAsync();
                 }
                 await writer.WriteLineAsync(documentation);
@@ -213,7 +233,7 @@ namespace DocGen
                         relatedTypes = apiTypes.Where(type => baseType.IsSubclassOf(typeof(ModelObject)) && baseType.IsAssignableFrom(type)).ToArray();
                     }
 
-                    if (property.PropertyType == typeof(ModelObjectDictionary<Plugin>))
+                    if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ModelDictionary<>))
                     {
                         propertyName += @"\{\}";
                     }

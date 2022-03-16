@@ -3,7 +3,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI;
-using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
@@ -163,33 +162,6 @@ namespace UnitTests.SPI
             Assert.AreEqual(123456, filePosition);
             Assert.AreEqual(PrintPausedReason.GCode, reason);
         } 
-        
-        [Test]
-        public void Heightmap()
-        {
-            Span<byte> blob = GetBlob("heightmap.bin");
-
-            int bytesRead = Reader.ReadHeightMap(blob, out Heightmap map);
-            Assert.AreEqual(80, bytesRead);
-            
-            // Header
-            Assert.AreEqual(20, map.XMin, 0.0001);
-            Assert.AreEqual(180, map.XMax, 0.0001);
-            Assert.AreEqual(40, map.XSpacing, 0.0001);
-            Assert.AreEqual(50, map.YMin, 0.0001);
-            Assert.AreEqual(150, map.YMax, 0.0001);
-            Assert.AreEqual(50, map.YSpacing, 0.0001);
-            Assert.AreEqual(0, map.Radius, 0.0001);
-            Assert.AreEqual(3, map.NumX);
-            Assert.AreEqual(4, map.NumY);
-            
-            // Points
-            Assert.AreEqual(12, map.ZCoordinates.Length);
-            for (int i = 0; i < map.ZCoordinates.Length; i++)
-            {
-                Assert.AreEqual(map.ZCoordinates[i], 10 * i + 10, 0.0001);
-            }
-        }
 
         [Test]
         public void CodeChannel()
@@ -208,7 +180,7 @@ namespace UnitTests.SPI
         {
             Span<byte> blob = GetBlob("fileChunk.bin");
 
-            int bytesRead = Reader.ReadFileChunkRequest(blob, out string filename, out uint offset, out uint maxLength);
+            int bytesRead = Reader.ReadFileChunkRequest(blob, out string filename, out uint offset, out int maxLength);
             Assert.AreEqual(20, bytesRead);
 
             // Header
@@ -249,7 +221,7 @@ namespace UnitTests.SPI
             Assert.AreEqual("M20 S2 P\"0:/macros\"", code);
         }
 
-        private Span<byte> GetBlob(string filename)
+        private static Span<byte> GetBlob(string filename)
         {
             FileStream stream = new(Path.Combine(Directory.GetCurrentDirectory(), "../../../SPI/Blobs", filename), FileMode.Open, FileAccess.Read);
             Span<byte> content = new byte[stream.Length];

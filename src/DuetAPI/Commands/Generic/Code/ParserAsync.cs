@@ -7,11 +7,6 @@ namespace DuetAPI.Commands
     public partial class Code
     {
         /// <summary>
-        /// Array of possible axis letters for Fanuc CNC and LaserWeb G-code styles
-        /// </summary>
-        private static readonly char[] PossibleAxisLetters = { 'X', 'Y', 'Z', 'U', 'V', 'W', 'A', 'B', 'C', 'D' };
-
-        /// <summary>
         /// Parse the next available G/M/T-code from the given stream asynchronously
         /// </summary>
         /// <param name="reader">Input to read from</param>
@@ -27,7 +22,7 @@ namespace DuetAPI.Commands
             bool contentRead = false, unprecedentedParameter = false;
             bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
             bool readingAtStart = buffer.SeenNewLine, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
-            bool wasQuoted = false, wasExpression = false;
+            bool nextCharLowerCase = false, wasQuoted = false, wasExpression = false;
             int numCurlyBraces = 0, numRoundBraces = 0;
             buffer.SeenNewLine = false;
 
@@ -41,7 +36,7 @@ namespace DuetAPI.Commands
                 // Check if the buffer needs to be filled
                 if (buffer.BufferPointer >= buffer.BufferSize)
                 {
-                    buffer.BufferSize = await reader.ReadAsync(buffer.Buffer);
+                    buffer.BufferSize = await reader.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
                     buffer.BufferPointer = 0;
                 }
 
@@ -66,8 +61,9 @@ namespace DuetAPI.Commands
                 if (contentRead && !inFinalComment && !inEncapsulatedComment && !inCondition && !inChunk)
                 {
                     char nextChar = char.ToUpperInvariant(c);
-                    if (result.MajorNumber != null && result.MajorNumber != 53 && (nextChar == 'G' || nextChar == 'M' || nextChar == 'T') &&
-                        (nextChar == 'M' || result.Type != CodeType.MCode || result.Parameters.Any(item => item.Letter == nextChar)))
+                    if ((nextChar == 'G' || nextChar == 'M' || nextChar == 'T') && result.Type != CodeType.None &&
+                        (result.Type != CodeType.GCode || result.MajorNumber != 53) &&
+                        (nextChar != 'T' || result.Type == CodeType.TCode || result.Parameters.Any(item => item.Letter == 'T')))
                     {
                         // Note that M-codes may have G or T parameters but only one
                         buffer.BufferPointer--;
@@ -114,45 +110,73 @@ namespace DuetAPI.Commands
 
                 if (inCondition)
                 {
-                    switch (c)
+                    if (inQuotes)
                     {
-                        case '\n':
-                            // Ignore final NL
-                            break;
-                        case ';':
-                            inCondition = false;
-                            inFinalComment = true;
-                            break;
-                        case '{':
-                            result.KeywordArgument += '{';
-                            numCurlyBraces++;
-                            break;
-                        case '}':
-                            result.KeywordArgument += '}';
-                            numCurlyBraces--;
-                            break;
-                        case '(':
-                            result.KeywordArgument += '(';
-                            numRoundBraces++;
-                            break;
-                        case ')':
-                            if (numRoundBraces > 0)
+                        // Add next character to the parameter value
+                        result.KeywordArgument += c;
+
+                        if (c == '"')
+                        {
+                            if (reader.Peek() == '"')
                             {
-                                result.KeywordArgument += ')';
-                                numRoundBraces--;
+                                // Subsequent double quotes are treated as a single quote char
+                                reader.Read();
+                                result.KeywordArgument += c;
+                                result.Length++;
                             }
                             else
                             {
-                                throw new CodeParserException("Unexpected closing round brace", result);
+                                // No longer in an escaped parameter
+                                inQuotes = false;
                             }
-                            break;
-                        default:
-                            if (!char.IsWhiteSpace(c) || !string.IsNullOrEmpty(result.KeywordArgument))
-                            {
-                                // In fact, it should be possible to leave out whitespaces here but we here don't check for quoted strings yet
-                                result.KeywordArgument += c;
-                            }
-                            break;
+                        }
+                    }
+                    else
+                    {
+                        switch (c)
+                        {
+                            case '\n':
+                                // Ignore final NL
+                                break;
+                            case '"':
+                                result.KeywordArgument += '"';
+                                inQuotes = true;
+                                break;
+                            case ';':
+                                inCondition = false;
+                                inFinalComment = true;
+                                break;
+                            case '{':
+                                result.KeywordArgument += '{';
+                                numCurlyBraces++;
+                                break;
+                            case '}':
+                                result.KeywordArgument += '}';
+                                numCurlyBraces--;
+                                break;
+                            case '(':
+                                result.KeywordArgument += '(';
+                                numRoundBraces++;
+                                break;
+                            case ')':
+                                if (numRoundBraces > 0)
+                                {
+                                    result.KeywordArgument += ')';
+                                    numRoundBraces--;
+                                }
+                                else
+                                {
+                                    throw new CodeParserException("Unexpected closing round brace", result);
+                                }
+                                break;
+                            default:
+                                if (!char.IsWhiteSpace(c) || !string.IsNullOrEmpty(result.KeywordArgument))
+                                {
+                                    // In fact, it should be possible to leave out whitespaces here but we here don't check for quoted strings yet
+                                    result.KeywordArgument += c;
+                                }
+                                break;
+                        }
                     }
 
                     if (inCondition)
@@ -165,18 +189,31 @@ namespace DuetAPI.Commands
                 {
                     if (inQuotes)
                     {
-                        if (c == '"')
+                        if (c == '\'')
+                        {
+                            if (nextCharLowerCase)
+                            {
+                                // Treat subsequent single-quotes as a single-quite char
+                                value += '\'';
+                            }
+                            else
+                            {
+                                // Next letter should be lower-case
+                                nextCharLowerCase = true;
+                            }
+                        }
+                        else if (c == '"')
                         {
                             if (buffer.BufferPointer >= buffer.BufferSize)
                             {
-                                buffer.BufferSize = await reader.ReadAsync(buffer.Buffer);
+                                buffer.BufferSize = await reader.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
                                 buffer.BufferPointer = 0;
                             }
 
                             char nextC = (buffer.BufferPointer < buffer.BufferSize) ? buffer.Buffer[buffer.BufferPointer] : '\0';
                             if (nextC == '"')
                             {
-                                // Treat subsequent double quotes as a single quote char
+                                // Treat subsequent double quotes as a single double-quote char
                                 value += '"';
                                 buffer.BufferPointer++;
                                 result.Length++;
@@ -184,10 +221,16 @@ namespace DuetAPI.Commands
                             else
                             {
                                 // No longer in an escaped parameter
-                                inQuotes = false;
+                                inQuotes = nextCharLowerCase = false;
                                 wasQuoted = true;
                                 endingChunk = true;
                             }
+                        }
+                        else if (nextCharLowerCase)
+                        {
+                            // Add next lower-case character to the parameter value
+                            value += char.ToLower(c);
+                            nextCharLowerCase = false;
                         }
                         else
                         {
@@ -278,8 +321,23 @@ namespace DuetAPI.Commands
                         (!unprecedentedParameter && char.IsWhiteSpace(c)) ||
                         (isNumericParameter && c != ':' && !NumericParameterChars.Contains(c)))
                     {
-                        // Parameter has ended
-                        inChunk = endingChunk = false;
+                        if ((c == '{' && value.TrimEnd().EndsWith(":")) ||
+                            (c == ':' && wasExpression))
+                        {
+                            // Array expression, keep on reading
+                            value += c;
+                            inExpression = true;
+                            isNumericParameter = false;
+                            if (c == '{')
+                            {
+                                numCurlyBraces++;
+                            }
+                        }
+                        else
+                        {
+                            // Parameter has ended
+                            inChunk = endingChunk = false;
+                        }
                     }
                     else
                     {
@@ -330,7 +388,6 @@ namespace DuetAPI.Commands
                     if (letter != '\0' || !string.IsNullOrEmpty(value) || wasQuoted)
                     {
                         // Chunk is complete
-                        char upperLetter = char.ToUpperInvariant(letter);
                         if (isLineNumber)
                         {
                             // Process line number
@@ -342,7 +399,7 @@ namespace DuetAPI.Commands
                             isLineNumber = false;
                             hadLineNumber = true;
                         }
-                        else if ((upperLetter == 'G' || upperLetter == 'M' || upperLetter == 'T') &&
+                        else if (((letter == 'G' && value != "lobal") || letter == 'M' || letter == 'T') &&
                                  (result.MajorNumber == null || (result.Type == CodeType.GCode && result.MajorNumber == 53)))
                         {
                             // Process G/M/T identifier(s)
@@ -353,7 +410,7 @@ namespace DuetAPI.Commands
                                 buffer.EnforcingAbsolutePosition = true;
                             }
 
-                            result.Type = (CodeType)upperLetter;
+                            result.Type = (CodeType)letter;
                             if (wasExpression)
                             {
                                 if (result.Type == CodeType.TCode)
@@ -364,12 +421,6 @@ namespace DuetAPI.Commands
                                 {
                                     throw new CodeParserException("Dynamic command numbers are only supported for T-codes");
                                 }
-                            }
-                            else if (letter == 'g' && value == "lobal")
-                            {
-                                result.Keyword = KeywordType.Global;
-                                result.KeywordArgument = string.Empty;
-                                inCondition = true;
                             }
                             else if (value.Contains('.'))
                             {
@@ -395,82 +446,92 @@ namespace DuetAPI.Commands
                             else if (int.TryParse(value, out int majorNumber))
                             {
                                 result.MajorNumber = majorNumber;
-                                unprecedentedParameter = (upperLetter == 'M') && (majorNumber == 23 || majorNumber == 28 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
+                                unprecedentedParameter = (letter == 'M') && (majorNumber == 23 || majorNumber == 28 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
                             }
                             else if (!string.IsNullOrWhiteSpace(value) || result.Type != CodeType.TCode)
                             {
                                 throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
                             }
                         }
-                        else if (result.Type == CodeType.None && result.MajorNumber == null && result.Keyword == KeywordType.None && !wasQuoted && !wasExpression)
+                        else if (result.Type == CodeType.None && result.MajorNumber == null && !wasQuoted && !wasExpression)
                         {
                             // Check for conditional G-code
-                            if (letter == 'i' && value == "f")
+                            string keyword = char.ToLowerInvariant(letter) + value;
+                            if (keyword == "if")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.If;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (letter == 'e' && value == "lif")
+                            else if (keyword == "elif")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.ElseIf;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (letter == 'e' && value == "lse")
+                            else if (keyword == "else")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Else;
                             }
-                            else if (letter == 'w' && value == "hile")
+                            else if (keyword == "while")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.While;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (letter == 'b' && value == "reak")
+                            else if (keyword == "break")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Break;
                                 inCondition = true;
                             }
-                            else if (letter == 'c' && value == "ontinue")
+                            else if (keyword == "continue")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Continue;
                                 inCondition = true;
                             }
-#pragma warning disable CS0618 // Type or member is obsolete
-                            else if (letter == 'r' && value == "eturn")
+                            else if (keyword == "abort")
                             {
-                                result.Keyword = KeywordType.Return;
-                                result.KeywordArgument = string.Empty;
-                                inCondition = true;
-                            }
-#pragma warning restore CS0618 // Type or member is obsolete
-                            else if (letter == 'a' && value == "bort")
-                            {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Abort;
                                 inCondition = true;
                             }
-                            else if (letter == 'v' && value == "ar")
+                            else if (keyword == "var")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Var;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (letter == 's' && value == "et")
+                            else if (keyword == "global")
                             {
+                                result.Type = CodeType.Keyword;
+                                result.Keyword = KeywordType.Global;
+                                result.KeywordArgument = string.Empty;
+                                inCondition = true;
+                            }
+                            else if (keyword == "set")
+                            {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Set;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (letter == 'e' && value == "cho")
+                            else if (keyword == "echo")
                             {
+                                result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Echo;
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
                             else if (result.Parameter(letter) == null)
                             {
-                                AddParameter(result, char.ToUpperInvariant(letter), value, false, buffer.MayRepeatCode);
+                                AddParameter(result, letter, value, false, buffer.MayRepeatCode);
                             }
                             // Ignore duplicate parameters
                         }
@@ -485,13 +546,13 @@ namespace DuetAPI.Commands
                                 value = letter + value;
                                 letter = '@';
                             }
-                            else
-                            {
-                                letter = char.ToUpperInvariant(letter);
-                            }
 
                             if (result.Parameter(letter) == null)
                             {
+                                if (wasExpression && (!value.StartsWith("{") || !value.EndsWith("}")))
+                                {
+                                    value = '{' + value.Trim() + '}';
+                                }
                                 AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
                             }
                             // Ignore duplicate parameters
@@ -512,6 +573,10 @@ namespace DuetAPI.Commands
                         // Starting encapsulated comment
                         contentRead = inEncapsulatedComment = true;
                     }
+                    else if (c == '\'')
+                    {
+                        contentRead = nextCharLowerCase = true;
+                    }
                     else if (!char.IsWhiteSpace(c))
                     {
                         // Starting a new parameter
@@ -526,6 +591,15 @@ namespace DuetAPI.Commands
                         else if (c == '"')
                         {
                             inQuotes = true;
+                        }
+                        else if (nextCharLowerCase)
+                        {
+                            letter = char.ToLowerInvariant(c);
+                            nextCharLowerCase = false;
+                        }
+                        else if (!unprecedentedParameter)
+                        {
+                            letter = char.ToUpperInvariant(c);
                         }
                         else
                         {
@@ -549,9 +623,9 @@ namespace DuetAPI.Commands
                 {
                     buffer.LastGCode = result.MajorNumber.Value;
                 }
-                else if (result.Type == CodeType.None && result.Keyword == KeywordType.None &&
+                else if (result.Type == CodeType.None &&
                          (buffer.LastGCode == 0 || buffer.LastGCode == 1) &&
-                         result.Parameters.Any(parameter => PossibleAxisLetters.Contains(parameter.Letter)))
+                         result.Parameters.Any(parameter => ObjectModel.Axis.Letters.Contains(parameter.Letter)))
                 {
                     result.Type = CodeType.GCode;
                     result.MajorNumber = buffer.LastGCode;

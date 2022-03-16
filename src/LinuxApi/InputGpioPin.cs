@@ -104,11 +104,116 @@ namespace LinuxApi
 
             if (_deviceFileDescriptor >= 0)
             {
-                Interop.close(_deviceFileDescriptor);
+                int result = Interop.close(_deviceFileDescriptor);
+                if (result != 0)
+                {
+                    throw new IOException($"Failed to close GPIO file (error {result})");
+                }
                 _deviceFileDescriptor = _reqFd = -1;
             }
 
             disposed = true;
+        }
+
+        /// <summary>
+        /// Size of the event data struct
+        /// </summary>
+        private static readonly int _sizeOfEventData = Marshal.SizeOf<gpioevent_data>();
+
+        /// <summary>
+        /// Wait for a pin event to occur
+        /// </summary>
+        /// <param name="timeout">Timeout in ms</param>
+        /// <returns>New pin level</returns>
+        /// <exception cref="IOException">Generic IO error</exception>
+        /// <exception cref="OperationCanceledException">Timeout occurred</exception>
+        public unsafe bool WaitForEvent(int timeout)
+        {
+            // Wait for an event first
+            PollFd pollData = new()
+            {
+                Fd = _reqFd,
+                Events = (short)PollFlags.POLLIN,
+                REvents = 0
+            };
+
+            int result;
+            do
+            {
+                result = Interop.poll(new IntPtr(&pollData), 1, timeout);
+                if (result < 0)
+                {
+                    // Sometimes we get EINTR but that is benign. Just repeat the operation in that case
+                    int errno = Marshal.GetLastWin32Error();
+                    if (errno != 4)
+                    {
+                        throw new IOException($"Error {errno}. Failed to poll for event.");
+                    }
+                }
+                if (result == 0)
+                {
+                    throw new OperationCanceledException("Timeout while waiting for event");
+                }
+            }
+            while (result <= 0);
+
+            // Read it
+            gpioevent_data eventData = new();
+            if (Interop.read(_reqFd, new IntPtr(&eventData), _sizeOfEventData) == _sizeOfEventData)
+            {
+                Value = (eventData.id == (uint)GpioEvent.GPIOEVENT_EVENT_RISING_EDGE);
+                return Value;
+            }
+            throw new IOException("Read returned invalid size");
+        }
+
+        /// <summary>
+        /// Flush pending events
+        /// </summary>
+        public unsafe void FlushEvents()
+        {
+            while (true)
+            {
+                // Wait for an event first
+                PollFd pollData = new()
+                {
+                    Fd = _reqFd,
+                    Events = (short)PollFlags.POLLIN,
+                    REvents = 0
+                };
+
+                int result;
+                do
+                {
+                    result = Interop.poll(new IntPtr(&pollData), 1, 0);
+                    if (result < 0)
+                    {
+                        // Sometimes we get EINTR but that is benign. Just repeat the operation in that case
+                        int errno = Marshal.GetLastWin32Error();
+                        if (errno != 4)
+                        {
+                            throw new IOException($"Error {errno}. Failed to poll for event.");
+                        }
+                    }
+                    if (result == 0)
+                    {
+                        // No more events available
+                        return;
+                    }
+                }
+                while (result <= 0);
+
+                // Read it
+                gpioevent_data eventData = new();
+                if (Interop.read(_reqFd, new IntPtr(&eventData), _sizeOfEventData) == _sizeOfEventData)
+                {
+                    Value = (eventData.id == (uint)GpioEvent.GPIOEVENT_EVENT_RISING_EDGE);
+                }
+                else
+                {
+                    throw new IOException("Read returned invalid size");
+                }
+            }
         }
 
         /// <summary>
@@ -143,11 +248,10 @@ namespace LinuxApi
             return Task.Run(() =>
             {
                 gpioevent_data eventData = new();
-                int sizeOfEventData = Marshal.SizeOf(typeof(gpioevent_data));
 
                 do
                 {
-                    if (Interop.read(_reqFd, new IntPtr(&eventData), sizeOfEventData) == sizeOfEventData)
+                    if (Interop.read(_reqFd, new IntPtr(&eventData), _sizeOfEventData) == _sizeOfEventData)
                     {
                         Value = (eventData.id == (uint)GpioEvent.GPIOEVENT_EVENT_RISING_EDGE);
                         PinChanged?.Invoke(this, Value);
@@ -158,7 +262,7 @@ namespace LinuxApi
                     }
                 }
                 while (!cancellationToken.IsCancellationRequested);
-            });
+            }, cancellationToken);
         }
     }
 }

@@ -47,14 +47,20 @@ namespace DuetPluginService.Commands
                     throw new ArgumentException("Plugin must be stopped before it can be uninstalled");
                 }
 
-                // Uninstall the plugin instance
-                logger.Info("Uninstalling plugin {0}", Plugin + (ForUpgrade ? " for upgrade" : string.Empty));
-
                 // Root plugins are deleted by the root service to avoid potential permission issues
                 if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Program.IsRoot)
                 {
-                    // Remove the plugin manifest
                     string manifestFile = Path.Combine(Settings.PluginDirectory, $"{Plugin}.json");
+
+                    // Check if the manifest is writable
+                    LinuxApi.Commands.GetPermissions(manifestFile, out LinuxApi.UnixPermissions userPermission, out _, out _);
+                    if (!userPermission.HasFlag(LinuxApi.UnixPermissions.Write))
+                    {
+                        throw new ArgumentException("Plugin cannot be uninstalled via API");
+                    }
+
+                    // Remove the plugin manifest
+                    logger.Info("Uninstalling plugin {0}", Plugin + (ForUpgrade ? " for upgrade" : string.Empty));
                     if (File.Exists(manifestFile))
                     {
                         logger.Debug("Removing plugin manifest");

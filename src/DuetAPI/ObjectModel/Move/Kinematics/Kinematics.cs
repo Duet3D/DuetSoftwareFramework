@@ -1,7 +1,5 @@
 ﻿using System;
-using System.IO;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace DuetAPI.ObjectModel
 {
@@ -21,20 +19,44 @@ namespace DuetAPI.ObjectModel
         private KinematicsName _name = KinematicsName.Unknown;
 
         /// <summary>
+        /// Segmentation parameters or null if not configured
+        /// </summary>
+        public MoveSegmentation Segmentation
+        {
+            get => _segmentation;
+            set => SetPropertyValue(ref _segmentation, value);
+        }
+        private MoveSegmentation _segmentation;
+
+        /// <summary>
         /// Figure out the required type for the given kinematics name
         /// </summary>
         /// <param name="name">Kinematics name</param>
         /// <returns>Required type</returns>
         private static Type GetKinematicsType(KinematicsName name)
         {
-            return name switch
+            switch (name)
             {
-                KinematicsName.Cartesian or KinematicsName.CoreXY or KinematicsName.CoreXYU or KinematicsName.CoreXYUV or KinematicsName.CoreXZ or KinematicsName.MarkForged => typeof(CoreKinematics),
-                KinematicsName.Delta or KinematicsName.RotaryDelta => typeof(DeltaKinematics),
-                KinematicsName.Hangprinter => typeof(HangprinterKinematics),
-                KinematicsName.FiveBarScara or KinematicsName.Scara => typeof(ScaraKinematics),
-                _ => typeof(Kinematics)
-            };
+                case KinematicsName.Cartesian:
+                case KinematicsName.CoreXY:
+                case KinematicsName.CoreXYU:
+                case KinematicsName.CoreXYUV:
+                case KinematicsName.CoreXZ:
+                case KinematicsName.MarkForged:
+                    return typeof(CoreKinematics);
+                case KinematicsName.Delta:
+                case KinematicsName.RotaryDelta:
+                    return typeof(DeltaKinematics);
+                case KinematicsName.Hangprinter:
+                    return typeof(HangprinterKinematics);
+                case KinematicsName.FiveBarScara:
+                case KinematicsName.Scara:
+                    return typeof(ScaraKinematics);
+                case KinematicsName.Polar:
+                    return typeof(PolarKinematics);
+                default:
+                    return typeof(Kinematics);
+            }
         }
 
         /// <summary>
@@ -44,7 +66,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        internal override ModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public override IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
@@ -58,17 +80,10 @@ namespace DuetAPI.ObjectModel
                 if (GetType() != requiredType)
                 {
                     Kinematics newInstance = (Kinematics)Activator.CreateInstance(requiredType);
-                    return newInstance.UpdateFromJson(jsonElement);
+                    return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }
             return base.UpdateFromJson(jsonElement, ignoreSbcProperties);
         }
-
-        /// <summary>
-        /// Optional method to override in case a kinematics class supports writing calibration parameters to config-override.g
-        /// </summary>
-        /// <param name="writer">Stream writer for config-override.g</param>
-        /// <returns>Asynchronous task</returns>
-        public virtual Task WriteCalibrationParameters(StreamWriter writer) => Task.CompletedTask;
     }
 }

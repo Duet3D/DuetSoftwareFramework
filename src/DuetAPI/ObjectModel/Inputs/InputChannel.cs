@@ -66,6 +66,16 @@
         private bool _inMacro = false;
 
         /// <summary>
+        /// Indicates if the current macro file can be restarted after a pause
+        /// </summary>
+        public bool MacroRestartable
+        {
+            get => _macroRestartable;
+            set => SetPropertyValue(ref _macroRestartable, value);
+        }
+        private bool _macroRestartable;
+
+        /// <summary>
         /// Name of this channel
         /// </summary>
         public CodeChannel Name

@@ -48,6 +48,11 @@ namespace DuetAPI.ObjectModel
         /// The machine is about to resume a paused file job
         /// </summary>
         Resuming,
+
+        /// <summary>
+        /// Job file is being cancelled
+        /// </summary>
+        Cancelling,
         
         /// <summary>
         /// The machine is processing a file job

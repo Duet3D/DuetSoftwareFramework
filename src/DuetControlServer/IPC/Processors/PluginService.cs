@@ -5,6 +5,7 @@ using DuetAPIClient;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -177,6 +178,19 @@ namespace DuetControlServer.IPC.Processors
                             request.Item2.SetResult();
                         }
                     }
+                    catch (SocketException se)
+                    {
+                        if (request.Item1 is StopPlugins)
+                        {
+                            // Service may terminate before our own request is fully processed
+                            request.Item2.SetResult();
+                        }
+                        else
+                        {
+                            // Unexpected exception
+                            request.Item2.SetException(se);
+                        }
+                    }
                     catch (Exception e)
                     {
                         // Unexpected exception
@@ -196,7 +210,7 @@ namespace DuetControlServer.IPC.Processors
                         {
                             if (item.Pid > 0 && item.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Connection.IsRoot)
                             {
-                                item.Pid = -1;
+                                item.Pid = 0;
                             }
                         }
                     }
@@ -223,6 +237,18 @@ namespace DuetControlServer.IPC.Processors
                     {
                         Commands.StopPlugins stopCommand = new();
                         _ = Task.Run(stopCommand.Execute);
+                    }
+
+                    // Plugins from this service are no longer running
+                    using (await Model.Provider.AccessReadWriteAsync())
+                    {
+                        foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                        {
+                            if (item.Pid > 0 && item.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Connection.IsRoot)
+                            {
+                                item.Pid = -1;
+                            }
+                        }
                     }
                 }
             }

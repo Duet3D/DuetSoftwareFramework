@@ -1,3 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
-echo "To delete the \"dsf\" user run as root: userdel --force dsf"
+if [[ "$1" == "remove" ]]; then
+	echo "To delete the \"dsf\" user run as root: userdel --force dsf"
+fi
+

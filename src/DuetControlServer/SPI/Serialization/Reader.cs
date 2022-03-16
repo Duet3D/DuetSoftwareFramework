@@ -139,42 +139,6 @@ namespace DuetControlServer.SPI.Serialization
         }
 
         /// <summary>
-        /// Read a heightmap report
-        /// </summary>
-        /// <param name="from">Origin</param>
-        /// <param name="map">Deserialized heightmap</param>
-        /// <returns>Number of bytes read</returns>
-        public static int ReadHeightMap(ReadOnlySpan<byte> from, out Heightmap map)
-        {
-            HeightMapHeader header = MemoryMarshal.Read<HeightMapHeader>(from);
-            map = new Heightmap
-            {
-                XMin = header.XMin,
-                XMax = header.XMax,
-                XSpacing = header.XSpacing,
-                YMin = header.YMin,
-                YMax = header.YMax,
-                YSpacing = header.YSpacing,
-                Radius = header.Radius,
-                NumX = header.NumX,
-                NumY = header.NumY
-            };
-
-            int headerSize = Marshal.SizeOf<HeightMapHeader>(), dataLength = Marshal.SizeOf<float>() * map.NumX * map.NumY;
-            if (from.Length > headerSize)
-            {
-                ReadOnlySpan<byte> zCoordinates = from.Slice(headerSize, dataLength);
-                map.ZCoordinates = MemoryMarshal.Cast<byte, float>(zCoordinates).ToArray();
-            }
-            else
-            {
-                map.NumX = map.NumY = dataLength = 0;
-                map.ZCoordinates = Array.Empty<float>();
-            }
-            return headerSize + dataLength;
-        }
-
-        /// <summary>
         /// Read a G-code channel
         /// </summary>
         /// <param name="from">Origin</param>
@@ -195,14 +159,14 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="offset">Offset in the file</param>
         /// <param name="maxLength">Maximum chunk length</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadFileChunkRequest(ReadOnlySpan<byte> from, out string filename, out uint offset, out uint maxLength)
+        public static int ReadFileChunkRequest(ReadOnlySpan<byte> from, out string filename, out uint offset, out int maxLength)
         {
             FileChunkHeader header = MemoryMarshal.Read<FileChunkHeader>(from);
             int bytesRead = Marshal.SizeOf<FileChunkHeader>();
 
             // Read header
             offset = header.Offset;
-            maxLength = header.MaxLength;
+            maxLength = (int)header.MaxLength;
 
             // Read filename
             ReadOnlySpan<byte> unicodeFilename = from.Slice(bytesRead, (int)header.FilenameLength);
@@ -241,12 +205,16 @@ namespace DuetControlServer.SPI.Serialization
                 case DataType.Float:
                     result = header.FloatValue;
                     break;
+                case DataType.ULong:
+                    bytesRead = AddPadding(bytesRead);
+                    result = MemoryMarshal.Read<ulong>(from[bytesRead..]);
+                    break;
                 case DataType.IntArray:
                     int[] intArray = new int[header.IntValue];
                     for (int i = 0; i < header.IntValue; i++)
                     {
                         intArray[i] = MemoryMarshal.Read<int>(from[bytesRead..]);
-                        bytesRead += Marshal.SizeOf<int>();
+                        bytesRead += sizeof(int);
                     }
                     result = intArray;
                     break;
@@ -255,7 +223,7 @@ namespace DuetControlServer.SPI.Serialization
                     for (int i = 0; i < header.IntValue; i++)
                     {
                         uintArray[i] = MemoryMarshal.Read<uint>(from[bytesRead..]);
-                        bytesRead += Marshal.SizeOf<uint>();
+                        bytesRead += sizeof(uint);
                     }
                     result = uintArray;
                     break;
@@ -264,7 +232,7 @@ namespace DuetControlServer.SPI.Serialization
                     for (int i = 0; i < header.IntValue; i++)
                     {
                         floatArray[i] = MemoryMarshal.Read<float>(from[bytesRead..]);
-                        bytesRead += Marshal.SizeOf<float>();
+                        bytesRead += sizeof(float);
                     }
                     result = floatArray;
                     break;
@@ -280,7 +248,7 @@ namespace DuetControlServer.SPI.Serialization
                     for (int i = 0; i < header.IntValue; i++)
                     {
                         driverIdArray[i] = new DriverId(MemoryMarshal.Read<uint>(from[bytesRead..]));
-                        bytesRead += Marshal.SizeOf<uint>();
+                        bytesRead += sizeof(uint);
                     }
                     result = driverIdArray;
                     break;
@@ -292,7 +260,7 @@ namespace DuetControlServer.SPI.Serialization
                     for (int i = 0; i < header.IntValue; i++)
                     {
                         boolArray[i] = Convert.ToBoolean(MemoryMarshal.Read<byte>(from[bytesRead..]));
-                        bytesRead += Marshal.SizeOf<byte>();
+                        bytesRead += sizeof(byte);
                     }
                     result = boolArray;
                     break;
@@ -300,6 +268,11 @@ namespace DuetControlServer.SPI.Serialization
                     string errorMessage = Encoding.UTF8.GetString(from.Slice(bytesRead, header.IntValue));
                     result = new CodeParserException(errorMessage);
                     break;
+                case DataType.DateTime:
+                    result = DateTime.Parse(Encoding.UTF8.GetString(from.Slice(bytesRead, header.IntValue)));
+                    bytesRead += header.IntValue;
+                    break;
+                case DataType.Null:
                 default:
                     result = null;
                     break;
@@ -347,6 +320,94 @@ namespace DuetControlServer.SPI.Serialization
             bytesRead += header.Length;
 
             return AddPadding(bytesRead);
+        }
+
+        /// <summary>
+        /// Read a UTF-8 encoded string request from a memory span
+        /// </summary>
+        /// <param name="from">Origin</param>
+        /// <param name="data">UTF-8 string</param>
+        /// <returns>Number of bytes read</returns>
+        public static int ReadStringRequest(ReadOnlySpan<byte> from, out string data)
+        {
+            StringHeader header = MemoryMarshal.Read<StringHeader>(from);
+            int bytesRead = Marshal.SizeOf<StringHeader>();
+
+            // Read data
+            data = Encoding.UTF8.GetString(from.Slice(bytesRead, header.Length));
+            bytesRead += header.Length;
+
+            return AddPadding(bytesRead);
+        }
+
+        /// <summary>
+        /// Read an open file request
+        /// </summary>
+        /// <param name="from">Origin</param>
+        /// <param name="filename">Filename to open</param>
+        /// <param name="forWriting">Whether the file is supposed to be written to</param>
+        /// <param name="append">Whether data is supposed to be appended in write mode</param>
+        /// <param name="preAllocSize">How many bytes to allocate if the file is created or overwritten</param>
+        /// <returns>Number of bytes read</returns>
+        public static int ReadOpenFile(ReadOnlySpan<byte> from, out string filename, out bool forWriting, out bool append, out long preAllocSize)
+        {
+            OpenFileHeader header = MemoryMarshal.Read<OpenFileHeader>(from);
+            int bytesRead = Marshal.SizeOf<OpenFileHeader>();
+
+            // Read header
+            forWriting = Convert.ToBoolean(header.ForWriting);
+            append = Convert.ToBoolean(header.Append);
+            preAllocSize = header.PreAllocSize;
+
+            // Read filename
+            ReadOnlySpan<byte> unicodeCode = from.Slice(bytesRead, header.FilenameLength);
+            filename = Encoding.UTF8.GetString(unicodeCode);
+            bytesRead += header.FilenameLength;
+
+            return AddPadding(bytesRead);
+        }
+
+        /// <summary>
+        /// Read a request to seek in a file
+        /// </summary>
+        /// <param name="from">Origin</param>
+        /// <param name="handle">File handle</param>
+        /// <param name="offset">New file position</param>
+        /// <returns>Number of bytes read</returns>
+        public static int ReadSeekFile(ReadOnlySpan<byte> from, out uint handle, out long offset)
+        {
+            SeekFileHeader header = MemoryMarshal.Read<SeekFileHeader>(from);
+            handle = header.Handle;
+            offset = header.Offset;
+            return Marshal.SizeOf<SeekFileHeader>();
+        }
+
+        /// <summary>
+        /// Read a request to retrieve data from a file
+        /// </summary>
+        /// <param name="from">Origin</param>
+        /// <param name="handle">File handle</param>
+        /// <param name="maxLength">Maximum buffer length</param>
+        /// <returns>Number of bytes read</returns>
+        public static int ReadFileRequest(ReadOnlySpan<byte> from, out uint handle, out int maxLength)
+        {
+            ReadFileHeader header = MemoryMarshal.Read<ReadFileHeader>(from);
+            handle = header.Handle;
+            maxLength = (int)header.MaxLength;
+            return Marshal.SizeOf<ReadFileHeader>();
+        }
+
+        /// <summary>
+        /// Read an arbitrary file handle
+        /// </summary>
+        /// <param name="from">Origin</param>
+        /// <param name="handle">File handle</param>
+        /// <returns>Number of bytes read</returns>
+        public static int ReadFileHandle(ReadOnlySpan<byte> from, out uint handle)
+        {
+            FileHandleHeader header = MemoryMarshal.Read<FileHandleHeader>(from);
+            handle = header.Handle;
+            return Marshal.SizeOf<FileHandleHeader>();
         }
 
         /// <summary>

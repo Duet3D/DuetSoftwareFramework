@@ -24,6 +24,12 @@ namespace DuetAPI.ObjectModel
         }
 
         /// <summary>
+        /// Content of this message
+        /// </summary>
+        /// <remarks>May be empty but not null</remarks>
+        public string Content { get; set; } = string.Empty;
+
+        /// <summary>
         /// Time at which the message was generated
         /// </summary>
         public DateTime Time { get; set; } = DateTime.Now;
@@ -34,10 +40,63 @@ namespace DuetAPI.ObjectModel
         public MessageType Type { get; set; } = MessageType.Success;
 
         /// <summary>
-        /// Content of this message
+        /// Replace the content if empty or append a new line that is not empty
         /// </summary>
-        /// <remarks>May be empty but not null</remarks>
-        public string Content { get; set; } = string.Empty;
+        /// <param name="line">Line content</param>
+        public void AppendLine(string line)
+        {
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                if (string.IsNullOrEmpty(Content))
+                {
+                    Content = line;
+                }
+                else
+                {
+                    if (!Content.EndsWith("\n"))
+                    {
+                        Content += '\n';
+                    }
+                    Content += line;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Append another message to this one, potentially overwriting the message type
+        /// </summary>
+        /// <param name="other">Message to append</param>
+        public void Append(Message other)
+        {
+            if (other != null)
+            {
+                if (other.Type > Type)
+                {
+                    Type = other.Type;
+                }
+                if (!string.IsNullOrEmpty(other.Content))
+                {
+                    AppendLine(other.Content);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Append another message to this one, potentially overwriting the message type
+        /// </summary>
+        /// <param name="type">Message type</param>
+        /// <param name="content">Message content</param>
+        public void Append(MessageType type, string content)
+        {
+            if (type > Type)
+            {
+                Type = type;
+            }
+            if (!string.IsNullOrEmpty(content))
+            {
+                AppendLine(content);
+            }
+        }
 
         /// <summary>
         /// Converts this message to a RepRapFirmware-style message

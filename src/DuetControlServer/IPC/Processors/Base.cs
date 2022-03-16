@@ -22,7 +22,7 @@ namespace DuetControlServer.IPC.Processors
         /// Add a list of supported commands
         /// </summary>
         /// <param name="supportedCommands">List of supported commands</param>
-        protected static void AddSupportedCommands(IEnumerable<Type> supportedCommands) => SupportedCommands.AddRange(supportedCommands.Where(item => !SupportedCommands.Contains(item)));
+        protected static void AddSupportedCommands(IEnumerable<Type> supportedCommands) => SupportedCommands.AddRange(supportedCommands.Where(item => item != null && !SupportedCommands.Contains(item)));
 
         /// <summary>
         /// Get the corresponding command type

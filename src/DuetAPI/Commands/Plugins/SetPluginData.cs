@@ -16,7 +16,7 @@ namespace DuetAPI.Commands
     public class SetPluginData : Command
     {
         /// <summary>
-        /// Identifier of the plugin to update (optional)
+        /// Identifier of the plugin to update (only mandatory if running as root)
         /// </summary>
         public string Plugin { get; set; }
 

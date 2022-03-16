@@ -104,15 +104,35 @@ namespace LinuxApi
         /// <param name="pathname">Name of the file</param>
         /// <param name="uid">User ID</param>
         /// <param name="gid">Group ID</param>
-        public static void Stat(string pathname, out int uid, out int gid)
+        public static void GetOwner(string pathname, out int uid, out int gid)
         {
             statbuf buffer = new();
             if (Interop.stat(Interop.STATVER, pathname, ref buffer) < 0)
             {
                 throw new ArgumentException($"Failed to get file info (error {Marshal.GetLastWin32Error()})");
             }
-            uid = buffer.st_uid;
-            gid = buffer.st_gid;
+            uid = (int)buffer.UserID;
+            gid = (int)buffer.GroupID;
+        }
+
+        /// <summary>
+        /// Get the permissions of a file
+        /// </summary>
+        /// <param name="pathname">Name of the file</param>
+        /// <param name="user">User permissions</param>
+        /// <param name="group">Group permissions</param>
+        /// <param name="any">Any permissions</param>
+        public static void GetPermissions(string pathname, out UnixPermissions user, out UnixPermissions group, out UnixPermissions any)
+        {
+            statbuf buffer = new();
+            if (Interop.stat(Interop.STATVER, pathname, ref buffer) < 0)
+            {
+                throw new ArgumentException($"Failed to get file info (error {Marshal.GetLastWin32Error()})");
+            }
+
+            user = (UnixPermissions)((buffer.Mode >> 6) & 0xF);
+            group = (UnixPermissions)((buffer.Mode >> 3) & 0xF);
+            any = (UnixPermissions)(buffer.Mode & 0xF);
         }
 
         /// <summary>

@@ -8,7 +8,17 @@ namespace DuetAPI.ObjectModel
     public sealed class Board : ModelObject
     {
         /// <summary>
-        /// Filename of the firmware binary
+        /// Accelerometer of this board or null if unknown
+        /// </summary>
+        public Accelerometer Accelerometer
+        {
+            get => _accelerometer;
+            set => SetPropertyValue(ref _accelerometer, value);
+        }
+        private Accelerometer _accelerometer;
+
+        /// <summary>
+        /// Filename of the bootloader binary or null if unknown
         /// </summary>
         public string BootloaderFileName
         {
@@ -26,6 +36,16 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _canAddress, value);
         }
         private int? _canAddress;
+
+        /// <summary>
+        /// Closed loop data of this board or null if unknown
+        /// </summary>
+        public ClosedLoop ClosedLoop
+        {
+            get => _closedLoop;
+            set => SetPropertyValue(ref _closedLoop, value);
+        }
+        private ClosedLoop _closedLoop;
 
         /// <summary>
         /// Details about a connected display or null if none is connected
@@ -80,6 +100,9 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Filename of the IAP binary that is used for updates from the SBC or null if unsupported
         /// </summary>
+        /// <remarks>
+        /// This is only available for the mainboard (first board item)
+        /// </remarks>
         public string IapFileNameSBC
         {
             get => _iapFileNameSBC;
@@ -90,6 +113,9 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Filename of the IAP binary that is used for updates from the SD card or null if unsupported
         /// </summary>
+        /// <remarks>
+        /// This is only available for the mainboard (first board item)
+        /// </remarks>
         public string IapFileNameSD
         {
             get => _iapFileNameSD;
@@ -118,14 +144,14 @@ namespace DuetAPI.ObjectModel
         private int _maxMotors;
 
         /// <summary>
-        /// Minimum, maximum, and current temperatures of the MCU
+        /// Minimum, maximum, and current temperatures of the MCU or null if unknown
         /// </summary>
-        public MinMaxCurrent<float> McuTemp { get; } = new MinMaxCurrent<float>
+        public MinMaxCurrent<float> McuTemp
         {
-            Current = -273.15F,
-            Min = -273.15F,
-            Max = -273.15F
-        };
+            get => _mcuTemp;
+            set => SetPropertyValue(ref _mcuTemp, value);
+        }
+        private MinMaxCurrent<float> _mcuTemp;
 
         /// <summary>
         /// Full name of the board
@@ -178,7 +204,7 @@ namespace DuetAPI.ObjectModel
         private bool _supportsDirectDisplay;
 
         /// <summary>
-        /// Unique identifier of the board
+        /// Unique identifier of the board or null if unknown
         /// </summary>
         public string UniqueId
         {
@@ -188,13 +214,23 @@ namespace DuetAPI.ObjectModel
         private string _uniqueId;
 
         /// <summary>
-        /// Minimum, maximum, and current voltages on the 12V rail
+        /// Minimum, maximum, and current voltages on the 12V rail or null if unknown
         /// </summary>
-        public MinMaxCurrent<float> V12 { get; } = new MinMaxCurrent<float>();
+        public MinMaxCurrent<float> V12
+        {
+            get => _v12;
+            set => SetPropertyValue(ref _v12, value);
+        }
+        private MinMaxCurrent<float> _v12;
 
         /// <summary>
-        /// Minimum, maximum, and current voltages on the input rail
+        /// Minimum, maximum, and current voltages on the input rail or null if unknown
         /// </summary>
-        public MinMaxCurrent<float> VIn { get; } = new MinMaxCurrent<float>();
+        public MinMaxCurrent<float> VIn
+        {
+            get => _vIn;
+            set => SetPropertyValue(ref _vIn, value);
+        }
+        private MinMaxCurrent<float> _vIn;
     }
 }

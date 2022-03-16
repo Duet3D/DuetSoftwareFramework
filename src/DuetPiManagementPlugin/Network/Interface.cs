@@ -28,7 +28,7 @@ namespace DuetPiManagementPlugin.Network
             int i = 0;
             foreach (NetworkInterface iface in NetworkInterface.GetAllNetworkInterfaces())
             {
-                if (iface.NetworkInterfaceType != NetworkInterfaceType.Loopback && i++ == index)
+                if (iface.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback && i++ == index)
                 {
                     return iface;
                 }
@@ -56,18 +56,18 @@ namespace DuetPiManagementPlugin.Network
             // Set link down (if needed)
             if (isUp)
             {
-                string setDownResult = await Command.Execute("/usr/sbin/ip", $"link set dev {iface.Name} down");
+                string setDownResult = await Command.Execute("ip", $"link set dev {iface.Name} down");
                 result.AppendLine(setDownResult);
             }
 
             // Update MAC address
-            string setResult = await Command.Execute("/usr/sbin/ip", $"link set dev {iface.Name} address {BitConverter.ToString(parsedAddress.GetAddressBytes()).Replace('-', ':')}");
+            string setResult = await Command.Execute("ip", $"link set dev {iface.Name} address {BitConverter.ToString(parsedAddress.GetAddressBytes()).Replace('-', ':')}");
             result.AppendLine(setResult);
 
             // Set link up again (if needed)
             if (isUp)
             {
-                string setUpResult = await Command.Execute("/usr/sbin/ip", $"link set dev {iface.Name} up");
+                string setUpResult = await Command.Execute("ip", $"link set dev {iface.Name} up");
                 result.AppendLine(setUpResult);
             }
 
@@ -100,7 +100,7 @@ namespace DuetPiManagementPlugin.Network
                     result.AppendLine(await WPA.Stop());
 
                     // Disable WiFi adapter
-                    string linkResult = await Command.Execute("/usr/sbin/ip", $"link set {iface.Name} down");
+                    string linkResult = await Command.Execute("ip", $"link set {iface.Name} down");
                     result.AppendLine(linkResult);
                 }
                 else if (sParam == 1)
@@ -115,21 +115,21 @@ namespace DuetPiManagementPlugin.Network
                     result.AppendLine(await AccessPoint.Stop());
 
                     // Disable the adapter
-                    string disableResult = await Command.Execute("/usr/sbin/ip", $"link set {iface.Name} down");
+                    string disableResult = await Command.Execute("ip", $"link set {iface.Name} down");
                     result.AppendLine(disableResult);
 
                     // Start station mode
                     result.AppendLine(await WPA.Start());
 
                     // Enable the adapter again
-                    string enableResult = await Command.Execute("/usr/sbin/ip", $"link set {iface.Name} up");
+                    string enableResult = await Command.Execute("ip", $"link set {iface.Name} up");
                     result.AppendLine(enableResult);
 
                     // Connect to the given SSID (if applicable)
                     if (pParam != null)
                     {
                         // Find the network index
-                        string networkList = await Command.Execute("/usr/sbin/wpa_cli", "list_networks");
+                        string networkList = await Command.Execute("wpa_cli", "list_networks");
                         Regex ssidRegex = new($"^(\\d+)\\s+{Regex.Escape(sParam)}\\W", RegexOptions.IgnoreCase);
 
                         int networkIndex = -1;
@@ -158,7 +158,7 @@ namespace DuetPiManagementPlugin.Network
                         }
 
                         // Select it
-                        string selectResult = await Command.Execute("/usr/sbin/wpa_cli", $"-i {iface.Name} select_network {networkIndex}");
+                        string selectResult = await Command.Execute("wpa_cli", $"-i {iface.Name} select_network {networkIndex}");
                         if (selectResult.Trim() != "OK")
                         {
                             result.AppendLine(selectResult);
@@ -188,7 +188,7 @@ namespace DuetPiManagementPlugin.Network
                     result.AppendLine(await WPA.Stop());
 
                     // Disable the adapter
-                    string disableResult = await Command.Execute("/usr/sbin/ip", $"link set {iface.Name} down");
+                    string disableResult = await Command.Execute("ip", $"link set {iface.Name} down");
                     result.AppendLine(disableResult);
 
                     // Start AP mode. This will enable the adapter too
@@ -209,7 +209,7 @@ namespace DuetPiManagementPlugin.Network
                 if (sParam != null && (iface.OperationalStatus != OperationalStatus.Up) != sParam)
                 {
                     // Enable or disable the adapter if required
-                    result.AppendLine(await Command.Execute("/usr/sbin/ip", $"link set {iface.Name} {(sParam ? "up" : "down")}"));
+                    result.AppendLine(await Command.Execute("ip", $"link set {iface.Name} {(sParam ? "up" : "down")}"));
                 }
             }
             return new Message(MessageType.Success, result.ToString().Trim());
@@ -291,7 +291,7 @@ namespace DuetPiManagementPlugin.Network
                 int i = 0;
                 foreach (NetworkInterface item in NetworkInterface.GetAllNetworkInterfaces())
                 {
-                    if (item.NetworkInterfaceType != NetworkInterfaceType.Loopback && (index < 0 || index == i))
+                    if (item.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback && (index < 0 || index == i))
                     {
                         await Report(builder, item, i++);
                     }
@@ -299,7 +299,7 @@ namespace DuetPiManagementPlugin.Network
             }
             else
             {
-                if (NetworkInterface.GetAllNetworkInterfaces().Count(item => item.NetworkInterfaceType != NetworkInterfaceType.Loopback) > 1)
+                if (NetworkInterface.GetAllNetworkInterfaces().Count(item => item.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback) > 1)
                 {
                     // Add labels if there is more than one available network interface
                     builder.Append($"Interface {index}: ");

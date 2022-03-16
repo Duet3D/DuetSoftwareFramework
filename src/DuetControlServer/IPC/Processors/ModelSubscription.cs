@@ -7,12 +7,14 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Model;
+using DuetControlServer.SPI.Communication.Shared;
 
 namespace DuetControlServer.IPC.Processors
 {
@@ -41,17 +43,29 @@ namespace DuetControlServer.IPC.Processors
         private static readonly List<ModelSubscription> _subscriptions = new();
 
         /// <summary>
-        /// True if any subscribers are connected
+        /// Check if there are any clients waiting for generic messages
         /// </summary>
-        public static bool AreClientsConnected
+        public static bool HasClientsWaitingForMessages
         {
             get
             {
                 lock (_subscriptions)
                 {
-                    // TODO here it would be better to check for subscribers waiting to messages
-                    return _subscriptions.Count > 0;
+                    foreach (ModelSubscription subscription in _subscriptions)
+                    {
+                        if (subscription._mode == SubscriptionMode.Full || subscription._channel == null)
+                        {
+                            return true;
+                        }
+
+                        MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)subscription._channel);
+                        if (MessageTypeFlags.GenericMessage.HasFlag(channelFlag))
+                        {
+                            return true;
+                        }
+                    }
                 }
+                return false;
             }
         }
 
@@ -59,6 +73,11 @@ namespace DuetControlServer.IPC.Processors
         /// Mode of this subscriber
         /// </summary>
         private readonly SubscriptionMode _mode;
+
+        /// <summary>
+        /// Optional code channel or null if only generic messages are supposed to be recorded
+        /// </summary>
+        private readonly CodeChannel? _channel;
 
         /// <summary>
         /// List of filters (in Patch mode)
@@ -84,16 +103,17 @@ namespace DuetControlServer.IPC.Processors
         {
             SubscribeInitMessage subscribeInitMessage = (SubscribeInitMessage)initMessage;
             _mode = subscribeInitMessage.SubscriptionMode;
+            _channel = subscribeInitMessage.Channel;
             if (subscribeInitMessage.Filters != null)
             {
                 _filters = Filter.ConvertFilters(subscribeInitMessage.Filters);
             }
-#pragma warning disable CS0612 // Type or member is obsolete
+#pragma warning disable CS0618 // Type or member is obsolete
             else if (!string.IsNullOrEmpty(subscribeInitMessage.Filter))
             {
                 _filters = Filter.ConvertFilters(subscribeInitMessage.Filter);
             }
-#pragma warning restore CS0612 // Type or member is obsolete
+#pragma warning restore CS0618 // Type or member is obsolete
             else
             {
                 _filters = Array.Empty<object[]>();
@@ -143,19 +163,17 @@ namespace DuetControlServer.IPC.Processors
                     }
                 }
 
-                BaseCommand command;
-                Type commandType;
                 do
                 {
-                    // Send new JSON data
                     if (jsonData != null)
                     {
+                        // Send new JSON data
                         await Connection.Send(jsonData);
                         jsonData = null;
 
                         // Wait for an acknowledgement from the client
-                        command = await Connection.ReceiveCommand();
-                        commandType = command.GetType();
+                        BaseCommand command = await Connection.ReceiveCommand();
+                        Type commandType = command.GetType();
 
                         // Make sure the command is supported and permitted
                         if (!SupportedCommands.Contains(commandType))
@@ -166,21 +184,33 @@ namespace DuetControlServer.IPC.Processors
                     }
 
                     // Wait for an object model update to complete
-                    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                    cts.CancelAfter(Settings.SocketPollInterval);
-                    try
+                    bool waitForUpdate = true;
+                    if (_mode != SubscriptionMode.Full)
                     {
-                        await Provider.WaitForUpdate(cts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        if (!Program.CancellationToken.IsCancellationRequested)
+                        lock (_patch)
                         {
-                            Connection.Poll();
-                            continue;
+                            waitForUpdate = (_patch.Count == 0);
                         }
-                        Connection.Logger.Debug("Subscriber connection requested to terminate");
-                        throw;
+                    }
+
+                    if (waitForUpdate)
+                    {
+                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+                        cts.CancelAfter(Settings.SocketPollInterval);
+                        try
+                        {
+                            await Provider.WaitForUpdateAsync(cts.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            if (!Program.CancellationToken.IsCancellationRequested)
+                            {
+                                Connection.Poll();
+                                continue;
+                            }
+                            Connection.Logger.Debug("Subscriber connection requested to terminate");
+                            throw;
+                        }
                     }
 
                     // Get the (diff) JSON
@@ -209,8 +239,8 @@ namespace DuetControlServer.IPC.Processors
             }
             catch (Exception e)
             {
-                // Don't throw this exception if the connection has been termianted
-                if (!(e is SocketException))
+                // Don't throw this exception if the connection has been terminated
+                if (e is not SocketException)
                 {
                     throw;
                 }
@@ -254,7 +284,7 @@ namespace DuetControlServer.IPC.Processors
         }
 
         /// <summary>
-        /// Get the object from a path node
+        /// Get the dictionary or list object using a path node to record properties
         /// </summary>
         /// <param name="root">Root dictionary</param>
         /// <param name="path">Path node</param>
@@ -269,17 +299,12 @@ namespace DuetControlServer.IPC.Processors
                 object pathItem = path[i];
                 if (pathItem is string pathString)
                 {
+                    // Get the requested dictionary
                     if (currentDictionary.TryGetValue(pathString, out object child))
                     {
                         if (child is Dictionary<string, object> childDictionary)
                         {
-                            currentList = null;
                             currentDictionary = childDictionary;
-                        }
-                        else if (child is List<object> childList)
-                        {
-                            currentList = childList;
-                            currentDictionary = null;
                         }
                         else
                         {
@@ -293,9 +318,11 @@ namespace DuetControlServer.IPC.Processors
                         currentDictionary.Add(pathString, newNode);
                         currentDictionary = newNode;
                     }
+                    currentList = null;
                 }
                 else if (pathItem is ItemPathNode pathNode)
                 {
+                    // Get the requested list
                     if (currentDictionary.TryGetValue(pathNode.Name, out object nodeObject))
                     {
                         if (nodeObject is List<object> nodeList)
@@ -309,7 +336,7 @@ namespace DuetControlServer.IPC.Processors
                         else
                         {
                             // Stop here if the node type is unsupported
-                            return nodeObject;
+                            return null;
                         }
                     }
                     else
@@ -318,34 +345,37 @@ namespace DuetControlServer.IPC.Processors
                         currentDictionary.Add(pathNode.Name, currentList);
                     }
 
-                    Type itemType = (path[i + 1] is string) ? typeof(Dictionary<string, object>) : typeof(List<object>);
+                    // Add missing items to the current list
                     for (int k = currentList.Count; k < pathNode.List.Count; k++)
                     {
                         if (pathNode.List[k] == null)
                         {
                             currentList.Add(null);
                         }
+                        else if (pathNode.List[k] is IModelObject)
+                        {
+                            currentList.Add(new Dictionary<string, object>());
+                        }
+                        else if (pathNode.List[k] is IModelCollection)
+                        {
+                            currentList.Add(new List<object>());
+                        }
                         else
                         {
-                            object newItem = Activator.CreateInstance(itemType);
-                            currentList.Add(newItem);
+                            currentList.Add(pathNode.List[k]);
                         }
                     }
 
-                    object currentItem = currentList[pathNode.Index];
-                    if (currentItem is Dictionary<string, object> dictionaryItem)
+                    // Try to move on to the next node
+                    nodeObject = currentList[pathNode.Index];
+                    if (nodeObject is Dictionary<string, object> nextDictionary)
                     {
+                        currentDictionary = nextDictionary;
                         currentList = null;
-                        currentDictionary = dictionaryItem;
-                    }
-                    else if (currentItem is List<object> listItem)
-                    {
-                        currentList = listItem;
-                        currentDictionary = null;
                     }
                     else
                     {
-                        // Stop here if the item type is unsupported
+                        // Stop here if the node type is unsupported
                         return null;
                     }
                 }
@@ -386,16 +416,17 @@ namespace DuetControlServer.IPC.Processors
                     {
                         case PropertyChangeType.Property:
                             // Set new property value
-                            Dictionary<string, object> propertyNode = (Dictionary<string, object>)node;
-                            string propertyName = (string)path[^1];
-
-                            propertyNode[propertyName] = value;
+                            if (node is Dictionary<string, object> propertyNode)
+                            {
+                                string propertyName = (string)path[^1];
+                                propertyNode[propertyName] = value;
+                            }
                             break;
 
-                        case PropertyChangeType.ObjectCollection:
-                            // Update an object collection
+                        case PropertyChangeType.Collection:
+                            // Update a collection
                             ItemPathNode pathNode = (ItemPathNode)path[^1];
-                            if (node is not List<object> objectCollectionList)
+                            if (node is not List<object> collection)
                             {
                                 if (pathNode.Name.Equals(nameof(ObjectModel.Job.Layers)) && Connection.ApiVersion < 11)
                                 {
@@ -406,37 +437,43 @@ namespace DuetControlServer.IPC.Processors
                                 Dictionary<string, object> objectCollectionNode = (Dictionary<string, object>)node;
                                 if (objectCollectionNode.TryGetValue(pathNode.Name, out object objectCollection))
                                 {
-                                    objectCollectionList = (List<object>)objectCollection;
+                                    collection = (List<object>)objectCollection;
 
-                                    for (int k = objectCollectionList.Count; k > pathNode.List.Count; k--)
+                                    for (int k = collection.Count; k > pathNode.List.Count; k--)
                                     {
-                                        objectCollectionList.RemoveAt(k - 1);
+                                        collection.RemoveAt(k - 1);
                                     }
                                 }
                                 else
                                 {
-                                    objectCollectionList = new List<object>(pathNode.List.Count);
-                                    objectCollectionNode.Add(pathNode.Name, objectCollectionList);
+                                    collection = new List<object>(pathNode.List.Count);
+                                    objectCollectionNode.Add(pathNode.Name, collection);
                                 }
                             }
 
-                            Type itemType = (value is IList) ? typeof(List<object>) : typeof(Dictionary<string, object>);
-                            for (int k = objectCollectionList.Count; k < pathNode.List.Count; k++)
+                            for (int k = collection.Count; k < pathNode.List.Count; k++)
                             {
                                 if (pathNode.List[k] == null)
                                 {
-                                    objectCollectionList.Add(null);
+                                    collection.Add(null);
+                                }
+                                else if (pathNode.List[k] is IModelObject)
+                                {
+                                    collection.Add(new Dictionary<string, object>());
+                                }
+                                else if (pathNode.List[k] is IModelCollection)
+                                {
+                                    collection.Add(new List<object>());
                                 }
                                 else
                                 {
-                                    object newItem = Activator.CreateInstance(itemType);
-                                    objectCollectionList.Add(newItem);
+                                    collection.Add(pathNode.List[k]);
                                 }
                             }
 
                             if (pathNode.Index < pathNode.List.Count)
                             {
-                                objectCollectionList[pathNode.Index] = value;
+                                collection[pathNode.Index] = value;
                             }
                             break;
 
@@ -445,10 +482,23 @@ namespace DuetControlServer.IPC.Processors
                             if (node is Dictionary<string, object> parent)
                             {
                                 string collectionName = (string)path[^1];
-                                if (value == null && collectionName.Equals(nameof(ObjectModel.Messages), StringComparison.InvariantCultureIgnoreCase))
+                                if (collectionName.Equals(nameof(ObjectModel.Messages), StringComparison.InvariantCultureIgnoreCase))
                                 {
-                                    // Don't clear messages - they are volatile anyway
-                                    break;
+                                    if (value == null)
+                                    {
+                                        // Don't clear messages - they are volatile anyway
+                                        break;
+                                    }
+
+                                    if (_channel != null)
+                                    {
+                                        MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)_channel);
+                                        if (!MessageTypeFlags.GenericMessage.HasFlag(channelFlag))
+                                        {
+                                            // This message isn't meant for this subscriber, skip it
+                                            break;
+                                        }
+                                    }
                                 }
 
                                 IList growingCollection;
@@ -486,6 +536,38 @@ namespace DuetControlServer.IPC.Processors
                     Connection.Logger.Error(e, "Failed to record {0} = {1} ({2})", string.Join('/', path), value, changeType);
                 }
             }
+        }
+
+        /// <summary>
+        /// Record a new message based on the message flags
+        /// </summary>
+        /// <param name="flags">Message flags</param>
+        /// <param name="message"></param>
+        public static void RecordMessage(MessageTypeFlags flags, Message message)
+        {
+            lock (_subscriptions)
+            {
+                foreach (ModelSubscription subscription in _subscriptions)
+                {
+                    if (subscription._mode == SubscriptionMode.Patch && subscription._channel != null)
+                    {
+                        MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)subscription._channel);
+                        if (flags.HasFlag(channelFlag))
+                        {
+                            subscription.RecordMessage(message);
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Record a new message
+        /// </summary>
+        /// <param name="message"></param>
+        private void RecordMessage(Message message)
+        {
+            MachineModelPropertyChanged(new object[] { "messages" }, PropertyChangeType.GrowingCollection, new[] { message });
         }
 
         /// <summary>

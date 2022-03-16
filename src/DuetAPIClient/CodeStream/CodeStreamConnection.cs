@@ -37,7 +37,7 @@ namespace DuetAPIClient
             BufferSize = bufferSize;
             Channel = channel;
 
-            CodeStreamInitMessage initMessage = new() { BufferSize = bufferSize, Channel = channel };
+            CodeStreamInitMessage initMessage = new CodeStreamInitMessage() { BufferSize = bufferSize, Channel = channel };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -47,7 +47,7 @@ namespace DuetAPIClient
         public int BufferSize { get; private set; }
 
         /// <summary>
-        /// Destination channel for incoming codes
+        /// Destination channel for incoming codes and source channel for incoming messages
         /// </summary>
         public CodeChannel Channel { get; private set; }
 
@@ -55,6 +55,6 @@ namespace DuetAPIClient
         /// Get a network stream for input/output of codes
         /// </summary>
         /// <returns></returns>
-        public NetworkStream GetStream() => new(_unixSocket);
+        public NetworkStream GetStream() => new NetworkStream(_unixSocket);
     }
 }

@@ -68,14 +68,14 @@ namespace DuetControlServer.Files
         private readonly Stack<CodeBlock> _codeBlocks = new();
 
         /// <summary>
+        /// Last code read from the file
+        /// </summary>
+        private Code _lastCode;
+
+        /// <summary>
         /// Last code block
         /// </summary>
         private CodeBlock _lastCodeBlock;
-
-        /// <summary>
-        /// Internal queue of codes read used to determine when pending codes have been processed
-        /// </summary>
-        private readonly Queue<Code> _pendingCodes = new();
 
         /// <summary>
         /// Gets or sets the current file position in bytes
@@ -128,7 +128,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Returns the length of the file in bytes
         /// </summary>
-        public long Length { get => _fileStream.Length; }
+        public long Length => _fileStream.Length;
 
         /// <summary>
         /// Indicates if this file is closed
@@ -146,7 +146,7 @@ namespace DuetControlServer.Files
             Channel = channel;
 
             _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-            _reader = new StreamReader(_fileStream);
+            _reader = new StreamReader(_fileStream, leaveOpen: true);
         }
 
         /// <summary>
@@ -166,7 +166,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Indicates if this instance has been disposed
         /// </summary>
-        private bool disposed;
+        private bool _disposed;
 
         /// <summary>
         /// Dispose this instance internally
@@ -174,22 +174,19 @@ namespace DuetControlServer.Files
         /// <param name="disposing">True if this instance is being disposed</param>
         private void Dispose(bool disposing)
         {
-            if (disposed)
+            if (_disposed)
             {
                 return;
             }
 
             if (disposing)
             {
-                using (_lock.Lock())
-                {
-                    IsClosed = true;
-                    _reader.Dispose();
-                    _fileStream.Dispose();
-                }
+                IsClosed = true;
+                _reader.Dispose();
+                _fileStream.Dispose();
             }
 
-            disposed = true;
+            _disposed = true;
         }
 
         /// <summary>
@@ -222,12 +219,6 @@ namespace DuetControlServer.Files
                         return null;
                     }
 
-                    while (_pendingCodes.TryPeek(out Code pendingCode) && pendingCode.IsExecuted)
-                    {
-                        // Clean up the pending codes whenever a new code is read to save memory
-                        _pendingCodes.Dequeue();
-                    }
-
                     do
                     {
                         // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
@@ -254,8 +245,14 @@ namespace DuetControlServer.Files
                 bool readAgain = false;
                 while (_codeBlocks.TryPeek(out CodeBlock state))
                 {
-                    if (!codeRead || ((code.Keyword != KeywordType.None || (code.Type != CodeType.None && code.Type != CodeType.Comment)) && code.Indent <= state.StartingCode.Indent))
+                    if (!codeRead || (code.Type != CodeType.Comment && state.IsFinished(code.Indent)))
                     {
+                        if (state.HasLocalVariables)
+                        {
+                            // Wait for pending commands to be executed so all the local variables can be disposed again
+                            await Flush();
+                        }
+
                         if (state.StartingCode.Keyword == KeywordType.While)
                         {
                             if (state.ProcessBlock && !state.SeenCodes)
@@ -268,7 +265,12 @@ namespace DuetControlServer.Files
                                 // End of while loop
                                 if (state.ProcessBlock || state.ContinueLoop)
                                 {
-                                    await WaitForPendingCodes();
+                                    if (!state.HasLocalVariables)
+                                    {
+                                        // Wait for pending codes to be fully executed so that "iterations" can be incremented
+                                        await Flush();
+                                    }
+
                                     using (await _lock.LockAsync(Program.CancellationToken))
                                     {
                                         Position = state.StartingCode.FilePosition.Value;
@@ -276,6 +278,8 @@ namespace DuetControlServer.Files
                                         state.ProcessBlock = true;
                                         state.ContinueLoop = false;
                                         state.Iterations++;
+                                        await DeleteLocalVariables(state);
+                                        state.HasLocalVariables = false;
                                         readAgain = true;
                                         _logger.Debug("Restarting {0} block, iterations = {1}", state.StartingCode.Keyword, state.Iterations);
                                     }
@@ -342,26 +346,20 @@ namespace DuetControlServer.Files
                                     _logger.Debug("Skipping {0} block", code.Keyword);
                                     using (await _lock.LockAsync(Program.CancellationToken))
                                     {
-                                        _codeBlocks.Push(new CodeBlock
-                                        {
-                                            StartingCode = code
-                                        });
+                                        _codeBlocks.Push(new CodeBlock(code, false));
                                     }
                                     break;
                                 }
                             }
 
                             // Start a new conditional block if necessary
-                            await WaitForPendingCodes();
+                            await Flush();
                             _logger.Debug("Evaluating {0} block", code.Keyword);
                             if (code.Keyword != KeywordType.While || codeBlock == null || codeBlock.StartingCode.FilePosition != code.FilePosition)
                             {
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
-                                    codeBlock = new CodeBlock
-                                    {
-                                        StartingCode = code
-                                    };
+                                    codeBlock = new CodeBlock(code, false);
                                     _codeBlocks.Push(codeBlock);
                                 }
                             }
@@ -391,11 +389,7 @@ namespace DuetControlServer.Files
                             _logger.Debug("{0} {1} block", _lastCodeBlock.ExpectingElse ? "Starting" : "Skipping", code.Keyword);
                             using (await _lock.LockAsync(Program.CancellationToken))
                             {
-                                _codeBlocks.Push(new CodeBlock
-                                {
-                                    StartingCode = code,
-                                    ProcessBlock = _lastCodeBlock.ExpectingElse
-                                });
+                                _codeBlocks.Push(new CodeBlock(code, _lastCodeBlock.ExpectingElse));
                             }
                             break;
 
@@ -407,7 +401,7 @@ namespace DuetControlServer.Files
                             }
 
                             _logger.Debug("Doing {0}", code.Keyword);
-                            await WaitForPendingCodes();
+                            await Flush();
 
                             foreach (CodeBlock state in _codeBlocks)
                             {
@@ -421,50 +415,47 @@ namespace DuetControlServer.Files
                             break;
 
                         case KeywordType.Abort:
-#pragma warning disable CS0618 // Type or member is obsolete
-                        case KeywordType.Return:
-#pragma warning restore CS0618 // Type or member is obsolete
                             _logger.Debug("Doing {0}", code.Keyword);
                             using (await _lock.LockAsync(Program.CancellationToken))
                             {
                                 Close();
+                                _lastCode = code;
                             }
                             return code;
 
-                        case KeywordType.Global:
                         case KeywordType.Var:
-                        case KeywordType.Set:
-                            if (codeBlock != null)
-                            {
-                                codeBlock.SeenCodes = true;
-                            }
-                            if (codeBlock == null || codeBlock.StartingCode.Indent < code.Indent)
+                            if (codeBlock == null || code.Indent > codeBlock.StartingCode.Indent)
                             {
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
-                                    codeBlock = new CodeBlock
+                                    codeBlock = new CodeBlock(code, true)
                                     {
-                                        StartingCode = code
+                                        HasLocalVariables = true
                                     };
                                     _codeBlocks.Push(codeBlock);
                                 }
                             }
+                            else
+                            {
+                                codeBlock.HasLocalVariables = true;
+                            }
 
                             using (await _lock.LockAsync(Program.CancellationToken))
                             {
-                                _pendingCodes.Enqueue(code);
+                                _lastCode = code;
                             }
                             return code;
 
                         case KeywordType.Echo:
+                        case KeywordType.Global:
                         case KeywordType.None:
-                            if (codeBlock != null)
+                        case KeywordType.Set:
+                            if (code.Keyword != KeywordType.None || code.Type != CodeType.Comment)
                             {
-                                codeBlock.SeenCodes = true;
-                            }
-                            using (await _lock.LockAsync(Program.CancellationToken))
-                            {
-                                _pendingCodes.Enqueue(code);
+                                using (await _lock.LockAsync(Program.CancellationToken))
+                                {
+                                    _lastCode = code;
+                                }
                             }
                             return code;
 
@@ -482,78 +473,97 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
-        /// Wait for pending codes from the file being read
+        /// Wait for the last code to be fully executed
         /// </summary>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        private async Task WaitForPendingCodes()
+        private async Task Flush()
         {
-            if (_pendingCodes.TryPeek(out _))
+            while (await SPI.Interface.Flush(Channel))
             {
-                while (await SPI.Interface.Flush(Channel))
+                using (await _lock.LockAsync(Program.CancellationToken))
                 {
-                    using (await _lock.LockAsync(Program.CancellationToken))
+                    if (IsClosed)
                     {
-                        if (IsClosed)
-                        {
-                            // Canot continue if the file has been closed
-                            throw new OperationCanceledException();
-                        }
+                        // Cannot continue if the file has been closed
+                        break;
+                    }
 
-                        while (_pendingCodes.TryPeek(out Code pendingCode) && pendingCode.IsExecuted)
-                        {
-                            // Remove executed codes from the internal queue
-                            _pendingCodes.Dequeue();
-                        }
-
-                        if (!_pendingCodes.TryPeek(out _))
-                        {
-                            // No more pending codes, resume normal code execution
-                            return;
-                        }
+                    if (_lastCode == null || _lastCode.IsExecuted)
+                    {
+                        // No more code to await
+                        return;
                     }
                 }
-                throw new OperationCanceledException();
             }
+            throw new OperationCanceledException();
+        }
+
+        /// <summary>
+        /// Add a new local variable to the current code block
+        /// </summary>
+        /// <param name="varName">Name of the variable</param>
+        public void AddLocalVariable(string varName)
+        {
+            if (_codeBlocks.TryPeek(out CodeBlock codeBlock))
+            {
+                if (!codeBlock.LocalVariables.Contains(varName))
+                {
+                    codeBlock.LocalVariables.Add(varName);
+                }
+            }
+            else
+            {
+                _logger.Warn("Cannot add local variable because there is no open code block");
+            }
+        }
+
+        /// <summary>
+        /// Delete local variables from a given code block
+        /// </summary>
+        /// <param name="codeBlock">Code block</param>
+        /// <returns>Asynchronous task</returns>
+        public async Task DeleteLocalVariables(CodeBlock codeBlock)
+        {
+            Task[] deletionTasks = new Task[codeBlock.LocalVariables.Count];
+            for (int i = 0; i < codeBlock.LocalVariables.Count; i++)
+            {
+                deletionTasks[i] = SPI.Interface.SetVariable(Channel, false, codeBlock.LocalVariables[i], null);
+            }
+            await Task.WhenAll(deletionTasks);
+            codeBlock.LocalVariables.Clear();
         }
 
         /// <summary>
         /// Called to finish the current code block
         /// </summary>
-        /// <returns>True if the last code block could be disposed of</returns>
-        private async Task<bool> EndCodeBlock()
+        /// <returns>Asynchronous task</returns>
+        private async Task EndCodeBlock()
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
-                if (_codeBlocks.TryPop(out CodeBlock block))
+                if (_codeBlocks.TryPop(out CodeBlock codeBlock))
                 {
                     // Log the end of this block
-                    if (block.StartingCode.Keyword == KeywordType.If ||
-                        block.StartingCode.Keyword == KeywordType.ElseIf ||
-                        block.StartingCode.Keyword == KeywordType.Else ||
-                        block.StartingCode.Keyword == KeywordType.While)
+                    if (codeBlock.StartingCode.Keyword == KeywordType.If ||
+                        codeBlock.StartingCode.Keyword == KeywordType.ElseIf ||
+                        codeBlock.StartingCode.Keyword == KeywordType.Else ||
+                        codeBlock.StartingCode.Keyword == KeywordType.While)
                     {
-                        _logger.Debug("End of {0} block", block.StartingCode.Keyword);
+                        _logger.Debug("End of {0} block", codeBlock.StartingCode.Keyword);
                     }
                     else
                     {
-                        _logger.Debug("End of generic block", block.StartingCode.Keyword);
+                        _logger.Debug("End of generic block");
                     }
 
                     // Delete previously created local variables
-                    Task[] deletionTasks = new Task[block.LocalVariables.Count];
-                    for (int i = 0; i < block.LocalVariables.Count; i++)
-                    {
-                        deletionTasks[i] = SPI.Interface.SetVariable(Channel, false, block.LocalVariables[i], null);
-                    }
-                    await Task.WhenAll(deletionTasks);
+                    await DeleteLocalVariables(codeBlock);
 
                     // End
-                    _lastCodeBlock = block;
-                    return true;
+                    _lastCodeBlock = codeBlock;
                 }
             }
-            return false;
         }
 
         /// <summary>

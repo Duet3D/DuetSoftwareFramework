@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DuetAPIClient;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -13,6 +14,11 @@ namespace DuetPluginService.Commands
     public sealed class InstallSystemPackage : DuetAPI.Commands.InstallSystemPackage
     {
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private NLog.Logger _logger;
+
+        /// <summary>
         /// Magic value every ZIP file starts with
         /// </summary>
         private static readonly byte[] ZipSignature = new byte[] { 0x50, 0x4B, 0x03, 0x04 };
@@ -24,7 +30,7 @@ namespace DuetPluginService.Commands
         /// <returns></returns>
         private static async Task<bool> IsZipFile(string fileName)
         {
-            using FileStream fs = new(fileName, FileMode.Open, FileAccess.Read);
+            await using FileStream fs = new(fileName, FileMode.Open, FileAccess.Read);
             byte[] firstBytes = new byte[ZipSignature.Length];
 
             if (await fs.ReadAsync(firstBytes, Program.CancellationToken) == ZipSignature.Length)
@@ -45,10 +51,19 @@ namespace DuetPluginService.Commands
             {
                 throw new ArgumentException("Unable to manage system packages without root privileges");
             }
+            _logger = NLog.LogManager.GetLogger(Path.GetFileName(PackageFile));
 
             string packageDirectory = null, args;
             if (await IsZipFile(PackageFile))
             {
+                // Go into update mode, this may take longer
+                _logger.Info("Start of combined ZIP package installation");
+                using (CommandConnection commandConnection = new())
+                {
+                    await commandConnection.Connect(Settings.SocketPath);
+                    await commandConnection.SetUpdateStatus(true);
+                }
+
                 // Unpack the ZIP file first
                 packageDirectory = Path.Combine(Path.GetTempPath(), Path.GetFileNameWithoutExtension(PackageFile));
                 Directory.CreateDirectory(packageDirectory);
@@ -60,23 +75,79 @@ namespace DuetPluginService.Commands
             else
             {
                 // Just need to install a single file
+                _logger.Info("Start of package installation");
                 args = Settings.InstallLocalPackageArguments.Replace("{file}", PackageFile);
             }
 
-            // Run the installation process
-            using Process process = Process.Start(Settings.InstallLocalPackageCommand, args);
-            await process.WaitForExitAsync(Program.CancellationToken);
-
-            // Clean up again
-            if (packageDirectory != null)
+            try
             {
-                Directory.Delete(packageDirectory, true);
+                // Run the installation process
+                using Process process = Process.Start(Settings.InstallLocalPackageCommand, args);
+                try
+                {
+                    await process.WaitForExitAsync(Program.CancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    if (Program.CancelSource.IsCancellationRequested)
+                    {
+                        // Probably updating DPS as well so stop here
+                        return;
+                    }
+                    throw;
+                }
+
+                if (packageDirectory != null)
+                {
+                    // Run update script if it exists
+                    string updateScript = Path.Combine(packageDirectory, "update.sh");
+                    if (File.Exists(updateScript))
+                    {
+                        LinuxApi.Commands.Chmod(updateScript,
+                            LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
+                            LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
+                            LinuxApi.UnixPermissions.None);
+
+                        try
+                        {
+                            using Process updateScriptProcess = Process.Start(updateScript);
+                            await updateScriptProcess.WaitForExitAsync(Program.CancellationToken);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            if (Program.CancelSource.IsCancellationRequested)
+                            {
+                                // Probably updating DPS as well so stop here
+                                return;
+                            }
+                            throw;
+                        }
+                    }
+
+                    // Clean up again
+                    Directory.Delete(packageDirectory, true);
+                }
+
+                // Check the installation result
+                if (process.ExitCode != 0)
+                {
+                    throw new ArgumentException($"Failed to install system package (exit code {process.ExitCode})");
+                }
             }
-
-            // Check the installation result
-            if (process.ExitCode != 0)
+            finally
             {
-                throw new ArgumentException($"Failed to install system package (exit code {process.ExitCode})");
+                // Restore the previous update state if applicable
+                if (packageDirectory != null)
+                {
+                    _logger.Info("End of combined ZIP package installation");
+                    using CommandConnection commandConnection = new();
+                    await commandConnection.Connect(Settings.SocketPath);
+                    await commandConnection.SetUpdateStatus(false);
+                }
+                else
+                {
+                    _logger.Info("End of package installation");
+                }
             }
         }
     }

@@ -43,6 +43,11 @@
         /// <summary>
         /// Paused due to a voltage drop
         /// </summary>
-        LowVoltage = 8
+        LowVoltage = 8,
+
+        /// <summary>
+        /// Motor driver reported an error
+        /// </summary>
+        DriverError = 9
     }
 }

@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Utility;
 using System;
+using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
 {
@@ -160,11 +161,6 @@ namespace DuetAPI.ObjectModel
         private string _sbcExecutable;
 
         /// <summary>
-        /// List of other filenames in the dsf directory that should be executable
-        /// </summary>
-        public ModelCollection<string> SbcExtraExecutables { get; } = new ModelCollection<string>();
-
-        /// <summary>
         /// Command-line arguments for the executable
         /// </summary>
         public string SbcExecutableArguments
@@ -173,6 +169,11 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _sbcExecutableArguments, value);
         }
         private string _sbcExecutableArguments;
+
+        /// <summary>
+        /// List of other filenames in the dsf directory that should be executable
+        /// </summary>
+        public ModelCollection<string> SbcExtraExecutables { get; } = new ModelCollection<string>();
 
         /// <summary>
         /// Defines if messages from stdout/stderr are output as generic messages
@@ -200,6 +201,11 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<string> SbcPackageDependencies { get; } = new ModelCollection<string>();
 
         /// <summary>
+        /// List of Python packages this plugin depends on
+        /// </summary>
+        public ModelCollection<string> SbcPythonDependencies { get; } = new ModelCollection<string>();
+
+        /// <summary>
         /// List of SBC plugins this plugin depends on. Circular dependencies are not supported
         /// </summary>
         public ModelCollection<string> SbcPluginDependencies { get; } = new ModelCollection<string>();
@@ -219,7 +225,7 @@ namespace DuetAPI.ObjectModel
         /// Before <see cref="Commands.SetPluginData"/> can be used, corresponding properties must be registered via this property first!
         /// </summary>
         /// <seealso cref="Commands.SetPluginData"/>
-        public ModelJsonDictionary Data { get; } = new ModelJsonDictionary();
+        public ModelDictionary<JsonElement> Data { get; } = new ModelDictionary<JsonElement>(false);
 
         /// <summary>
         /// Check if the given version satisfies a required version

@@ -7,13 +7,17 @@ chmod 440 /opt/dsf/plugins/DuetPiManagementPlugin.json
 chown -R dsf:dsf /opt/dsf/plugins/DuetPiManagementPlugin
 chmod 755 /opt/dsf/plugins/DuetPiManagementPlugin
 
-# Restart DCS to load the new manifest and start DPM
-if (systemctl is-active -q duetcontrolserver); then
-	systemctl restart duetcontrolserver
-	if (systemctl is-active -q duetpluginservice-root); then
-		/opt/dsf/bin/PluginManager start DuetPiManagementPlugin
-	fi
+# Reload the plugin manifest
+if [ -f /opt/dsf/plugins/DuetPiManagementPlugin/.start ]; then
+        rm /opt/dsf/plugins/DuetPiManagementPlugin/.start
+        if (systemctl is-active -q duetcontrolserver && systemctl is-active -q duetpluginservice && systemctl is-active -q duetpluginservice-root); then
+                /opt/dsf/bin/PluginManager -q reload DuetPiManagementPlugin
+                /opt/dsf/bin/PluginManager -q start DuetPiManagementPlugin
+        else
+                echo "DuetPiManagementPlugin" >> /opt/dsf/conf/plugins.txt
+        fi
 fi
 
 # Don't block the configuration of other packages if DPS failed to start
 exit 0
+

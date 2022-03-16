@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -51,20 +52,19 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="access">Access level of this session</param>
         /// <param name="type">Type of this session</param>
-        /// <param name="origin">Origin of the user session (e.g. IP address)</param>
-        /// <param name="originPort">Origin of the user session (e.g. WebSocket port). Defaults to the current PID</param>
+        /// <param name="origin">Origin of the user session (e.g. IP address or PID)</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>New session ID</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ManageUserSessions"/>
-        public Task<int> AddUserSession(AccessLevel access, SessionType type, string origin, int? originPort = null, CancellationToken cancellationToken = default)
+        public Task<int> AddUserSession(AccessLevel access, SessionType type, string origin = null, CancellationToken cancellationToken = default)
         {
-            if (originPort == null)
+            if (origin == null)
             {
-                originPort = Environment.ProcessId;
+                origin = Process.GetCurrentProcess().Id.ToString();
             }
-            return PerformCommand<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin, OriginPort = originPort.Value }, cancellationToken);
+            return PerformCommand<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin }, cancellationToken);
         }
 
         /// <summary>
@@ -120,13 +120,31 @@ namespace DuetAPIClient
         /// <returns>Information about the parsed file</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
-        /// <seealso cref="GetFileInfo"/>
+        /// <seealso cref="GetFileInfo.GetFileInfo"/>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
         /// <seealso cref="SbcPermissions.FileSystemAccess"/>
         /// <seealso cref="SbcPermissions.ReadGCodes"/>
-        public Task<ParsedFileInfo> GetFileInfo(string fileName, CancellationToken cancellationToken = default)
+        public Task<GCodeFileInfo> GetFileInfo(string fileName, CancellationToken cancellationToken = default)
         {
-            return PerformCommand<ParsedFileInfo>(new GetFileInfo { FileName = fileName }, cancellationToken);
+            return PerformCommand<GCodeFileInfo>(new GetFileInfo { FileName = fileName }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Parse a G-code file and returns file information about it
+        /// </summary>
+        /// <param name="fileName">The file to parse</param>
+        /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Information about the parsed file</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="GetFileInfo.GetFileInfo"/>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        /// <seealso cref="SbcPermissions.FileSystemAccess"/>
+        /// <seealso cref="SbcPermissions.ReadGCodes"/>
+        public Task<GCodeFileInfo> GetFileInfo(string fileName, bool readThumbnailContent, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand<GCodeFileInfo>(new GetFileInfo { FileName = fileName, ReadThumbnailContent = readThumbnailContent }, cancellationToken);
         }
 
         /// <summary>
@@ -320,9 +338,9 @@ namespace DuetAPIClient
         /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
         /// <seealso cref="Code"/>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
-        public Task<CodeResult> PerformCode(Code code, CancellationToken cancellationToken = default)
+        public Task<Message> PerformCode(Code code, CancellationToken cancellationToken = default)
         {
-            return PerformCommand<CodeResult>(code, cancellationToken);
+            return PerformCommand<Message>(code, cancellationToken);
         }
 
         /// <summary>
@@ -341,6 +359,39 @@ namespace DuetAPIClient
         public Task<string> PerformSimpleCode(string code, CodeChannel channel = Defaults.InputChannel, CancellationToken cancellationToken = default)
         {
             return PerformCommand<string>(new SimpleCode { Code = code, Channel = channel }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Execute an arbitrary G/M/T-code in text form and return the result as a string
+        /// </summary>
+        /// <param name="code">The code to execute</param>
+        /// <param name="channel">Optional destination channel of this code</param>
+        /// <param name="executeAsynchronously">Execute this code asynchronously in the background</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Result of the given code converted to a string</returns>
+        /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
+        /// <exception cref="OperationCanceledException">Code or operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
+        /// <seealso cref="SimpleCode"/>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        public Task<string> PerformSimpleCode(string code, CodeChannel channel, bool executeAsynchronously, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand<string>(new SimpleCode { Code = code, Channel = channel, ExecuteAsynchronously = executeAsynchronously }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Reload a plugin manifest
+        /// </summary>
+        /// <param name="plugin">Identifier of the plugin</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.ManagePlugins"/>
+        public Task ReloadPlugin(string plugin, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new ReloadPlugin { Plugin = plugin }, cancellationToken);
         }
 
         /// <summary>
@@ -423,7 +474,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <param name="key">Key to set</param>
         /// <param name="value">Value to set</param>
-        /// <param name="plugin">Name of the plugin to update (optional)</param>
+        /// <param name="plugin">Identifier of the plugin to update (optional)</param>
         /// <param name="cancellationToken"></param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
@@ -455,7 +506,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Start a plugin
         /// </summary>
-        /// <param name="plugin">Name of the plugin</param>
+        /// <param name="plugin">Identifier of the plugin</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
@@ -469,7 +520,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Stop a plugin
         /// </summary>
-        /// <param name="plugin">Name of the plugin</param>
+        /// <param name="plugin">Identifier of the plugin</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
@@ -511,7 +562,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Uninstall a plugin
         /// </summary>
-        /// <param name="plugin">Name of the plugin</param>
+        /// <param name="plugin">Identifier of the plugin</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
@@ -525,7 +576,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Uninstall a system package
         /// </summary>
-        /// <param name="package">Name of the package</param>
+        /// <param name="package">Identifier of the package</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>

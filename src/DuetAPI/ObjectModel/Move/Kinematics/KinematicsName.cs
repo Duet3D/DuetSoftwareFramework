@@ -96,7 +96,7 @@ namespace DuetAPI.ObjectModel
             }
             if (reader.TokenType == JsonTokenType.String)
             {
-                return (reader.GetString().ToLowerInvariant()) switch
+                return reader.GetString().ToLowerInvariant() switch
                 {
                     "cartesian" => KinematicsName.Cartesian,
                     "corexy" => KinematicsName.CoreXY,

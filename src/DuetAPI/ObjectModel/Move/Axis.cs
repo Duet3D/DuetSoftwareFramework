@@ -10,7 +10,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of supported axis letters
         /// </summary>
-        public static readonly char[] Letters = new char[] { 'X', 'Y', 'Z', 'U', 'V', 'W', 'A', 'B', 'C' };
+        public static readonly char[] Letters = new char[] {
+            'X', 'Y', 'Z',
+            'U', 'V', 'W',
+            'A', 'B', 'C', 'D',
+            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'
+        };
 
         /// <summary>
         /// Acceleration of this axis (in mm/s^2)
@@ -58,7 +63,7 @@ namespace DuetAPI.ObjectModel
         private bool _homed;
 
         /// <summary>
-        /// Motor jerk (in mm/s)
+        /// Motor jerk (in mm/min)
         /// </summary>
         public float Jerk
         {
@@ -68,12 +73,12 @@ namespace DuetAPI.ObjectModel
         private float _jerk = 15F;
 
         /// <summary>
-        /// Letter of the axis (always upper-case)
+        /// Letter of this axis
         /// </summary>
         public char Letter
         {
             get => _letter;
-			set => SetPropertyValue(ref _letter, char.ToUpper(value));
+			set => SetPropertyValue(ref _letter, value);
         }
         private char _letter;
 
@@ -133,7 +138,27 @@ namespace DuetAPI.ObjectModel
         private bool _minProbed;
 
         /// <summary>
-        /// Maximum speed (in mm/s)
+        /// Percentage applied to the motor current (0..100)
+        /// </summary>
+        public int PercentCurrent
+        {
+            get => _percentCurrent;
+            set => SetPropertyValue(ref _percentCurrent, value);
+        }
+        private int _percentCurrent = 100;
+
+        /// <summary>
+        /// Percentage applied to the motor current during standstill (0..100 or null if not supported)
+        /// </summary>
+        public int? PercentStstCurrent
+        {
+            get => _percentStstCurrent;
+            set => SetPropertyValue(ref _percentStstCurrent, value);
+        }
+        private int? _percentStstCurrent;
+
+        /// <summary>
+        /// Maximum speed (in mm/min)
         /// </summary>
         public float Speed
         {

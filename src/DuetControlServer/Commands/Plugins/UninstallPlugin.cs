@@ -2,6 +2,7 @@
 using DuetAPI.Utility;
 using DuetControlServer.IPC;
 using System;
+using System.IO;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -68,6 +69,20 @@ namespace DuetControlServer.Commands
                 Plugin = Plugin
             };
             await IPC.Processors.PluginService.PerformCommand(stopCommand, plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser));
+
+            // Make sure we don't attempt to start it again once it's uninstalled
+            await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
+            await using StreamWriter writer = new(fileStream);
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                {
+                    if (item.Pid >= 0 && item.Id != Plugin)
+                    {
+                        await writer.WriteLineAsync(item.Id);
+                    }
+                }
+            }
 
             // Perform the actual uninstallation via the plugin service.
             // If it is a root plugin, the root plugin service will clean up everything

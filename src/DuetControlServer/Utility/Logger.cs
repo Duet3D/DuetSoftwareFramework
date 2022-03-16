@@ -1,5 +1,4 @@
-﻿using DuetAPI.Commands;
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using Nito.AsyncEx;
 using System;
@@ -29,7 +28,7 @@ namespace DuetControlServer.Utility
         private static readonly AsyncLock _lock = new();
 
         /// <summary>
-        /// Filestream of the log file
+        /// File stream of the log file
         /// </summary>
         private static FileStream _fileStream;
 
@@ -49,18 +48,52 @@ namespace DuetControlServer.Utility
         /// <param name="filename">Filename to write to</param>
         /// <param name="level">Requested log level</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Start(string filename, LogLevel level)
+        public static void Start(string filename, LogLevel level)
+        {
+            using (_lock.Lock(Program.CancellationToken))
+            {
+                // Close any open file
+                StopInternal();
+
+                // Initialize access to the log file
+                string physicalFile = FilePath.ToPhysical(filename, FileDirectory.System);
+                _fileStream = new FileStream(physicalFile, FileMode.Append, FileAccess.Write);
+                _writer = new StreamWriter(_fileStream) { AutoFlush = true };
+                _logCloseEvent = Program.CancellationToken.Register(Stop);
+
+                // Write the first line
+                _writer.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging started");
+
+                // Update the object model
+                using (Model.Provider.AccessReadWrite())
+                {
+                    Model.Provider.Get.State.LogFile = filename;
+                    Model.Provider.Get.State.LogLevel = level;
+                }
+
+                // Write event
+                _logger.Info("Event logging to {0} started", filename);
+            }
+        }
+
+        /// <summary>
+        /// Start logging to a file
+        /// </summary>
+        /// <param name="filename">Filename to write to</param>
+        /// <param name="level">Requested log level</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task StartAsync(string filename, LogLevel level)
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
                 // Close any open file
-                await StopInternal();
+                await StopInternalAsync();
 
                 // Initialize access to the log file
                 string physicalFile = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
                 _fileStream = new FileStream(physicalFile, FileMode.Append, FileAccess.Write);
                 _writer = new StreamWriter(_fileStream) { AutoFlush = true };
-                _logCloseEvent = Program.CancellationToken.Register(() => Stop().Wait());
+                _logCloseEvent = Program.CancellationToken.Register(Stop);
 
                 // Write the first line
                 await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging started");
@@ -81,11 +114,23 @@ namespace DuetControlServer.Utility
         /// Stop logging
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task Stop()
+        public static void Stop()
+        {
+            using (_lock.Lock(Program.CancellationToken))
+            {
+                StopInternal();
+            }
+        }
+
+        /// <summary>
+        /// Stop logging asynchronously
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static async Task StopAsync()
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
-                await StopInternal();
+                await StopInternalAsync();
             }
         }
 
@@ -93,7 +138,44 @@ namespace DuetControlServer.Utility
         /// Stop logging internally
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        private static async Task StopInternal()
+        private static void StopInternal()
+        {
+            if (_writer != null)
+            {
+                _writer.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging stopped");
+                _writer.Close();
+                _writer = null;
+
+                _logger.Info("Event logging stopped");
+            }
+
+            if (_fileStream != null)
+            {
+                _fileStream.Close();
+                _fileStream = null;
+            }
+
+            if (!Program.CancellationToken.IsCancellationRequested)
+            {
+                if (_logCloseEvent != null)
+                {
+                    _logCloseEvent.Dispose();
+                    _logCloseEvent = null;
+                }
+
+                using (Model.Provider.AccessReadWrite())
+                {
+                    Model.Provider.Get.State.LogFile = null;
+                    Model.Provider.Get.State.LogLevel = LogLevel.Off;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Stop logging internally and asynchronously
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private static async Task StopInternalAsync()
         {
             if (_writer != null)
             {
@@ -130,13 +212,46 @@ namespace DuetControlServer.Utility
         /// Write a message including timestamp to the log file
         /// </summary>
         /// <param name="level">Log level of the message</param>
-        /// <param name="msg">Message to log</param>
+        /// <param name="message">Message to log</param>
+        public static void Log(LogLevel level, Message message)
+        {
+            using (_lock.Lock(Program.CancellationToken))
+            {
+                if (level != LogLevel.Off && _writer != null && !string.IsNullOrWhiteSpace(message?.Content))
+                {
+                    using (Model.Provider.AccessReadOnly())
+                    {
+                        if (Model.Provider.Get.State.LogLevel == LogLevel.Off || level < Model.Provider.Get.State.LogLevel)
+                        {
+                            return;
+                        }
+                    }
+
+                    try
+                    {
+                        _writer.Write(message.Time.ToString("yyyy-MM-dd HH:mm:ss "));
+                        _writer.WriteLine(message.ToString().TrimEnd());
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Error(e, "Failed to write to log file");
+                        StopInternal();
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Write a message including timestamp to the log file asynchronously
+        /// </summary>
+        /// <param name="level">Log level of the message</param>
+        /// <param name="message">Message to log</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Log(LogLevel level, Message msg)
+        public static async Task LogAsync(LogLevel level, Message message)
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
-                if (level != LogLevel.Off && _writer != null && !string.IsNullOrWhiteSpace(msg.Content))
+                if (level != LogLevel.Off && _writer != null && !string.IsNullOrWhiteSpace(message?.Content))
                 {
                     using (await Model.Provider.AccessReadOnlyAsync())
                     {
@@ -148,13 +263,13 @@ namespace DuetControlServer.Utility
 
                     try
                     {
-                        await _writer.WriteAsync(msg.Time.ToString("yyyy-MM-dd HH:mm:ss "));
-                        await _writer.WriteLineAsync(msg.ToString().TrimEnd());
+                        await _writer.WriteAsync(message.Time.ToString("yyyy-MM-dd HH:mm:ss "));
+                        await _writer.WriteLineAsync(message.ToString().TrimEnd());
                     }
                     catch (Exception e)
                     {
                         _logger.Error(e, "Failed to write to log file");
-                        await StopInternal();
+                        await StopInternalAsync();
                     }
                 }
             }
@@ -166,59 +281,91 @@ namespace DuetControlServer.Utility
         /// <param name="level">Log level</param>
         /// <param name="type">Message type</param>
         /// <param name="content">Message content</param>
-        public static Task Log(LogLevel level, MessageType type, string content) => Log(level, new Message(type, content));
+        public static void Log(LogLevel level, MessageType type, string content) => Log(level, new Message(type, content));
+
+        /// <summary>
+        /// Write a message including timestamp to the log file asynchronously
+        /// </summary>
+        /// <param name="level">Log level</param>
+        /// <param name="type">Message type</param>
+        /// <param name="content">Message content</param>
+        /// <returns>Asynchronous task</returns>
+        public static Task LogAsync(LogLevel level, MessageType type, string content) => LogAsync(level, new Message(type, content));
 
         /// <summary>
         /// Write a message including timestamp to the log file
         /// </summary>
         /// <param name="type">Message type</param>
         /// <param name="content">Message content</param>
-        public static Task Log(MessageType type, string content)
+        public static void Log(MessageType type, string content)
         {
             LogLevel level = (type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
-            return Log(level, new Message(type, content));
+            Log(level, new Message(type, content));
+        }
+
+        /// <summary>
+        /// Write a message including timestamp to the log file asynchronously
+        /// </summary>
+        /// <param name="type">Message type</param>
+        /// <param name="content">Message content</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task LogAsync(MessageType type, string content)
+        {
+            LogLevel level = (type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
+            await LogAsync(level, new Message(type, content));
         }
 
         /// <summary>
         /// Write messages including timestamp to the log file
         /// </summary>
-        /// <param name="result">Message list</param>
-        public static async Task Log(CodeResult result)
+        /// <param name="message">Message to log</param>
+        public static void Log(Message message)
         {
-            if (result != null)
+            if (message != null && !string.IsNullOrEmpty(message.Content))
             {
-                foreach (Message msg in result)
-                {
-                    LogLevel level = (msg.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
-                    await Log(level, msg);
-                }
+                LogLevel level = (message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
+                Log(level, message);
+            }
+        }
+
+        /// <summary>
+        /// Write messages including timestamp to the log file asynchronously
+        /// </summary>
+        /// <param name="message">Message to log</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task LogAsync(Message message)
+        {
+            if (message != null && !string.IsNullOrEmpty(message.Content))
+            {
+                LogLevel level = (message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
+                await LogAsync(level, message);
             }
         }
 
         /// <summary>
         /// Log and output a message
         /// </summary>
-        /// <param name="msg">Message</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task LogOutput(Message msg)
+        /// <param name="message">Message to log and output</param>
+        public static void LogOutput(Message message)
         {
-            await Model.Provider.Output(msg);
-            await Log((msg.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, msg);
+            if (message != null && !string.IsNullOrEmpty(message.Content))
+            {
+                Model.Provider.Output(message);
+                Log((message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, message);
+            }
         }
 
         /// <summary>
-        /// Log and output a code result
+        /// Log and output a message asynchronously
         /// </summary>
-        /// <param name="result">Code result</param>
+        /// <param name="message">Message to log and output</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task LogOutput(CodeResult result)
+        public static async Task LogOutputAsync(Message message)
         {
-            if (result != null)
+            if (message != null && !string.IsNullOrEmpty(message.Content))
             {
-                foreach (Message msg in result)
-                {
-                    await LogOutput(msg);
-                }
+                await Model.Provider.OutputAsync(message);
+                await LogAsync((message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, message);
             }
         }
 
@@ -228,6 +375,14 @@ namespace DuetControlServer.Utility
         /// <param name="type">Message type</param>
         /// <param name="content">Message content</param>
         /// <returns>Asynchronous task</returns>
-        public static Task LogOutput(MessageType type, string content) => LogOutput(new Message(type, content));
+        public static void LogOutput(MessageType type, string content) => LogOutput(new Message(type, content));
+
+        /// <summary>
+        /// Log and output a message
+        /// </summary>
+        /// <param name="type">Message type</param>
+        /// <param name="content">Message content</param>
+        /// <returns>Asynchronous task</returns>
+        public static Task LogOutputAsync(MessageType type, string content) => LogOutputAsync(new Message(type, content));
     }
 }

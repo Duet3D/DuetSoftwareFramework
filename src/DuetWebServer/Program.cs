@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Hosting;
+﻿using DuetWebServer.Singletons;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -43,7 +44,11 @@ namespace DuetWebServer
                 })
                 .ConfigureServices(services =>
                 {
+                    services.AddSingleton<IModelProvider, ModelProvider>();
+                    services.AddSingleton<ISessionStorage, SessionStorage>();
+
                     services.AddHostedService<Services.ModelObserver>();
+                    services.AddHostedService<Services.SessionExpiry>();
                 });
     }
 }

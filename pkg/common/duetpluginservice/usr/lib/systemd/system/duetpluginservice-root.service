@@ -9,6 +9,7 @@ ExecStart=/opt/dsf/bin/DuetPluginService
 KillMode=process
 TimeoutStopSec=15
 Restart=always
+Type=notify
 
 [Install]
 WantedBy=multi-user.target

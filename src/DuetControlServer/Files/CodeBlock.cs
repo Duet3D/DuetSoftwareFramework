@@ -9,9 +9,34 @@ namespace DuetControlServer.Files
     public sealed class CodeBlock
     {
         /// <summary>
+        /// Constructor of this class
+        /// </summary>
+        /// <param name="startingCode">Code starting this block</param>
+        /// <param name="processBlock">Whether instructions from this block may be processed</param>
+        public CodeBlock(Code startingCode, bool processBlock)
+        {
+            StartingCode = startingCode;
+            ProcessBlock = processBlock;
+        }
+
+        /// <summary>
         /// Code starting this block
         /// </summary>
-        public Code StartingCode { get; set; }
+        public Code StartingCode { get; }
+
+        /// <summary>
+        /// Check if the given indentation level finishes this block
+        /// </summary>
+        /// <param name="indent">Current indentation level</param>
+        /// <returns>Whether the block is complete</returns>
+        public bool IsFinished(int indent)
+        {
+            if (StartingCode.Keyword == DuetAPI.Commands.KeywordType.Var)
+            {
+                return indent < StartingCode.Indent;
+            }
+            return indent <= StartingCode.Indent;
+        }
 
         /// <summary>
         /// Last evaluation result of the conditional start code indicating if this block is supposed to be processed
@@ -39,8 +64,13 @@ namespace DuetControlServer.Files
         public int Iterations { get; set; }
 
         /// <summary>
+        /// Indicates if this block contains local variables
+        /// </summary>
+        public bool HasLocalVariables { get; set; }
+
+        /// <summary>
         /// List of local variables
         /// </summary>
-        public List<string> LocalVariables { get; } = new List<string>();
+        public List<string> LocalVariables { get; } = new();
     }
 }

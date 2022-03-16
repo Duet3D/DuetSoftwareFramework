@@ -2,14 +2,13 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI.ObjectModel;
-using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
-using DuetControlServer.SPI.Communication.LinuxRequests;
+using DuetControlServer.SPI.Communication.SbcRequests;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.SPI.Serialization;
 using NUnit.Framework;
 using Code = DuetControlServer.Commands.Code;
-using CodeFlags = DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags;
+using CodeFlags = DuetControlServer.SPI.Communication.SbcRequests.CodeFlags;
 
 namespace UnitTests.SPI
 {
@@ -46,7 +45,7 @@ namespace UnitTests.SPI
             Writer.WritePacketHeader(span, Request.Reset, 12, 1054);
 
             // Header
-            ushort request = MemoryMarshal.Read<ushort>(span.Slice(0, 2));
+            ushort request = MemoryMarshal.Read<ushort>(span[..2]);
             Assert.AreEqual((ushort)Request.Reset, request);
             ushort packetId = MemoryMarshal.Read<ushort>(span.Slice(2, 2));
             Assert.AreEqual(12, packetId);
@@ -255,19 +254,18 @@ namespace UnitTests.SPI
         }
 
         [Test]
-        public void PrintStarted()
+        public void SetPrintFileInfo()
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            ParsedFileInfo info = new()
+            GCodeFileInfo info = new()
             {
                 Size = 452432,
                 FileName = "0:/gcodes/test.g",
-                FirstLayerHeight = 0.3F,
                 GeneratedBy = "Slic3r",
                 Height = 53.4F,
-                NumLayers = 343,
+                NumLayers = 16,
                 LayerHeight = 0.2F,
                 PrintTime = 12355,
                 SimulatedTime = 10323
@@ -275,11 +273,11 @@ namespace UnitTests.SPI
             info.Filament.Add(123.45F);
             info.Filament.Add(678.9F);
 
-            int bytesWritten = Writer.WritePrintStarted(span, info);
+            int bytesWritten = Writer.WritePrintFileInfo(span, info);
             Assert.AreEqual(72, bytesWritten);
 
             // Header
-            ushort filenameLength = MemoryMarshal.Read<ushort>(span.Slice(0, 2));
+            ushort filenameLength = MemoryMarshal.Read<ushort>(span[..2]);
             Assert.AreEqual(info.FileName.Length, filenameLength);
             ushort generatedByLength = MemoryMarshal.Read<ushort>(span.Slice(2, 2));
             Assert.AreEqual(6, generatedByLength);
@@ -287,8 +285,8 @@ namespace UnitTests.SPI
             Assert.AreEqual(2, numFilaments);
             uint fileSize = MemoryMarshal.Read<uint>(span.Slice(16, 4));
             Assert.AreEqual(452432, fileSize);
-            float firstLayerHeight = MemoryMarshal.Read<float>(span.Slice(20, 4));
-            Assert.AreEqual(0.3, firstLayerHeight, 0.00001);
+            uint numLayers = MemoryMarshal.Read<uint>(span.Slice(20, 4));
+            Assert.AreEqual(16, numLayers);
             float layerHeight = MemoryMarshal.Read<float>(span.Slice(24, 4));
             Assert.AreEqual(0.2, layerHeight, 0.00001);
             float objectHeight = MemoryMarshal.Read<float>(span.Slice(28, 4));
@@ -314,16 +312,16 @@ namespace UnitTests.SPI
         }
 
         [Test]
-        public void PrintStarted2()
+        public void SetPrintFileInfo2()
         {
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            ParsedFileInfo info = new()
+            GCodeFileInfo info = new()
             {
                 Size = 4180,
                 FileName = "0:/gcodes/circle.g",
-                FirstLayerHeight = 0.5F,
+                NumLayers = 0,
                 GeneratedBy = string.Empty,
                 Height = 0,
                 LayerHeight = 0,
@@ -331,11 +329,11 @@ namespace UnitTests.SPI
                 SimulatedTime = 0,
             };
 
-            int bytesWritten = Writer.WritePrintStarted(span, info);
+            int bytesWritten = Writer.WritePrintFileInfo(span, info);
             Assert.AreEqual(60, bytesWritten);
 
             // Header
-            ushort filenameLength = MemoryMarshal.Read<ushort>(span.Slice(0, 2));
+            ushort filenameLength = MemoryMarshal.Read<ushort>(span[..2]);
             Assert.AreEqual(info.FileName.Length, filenameLength);
             ushort generatedByLength = MemoryMarshal.Read<ushort>(span.Slice(2, 2));
             Assert.AreEqual(info.GeneratedBy.Length, generatedByLength);
@@ -343,8 +341,8 @@ namespace UnitTests.SPI
             Assert.AreEqual(0, numFilaments);
             uint fileSize = MemoryMarshal.Read<uint>(span.Slice(16, 4));
             Assert.AreEqual(4180, fileSize);
-            float firstLayerHeight = MemoryMarshal.Read<float>(span.Slice(20, 4));
-            Assert.AreEqual(0.5, firstLayerHeight, 0.00001);
+            uint numLayers = MemoryMarshal.Read<uint>(span.Slice(20, 4));
+            Assert.AreEqual(0, numLayers);
             float layerHeight = MemoryMarshal.Read<float>(span.Slice(24, 4));
             Assert.AreEqual(0, layerHeight, 0.00001);
             float objectHeight = MemoryMarshal.Read<float>(span.Slice(28, 4));
@@ -399,63 +397,6 @@ namespace UnitTests.SPI
             Assert.AreEqual(0, span[3]);
         }
 
-
-        [Test]
-        public void SetHeightmap()
-        {
-            Span<byte> span = new byte[128];
-            span.Fill(0xFF);
-
-            Heightmap map = new()
-            {
-                XMin = 20,
-                XMax = 180,
-                XSpacing = 40,
-                YMin = 50,
-                YMax = 150,
-                YSpacing = 50,
-                Radius = 0,
-                NumX = 3,
-                NumY = 4,
-                ZCoordinates = new float[] {
-                    10, 20, 30,
-                    40, 50, 60,
-                    70, 80, 90,
-                    100, 110, 120
-                }
-            };
-
-            int bytesWritten = Writer.WriteHeightMap(span, map);
-            Assert.AreEqual(80, bytesWritten);
-
-            // Header
-            float xMin = MemoryMarshal.Read<float>(span);
-            Assert.AreEqual(20, xMin, 0.0001);
-            float xMax = MemoryMarshal.Read<float>(span.Slice(4, 4));
-            Assert.AreEqual(180, xMax, 0.0001);
-            float xSpacing = MemoryMarshal.Read<float>(span.Slice(8, 4));
-            Assert.AreEqual(40, xSpacing, 0.0001);
-            float yMin = MemoryMarshal.Read<float>(span.Slice(12, 4));
-            Assert.AreEqual(50, yMin, 0.0001);
-            float yMax = MemoryMarshal.Read<float>(span.Slice(16, 4));
-            Assert.AreEqual(150, yMax, 0.0001);
-            float ySpacing = MemoryMarshal.Read<float>(span.Slice(20, 4));
-            Assert.AreEqual(50, ySpacing, 0.0001);
-            float radius = MemoryMarshal.Read<float>(span.Slice(24, 4));
-            Assert.AreEqual(0, radius, 0.0001);
-            ushort numX = MemoryMarshal.Read<ushort>(span.Slice(28, 2));
-            Assert.AreEqual(3, numX);
-            ushort numY = MemoryMarshal.Read<ushort>(span.Slice(30, 2));
-            Assert.AreEqual(4, numY);
-
-            // Points
-            Span<float> zCoordinates = MemoryMarshal.Cast<byte, float>(span[32..]);
-            for (int i = 0; i < map.ZCoordinates.Length; i++)
-            {
-                Assert.AreEqual(zCoordinates[i], 10 * i + 10, 0.0001);
-            }
-        }
-
         [Test]
         public void CodeChannel()
         {
@@ -484,7 +425,7 @@ namespace UnitTests.SPI
             Assert.AreEqual(16, bytesWritten);
 
             // Header
-            int extruder = MemoryMarshal.Read<int>(span.Slice(0, 4));
+            int extruder = MemoryMarshal.Read<int>(span[..4]);
             Assert.AreEqual(12, extruder);
             int filamentLength = MemoryMarshal.Read<int>(span.Slice(4, 4));
             Assert.AreEqual(7, filamentLength);

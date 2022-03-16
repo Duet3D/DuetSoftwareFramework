@@ -25,6 +25,19 @@ The following command-line arguments are available:
 
 Note that all the command-line options are case-sensitive.
 
+### Return Codes
+
+This application may return the following codes (derived from `sysexits.h`):
+- `0`: Successful termination
+- `64`: Failed to initialize settings (usage error)
+- `69`: Could not connect to Duet (service unavailable)
+- `70`: Internal software error
+- `71`: Failed to initialize environment (OS error)
+- `73`: Failed to initialize IPC socket (Cannot create file)
+- `74`: Could not open SPI or GPIO device (IO error)
+- `75`: Auto-update disabled or other instance already running (temporary failure)
+- `78`: Bad settings file (configuration error)
+
 ### SPI Link
 
 In order to connect to the firmware, a binary data protocol is used. DuetControlServer attaches to the Duet using an SPI connection (typically `/dev/spidev0.0`) in master mode.
@@ -73,7 +86,10 @@ The `Kestrel` section specifies the default configuration of the underlying webs
 
 Apart from these two sections, you can also customize the following settings:
 
+- `SocketPath`: Path to the UNIX socket provided by DCS
+- `StartErrorFile`: Optional file containing the last start error from DCS
 - `KeepAliveInterval`: Default keep-alive interval for WebSocket connections. This is useful if DWS is operating as a reverse proxy
+- `SessionTimeout`: Default timeout for inactive HTTP sessions
 - `ModelRetryDelay`: If DuetControlServer is not running, this specifies the delay between reconnect attempts in milliseconds
 - `ObjectModelUpdateTimeout`: When a WebSocket is connected and waiting for object model changes, this specifies the timeout after which DWS stops waiting and polls the WebSocket again
 - `UseStaticFiles`: Whether to provide web files from the virtual `www` directory. This is required for DWC if DWS is not running as a reverse proxy
@@ -199,6 +215,9 @@ Since it relies on a [model subscription](#model-subscriptions), it gives an ide
 #### Command-Line Options
 
 - `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
+- `-f`, `--filter <filter>`: UNIX socket to connect to
+- `-c`, `--confirm`: Confirm every JSON receipt manually
+- `-q`, `--quiet`: Do not display when a connection has been established
 - `-h`, `--help`: Display all available command-line parameters
 
 ### PluginManager
@@ -219,12 +238,12 @@ This tool is intended to manage third-party plugins directly on the SBC without 
 
 ## Unit Tests
 
-To ensure flawless operation of the most critical components, Duet Software Framework relies on unit tests via the NUnit framework. These unit tests can be found in the [src/UnitTests](/src/UnitTests) directory.
+To ensure flawless operation of the most critical components, Duet Software Framework relies on unit tests via the NUnit framework. These unit tests can be found in the [src/UnitTests](src/UnitTests) directory.
 
 ## Known incompatibilities
 
-- Auto-save is not supported yet (TBD)
 - G-Code checksums and M998 are not supported
+- `exists()` may be used in meta G-code expressions only for fields that are managed by RRF
 
 ## Reporting issues
 

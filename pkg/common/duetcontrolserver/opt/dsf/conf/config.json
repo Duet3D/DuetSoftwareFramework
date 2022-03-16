@@ -1,10 +1,12 @@
 {
+  "AutoUpdateFirmware": true,
   "PluginSupport": true,
   "RootPluginSupport": false,
   "PluginsFilename": "/opt/dsf/conf/plugins.txt",
   "LogLevel": "info",
-  "SocketDirectory": "/var/run/dsf",
+  "SocketDirectory": "/run/dsf",
   "SocketFile": "dcs.sock",
+  "StartErrorFile": "/run/dsf/dcs.err",
   "Backlog": 4,
   "SocketPollInterval": 2000,
   "BaseDirectory": "/opt/dsf/sd",
@@ -20,7 +22,6 @@
   "SpiTransferTimeout": 500,
   "SpiConnectionTimeout": 4000,
   "MaxSpiRetries": 3,
-  "SpiPollDelay": 25,
   "GpioChipDevice": "/dev/gpiochip0",
   "TransferReadyPin": 25,
   "BufferedPrintCodes": 32,
@@ -69,6 +70,12 @@
     },
     {
       "Pattern": "sliceHeight\\D+(?<mm>(\\d+\\.?\\d*))",
+      "Options": 17
+    }
+  ],
+  "NumLayersFilters": [
+    {
+      "Pattern": "NUM_LAYERS\\D+(\\d+)",
       "Options": 17
     }
   ],
@@ -151,6 +158,10 @@
     },
     {
       "Pattern": "total print time \\(s\\) = (?<s>(\\d+\\.?\\d*))",
+      "Options": 17
+    },
+    {
+      "Pattern": "Build time:\\s+(?<h>(\\d+\\.?\\d*)):(?<m>(\\d+\\.?\\d*)):(?<s>(\\d+\\.?\\d*))",
       "Options": 17
     }
   ],

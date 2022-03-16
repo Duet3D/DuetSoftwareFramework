@@ -4,6 +4,8 @@ This plugin provides system management functions using regular RepRapFirmware M-
 
 ## Supported codes
 
+- `M21`: Initialize SD card (mount device)
+- `M22`: Release SD card (unmount device)
 - `M540` Set MAC address
 - `M550` Set Name
 - `M552` Set IP address, enable/disable network interface

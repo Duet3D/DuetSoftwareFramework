@@ -26,12 +26,16 @@ AutoReq:  0
 %description
 DSF Service for third-party plugins
 
+%build
+mkdir %{buildroot}/%{dsfoptdir}/plugins >/dev/null 2>&1 || :
+
 %pre
 if [ $1 -gt 1 ] && systemctl -q is-active %{name}.service ; then
 # upgrade
 	systemctl stop %{name}.service > /dev/null 2>&1 || :
 	systemctl stop %{name}-root.service > /dev/null 2>&1 || :
 fi
+
 
 %post
 systemctl daemon-reload >/dev/null 2>&1 || :
@@ -53,8 +57,15 @@ if [ $1 -eq 1 ] && systemctl -q is-enabled %{name}-root.service ; then
 fi
 
 %files
-%defattr(-,root,root,-)
+%defattr(0644,root,root,-) 
 %{_unitdir}/duetpluginservice.service
 %{_unitdir}/duetpluginservice-root.service
+
+%defattr(-,dsf,dsf,-)
+%dir %{dsfoptdir}/plugins
+%{dsfoptdir}/bin/DuetPluginService
+%{dsfoptdir}/bin/DuetPluginService.*
 %config(noreplace) %{dsfoptdir}/conf/plugins.json
-%{dsfoptdir}/bin/DuetPluginService*
+%config(noreplace) %{dsfoptdir}/conf/apparmor.conf
+
+

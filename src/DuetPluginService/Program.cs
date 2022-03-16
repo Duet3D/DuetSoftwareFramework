@@ -104,8 +104,32 @@ namespace DuetPluginService
                 }
             };
 
-            // Notify the service manager that we're up and running.
-            // It might take a while to process runonce.g so do it first
+            // Register installed plugins
+            foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
+            {
+                if (file.EndsWith(".json"))
+                {
+                    try
+                    {
+                        await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
+                        Plugin plugin = new();
+                        plugin.UpdateFromJson(manifestJson.RootElement, false);
+                        plugin.Pid = -1;
+                        using (await Plugins.LockAsync())
+                        {
+                            Plugins.List.Add(plugin);
+                        }
+                        _logger.Info("Plugin {0} loaded", plugin.Id);
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Error(e, "Failed to load plugin manifest {0}", Path.GetFileName(file));
+                    }
+                }
+            }
+
+            // Notify the service manager that we're up and running
             string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
             if (!string.IsNullOrEmpty(notifySocket))
             {
@@ -118,31 +142,6 @@ namespace DuetPluginService
                 catch (Exception e)
                 {
                     _logger.Warn(e, "Failed to notify systemd about process start");
-                }
-            }
-
-            // Register installed plugins
-            foreach (string file in Directory.GetFiles(Settings.PluginDirectory))
-            {
-                if (file.EndsWith(".json"))
-                {
-                    try
-                    {
-                        using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
-                        using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-                        Plugin plugin = new();
-                        plugin.UpdateFromJson(manifestJson.RootElement);
-                        plugin.Pid = -1;
-                        using (await Plugins.LockAsync())
-                        {
-                            Plugins.List.Add(plugin);
-                        }
-                        _logger.Info("Plugin {0} loaded", plugin.Id);
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.Error(e, "Failed to load plugin manifest {0}", Path.GetFileName(file));
-                    }
                 }
             }
 

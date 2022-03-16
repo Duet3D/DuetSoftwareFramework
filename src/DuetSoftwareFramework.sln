@@ -28,7 +28,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D9770827-53C5-4FBA-B4F1-2950C7C411DA}"
 	ProjectSection(SolutionItems) = preProject
 		..\README.md = ..\README.md
-		..\WHATS_NEW.md = ..\WHATS_NEW.md
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PluginManager", "PluginManager\PluginManager.csproj", "{BCC22B04-E9F6-4DD5-AA95-24F02C7AC311}"
@@ -39,7 +38,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetPiManagementPlugin", "D
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeStream", "CodeStream\CodeStream.csproj", "{7DFC5417-CFE4-4047-AF5D-A3B40DBDAB2C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocGen", "DocGen\DocGen.csproj", "{B5D19F18-CC99-4B56-8EEF-932B9884FF11}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DocGen", "DocGen\DocGen.csproj", "{B5D19F18-CC99-4B56-8EEF-932B9884FF11}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetHttpClient", "DuetHttpClient\DuetHttpClient.csproj", "{B0EC5384-D88E-44AA-8CB1-79BB92369699}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -110,6 +111,10 @@ Global
 		{B5D19F18-CC99-4B56-8EEF-932B9884FF11}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B5D19F18-CC99-4B56-8EEF-932B9884FF11}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B5D19F18-CC99-4B56-8EEF-932B9884FF11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0EC5384-D88E-44AA-8CB1-79BB92369699}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0EC5384-D88E-44AA-8CB1-79BB92369699}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0EC5384-D88E-44AA-8CB1-79BB92369699}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0EC5384-D88E-44AA-8CB1-79BB92369699}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

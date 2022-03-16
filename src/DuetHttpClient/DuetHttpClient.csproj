@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.1;net6.0</TargetFrameworks>
+    <Authors>Christian Hammacher</Authors>
+    <Company>Duet3D Ltd</Company>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+    <Version>3.4.0</Version>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Description>Official remote HTTP API client for Duet3D boards (supports standalone and SBC mode)</Description>
+    <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
+    <PackageIcon>duet_teardrop_wifi_large.png</PackageIcon>
+    <PackageIconUrl />
+    <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\pkg\common\duet_teardrop_wifi_large.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>

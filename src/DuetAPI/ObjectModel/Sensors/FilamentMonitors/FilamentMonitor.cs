@@ -43,17 +43,13 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="type">Filament monitor type</param>
         /// <returns>Required type</returns>
-        private Type GetFilamentMonitorType(FilamentMonitorType type)
+        private static Type GetFilamentMonitorType(FilamentMonitorType type) => type switch
         {
-            return type switch
-            {
-                FilamentMonitorType.Laser => typeof(LaserFilamentMonitor),
-                FilamentMonitorType.Pulsed => typeof(PulsedFilamentMonitor),
-                FilamentMonitorType.RotatingMagnet => typeof(RotatingMagnetFilamentMonitor),
-                FilamentMonitorType.Simple => typeof(SimpleFilamentMonitor),
-                _ => typeof(FilamentMonitor)
-            };
-        }
+            FilamentMonitorType.Laser => typeof(LaserFilamentMonitor),
+            FilamentMonitorType.Pulsed => typeof(PulsedFilamentMonitor),
+            FilamentMonitorType.RotatingMagnet => typeof(RotatingMagnetFilamentMonitor),
+            _ => typeof(FilamentMonitor),
+        };
 
         /// <summary>
         /// Update this instance from a given JSON element
@@ -62,7 +58,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        internal override ModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public override IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
@@ -76,7 +72,7 @@ namespace DuetAPI.ObjectModel
                 if (GetType() != requiredType)
                 {
                     FilamentMonitor newInstance = (FilamentMonitor)Activator.CreateInstance(requiredType);
-                    return newInstance.UpdateFromJson(jsonElement);
+                    return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }
             return base.UpdateFromJson(jsonElement, ignoreSbcProperties);

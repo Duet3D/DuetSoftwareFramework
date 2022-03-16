@@ -18,6 +18,16 @@ namespace DuetAPI.ObjectModel
         private bool? _atxPower;
 
         /// <summary>
+        /// Port of the ATX power pin or null if not assigned
+        /// </summary>
+        public string AtxPowerPort
+        {
+            get => _atxPowerPort;
+            set => SetPropertyValue(ref _atxPowerPort, value);
+        }
+        private string _atxPowerPort;
+
+        /// <summary>
         /// Information about a requested beep or null if none is requested
         /// </summary>
         public BeepRequest Beep
@@ -38,6 +48,19 @@ namespace DuetAPI.ObjectModel
         private int _currentTool = -1;
 
         /// <summary>
+        /// When provided it normally has value 0 normally and 1 when a deferred power down is pending
+        /// </summary>
+        /// <remarks>
+        /// It is only available after power switching has been enabled by M80 or M81
+        /// </remarks>
+        public bool? DeferredPowerDown
+        {
+            get => _deferredPowerDown;
+            set => SetPropertyValue(ref _deferredPowerDown, value);
+        }
+        private bool? _deferredPowerDown;
+
+        /// <summary>
         /// Persistent message to display (see M117)
         /// </summary>
         public string DisplayMessage
@@ -50,7 +73,8 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Version of the Duet Software Framework package
         /// </summary>
-        [LinuxProperty]
+        [Obsolete("This field will be removed in favour of a new dsf main key in v3.5")]
+        [SbcProperty(false)]
         public string DsfVersion
         {
             get => _dsfVersion;
@@ -61,7 +85,8 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if DSF allows the installation and usage of third-party plugins
         /// </summary>
-        [LinuxProperty]
+        [Obsolete("This field will be removed in favour of a new dsf main key in v3.5")]
+        [SbcProperty(false)]
         public bool DsfPluginSupport
         {
             get => _dsfPluginSupport;
@@ -72,7 +97,8 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if DSF allows the installation and usage of third-party root plugins (potentially dangerous)
         /// </summary>
-        [LinuxProperty]
+        [Obsolete("This field will be removed in favour of a new dsf main key in v3.5")]
+        [SbcProperty(false)]
         public bool DsfRootPluginSupport
         {
             get => _dsfRootPluginSupport;
@@ -94,12 +120,12 @@ namespace DuetAPI.ObjectModel
             get => _laserPwm;
             set => SetPropertyValue(ref _laserPwm, value);
         }
-        private float? _laserPwm = null;
+        private float? _laserPwm;
 
         /// <summary>
         /// Log file being written to or null if logging is disabled
         /// </summary>
-        [LinuxProperty]
+        [SbcProperty(true)]
         public string LogFile
         {
             get => _logFile;
@@ -110,7 +136,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Current log level
         /// </summary>
-        [LinuxProperty]
+        [SbcProperty(true)]
         public LogLevel LogLevel
         {
             get => _logLevel;
@@ -139,6 +165,16 @@ namespace DuetAPI.ObjectModel
         private MachineMode _machineMode = MachineMode.FFF;
 
         /// <summary>
+        /// Indicates if the current macro file was restarted after a pause
+        /// </summary>
+        public bool MacroRestarted
+        {
+            get => _macroRestarted;
+            set => SetPropertyValue(ref _macroRestarted, value);
+        }
+        private bool _macroRestarted;
+
+        /// <summary>
         /// Millisecond fraction of <see cref="UpTime"/>
         /// </summary>
         public int MsUpTime
@@ -161,6 +197,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if at least one plugin has been started
         /// </summary>
+        [SbcProperty(false)]
         public bool PluginsStarted
         {
             get => _pluginsStarted;
@@ -202,6 +239,20 @@ namespace DuetAPI.ObjectModel
 			set => SetPropertyValue(ref _status, value);
         }
         private MachineStatus _status = MachineStatus.Starting;
+
+        /// <summary>
+        /// Index of the current G-code input channel (see <see cref="ObjectModel.Inputs"/>)
+        /// </summary>
+        /// <remarks>
+        /// This is primarily intended for macro files to determine on which G-code channel it is running.
+        /// The value of this property is always null in object model queries
+        /// </remarks>
+        public int? ThisInput
+        {
+            get => _thisInput;
+            set => SetPropertyValue(ref _thisInput, value);
+        }
+        private int? _thisInput;
 
         /// <summary>
         /// Internal date and time in RepRapFirmware or null if unknown

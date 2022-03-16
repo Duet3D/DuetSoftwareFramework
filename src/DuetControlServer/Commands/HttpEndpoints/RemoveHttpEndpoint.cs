@@ -16,7 +16,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Remove a third-party HTTP endpoint
         /// </summary>
-        /// <returns>True if the endpint could be removed</returns>
+        /// <returns>True if the endpoint could be removed</returns>
         public override async Task<bool> Execute()
         {
             using (await Model.Provider.AccessReadWriteAsync())

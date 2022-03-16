@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
@@ -12,54 +11,8 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Base class for machine model properties
     /// </summary>
-    /// <remarks>
-    /// Much of this is going to be refactored in v3.4 for better performance and cleaner typing
-    /// </remarks>
-    public class ModelObject : ICloneable, INotifyPropertyChanging, INotifyPropertyChanged
+    public class ModelObject : IModelObject, INotifyPropertyChanging
     {
-        /// <summary>
-        /// Cached dictionary of derived types vs JSON property names vs property descriptors
-        /// </summary>
-        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = new();
-
-        /// <summary>
-        /// Get the cached JSON properties of this type
-        /// </summary>
-        /// <returns>Properties of this type</returns>
-        public readonly Dictionary<string, PropertyInfo> JsonProperties;
-
-        /// <summary>
-        /// Default constructor to be called from derived classes
-        /// </summary>
-        public ModelObject()
-        {
-            Type type = GetType();
-            lock (_propertyInfos)
-            {
-                if (!_propertyInfos.TryGetValue(type, out JsonProperties))
-                {
-                    JsonProperties = new Dictionary<string, PropertyInfo>();
-                    foreach (PropertyInfo property in type.GetProperties())
-                    {
-                        if (!Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
-                        {
-                            if (Attribute.IsDefined(property, typeof(JsonPropertyNameAttribute)))
-                            {
-                                JsonPropertyNameAttribute attribute = (JsonPropertyNameAttribute)Attribute.GetCustomAttribute(property, typeof(JsonPropertyNameAttribute));
-                                JsonProperties.Add(attribute.Name, property);
-                            }
-                            else
-                            {
-                                string jsonName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                                JsonProperties.Add(jsonName, property);
-                            }
-                        }
-                    }
-                    _propertyInfos.Add(type, JsonProperties);
-                }
-            }
-        }
-
         /// <summary>
         /// Event that is triggered when a property is being changed
         /// </summary>
@@ -87,10 +40,63 @@ namespace DuetAPI.ObjectModel
         }
 
         /// <summary>
-        /// Method to assign the value of one type to another
+        /// Cached dictionary of derived types vs JSON property names vs property descriptors
         /// </summary>
-        /// <param name="from">Other object</param>
-        public void Assign(ModelObject from)
+        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
+
+        /// <summary>
+        /// Static constructor that caches the JSON properties of each derived type
+        /// </summary>
+        static ModelObject()
+        {
+            Type[] assemblyTypes = Assembly.GetExecutingAssembly().GetTypes();
+            foreach (Type type in assemblyTypes)
+            {
+                if (!type.IsGenericType && type.IsSubclassOf(typeof(ModelObject)))
+                {
+                    RegisterJsonType(type);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Function to add custom JSON types. This must be invoked from types with generic type arguments
+        /// </summary>
+        /// <param name="type">Type to register</param>
+        static protected void RegisterJsonType(Type type)
+        {
+            Dictionary<string, PropertyInfo> jsonProperties = new Dictionary<string, PropertyInfo>();
+            foreach (PropertyInfo property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
+                {
+                    if (Attribute.IsDefined(property, typeof(JsonPropertyNameAttribute)))
+                    {
+                        JsonPropertyNameAttribute attribute = (JsonPropertyNameAttribute)Attribute.GetCustomAttribute(property, typeof(JsonPropertyNameAttribute));
+                        jsonProperties.Add(attribute.Name, property);
+                    }
+                    else
+                    {
+                        string jsonName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
+                        jsonProperties.Add(jsonName, property);
+                    }
+                }
+            }
+            _propertyInfos.Add(type, jsonProperties);
+        }
+
+        /// <summary>
+        /// Get the cached JSON properties of this type
+        /// </summary>
+        /// <returns>Properties of this type</returns>
+        [JsonIgnore]
+        public Dictionary<string, PropertyInfo> JsonProperties => _propertyInfos[GetType()];
+
+        /// <summary>
+        /// Assign the properties from another instance
+        /// </summary>
+        /// <param name="from">Other instance</param>
+        public void Assign(object from)
         {
             // Assigning null values is not supported
             if (from == null)
@@ -106,52 +112,25 @@ namespace DuetAPI.ObjectModel
             }
 
             // Assign property values
-            foreach (PropertyInfo property in GetType().GetProperties())
+            IEnumerable<PropertyInfo> properties = _propertyInfos[myType].Values;
+            foreach (PropertyInfo property in properties)
             {
-                if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
+                if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                 {
-                    ModelObject oldValue = (ModelObject)property.GetValue(this);
-                    ModelObject newValue = (ModelObject)property.GetValue(from);
-                    if (oldValue == null || newValue == null)
+                    IModelObject myValue = (IModelObject)property.GetValue(this);
+                    IModelObject otherValue = (IModelObject)property.GetValue(from);
+                    if (property.SetMethod != null)
                     {
-                        property.SetValue(this, newValue);
+                        property.SetValue(this, otherValue?.Clone());
                     }
-                    else if (oldValue.GetType() != newValue.GetType())
+                    else if (myValue != null && otherValue != null)
                     {
-                        property.SetValue(this, newValue.Clone());
-                    }
-                    else
-                    {
-                        oldValue.Assign(newValue);
+                        myValue.Assign(otherValue);
                     }
                 }
-                else if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
+                else if (property.SetMethod != null)
                 {
-                    IList oldModelCollection = (IList)property.GetValue(this);
-                    IList newModelCollection = (IList)property.GetValue(from);
-                    if (ModelGrowingCollection.TypeMatches(property.PropertyType))
-                    {
-                        ModelGrowingCollectionHelper.Assign(oldModelCollection, newModelCollection);
-                    }
-                    else
-                    {
-                        ModelCollectionHelper.Assign(oldModelCollection, itemType, newModelCollection);
-                    }
-                }
-                else if (property.PropertyType == typeof(ModelJsonDictionary))
-                {
-                    ModelJsonDictionary oldValue = (ModelJsonDictionary)property.GetValue(this);
-                    ModelJsonDictionary newValue = (ModelJsonDictionary)property.GetValue(from);
-                    oldValue.Clear();
-                    foreach (var kv in oldValue)
-                    {
-                        oldValue.Add(kv.Key, kv.Value);
-                    }
-                }
-                else
-                {
-                    object newValue = property.GetValue(from);
-                    property.SetValue(this, newValue);
+                    property.SetValue(this, property.GetValue(from));
                 }
             }
         }
@@ -167,68 +146,120 @@ namespace DuetAPI.ObjectModel
             ModelObject clone = (ModelObject)Activator.CreateInstance(myType);
 
             // Assign cloned property values
-            foreach (PropertyInfo property in GetType().GetProperties())
+            IEnumerable<PropertyInfo> properties = _propertyInfos[myType].Values;
+            foreach (PropertyInfo property in properties)
             {
-                if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
+                if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                 {
-                    ModelObject value = (ModelObject)property.GetValue(this);
-                    ModelObject cloneValue = (ModelObject)property.GetValue(clone);
-                    if (value == null || cloneValue == null)
+                    IModelObject myValue = (IModelObject)property.GetValue(this);
+                    if (property.SetMethod != null)
                     {
-                        property.SetValue(clone, value);
-                    }
-                    else if (value.GetType() != cloneValue.GetType())
-                    {
-                        property.SetValue(clone, value.Clone());
+                        property.SetValue(clone, myValue?.Clone());
                     }
                     else
                     {
-                        cloneValue.Assign(value);
+                        IModelObject clonedValue = (IModelObject)property.GetValue(clone);
+                        if (myValue != null && clonedValue != null)
+                        {
+                            clonedValue.Assign(myValue);
+                        }
                     }
                 }
-                else if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
+                else if (property.SetMethod != null)
                 {
-                    IList collection = (IList)property.GetValue(this);
-                    IList clonedCollection = (IList)property.GetValue(clone);
-                    if (ModelGrowingCollection.TypeMatches(property.PropertyType))
+                    if (typeof(ICloneable).IsAssignableFrom(property.PropertyType))
                     {
-                        ModelGrowingCollectionHelper.Assign(clonedCollection, collection);
+                        ICloneable myValue = (ICloneable)property.GetValue(this);
+                        property.SetValue(clone, myValue?.Clone());
                     }
                     else
                     {
-                        ModelCollectionHelper.Assign(clonedCollection, itemType, collection);
+                        property.SetValue(clone, property.GetValue(this));
                     }
-                }
-                else if (property.PropertyType == typeof(ModelJsonDictionary))
-                {
-                    ModelJsonDictionary dictionary = (ModelJsonDictionary)property.GetValue(this);
-                    ModelJsonDictionary clonedDictionary = (ModelJsonDictionary)property.GetValue(clone);
-                    foreach (var kv in dictionary)
-                    {
-                        clonedDictionary.Add(kv.Key, kv.Value);
-                    }
-                }
-                else if (property.PropertyType.IsAssignableFrom(typeof(ICloneable)))
-                {
-                    ICloneable value = (ICloneable)property.GetValue(this);
-                    property.SetValue(clone, value?.Clone());
-                }
-                else
-                {
-                    object value = property.GetValue(this);
-                    property.SetValue(clone, value);
                 }
             }
-
             return clone;
         }
 
         /// <summary>
-        /// Update this instance from a given JSON element
+        /// Create a dictionary or list of all the differences between this instance and another.
+        /// This method outputs own property values that differ from the other instance
         /// </summary>
-        /// <param name="jsonElement">Element to update this intance from</param>
-        /// <returns>Updated instance</returns>
-        public ModelObject UpdateFromJson(JsonElement jsonElement) => UpdateFromJson(jsonElement, false);
+        /// <param name="other">Other instance</param>
+        /// <returns>Object differences or null if both instances are equal</returns>
+        public object FindDifferences(IModelObject other)
+        {
+            // Check the types
+            Type myType = GetType(), otherType = other?.GetType();
+            if (myType != otherType)
+            {
+                // Types differ, return the entire instance
+                return this;
+            }
+
+            // Look for differences
+            Dictionary<string, object> diffs = null;
+            var properties = _propertyInfos[myType];
+            foreach (var jsonProperty in properties)
+            {
+                object myValue = jsonProperty.Value.GetValue(this);
+                object otherValue = jsonProperty.Value.GetValue(other);
+                if (otherValue == null || myValue == null || otherValue.GetType() != myValue.GetType())
+                {
+                    if (otherValue != myValue)
+                    {
+                        if (diffs == null)
+                        {
+                            diffs = new Dictionary<string, object>();
+                        }
+                        diffs.Add(jsonProperty.Key, myValue);
+                    }
+                }
+                else if (typeof(IModelObject).IsAssignableFrom(jsonProperty.Value.PropertyType))
+                {
+                    object diff = ((IModelObject)myValue).FindDifferences((IModelObject)otherValue);
+                    if (diff != null)
+                    {
+                        if (diffs == null)
+                        {
+                            diffs = new Dictionary<string, object>();
+                        }
+                        diffs.Add(jsonProperty.Key, diff);
+                    }
+                }
+                else if (!myValue.Equals(otherValue))
+                {
+                    if (diffs == null)
+                    {
+                        diffs = new Dictionary<string, object>();
+                    }
+                    diffs.Add(jsonProperty.Key, myValue);
+                }
+            }
+            return diffs;
+        }
+
+        /// <summary>
+        /// Create a UTF8-encoded JSON patch to bring an old instance to this state
+        /// </summary>
+        /// <param name="old">Old object state</param>
+        /// <returns>JSON patch</returns>
+        public byte[] MakeUtf8Patch(ModelObject old)
+        {
+            object diffs = FindDifferences(old);
+            return JsonSerializer.SerializeToUtf8Bytes(diffs, Utility.JsonHelper.DefaultJsonOptions);
+        }
+
+        /// <summary>
+        /// Create a string-encoded JSON patch to bring an old instance to this state
+        /// </summary>
+        /// <param name="old">Old object state</param>
+        /// <returns>JSON patch</returns>
+        public string MakeStringPatch(ModelObject old)
+        {
+            object diffs = FindDifferences(old);
+            return JsonSerializer.Serialize(diffs, Utility.JsonHelper.DefaultJsonOptions);
+        }
 
         /// <summary>
         /// Update this instance from a given JSON element
@@ -237,44 +268,50 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        internal virtual ModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public virtual IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
+            Dictionary<string, PropertyInfo> properties = JsonProperties;
             foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
             {
-                if (JsonProperties.TryGetValue(jsonProperty.Name, out PropertyInfo property))
+                if (properties.TryGetValue(jsonProperty.Name, out PropertyInfo property))
                 {
-                    if (ignoreSbcProperties && Attribute.IsDefined(property, typeof(LinuxPropertyAttribute)))
+                    if (ignoreSbcProperties && Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                     {
                         // Skip this field if it must not be updated
                         continue;
                     }
 
-                    if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
+                    if (jsonProperty.Value.ValueKind == JsonValueKind.Null)
                     {
-                        ModelObject modelObject = (ModelObject)property.GetValue(this);
-                        if (jsonProperty.Value.ValueKind == JsonValueKind.Null)
+                        if (property.SetMethod != null)
                         {
-                            if (modelObject != null)
-                            {
-                                if (property.SetMethod != null)
-                                {
-                                    property.SetValue(this, null);
-                                }
-#if VERIFY_OBJECT_MODEL
-                                else
-                                {
-                                    Console.WriteLine("[warn] Tried to set unsettable property {0} to null", jsonProperty.Name);
-                                }
-#endif
-                            }
+                            property.SetValue(this, null);
                         }
-                        else if (modelObject == null)
+                        else if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                         {
-                            modelObject = (ModelObject)Activator.CreateInstance(property.PropertyType);
-                            modelObject = modelObject.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                            IModelObject propertyValue = (IModelObject)property.GetValue(this);
+                            propertyValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                        }
+#if VERIFY_OBJECT_MODEL
+                        else
+                        {
+                            Console.WriteLine("[warn] Tried to set unsettable property {0} to null", jsonProperty.Name);
+                        }
+#endif
+                    }
+                    else if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
+                    {
+                        object propertyValue = property.GetValue(this), newPropertyValue = propertyValue;
+                        if (propertyValue == null)
+                        {
+                            newPropertyValue = Activator.CreateInstance(property.PropertyType);
+                        }
+                        newPropertyValue = (newPropertyValue as IModelObject).UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                        if (propertyValue != newPropertyValue)
+                        {
                             if (property.SetMethod != null)
                             {
-                                property.SetValue(this, modelObject);
+                                property.SetValue(this, newPropertyValue);
                             }
 #if VERIFY_OBJECT_MODEL
                             else
@@ -282,73 +319,16 @@ namespace DuetAPI.ObjectModel
                                 Console.WriteLine("[warn] Tried to assign unsettable property {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
                             }
 #endif
-                        }
-                        else
-                        {
-                            ModelObject updatedInstance = modelObject.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
-                            if (updatedInstance != modelObject)
-                            {
-                                if (property.SetMethod != null)
-                                {
-                                    property.SetValue(this, updatedInstance);
-                                }
-#if VERIFY_OBJECT_MODEL
-                                else
-                                {
-                                    Console.WriteLine("[warn] Tried to assign unsettable property {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
-                                }
-#endif
-                            }
-                        }
-                    }
-                    else if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
-                    {
-                        IList modelCollection = (IList)property.GetValue(this);
-                        if (ModelGrowingCollection.TypeMatches(property.PropertyType))
-                        {
-                            ModelGrowingCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonProperty.Value, ignoreSbcProperties);
-                        }
-                        else
-                        {
-                            ModelCollectionHelper.UpdateFromJson(modelCollection, itemType, jsonProperty.Value, ignoreSbcProperties);
-                        }
-                    }
-                    else if (property.PropertyType == typeof(ModelJsonDictionary))
-                    {
-                        ModelJsonDictionary value = (ModelJsonDictionary)property.GetValue(this);
-                        value.UpdateFromJson(jsonProperty.Value);
-                    }
-                    else if (property.PropertyType == typeof(bool) && jsonProperty.Value.ValueKind == JsonValueKind.Number)
-                    {
-                        try
-                        {
-                            if (property.SetMethod != null)
-                            {
-                                property.SetValue(this, Convert.ToBoolean(jsonProperty.Value.GetInt32()));
-#if VERIFY_OBJECT_MODEL
-                                Console.WriteLine("[warn] Updating bool value from number {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
-#endif
-                            }
-#if VERIFY_OBJECT_MODEL
-                            else
-                            {
-                                Console.WriteLine("[warn] Tried to assign unsettable property {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
-                            }
-#endif
-                        }
-                        catch (FormatException e)
-                        {
-                            throw new JsonException($"Failed to deserialize property [{GetType().Name}].{property.Name} (type bool) from JSON {jsonProperty.Value.GetRawText()}", e);
                         }
                     }
                     else
                     {
                         try
                         {
-                            object newValue = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), property.PropertyType);
+                            object deserializedValue = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), property.PropertyType);
                             if (property.SetMethod != null)
                             {
-                                property.SetValue(this, newValue);
+                                property.SetValue(this, deserializedValue);
 
                             }
 #if VERIFY_OBJECT_MODEL
@@ -372,101 +352,6 @@ namespace DuetAPI.ObjectModel
 #endif
             }
             return this;
-        }
-
-        /// <summary>
-        /// Create a UTF8-encoded JSON patch to bring an old instance to this state
-        /// </summary>
-        /// <param name="old">Old object state</param>
-        /// <returns>JSON patch</returns>
-        public byte[] MakeUtf8Patch(ModelObject old)
-        {
-            object diffs = MakePatch(old);
-            return JsonSerializer.SerializeToUtf8Bytes(diffs, Utility.JsonHelper.DefaultJsonOptions);
-        }
-
-        /// <summary>
-        /// Create a string-encoded JSON patch to bring an old instance to this state
-        /// </summary>
-        /// <param name="old">Old object state</param>
-        /// <returns>JSON patch</returns>
-        public string MakeStringPatch(ModelObject old)
-        {
-            object diffs = MakePatch(old);
-            return JsonSerializer.Serialize(diffs, Utility.JsonHelper.DefaultJsonOptions);
-        }
-
-        /// <summary>
-        /// Create a patch to update an old instance to this state
-        /// </summary>
-        /// <param name="old">Old object state</param>
-        /// <returns>Differences between this and other or null if they are equal</returns>
-        internal object MakePatch(ModelObject old)
-        {
-            // Need a valid other instance
-            if (old == null)
-            {
-                throw new ArgumentNullException(nameof(old));
-            }
-
-            // Check the types
-            Type myType = GetType(), otherType = GetType();
-            if (myType != otherType)
-            {
-                // Types differ. Serialize every property of the other instance
-                return old;
-            }
-
-            // Look for differences
-            Dictionary<string, object> diffs = null;
-            foreach (KeyValuePair<string, PropertyInfo> jsonProperty in JsonProperties)
-            {
-                object oldValue = jsonProperty.Value.GetValue(old), newValue = jsonProperty.Value.GetValue(this);
-                if (oldValue == null || newValue == null || oldValue.GetType() != newValue.GetType())
-                {
-                    if (oldValue != newValue)
-                    {
-                        if (diffs == null)
-                        {
-                            diffs = new Dictionary<string, object>();
-                        }
-                        diffs.Add(jsonProperty.Key, newValue);
-                    }
-                }
-                else if (jsonProperty.Value.PropertyType.IsSubclassOf(typeof(ModelObject)))
-                {
-                    object diff = ((ModelObject)newValue).MakePatch((ModelObject)oldValue);
-                    if (diff != null)
-                    {
-                        if (diffs == null)
-                        {
-                            diffs = new Dictionary<string, object>();
-                        }
-                        diffs.Add(jsonProperty.Key, diff);
-                    }
-                }
-                else if (ModelCollection.GetItemType(jsonProperty.Value.PropertyType, out Type itemType))
-                {
-                    object listDiff = ModelCollectionHelper.FindDiffs((IList)oldValue, (IList)newValue, itemType);
-                    if (listDiff != null)
-                    {
-                        if (diffs == null)
-                        {
-                            diffs = new Dictionary<string, object>();
-                        }
-                        diffs.Add(jsonProperty.Key, listDiff);
-                    }
-                }
-                else if (!newValue.Equals(oldValue))
-                {
-                    if (diffs == null)
-                    {
-                        diffs = new Dictionary<string, object>();
-                    }
-                    diffs.Add(jsonProperty.Key, newValue);
-                }
-            }
-            return diffs;
         }
     }
 }

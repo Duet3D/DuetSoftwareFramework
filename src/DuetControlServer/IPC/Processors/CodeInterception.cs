@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
+using DuetAPI.ObjectModel;
 using Nito.AsyncEx;
 using Code = DuetControlServer.Commands.Code;
 
@@ -142,13 +144,11 @@ namespace DuetControlServer.IPC.Processors
                             await Connection.Send<DuetAPI.Commands.Code>(_codeBeingIntercepted);
 
                             // Keep processing incoming commands until a final action for the code has been received
-                            BaseCommand command;
-                            Type commandType;
                             do
                             {
                                 // Read another command from the IPC connection
-                                command = await Connection.ReceiveCommand();
-                                commandType = command.GetType();
+                                BaseCommand command = await Connection.ReceiveCommand();
+                                Type commandType = command.GetType();
                                 if (Command.SupportedCommands.Contains(commandType))
                                 {
                                     // Make sure it is permitted
@@ -175,12 +175,6 @@ namespace DuetControlServer.IPC.Processors
                                 }
                             }
                             while (!Program.CancellationToken.IsCancellationRequested);
-
-                            // Stop if the connection has been terminated
-                            if (command == null)
-                            {
-                                break;
-                            }
                         }
                         catch (SocketException)
                         {
@@ -231,7 +225,7 @@ namespace DuetControlServer.IPC.Processors
                     }
 
                     int asteriskIndex = filter.IndexOf('*');
-                    if (asteriskIndex >= 0 && filter.Substring(0, asteriskIndex).Equals(shortCodeString.Substring(0, asteriskIndex), StringComparison.InvariantCultureIgnoreCase))
+                    if (asteriskIndex >= 0 && filter[..asteriskIndex].Equals(shortCodeString[..asteriskIndex], StringComparison.InvariantCultureIgnoreCase))
                     {
                         return true;
                     }
@@ -252,12 +246,12 @@ namespace DuetControlServer.IPC.Processors
         {
             using (await _codeMonitor.EnterAsync(Program.CancellationToken))
             {
-                // Send it to the IPC client
+                // Send it to the IPC client and wait for a result
                 _codeBeingIntercepted = code;
                 _codeMonitor.Pulse();
-
-                // Wait for a code result to be set by the interceptor
                 await _codeMonitor.WaitAsync(Program.CancellationToken);
+                //_codeBeingIntercepted = null;     // TODO check this when the code pipeline is reworked; with this line something goes wrong in the interceptors
+
                 try
                 {
                     // Code is cancelled. This invokes an OperationCanceledException on the code's task.
@@ -269,13 +263,13 @@ namespace DuetControlServer.IPC.Processors
                     // Code is resolved with a given result and the request is acknowledged
                     if (_interceptionResult is Resolve resolveCommand)
                     {
-                        code.Result = (resolveCommand.Content == null) ? new CodeResult() : new CodeResult(resolveCommand.Type, resolveCommand.Content);
+                        code.Result = new Message(resolveCommand.Type, resolveCommand.Content);
                         return true;
                     }
 
                     // Code is ignored. Don't do anything
                 }
-                catch (Exception e) when (!(e is OperationCanceledException))
+                catch (Exception e) when (e is not OperationCanceledException)
                 {
                     Connection.Logger.Error(e, "Interception processor caught an exception");
                 }
@@ -377,6 +371,27 @@ namespace DuetControlServer.IPC.Processors
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// Print diagnostics
+        /// </summary>
+        /// <param name="builder">String builder to write to</param>
+        public static void Diagnostics(StringBuilder builder)
+        {
+            foreach (List<CodeInterception> processorList in _connections.Values)
+            {
+                lock (processorList)
+                {
+                    foreach (CodeInterception processor in processorList)
+                    {
+                        if (processor._codeBeingIntercepted is { IsExecuted: false })
+                        {
+                            builder.AppendLine($"IPC connection #{processor.Connection.Id} is intercepting {processor._codeBeingIntercepted} ({processor._mode})");
+                        }
+                    }
+                }
+            }
         }
     }
 }

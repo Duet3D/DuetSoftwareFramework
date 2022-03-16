@@ -6,16 +6,6 @@
     public sealed class UserSession : ModelObject
     {
         /// <summary>
-        /// Identifier of this session
-        /// </summary>
-        public int Id
-        {
-            get => _id;
-			set => SetPropertyValue(ref _id, value);
-        }
-        private int _id;
-
-        /// <summary>
         /// Access level of this session
         /// </summary>
         public AccessLevel AccessLevel
@@ -26,14 +16,14 @@
         private AccessLevel _accessLevel;
 
         /// <summary>
-        /// Type of this sessionSessionAccessLevel
+        /// Identifier of this session
         /// </summary>
-        public SessionType SessionType
+        public int Id
         {
-            get => _sessionType;
-			set => SetPropertyValue(ref _sessionType, value);
+            get => _id;
+			set => SetPropertyValue(ref _id, value);
         }
-        private SessionType _sessionType;
+        private int _id;
 
         /// <summary>
         /// Origin of this session. For remote sessions, this equals the remote IP address
@@ -55,5 +45,15 @@
 			set => SetPropertyValue(ref _originId, value);
         }
         private int _originId = -1;
+
+        /// <summary>
+        /// Type of this session
+        /// </summary>
+        public SessionType SessionType
+        {
+            get => _sessionType;
+			set => SetPropertyValue(ref _sessionType, value);
+        }
+        private SessionType _sessionType = SessionType.Local;
     }
 }

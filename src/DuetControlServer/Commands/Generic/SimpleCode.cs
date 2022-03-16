@@ -42,7 +42,7 @@ namespace DuetControlServer.Commands
         /// <returns>Parsed G/M/T-codes</returns>
         public async IAsyncEnumerable<Code> ParseAsync()
         {
-            using MemoryStream stream = new(Encoding.UTF8.GetBytes(Code));
+            await using MemoryStream stream = new(Encoding.UTF8.GetBytes(Code));
             using StreamReader reader = new(stream);
             CodeParserBuffer buffer = new((int)stream.Length, Code.Contains('\n'));
 
@@ -52,7 +52,7 @@ namespace DuetControlServer.Commands
                 {
                     Channel = Channel,
                     Connection = Connection,
-                    SourceConnection = (Connection != null) ? Connection.Id : 0
+                    SourceConnection = Connection?.Id ?? 0
                 };
 
                 if (await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer))
@@ -84,6 +84,12 @@ namespace DuetControlServer.Commands
             {
                 await foreach (Code code in ParseAsync())
                 {
+                    // Check for async execution
+                    if (ExecuteAsynchronously)
+                    {
+                        code.Flags |= CodeFlags.Asynchronous;
+                    }
+
                     // M108, M112, M122, and M999 (B0) always go to an idle channel so we (hopefully) get a low-latency response
                     if (code.Type == CodeType.MCode &&
                         (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || (code.MajorNumber == 999 && code.Parameter('B', 0) == 0)))
@@ -106,21 +112,21 @@ namespace DuetControlServer.Commands
             catch (CodeParserException e)
             {
                 // Report parsing errors as an error message
-                return (new CodeResult(MessageType.Error, e.Message)).ToString();
+                return (new Message(MessageType.Error, e.Message)).ToString();
             }
 
-            CodeResult result = new();
+            Message result = new();
             try
             {
                 // Execute priority codes first
                 foreach (Code priorityCode in priorityCodes)
                 {
-                    CodeResult codeResult = await priorityCode.Execute();
+                    Message codeResult = await priorityCode.Execute();
                     try
                     {
-                        if (codeResult != null)
+                        if (codeResult != null && !string.IsNullOrEmpty(codeResult.Content))
                         {
-                            result.AddRange(codeResult);
+                            result.AppendLine(codeResult.ToString());
                         }
                     }
                     catch (OperationCanceledException)
@@ -132,7 +138,7 @@ namespace DuetControlServer.Commands
                 // Execute normal codes next. Use a lock here because multiple codes may be queued for the same channel
                 if (codes.Count > 0)
                 {
-                    Task<CodeResult>[] codeTasks = new Task<CodeResult>[codes.Count];
+                    Task<Message>[] codeTasks = new Task<Message>[codes.Count];
                     using (await _channelLocks[(int)Channel].LockAsync(Program.CancellationToken))
                     {
                         for (int i = 0; i < codes.Count; i++)
@@ -141,14 +147,14 @@ namespace DuetControlServer.Commands
                         }
                     }
 
-                    foreach (Task<CodeResult> codeTask in codeTasks)
+                    foreach (Task<Message> codeTask in codeTasks)
                     {
                         try
                         {
-                            CodeResult codeResult = await codeTask;
+                            Message codeResult = await codeTask;
                             if (codeResult != null)
                             {
-                                result.AddRange(codeResult);
+                                result.Append(codeResult);
                             }
                         }
                         catch (OperationCanceledException)
@@ -160,7 +166,7 @@ namespace DuetControlServer.Commands
             }
             catch (CodeParserException cpe)
             {
-                result.Add(MessageType.Error, cpe.Message);
+                result.Append(MessageType.Error, cpe.Message);
             }
             return result.ToString();
         }

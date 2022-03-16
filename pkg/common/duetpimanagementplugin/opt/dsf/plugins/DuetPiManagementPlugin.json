@@ -1,0 +1,18 @@
+{
+  "id": "DuetPiManagementPlugin",
+  "name": "DuetPi Management Plugin",
+  "author": "Duet3D Ltd",
+  "version": "DMPVER",
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://github.com/Duet3D/DSF-Plugins",
+  "sbcRequired": true,
+  "sbcDsfVersion": "DCSVER",
+  "sbcExecutable": "DuetPiManagementPlugin",
+  "sbcExtraExecutables": [
+    "gen-https-cert.sh"
+  ],
+  "sbcOutputRedirected": false,
+  "sbcPermissions": [
+    "superUser"
+  ]
+}

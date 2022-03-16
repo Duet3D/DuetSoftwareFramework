@@ -1,5 +1,4 @@
-﻿using DuetAPI.Commands;
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
@@ -47,6 +46,11 @@ namespace DuetControlServer.Model
         private static readonly ConcurrentDictionary<string, int> _lastSeqs = new();
 
         /// <summary>
+        /// Last invalid JSON response. This should always be null
+        /// </summary>
+        private static string _lastInvalidJsonResponse;
+
+        /// <summary>
         /// Wait for the model to be fully updated from RepRapFirmware
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
@@ -83,16 +87,16 @@ namespace DuetControlServer.Model
         /// Process a config response (no longer supported or encouraged; for backwards-compatibility)
         /// </summary>
         /// <param name="response">Legacy config response</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task ProcessLegacyConfigResponse(byte[] response)
+        public static void ProcessLegacyConfigResponse(byte[] response)
         {
             using JsonDocument jsonDocument = JsonDocument.Parse(response);
-            using (await _lock.LockAsync(Program.CancellationToken))
+            using (_lock.Lock(Program.CancellationToken))
             {
                 if (jsonDocument.RootElement.TryGetProperty("boardName", out JsonElement boardName))
                 {
-                    using (await Provider.AccessReadWriteAsync())
+                    using (Provider.AccessReadWrite())
                     {
+                        Provider.Get.Boards.Clear();
                         Provider.Get.Boards.Add(new Board
                         {
                             IapFileNameSBC = $"Duet3_SBCiap_{boardName.GetString()}.bin",
@@ -104,15 +108,16 @@ namespace DuetControlServer.Model
                 else
                 {
                     // boardName field is not present - this must be a really old firmware version
-                    using (await Provider.AccessReadWriteAsync())
+                    using (Provider.AccessReadWrite())
                     {
+                        Provider.Get.Boards.Clear();
                         Provider.Get.Boards.Add(new Board
                         {
-                            IapFileNameSBC = $"Duet3_SDiap_MB6HC.bin",
+                            IapFileNameSBC = "Duet3_SBCiap_MB6HC.bin",
                             FirmwareFileName = "Duet3Firmware_MB6HC.bin"
                         });
                     }
-                    _logger.Warn("Deprecated firmware detected, assuming legacy firmware files. You may have to use bossa to update it");
+                    _logger.Warn("Deprecated firmware detected, assuming legacy firmware files for MB6HC. You may have to use bossa to update it");
                 }
 
                 // Cannot perform any further updates...
@@ -123,7 +128,7 @@ namespace DuetControlServer.Model
                 if (Settings.UpdateOnly && !_updatingFirmware)
                 {
                     _updatingFirmware = true;
-                    _ = Task.Run(UpdateFirmware);
+                    _ = Task.Run(Utility.Firmware.UpdateFirmware);
                 }
             }
         }
@@ -161,7 +166,7 @@ namespace DuetControlServer.Model
                             {
                                 using (await Provider.AccessReadWriteAsync())
                                 {
-                                    Provider.Get.UpdateFromFirmwareModel("limits", limitsResult);
+                                    Provider.Get.UpdateFromFirmwareJson("limits", limitsResult);
                                     _logger.Debug("Updated key limits");
                                 }
                             }
@@ -181,7 +186,7 @@ namespace DuetControlServer.Model
                         // Update frequently changing properties
                         using (await Provider.AccessReadWriteAsync())
                         {
-                            Provider.Get.UpdateFromFirmwareModel(string.Empty, statusResult);
+                            Provider.Get.UpdateFromFirmwareJson(string.Empty, statusResult);
                             if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
                             {
                                 Provider.Get.State.Status = MachineStatus.Updating;
@@ -192,7 +197,7 @@ namespace DuetControlServer.Model
                         // Update object model keys depending on the sequence numbers
                         foreach (JsonProperty seqProperty in statusResult.GetProperty("seqs").EnumerateObject())
                         {
-                            if (seqProperty.Name != "reply" && (!Settings.UpdateOnly || seqProperty.Name == "boards" || seqProperty.Name == "directories") &&
+                            if (seqProperty.Name != "reply" && (!Settings.UpdateOnly || seqProperty.Name == "boards" || seqProperty.Name == "directories" || seqProperty.Name == "state") &&
                                 seqProperty.Value.ValueKind == JsonValueKind.Number)
                             {
                                 int newSeq = seqProperty.Value.GetInt32();
@@ -200,13 +205,13 @@ namespace DuetControlServer.Model
                                 {
                                     _logger.Debug("Requesting update of key {0}, seq {1} -> {2}", seqProperty.Name, lastSeq, newSeq);
 
-                                    int next = 0, offset = 0;
+                                    int next = 0;
                                     do
                                     {
                                         // Request the next model chunk
                                         jsonData = await SPI.Interface.RequestObjectModel(seqProperty.Name, (next == 0) ? "d99vn" : $"d99vna{next}");
                                         using JsonDocument keyDocument = JsonDocument.Parse(jsonData);
-                                        offset = next;
+                                        int offset = next;
                                         next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
 
                                         if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
@@ -215,7 +220,7 @@ namespace DuetControlServer.Model
                                             _lastSeqs[seqProperty.Name] = newSeq;
                                             using (await Provider.AccessReadWriteAsync())
                                             {
-                                                if (Provider.Get.UpdateFromFirmwareModel(keyName.GetString(), keyResult, offset, next == 0))
+                                                if (Provider.Get.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
                                                 {
                                                     _logger.Debug("Updated key {0}{1}", keyName.GetString(), (offset + next != 0) ? $" starting from {offset}, next {next}" : string.Empty);
                                                     if (_logger.IsTraceEnabled)
@@ -240,9 +245,6 @@ namespace DuetControlServer.Model
                                             _logger.Warn("Received invalid object model key response without key and/or result field(s)");
                                             break;
                                         }
-
-                                        // Check the index of the next element
-                                        offset = next;
                                     }
                                     while (next != 0);
                                 }
@@ -256,7 +258,7 @@ namespace DuetControlServer.Model
                         if (Settings.UpdateOnly && !_updatingFirmware)
                         {
                             _updatingFirmware = true;
-                            _ = Task.Run(UpdateFirmware);
+                            _ = Task.Run(Utility.Firmware.UpdateFirmware);
                         }
                     }
                     else
@@ -270,7 +272,12 @@ namespace DuetControlServer.Model
                 }
                 catch (JsonException e)
                 {
-                    _logger.Error(e, "Failed to merge JSON: {0}", Encoding.UTF8.GetString(jsonData));
+                    string jsonResponse = Encoding.UTF8.GetString(jsonData);
+                    _logger.Error(e, "Failed to merge JSON: {0}", jsonResponse);
+                    using (await _lock.LockAsync(Program.CancellationToken))
+                    {
+                        _lastInvalidJsonResponse = jsonResponse;
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -287,31 +294,6 @@ namespace DuetControlServer.Model
         /// Indicates if the firmware is being updated
         /// </summary>
         private static bool _updatingFirmware;
-
-        /// <summary>
-        /// Update the firmware internally
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static async Task UpdateFirmware()
-        {
-            Console.Write("Updating firmware... ");
-            try
-            {
-                Commands.Code updateCode = new()
-                {
-                    Channel = DuetAPI.CodeChannel.Trigger,
-                    Type = CodeType.MCode,
-                    MajorNumber = 997
-                };
-                await updateCode.Execute();
-                Console.WriteLine("Done!");
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("Error: {0}", e.Message);
-                _logger.Debug(e);
-            }
-        }
 
         /// <summary>
         /// Number of the last layer
@@ -370,10 +352,10 @@ namespace DuetControlServer.Model
                 return;
             }
 
-            int numChangedLayers = Math.Abs(Provider.Get.Job.Layer.Value - _lastLayer);
-            if (numChangedLayers > 0 && Provider.Get.Job.Layer.Value > 0 && _lastLayer > 0)
+            if (Provider.Get.Job.Layer.Value > 0 && Provider.Get.Job.Layer.Value != _lastLayer)
             {
-                // Compute average stats per changed layer
+                // Compute layer usage stats first
+                int numChangedLayers = (Provider.Get.Job.Layer.Value > _lastLayer) ? Math.Abs(Provider.Get.Job.Layer.Value - _lastLayer) : 1;
                 int printDuration = Provider.Get.Job.Duration.Value - (Provider.Get.Job.WarmUpDuration != null ? Provider.Get.Job.WarmUpDuration.Value : 0);
                 float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
                 List<float> totalFilamentUsage = new(), avgFilamentUsage = new();
@@ -388,49 +370,81 @@ namespace DuetControlServer.Model
                         avgFilamentUsage.Add((Provider.Get.Move.Extruders[i].RawPosition - lastFilamentUsage) / numChangedLayers);
                     }
                 }
+
+                // Get layer height
                 float currentHeight = 0F;
                 foreach (Axis axis in Provider.Get.Move.Axes)
                 {
-                    if (axis != null && axis.Letter == 'Z' && axis.UserPosition != null)
+                    if (axis is { Letter: 'Z', UserPosition: {} })
                     {
                         currentHeight = axis.UserPosition.Value;
                         break;
                     }
                 }
-                float avgHeight = Math.Abs(currentHeight - _lastHeight) / numChangedLayers;
+                float avgLayerHeight = Math.Abs(currentHeight - _lastHeight) / Math.Abs(Provider.Get.Job.Layer.Value - _lastLayer);
 
-                // Add missing layers
-                for (int i = Provider.Get.Job.Layers.Count; i < Provider.Get.Job.Layer.Value - 1; i++)
+                if (Provider.Get.Job.Layer > _lastLayer)
                 {
-                    Layer newLayer = new();
-                    foreach (AnalogSensor sensor in Provider.Get.Sensors.Analog)
+                    // Add new layers
+                    for (int i = Provider.Get.Job.Layers.Count; i < Provider.Get.Job.Layer.Value - 1; i++)
                     {
-                        if (sensor != null)
+                        Layer newLayer = new()
                         {
-                            newLayer.Temperatures.Add(sensor.LastReading);
+                            Duration = avgLayerDuration
+                        };
+                        foreach (float filamentUsage in avgFilamentUsage)
+                        {
+                            newLayer.Filament.Add(filamentUsage);
                         }
-                    }
-                    newLayer.Height = avgHeight;
-                    Provider.Get.Job.Layers.Add(newLayer);
-                }
-
-                // Merge data
-                for (int i = Math.Min(_lastLayer, Provider.Get.Job.Layer.Value); i < Math.Max(_lastLayer, Provider.Get.Job.Layer.Value); i++)
-                {
-                    Layer layer = Provider.Get.Job.Layers[i - 1];
-                    layer.Duration += avgLayerDuration;
-                    for (int k = 0; k < avgFilamentUsage.Count; k++)
-                    {
-                        if (k >= layer.Filament.Count)
+                        newLayer.FractionPrinted = avgFractionPrinted;
+                        newLayer.Height = avgLayerHeight;
+                        foreach (AnalogSensor sensor in Provider.Get.Sensors.Analog)
                         {
-                            layer.Filament.Add(avgFilamentUsage[k]);
+                            if (sensor != null)
+                            {
+                                newLayer.Temperatures.Add(sensor.LastReading);
+                            }
+                        }
+                        Provider.Get.Job.Layers.Add(newLayer);
+                    }
+                }
+                else if (Provider.Get.Job.Layer < _lastLayer)
+                {
+                    // Layer count went down (probably printing sequentially), update the last layer
+                    Layer lastLayer;
+                    if (Provider.Get.Job.Layers.Count < _lastLayer)
+                    {
+                        lastLayer = new()
+                        {
+                            Height = avgLayerHeight
+                        };
+                        foreach (AnalogSensor sensor in Provider.Get.Sensors.Analog)
+                        {
+                            if (sensor != null)
+                            {
+                                lastLayer.Temperatures.Add(sensor.LastReading);
+                            }
+                        }
+                        Provider.Get.Job.Layers.Add(lastLayer);
+                    }
+                    else
+                    {
+                        lastLayer = Provider.Get.Job.Layers[_lastLayer];
+                    }
+
+                    lastLayer.Duration += avgLayerDuration;
+                    for (int i = 0; i < avgFilamentUsage.Count; i++)
+                    {
+                        if (i >= lastLayer.Filament.Count)
+                        {
+                            lastLayer.Filament.Add(avgFilamentUsage[i]);
                         }
                         else
                         {
-                            layer.Filament[k] += avgFilamentUsage[k];
+                            lastLayer.Filament[i] += avgFilamentUsage[i];
                         }
                     }
-                    layer.FractionPrinted += avgFractionPrinted;
+                    lastLayer.FractionPrinted += avgFractionPrinted;
                 }
 
                 // Record values for the next layer change
@@ -438,8 +452,8 @@ namespace DuetControlServer.Model
                 _lastFilamentUsage = totalFilamentUsage;
                 _lastFilePosition = Provider.Get.Job.FilePosition ?? 0L;
                 _lastHeight = currentHeight;
+                _lastLayer = Provider.Get.Job.Layer.Value;
             }
-            _lastLayer = Provider.Get.Job.Layer.Value;
         }
 
         /// <summary>
@@ -450,14 +464,31 @@ namespace DuetControlServer.Model
             using (Provider.AccessReadWrite())
             {
                 Provider.Get.Boards.Clear();
+                Provider.Get.Global.Clear();
                 if (Provider.Get.State.Status != MachineStatus.Halted && Provider.Get.State.Status != MachineStatus.Updating)
                 {
                     Provider.Get.State.Status = MachineStatus.Disconnected;
                 }
-                Provider.ClearGlobalVariables();
             }
 
             _lastSeqs.Clear();
+        }
+
+        /// <summary>
+        /// Print diagnostics of this class
+        /// </summary>
+        /// <param name="builder">String builder</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task Diagnostics(StringBuilder builder)
+        {
+            using (await _lock.LockAsync(Program.CancellationToken))
+            {
+                if (_lastInvalidJsonResponse != null)
+                {
+                    builder.AppendLine("Last invalid JSON response:");
+                    builder.AppendLine(_lastInvalidJsonResponse);
+                }
+            }
         }
     }
 }

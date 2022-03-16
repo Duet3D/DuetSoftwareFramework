@@ -56,11 +56,11 @@ namespace UnitTests.Machine
 
             // Nested item propery
             TestContext.Out.WriteLine("Nested item property");
-            mainBoard.V12.Current = 123F;
+            mainBoard.V12 = new() { Current = 123F };
 
             Assert.AreEqual(1, numEvents);
-            Assert.AreEqual(new object[] { new ItemPathNode("boards", 0, new object[1]), "v12", "current" }, recordedPath);
-            Assert.AreEqual(123F, recordedValue);
+            Assert.AreEqual(new object[] { new ItemPathNode("boards", 0, new object[1]), "v12" }, recordedPath);
+            Assert.AreEqual(mainBoard.V12, recordedValue);
 
             // Reset
             numEvents = 0;
@@ -195,6 +195,23 @@ namespace UnitTests.Machine
             Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
             Assert.AreEqual(customData, recordedValue);
 
+            // global.foo
+            using JsonDocument jsonDoc = JsonDocument.Parse("{\"foobar\":\"test\"}");
+            Provider.Get.Global.Add("foobar", jsonDoc.RootElement);
+
+            Assert.AreEqual(3, numEvents);
+            Assert.AreEqual(new object[] { "global", "foobar" }, recordedPath);
+            Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
+            Assert.AreEqual(jsonDoc.RootElement, recordedValue);
+
+            // clear event
+            Provider.Get.Global.Clear();
+
+            Assert.AreEqual(4, numEvents);
+            Assert.AreEqual(new object[] { "global" }, recordedPath);
+            Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
+            Assert.IsNull(recordedValue);
+
             // End
             DuetControlServer.Model.Observer.OnPropertyPathChanged -= onPropertyChanged;
             Provider.Get.Plugins.Clear();
@@ -219,11 +236,11 @@ namespace UnitTests.Machine
             DuetControlServer.Model.Observer.OnPropertyPathChanged += onPropertyChanged;
 
             // plugins
-            Plugin plugin = new() { Id = "Foobar" };
-            Provider.Get.Plugins.Add("Foobar", plugin);
+            Plugin plugin = new() { Id = "Foobar2" };
+            Provider.Get.Plugins.Add("Foobar2", plugin);
 
             Assert.AreEqual(1, numEvents);
-            Assert.AreEqual(new object[] { "plugins", "Foobar" }, recordedPath);
+            Assert.AreEqual(new object[] { "plugins", "Foobar2" }, recordedPath);
             Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
             Assert.AreSame(plugin, recordedValue);
 
@@ -231,15 +248,15 @@ namespace UnitTests.Machine
             plugin.Pid = 1234;
 
             Assert.AreEqual(2, numEvents);
-            Assert.AreEqual(new object[] { "plugins", "Foobar", "pid" }, recordedPath);
+            Assert.AreEqual(new object[] { "plugins", "Foobar2", "pid" }, recordedPath);
             Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
             Assert.AreEqual(plugin.Pid, recordedValue);
 
             // delete item
-            Provider.Get.Plugins.Remove("Foobar");
+            Provider.Get.Plugins.Remove("Foobar2");
 
             Assert.AreEqual(3, numEvents);
-            Assert.AreEqual(new object[] { "plugins", "Foobar" }, recordedPath);
+            Assert.AreEqual(new object[] { "plugins", "Foobar2" }, recordedPath);
             Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
             Assert.IsNull(recordedValue);
 
@@ -272,7 +289,7 @@ namespace UnitTests.Machine
             Provider.Get.Heat.Heaters.Add(newHeater);
 
             Assert.AreEqual(1, numEvents);
-            Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
+            Assert.AreEqual(PropertyChangeType.Collection, recordedChangeType);
             Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 0, new object[1]) }, recordedPath);
             Assert.AreSame(newHeater, recordedValue);
 
@@ -288,7 +305,7 @@ namespace UnitTests.Machine
             Provider.Get.Heat.Heaters.Add(newHeater);
 
             Assert.AreEqual(1, numEvents);
-            Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
+            Assert.AreEqual(PropertyChangeType.Collection, recordedChangeType);
             Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 1, new object[2]) }, recordedPath);
             Assert.AreSame(newHeater, recordedValue);
 
@@ -318,7 +335,7 @@ namespace UnitTests.Machine
             Provider.Get.Heat.Heaters.Move(1, 0);
 
             Assert.AreEqual(2, numEvents);
-            Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
+            Assert.AreEqual(PropertyChangeType.Collection, recordedChangeType);
             Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 1, new object[2]) }, recordedPath);
             Assert.AreSame(Provider.Get.Heat.Heaters[1], recordedValue);
 
@@ -334,7 +351,7 @@ namespace UnitTests.Machine
             Provider.Get.Heat.Heaters[0] = newHeater;
 
             Assert.AreEqual(1, numEvents);
-            Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
+            Assert.AreEqual(PropertyChangeType.Collection, recordedChangeType);
             Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 0, new object[2]) }, recordedPath);
             Assert.AreSame(newHeater, recordedValue);
 
@@ -350,7 +367,7 @@ namespace UnitTests.Machine
             Provider.Get.Heat.Heaters.Insert(0, newHeater);
 
             Assert.AreEqual(3, numEvents);
-            Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
+            Assert.AreEqual(PropertyChangeType.Collection, recordedChangeType);
             Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 2, new object[3]) }, recordedPath);
             Assert.AreEqual(Provider.Get.Heat.Heaters[2], recordedValue);
 
@@ -365,7 +382,7 @@ namespace UnitTests.Machine
             Provider.Get.Heat.Heaters.RemoveAt(0);
 
             Assert.AreEqual(3, numEvents);
-            Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
+            Assert.AreEqual(PropertyChangeType.Collection, recordedChangeType);
             Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 1, new object[2]) }, recordedPath);
             Assert.AreEqual(Provider.Get.Heat.Heaters[1], recordedValue);
 
@@ -380,7 +397,7 @@ namespace UnitTests.Machine
             Provider.Get.Heat.Heaters.Clear();
 
             Assert.AreEqual(1, numEvents);
-            Assert.AreEqual(PropertyChangeType.ObjectCollection, recordedChangeType);
+            Assert.AreEqual(PropertyChangeType.Collection, recordedChangeType);
             Assert.AreEqual(new object[] { "heat", new ItemPathNode("heaters", 0, Array.Empty<object>()) }, recordedPath);
             Assert.AreEqual(null, recordedValue);
 

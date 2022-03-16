@@ -14,13 +14,35 @@ namespace PluginManager
             List,
             ListData,
             Install,
+            Reload,
             Start,
             SetData,
             Stop,
-            Uninstall
+            Uninstall,
+            IsInstalled,
+            IsStarted
         }
 
-        public static async Task Main(string[] args)
+        /// <summary>
+        /// Set to true if no regular messages are supposed to be printed
+        /// </summary>
+        private static bool Quiet;
+
+        private static void WriteLine(string format, params object[] arg)
+        {
+            if (!Quiet)
+            {
+                Console.WriteLine(format, arg);
+            }
+        }
+
+
+        /// <summary>
+        /// Entry point of this application
+        /// </summary>
+        /// <param name="args">Command-line arguments</param>
+        /// <returns>Return code</returns>
+        public static async Task<int> Main(string[] args)
         {
             // Parse the command line arguments
             PluginOperation operation = PluginOperation.List;
@@ -34,6 +56,11 @@ namespace PluginManager
                 else if (lastArg == "install")
                 {
                     operation = PluginOperation.Install;
+                    plugin = arg;
+                }
+                else if (lastArg == "reload")
+                {
+                    operation = PluginOperation.Reload;
                     plugin = arg;
                 }
                 else if (lastArg == "start")
@@ -56,6 +83,16 @@ namespace PluginManager
                     operation = PluginOperation.Uninstall;
                     plugin = arg;
                 }
+                else if (lastArg == "is-installed")
+                {
+                    operation = PluginOperation.IsInstalled;
+                    plugin = arg;
+                }
+                else if (lastArg == "is-started")
+                {
+                    operation = PluginOperation.IsStarted;
+                    plugin = arg;
+                }
                 else if (arg == "list")
                 {
                     operation = PluginOperation.List;
@@ -64,19 +101,27 @@ namespace PluginManager
                 {
                     operation = PluginOperation.ListData;
                 }
+                else if (arg == "-q" || arg == "--quiet")
+                {
+                    Quiet = true;
+                }
                 else if (arg == "-h" || arg == "--help")
                 {
                     Console.WriteLine("Available command line arguments:");
                     Console.WriteLine("list: List plugin status (default)");
                     Console.WriteLine("list-data: List plugin data");
                     Console.WriteLine("install <zipfile>: Install new ZIP bundle");
+                    Console.WriteLine("reload <id>: Reload a plugin manifest");
                     Console.WriteLine("start <id>: Start a plugin");
                     Console.WriteLine("set-data <id>:<key>=<value>: Set plugin data (JSON or text)");
                     Console.WriteLine("stop <id>: Stop a plugin");
                     Console.WriteLine("uninstall <id>: Uninstall a plugin");
+                    Console.WriteLine("is-installed <id>: Check if a plugin is installed (result is given by return code)");
+                    Console.WriteLine("is-started <id>: Check if a plugin is started (result is given by return code)");
                     Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
+                    Console.WriteLine("-q, --quiet: Do not output regular messages");
                     Console.WriteLine("-h, --help: Display this help text");
-                    return;
+                    return 0;
                 }
                 lastArg = arg;
             }
@@ -137,7 +182,7 @@ namespace PluginManager
                     try
                     {
                         await connection.InstallPlugin(plugin);
-                        Console.WriteLine("Plugin installed");
+                        WriteLine("Plugin installed");
                     }
                     catch (Exception e)
                     {
@@ -145,15 +190,27 @@ namespace PluginManager
                     }
                     break;
 
+                case PluginOperation.Reload:
+                    try
+                    {
+                        await connection.ReloadPlugin(plugin);
+                        WriteLine("Plugin manifest reloaded");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Failed to reload plugin: {0}", e.Message);
+                    }
+                    break;
+
                 case PluginOperation.Start:
                     try
                     {
                         await connection.StartPlugin(plugin);
-                        Console.WriteLine("Plugin started");
+                        WriteLine("Plugin started");
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("Failed to start plugin: {0}", e.Message);
+                        Console.Error.WriteLine("Failed to start plugin: {0}", e.Message);
                     }
                     break;
 
@@ -204,11 +261,11 @@ namespace PluginManager
                         {
                             await connection.SetPluginData(key, value, pluginName);
                         }
-                        Console.WriteLine("Plugin data set");
+                        WriteLine("Plugin data set");
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("Failed to set plugin data: {0}", e.Message);
+                        Console.Error.WriteLine("Failed to set plugin data: {0}", e.Message);
                     }
                     break;
 
@@ -216,11 +273,11 @@ namespace PluginManager
                     try
                     {
                         await connection.StopPlugin(plugin);
-                        Console.WriteLine("Plugin stopped");
+                        WriteLine("Plugin stopped");
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("Failed to stop plugin: {0}", e.Message);
+                        Console.Error.WriteLine("Failed to stop plugin: {0}", e.Message);
                     }
                     break;
 
@@ -228,13 +285,35 @@ namespace PluginManager
                     try
                     {
                         await connection.UninstallPlugin(plugin);
+                        WriteLine("Plugin uninstalled");
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("Failed to uninstall plugin: {0}", e.Message);
+                        Console.Error.WriteLine("Failed to uninstall plugin: {0}", e.Message);
                     }
                     break;
+
+                case PluginOperation.IsInstalled:
+                    model = await connection.GetObjectModel();
+                    if (model.Plugins.ContainsKey(plugin))
+                    {
+                        WriteLine("Plugin is installed");
+                        return 0;
+                    }
+                    WriteLine("Plugin is not installed");
+                    return 1;
+
+                case PluginOperation.IsStarted:
+                    model = await connection.GetObjectModel();
+                    if (model.Plugins.TryGetValue(plugin, out Plugin pluginItem) && pluginItem.Pid > 0)
+                    {
+                        WriteLine("Plugin is started");
+                        return 0;
+                    }
+                    WriteLine("Plugin is not started");
+                    return 1;
             }
+            return 0;
         }
     }
 }

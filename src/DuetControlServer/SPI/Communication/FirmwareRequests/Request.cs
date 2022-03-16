@@ -1,7 +1,7 @@
 namespace DuetControlServer.SPI.Communication.FirmwareRequests
 {
     /// <summary>
-    /// Request indices for SPI transfers from the RepRapFirmware controller to the Linux board
+    /// Request indices for SPI transfers from the RepRapFirmware controller to the SBC
     /// </summary>
     public enum Request : ushort
     {
@@ -53,13 +53,13 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         PrintPaused = 7,
         
         /// <summary>
-        /// Response to a heightmap request
+        /// Response to a heightmap request. This is no longer used
         /// </summary>
         /// <seealso cref="Shared.HeightMapHeader"/>
-        HeightMap = 8,
+        HeightMap_Obsolete = 8,
 
         /// <summary>
-        /// Ressource locked
+        /// Resource locked
         /// </summary>
         /// <seealso cref="Shared.CodeChannelHeader"/>
         Locked = 9,
@@ -102,6 +102,46 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// Response to a variable set request
         /// </summary>
         /// <seealso cref="EvaluationResultHeader"/>
-        VariableResult = 16
+        VariableResult = 16,
+
+        /// <summary>
+        /// Check if a file exists
+        /// </summary>
+        CheckFileExists = 17,
+
+        /// <summary>
+        /// Delete a file or directory
+        /// </summary>
+        DeleteFileOrDirectory = 18,
+
+        /// <summary>
+        /// Open a file on the SBC
+        /// </summary>
+        OpenFile = 19,
+
+        /// <summary>
+        /// Read from a file
+        /// </summary>
+        ReadFile = 20,
+
+        /// <summary>
+        /// Write to a file
+        /// </summary>
+        WriteFile = 21,
+
+        /// <summary>
+        /// Seek in a file
+        /// </summary>
+        SeekFile = 22,
+
+        /// <summary>
+        /// Truncate a file
+        /// </summary>
+        TruncateFile = 23,
+
+        /// <summary>
+        /// Close a file again
+        /// </summary>
+        CloseFile = 24
     }
 }

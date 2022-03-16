@@ -1,5 +1,4 @@
 ﻿using DuetAPI.ObjectModel;
-using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
@@ -56,118 +55,92 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Subscribe to changes of the given model object
         /// </summary>
-        /// <param name="model">Object to subscribe to</param>
+        /// <param name="modelObject">Object to subscribe to</param>
         /// <param name="path">Collection path</param>
-        private static void SubscribeToModelObject(ModelObject model, object[] path)
+        private static void SubscribeToModelObject(ModelObject modelObject, object[] path)
         {
-            if (model == null)
-            {
-                return;
-            }
-
             bool hasVariableModelObjects = false;
-            foreach (PropertyInfo property in model.GetType().GetProperties())
+            foreach (PropertyInfo property in modelObject.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
+                if (property.GetMethod.GetParameters().Length != 0)
+                {
+                    continue;
+                }
                 string propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                object value = property.GetValue(model);
-                if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
+                object value = property.GetValue(modelObject);
+
+                if (value is ModelObject objectValue)
                 {
-                    if (value != null)
-                    {
-                        SubscribeToModelObject((ModelObject)value, AddToPath(path, propertyName));
-                    }
-                    hasVariableModelObjects |= (property.SetMethod != null);
+                    SubscribeToModelObject(objectValue, AddToPath(path, propertyName));
                 }
-                else if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
+                else if (value is IModelCollection collectionValue)
                 {
-                    if (ModelGrowingCollection.TypeMatches(property.PropertyType))
-                    {
-                        SubscribeToGrowingModelCollection(value, propertyName, path);
-                    }
-                    else
-                    {
-                        SubscribeToModelCollection(value, itemType, propertyName, path);
-                    }
+                    SubscribeToModelCollection(collectionValue, propertyName, path);
                 }
-                else if (property.PropertyType == typeof(ModelJsonDictionary))
+                else if (value is IModelDictionary dictionaryValue)
                 {
-                    SubscribeToModelDictionary(value, AddToPath(path, propertyName));
+                    SubscribeToModelDictionary(dictionaryValue, AddToPath(path, propertyName));
                 }
-                else if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ModelObjectDictionary<>))
-                {
-                    SubscribeToModelObjectDictionary(value, AddToPath(path, propertyName));
-                }
+
+                hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod != null);
             }
 
-            PropertyChangedEventHandler changeHandler = PropertyChanged(hasVariableModelObjects, path);
-            model.PropertyChanged += changeHandler;
-            _propertyChangedHandlers[model] = changeHandler;
+            if (modelObject is INotifyPropertyChanged propChangeModel)
+            {
+                PropertyChangedEventHandler changeHandler = PropertyChanged(hasVariableModelObjects, path);
+                propChangeModel.PropertyChanged += changeHandler;
+                _propertyChangedHandlers[modelObject] = changeHandler;
+            }
 
             if (hasVariableModelObjects)
             {
                 // This is barely needed so only register it where it is actually required.
                 // It makes sure that events are removed again when a ModelObject instance is replaced
-                model.PropertyChanging += VariableModelObjectChanging;
+                modelObject.PropertyChanging += VariableModelObjectChanging;
             }
         }
 
         /// <summary>
         /// Unsubscribe from model object changes
         /// </summary>
-        /// <param name="model">Model object to unsubscribe from</param>
-        private static void UnsubscribeFromModelObject(ModelObject model)
+        /// <param name="modelObject">Model object to unsubscribe from</param>
+        private static void UnsubscribeFromModelObject(ModelObject modelObject)
         {
-            if (model == null)
+            if (_propertyChangedHandlers.TryGetValue(modelObject, out PropertyChangedEventHandler changeHandler))
             {
-                return;
+                modelObject.PropertyChanged -= changeHandler;
+                _propertyChangedHandlers.Remove(modelObject);
             }
 
-            PropertyChangedEventHandler changeHandler = _propertyChangedHandlers[model];
-            if (changeHandler == null)
+            bool hasVariableModelObjects = false;
+            foreach (PropertyInfo property in modelObject.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
-                // Already unregistered - don't bother to continue
-                return;
-            }
-            model.PropertyChanged -= changeHandler;
-            _propertyChangedHandlers.Remove(model);
+                if (property.GetMethod.GetParameters().Length != 0)
+                {
+                    continue;
+                }
+                object value = property.GetValue(modelObject);
 
-            bool unregisterPropertyChanging = false;
-            foreach (PropertyInfo property in model.GetType().GetProperties())
-            {
-                object value = property.GetValue(model);
-                if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
+                if (value is ModelObject objectValue)
                 {
-                    if (value != null)
-                    {
-                        UnsubscribeFromModelObject((ModelObject)value);
-                    }
-                    unregisterPropertyChanging |= (property.SetMethod != null);
+                    UnsubscribeFromModelObject(objectValue);
                 }
-                else if (ModelCollection.GetItemType(property.PropertyType, out Type itemType))
+                else if (value is IModelCollection collectionValue)
                 {
-                    if (ModelGrowingCollection.TypeMatches(property.PropertyType))
-                    {
-                        UnsubscribeFromGrowingModelCollection(value);
-                    }
-                    else
-                    {
-                        UnsubscribeFromModelCollection(value, property.PropertyType.GetGenericArguments()[0]);
-                    }
+                    UnsubscribeFromModelCollection(collectionValue);
                 }
-                else if (property.PropertyType == typeof(ModelJsonDictionary))
+                else if (value is IModelDictionary dictionaryValue)
                 {
-                    UnsubscribeFromModelDictionary(value);
+                    UnsubscribeFromModelDictionary(dictionaryValue);
                 }
-                else if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ModelObjectDictionary<>))
-                {
-                    UnsubscribeFromModelObjectDictionary(value);
-                }
+
+                hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod != null);
             }
 
-            if (unregisterPropertyChanging)
+            if (hasVariableModelObjects)
             {
                 // Same here - unregister the event handler only where required
-                model.PropertyChanging -= VariableModelObjectChanging;
+                modelObject.PropertyChanging -= VariableModelObjectChanging;
             }
         }
     }

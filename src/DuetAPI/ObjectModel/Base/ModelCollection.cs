@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -9,48 +8,17 @@ using System.Text.Json;
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
-    /// Helper class to keep track of individual model collection subtypes
-    /// </summary>
-    public static class ModelCollection
-    {
-        /// <summary>
-        /// List of types that are derived from this class
-        /// </summary>
-        private static readonly ConcurrentDictionary<Type, Type> _derivedTypes = new();
-
-        /// <summary>
-        /// Check if the given type is derived from a <see cref="ModelCollection{T}"/> and return the corresponding item type
-        /// </summary>
-        /// <param name="type">Type to check</param>
-        /// <param name="itemType">Item type</param>
-        /// <returns>Whether the item type could be found</returns>
-        public static bool GetItemType(Type type, out Type itemType) => _derivedTypes.TryGetValue(type, out itemType);
-
-        /// <summary>
-        /// Register another model collection type
-        /// </summary>
-        /// <param name="type">Specific collection type</param>
-        /// <param name="itemType">Item type</param>
-        internal static void RegisterType(Type type, Type itemType) => _derivedTypes.TryAdd(type, itemType);
-    }
-
-    /// <summary>
     /// Generic container for object model arrays
     /// </summary>
     /// <typeparam name="T">Item type</typeparam>
-    public class ModelCollection<T> : ObservableCollection<T>, ICloneable
+    public class ModelCollection<T> : ObservableCollection<T>, IModelCollection
     {
-        /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        public ModelCollection() => ModelCollection.RegisterType(GetType(), typeof(T));
-
         /// <summary>
         /// Removes all items from the collection
         /// </summary>
         protected override void ClearItems()
         {
-            List<T> removed = new(this);
+            List<T> removed = new List<T>(this);
             base.ClearItems();
             base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
         }
@@ -69,12 +37,106 @@ namespace DuetAPI.ObjectModel
         }
 
         /// <summary>
+        /// Assign the properties from another instance.
+        /// This is required to update model properties which do not have a setter
+        /// </summary>
+        /// <param name="from">Other instance</param>
+        public void Assign(object from)
+        {
+            // Assigning null values is not supported
+            if (from == null)
+            {
+                throw new ArgumentNullException(nameof(from));
+            }
+
+            // Validate the types
+            if (!(from is ModelCollection<T> other))
+            {
+                throw new ArgumentException("Types do not match", nameof(from));
+            }
+
+            // Delete obsolete items
+            for (int i = Count; i > other.Count; i--)
+            {
+                RemoveAt(i - 1);
+            }
+
+            // Update common items
+            Type itemType = typeof(T);
+            if (typeof(IModelObject).IsAssignableFrom(itemType))
+            {
+                for (int i = 0; i < Math.Min(Count, other.Count); i++)
+                {
+                    IModelObject myItem = (IModelObject)this[i];
+                    IModelObject otherItem = (IModelObject)other[i];
+                    if (myItem == null || otherItem == null)
+                    {
+                        this[i] = (T)otherItem;
+                    }
+                    else if (myItem.GetType() != otherItem.GetType())
+                    {
+                        this[i] = (T)otherItem.Clone();
+                    }
+                    else
+                    {
+                        myItem.Assign(otherItem);
+                    }
+                }
+            }
+            else if (itemType.IsArray)
+            {
+                for (int i = 0; i < Math.Min(Count, other.Count); i++)
+                {
+                    if (this[i] == null || other[i] == null)
+                    {
+                        this[i] = other[i];
+                    }
+                    else
+                    {
+                        IList listItem = (IList)this[i], fromItem = (IList)other[i];
+                        if (listItem.Count != fromItem.Count)
+                        {
+                            this[i] = other[i];
+                        }
+                        else
+                        {
+                            for (int k = 0; k < listItem.Count; k++)
+                            {
+                                if (!Equals(listItem[k], fromItem[k]))
+                                {
+                                    this[i] = other[i];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < Math.Min(Count, other.Count); i++)
+                {
+                    if (!Equals(this[i], other[i]))
+                    {
+                        this[i] = other[i];
+                    }
+                }
+            }
+
+            // Add missing items
+            for (int i = Count; i < other.Count; i++)
+            {
+                Add(other[i]);
+            }
+        }
+
+        /// <summary>
         /// Create a clone of this list
         /// </summary>
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            ModelCollection<T> clone = new();
+            ModelCollection<T> clone = new ModelCollection<T>();
             foreach (T item in this)
             {
                 if (item is ICloneable cloneableItem)
@@ -91,315 +153,39 @@ namespace DuetAPI.ObjectModel
         }
 
         /// <summary>
-        /// Assign this collection from another one
+        /// Create a dictionary or list of all the differences between this instance and another.
+        /// This method outputs own property values that differ from the other instance
         /// </summary>
-        /// <param name="from">Element to assign this instance from</param>
-        public virtual void Assign(ModelCollection<T> from)
+        /// <param name="other">Other instance</param>
+        /// <returns>Object differences or null if both instances are equal</returns>
+        public object FindDifferences(IModelObject other)
         {
-            ModelCollectionHelper.Assign(this, typeof(T), from);
-        }
-
-        /// <summary>
-        /// Update this collection from a given JSON array
-        /// </summary>
-        /// <param name="jsonElement">Element to update this intance from</param>
-        /// <param name="offset">Index offset</param>
-        /// <param name="last">Whether this is the last update</param>
-        public virtual void UpdateFromJson(JsonElement jsonElement, int offset = 0, bool last = true)
-        {
-            ModelCollectionHelper.UpdateFromJson(this, typeof(T), jsonElement, false, offset, last);
-        }
-    }
-
-    /// <summary>
-    /// Internal untyped helper class for dealing with model collections
-    /// </summary>
-    internal static class ModelCollectionHelper
-    {
-        /// <summary>
-        /// Assign items to a given list
-        /// </summary>
-        /// <param name="list">List to assign to</param>
-        /// <param name="itemType">Item type</param>
-        /// <param name="from">List to assign from</param>
-        public static void Assign(IList list, Type itemType, IList from)
-        {
-            // Assigning null values is not supported
-            if (from == null)
+            // Check the types
+            if (!(other is ModelCollection<T> otherList))
             {
-                throw new ArgumentNullException(nameof(from));
+                // Types differ, return the entire instance
+                return this;
             }
+            Type itemType = typeof(T);
 
-            // Delete obsolete items
-            for (int i = list.Count; i > from.Count; i--)
+            // Compare the collections
+            bool hadDiffs = (Count != otherList.Count);
+            IList diffs = new object[Count];
+            if (typeof(IModelObject).IsAssignableFrom(itemType))
             {
-                list.RemoveAt(i - 1);
-            }
-
-            // Update common items
-            if (itemType.IsSubclassOf(typeof(ModelObject)))
-            {
-                for (int i = 0; i < Math.Min(list.Count, from.Count); i++)
+                for (int i = 0; i < Count; i++)
                 {
-                    ModelObject item = (ModelObject)list[i];
-                    ModelObject sourceItem = (ModelObject)from[i];
-                    if (item == null || sourceItem == null)
+                    if (i < otherList.Count)
                     {
-                        list[i] = sourceItem;
-                    }
-                    else if (sourceItem.GetType() != item.GetType())
-                    {
-                        list[i] = sourceItem.Clone();
-                    }
-                    else
-                    {
-                        item.Assign(sourceItem);
-                    }
-                }
-            }
-            else if (itemType.IsArray)
-            {
-                for (int i = 0; i < Math.Min(list.Count, from.Count); i++)
-                {
-                    if (list[i] == null || from[i] == null)
-                    {
-                        list[i] = from[i];
-                    }
-                    else
-                    {
-                        IList listItem = (IList)list[i], fromItem = (IList)from[i];
-                        if (listItem.Count != fromItem.Count)
+                        IModelObject myItem = (IModelObject)this[i], otherItem = (IModelObject)otherList[i];
+                        if (otherItem == null || myItem == null || otherItem.GetType() != myItem.GetType())
                         {
-                            list[i] = from[i];
+                            hadDiffs = myItem != otherItem;
+                            diffs[i] = myItem;
                         }
                         else
                         {
-                            for (int k = 0; k < listItem.Count; k++)
-                            {
-                                if (!Equals(listItem[k], fromItem[k]))
-                                {
-                                    list[i] = from[i];
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                for (int i = 0; i < Math.Min(list.Count, from.Count); i++)
-                {
-                    if (!Equals(list[i], from[i]))
-                    {
-                        list[i] = from[i];
-                    }
-                }
-            }
-
-            // Add missing items
-            for (int i = list.Count; i < from.Count; i++)
-            {
-                list.Add(from[i]);
-            }
-        }
-
-        /// <summary>
-        /// Update a list from a given JSON array
-        /// </summary>
-        /// <param name="list">List to update</param>
-        /// <param name="itemType">Item type</param>
-        /// <param name="jsonElement">Element to update the intance from</param>
-        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-        /// <param name="offset">Index offset</param>
-        /// <param name="last">Whether this is the last update call</param>
-        public static void UpdateFromJson(IList list, Type itemType, JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
-        {
-            int arrayLength = jsonElement.GetArrayLength();
-
-            // Delete obsolete items when the last update has been processed
-            if (last)
-            {
-                for (int i = list.Count; i > offset + arrayLength; i--)
-                {
-                    list.RemoveAt(i - 1);
-                }
-            }
-
-            if (itemType.IsSubclassOf(typeof(ModelObject)))
-            {
-                // Update model items
-                for (int i = offset; i < Math.Min(list.Count, offset + arrayLength); i++)
-                {
-                    ModelObject item = (ModelObject)list[i];
-                    JsonElement jsonItem = jsonElement[i - offset];
-                    if (jsonItem.ValueKind == JsonValueKind.Null)
-                    {
-                        if (list[i] != null)
-                        {
-                            list[i] = null;
-                        }
-                    }
-                    else if (item == null)
-                    {
-                        item = (ModelObject)Activator.CreateInstance(itemType);
-                        list[i] = item.UpdateFromJson(jsonItem, ignoreSbcProperties);
-                    }
-                    else
-                    {
-                        ModelObject updatedInstance = item.UpdateFromJson(jsonItem, ignoreSbcProperties);
-                        if (updatedInstance != item)
-                        {
-                            list[i] = updatedInstance;
-                        }
-                    }
-                }
-
-                // Add missing items
-                for (int i = list.Count; i < offset + arrayLength; i++)
-                {
-                    JsonElement jsonItem = jsonElement[i - offset];
-                    if (jsonItem.ValueKind == JsonValueKind.Null)
-                    {
-                        list.Add(null);
-                    }
-                    else
-                    {
-                        ModelObject newItem = (ModelObject)Activator.CreateInstance(itemType);
-                        newItem = newItem.UpdateFromJson(jsonElement[i], ignoreSbcProperties);
-                        list.Add(newItem);
-                    }
-                }
-            }
-            else
-            {
-                // Update items
-                for (int i = 0; i < Math.Min(list.Count, offset + arrayLength); i++)
-                {
-                    JsonElement jsonItem = jsonElement[i - offset];
-                    if (jsonItem.ValueKind == JsonValueKind.Null)
-                    {
-                        if (list[i] != null)
-                        {
-                            list[i] = null;
-                        }
-                    }
-                    else if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
-                    {
-                        try
-                        {
-                            bool itemValue = Convert.ToBoolean(jsonItem.GetInt32());
-                            if (!Equals(list[i], itemValue))
-                            {
-                                list[i] = itemValue;
-                            }
-                        }
-                        catch (FormatException e)
-                        {
-                            throw new JsonException($"Failed to deserialize item type bool from JSON {jsonItem.GetRawText()}", e);
-                        }
-                    }
-                    else
-                    {
-                        try
-                        {
-                            object itemValue = JsonSerializer.Deserialize(jsonItem.GetRawText(), itemType);
-                            if (itemType.IsArray)
-                            {
-                                IList listItem = (IList)list[i], newItem = (IList)itemValue;
-                                if (listItem == null || listItem.Count != newItem.Count)
-                                {
-                                    list[i] = itemValue;
-                                }
-                                else
-                                {
-                                    for (int k = 0; k < listItem.Count; k++)
-                                    {
-                                        if (!Equals(listItem[k], newItem[k]))
-                                        {
-                                            list[i] = itemValue;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            else if (!Equals(list[i], itemValue))
-                            {
-                                list[i] = itemValue;
-                            }
-                        }
-                        catch (JsonException e)
-                        {
-                            throw new JsonException($"Failed to deserialize item type {itemType.Name} from JSON {jsonItem.GetRawText()}", e);
-                        }
-                    }
-                }
-
-                // Add missing items
-                for (int i = list.Count; i < offset + arrayLength; i++)
-                {
-                    JsonElement jsonItem = jsonElement[i - offset];
-                    if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
-                    {
-                        try
-                        {
-                            list.Add(Convert.ToBoolean(jsonItem.GetInt32()));
-                        }
-                        catch (FormatException e)
-                        {
-                            throw new JsonException($"Failed to deserialize item type bool from JSON {jsonItem.GetRawText()}", e);
-                        }
-                    }
-                    else
-                    {
-                        try
-                        {
-                            object newItem = JsonSerializer.Deserialize(jsonItem.GetRawText(), itemType);
-                            list.Add(newItem);
-                        }
-                        catch (JsonException e)
-                        {
-                            throw new JsonException($"Failed to deserialize item type {itemType.Name} from JSON {jsonItem.GetRawText()}", e);
-                        }
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Find the diffs between two lists
-        /// </summary>
-        /// <param name="oldList">Old list</param>
-        /// <param name="newList">New list</param>
-        /// <param name="itemType">Item type</param>
-        /// <returns>Differences of the lists or null if they are equal</returns>
-        public static IList FindDiffs(IList oldList, IList newList, Type itemType)
-        {
-            bool hadDiffs = (oldList.Count != newList.Count);
-            IList diffs = new object[newList.Count];
-
-            if (itemType.IsSubclassOf(typeof(ModelObject)))
-            {
-                for (int i = 0; i < newList.Count; i++)
-                {
-                    if (i < oldList.Count)
-                    {
-                        ModelObject oldItem = (ModelObject)oldList[i], newItem = (ModelObject)newList[i];
-                        if (oldItem == null || newItem == null || oldItem.GetType() != newItem.GetType())
-                        {
-                            if (oldItem != newItem)
-                            {
-                                hadDiffs = true;
-                                diffs[i] = newItem;
-                            }
-                            else
-                            {
-                                diffs[i] = new Dictionary<string, object>();
-                            }
-                        }
-                        else
-                        {
-                            object diff = newItem.MakePatch(oldItem);
+                            object diff = myItem.FindDifferences(otherItem);
                             if (diff != null)
                             {
                                 hadDiffs = true;
@@ -413,57 +199,18 @@ namespace DuetAPI.ObjectModel
                     }
                     else
                     {
-                        diffs[i] = newList[i];
-                    }
-                }
-            }
-            else if (ModelCollection.GetItemType(itemType, out Type subItemType))
-            {
-                for (int i = 0; i < newList.Count; i++)
-                {
-                    if (i < oldList.Count)
-                    {
-                        IList oldItem = (IList)oldList[i], newItem = (IList)newList[i];
-                        if (oldItem == null || newItem == null || oldItem.GetType() != newItem.GetType())
-                        {
-                            if (oldItem != newItem)
-                            {
-                                hadDiffs = true;
-                                diffs[i] = newItem;
-                            }
-                            else
-                            {
-                                diffs[i] = new Dictionary<string, object>();
-                            }
-                        }
-                        else
-                        {
-                            object diff = FindDiffs(oldItem, newItem, subItemType);
-                            if (diff != null)
-                            {
-                                hadDiffs = true;
-                                diffs[i] = diff;
-                            }
-                            else
-                            {
-                                diffs[i] = new Dictionary<string, object>();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        diffs[i] = newList[i];
+                        diffs[i] = this[i];
                     }
                 }
             }
             else
             {
-                diffs = newList;
+                diffs = this;
                 if (!hadDiffs)
                 {
-                    for (int i = 0; i < newList.Count; i++)
+                    for (int i = 0; i < Count; i++)
                     {
-                        if (!oldList[i].Equals(newList[i]))
+                        if (!this[i].Equals(otherList[i]))
                         {
                             hadDiffs = true;
                             break;
@@ -472,6 +219,187 @@ namespace DuetAPI.ObjectModel
                 }
             }
             return hadDiffs ? diffs : null;
+        }
+
+        /// <summary>
+        /// Update this instance from a given JSON element
+        /// </summary>
+        /// <param name="jsonElement">Element to update this intance from</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <returns>Updated instance</returns>
+        /// <exception cref="JsonException">Failed to deserialize data</exception>
+        /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
+        public IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        {
+            if (jsonElement.ValueKind == JsonValueKind.Null)
+            {
+                ClearItems();
+            }
+            else
+            {
+                UpdateFromJson(jsonElement, ignoreSbcProperties, 0, true);
+            }
+            return this;
+        }
+
+        /// <summary>
+        /// Update this collection from a given JSON array
+        /// </summary>
+        /// <param name="jsonElement">Element to update this intance from</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <param name="offset">Index offset</param>
+        /// <param name="last">Whether this is the last update</param>
+        public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
+        {
+            int arrayLength = jsonElement.GetArrayLength();
+
+            // Delete obsolete items when the last update has been processed
+            if (last)
+            {
+                for (int i = Count; i > offset + arrayLength; i--)
+                {
+                    RemoveAt(i - 1);
+                }
+            }
+
+            Type itemType = typeof(T);
+            if (typeof(IModelObject).IsAssignableFrom(itemType))
+            {
+                // Update model items
+                for (int i = offset; i < Math.Min(Count, offset + arrayLength); i++)
+                {
+                    IModelObject item = (IModelObject)this[i];
+                    JsonElement jsonItem = jsonElement[i - offset];
+                    if (jsonItem.ValueKind == JsonValueKind.Null)
+                    {
+                        if (this[i] != null)
+                        {
+                            this[i] = default;
+                        }
+                    }
+                    else
+                    {
+                        if (item == null)
+                        {
+                            item = (IModelObject)Activator.CreateInstance(itemType);
+                        }
+                        T updatedItem = (T)item.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                        if (!ReferenceEquals(this[i], updatedItem))
+                        {
+                            this[i] = updatedItem;
+                        }
+                    }
+                }
+
+                // Add missing items
+                for (int i = Count; i < offset + arrayLength; i++)
+                {
+                    JsonElement jsonItem = jsonElement[i - offset];
+                    if (jsonItem.ValueKind == JsonValueKind.Null)
+                    {
+                        Add(default);
+                    }
+                    else
+                    {
+                        IModelObject newItem = (IModelObject)Activator.CreateInstance(itemType);
+                        newItem = newItem.UpdateFromJson(jsonElement[i], ignoreSbcProperties);
+                        Add((T)newItem);
+                    }
+                }
+            }
+            else
+            {
+                // Update items
+                for (int i = 0; i < Math.Min(Count, offset + arrayLength); i++)
+                {
+                    JsonElement jsonItem = jsonElement[i - offset];
+                    if (jsonItem.ValueKind == JsonValueKind.Null)
+                    {
+                        if (this[i] != null)
+                        {
+                            this[i] = default;
+                        }
+                    }
+                    else if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
+                    {
+                        try
+                        {
+                            bool itemValue = Convert.ToBoolean(jsonItem.GetInt32());
+                            if (!Equals(this[i], itemValue))
+                            {
+                                this[i] = (T)(object)itemValue;
+                            }
+                        }
+                        catch (FormatException e)
+                        {
+                            throw new JsonException($"Failed to deserialize item type bool from JSON {jsonItem.GetRawText()}", e);
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
+                            if (itemType.IsArray)
+                            {
+                                IList listItem = (IList)this[i], newItem = (IList)itemValue;
+                                if (listItem == null || listItem.Count != newItem.Count)
+                                {
+                                    this[i] = itemValue;
+                                }
+                                else
+                                {
+                                    for (int k = 0; k < listItem.Count; k++)
+                                    {
+                                        if (!Equals(listItem[k], newItem[k]))
+                                        {
+                                            this[i] = itemValue;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            else if (!Equals(this[i], itemValue))
+                            {
+                                this[i] = itemValue;
+                            }
+                        }
+                        catch (JsonException e)
+                        {
+                            throw new JsonException($"Failed to deserialize item type {itemType.Name} from JSON {jsonItem.GetRawText()}", e);
+                        }
+                    }
+                }
+
+                // Add missing items
+                for (int i = Count; i < offset + arrayLength; i++)
+                {
+                    JsonElement jsonItem = jsonElement[i - offset];
+                    if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
+                    {
+                        try
+                        {
+                            Add((T)(object)Convert.ToBoolean(jsonItem.GetInt32()));
+                        }
+                        catch (FormatException e)
+                        {
+                            throw new JsonException($"Failed to deserialize item type bool from JSON {jsonItem.GetRawText()}", e);
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            T newItem = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
+                            Add(newItem);
+                        }
+                        catch (JsonException e)
+                        {
+                            throw new JsonException($"Failed to deserialize item type {itemType.Name} from JSON {jsonItem.GetRawText()}", e);
+                        }
+                    }
+                }
+            }
         }
     }
 }

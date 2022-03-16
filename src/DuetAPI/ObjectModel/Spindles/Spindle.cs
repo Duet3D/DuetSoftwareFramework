@@ -16,6 +16,16 @@
         private int _active;
 
         /// <summary>
+        /// Flags whether the spindle may spin in reverse direction
+        /// </summary>
+        public bool CanReverse
+        {
+            get => _canReverse;
+            set => SetPropertyValue(ref _canReverse, value);
+        }
+        private bool _canReverse;
+
+        /// <summary>
         /// Current RPM, negative if anticlockwise direction
         /// </summary>
         public int Current
@@ -63,6 +73,6 @@
             get => _state;
             set => SetPropertyValue(ref _state, value);
         }
-        private SpindleState _state;
+        private SpindleState _state = SpindleState.Unconfigured;
     }
 }

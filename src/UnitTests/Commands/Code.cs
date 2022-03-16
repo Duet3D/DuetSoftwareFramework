@@ -173,6 +173,34 @@ namespace UnitTests.Commands
             }
         }
 
+#if false
+        [Test]
+        public void ParseM260()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M260 A0xF1 B0"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(260, code.MajorNumber);
+                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual('A', code.Parameters[0].Letter);
+                Assert.AreEqual(0xF1, (int)code.Parameters[0]);
+                Assert.AreEqual('B', code.Parameters[1].Letter);
+                Assert.AreEqual(0, (int)code.Parameters[1]);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("M260 A0XF1 B0"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(260, code.MajorNumber);
+                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual('A', code.Parameters[0].Letter);
+                Assert.AreEqual(0xF1, (int)code.Parameters[0]);
+                Assert.AreEqual('B', code.Parameters[1].Letter);
+                Assert.AreEqual(0, (int)code.Parameters[1]);
+            }
+        }
+#endif
+
         [Test]
         public void ParseM302Compact()
         {
@@ -219,6 +247,25 @@ namespace UnitTests.Commands
                 Assert.AreEqual(3, code.Parameters.Count);
                 Assert.AreEqual('P', code.Parameters[0].Letter);
                 Assert.AreEqual(new DriverId(1, 2), (DriverId)code.Parameters[0]);
+                Assert.AreEqual('S', code.Parameters[1].Letter);
+                Assert.AreEqual(1, (int)code.Parameters[1]);
+                Assert.AreEqual('T', code.Parameters[2].Letter);
+                Assert.AreEqual(0.5, code.Parameters[2], 0.0001);
+            }
+        }
+
+        [Test]
+        public void ParseM569Array()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M569 P1.2:3.4 S1 T0.5"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(569, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
+                Assert.AreEqual(3, code.Parameters.Count);
+                Assert.AreEqual('P', code.Parameters[0].Letter);
+                Assert.AreEqual(new DriverId[] { new DriverId(1, 2), new DriverId(3, 4) }, (DriverId[])code.Parameters[0]);
                 Assert.AreEqual('S', code.Parameters[1].Letter);
                 Assert.AreEqual(1, (int)code.Parameters[1]);
                 Assert.AreEqual('T', code.Parameters[2].Letter);
@@ -329,6 +376,55 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseM584WithExpressions()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M584 E123:{456}"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(584, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual('E', code.Parameters[0].Letter);
+                Assert.IsTrue(code.Parameters[0].IsExpression);
+                Assert.AreEqual("{123:{456}}", (string)code.Parameters[0]);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("M584 E{123}:{456}:789"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(584, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual('E', code.Parameters[0].Letter);
+                Assert.IsTrue(code.Parameters[0].IsExpression);
+                Assert.AreEqual("{{123}:{456}:789}", (string)code.Parameters[0]);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("M584 E{123}:{456}:{789}"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(584, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual('E', code.Parameters[0].Letter);
+                Assert.IsTrue(code.Parameters[0].IsExpression);
+                Assert.AreEqual("{123}:{456}:{789}", (string)code.Parameters[0]);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("M92 E{123,456}"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(92, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual('E', code.Parameters[0].Letter);
+                Assert.IsTrue(code.Parameters[0].IsExpression);
+                Assert.AreEqual("{123,456}", (string)code.Parameters[0]);
+            }
+
+        }
+
+        [Test]
         public void ParseM586WithComment()
         {
             foreach (DuetAPI.Commands.Code code in Parse(" \t M586 P2 S0                               ; Disable Telnet"))
@@ -349,16 +445,22 @@ namespace UnitTests.Commands
         [Test]
         public void ParseG1Absolute()
         {
-            foreach (DuetAPI.Commands.Code code in Parse("G53 G1 X3 Y1.25"))
+            foreach (DuetAPI.Commands.Code code in Parse("G53 G1 X3 Y1.25 A2 'a3 b4"))
             {
                 Assert.AreEqual(CodeFlags.EnforceAbsolutePosition | CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(1, code.MajorNumber);
                 Assert.IsNull(code.MinorNumber);
-                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual(5, code.Parameters.Count);
                 Assert.AreEqual('X', code.Parameters[0].Letter);
                 Assert.AreEqual(3, (int)code.Parameters[0]);
                 Assert.AreEqual('Y', code.Parameters[1].Letter);
                 Assert.AreEqual(1.25, code.Parameters[1], 0.0001);
+                Assert.AreEqual('A', code.Parameters[2].Letter);
+                Assert.AreEqual(2, code.Parameters[2], 0.0001);
+                Assert.AreEqual('a', code.Parameters[3].Letter);
+                Assert.AreEqual(3, code.Parameters[3], 0.0001);
+                Assert.AreEqual('B', code.Parameters[4].Letter);
+                Assert.AreEqual(4, code.Parameters[4], 0.0001);
             }
         }
 
@@ -412,7 +514,7 @@ namespace UnitTests.Commands
         }
 
         [Test]
-        public void ParseM117Expressino()
+        public void ParseM117Expression()
         {
             foreach (DuetAPI.Commands.Code code in Parse("M117 { \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }"))
             {
@@ -466,6 +568,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("if machine.tool.is.great <= {(0.03 - 0.001) + {foo}} ;some nice comment"))
             {
                 Assert.AreEqual(0, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.If, code.Keyword);
                 Assert.AreEqual("machine.tool.is.great <= {(0.03 - 0.001) + {foo}}", code.KeywordArgument);
                 Assert.AreEqual("some nice comment", code.Comment);
@@ -478,6 +581,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("  if {abs(move.calibration.final.deviation - move.calibration.initial.deviation)} < 0.005"))
             {
                 Assert.AreEqual(2, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.If, code.Keyword);
                 Assert.AreEqual("{abs(move.calibration.final.deviation - move.calibration.initial.deviation)} < 0.005", code.KeywordArgument);
                 Assert.IsNull(code.Comment);
@@ -490,6 +594,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("  elif true"))
             {
                 Assert.AreEqual(2, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.ElseIf, code.Keyword);
                 Assert.AreEqual("true", code.KeywordArgument);
             }
@@ -501,6 +606,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("  else"))
             {
                 Assert.AreEqual(2, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.Else, code.Keyword);
                 Assert.IsNull(code.KeywordArgument);
             }
@@ -512,6 +618,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("  while machine.autocal.stddev > 0.04"))
             {
                 Assert.AreEqual(2, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.While, code.Keyword);
                 Assert.AreEqual("machine.autocal.stddev > 0.04", code.KeywordArgument);
             }
@@ -523,6 +630,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("    break"))
             {
                 Assert.AreEqual(4, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.Break, code.Keyword);
                 Assert.IsNull(code.KeywordArgument);
             }
@@ -534,6 +642,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("  continue"))
             {
                 Assert.AreEqual(2, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.Continue, code.Keyword);
                 Assert.IsNull(code.KeywordArgument);
             }
@@ -545,6 +654,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("    abort foo bar"))
             {
                 Assert.AreEqual(4, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.Abort, code.Keyword);
                 Assert.AreEqual("foo bar", code.KeywordArgument);
             }
@@ -556,6 +666,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("  var asdf=0.34"))
             {
                 Assert.AreEqual(2, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.Var, code.Keyword);
                 Assert.AreEqual("asdf=0.34", code.KeywordArgument);
             }
@@ -567,6 +678,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("  set asdf=\"meh\""))
             {
                 Assert.AreEqual(2, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.Set, code.Keyword);
                 Assert.AreEqual("asdf=\"meh\"", code.KeywordArgument);
             }
@@ -578,6 +690,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse(" \tglobal foo=\"bar\""))
             {
                 Assert.AreEqual(4, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.Global, code.Keyword);
                 Assert.AreEqual("foo=\"bar\"", code.KeywordArgument);
             }
@@ -589,8 +702,21 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse("echo {{3 + 3} + (volumes[0].freeSpace - 4)}"))
             {
                 Assert.AreEqual(0, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.Echo, code.Keyword);
                 Assert.AreEqual("{{3 + 3} + (volumes[0].freeSpace - 4)}", code.KeywordArgument);
+            }
+        }
+
+        [Test]
+        public void ParseEchoWithSemicolon()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("echo \"; this should work\""))
+            {
+                Assert.AreEqual(0, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
+                Assert.AreEqual(KeywordType.Echo, code.Keyword);
+                Assert.AreEqual("\"; this should work\"", code.KeywordArgument);
             }
         }
 
@@ -600,6 +726,7 @@ namespace UnitTests.Commands
             foreach (DuetAPI.Commands.Code code in Parse(" \techo \"debug \" ^ abs(3)"))
             {
                 Assert.AreEqual(4, code.Indent);
+                Assert.AreEqual(CodeType.Keyword, code.Type);
                 Assert.AreEqual(KeywordType.Echo, code.Keyword);
                 Assert.AreEqual("\"debug \" ^ abs(3)", code.KeywordArgument);
             }
@@ -768,7 +895,7 @@ namespace UnitTests.Commands
         {
             string codeString = "G53 G1 X0 Y5 F3000 G0 X5 Y10";
             byte[] codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new(codeBytes))
+            await using (MemoryStream memoryStream = new(codeBytes))
             {
                 using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);
@@ -797,7 +924,7 @@ namespace UnitTests.Commands
 
             codeString = "G1 X1 Y5 F3000\nG1 X5 F300\nG0 Y40";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new(codeBytes))
+            await using (MemoryStream memoryStream = new(codeBytes))
             {
                 using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);
@@ -819,7 +946,7 @@ namespace UnitTests.Commands
 
             codeString = "G1 X1 Y5 F3000\nX5 F300\nY40";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new(codeBytes))
+            await using (MemoryStream memoryStream = new(codeBytes))
             {
                 using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true) { MayRepeatCode = true };
@@ -854,7 +981,7 @@ namespace UnitTests.Commands
 
             codeString = "G1 X1 Y5 F3000\n  G53 G1 X5 F300\n    G53 G0 Y40 G1 Z50\n  G4 S3\nG1 Z3";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new(codeBytes))
+            await using (MemoryStream memoryStream = new(codeBytes))
             {
                 using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);
@@ -898,7 +1025,7 @@ namespace UnitTests.Commands
 
             codeString = "M291 P\"Please go to <a href=\"\"https://www.duet3d.com/StartHere\"\" target=\"\"_blank\"\">this</a> page for further instructions on how to set it up.\" R\"Welcome to your new Duet 3!\" S1 T0";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
-            using (MemoryStream memoryStream = new(codeBytes))
+            await using (MemoryStream memoryStream = new(codeBytes))
             {
                 using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);

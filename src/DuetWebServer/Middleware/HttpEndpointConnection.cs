@@ -54,10 +54,7 @@ namespace DuetWebServer.Middleware
         /// <summary>
         /// Returns true if the socket is still connected
         /// </summary>
-        public bool IsConnected
-        {
-            get => !disposed && _unixSocket.Connected;
-        }
+        public bool IsConnected => !disposed && _unixSocket.Connected;
 
         /// <summary>
         /// Closes the current connection and disposes it
@@ -113,7 +110,7 @@ namespace DuetWebServer.Middleware
         /// <exception cref="SocketException">Connection has been closed</exception>
         private async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
-            using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
             return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions);
         }
 

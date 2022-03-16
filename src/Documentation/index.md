@@ -9,4 +9,4 @@ You may choose one of the following namespace documentations:
 3. [DuetControlServer](api/DuetControlServer.yml)
 4. [DuetWebServer](api/DuetWebServer.yml)
 
-For more general documentation, please visit the [DSF Repository on GitHub](https://github.com/chrishamm/DuetSoftwareFramework) or the [Duet3D Documentation](https://docs.duet3d.com).
+For more general documentation, please visit the [DSF Repository on GitHub](https://github.com/chrishamm/DuetSoftwareFramework) or the [Duet3D Documentation](https://duet3d.dozuki.com/).

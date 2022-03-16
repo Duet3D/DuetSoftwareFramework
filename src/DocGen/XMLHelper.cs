@@ -29,7 +29,7 @@ namespace DocGen
         /// <returns>Asynchronous task</returns>
         public static async Task Init(string xmlDocumentation)
         {
-            using FileStream fs = new(xmlDocumentation, FileMode.Open, FileAccess.Read);
+            await using FileStream fs = new(xmlDocumentation, FileMode.Open, FileAccess.Read);
             using XmlReader xmlReader = XmlReader.Create(fs, new() { Async = true });
             while (await xmlReader.ReadAsync())
             {

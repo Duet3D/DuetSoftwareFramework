@@ -3,10 +3,10 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -80,17 +80,20 @@ namespace DuetControlServer.Model
             string lastHostname = Environment.MachineName;
             do
             {
+                // Prefetch the network and volume devices because this can take quite a while (> 1.5s)
+                System.Net.NetworkInformation.NetworkInterface[] networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
+                DriveInfo[] drives = DriveInfo.GetDrives();
+
                 // Run another update cycle
                 using (await Provider.AccessReadWriteAsync())
                 {
-                    await UpdateNetwork();
-                    UpdateVolumes();
+                    UpdateNetwork(networkInterfaces);
+                    UpdateVolumes(drives);
                     CleanMessages();
                 }
 
                 // Check if the system time has to be updated
-                if (DateTime.Now - lastUpdateTime > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 5000) &&
-                    !System.Diagnostics.Debugger.IsAttached)
+                if (DateTime.Now - lastUpdateTime > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 5000) && !Debugger.IsAttached)
                 {
                     _logger.Info("System time has been changed");
                     Code code = new()
@@ -99,10 +102,13 @@ namespace DuetControlServer.Model
                         Flags = CodeFlags.Asynchronous,
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
-                        MajorNumber = 905
+                        MajorNumber = 905,
+                        Parameters = new()
+                        {
+                            new('P', DateTime.Now.ToString("yyyy-MM-dd")),
+                            new('S', DateTime.Now.ToString("HH:mm:ss"))
+                        }
                     };
-                    code.Parameters.Add(new CodeParameter('P', DateTime.Now.ToString("yyyy-MM-dd")));
-                    code.Parameters.Add(new CodeParameter('S', DateTime.Now.ToString("HH:mm:ss")));
                     await code.Execute();
                 }
 
@@ -117,9 +123,12 @@ namespace DuetControlServer.Model
                         Flags = CodeFlags.Asynchronous,
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
-                        MajorNumber = 550
+                        MajorNumber = 550,
+                        Parameters = new()
+                        {
+                            new('P', lastHostname)
+                        }
                     };
-                    code.Parameters.Add(new CodeParameter('P', lastHostname));
                     await code.Execute();
                 }
 
@@ -133,12 +142,12 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Update network interfaces
         /// </summary>
-        private static async Task UpdateNetwork()
+        private static void UpdateNetwork(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces)
         {
             int index = 0;
-            foreach (var iface in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+            foreach (System.Net.NetworkInformation.NetworkInterface iface in networkInterfaces)
             {
-                if (iface.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                if (iface.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
                 {
                     DuetAPI.ObjectModel.NetworkInterface networkInterface;
                     if (index >= Provider.Get.Network.Interfaces.Count)
@@ -180,7 +189,7 @@ namespace DuetControlServer.Model
                     networkInterface.DnsServer = dnsServer?.ToString();
                     networkInterface.Mac = BitConverter.ToString(iface.GetPhysicalAddress().GetAddressBytes()).Replace('-', ':');
                     networkInterface.Speed = (int?)(iface.Speed / 1000000);
-                    networkInterface.Type = iface.Name.StartsWith("w") ? InterfaceType.WiFi : InterfaceType.LAN;
+                    networkInterface.Type = iface.Name.StartsWith("w") ? DuetAPI.ObjectModel.NetworkInterfaceType.WiFi : DuetAPI.ObjectModel.NetworkInterfaceType.LAN;
 
                     // Get WiFi-specific values.
                     // Note that iface.NetworkInterfaceType is broken on Unix and cannot be used (.NET 5)
@@ -188,7 +197,7 @@ namespace DuetControlServer.Model
                     {
                         try
                         {
-                            string wifiData = await File.ReadAllTextAsync("/proc/net/wireless", Program.CancellationToken);
+                            string wifiData = File.ReadAllText("/proc/net/wireless");
                             Regex signalRegex = new(iface.Name + @".*(-\d+)\.");
                             Match signalMatch = signalRegex.Match(wifiData);
                             if (signalMatch.Success)
@@ -201,12 +210,12 @@ namespace DuetControlServer.Model
                             networkInterface.Signal = null;
                             _logger.Debug(e);
                         }
-                        networkInterface.Type = InterfaceType.WiFi;
+                        networkInterface.Type = DuetAPI.ObjectModel.NetworkInterfaceType.WiFi;
                     }
                     else
                     {
                         networkInterface.Signal = null;
-                        networkInterface.Type = InterfaceType.LAN;
+                        networkInterface.Type = DuetAPI.ObjectModel.NetworkInterfaceType.LAN;
                     }
                 }
             }
@@ -221,13 +230,13 @@ namespace DuetControlServer.Model
         /// Update volume devices
         /// </summary>
         /// <remarks>
-        /// Volume 0 always represents the virtual SD card on Linux. The following code achieves this but it
+        /// Volume 0 always represents the virtual SD card on DuetPi. The following code achieves this but it
         /// might need further adjustments to ensure this on every Linux distribution
         /// </remarks>
-        private static void UpdateVolumes()
+        private static void UpdateVolumes(DriveInfo[] drives)
         {
             int index = 0;
-            foreach (DriveInfo drive in DriveInfo.GetDrives())
+            foreach (DriveInfo drive in drives)
             {
                 long totalSize;
                 try
@@ -254,9 +263,10 @@ namespace DuetControlServer.Model
                     }
                     index++;
 
-                    volume.Capacity = (drive.DriveType == DriveType.Network) ? null : (long?)totalSize;
-                    volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : (long?)drive.AvailableFreeSpace;
+                    volume.Capacity = (drive.DriveType == DriveType.Network) ? null : totalSize;
+                    volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : drive.AvailableFreeSpace;
                     volume.Mounted = drive.IsReady;
+                    volume.PartitionSize = (drive.DriveType == DriveType.Network) ? null : totalSize;
                     volume.Path = drive.VolumeLabel;
                 }
             }

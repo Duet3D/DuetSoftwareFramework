@@ -43,6 +43,6 @@
         /// <summary>
         /// The tool number that was active
         /// </summary>
-        public int ToolNumber { get; set; }
+        public int ToolNumber { get; set; } = -1;
     }
 }

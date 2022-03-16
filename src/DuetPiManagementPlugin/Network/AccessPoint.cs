@@ -18,7 +18,7 @@ namespace DuetPiManagementPlugin.Network
         /// <returns>True if the adapter is in AP mode</returns>
         public static async Task<bool> IsEnabled()
         {
-            return File.Exists("/etc/hostapd/wlan0.conf") && (await Command.ExecQuery("/usr/bin/systemctl", "is-active -q hostapd@wlan0.service"));
+            return File.Exists("/etc/hostapd/wlan0.conf") && (await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"));
         }
 
         /// <summary>
@@ -28,15 +28,15 @@ namespace DuetPiManagementPlugin.Network
         public static async Task<string> Start()
         {
             StringBuilder builder = new();
-            if (!await Command.ExecQuery("/usr/bin/systemctl", "is-active -q hostapd@wlan0.service"))
+            if (!await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"))
             {
-                builder.AppendLine(await Command.Execute("/usr/bin/systemctl", "start hostapd@wlan0.service"));
-                builder.AppendLine(await Command.Execute("/usr/bin/systemctl", "enable -q hostapd@wlan0.service"));
+                builder.AppendLine(await Command.Execute("systemctl", "start hostapd@wlan0.service"));
+                builder.AppendLine(await Command.Execute("systemctl", "enable -q hostapd@wlan0.service"));
             }
-            if (!await Command.ExecQuery("/usr/bin/systemctl", "is-active -q dnsmasq.service"))
+            if (!await Command.ExecQuery("systemctl", "is-active -q dnsmasq.service"))
             {
-                builder.AppendLine(await Command.Execute("/usr/bin/systemctl", "start dnsmasq.service"));
-                builder.AppendLine(await Command.Execute("/usr/bin/systemctl", "enable -q dnsmasq.service"));
+                builder.AppendLine(await Command.Execute("systemctl", "start dnsmasq.service"));
+                builder.AppendLine(await Command.Execute("systemctl", "enable -q dnsmasq.service"));
             }
             return builder.ToString().Trim();
         }
@@ -48,15 +48,15 @@ namespace DuetPiManagementPlugin.Network
         public static async Task<string> Stop()
         {
             StringBuilder builder = new();
-            if (await Command.ExecQuery("/usr/bin/systemctl", "is-active -q hostapd@wlan0.service"))
+            if (await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"))
             {
-                builder.AppendLine(await Command.Execute("/usr/bin/systemctl", "stop hostapd@wlan0.service"));
-                builder.AppendLine(await Command.Execute("/usr/bin/systemctl", "disable -q hostapd@wlan0.service"));
+                builder.AppendLine(await Command.Execute("systemctl", "stop hostapd@wlan0.service"));
+                builder.AppendLine(await Command.Execute("systemctl", "disable -q hostapd@wlan0.service"));
             }
-            if (await Command.ExecQuery("/usr/bin/systemctl", "is-active -q dnsmasq.service"))
+            if (await Command.ExecQuery("systemctl", "is-active -q dnsmasq.service"))
             {
-                builder.AppendLine(await Command.Execute("/usr/bin/systemctl", "stop dnsmasq.service"));
-                builder.AppendLine(await Command.Execute("/usr/bin/systemctl", "disable -q dnsmasq.service"));
+                builder.AppendLine(await Command.Execute("systemctl", "stop dnsmasq.service"));
+                builder.AppendLine(await Command.Execute("systemctl", "disable -q dnsmasq.service"));
             }
             return builder.ToString().Trim();
         }
@@ -102,11 +102,11 @@ namespace DuetPiManagementPlugin.Network
             else
             {
                 // Write hostapd config
-                using (FileStream hostapdTemplateStream = new(Path.Combine(Directory.GetCurrentDirectory(), "hostapd.conf"), FileMode.Open, FileAccess.Read))
+                await using (FileStream hostapdTemplateStream = new(Path.Combine(Directory.GetCurrentDirectory(), "hostapd.conf"), FileMode.Open, FileAccess.Read))
                 {
                     using StreamReader reader = new(hostapdTemplateStream);
-                    using FileStream hostapdConfigStream = new("/etc/hostapd/wlan0.conf", FileMode.Create, FileAccess.Write);
-                    using StreamWriter writer = new(hostapdConfigStream);
+                    await using FileStream hostapdConfigStream = new("/etc/hostapd/wlan0.conf", FileMode.Create, FileAccess.Write);
+                    await using StreamWriter writer = new(hostapdConfigStream);
 
                     while (!reader.EndOfStream)
                     {
@@ -120,11 +120,11 @@ namespace DuetPiManagementPlugin.Network
                 }
 
                 // Write dnsmasq config
-                using (FileStream dnsmasqTemplateStream = new(Path.Combine(Directory.GetCurrentDirectory(), "dnsmasq.conf"), FileMode.Open, FileAccess.Read))
+                await using (FileStream dnsmasqTemplateStream = new(Path.Combine(Directory.GetCurrentDirectory(), "dnsmasq.conf"), FileMode.Open, FileAccess.Read))
                 {
                     using StreamReader reader = new(dnsmasqTemplateStream);
-                    using FileStream dnsmasqConfigStream = new("/etc/dnsmasq.conf", FileMode.Create, FileAccess.Write);
-                    using StreamWriter writer = new(dnsmasqConfigStream);
+                    await using FileStream dnsmasqConfigStream = new("/etc/dnsmasq.conf", FileMode.Create, FileAccess.Write);
+                    await using StreamWriter writer = new(dnsmasqConfigStream);
 
                     byte[] ip = ipAddress.GetAddressBytes();
                     string ipRangeStart = $"{ip[0]}.{ip[1]}.{ip[2]}.{((ip[3] < 100 || ip[3] > 150) ? 100 : 151)}";

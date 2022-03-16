@@ -46,14 +46,19 @@ namespace DuetPluginService.Permissions
                             break;
 
                         case SbcPermissions.ManagePlugins:
-                            rules.AppendLine($"  owner {Settings.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/ r,");
-                            rules.AppendLine($"  owner {Settings.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/** rw,");
+                            rules.AppendLine($"  {Settings.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/ r,");
+                            rules.AppendLine($"  {Settings.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/** rw,");
                             // partially enforced by DCS
                             break;
 
                         case SbcPermissions.FileSystemAccess:
                             rules.AppendLine( "  / rw,");
                             rules.AppendLine( "  /** rw,");
+                            break;
+                        case SbcPermissions.GpioAccess:
+                            rules.AppendLine("  /dev/gpio* rwmlk,");
+                            rules.AppendLine("  /dev/i2c* rwmlk,");
+                            rules.AppendLine("  /dev/spidev* rwmlk,");
                             break;
                         case SbcPermissions.LaunchProcesses:
                             rules.AppendLine("  /** mix,");
@@ -62,54 +67,57 @@ namespace DuetPluginService.Permissions
                             includes.AppendLine("  #include <abstractions/nameservice>");
                             rules.AppendLine("  network,");
                             break;
+                        case SbcPermissions.WebcamAccess:
+                            rules.AppendLine("  /dev/video* rwmlk,");
+                            break;
                         case SbcPermissions.ReadFilaments:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "filaments")}/ r,");
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "filaments")}/** r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "filaments")}/ r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "filaments")}/** r,");
                             break;
                         case SbcPermissions.WriteFilaments:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "filaments")}/** wk,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "filaments")}/** wk,");
                             break;
                         case SbcPermissions.ReadFirmware:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "firmware")}/ r,");
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "firmware")}/** r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "firmware")}/ r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "firmware")}/** r,");
                             break;
                         case SbcPermissions.WriteFirmware:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "firmware")}/** wk,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "firmware")}/** wk,");
                             break;
                         case SbcPermissions.ReadGCodes:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "gcodes")}/ r,");
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "gcodes")}/** r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "gcodes")}/ r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "gcodes")}/** r,");
                             break;
                         case SbcPermissions.WriteGCodes:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "gcodes")}/** wk,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "gcodes")}/** wk,");
                             break;
                         case SbcPermissions.ReadMacros:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "macros")}/ r,");
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "macros")}/** r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "macros")}/ r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "macros")}/** r,");
                             break;
                         case SbcPermissions.WriteMacros:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "macros")}/** wk,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "macros")}/** wk,");
                             break;
                         case SbcPermissions.ReadMenu:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "menu")}/ r,");
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "menu")}/** r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "menu")}/ r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "menu")}/** r,");
                             break;
                         case SbcPermissions.WriteMenu:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "menu")}/** wk,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "menu")}/** wk,");
                             break;
                         case SbcPermissions.ReadSystem:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "sys")}/ r,");
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "sys")}/** r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "sys")}/ r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "sys")}/** r,");
                             break;
                         case SbcPermissions.WriteSystem:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "sys")}/** wk,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "sys")}/** wk,");
                             break;
                         case SbcPermissions.ReadWeb:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "www")}/ r,");
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "www")}/** r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "www")}/ r,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "www")}/** r,");
                             break;
                         case SbcPermissions.WriteWeb:
-                            rules.AppendLine($"  owner {Path.Combine(Settings.BaseDirectory, "www")}/** wk,");
+                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "www")}/** wk,");
                             break;
 
                         case SbcPermissions.None:

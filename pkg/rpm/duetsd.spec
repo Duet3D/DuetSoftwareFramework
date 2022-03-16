@@ -24,7 +24,7 @@ AutoReq:  0
 DSF SD Card
 
 %files
-%defattr(0664,root,root,0775)
+%defattr(0664,dsf,dsf,0775)
 %dir %{dsfoptdir}/sd/filaments
 %dir %{dsfoptdir}/sd/firmware
 %dir %{dsfoptdir}/sd/gcodes

@@ -1,6 +1,5 @@
 ﻿using DuetAPI;
 using DuetAPI.ObjectModel;
-using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using System;
 using System.IO;
@@ -8,13 +7,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using Code = DuetControlServer.Commands.Code;
-using Nito.AsyncEx;
 using LinuxApi;
 using System.Collections.Generic;
 using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Model;
-using System.Threading.Tasks;
 using DuetControlServer.Utility;
 using System.Diagnostics;
 
@@ -32,16 +29,14 @@ namespace DuetControlServer.SPI
 
         // General transfer variables
         private static InputGpioPin _transferReadyPin;
-        private static bool _expectedTfrRdyPinValue = false;
-        private static volatile bool _transferReadyPinMonitored;
+        private static bool _expectedTfrRdyPinValue;
         private static SpiDevice _spiDevice;
-        private static readonly AsyncManualResetEvent _transferReadyEvent = new();
         private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting, _updating;
         private static ushort _lastTransferNumber;
 
         private static DateTime _lastTransferMeasureTime = DateTime.Now, _lastCodesMeasureTime = DateTime.Now;
-        private static volatile int _numMeasuredTransfers, _numMeasuredCodes, _maxRxSize, _maxTxSize;
-        private static TimeSpan _maxPinWaitDurationFull = TimeSpan.Zero, _maxPinWaitDuration = TimeSpan.Zero;
+        private static volatile int _numMeasuredTransfers, _numMeasuredCodes, _maxRxSize, _maxTxSize, _numTfrPinGlitches;
+        private static TimeSpan _maxFullTransferDelay = TimeSpan.Zero, _maxPinWaitDurationFull = TimeSpan.Zero, _maxPinWaitDuration = TimeSpan.Zero;
 
         // Transfer headers
         private static readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf<TransferHeader>()];
@@ -81,12 +76,8 @@ namespace DuetControlServer.SPI
             }
             _txBuffer = _txBuffers.First;
 
-            // Initialize transfer ready pin
+            // Initialize transfer ready pin and SPI device
             _transferReadyPin = new InputGpioPin(Settings.GpioChipDevice, Settings.TransferReadyPin, $"dcs-trp-{Settings.TransferReadyPin}");
-            _transferReadyPin.PinChanged += (sender, pinValue) => _transferReadyEvent.Set();
-            MonitorTransferReadyPin();
-
-            // Initialize SPI device
             _spiDevice = new SpiDevice(Settings.SpiDevice, Settings.SpiFrequency, Settings.SpiTransferMode);
 
             // Check if large transfers can be performed
@@ -142,16 +133,27 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Get the maximum time between two full transfers
+        /// </summary>
+        /// <returns>Time in ms</returns>
+        public static double GetMaxFullTransferDelay()
+        {
+            double result = _maxFullTransferDelay.TotalMilliseconds;
+            _maxFullTransferDelay = TimeSpan.Zero;
+            return result;
+        }
+
+        /// <summary>
         /// Get the maximum time to wait for the transfer ready pin to be toggled and reset the counter
         /// </summary>
         /// <param name="fullTransferCounter">Query and reset the full transfer duration</param>
-        /// <returns></returns>
+        /// <returns>Time in ms</returns>
         public static double GetMaxPinWaitDuration(bool fullTransferCounter)
         {
             if (fullTransferCounter)
             {
                 double fullResult = _maxPinWaitDurationFull.TotalMilliseconds;
-                _maxPinWaitDuration = TimeSpan.Zero;
+                _maxPinWaitDurationFull = TimeSpan.Zero;
                 return fullResult;
             }
 
@@ -166,11 +168,16 @@ namespace DuetControlServer.SPI
         /// <param name="builder">Target to write to</param>
         public static void Diagnostics(StringBuilder builder)
         {
-            builder.AppendLine($"Configured SPI speed: {Settings.SpiFrequency}Hz");
-            builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max wait times: {GetMaxPinWaitDuration(true):0.0}ms/{GetMaxPinWaitDuration(false):0.0}ms");
+            builder.AppendLine($"Configured SPI speed: {Settings.SpiFrequency}Hz, TfrRdy pin glitches: {_numTfrPinGlitches}");
+            builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max time between full transfers: {GetMaxFullTransferDelay():0.0}ms, max pin wait times: {GetMaxPinWaitDuration(true):0.0}ms/{GetMaxPinWaitDuration(false):0.0}ms");
             builder.AppendLine($"Codes per second: {GetCodesPerSecond():F2}");
             builder.AppendLine($"Maximum length of RX/TX data transfers: {_maxRxSize}/{_maxTxSize}");
         }
+
+        /// <summary>
+        /// Static stopwatch to measure the times between full transfers with
+        /// </summary>
+        private static readonly Stopwatch _fullTransferStopwatch = new();
 
         /// <summary>
         /// Perform a full data transfer synchronously
@@ -198,6 +205,28 @@ namespace DuetControlServer.SPI
             {
                 try
                 {
+                    // Keep track of the maximum times between regular full transfers
+                    if (!connecting && !_waitingForFirstTransfer && _started && !_hadTimeout && !_updating && !_resetting)
+                    {
+                        if (_fullTransferStopwatch.IsRunning)
+                        {
+                            TimeSpan timeElapsed = _fullTransferStopwatch.Elapsed;
+                            if (timeElapsed > _maxFullTransferDelay)
+                            {
+                                _maxFullTransferDelay = timeElapsed;
+                            }
+                            _fullTransferStopwatch.Reset();
+                        }
+                        else
+                        {
+                            _fullTransferStopwatch.Start();
+                        }
+                    }
+                    else if (_transferStopwatch.IsRunning)
+                    {
+                        _fullTransferStopwatch.Stop();
+                    }
+
                     // Exchange transfer headers. This also deals with transfer responses
                     if (!ExchangeHeader())
                     {
@@ -214,13 +243,13 @@ namespace DuetControlServer.SPI
                     ProtocolVersion = _rxHeader.ProtocolVersion;
                     if ((_hadTimeout || !_started) && ProtocolVersion != Consts.ProtocolVersion)
                     {
-                        _ = Logger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
+                        Logger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
                     }
 
                     // Deal with timeouts
                     if (_hadTimeout)
                     {
-                        _ = Logger.LogOutput(MessageType.Success, "Connection to Duet established");
+                        Logger.LogOutput(MessageType.Success, "Connection to Duet established");
                         _hadTimeout = _resetting = false;
                     }
 
@@ -269,7 +298,7 @@ namespace DuetControlServer.SPI
                     {
                         _hadTimeout = true;
                         Updater.ConnectionLost();
-                        _ = Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
+                        Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
                     }
                 }
             }
@@ -289,7 +318,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Returns the number of packets to read
         /// </summary>
-        public static int PacketsToRead { get => _rxHeader.NumPackets; }
+        public static int PacketsToRead => _rxHeader.NumPackets;
 
         /// <summary>
         /// Read the next packet
@@ -314,7 +343,7 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Read the legacy result of a <see cref="Communication.LinuxRequests.Request.GetObjectModel"/> request
+        /// Read the legacy result of a <see cref="Communication.SbcRequests.Request.GetObjectModel"/> request
         /// </summary>
         /// <param name="json">JSON data</param>
         public static void ReadLegacyConfigResponse(out ReadOnlySpan<byte> json)
@@ -323,7 +352,7 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Read the result of a <see cref="Communication.LinuxRequests.Request.GetObjectModel"/> request
+        /// Read the result of a <see cref="Communication.SbcRequests.Request.GetObjectModel"/> request
         /// </summary>
         /// <param name="json">JSON data</param>
         public static void ReadObjectModel(out ReadOnlySpan<byte> json)
@@ -382,15 +411,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Read the result of a <see cref="Communication.LinuxRequests.Request.GetHeightMap"/> request
-        /// </summary>
-        /// <param name="map">Received heightmap</param>
-        public static void ReadHeightMap(out Heightmap map)
-        {
-            Serialization.Reader.ReadHeightMap(_packetData.Span, out map);
-        }
-
-        /// <summary>
         /// Read a code channel
         /// </summary>
         /// <param name="channel">Code channel that has acquired the lock</param>
@@ -406,7 +426,7 @@ namespace DuetControlServer.SPI
         /// <param name="filename">Filename</param>
         /// <param name="offset">File offset</param>
         /// <param name="maxLength">Maximum chunk size</param>
-        public static void ReadFileChunkRequest(out string filename, out uint offset, out uint maxLength)
+        public static void ReadFileChunkRequest(out string filename, out uint offset, out int maxLength)
         {
             Serialization.Reader.ReadFileChunkRequest(_packetData.Span, out filename, out offset, out maxLength);
         }
@@ -432,13 +452,92 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Read a request to check if a file exists
+        /// </summary>
+        /// <param name="filename">Name of the file</param>
+        public static void ReadCheckFileExists(out string filename)
+        {
+            Serialization.Reader.ReadStringRequest(_packetData.Span, out filename);
+        }
+
+        /// <summary>
+        /// Read a request to delete a file or directory
+        /// </summary>
+        /// <param name="filename">Name of the file</param>
+        public static void ReadDeleteFileOrDirectory(out string filename)
+        {
+            Serialization.Reader.ReadStringRequest(_packetData.Span, out filename);
+        }
+
+        /// <summary>
+        /// Read an open file request
+        /// </summary>
+        /// <param name="filename">Filename to open</param>
+        /// <param name="forWriting">Whether the file is supposed to be written to</param>
+        /// <param name="append">Whether data is supposed to be appended in write mode</param>
+        /// <param name="preAllocSize">How many bytes to allocate if the file is created or overwritten</param>
+        public static void ReadOpenFile(out string filename, out bool forWriting, out bool append, out long preAllocSize)
+        {
+            Serialization.Reader.ReadOpenFile(_packetData.Span, out filename, out forWriting, out append, out preAllocSize);
+        }
+
+        /// <summary>
+        /// Read a request to seek in a file
+        /// </summary>
+        /// <param name="handle">File handle</param>
+        /// <param name="offset">New file position</param>
+        public static void ReadSeekFile(out uint handle, out long offset)
+        {
+            Serialization.Reader.ReadSeekFile(_packetData.Span, out handle, out offset);
+        }
+
+        /// <summary>
+        /// Read a request to truncate a file
+        /// </summary>
+        /// <param name="handle">File handle</param>
+        public static void ReadTruncateFile(out uint handle)
+        {
+            Serialization.Reader.ReadFileHandle(_packetData.Span, out handle);
+        }
+
+        /// <summary>
+        /// Read a request to read data from a file
+        /// </summary>
+        /// <param name="handle">File handle</param>
+        /// <param name="maxLength">Maximum data length</param>
+        public static void ReadFileRequest(out uint handle, out int maxLength)
+        {
+            Serialization.Reader.ReadFileRequest(_packetData.Span, out handle, out maxLength);
+        }
+
+        /// <summary>
+        /// Read a request to write data to a file
+        /// </summary>
+        /// <param name="handle">File handle</param>
+        /// <param name="data">Data to write</param>
+        public static void ReadWriteRequest(out uint handle, out ReadOnlySpan<byte> data)
+        {
+            int bytesRead = Serialization.Reader.ReadFileHandle(_packetData.Span, out handle);
+            data = _packetData[bytesRead..].Span;
+        }
+
+        /// <summary>
+        /// Read a request to close a file
+        /// </summary>
+        /// <param name="handle">File handle</param>
+        public static void ReadCloseFile(out uint handle)
+        {
+            Serialization.Reader.ReadFileHandle(_packetData.Span, out handle);
+        }
+
+        /// <summary>
         /// Write the last packet + content for diagnostic purposes
         /// </summary>
         public static void DumpMalformedPacket()
         {
-            using (FileStream stream = new(Path.Combine(Directory.GetCurrentDirectory(), "transferDump.bin"), FileMode.Create, FileAccess.Write))
+            using (FileStream stream = new(Path.Combine(Settings.BaseDirectory, "sys/transferDump.bin"), FileMode.Create, FileAccess.Write))
             {
-                stream.Write(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+                stream.Write(_rxBuffer[.._rxHeader.DataLength].Span);
             }
 
             string dump = "Received malformed packet:\n";
@@ -463,9 +562,9 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Write a packet
         /// </summary>
-        /// <param name="request">Linux request to send</param>
+        /// <param name="request">SBC request to send</param>
         /// <param name="dataLength">Length of the extra payload</param>
-        private static void WritePacket(Communication.LinuxRequests.Request request, int dataLength = 0)
+        private static void WritePacket(Communication.SbcRequests.Request request, int dataLength = 0)
         {
             PacketHeader header = new()
             {
@@ -481,15 +580,20 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Get a span on a 4-byte bounary for writing packet data
+        /// Get a span on a 4-byte boundary for writing packet data
         /// </summary>
         /// <param name="dataLength">Required data length</param>
         /// <returns>Data span</returns>
         private static Span<byte> GetWriteBuffer(int dataLength)
         {
-            Span<byte> result = _txBuffer.Value.Slice(_txPointer, dataLength).Span;
             int padding = 4 - (dataLength % 4);
-            _txPointer += dataLength + ((padding == 4) ? 0 : padding);
+            if (padding != 4)
+            {
+                dataLength += padding;
+            }
+
+            Span<byte> result = _txBuffer.Value.Slice(_txPointer, dataLength).Span;
+            _txPointer += dataLength;
             return result;
         }
 
@@ -497,8 +601,8 @@ namespace DuetControlServer.SPI
         /// Resend a packet back to the firmware
         /// </summary>
         /// <param name="packet">Packet holding the resend request</param>
-        /// <param name="linuxRequest">Content of the packet to resend</param>
-        public static void ResendPacket(PacketHeader packet, out Communication.LinuxRequests.Request linuxRequest)
+        /// <param name="sbcRequest">Content of the packet to resend</param>
+        public static void ResendPacket(PacketHeader packet, out Communication.SbcRequests.Request sbcRequest)
         {
             Span<byte> buffer = (_txBuffer.Next ?? _txBuffers.First).Value.Span;
 
@@ -511,8 +615,8 @@ namespace DuetControlServer.SPI
                 if (header.Id == packet.ResendPacketId)
                 {
                     // Resend it but use a new identifier
-                    linuxRequest = (Communication.LinuxRequests.Request)header.Request;
-                    WritePacket(linuxRequest, header.Length);
+                    sbcRequest = (Communication.SbcRequests.Request)header.Request;
+                    WritePacket(sbcRequest, header.Length);
                     buffer.Slice(headerSize, header.Length).CopyTo(GetWriteBuffer(header.Length));
                     return;
                 }
@@ -537,7 +641,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.EmergencyStop);
+            WritePacket(Communication.SbcRequests.Request.EmergencyStop);
             return true;
         }
 
@@ -554,7 +658,7 @@ namespace DuetControlServer.SPI
 
             _txPointer = 0;
             _resetting = true;
-            WritePacket(Communication.LinuxRequests.Request.Reset);
+            WritePacket(Communication.SbcRequests.Request.Reset);
             return true;
         }
 
@@ -603,8 +707,8 @@ namespace DuetControlServer.SPI
             _numMeasuredCodes++;
 
             // Write it
-            WritePacket(Communication.LinuxRequests.Request.Code, codeLength);
-            span.Slice(0, codeLength).CopyTo(GetWriteBuffer(codeLength));
+            WritePacket(Communication.SbcRequests.Request.Code, codeLength);
+            span[..codeLength].CopyTo(GetWriteBuffer(codeLength));
             return true;
         }
 
@@ -614,13 +718,13 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteGetLegacyConfigResponse()
         {
-            if (!CanWritePacket(Marshal.SizeOf<int>()))
+            if (!CanWritePacket(sizeof(int)))
             {
                 return false;
             }
 
             // Write header
-            WritePacket(Communication.LinuxRequests.Request.GetObjectModel, Marshal.SizeOf<int>());
+            WritePacket(Communication.SbcRequests.Request.GetObjectModel, sizeof(int));
 
             // Write data
             byte[] configModuleRequest = new byte[] { 0, 0, 5, 0 };
@@ -633,7 +737,7 @@ namespace DuetControlServer.SPI
         /// Request the key of a object module of a specific module
         /// </summary>
         /// <param name="key">Object model key to query</param>
-        /// <param name="flags">Objecvt model flags to query</param>
+        /// <param name="flags">Object model flags to query</param>
         /// <returns>True if the packet could be written</returns>
         public static bool WriteGetObjectModel(string key, string flags)
         {
@@ -648,8 +752,8 @@ namespace DuetControlServer.SPI
             }
 
             // Write it
-            WritePacket(Communication.LinuxRequests.Request.GetObjectModel, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            WritePacket(Communication.SbcRequests.Request.GetObjectModel, dataLength);
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -672,8 +776,8 @@ namespace DuetControlServer.SPI
             }
 
             // Write it
-            WritePacket(Communication.LinuxRequests.Request.SetObjectModel, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            WritePacket(Communication.SbcRequests.Request.SetObjectModel, dataLength);
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -682,11 +786,11 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="info">Information about the file being printed</param>
         /// <returns>True if the packet could be written</returns>
-        public static bool WritePrintStarted(ParsedFileInfo info)
+        public static bool WritePrintFileInfo(GCodeFileInfo info)
         {
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
-            int dataLength = Serialization.Writer.WritePrintStarted(span, info);
+            int dataLength = Serialization.Writer.WritePrintFileInfo(span, info);
 
             // See if the request fits into the buffer
             if (!CanWritePacket(dataLength))
@@ -695,8 +799,8 @@ namespace DuetControlServer.SPI
             }
 
             // Write it
-            WritePacket(Communication.LinuxRequests.Request.PrintStarted, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            WritePacket(Communication.SbcRequests.Request.SetPrintFileInfo, dataLength);
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -707,13 +811,13 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WritePrintStopped(PrintStoppedReason reason)
         {
-            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.PrintStoppedHeader>();
+            int dataLength = Marshal.SizeOf<Communication.SbcRequests.PrintStoppedHeader>();
             if (!CanWritePacket(dataLength))
             {
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.PrintStopped, dataLength);
+            WritePacket(Communication.SbcRequests.Request.PrintStopped, dataLength);
             Serialization.Writer.WritePrintStopped(GetWriteBuffer(dataLength), reason);
             return true;
         }
@@ -727,52 +831,14 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteMacroCompleted(CodeChannel channel, bool error)
         {
-            int dataLength = Marshal.SizeOf<Communication.LinuxRequests.MacroCompleteHeader>();
+            int dataLength = Marshal.SizeOf<Communication.SbcRequests.MacroCompleteHeader>();
             if (!CanWritePacket(dataLength))
             {
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.MacroCompleted, dataLength);
+            WritePacket(Communication.SbcRequests.Request.MacroCompleted, dataLength);
             Serialization.Writer.WriteMacroCompleted(GetWriteBuffer(dataLength), channel, error);
-            return true;
-        }
-
-        /// <summary>
-        /// Request the heightmap from the firmware
-        /// </summary>
-        /// <returns>True if the packet could be written</returns>
-        public static bool WriteGetHeightMap()
-        {
-            if (!CanWritePacket())
-            {
-                return false;
-            }
-
-            WritePacket(Communication.LinuxRequests.Request.GetHeightMap);
-            return true;
-        }
-        
-        /// <summary>
-        /// Write a heightmap to the firmware
-        /// </summary>
-        /// <param name="map">Heightmap to send</param>
-        /// <returns>True if the packet could be written</returns>
-        public static bool WriteHeightMap(Heightmap map)
-        {
-            // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
-            int dataLength = Serialization.Writer.WriteHeightMap(span, map);
-
-            // See if the request fits into the buffer
-            if (!CanWritePacket(dataLength))
-            {
-                return false;
-            }
-
-            // Write it
-            WritePacket(Communication.LinuxRequests.Request.SetHeightMap, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -789,7 +855,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.LockMovementAndWaitForStandstill, dataLength);
+            WritePacket(Communication.SbcRequests.Request.LockMovementAndWaitForStandstill, dataLength);
             Serialization.Writer.WriteCodeChannel(GetWriteBuffer(dataLength), channel);
             return true;
         }
@@ -807,7 +873,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.Unlock, dataLength);
+            WritePacket(Communication.SbcRequests.Request.Unlock, dataLength);
             Serialization.Writer.WriteCodeChannel(GetWriteBuffer(dataLength), channel);
             return true;
         }
@@ -817,16 +883,16 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="stream">IAP binary</param>
         /// <returns>Whether another segment could be written</returns>
-        public static async Task<bool> WriteIapSegment(Stream stream)
+        public static bool WriteIapSegment(Stream stream)
         {
-            byte[] data = new byte[Consts.IapSegmentSize];
-            int bytesRead = await stream.ReadAsync(data);
+            Span<byte> data = stackalloc byte[Consts.IapSegmentSize];
+            int bytesRead = stream.Read(data);
             if (bytesRead <= 0)
             {
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.WriteIap, bytesRead);
+            WritePacket(Communication.SbcRequests.Request.WriteIap, bytesRead);
             data[..bytesRead].CopyTo(GetWriteBuffer(bytesRead));
             PerformFullTransfer();
             return true;
@@ -838,7 +904,7 @@ namespace DuetControlServer.SPI
         public static void StartIap()
         {
             // Tell the firmware to boot the IAP program
-            WritePacket(Communication.LinuxRequests.Request.StartIap);
+            WritePacket(Communication.SbcRequests.Request.StartIap);
             PerformFullTransfer();
 
             // Wait for the first transfer.
@@ -851,12 +917,12 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="stream">Stream of the firmware binary</param>
         /// <returns>Whether another segment could be sent</returns>
-        public static async Task<bool> FlashFirmwareSegment(Stream stream)
+        public static bool FlashFirmwareSegment(Stream stream)
         {
-            byte[] readBuffer = new byte[Consts.FirmwareSegmentSize];
-            byte[] writeBuffer = new byte[Consts.FirmwareSegmentSize];
+            Span<byte> readBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
+            Span<byte> writeBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
 
-            int bytesRead = await stream.ReadAsync(writeBuffer);
+            int bytesRead = stream.Read(writeBuffer);
             if (bytesRead <= 0)
             {
                 return false;
@@ -865,7 +931,7 @@ namespace DuetControlServer.SPI
             if (bytesRead != Consts.FirmwareSegmentSize)
             {
                 // Fill up the remaining space with 0xFF. The IAP program does the same once complete
-                writeBuffer.AsSpan(bytesRead..).Fill(0xFF);
+                writeBuffer[bytesRead..].Fill(0xFF);
             }
 
             WaitForTransfer();
@@ -879,25 +945,25 @@ namespace DuetControlServer.SPI
         /// <param name="firmwareLength">Length of the written firmware in bytes</param>
         /// <param name="crc16">CRC16 checksum of the firmware</param>
         /// <returns>Whether the firmware has been written successfully</returns>
-        public static async Task<bool> VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
+        public static bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
         {
             // At this point IAP expects another segment so wait for it to be ready first. After that, wait a moment for IAP to acknowledge we're done
             WaitForTransfer();
-            await Task.Delay(Consts.FirmwareFinishedDelay);
+            Thread.Sleep(Consts.FirmwareFinishedDelay);
 
             // Send the final firmware size plus CRC16 checksum to IAP
-            Communication.LinuxRequests.FlashVerify verifyRequest = new()
+            Communication.SbcRequests.FlashVerify verifyRequest = new()
             {
                 firmwareLength = (uint)firmwareLength,
                 crc16 = crc16
             };
-            byte[] transferData = new byte[Marshal.SizeOf<Communication.LinuxRequests.FlashVerify>()];
+            Span<byte> transferData = stackalloc byte[Marshal.SizeOf<Communication.SbcRequests.FlashVerify>()];
             MemoryMarshal.Write(transferData, ref verifyRequest);
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(transferData, transferData);
 
             // Check if the IAP can confirm our CRC16 checksum
-            byte[] writeOk = new byte[1];
+            Span<byte> writeOk = stackalloc byte[1];
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(writeOk, writeOk);
             return (writeOk[0] == 0x0C);
@@ -906,40 +972,16 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Wait for the IAP program to reset the controller
         /// </summary>
-        public static async Task WaitForIapReset()
+        public static void WaitForIapReset()
         {
             // Wait a moment for the firmware to start
-            await Task.Delay(Consts.IapRebootDelay);
+            Thread.Sleep(Consts.IapRebootDelay);
 
             // Wait for the first data transfer from the firmware
             _updating = _started = false;
             _waitingForFirstTransfer = true;
             _rxHeader.SequenceNumber = 1;
             _txHeader.SequenceNumber = 0;
-        }
-
-        /// <summary>
-        /// Assign a filament name to the given extruder drive
-        /// </summary>
-        /// <param name="extruder">Extruder index</param>
-        /// <param name="filamentName">Filament name</param>
-        /// <returns>Whether the firmware has been written successfully</returns>
-        public static bool WriteAssignFilament(int extruder, string filamentName)
-        {
-            // Serialize the request first to see how much space it requires
-            Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
-            int dataLength = Serialization.Writer.WriteAssignFilament(span, extruder, filamentName);
-
-            // See if the request fits into the buffer
-            if (!CanWritePacket(dataLength))
-            {
-                return false;
-            }
-
-            // Write it
-            WritePacket(Communication.LinuxRequests.Request.AssignFilament, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
-            return true;
         }
 
         /// <summary>
@@ -961,8 +1003,8 @@ namespace DuetControlServer.SPI
             }
 
             // Write it
-            WritePacket(Communication.LinuxRequests.Request.FileChunk, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            WritePacket(Communication.SbcRequests.Request.FileChunk, dataLength);
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -985,8 +1027,8 @@ namespace DuetControlServer.SPI
             }
 
             // Write it
-            WritePacket(Communication.LinuxRequests.Request.EvaluateExpression, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            WritePacket(Communication.SbcRequests.Request.EvaluateExpression, dataLength);
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -1009,8 +1051,8 @@ namespace DuetControlServer.SPI
             }
 
             // Write it
-            WritePacket(Communication.LinuxRequests.Request.Message, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            WritePacket(Communication.SbcRequests.Request.Message, dataLength);
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -1027,17 +1069,17 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.MacroStarted, dataLength);
+            WritePacket(Communication.SbcRequests.Request.MacroStarted, dataLength);
             Serialization.Writer.WriteCodeChannel(GetWriteBuffer(dataLength), channel);
             return true;
         }
 
         /// <summary>
-        /// Called when all the files have been aborted by DSF (e.g. via abort keyword)
+        /// Called when a code channel is supposed to be invalidated (e.g. via abort keyword)
         /// </summary>
         /// <param name="channel">Code channel that requires the lock</param>
         /// <returns>True if the packet could be written</returns>
-        public static bool WriteFilesAborted(CodeChannel channel)
+        public static bool WriteInvalidateChannel(CodeChannel channel)
         {
             int dataLength = Marshal.SizeOf<CodeChannelHeader>();
             if (!CanWritePacket(dataLength))
@@ -1045,7 +1087,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            WritePacket(Communication.LinuxRequests.Request.FilesAborted, dataLength);
+            WritePacket(Communication.SbcRequests.Request.InvalidateChannel, dataLength);
             Serialization.Writer.WriteCodeChannel(GetWriteBuffer(dataLength), channel);
             return true;
         }
@@ -1071,8 +1113,8 @@ namespace DuetControlServer.SPI
             }
 
             // Write it
-            WritePacket(Communication.LinuxRequests.Request.SetVariable, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            WritePacket(Communication.SbcRequests.Request.SetVariable, dataLength);
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
 
@@ -1081,7 +1123,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">G-code channel</param>
         /// <param name="varName">Name of the variable excluding var prefix</param>
-        /// <returns>True fi the packet could be written</returns>
+        /// <returns>True if the packet could be written</returns>
         public static bool WriteDeleteLocalVariable(CodeChannel channel, string varName)
         {
             // Serialize the request first to see how much space it requires
@@ -1095,8 +1137,136 @@ namespace DuetControlServer.SPI
             }
 
             // Write it
-            WritePacket(Communication.LinuxRequests.Request.DeleteLocalVariable, dataLength);
-            span.Slice(0, dataLength).CopyTo(GetWriteBuffer(dataLength));
+            WritePacket(Communication.SbcRequests.Request.DeleteLocalVariable, dataLength);
+            span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
+            return true;
+        }
+
+        /// <summary>
+        /// Send back whether a file exists or not
+        /// </summary>
+        /// <param name="exists">Whether the file exists</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteCheckFileExistsResult(bool exists)
+        {
+            int dataLength = Marshal.SizeOf<Communication.SbcRequests.BooleanHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.SbcRequests.Request.CheckFileExistsResult, dataLength);
+            Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), exists);
+            return true;
+        }
+
+        /// <summary>
+        /// Send back whether a file or directory could be deleted
+        /// </summary>
+        /// <param name="success">Whether the file operation was successful</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteFileDeleteResult(bool success)
+        {
+            int dataLength = Marshal.SizeOf<Communication.SbcRequests.BooleanHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.SbcRequests.Request.FileDeleteResult, dataLength);
+            Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), success);
+            return true;
+        }
+
+        /// <summary>
+        /// Write the new file handle and file length of the file that has just been opened
+        /// </summary>
+        /// <param name="fileHandle">New file handle or noFileHandle if the file could not be opened</param>
+        /// <param name="length">Length of the file</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteOpenFileResult(uint fileHandle, long length)
+        {
+            int dataLength = Marshal.SizeOf<Communication.SbcRequests.OpenFileResult>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.SbcRequests.Request.OpenFileResult, dataLength);
+            Serialization.Writer.WriteOpenFileResult(GetWriteBuffer(dataLength), fileHandle, length);
+            return true;
+        }
+
+        /// <summary>
+        /// Write requested read data from a file
+        /// </summary>
+        /// <param name="data">File data</param>
+        /// <param name="bytesRead">Number of bytes read or negative on error</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteFileReadResult(Span<byte> data, int bytesRead)
+        {
+            int dataLength = Marshal.SizeOf<Communication.SbcRequests.FileDataHeader>() + data.Length;
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.SbcRequests.Request.FileReadResult, dataLength);
+            Serialization.Writer.WriteFileReadResult(GetWriteBuffer(dataLength), data, bytesRead);
+            return true;
+        }
+
+        /// <summary>
+        /// Tell RRF if the last file block could be written
+        /// </summary>
+        /// <param name="success">If the file data could be written</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteFileWriteResult(bool success)
+        {
+            int dataLength = Marshal.SizeOf<Communication.SbcRequests.BooleanHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.SbcRequests.Request.FileWriteResult, dataLength);
+            Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), success);
+            return true;
+        }
+
+        /// <summary>
+        /// Tell RRF if the seek operation was successful
+        /// </summary>
+        /// <param name="success">If the seek operation succeeded</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteFileSeekResult(bool success)
+        {
+            int dataLength = Marshal.SizeOf<Communication.SbcRequests.BooleanHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.SbcRequests.Request.FileSeekResult, dataLength);
+            Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), success);
+            return true;
+        }
+
+        /// <summary>
+        /// Tell RRF if the seek operation was successful
+        /// </summary>
+        /// <param name="success">If the seek operation succeeded</param>
+        /// <returns>If the packet could be written</returns>
+        public static bool WriteFileTruncateResult(bool success)
+        {
+            int dataLength = Marshal.SizeOf<Communication.SbcRequests.BooleanHeader>();
+            if (!CanWritePacket(dataLength))
+            {
+                return false;
+            }
+
+            WritePacket(Communication.SbcRequests.Request.FileTruncateResult, dataLength);
+            Serialization.Writer.WriteBoolean(GetWriteBuffer(dataLength), success);
             return true;
         }
 
@@ -1113,29 +1283,9 @@ namespace DuetControlServer.SPI
 
         #region Functions for data transfers
         /// <summary>
-        /// Internal function to monitor the transfer ready pin
+        /// Static stopwatch to measure the transfer times with
         /// </summary>
-        public static void MonitorTransferReadyPin()
-        {
-            _transferReadyPinMonitored = true;
-            _transferReadyPin.StartMonitoring(Program.CancellationToken)
-                .ContinueWith(async task =>
-                {
-                    try
-                    {
-                        // Wait for the task to complete
-                        await task;
-                    }
-                    catch (Exception e)
-                    {
-                        if (!(e is OperationCanceledException))
-                        {
-                            _transferReadyPinMonitored = false;
-                            _logger.Error(e, "Failed to monitor transfer ready pin");
-                        }
-                    }
-                });
-        }
+        private static readonly Stopwatch _transferStopwatch = new();
 
         /// <summary>
         /// Wait for the Duet to flag when it is ready to transfer data
@@ -1143,22 +1293,15 @@ namespace DuetControlServer.SPI
         /// <param name="inTransfer">Whether a full transfer is being performed</param>
         private static void WaitForTransfer(bool inTransfer = true)
         {
-            if (!_transferReadyPinMonitored)
-            {
-                throw new InvalidOperationException("Transfer ready pin is not monitored");
-            }
-
             if (_waitingForFirstTransfer)
             {
-                _transferReadyEvent.Reset();
+                _transferReadyPin.FlushEvents();
                 if (!_transferReadyPin.Value)
                 {
-                    // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
-                    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                    cts.CancelAfter(_updating ? Consts.IapTimeout : Settings.SpiConnectTimeout);
                     try
                     {
-                        _transferReadyEvent.Wait(cts.Token);
+                        // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
+                        while (!_transferReadyPin.WaitForEvent(_updating ? Consts.IapTimeout : Settings.SpiConnectTimeout)) { }
                     }
                     catch (OperationCanceledException)
                     {
@@ -1174,49 +1317,43 @@ namespace DuetControlServer.SPI
             }
             else
             {
-                Stopwatch watch = new();
-                watch.Start();
-
                 // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred.
-                using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-                cts.CancelAfter(_updating ? Consts.IapTimeout : (inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout));
-                do
+                int timeout = _updating ? Consts.IapTimeout : (inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout);
+                _transferStopwatch.Restart();
+                try
                 {
-                    try
+                    while (_transferReadyPin.WaitForEvent(timeout) != _expectedTfrRdyPinValue)
                     {
-                        _transferReadyEvent.Wait(cts.Token);
+                        _numTfrPinGlitches++;
                     }
-                    catch
-                    {
-                        if (Program.CancellationToken.IsCancellationRequested)
-                        {
-                            throw new OperationCanceledException("Program termination");
-                        }
-                        throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
-                    }
-                    _transferReadyEvent.Reset();
                 }
-                while (_transferReadyPin.Value != _expectedTfrRdyPinValue);
+                catch (OperationCanceledException)
+                {
+                    if (Program.CancellationToken.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException("Program termination");
+                    }
+                    throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
+                }
                 _expectedTfrRdyPinValue = !_expectedTfrRdyPinValue;
+                _transferStopwatch.Stop();
 
                 // Keep track of the maximum times to wait for the TfrRdy pin to change
-                watch.Stop();
                 if (inTransfer)
                 {
-                    if (watch.Elapsed > _maxPinWaitDuration)
+                    if (_transferStopwatch.Elapsed > _maxPinWaitDuration)
                     {
-                        _maxPinWaitDuration = watch.Elapsed;
+                        _maxPinWaitDuration = _transferStopwatch.Elapsed;
                     }
                 }
                 else
                 {
-                    if (watch.Elapsed > _maxPinWaitDurationFull)
+                    if (_transferStopwatch.Elapsed > _maxPinWaitDurationFull)
                     {
-                        _maxPinWaitDurationFull = watch.Elapsed;
+                        _maxPinWaitDurationFull = _transferStopwatch.Elapsed;
                     }
                 }
             }
-            _transferReadyEvent.Reset();
         }
 
         /// <summary>
@@ -1226,16 +1363,16 @@ namespace DuetControlServer.SPI
         {
             if (_txHeader.ProtocolVersion >= 4)
             {
-                _txHeader.ChecksumData32 = CRC32.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
+                _txHeader.ChecksumData32 = CRC32.Calculate(_txBuffer.Value[.._txPointer].Span);
                 MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-                _txHeader.ChecksumHeader32 = CRC32.Calculate(_txHeaderBuffer.Slice(0, 12).Span);
+                _txHeader.ChecksumHeader32 = CRC32.Calculate(_txHeaderBuffer[..12].Span);
                 MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
             }
             else
             {
-                _txHeader.ChecksumData16 = CRC16.Calculate(_txBuffer.Value.Slice(0, _txPointer).Span);
+                _txHeader.ChecksumData16 = CRC16.Calculate(_txBuffer.Value[.._txPointer].Span);
                 MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
-                _txHeader.ChecksumHeader16 = CRC16.Calculate(_txHeaderBuffer.Slice(0, 10).Span);
+                _txHeader.ChecksumHeader16 = CRC16.Calculate(_txHeaderBuffer[..10].Span);
                 MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
             }
         }
@@ -1256,7 +1393,7 @@ namespace DuetControlServer.SPI
                 }
                 else
                 {
-                    _spiDevice.TransferFullDuplex(_txHeaderBuffer.Slice(0, 12).Span, _rxHeaderBuffer.Slice(0, 12).Span);
+                    _spiDevice.TransferFullDuplex(_txHeaderBuffer[..12].Span, _rxHeaderBuffer[..12].Span);
                 }
 
                 // Check for possible response code
@@ -1289,10 +1426,10 @@ namespace DuetControlServer.SPI
                 // Verify header checksum
                 if (_rxHeader.ProtocolVersion >= 4)
                 {
-                    uint crc32 = CRC32.Calculate(_rxHeaderBuffer.Slice(0, 12).Span);
+                    uint crc32 = CRC32.Calculate(_rxHeaderBuffer[..12].Span);
                     if (_rxHeader.ChecksumHeader32 != crc32)
                     {
-                        _logger.Warn("Bad header CRC32 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader32.ToString("x8"), crc32.ToString("x8"));
+                        _logger.Warn("Bad header CRC32 (expected 0x{0:x8}, got 0x{1:x8})", _rxHeader.ChecksumHeader32, crc32);
                         responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
@@ -1301,17 +1438,17 @@ namespace DuetControlServer.SPI
                         }
                         if (responseCode != TransferResponse.Success)
                         {
-                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                         }
                         continue;
                     }
                 }
                 else
                 {
-                    ushort crc16 = CRC16.Calculate(_rxHeaderBuffer.Slice(0, 10).Span);
+                    ushort crc16 = CRC16.Calculate(_rxHeaderBuffer[..10].Span);
                     if (_rxHeader.ChecksumHeader16 != crc16)
                     {
-                        _logger.Warn("Bad header CRC16 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumHeader16.ToString("x4"), crc16.ToString("x4"));
+                        _logger.Warn("Bad header CRC16 (expected 0x{0:x4}, got 0x{1:x4})", _rxHeader.ChecksumHeader16, crc16);
                         responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
@@ -1320,7 +1457,7 @@ namespace DuetControlServer.SPI
                         }
                         if (responseCode != TransferResponse.Success)
                         {
-                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                         }
                         continue;
                     }
@@ -1351,14 +1488,8 @@ namespace DuetControlServer.SPI
 
                 if (lastProtocolVersion != _txHeader.ProtocolVersion)
                 {
-                    if (_txHeader.ProtocolVersion < Consts.ProtocolVersion)
-                    {
-                        _logger.Warn("Downgrading protocol version {0} to {1}", lastProtocolVersion, _txHeader.ProtocolVersion);
-                    }
-                    else
-                    {
-                        _logger.Warn("Upgrading protocol version {0} to {1}", lastProtocolVersion, _txHeader.ProtocolVersion);
-                    }
+                    _logger.Warn(_txHeader.ProtocolVersion < Consts.ProtocolVersion ? "Downgrading protocol version {0} to {1}" : "Upgrading protocol version {0} to {1}",
+                        lastProtocolVersion, _txHeader.ProtocolVersion);
                 }
 
                 // Check the data length
@@ -1390,7 +1521,7 @@ namespace DuetControlServer.SPI
                     case TransferResponse.HighPin:
                         throw new OperationCanceledException("Board is not available (no header response)");
                     default:
-                        _logger.Warn("Restarting transfer because a bad header response was received (0x{0})", response.ToString("x8"));
+                        _logger.Warn("Restarting transfer because a bad header response was received (0x{0:x8})", response);
                         ExchangeResponse(TransferResponse.BadResponse);
                         return false;
                 }
@@ -1408,7 +1539,7 @@ namespace DuetControlServer.SPI
         /// <returns>Received response</returns>
         private static uint ExchangeResponse(uint response)
         {
-            Span<byte> txResponseBuffer = stackalloc byte[Marshal.SizeOf<uint>()], rxResponseBuffer = stackalloc byte[Marshal.SizeOf<uint>()];
+            Span<byte> txResponseBuffer = stackalloc byte[sizeof(uint)], rxResponseBuffer = stackalloc byte[sizeof(uint)];
             MemoryMarshal.Write(txResponseBuffer, ref response);
 
             WaitForTransfer();
@@ -1427,7 +1558,7 @@ namespace DuetControlServer.SPI
             for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
             {
                 WaitForTransfer();
-                _spiDevice.TransferFullDuplex(_txBuffer.Value.Slice(0, bytesToTransfer).Span, _rxBuffer.Slice(0, bytesToTransfer).Span);
+                _spiDevice.TransferFullDuplex(_txBuffer.Value[..bytesToTransfer].Span, _rxBuffer[..bytesToTransfer].Span);
 
                 // Check for possible response code
                 uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);
@@ -1440,10 +1571,10 @@ namespace DuetControlServer.SPI
                 // Inspect received data
                 if (_rxHeader.ProtocolVersion >= 4)
                 {
-                    uint crc32 = CRC32.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+                    uint crc32 = CRC32.Calculate(_rxBuffer[.._rxHeader.DataLength].Span);
                     if (crc32 != _rxHeader.ChecksumData32)
                     {
-                        _logger.Warn("Bad data CRC32 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData32.ToString("x8"), crc32.ToString("x8"));
+                        _logger.Warn("Bad data CRC32 (expected 0x{0:x8}, got 0x{1:x8})", _rxHeader.ChecksumData32, crc32);
                         responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
@@ -1452,17 +1583,17 @@ namespace DuetControlServer.SPI
                         }
                         if (responseCode != TransferResponse.Success)
                         {
-                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                         }
                         continue;
                     }
                 }
                 else
                 {
-                    ushort crc16 = CRC16.Calculate(_rxBuffer.Slice(0, _rxHeader.DataLength).Span);
+                    ushort crc16 = CRC16.Calculate(_rxBuffer[.._rxHeader.DataLength].Span);
                     if (crc16 != _rxHeader.ChecksumData16)
                     {
-                        _logger.Warn("Bad data CRC16 (expected 0x{0}, got 0x{1})", _rxHeader.ChecksumData16.ToString("x4"), crc16.ToString("x4"));
+                        _logger.Warn("Bad data CRC16 (expected 0x{0:x4}, got 0x{1:x4})", _rxHeader.ChecksumData16, crc16);
                         responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
@@ -1471,7 +1602,7 @@ namespace DuetControlServer.SPI
                         }
                         if (responseCode != TransferResponse.Success)
                         {
-                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0})", responseCode.ToString("x8"));
+                            _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                         }
                         continue;
                     }
@@ -1493,7 +1624,7 @@ namespace DuetControlServer.SPI
                     case TransferResponse.HighPin:
                         throw new OperationCanceledException("Board is not available (no data response)");
                     default:
-                        _logger.Warn("Restarting transfer because a bad data response was received (0x{0})", response.ToString("x8"));
+                        _logger.Warn("Restarting transfer because a bad data response was received (0x{0:x8})", response);
                         ExchangeResponse(TransferResponse.BadResponse);
                         return false;
                 }

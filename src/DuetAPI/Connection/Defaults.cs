@@ -8,12 +8,12 @@
         /// <summary>
         /// Current API protocol version number
         /// </summary>
-        public const int ProtocolVersion = 11;
+        public const int ProtocolVersion = 12;
 
         /// <summary>
         /// Default directory in which DSF-related UNIX sockets reside
         /// </summary>
-        public const string SocketDirectory = "/var/run/dsf";
+        public const string SocketDirectory = "/run/dsf";
 
         /// <summary>
         /// Default UNIX socket file for DuetControlServer
@@ -23,7 +23,12 @@
         /// <summary>
         /// Default fully-qualified path to the UNIX socket for DuetControlServer
         /// </summary>
-        public const string FullSocketPath = "/var/run/dsf/dcs.sock";
+        public const string FullSocketPath = "/run/dsf/dcs.sock";
+
+        /// <summary>
+        /// Default file to contain the last start error of DCS. Once DCS starts successfully, it is deleted
+        /// </summary>
+        public const string StartErrorFile = "/run/dsf/dcs.err";
 
         /// <summary>
         /// Default code channel to use
@@ -39,5 +44,10 @@
         /// Maximum number of codes to buffer in <see cref="ConnectionMode.CodeStream"/> mode
         /// </summary>
         public const int MaxCodeBufferSize = 256;
+
+        /// <summary>
+        /// Default password
+        /// </summary>
+        public const string Password = "reprap";
     }
 }

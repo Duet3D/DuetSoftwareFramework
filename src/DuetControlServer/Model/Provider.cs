@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,11 +14,6 @@ namespace DuetControlServer.Model
     /// </summary>
     public static class Provider
     {
-        /// <summary>
-        /// Default password (see also RRF)
-        /// </summary>
-        public const string DefaultPassword = "reprap";
-
         /// <summary>
         /// Logger instance
         /// </summary>
@@ -67,7 +61,7 @@ namespace DuetControlServer.Model
                         {
                             await Task.Delay(Settings.MaxMachineModelLockTime, _releaseCts.Token);
                             _logger.Fatal("{0} deadlock detected, stack trace of the deadlock:\n{1}", isWriteLock ? "Writer" : "Reader", stackTrace);
-                            await Program.Shutdown();
+                            await Program.ShutdownAsync();
                         }
                         finally
                         {
@@ -78,7 +72,7 @@ namespace DuetControlServer.Model
             }
 
             /// <summary>
-            /// Dipose method that is called when the lock is released
+            /// Dispose method that is called when the lock is released
             /// </summary>
             public void Dispose()
             {
@@ -92,8 +86,8 @@ namespace DuetControlServer.Model
                             _updateEvent.NotifyAll();
                         }
 
-                        // Clear the messages again if anyone is connected
-                        if (IPC.Processors.ModelSubscription.AreClientsConnected && Get.Messages.Count > 0)
+                        // Clear the messages again if waiting clients could output this message
+                        if (IPC.Processors.CodeStream.HasClientsWaitingForMessages || IPC.Processors.ModelSubscription.HasClientsWaitingForMessages)
                         {
                             Get.Messages.Clear();
                         }
@@ -136,12 +130,12 @@ namespace DuetControlServer.Model
         /// <seealso cref="AccessReadWriteAsync()"/>
         /// <seealso cref="WaitForUpdate(CancellationToken)"/>
         /// <seealso cref="Updater.WaitForFullUpdate(CancellationToken)"/>
-        public static ObjectModel Get { get; } = new ObjectModel();
+        public static ObjectModel Get { get; } = new();
 
         /// <summary>
         /// Configured password (see M551)
         /// </summary>
-        public static string Password { get; set; } = DefaultPassword;
+        public static string Password { get; set; } = DuetAPI.Connection.Defaults.Password;
 
         /// <summary>
         /// Whether the current machine status is overridden because an update is in progress
@@ -165,25 +159,13 @@ namespace DuetControlServer.Model
         /// </summary>
         public static void Init()
         {
-            Get.Move.Compensation.PropertyChanged += Compensation_PropertyChanged;
+#pragma warning disable CS0618 // Type or member is obsolete
             Get.State.DsfVersion = Program.Version;
             Get.State.DsfPluginSupport = Settings.PluginSupport;
             Get.State.DsfRootPluginSupport = Settings.PluginSupport && Settings.RootPluginSupport;
+#pragma warning restore CS0618 // Type or member is obsolete
             Get.Network.Hostname = Environment.MachineName;
             Get.Network.Name = Environment.MachineName;
-        }
-
-        /// <summary>
-        /// Change handler for move.compensation
-        /// </summary>
-        /// <param name="sender">Sender object</param>
-        /// <param name="e">Event arguments</param>
-        private static void Compensation_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == nameof(MoveCompensation.Type) && Get.Move.Compensation.Type == MoveCompensationType.None)
-            {
-                Get.Move.Compensation.File = null;
-            }
         }
 
         /// <summary>
@@ -247,20 +229,24 @@ namespace DuetControlServer.Model
         public static Task<IDisposable> AccessReadWriteAsync() => AccessReadWriteAsync(Program.CancellationToken);
 
         /// <summary>
-        /// Reset the global variables when the connection has been lost
-        /// </summary>
-        public static void ClearGlobalVariables()
-        {
-            Get.Global.Clear();
-            Observer.GlobalVariablesCleared();
-        }
-
-        /// <summary>
         /// Wait for an update to occur
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
+        public static void WaitForUpdate(CancellationToken cancellationToken)
+        {
+            using (_updateLock.Lock(cancellationToken))
+            {
+                _updateEvent.Wait(cancellationToken);
+                Program.CancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+
+        /// <summary>
+        /// Wait for an update to occur asynchronously
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task WaitForUpdate(CancellationToken cancellationToken)
+        public static async Task WaitForUpdateAsync(CancellationToken cancellationToken)
         {
             using (await _updateLock.LockAsync(cancellationToken))
             {
@@ -272,8 +258,13 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Wait for an update to occur
         /// </summary>
+        public static void WaitForUpdate() => WaitForUpdate(Program.CancellationToken);
+
+        /// <summary>
+        /// Wait for an update to occur asynchronously
+        /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static Task WaitForUpdate() => WaitForUpdate(Program.CancellationToken);
+        public static Task WaitForUpdateAsync() => WaitForUpdateAsync(Program.CancellationToken);
 
         /// <summary>
         /// Output a generic message
@@ -281,7 +272,48 @@ namespace DuetControlServer.Model
         /// <param name="level">Log level</param>
         /// <param name="message">Message to output</param>
         /// <returns>Whether the message has been written</returns>
-        public static async Task<bool> Output(LogLevel level, Message message)
+        public static bool Output(LogLevel level, Message message)
+        {
+            if (!string.IsNullOrWhiteSpace(message?.Content))
+            {
+                using (AccessReadWrite())
+                {
+                    // Can we output this message?
+                    if (Get.State.LogLevel == LogLevel.Off || (byte)Get.State.LogLevel + (byte)level < 3)
+                    {
+                        return false;
+                    }
+
+                    // Print the message to the DCS log
+                    switch (message.Type)
+                    {
+                        case MessageType.Error:
+                            _logger.Error(message.Content);
+                            break;
+                        case MessageType.Warning:
+                            _logger.Warn(message.Content);
+                            break;
+                        default:
+                            _logger.Info(message.Content);
+                            break;
+                    }
+
+                    // Send it to the object model
+                    Get.Messages.Add(message);
+                }
+
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Output a generic message asynchronously
+        /// </summary>
+        /// <param name="level">Log level</param>
+        /// <param name="message">Message to output</param>
+        /// <returns>Whether the message has been written</returns>
+        public static async Task<bool> OutputAsync(LogLevel level, Message message)
         {
             if (!string.IsNullOrWhiteSpace(message?.Content))
             {
@@ -315,12 +347,44 @@ namespace DuetControlServer.Model
             }
             return false;
         }
+
         /// <summary>
         /// Output a generic message
         /// </summary>
         /// <param name="message">Message to output</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Output(Message message)
+        public static void Output(Message message)
+        {
+            if (!string.IsNullOrWhiteSpace(message?.Content))
+            {
+                // Print the message to the DCS log
+                switch (message.Type)
+                {
+                    case MessageType.Error:
+                        _logger.Error(message.Content);
+                        break;
+                    case MessageType.Warning:
+                        _logger.Warn(message.Content);
+                        break;
+                    default:
+                        _logger.Info(message.Content);
+                        break;
+                }
+
+                // Send it to the object model
+                using (AccessReadWrite())
+                {
+                    Get.Messages.Add(message);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Output a generic message asynchronously
+        /// </summary>
+        /// <param name="message">Message to output</param>
+        /// <returns>Asynchronous task</returns>
+        public static async Task OutputAsync(Message message)
         {
             if (!string.IsNullOrWhiteSpace(message?.Content))
             {
@@ -352,22 +416,14 @@ namespace DuetControlServer.Model
         /// <param name="type">Type of the message</param>
         /// <param name="content">Content of the message</param>
         /// <returns>Asynchronous task</returns>
-        public static Task Output(MessageType type, string content) => Output(new Message(type, content));
+        public static void Output(MessageType type, string content) => Output(new Message(type, content));
 
         /// <summary>
-        /// Output the result of a G/M/T-code
+        /// Output a generic message asynchronously
         /// </summary>
-        /// <param name="codeResult">Messages to output</param>
+        /// <param name="type">Type of the message</param>
+        /// <param name="content">Content of the message</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task Output(DuetAPI.Commands.CodeResult codeResult)
-        {
-            if (codeResult != null)
-            {
-                foreach (Message message in codeResult)
-                {
-                    await Output(message);
-                }
-            }
-        }
+        public static Task OutputAsync(MessageType type, string content) => OutputAsync(new Message(type, content));
     }
 }

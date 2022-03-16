@@ -57,7 +57,7 @@ namespace CodeStream
                 Console.WriteLine("Connected!");
             }
 
-            using NetworkStream stream = connection.GetStream();
+            await using NetworkStream stream = connection.GetStream();
             Task inputTask = Task.Run(async () => await ReadCodes(stream));     // This is started with Task.Run() because Console.ReadLine blocks...
             Task outputTask = WriteReplies(stream);
             await Task.WhenAny(inputTask, outputTask);
@@ -75,7 +75,7 @@ namespace CodeStream
         /// <returns>Asynchronous task</returns>
         private static async Task ReadCodes(Stream socketStream)
         {
-            using StreamWriter writer = new(socketStream);
+            await using StreamWriter writer = new(socketStream);
             do
             {
                 try

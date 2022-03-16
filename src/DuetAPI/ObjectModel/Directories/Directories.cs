@@ -23,17 +23,17 @@
             get => _firmware;
 			set => SetPropertyValue(ref _firmware, value);
         }
-        private string _firmware = "0:/sys";
+        private string _firmware = "0:/firmware";
 
         /// <summary>
         /// Path to the G-Codes directory
         /// </summary>
         public string GCodes
         {
-            get => _gcodes;
-			set => SetPropertyValue(ref _gcodes, value);
+            get => _gCodes;
+			set => SetPropertyValue(ref _gCodes, value);
         }
-        private string _gcodes = "0:/gcodes";
+        private string _gCodes = "0:/gcodes";
 
         /// <summary>
         /// Path to the macros directory
@@ -71,6 +71,7 @@
         /// <summary>
         /// Path to the system directory
         /// </summary>
+        [SbcProperty(true)]
         public string System
         {
             get => _system;

@@ -56,9 +56,9 @@ namespace DuetControlServer.FileExecution
         public bool IsNested { get; }
 
         /// <summary>
-        /// List of messages written by the codes
+        /// Indicates if this macro can be aborted on a pause request
         /// </summary>
-        public CodeResult Result { get; set; } = new CodeResult();
+        public bool IsPausable { get; set; }
 
         /// <summary>
         /// Internal cancellation token source used for codes
@@ -68,7 +68,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Cancellation token that is triggered when the file is cancelled/aborted
         /// </summary>
-        public CancellationToken CancellationToken { get => _cts.Token; }
+        public CancellationToken CancellationToken => _cts.Token;
 
         /// <summary>
         /// Internal lock used for starting codes in the right order
@@ -107,12 +107,6 @@ namespace DuetControlServer.FileExecution
         /// Name of the file being executed
         /// </summary>
         public string FileName { get; }
-
-        /// <summary>
-        /// Indicates if config.g is being processed
-        /// </summary>
-        public static bool RunningConfig { get => _runningConfig; }
-        private static volatile bool _runningConfig;
 
         /// <summary>
         /// Whether this file is config.g or config.g.bak
@@ -162,7 +156,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Indicates if the macro file could be opened
         /// </summary>
-        public bool FileOpened { get => _file != null; }
+        public bool FileOpened => _file != null;
 
         /// <summary>
         /// Constructor of a macro
@@ -188,7 +182,6 @@ namespace DuetControlServer.FileExecution
             else if (name == FilePath.ConfigFile || name == FilePath.ConfigFileFallback)
             {
                 IsConfig = true;
-                _runningConfig = true;
             }
 
             // Try to start the macro file
@@ -226,9 +219,33 @@ namespace DuetControlServer.FileExecution
         /// Abort this macro
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public async Task Abort()
+        public void Abort()
         {
-            if (IsAborted || disposed)
+            if (IsAborted || _disposed)
+            {
+                return;
+            }
+            IsAborted = true;
+            _cts.Cancel();
+
+            if (_file != null)
+            {
+                using (_file.Lock())
+                {
+                    _file.Close();
+                }
+            }
+
+            _logger.Info("Aborted macro file {0}", FileName);
+        }
+
+        /// <summary>
+        /// Abort this macro asynchronously
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public async Task AbortAsync()
+        {
+            if (IsAborted || _disposed)
             {
                 return;
             }
@@ -249,28 +266,28 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Internal TCS to resolve when the macro has finished
         /// </summary>
-        private TaskCompletionSource<CodeResult> _finishTCS;
+        private TaskCompletionSource _finishTcs;
 
         /// <summary>
         /// Wait for this macro to finish asynchronously
         /// </summary>
-        /// <returns>Code result of the finished macro</returns>
+        /// <returns>Asynchronous task</returns>
         /// <remarks>
         /// This task is always resolved and never cancelled
         /// </remarks>
-        public Task<CodeResult> FinishAsync()
+        public Task FinishAsync()
         {
             if (!IsExecuting)
             {
-                return Task.FromResult(Result);
+                return Task.CompletedTask;
             }
 
-            if (_finishTCS != null)
+            if (_finishTcs != null)
             {
-                return _finishTCS.Task;
+                return _finishTcs.Task;
             }
-            _finishTCS = new TaskCompletionSource<CodeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            return _finishTCS.Task;
+            _finishTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            return _finishTcs.Task;
         }
 
         /// <summary>
@@ -280,7 +297,7 @@ namespace DuetControlServer.FileExecution
         private async Task Run()
         {
             Queue<Code> codes = new();
-            Queue<Task<CodeResult>> codesBeingExecuted = new();
+            Queue<Task<Message>> codeTasks = new();
 
             do
             {
@@ -296,14 +313,19 @@ namespace DuetControlServer.FileExecution
                             break;
                         }
 
+                        readCode.LogOutput = true;
                         codes.Enqueue(readCode);
-                        codesBeingExecuted.Enqueue(readCode.Execute());
+                        codeTasks.Enqueue(readCode.Execute());
                     }
-                    catch (OperationCanceledException)
+                    catch (OperationCanceledException oce)
                     {
                         using (await _lock.LockAsync(Program.CancellationToken))
                         {
-                            await Abort();
+                            if (!IsAborted)
+                            {
+                                _logger.Debug(oce, "Cancelling macro file because of cancelled code");
+                                await AbortAsync();
+                            }
                         }
                     }
                     catch (AggregateException ae)
@@ -313,7 +335,7 @@ namespace DuetControlServer.FileExecution
                             _file.Close();
                         }
 
-                        await Logger.LogOutput(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {ae.InnerException.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {ae.InnerException.Message}");
                         _logger.Error(ae.InnerException, "Failed to read code from macro {0}", FileName);
                     }
                     catch (Exception e)
@@ -323,48 +345,36 @@ namespace DuetControlServer.FileExecution
                             _file.Close();
                         }
 
-                        await Logger.LogOutput(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {e.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {e.Message}");
                         _logger.Error(e, "Failed to read code from macro {0}", FileName);
                     }
                 }
 
                 // Wait for the next code to finish
-                if (codes.TryDequeue(out Code code) && codesBeingExecuted.TryDequeue(out Task<CodeResult> codeTask))
+                if (codes.TryDequeue(out Code code) && codeTasks.TryDequeue(out Task<Message> codeTask))
                 {
                     try
                     {
-                        CodeResult result = await codeTask;
-                        if (!result.IsEmpty)
-                        {
-                            using (await _lock.LockAsync(Program.CancellationToken))
-                            {
-                                Result.AddRange(result);
-                            }
-
-                            if (!IsNested)
-                            {
-                                // When we get here log messages were already handled by the channel processor
-                                await Model.Provider.Output(result);
-                            }
-                        }
+                        // Logging is done before we get here...
+                        await codeTask;
                     }
                     catch (OperationCanceledException)
                     {
-                        // Code has been cancelled, don't log this. In the future this may terminate the macro file
+                        // Code has been cancelled, don't log this. This can happen when a pausable macro is interrupted
                     }
                     catch (CodeParserException cpe)
                     {
-                        await Logger.LogOutput(MessageType.Error, cpe.Message + " of " + Path.GetFileName(FileName));
+                        await Logger.LogOutputAsync(MessageType.Error, cpe.Message + " of " + Path.GetFileName(FileName));
                         _logger.Debug(cpe);
                     }
                     catch (AggregateException ae)
                     {
-                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
                         _logger.Warn(ae);
                     }
                     catch (Exception e)
                     {
-                        await Logger.LogOutput(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{e.GetType().Name}] {e.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{e.GetType().Name}] {e.Message}");
                         _logger.Warn(e);
                     }
                 }
@@ -385,10 +395,10 @@ namespace DuetControlServer.FileExecution
                 {
                     _logger.Info("Finished macro file {0}", FileName);
                 }
-                if (_finishTCS != null)
+                if (_finishTcs != null)
                 {
-                    _finishTCS.SetResult(Result);
-                    _finishTCS = null;
+                    _finishTcs.SetResult();
+                    _finishTcs = null;
                 }
             }
 
@@ -463,9 +473,9 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Indicates if this instance has been disposed
+        /// Indicates if this instance has been _disposed
         /// </summary>
-        private bool disposed = false;
+        private bool _disposed;
 
         /// <summary>
         /// Dispose this instance
@@ -473,28 +483,16 @@ namespace DuetControlServer.FileExecution
         public void Dispose()
         {
             // Don't dispose this instance twice...
-            if (disposed)
+            if (_disposed)
             {
                 return;
-            }
-
-            // Synchronize the machine model one last time while config.g or config-override.g is being run.
-            // This makes sure the filaments can be properly assigned
-            if (IsConfig || IsConfigOverride)
-            {
-                _ = Task.Run(async () =>
-                {
-                    await Model.Updater.WaitForFullUpdate();
-                    FilamentManager.RefreshMapping();
-                    _runningConfig = false;
-                });
             }
 
             // Dispose the used resources
             _cts.Dispose();
             _file?.Dispose();
-            _finishTCS?.SetCanceled();
-            disposed = true;
+            _finishTcs?.SetCanceled();
+            _disposed = true;
         }
     }
 }

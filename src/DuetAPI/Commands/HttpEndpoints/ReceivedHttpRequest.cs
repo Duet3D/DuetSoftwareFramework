@@ -11,7 +11,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Identifier of the corresponding user session. This is -1 if it is an anonymous request
         /// </summary>
-        /// <seealso cref="ObjectModel.UserSession"/>
+        /// <seealso cref="UserSession"/>
         public int SessionId { get; set; }
 
         /// <summary>

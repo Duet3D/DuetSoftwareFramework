@@ -5,6 +5,7 @@ using DuetControlServer.Files;
 using DuetControlServer.Model;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
+using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -19,7 +20,7 @@ namespace DuetControlServer.FileExecution
     /// Main class dealing with a file job
     /// </summary>
     /// <remarks>
-    /// Lock this class whenver it is accessed (except for <see cref="Diagnostics(StringBuilder)"/>)
+    /// Lock this class whenever it is accessed (except for <see cref="Diagnostics(StringBuilder)"/>)
     /// </remarks>
     public static class Job
     {
@@ -43,7 +44,7 @@ namespace DuetControlServer.FileExecution
         /// Lock this class asynchronously
         /// </summary>
         /// <returns>Disposable lock</returns>
-        public static AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
+        public static Task<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
 
         /// <summary>
         /// Condition to trigger when the print is supposed to resume
@@ -73,7 +74,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Indicates if a file has been selected for printing
         /// </summary>
-        public static bool IsFileSelected { get => _file != null; }
+        public static bool IsFileSelected => _file != null;
 
         /// <summary>
         /// Indicates if a print is live
@@ -153,7 +154,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Returns the length of the file being printed in bytes
         /// </summary>
-        public static long FileLength { get => _file.Length; }
+        public static long FileLength => _file.Length;
 
         /// <summary>
         /// Start a new file print
@@ -167,14 +168,13 @@ namespace DuetControlServer.FileExecution
         public static async Task SelectFile(string fileName, bool simulating = false)
         {
             // Analyze and open the file
-            ParsedFileInfo info = await InfoParser.Parse(fileName);
+            GCodeFileInfo info = await InfoParser.Parse(fileName, true);
             CodeFile file = new(fileName, CodeChannel.File);
 
             // A file being printed may start another file print
             if (IsFileSelected)
             {
-                await Cancel();
-                Resume();
+                await CancelAsync();
                 await _finished.WaitAsync(Program.CancellationToken);
             }
 
@@ -193,6 +193,7 @@ namespace DuetControlServer.FileExecution
             }
 
             // Notify RepRapFirmware and start processing the file in the background
+            await SPI.Interface.SetPrintFileInfo();
             _logger.Info("Selected file {0}", _file.FileName);
         }
 
@@ -214,7 +215,7 @@ namespace DuetControlServer.FileExecution
                 // Wait for the next print to start
                 CancellationToken cancellationToken;
                 bool startingNewPrint;
-                using (await _lock.LockAsync(Program.CancellationToken))
+                using (await LockAsync())
                 {
                     await _resume.WaitAsync(Program.CancellationToken);
                     startingNewPrint = !_file.IsClosed;
@@ -227,12 +228,9 @@ namespace DuetControlServer.FileExecution
                 {
                     _logger.Info("Starting file print");
 
-                    // Notify RRF
-                    SPI.Interface.StartPrint();
-
                     // Process the file
                     Queue<Code> codes = new();
-                    Queue<Task<CodeResult>> codeTasks = new();
+                    Queue<Task<Message>> codeTasks = new();
                     long nextFilePosition = 0;
                     do
                     {
@@ -242,7 +240,7 @@ namespace DuetControlServer.FileExecution
                             sharedCode.Reset();
 
                             // Stop reading codes if the print has been paused or aborted
-                            using (await _lock.LockAsync(Program.CancellationToken))
+                            using (await LockAsync())
                             {
                                 if (IsPaused)
                                 {
@@ -272,6 +270,7 @@ namespace DuetControlServer.FileExecution
                                     throw;
                                 }
 
+                                readCode.LogOutput = true;
                                 codes.Enqueue(readCode);
                                 codeTasks.Enqueue(readCode.Execute());
                             }
@@ -289,48 +288,49 @@ namespace DuetControlServer.FileExecution
                                     _file.Close();
                                 }
 
-                                await Utility.Logger.LogOutput(MessageType.Error, $"Failed to read code from job file: {ae.InnerException.Message}");
+                                await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file: {ae.InnerException.Message}");
                                 _logger.Error(ae.InnerException);
                             }
                             catch (Exception e)
                             {
-                                using (await _lock.LockAsync(Program.CancellationToken))
+                                using (await LockAsync())
                                 {
                                     _file.Close();
                                 }
 
-                                await Utility.Logger.LogOutput(MessageType.Error, $"Failed to read code from job file: {e.Message}");
+                                await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file: {e.Message}");
                                 _logger.Error(e);
                             }
                         }
 
                         // Is there anything more to do?
-                        if (codes.TryDequeue(out Code code))
+                        if (codes.TryDequeue(out Code code) && codeTasks.TryDequeue(out Task<Message> codeTask))
                         {
                             try
                             {
                                 try
                                 {
-                                    CodeResult result = await codeTasks.Dequeue();
+                                    _ = await codeTask;     // Logging is done before we get here...
                                     nextFilePosition = code.FilePosition.Value + code.Length.Value;
-                                    await Utility.Logger.LogOutput(result);
                                 }
                                 catch (OperationCanceledException)
                                 {
-                                    // Code has been cancelled, don't log this. In the future this may terminate the job file
-                                    // Note this can happen as well when the file being printed is exchanged
+                                    // Code has been cancelled, don't log this.
+                                    // Note this can happen as well when the file being printed is exchanged or when a pausable macro is interrupted
                                 }
                                 catch (CodeParserException cpe)
                                 {
-                                    await Utility.Logger.LogOutput(MessageType.Error, cpe.Message);
+                                    await Logger.LogOutputAsync(MessageType.Error, cpe.Message);
                                 }
                                 catch (AggregateException ae)
                                 {
-                                    await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                                    await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                                    _logger.Error(ae.InnerException);
                                 }
                                 catch (Exception e)
                                 {
-                                    await Utility.Logger.LogOutput(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
+                                    await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
+                                    _logger.Error(e);
                                 }
                             }
                             finally
@@ -345,7 +345,7 @@ namespace DuetControlServer.FileExecution
                                 if (IsPaused)
                                 {
                                     // Adjust the file position
-                                    long newFilePosition = (_pausePosition != null) ? _pausePosition.Value : nextFilePosition;
+                                    long newFilePosition = _pausePosition ?? nextFilePosition;
                                     await SetFilePosition(newFilePosition);
                                     _logger.Info("Job has been paused at byte {0}, reason {1}", newFilePosition, _pauseReason);
 
@@ -364,12 +364,12 @@ namespace DuetControlServer.FileExecution
                     }
                     while (!Program.CancellationToken.IsCancellationRequested);
 
-                    using (await _lock.LockAsync(Program.CancellationToken))
+                    using (await LockAsync())
                     {
                         // Notify RepRapFirmware that the print file has been closed
                         if (IsCancelled)
                         {
-                            await SPI.Interface.StopPrint(PrintStoppedReason.UserCancelled);
+                            // Prints are cancelled by M0/M1 which is processed by RRF
                             _logger.Info("Cancelled job file");
                         }
                         else if (IsAborted)
@@ -424,7 +424,7 @@ namespace DuetControlServer.FileExecution
                     }
                 }
 
-                using (await _lock.LockAsync(Program.CancellationToken))
+                using (await LockAsync())
                 {
                     // We are no longer printing a file...
                     _finished.NotifyAll();
@@ -475,8 +475,28 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Cancel the current print (e.g. when M0/M1 is called)
         /// </summary>
+        public static void Cancel()
+        {
+            if (IsFileSelected)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+
+                using (_file.Lock())
+                {
+                    _file.Close();
+                }
+                IsCancelled = IsPaused;
+                Resume();
+            }
+        }
+
+        /// <summary>
+        /// Cancel the current print (e.g. when M0/M1 is called)
+        /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task Cancel()
+        public static async Task CancelAsync()
         {
             if (IsFileSelected)
             {
@@ -489,15 +509,36 @@ namespace DuetControlServer.FileExecution
                     _file.Close();
                 }
                 IsCancelled = IsPaused;
-                // Resume() needs to be called manually
+                Resume();
             }
         }
 
         /// <summary>
-        /// Abort the current print. This is called when the print could not complete as expected
+        /// Abort the current print asynchronously. This is called when the print could not complete as expected
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task Abort()
+        public static void Abort()
+        {
+            if (IsFileSelected)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
+
+                using (_file.Lock())
+                {
+                    _file.Close();
+                }
+                IsAborted = true;
+                Resume();
+            }
+        }
+
+        /// <summary>
+        /// Abort the current print asynchronously. This is called when the print could not complete as expected
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        public static async Task AbortAsync()
         {
             if (IsFileSelected)
             {

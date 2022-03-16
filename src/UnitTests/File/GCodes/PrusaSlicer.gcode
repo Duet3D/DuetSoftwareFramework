@@ -36019,6 +36019,7 @@ G1 X213.579 Y110.671 E0.01261 ; infill
 G1 E-1.40000 F2400.00000 ; retract
 G1 Z7.550 F7800.000 ; lift Z
 M107 ; disable fan
+;NUM_LAYERS=123
 ; Filament-specific end gcode
 G4 ; wait
 

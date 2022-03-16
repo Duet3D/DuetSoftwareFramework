@@ -22,7 +22,7 @@ namespace DuetAPI.Utility
         /// <returns>JSON file list object</returns>
         private static string MakeFileListContainer(IList items, string directory, int startAt, bool finished)
         {
-            Dictionary<string, object> jsonContainer = new()
+            Dictionary<string, object> jsonContainer = new Dictionary<string, object>()
             {
                 ["dir"] = directory,
                 ["first"] = Math.Max(startAt, 0),
@@ -56,7 +56,7 @@ namespace DuetAPI.Utility
         /// <returns>JSON file list</returns>
         public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)
         {
-            List<string> files = new();
+            List<string> files = new List<string>();
 
             try
             {
@@ -118,7 +118,7 @@ namespace DuetAPI.Utility
         /// <returns>JSON list</returns>
         public static string GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)
         {
-            List<object> fileList = new();
+            List<object> fileList = new List<object>();
 
             try
             {
@@ -129,7 +129,7 @@ namespace DuetAPI.Utility
                 {
                     if (startAt < 0 || numItems++ >= startAt)
                     {
-                        DirectoryInfo info = new(dir);
+                        DirectoryInfo info = new DirectoryInfo(dir);
                         fileList.Add(new { type = 'd', name = info.Name, date = info.LastWriteTime });
 
                         if (maxSize > 0 && GetFileListSize(fileList, directory, startAt) > maxSize)
@@ -149,7 +149,7 @@ namespace DuetAPI.Utility
                 {
                     if (startAt < 0 || numItems++ >= startAt)
                     {
-                        FileInfo info = new(file);
+                        FileInfo info = new FileInfo(file);
                         fileList.Add(new { type = 'f', name = info.Name, size = info.Length, date = info.LastWriteTime });
 
                         if (maxSize > 0 && GetFileListSize(fileList, directory, startAt) > maxSize)
@@ -172,7 +172,7 @@ namespace DuetAPI.Utility
             }
             catch
             {
-                if (startAt < 0)
+                if (startAt >= 0)
                 {
                     // Something went wrong...
                     return "{\"err\":2}";

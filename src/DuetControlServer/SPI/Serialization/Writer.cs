@@ -7,11 +7,11 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication;
-using DuetControlServer.SPI.Communication.LinuxRequests;
+using DuetControlServer.SPI.Communication.SbcRequests;
 using DuetControlServer.SPI.Communication.Shared;
 using Code = DuetControlServer.Commands.Code;
-using CodeFlags = DuetControlServer.SPI.Communication.LinuxRequests.CodeFlags;
-using CodeParameter = DuetControlServer.SPI.Communication.LinuxRequests.CodeParameter;
+using CodeFlags = DuetControlServer.SPI.Communication.SbcRequests.CodeFlags;
+using CodeParameter = DuetControlServer.SPI.Communication.SbcRequests.CodeParameter;
 
 namespace DuetControlServer.SPI.Serialization
 {
@@ -102,7 +102,7 @@ namespace DuetControlServer.SPI.Serialization
             {
                 int lineNumber = (int)(code.LineNumber ?? 0);
                 MemoryMarshal.Write(to[bytesWritten..], ref lineNumber);
-                bytesWritten += Marshal.SizeOf<int>();
+                bytesWritten += sizeof(int);
             }
 
             // Write parameters
@@ -120,7 +120,7 @@ namespace DuetControlServer.SPI.Serialization
                 MemoryMarshal.Write(to[bytesWritten..], ref binaryParam);
                 bytesWritten += Marshal.SizeOf<CodeParameter>();
 
-                Span<byte> asUnicode = Encoding.UTF8.GetBytes(comment.Substring(0, commentLength));
+                Span<byte> asUnicode = Encoding.UTF8.GetBytes(comment[..commentLength]);
                 asUnicode.CopyTo(to[bytesWritten..]);
                 bytesWritten += asUnicode.Length;
                 bytesWritten = AddPadding(to, bytesWritten);
@@ -187,7 +187,7 @@ namespace DuetControlServer.SPI.Serialization
                     {
                         string value = parameter;
                         binaryParam.Type = parameter.IsExpression ? DataType.Expression : DataType.String;
-                        binaryParam.IntValue = value.Length;
+                        binaryParam.IntValue = Encoding.UTF8.GetByteCount(value);
                         extraParameters.Add(value);
                     }
                     // Boolean values are not supported for codes. Use integers instead
@@ -209,7 +209,7 @@ namespace DuetControlServer.SPI.Serialization
                         {
                             int value = val;
                             MemoryMarshal.Write(to[bytesWritten..], ref value);
-                            bytesWritten += Marshal.SizeOf<int>();
+                            bytesWritten += sizeof(int);
                         }
                     }
                     else if (parameter is uint[] uintArray)
@@ -218,7 +218,7 @@ namespace DuetControlServer.SPI.Serialization
                         {
                             uint value = val;
                             MemoryMarshal.Write(to[bytesWritten..], ref value);
-                            bytesWritten += Marshal.SizeOf<uint>();
+                            bytesWritten += sizeof(uint);
                         }
                     }
                     else if (parameter is DriverId[] driverIdArray)
@@ -227,7 +227,7 @@ namespace DuetControlServer.SPI.Serialization
                         {
                             uint value = val;
                             MemoryMarshal.Write(to[bytesWritten..], ref value);
-                            bytesWritten += Marshal.SizeOf<uint>();
+                            bytesWritten += sizeof(uint);
                         }
                     }
                     else if (parameter is float[] floatArray)
@@ -236,7 +236,7 @@ namespace DuetControlServer.SPI.Serialization
                         {
                             float value = val;
                             MemoryMarshal.Write(to[bytesWritten..], ref value);
-                            bytesWritten += Marshal.SizeOf<float>();
+                            bytesWritten += sizeof(float);
                         }
                     }
                     else if (parameter is string value)
@@ -337,7 +337,7 @@ namespace DuetControlServer.SPI.Serialization
                 {
                     intValue = val;
                     MemoryMarshal.Write(to[bytesWritten..], ref intValue);
-                    bytesWritten += Marshal.SizeOf<int>();
+                    bytesWritten += sizeof(int);
                 }
             }
             else if (value is uint[] uintArray)
@@ -348,7 +348,7 @@ namespace DuetControlServer.SPI.Serialization
                 {
                     uintValue = val;
                     MemoryMarshal.Write(to[bytesWritten..], ref uintValue);
-                    bytesWritten += Marshal.SizeOf<uint>();
+                    bytesWritten += sizeof(uint);
                 }
             }
             else if (value is float[] floatArray)
@@ -359,7 +359,7 @@ namespace DuetControlServer.SPI.Serialization
                 {
                     floatValue = val;
                     MemoryMarshal.Write(to[bytesWritten..], ref floatValue);
-                    bytesWritten += Marshal.SizeOf<float>();
+                    bytesWritten += sizeof(float);
                 }
             }
             else if (value is string stringValue)
@@ -384,7 +384,7 @@ namespace DuetControlServer.SPI.Serialization
                 {
                     uintValue = val;
                     MemoryMarshal.Write(to[bytesWritten..], ref uintValue);
-                    bytesWritten += Marshal.SizeOf<uint>();
+                    bytesWritten += sizeof(uint);
                 }
             }
             else if (value is bool boolValue)
@@ -400,7 +400,7 @@ namespace DuetControlServer.SPI.Serialization
                 {
                     byte byteVal = Convert.ToByte(val);
                     MemoryMarshal.Write(to[bytesWritten..], ref byteVal);
-                    bytesWritten += Marshal.SizeOf<byte>();
+                    bytesWritten += sizeof(byte);
                 }
             }
             else
@@ -421,7 +421,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="info">Information about the file being printed</param>
         /// <returns>Number of bytes written</returns>
         /// <exception cref="ArgumentException">One of the supplied values is too big</exception>
-        public static int WritePrintStarted(Span<byte> to, ParsedFileInfo info)
+        public static int WritePrintFileInfo(Span<byte> to, GCodeFileInfo info)
         {
             Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName);
             if (unicodeFilename.Length > 254)
@@ -443,7 +443,7 @@ namespace DuetControlServer.SPI.Serialization
                 NumFilaments = (ushort)info.Filament.Count,
                 FileSize = (uint)info.Size,
                 LastModifiedTime = (info.LastModified != null) ? (ulong)(info.LastModified.Value - new DateTime(1970, 1, 1)).TotalSeconds : 0,
-                FirstLayerHeight = info.FirstLayerHeight,
+                NumLayers = (uint)info.NumLayers,
                 LayerHeight = info.LayerHeight,
                 ObjectHeight = info.Height,
                 PrintTime = (uint)(info.PrintTime ?? 0),
@@ -457,7 +457,7 @@ namespace DuetControlServer.SPI.Serialization
             {
                 float filamentUsage = filament;
                 MemoryMarshal.Write(to[bytesWritten..], ref filamentUsage);
-                bytesWritten += Marshal.SizeOf<float>();
+                bytesWritten += sizeof(float);
             }
             
             // Write filename
@@ -502,37 +502,6 @@ namespace DuetControlServer.SPI.Serialization
             };
             MemoryMarshal.Write(to, ref header);
             return Marshal.SizeOf<MacroCompleteHeader>();
-        }
-
-        /// <summary>
-        /// Write a heightmap as read by G29 S1
-        /// </summary>
-        /// <param name="to">Destination</param>
-        /// <param name="map">Heightmap to write</param>
-        /// <returns>Number of bytes written</returns>
-        public static int WriteHeightMap(Span<byte> to, Heightmap map)
-        {
-            HeightMapHeader header = new()
-            {
-                XMin = map.XMin,
-                XMax = map.XMax,
-                XSpacing = map.XSpacing,
-                YMin = map.YMin,
-                YMax = map.YMax,
-                YSpacing = map.YSpacing,
-                Radius = map.Radius,
-                NumX = (ushort)map.NumX,
-                NumY = (ushort)map.NumY
-            };
-            MemoryMarshal.Write(to, ref header);
-
-            Span<float> coords = MemoryMarshal.Cast<byte, float>(to[Marshal.SizeOf<HeightMapHeader>()..]);
-            for (int i = 0; i < map.NumX * map.NumY; i++)
-            {
-                coords[i] = map.ZCoordinates[i];
-            }
-
-            return Marshal.SizeOf<HeightMapHeader>() + Marshal.SizeOf<float>() * map.NumX * map.NumY;
         }
 
         /// <summary>
@@ -747,17 +716,75 @@ namespace DuetControlServer.SPI.Serialization
             }
 
             // Write header
-            SetVariableHeader request = new()
+            DeleteLocalVariableHeader request = new()
             {
                 Channel = channel,
                 VariableLength = (byte)unicodeVarName.Length
             };
             MemoryMarshal.Write(to, ref request);
-            int bytesWritten = Marshal.SizeOf<SetVariableHeader>();
+            int bytesWritten = Marshal.SizeOf<DeleteLocalVariableHeader>();
 
             // Write variable name
             unicodeVarName.CopyTo(to[bytesWritten..]);
             bytesWritten += unicodeVarName.Length;
+            return AddPadding(to, bytesWritten);
+        }
+
+        /// <summary>
+        /// Write an arbitrary boolean value
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="value">Boolean value</param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteBoolean(Span<byte> to, bool value)
+        {
+            BooleanHeader header = new()
+            {
+                Value = Convert.ToByte(value)
+            };
+            MemoryMarshal.Write(to, ref header);
+            return Marshal.SizeOf<BooleanHeader>();
+        }
+
+        /// <summary>
+        /// Write the result of an attempt to open a file
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="handle">File handle</param>
+        /// <param name="fileSize">File length</param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteOpenFileResult(Span<byte> to, uint handle, long fileSize)
+        {
+            OpenFileResult header = new()
+            {
+                Handle = handle,
+                FileSize = (uint)fileSize
+            };
+            MemoryMarshal.Write(to, ref header);
+            return Marshal.SizeOf<OpenFileResult>();
+        }
+
+        /// <summary>
+        /// Write read file data
+        /// </summary>
+        /// <param name="to">Destination</param>
+        /// <param name="data">Read file data</param>
+        /// <param name="bytesRead">Number of bytes read</param>
+        /// <returns>Number of bytes written</returns>
+        public static int WriteFileReadResult(Span<byte> to, Span<byte> data, int bytesRead)
+        {
+            // Write header
+            FileDataHeader header = new()
+            {
+                BytesRead = bytesRead
+            };
+            MemoryMarshal.Write(to, ref header);
+            int bytesWritten = Marshal.SizeOf<FileDataHeader>();
+
+            // Write content
+            data.CopyTo(to[bytesWritten..]);
+            bytesWritten += data.Length;
+
             return AddPadding(to, bytesWritten);
         }
 

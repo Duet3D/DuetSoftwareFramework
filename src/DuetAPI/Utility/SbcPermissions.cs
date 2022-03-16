@@ -148,6 +148,16 @@ namespace DuetAPI.Utility
         NetworkAccess = 33554432,
 
         /// <summary>
+        /// Access /dev/video* devices
+        /// </summary>
+        WebcamAccess = 134217728,
+
+        /// <summary>
+        /// Access /dev/gpio*, /dev/i2c*, and /dev/spidev* devices
+        /// </summary>
+        GpioAccess = 268435456,
+
+        /// <summary>
         /// Launch process as root user (for full device control - potentially dangerous)
         /// </summary>
         SuperUser = 67108864

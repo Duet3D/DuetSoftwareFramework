@@ -16,6 +16,16 @@
         private float _active;
 
         /// <summary>
+        /// Average heater PWM value (0..1)
+        /// </summary>
+        public float AvgPwm
+        {
+            get => _avgPwm;
+            set => SetPropertyValue(ref _avgPwm, value);
+        }
+        private float _avgPwm;
+
+        /// <summary>
         /// Current temperature of the heater (in C)
         /// </summary>
         public float Current
@@ -62,16 +72,6 @@
         public ModelCollection<HeaterMonitor> Monitors { get; } = new ModelCollection<HeaterMonitor>();
 
         /// <summary>
-        /// Name of the heater or null if unset
-        /// </summary>
-        public string Name
-        {
-            get => _name;
-			set => SetPropertyValue(ref _name, value);
-        }
-        private string _name;
-
-        /// <summary>
         /// Sensor number of this heater or -1 if not configured
         /// </summary>
         public int Sensor
@@ -79,7 +79,7 @@
             get => _sensor;
 			set => SetPropertyValue(ref _sensor, value);
         }
-        private int _sensor;
+        private int _sensor = -1;
 
         /// <summary>
         /// Standby temperature of the heater (in C)
@@ -94,11 +94,11 @@
         /// <summary>
         /// State of the heater
         /// </summary>
-        public HeaterState? State
+        public HeaterState State
         {
             get => _state;
 			set => SetPropertyValue(ref _state, value);
         }
-        private HeaterState? _state;
+        private HeaterState _state = HeaterState.Off;
     }
 }

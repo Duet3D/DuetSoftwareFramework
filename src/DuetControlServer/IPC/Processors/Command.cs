@@ -34,6 +34,7 @@ namespace DuetControlServer.IPC.Processors
             typeof(SyncObjectModel),
             typeof(UnlockObjectModel),
             typeof(InstallPlugin),
+            typeof(ReloadPlugin),
             typeof(SetNetworkProtocol),
             typeof(SetPluginData),
             typeof(SetPluginProcess),
@@ -66,15 +67,14 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Asynchronous task</returns>
         public override async Task Process()
         {
-            DuetAPI.Commands.BaseCommand command = null;
-            Type commandType;
             do
             {
+                DuetAPI.Commands.BaseCommand command = null;
                 try
                 {
                     // Read another command from the IPC connection
                     command = await Connection.ReceiveCommand();
-                    commandType = command.GetType();
+                    Type commandType = command.GetType();
 
                     // Make sure it is actually supported and permitted
                     if (!SupportedCommands.Contains(commandType))
@@ -101,19 +101,22 @@ namespace DuetControlServer.IPC.Processors
                 catch (Exception e)
                 {
                     // Send errors back to the client
-                    if (!(e is OperationCanceledException))
+                    if (e is not OperationCanceledException)
                     {
-                        if (e is UnauthorizedAccessException)
+                        if (command != null)
                         {
-                            Connection.Logger.Error("Insufficient permissions to execute {0}", command.Command);
-                        }
-                        else if (command != null)
-                        {
-                            Connection.Logger.Error(e, "Failed to execute {0}", command.Command);
+                            if (e is UnauthorizedAccessException)
+                            {
+                                Connection.Logger.Error("Insufficient permissions to execute {0}", command.Command);
+                            }
+                            else
+                            {
+                                Connection.Logger.Error(e, "Failed to execute {0}", command.Command);
+                            }
                         }
                         else
                         {
-                            Connection.Logger.Error(e, "Failed to execute command");
+                            Connection.Logger.Error(e, "Failed to receive command");
                         }
                     }
                     await Connection.SendResponse(e);

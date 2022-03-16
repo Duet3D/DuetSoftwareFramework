@@ -48,7 +48,27 @@ namespace DuetAPI.ObjectModel
             get => _kinematics;
 			set => SetPropertyValue(ref _kinematics, value);
         }
-        private Kinematics _kinematics = new();
+        private Kinematics _kinematics = new Kinematics();
+
+        /// <summary>
+        /// Limit axis positions by their minima and maxima
+        /// </summary>
+        public bool LimitAxes
+        {
+            get => _limitAxes;
+            set => SetPropertyValue(ref _limitAxes, value);
+        }
+        private bool _limitAxes = true;
+
+        /// <summary>
+        /// Indicates if standard moves are forbidden if the corresponding axis is not homed
+        /// </summary>
+        public bool NoMovesBeforeHoming
+        {
+            get => _noMovesBeforeHoming;
+            set => SetPropertyValue(ref _noMovesBeforeHoming, value);
+        }
+        private bool _noMovesBeforeHoming = true;
 
         /// <summary>
         /// Maximum acceleration allowed while printing (in mm/s^2)
@@ -66,9 +86,14 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<MoveQueueItem> Queue { get; } = new ModelCollection<MoveQueueItem>();
 
         /// <summary>
+        /// Parameters for centre rotation
+        /// </summary>
+        public MoveRotation Rotation { get; } = new MoveRotation();
+
+        /// <summary>
         /// Parameters for input shaping
         /// </summary>
-        public MoveInputShaping Shaping { get; } = new MoveInputShaping();
+        public InputShaping Shaping { get; } = new InputShaping();
 
         /// <summary>
         /// Speed factor applied to every regular move (0.01..1 or greater)

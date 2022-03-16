@@ -24,6 +24,6 @@ AutoReq:  0
 Official web interface for Duet electronics
 
 %files
-%defattr(-,root,root,-)
+%defattr(-,dsf,dsf,-)
 %{dsfoptdir}/dwc
 %{dsfoptdir}/sd/www

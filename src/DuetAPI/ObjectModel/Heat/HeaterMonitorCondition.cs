@@ -22,11 +22,6 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Limit temperature is too low
         /// </summary>
-        TooLow,
-
-        /// <summary>
-        /// Unknown condition
-        /// </summary>
-        Undefined
+        TooLow
     }
 }

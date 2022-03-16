@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using System;
+using System.IO;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -58,6 +59,23 @@ namespace DuetControlServer.Commands
             {
                 // Stop it via the plugin service. This will reset the PID to -1 too
                 await IPC.Processors.PluginService.PerformCommand(this, asRoot);
+            }
+
+            // Save the execution state if requested
+            if (SaveState)
+            {
+                await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
+                await using StreamWriter writer = new(fileStream);
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                    {
+                        if (item.Pid >= 0 && item.Id != Plugin)
+                        {
+                            await writer.WriteLineAsync(item.Id);
+                        }
+                    }
+                }
             }
         }
 

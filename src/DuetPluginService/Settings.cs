@@ -66,19 +66,35 @@ namespace DuetPluginService
         public static string AppArmorProfileDirectory { get; set; } = "/etc/apparmor.d";
 
         /// <summary>
-        /// Enable or disable custom package installations or uninstallations
+        /// Command to run before installing third-party packages
         /// </summary>
-        public static bool PackageManagement { get; set; }
+        public static string PreinstallPackageCommand { get; set; } = "/usr/bin/apt";
+
+
+        /// <summary>
+        /// Command-line arguments to use before installing third-party packages
+        /// </summary>
+        public static string PreinstallPackageArguments { get; set; } = "update";
 
         /// <summary>
         /// Command to install third-party packages
         /// </summary>
-        public static string InstallPackageCommand { get; set; } = "/usr/bin/apt-get";
+        public static string InstallPackageCommand { get; set; } = "/usr/bin/apt";
 
         /// <summary>
         /// Command-line arguments to install third-party packages
         /// </summary>
         public static string InstallPackageArguments { get; set; } = "install -y {package}";
+
+        /// <summary>
+        /// Command to install third-party Python packages
+        /// </summary>
+        public static string InstallPythonPackageCommand { get; set; } = "/usr/bin/pip";
+
+        /// <summary>
+        /// Command-line arguments to install third-party Python packages
+        /// </summary>
+        public static string InstallPythonPackageArguments { get; set; } = "install {package}";
 
         /// <summary>
         /// Environment variables for the installation command
@@ -96,7 +112,7 @@ namespace DuetPluginService
         /// <summary>
         /// Command-line arguments to install a local package
         /// </summary>
-        public static string InstallLocalPackageArguments { get; set; } = "-i {file}";
+        public static string InstallLocalPackageArguments { get; set; } = "--force-confold -i {file}";
 
         /// <summary>
         /// Command to uninstall a local package

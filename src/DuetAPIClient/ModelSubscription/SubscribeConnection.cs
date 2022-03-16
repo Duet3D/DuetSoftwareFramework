@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
@@ -25,6 +26,14 @@ namespace DuetAPIClient
         public SubscribeConnection() : base(ConnectionMode.Subscribe) { }
 
         /// <summary>
+        /// Code channel to receive messages from. If not set, only generic messages are forwarded (as in v3.3 and earlier)
+        /// </summary>
+        /// <remarks>
+        /// This has no effect in <see cref="SubscriptionMode.Full"/> mode
+        /// </remarks>
+        public CodeChannel? Channel { get; private set; }
+
+        /// <summary>
         /// Mode of the subscription
         /// </summary>
         public SubscriptionMode Mode { get; private set; }
@@ -33,7 +42,7 @@ namespace DuetAPIClient
         /// Delimited filter expression
         /// </summary>
         /// <seealso cref="Filters"/>
-        [Obsolete]
+        [Obsolete("Use Filters instead")]
         public string Filter { get; private set; }
 
         /// <summary>
@@ -54,14 +63,14 @@ namespace DuetAPIClient
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Init message could not be processed</exception>
-        [Obsolete]
+        [Obsolete("Use the new Connect overload with a filter list instead")]
         public Task Connect(SubscriptionMode mode, string filter = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
             Mode = mode;
             Filter = filter;
             Filters.Clear();
 
-            SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filter = Filter };
+            SubscribeInitMessage initMessage = new SubscribeInitMessage() { SubscriptionMode = mode, Filter = Filter };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -86,7 +95,34 @@ namespace DuetAPIClient
                 Filters.AddRange(filters);
             }
 
-            SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filters = Filters };
+            SubscribeInitMessage initMessage = new SubscribeInitMessage() { SubscriptionMode = mode, Filters = Filters };
+            return Connect(initMessage, socketPath, cancellationToken);
+        }
+
+        /// <summary>
+        /// Establishes a connection to the given UNIX socket file
+        /// </summary>
+        /// <param name="mode">Subscription mode</param>
+        /// <param name="channel">Optional code channel to receive messages from (not applicable in Full mode)</param>
+        /// <param name="filters">Optional filter strings</param>
+        /// <param name="socketPath">Path to the UNIX socket file</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
+        /// <exception cref="IOException">Connection mode is unavailable</exception>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Init message could not be processed</exception>
+        public Task Connect(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string> filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+        {
+            Mode = mode;
+            Channel = channel;
+            Filters.Clear();
+            if (filters != null)
+            {
+                Filters.AddRange(filters);
+            }
+
+            SubscribeInitMessage initMessage = new SubscribeInitMessage() { SubscriptionMode = mode, Channel = Channel, Filters = Filters };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -100,12 +136,14 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
         /// <seealso cref="SbcPermissions.ObjectModelRead"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        [Obsolete]
+        [Obsolete("Use GetObjectModel instead")]
         public async Task<ObjectModel> GetMachineModel(CancellationToken cancellationToken = default)
         {
-            ObjectModel model = await Receive<ObjectModel>(cancellationToken);
-            await Send(new Acknowledge(), cancellationToken);
-            return model;
+            if (Mode == SubscriptionMode.Full)
+            {
+                await Send(new Acknowledge(), cancellationToken);
+            }
+            return await Receive<ObjectModel>(cancellationToken);
         }
 
         /// <summary>
@@ -120,9 +158,11 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         public async Task<ObjectModel> GetObjectModel(CancellationToken cancellationToken = default)
         {
-            ObjectModel model = await Receive<ObjectModel>(cancellationToken);
-            await Send(new Acknowledge(), cancellationToken);
-            return model;
+            if (Mode == SubscriptionMode.Full)
+            {
+                await Send(new Acknowledge(), cancellationToken);
+            }
+            return await Receive<ObjectModel>(cancellationToken);
         }
 
         /// <summary>
@@ -135,12 +175,11 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
         /// <seealso cref="SbcPermissions.ObjectModelRead"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        [Obsolete]
+        [Obsolete("Use GetSerializedObjectModel instead")]
         public async Task<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
         {
-            MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
             await Send(new Acknowledge(), cancellationToken);
-            return json;
+            return await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
         }
 
         /// <summary>
@@ -155,9 +194,8 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>g
         public async Task<MemoryStream> GetSerializedObjectModel(CancellationToken cancellationToken = default)
         {
-            MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
             await Send(new Acknowledge(), cancellationToken);
-            return json;
+            return await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
         }
 
         /// <summary>
@@ -172,12 +210,11 @@ namespace DuetAPIClient
         /// <seealso cref="GetObjectModel"/>
         /// <seealso cref="SbcPermissions.ObjectModelRead"/>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        [Obsolete]
+        [Obsolete("Use GetObjectModelPatch instead")]
         public async Task<JsonDocument> GetMachineModelPatch(CancellationToken cancellationToken = default)
         {
-            JsonDocument patch = await ReceiveJson(cancellationToken);
             await Send(new Acknowledge(), cancellationToken);
-            return patch;
+            return await ReceiveJson(cancellationToken);
         }
 
         /// <summary>
@@ -194,9 +231,8 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         public async Task<JsonDocument> GetObjectModelPatch(CancellationToken cancellationToken = default)
         {
-            JsonDocument patch = await ReceiveJson(cancellationToken);
             await Send(new Acknowledge(), cancellationToken);
-            return patch;
+            return await ReceiveJson(cancellationToken);
         }
     }
 }

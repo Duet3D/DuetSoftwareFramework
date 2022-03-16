@@ -65,6 +65,21 @@ namespace DuetControlServer.SPI.Communication.Shared
         /// <summary>
         /// Parameter is a boolean array (byte[])
         /// </summary>
-        BoolArray = 11
+        BoolArray = 11,
+
+        /// <summary>
+        /// Parameter is an unsigned long
+        /// </summary>
+        ULong = 12,
+
+        /// <summary>
+        /// Parameter is a datetime string
+        /// </summary>
+        DateTime = 13,
+
+        /// <summary>
+        /// Parameter is a null value
+        /// </summary>
+        Null = 14
     }
 }

@@ -39,18 +39,29 @@ namespace DuetPluginService.Commands
             Plugin plugin = await ExtractManifest(zipArchive);
             _logger = NLog.LogManager.GetLogger($"Plugin {plugin.Id}");
 
-            // Install plugin dependencies as root
             if (Program.IsRoot)
             {
+                // Run preinstall routine if needed
+                if (plugin.SbcPackageDependencies.Count > 0 && !string.IsNullOrEmpty(Settings.PreinstallPackageCommand))
+                {
+                    _logger.Info("Running preinstall command");
+                    using Process process = Process.Start(Settings.PreinstallPackageCommand, Settings.PreinstallPackageArguments);
+                    await process.WaitForExitAsync(Program.CancellationToken);
+                }
+
+                // Install plugin dependencies
                 foreach (string package in plugin.SbcPackageDependencies)
                 {
                     _logger.Info("Installing package {0}", package);
                     await InstallPackage(package);
                 }
-            }
 
-            if (Program.IsRoot)
-            {
+                foreach (string package in plugin.SbcPythonDependencies)
+                {
+                    _logger.Info("Installing Python package {0}", package);
+                    await InstallPythonPackage(package);
+                }
+
                 // Apply security profile for this plugin unless it gets root permissions anyway
                 if (!plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser))
                 {
@@ -144,8 +155,8 @@ namespace DuetPluginService.Commands
 
                     // Extract the file
                     _logger.Debug("Extracting {0} to {1}", entry.FullName, fileName);
-                    using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
-                    using Stream zipFileStream = entry.Open();
+                    await using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
+                    await using Stream zipFileStream = entry.Open();
                     await zipFileStream.CopyToAsync(fileStream);
 
                     // Make program binaries executable
@@ -172,7 +183,7 @@ namespace DuetPluginService.Commands
 
                     if (!File.Exists(sbcExecutable))
                     {
-                        throw new ArgumentException("SBC executable {0} not found", plugin.SbcExecutable);
+                        throw new ArgumentException($"SBC executable {plugin.SbcExecutable} not found");
                     }
                 }
 
@@ -189,6 +200,7 @@ namespace DuetPluginService.Commands
                         Directory.CreateDirectory(directory);
                     }
 
+#warning check if this is fixed in ASP.NET 6
 #if true
                     // Copy the file. ASP.NET 5 does not perform lstat on symlinks so files served from symlinks are always truncated
                     _logger.Debug("Copying {0} -> {1}", pluginWwwPath, installWwwPath);
@@ -215,7 +227,7 @@ namespace DuetPluginService.Commands
                 // Install refreshed plugin manifest
                 _logger.Debug("Installing plugin manifest");
                 string manifestFilename = Path.Combine(Settings.PluginDirectory, $"{plugin.Id}.json");
-                using (FileStream manifestFile = new(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (FileStream manifestFile = new(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
                     await JsonSerializer.SerializeAsync(manifestFile, plugin, JsonHelper.DefaultJsonOptions);
                 }
@@ -245,10 +257,10 @@ namespace DuetPluginService.Commands
             }
 
             Plugin plugin = new();
-            using (Stream manifestStream = manifestFile.Open())
+            await using (Stream manifestStream = manifestFile.Open())
             {
                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-                plugin.UpdateFromJson(manifestJson.RootElement);
+                plugin.UpdateFromJson(manifestJson.RootElement, false);
             }
             plugin.Pid = -1;
 
@@ -284,6 +296,38 @@ namespace DuetPluginService.Commands
                 {
                     FileName = Settings.InstallPackageCommand,
                     Arguments = Settings.InstallPackageArguments.Replace("{package}", package)
+                };
+                foreach (var kv in Settings.InstallPackageEnvironment)
+                {
+                    startInfo.EnvironmentVariables.Add(kv.Key, kv.Value);
+                }
+
+                using Process process = Process.Start(startInfo);
+                await process.WaitForExitAsync(Program.CancellationToken);
+                if (process.ExitCode != 0)
+                {
+                    throw new ArgumentException($"Failed to install package {package}, package manager exited with code {process.ExitCode}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Install a Python package
+        /// </summary>
+        /// <param name="package">Name of the package to install</param>
+        private static async Task InstallPythonPackage(string package)
+        {
+            if (!Program.IsRoot)
+            {
+                throw new ArgumentException("Cannot install packages as regular user");
+            }
+
+            using (await _packageLock.LockAsync(Program.CancellationToken))
+            {
+                ProcessStartInfo startInfo = new()
+                {
+                    FileName = Settings.InstallPythonPackageCommand,
+                    Arguments = Settings.InstallPythonPackageArguments.Replace("{package}", package)
                 };
                 foreach (var kv in Settings.InstallPackageEnvironment)
                 {

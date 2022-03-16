@@ -1,7 +1,8 @@
-﻿using DuetAPI.ObjectModel;
+﻿using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
+using Nito.AsyncEx;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -18,6 +19,11 @@ namespace DuetControlServer.Commands
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
+        /// Indicates if the plugins are being started
+        /// </summary>
+        private static readonly AsyncLock _startLock = new();
+
+        /// <summary>
         /// Start all the plugins
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -28,48 +34,68 @@ namespace DuetControlServer.Commands
                 return;
             }
 
-            // Start all plugins
-            if (File.Exists(Settings.PluginsFilename))
+            using (await _startLock.LockAsync(Program.CancellationToken))
             {
-                using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Open, FileAccess.Read);
-                using StreamReader reader = new(fileStream);
-                while (!reader.EndOfStream)
+                // Don't proceed if all the plugins have been started
+                using (await Model.Provider.AccessReadOnlyAsync())
                 {
-                    string pluginName = await reader.ReadLineAsync();
-                    try
+                    if (Model.Provider.Get.State.PluginsStarted)
                     {
-                        StartPlugin startCommand = new() { Plugin = pluginName };
-                        await startCommand.Execute();
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.Debug(e);
-                        await Utility.Logger.LogOutput(MessageType.Error, $"Failed to start plugin {pluginName}: {e.Message}");
+                        return;
                     }
                 }
-            }
 
-            // Plugins have been started...
-            using (await Model.Provider.AccessReadWriteAsync())
-            {
-                Model.Provider.Get.State.PluginsStarted = true;
-            }
-
-            // Run dsf-config.g next
-            string dsfConfigFile = await FilePath.ToPhysicalAsync(FilePath.DsfConfigFile, FileDirectory.System);
-            if (File.Exists(dsfConfigFile))
-            {
-                Code dsfConfigCode = new()
+                // Start all plugins
+                if (File.Exists(Settings.PluginsFilename))
                 {
-                    Channel = DuetAPI.CodeChannel.SBC,
-                    Type = DuetAPI.Commands.CodeType.MCode,
-                    MajorNumber = 98,
-                    Parameters = new List<DuetAPI.Commands.CodeParameter>
+                    await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Open, FileAccess.Read);
+                    using StreamReader reader = new(fileStream);
+                    while (!reader.EndOfStream)
                     {
-                        new DuetAPI.Commands.CodeParameter('P', FilePath.DsfConfigFile)
+                        string pluginName = await reader.ReadLineAsync();
+                        if (pluginName == null)
+                        {
+                            break;
+                        }
+
+                        try
+                        {
+                            StartPlugin startCommand = new() {
+                                Plugin = pluginName,
+                                SaveState = false
+                            };
+                            await startCommand.Execute();
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.Debug(e);
+                            await Utility.Logger.LogOutputAsync(MessageType.Error, $"Failed to start plugin {pluginName}: {e.Message}");
+                        }
                     }
-                };
-                await dsfConfigCode.Execute();
+                }
+
+                // Plugins have been started...
+                using (await Model.Provider.AccessReadWriteAsync())
+                {
+                    Model.Provider.Get.State.PluginsStarted = true;
+                }
+
+                // Run dsf-config.g next
+                string dsfConfigFile = await FilePath.ToPhysicalAsync(FilePath.DsfConfigFile, FileDirectory.System);
+                if (File.Exists(dsfConfigFile))
+                {
+                    Code dsfConfigCode = new()
+                    {
+                        Channel = DuetAPI.CodeChannel.SBC,
+                        Type = CodeType.MCode,
+                        MajorNumber = 98,
+                        Parameters = new()
+                        {
+                            new CodeParameter('P', FilePath.DsfConfigFile)
+                        }
+                    };
+                    await dsfConfigCode.Execute();
+                }
             }
         }
     }

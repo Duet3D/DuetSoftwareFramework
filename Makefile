@@ -98,13 +98,13 @@ BINDIR = $(CONFIGDIR)/$(BUILD_ARCH)
 
 # These variables are static and only need to be expanded once
 # so we use the ":=" assignment
-DIRS := DuetControlServer DuetWebServer DuetPluginService CodeConsole CodeLogger CodeStream CustomHttpEndpoint ModelObserver PluginManager
+DIRS := CodeConsole CodeLogger CodeStream CustomHttpEndpoint DuetControlServer DuetPiManagementPlugin DuetPluginService DuetWebServer ModelObserver PluginManager 
 # DIRS_BUILD will expaned to DuetControlServer-build DuetWebServer-build, etc.
 # Same for the following rules.
 DIRS_BUILD := $(addsuffix .build,$(DIRS))
 DIRS_CLEAN := $(addsuffix .clean,$(DIRS))
 DIRS_PUBLISH := $(addsuffix .publish,$(DIRS))
-PACKAGES := DuetControlServer DuetWebServer DuetPluginService DuetTools DuetRuntime DuetSD DuetSoftwareFramework DuetWebControl
+PACKAGES := DuetControlServer DuetPiManagementPlugin DuetPluginService DuetRuntime DuetSD DuetSoftwareFramework DuetTools DuetWebServer DuetWebControl
 BUILDROOTS := $(addsuffix .buildroot,$(PACKAGES))
 RPMS := $(addsuffix .rpm,$(PACKAGES))
 DEBS := $(addsuffix .deb,$(PACKAGES))
@@ -113,17 +113,18 @@ DEBS := $(addsuffix .deb,$(PACKAGES))
 # every time DuetControlServer-version is referenced.
 # Once is enough.
 DuetControlServer-version := $(shell xmllint --xpath "string(//Project/PropertyGroup/Version)" src/DuetControlServer/DuetControlServer.csproj)
-DuetWebServer-version := $(shell xmllint --xpath "string(//Project/PropertyGroup/Version)" src/DuetWebServer/DuetWebServer.csproj)
+DuetPiManagementPlugin-version := $(shell xmllint --xpath "string(//Project/PropertyGroup/Version)" src/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj)
 DuetPluginService-version := $(shell xmllint --xpath "string(//Project/PropertyGroup/Version)" src/DuetPluginService/DuetPluginService.csproj)
-DuetTools-version := $(DuetControlServer-version)
 DuetRuntime-version := $(DuetControlServer-version)
-DuetSoftwareFramework-version := $(DuetControlServer-version)
 DuetSD-version := $(shell sed -n -r -e "s/^Version:\s+([0-9.]+)$$/\1/p" pkg/deb/duetsd/DEBIAN/control)
-DuetWebControl-repo := https://github.com/chrishamm/DuetWebControl.git
+DuetSoftwareFramework-version := $(DuetControlServer-version)
+DuetTools-version := $(DuetControlServer-version)
+DuetWebControl-repo := https://github.com/Duet3D/DuetWebControl.git
 # Exception...  This variable has to be dynamically expanded because
 # at the time the Makefile is parsed, DWC may not have been
 # downloaded or updated yet.
 DuetWebControl-version = $(shell jq -r ".version" $(CONFIGDIR)/all/publish/DuetWebControl/package.json 2>/dev/null)
+DuetWebServer-version := $(shell xmllint --xpath "string(//Project/PropertyGroup/Version)" src/DuetWebServer/DuetWebServer.csproj)
 
 # When you have too much time on your hands :)
 TARGET_PRINTF = printf " [%-9s] %-21s %-7s %-7s %-7s %s\n"
@@ -187,14 +188,22 @@ DuetWebControl.%: BUILD_ARCH = all
 # been updated.  Building it take a while so there's
 # no need to do it if it hasn't changed.
 #
+
 FORCE:
+
 $(CONFIGDIR)/all/publish/DuetWebControl/package.json: FORCE
 	$(CMD_PREFIX)mkdir -p $(dir $(OUTPUTDIR))
-	$(CMD_PREFIX)if [ ! -d $(OUTPUTDIR) ] ; then \
+	$(CMD_PREFIX)RECLONE=$$(git -C bin/Debug/all/publish/DuetWebControl remote -v 2>/dev/null | grep -q "chrishamm" && echo true || echo false) ;\
+	if [ ! -d $(OUTPUTDIR) ] || $${RECLONE} ; then \
+		if [ -d $(OUTPUTDIR) ] ; then \
+			$(TARGET_PRINTF) CLEAN DuetWebControl "" $(CONFIG) "$(BUILD_ARCH)" ;\
+			rm -rf $(OUTPUTDIR) || : ;\
+		fi ;\
 		$(TARGET_PRINTF) CLONE DuetWebControl "" $(CONFIG) "$(BUILD_ARCH)" ;\
 		git clone -q --single-branch --branch master $(DuetWebControl-repo) $(OUTPUTDIR) ;\
 	else \
-		$(TARGET_PRINTF) PULL DuetWebControl "" $(CONFIG) "all" ;\
+		$(TARGET_PRINTF) UPDATE DuetWebControl "" $(CONFIG) "all" ;\
+		git -C $(OUTPUTDIR) reset -q --hard HEAD ;\
 		git -C $(OUTPUTDIR) pull -q ;\
 	fi
 
@@ -389,13 +398,14 @@ endif
 	@printenv
 
 info:
-	@echo "DuetControlServer version:     $(DuetControlServer-version)"
-	@echo "DuetWebServer version:         $(DuetWebServer-version)"
-	@echo "DuetPluginService version:     $(DuetPluginService-version)"
-	@echo "DuetTools version:             $(DuetTools-version)"
-	@echo "DuetSD version:                $(DuetSD-version)"
-	@echo "DuetSoftwareFramework version: $(DuetSoftwareFramework-version)"
-	@echo "DuetWebControl version:        $(DuetWebControl-version)"
+	@echo "DuetControlServer version:     	$(DuetControlServer-version)"
+	@echo "DuetPiManagementPlugin version:	$(DuetPiManagementPlugin-version)"
+	@echo "DuetPluginService version:     	$(DuetPluginService-version)"
+	@echo "DuetSD version:                	$(DuetSD-version)"
+	@echo "DuetSoftwareFramework version: 	$(DuetSoftwareFramework-version)"
+	@echo "DuetTools version:             	$(DuetTools-version)"
+	@echo "DuetWebServer version:         	$(DuetWebServer-version)"
+	@echo "DuetWebControl version:        	$(DuetWebControl-version)"
 
 %.clean:
 	$(CMD_PREFIX)$(MAKE) $(MAKEOPTS) -C src/$* clean V=$(V)

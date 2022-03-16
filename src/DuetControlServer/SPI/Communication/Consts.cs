@@ -12,7 +12,7 @@ namespace DuetControlServer.SPI.Communication
         public const byte FormatCode = 0x5F;
 
         /// <summary>
-        /// Format code indicating that RRF is generally available but has not processed the last transfer yet
+        /// Format code indicating that RRF is operating in standalone mode
         /// </summary>
         public const byte FormatCodeStandalone = 0x60;
 
@@ -24,7 +24,7 @@ namespace DuetControlServer.SPI.Communication
         /// <summary>
         /// Used protocol version. This is incremented whenever the protocol details change
         /// </summary>
-        public const ushort ProtocolVersion = 5;
+        public const ushort ProtocolVersion = 6;
 
         /// <summary>
         /// Default size of a data transfer buffer
@@ -42,7 +42,7 @@ namespace DuetControlServer.SPI.Communication
         public const int MaxExpressionLength = 256;
 
         /// <summary>
-        /// Maximum lenght of a variable name
+        /// Maximum length of a variable name
         /// </summary>
         public const int MaxVariableLength = 120;
 
@@ -57,6 +57,11 @@ namespace DuetControlServer.SPI.Communication
         public const int BufferedCodeHeaderSize = 4;
 
         /// <summary>
+        /// Value used by RepRapFirmware to represent an invalid file handle
+        /// </summary>
+        public const uint NoFileHandle = 0;
+
+        /// <summary>
         /// Value used by RepRapFirmware to represent an invalid file position
         /// </summary>
         public const uint NoFilePosition = 0xFFFFFFFF;
@@ -65,11 +70,6 @@ namespace DuetControlServer.SPI.Communication
         /// Size of each transmitted IAP binary segment (must be a multiple of IFLASH_PAGE_SIZE)
         /// </summary>
         public const int IapSegmentSize = 1536;
-
-        /// <summary>
-        /// Time to wait when the IAP reboots to the main firmware
-        /// </summary>
-        public const int IapBootDelay = 500;
 
         /// <summary>
         /// Timeout when waiting for a response from IAP

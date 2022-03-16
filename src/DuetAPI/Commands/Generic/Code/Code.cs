@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using DuetAPI.Connection;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 
 namespace DuetAPI.Commands
@@ -12,7 +13,7 @@ namespace DuetAPI.Commands
     /// A parsed representation of a generic G/M/T-code
     /// </summary>
     [RequiredPermissions(SbcPermissions.CommandExecution)]
-    public partial class Code : Command<CodeResult>
+    public partial class Code : Command<Message>
     {
         /// <summary>
         /// Create an empty Code representation
@@ -25,8 +26,8 @@ namespace DuetAPI.Commands
         /// <param name="code">UTF8-encoded G/M/T-Code</param>
         public Code(string code)
         {
-            using MemoryStream stream = new(Encoding.UTF8.GetBytes(code));
-            using StreamReader reader = new(stream);
+            using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(code));
+            using StreamReader reader = new StreamReader(stream);
             Parse(reader, this);
         }
 
@@ -42,7 +43,10 @@ namespace DuetAPI.Commands
         /// Result of this code. This property is only set when the code has finished its excution.
         /// It remains null if the code has been cancelled
         /// </summary>
-        public CodeResult Result { get; set; }
+        /// <remarks>
+        /// This used to be of type CodeResult but since v3.2 CodeResult can read Message JSON so it should remain compatible
+        /// </remarks>
+        public Message Result { get; set; }
 
         /// <summary>
         /// Type of the code
@@ -140,11 +144,7 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="c">Letter of the parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
-        public CodeParameter Parameter(char c)
-        {
-            c = char.ToUpperInvariant(c);
-            return Parameters.FirstOrDefault(p => char.ToUpperInvariant(p.Letter) == c);
-        }
+        public CodeParameter Parameter(char c) => Parameters.FirstOrDefault(p => p.Letter == c);
 
         /// <summary>
         /// Retrieve the parameter whose letter equals c or generate a default parameter
@@ -170,7 +170,7 @@ namespace DuetAPI.Commands
                 }
             }
 
-            StringBuilder builder = new();
+            StringBuilder builder = new StringBuilder();
             foreach (CodeParameter p in Parameters)
             {
                 if (builder.Length != 0)
@@ -199,7 +199,13 @@ namespace DuetAPI.Commands
         {
             if (Keyword != KeywordType.None)
             {
-                return KeywordToString() + ((KeywordArgument == null) ? string.Empty : " " + KeywordArgument);
+                string asString = KeywordToString() + ((KeywordArgument == null) ? string.Empty : " " + KeywordArgument);
+                if (Result != null && !string.IsNullOrEmpty(Result.Content))
+                {
+                    asString += " => ";
+                    asString += Result.ToString().TrimEnd();
+                }
+                return asString;
             }
 
             if (Type == CodeType.Comment)
@@ -209,7 +215,7 @@ namespace DuetAPI.Commands
 
             // Because it is neither always feasible nor reasonable to keep track of the original code,
             // attempt to rebuild it here. First, assemble the code letter, then the major+minor numbers (e.g. G53.4)
-            StringBuilder builder = new();
+            StringBuilder builder = new StringBuilder();
             builder.Append(ToShortString());
 
             // After this append each parameter and encapsulate it in double quotes
@@ -257,7 +263,7 @@ namespace DuetAPI.Commands
             }
 
             // If this code has finished, append the code result
-            if (Result != null && !Result.IsEmpty)
+            if (Result != null && !string.IsNullOrEmpty(Result.Content))
             {
                 builder.Append(" => ");
                 builder.Append(Result.ToString().TrimEnd());
@@ -303,26 +309,20 @@ namespace DuetAPI.Commands
         /// Convert the keyword to a string
         /// </summary>
         /// <returns></returns>
-        private string KeywordToString()
+        private string KeywordToString() => Keyword switch
         {
-            return Keyword switch
-            {
-                KeywordType.If => "if",
-                KeywordType.ElseIf => "elif",
-                KeywordType.Else => "else",
-                KeywordType.While => "while",
-                KeywordType.Break => "break",
-                KeywordType.Continue => "continue",
-#pragma warning disable CS0618 // Type or member is obsolete
-                KeywordType.Return => "return",
-#pragma warning restore CS0618 // Type or member is obsolete
-                KeywordType.Abort => "abort",
-                KeywordType.Var => "var",
-                KeywordType.Set => "set",
-                KeywordType.Echo => "echo",
-                KeywordType.Global => "global",
-                _ => throw new NotImplementedException()
-            };
-        }
+            KeywordType.If => "if",
+            KeywordType.ElseIf => "elif",
+            KeywordType.Else => "else",
+            KeywordType.While => "while",
+            KeywordType.Break => "break",
+            KeywordType.Continue => "continue",
+            KeywordType.Abort => "abort",
+            KeywordType.Var => "var",
+            KeywordType.Set => "set",
+            KeywordType.Echo => "echo",
+            KeywordType.Global => "global",
+            _ => throw new NotImplementedException()
+        };
     }
 }

@@ -15,7 +15,7 @@ namespace DuetControlServer.Commands
         {
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                if (Model.Provider.Password == Model.Provider.DefaultPassword || string.IsNullOrEmpty(Model.Provider.Password))
+                if (Model.Provider.Password == DuetAPI.Connection.Defaults.Password || string.IsNullOrEmpty(Model.Provider.Password))
                 {
                     // No password set
                     return true;

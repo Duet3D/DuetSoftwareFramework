@@ -206,7 +206,7 @@ namespace CustomHttpEndpoint
                 }
                 catch (Exception e)
                 {
-                    if (!(e is OperationCanceledException) && !(e is SocketException))
+                    if (e is not OperationCanceledException && e is not SocketException)
                     {
                         Console.WriteLine("Unexpected error:");
                         Console.WriteLine(e);
@@ -264,7 +264,7 @@ namespace CustomHttpEndpoint
                     string args = _cmd;
                     foreach (var kv in request.Queries)
                     {
-                        args.Replace($"%{kv.Key}%", kv.Value);
+                        args = args.Replace($"%{kv.Key}%", kv.Value);
                     }
 
                     // Prepare the process start info

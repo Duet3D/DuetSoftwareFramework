@@ -116,11 +116,11 @@
         /// <summary>
         /// Type of this network interface
         /// </summary>
-        public InterfaceType Type
+        public NetworkInterfaceType Type
         {
             get => _type;
 			set => SetPropertyValue(ref _type, value);
         }
-        private InterfaceType _type = InterfaceType.WiFi;
+        private NetworkInterfaceType _type = NetworkInterfaceType.WiFi;
     }
 }

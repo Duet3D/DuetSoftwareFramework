@@ -101,9 +101,9 @@ namespace DuetControlServer.Commands
             lock (_cancellationTokenSources)
             {
                 // Cancel and dispose the existing CTS
-                CancellationTokenSource oldCTS = _cancellationTokenSources[(int)channel];
-                oldCTS.Cancel();
-                oldCTS.Dispose();
+                CancellationTokenSource oldTcs = _cancellationTokenSources[(int)channel];
+                oldTcs.Cancel();
+                oldTcs.Dispose();
 
                 // Create a new one
                 _cancellationTokenSources[(int)channel] = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
@@ -182,9 +182,9 @@ namespace DuetControlServer.Commands
                 return (Macro == null) ? _codeStartLocks[(int)Channel, (int)InternalCodeType.Macro].LockAsync(CancellationToken) : Macro.WaitForCodeStart();
             }
 
-            // Wait for pending codes for message acknowledgements
+            // Wait for pending codes for message acknowledgments
             // FIXME M0/M1 are not meant to be used while a message box is open
-            if (!Flags.HasFlag(CodeFlags.IsFromFirmware) && Interface.IsWaitingForAcknowledgement(Channel) &&
+            if (!Flags.HasFlag(CodeFlags.IsFromFirmware) && Interface.IsWaitingForAcknowledgment(Channel) && File == null &&
                 (Type != CodeType.MCode || (MajorNumber != 0 && MajorNumber != 1)))
             {
                 _codeType = InternalCodeType.Acknowledgement;
@@ -259,7 +259,7 @@ namespace DuetControlServer.Commands
             get => _connection;
             set
             {
-                SourceConnection = (value != null) ? value.Id : 0;
+                SourceConnection = value?.Id ?? 0;
                 _connection = value;
             }
         }
@@ -281,17 +281,17 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Indicates if this code is supposed to deal with a message box awaiting acknowledgement
         /// </summary>
-        internal bool IsForAcknowledgement { get => _codeType == InternalCodeType.Acknowledgement; }
+        internal bool IsForAcknowledgement => _codeType == InternalCodeType.Acknowledgement;
 
         /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish
         /// </summary>
         /// <returns>Result of the code</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        public override Task<CodeResult> Execute()
+        public override Task<Message> Execute()
         {
             // Wait until this code can be executed and then start it
-            Task<CodeResult> executingTask = WaitForExecution()
+            CodeTask = WaitForExecution()
                 .ContinueWith(async task =>
                 {
                     try
@@ -307,13 +307,18 @@ namespace DuetControlServer.Commands
                 .Unwrap();
 
             // Return either the task itself or null and let it finish in the background
-            return Flags.HasFlag(CodeFlags.Asynchronous) ? Task.FromResult<CodeResult>(null) : executingTask;
+            return Flags.HasFlag(CodeFlags.Asynchronous) ? Task.FromResult<Message>(null) : CodeTask;
         }
 
         /// <summary>
         /// Indicates whether the code has been internally processed
         /// </summary>
         internal bool InternallyProcessed { get; set; }
+
+        /// <summary>
+        /// Automatically log and output the code's result
+        /// </summary>
+        internal bool LogOutput { get; set; }
 
         /// <summary>
         /// File that started this code
@@ -329,7 +334,7 @@ namespace DuetControlServer.Commands
         /// Execute the given code internally
         /// </summary>
         /// <returns>Result of the code</returns>
-        private async Task<CodeResult> ExecuteInternally()
+        private async Task<Message> ExecuteInternally()
         {
             string logSuffix = Flags.HasFlag(CodeFlags.Asynchronous) ? " asynchronously" : string.Empty;
 
@@ -347,13 +352,17 @@ namespace DuetControlServer.Commands
                         {
                             _logger.Debug("Writing {0}{1}", this, logSuffix);
                             FilesBeingWritten[numChannel].WriteLine(this);
-                            return new CodeResult();
+                            return new Message();
                         }
                     }
 
                     // Execute this code
                     _logger.Debug("Processing {0}{1}", this, logSuffix);
                     await Process();
+                    if (LogOutput)
+                    {
+                        await Utility.Logger.LogOutputAsync(Result);
+                    }
                     _logger.Debug("Completed {0}{1}", this, logSuffix);
                 }
                 catch (OperationCanceledException oce)
@@ -373,13 +382,13 @@ namespace DuetControlServer.Commands
                 {
                     // Some inputs may be disabled in a custom build
                     _logger.Debug(ioe, "{0} cannot be executed{1} because its code channel {2} is disabled", this, logSuffix, Channel);
-                    Result = new CodeResult(MessageType.Error, $"Code channel {Channel} is disabled");
+                    Result = new Message(MessageType.Error, $"Code channel {Channel} is disabled");
                 }
                 catch (NotSupportedException nse)
                 {
                     // Some codes may not be supported yet
                     _logger.Debug(nse, "{0} is not supported{1}", this, logSuffix);
-                    Result = new CodeResult(MessageType.Error, "Operation is not supported");
+                    Result = new Message(MessageType.Error, "Operation is not supported");
                 }
                 catch (Exception e)
                 {
@@ -388,21 +397,21 @@ namespace DuetControlServer.Commands
                     throw;
                 }
             }
-            catch (Exception e) when (!(e is OperationCanceledException))
+            catch (Exception e) when (e is not OperationCanceledException)
             {
                 // Cancel the running file and then start the next code if an exception has occurred
                 if (Macro != null)
                 {
                     using (await Macro.LockAsync())
                     {
-                        await Macro.Abort();
+                        await Macro.AbortAsync();
                     }
                 }
                 else if (Channel == CodeChannel.File)
                 {
                     using (await Job.LockAsync())
                     {
-                        await Job.Abort();
+                        await Job.AbortAsync();
                     }
                 }
                 StartNextCode();
@@ -477,9 +486,6 @@ namespace DuetControlServer.Commands
             if (Keyword != KeywordType.None &&
                 Keyword != KeywordType.Echo &&
                 Keyword != KeywordType.Abort &&
-#pragma warning disable CS0618 // Type or member is obsolete
-                Keyword != KeywordType.Return &&
-#pragma warning restore CS0618 // Type or member is obsolete
                 Keyword != KeywordType.Global &&
                 Keyword != KeywordType.Var &&
                 Keyword != KeywordType.Set)
@@ -501,8 +507,8 @@ namespace DuetControlServer.Commands
                 }
             }
 
-            // Flush the code channel and populate Linux fields where applicable
-            if (Keyword == KeywordType.None && Expressions.ContainsLinuxFields(this) && !await Interface.Flush(this, true, false))
+            // Flush the code channel and populate SBC fields where applicable
+            if (Keyword == KeywordType.None && Expressions.ContainsSbcFields(this) && !await Interface.Flush(this, true, false))
             {
                 throw new OperationCanceledException();
             }
@@ -554,7 +560,7 @@ namespace DuetControlServer.Commands
             if ((Type == CodeType.None) ||
                 (Type == CodeType.Comment && (string.IsNullOrWhiteSpace(Comment) || !Settings.FirmwareComments.Any(chunk => Comment.Contains(chunk)))))
             {
-                Result = new CodeResult();
+                Result = new Message();
                 InternallyProcessed = true;
                 return true;
             }
@@ -572,6 +578,11 @@ namespace DuetControlServer.Commands
         /// TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
         /// </summary>
         internal TaskCompletionSource FirmwareTCS { get; private set; }
+
+        /// <summary>
+        /// Actual task of this code
+        /// </summary>
+        internal Task<Message> CodeTask { get; private set; }
 
         /// <summary>
         /// Indicates if the code has been fully executed (including the Executed interceptor if applicable)
@@ -610,19 +621,16 @@ namespace DuetControlServer.Commands
                 if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
                 {
                     // RepRapFirmware generally prefixes error messages with the code itself, mimic this behavior
-                    foreach (Message msg in Result)
+                    if (Result.Type == MessageType.Error)
                     {
-                        if (msg.Type == MessageType.Error)
-                        {
-                            msg.Content = ToShortString() + ": " + msg.Content;
-                        }
+                        Result.Content = ToShortString() + ": " + Result.Content;
                     }
 
                     // Messages from RRF and replies to file print codes are logged somewhere else,
                     // so we only need to log internal code replies that are not part of file prints
                     if (File == null || Channel != CodeChannel.File)
                     {
-                        await Utility.Logger.Log(Result);
+                        await Utility.Logger.LogAsync(Result);
                     }
                 }
 
@@ -633,45 +641,34 @@ namespace DuetControlServer.Commands
                     {
                         if (Flags.HasFlag(CodeFlags.IsLastCode))
                         {
-                            if (Result.Count != 0 && Type == CodeType.MCode && MajorNumber == 105)
+                            if (Result == null || string.IsNullOrEmpty(Result.Content))
                             {
-                                Result[0].Content = "ok " + Result[0].Content;
+                                Result = new Message(MessageType.Success, "ok\n");
                             }
-                            else if (Result.IsEmpty)
+                            else if (Type == CodeType.MCode && MajorNumber == 105)
                             {
-                                Result.Add(MessageType.Success, "ok\n");
+                                Result.Content = "ok " + Result.Content + "\n";
                             }
                             else
                             {
-                                Result[^1].Content += "\nok\n";
+                                Result.AppendLine("ok\n");
                             }
                         }
                     }
-                    else if (!Result.IsEmpty)
+                    else if (Result == null || string.IsNullOrEmpty(Result.Content))
                     {
-                        Result[^1].Content += "\n";
+                        Result = new Message(MessageType.Success, "\n");
                     }
                     else
                     {
-                        Result.Add(MessageType.Success, "\n");
+                        Result.AppendLine(string.Empty);
                     }
                 }
 
                 // Update the last code result
                 if (File != null)
                 {
-                    if (Result.Any(message => message.Type == MessageType.Error))
-                    {
-                        File.LastResult = 2;
-                    }
-                    else if (Result.Any(message => message.Type == MessageType.Warning))
-                    {
-                        File.LastResult = 1;
-                    }
-                    else
-                    {
-                        File.LastResult = 0;
-                    }
+                    File.LastResult = (int)Result.Type;
                 }
             }
 
