@@ -238,7 +238,7 @@ This tool is intended to manage third-party plugins directly on the SBC without 
 
 ## Unit Tests
 
-To ensure flawless operation of the most critical components, Duet Software Framework relies on unit tests via the NUnit framework. These unit tests can be found in the [src/UnitTests](/src/UnitTests) directory.
+To ensure flawless operation of the most critical components, Duet Software Framework relies on unit tests via the NUnit framework. These unit tests can be found in the [src/UnitTests](src/UnitTests) directory.
 
 ## Known incompatibilities
 

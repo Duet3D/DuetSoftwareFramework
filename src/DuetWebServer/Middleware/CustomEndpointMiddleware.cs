@@ -57,6 +57,7 @@ namespace DuetWebServer.Middleware
         /// <param name="logger">Logger instance</param>
         /// <param name="applicationLifetime">Host application lifetime</param>
         /// <param name="modelProvider">Object model provider</param>
+        /// <param name="sessionStorage">Session storage</param>
         public CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger, IHostApplicationLifetime applicationLifetime, IModelProvider modelProvider, ISessionStorage sessionStorage)
         {
             _next = next;

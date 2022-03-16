@@ -389,7 +389,7 @@ namespace DuetWebServer.Controllers
 
         /// <summary>
         /// PUT /machine/file/{filename}
-        /// Upload a file from the HTTP body and create the subdirectories if necessary.
+        /// Upload a file from the HTTP body and create the subdirectories if necessary
         /// </summary>
         /// <param name="filename">Destination of the file to upload</param>
         /// <param name="sessionStorage">Session storage singleton</param>
