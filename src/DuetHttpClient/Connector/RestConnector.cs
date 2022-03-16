@@ -440,7 +440,7 @@ namespace DuetHttpClient.Connector
             string errorMessage = "Invalid number of maximum retries configured";
             for (int i = 0; i <= Options.MaxRetries; i++)
             {
-                using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, executeAsynchronously ? "machine/code" : "machine/code?async=true");
+                using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, executeAsynchronously ? "machine/code?async=true" : "machine/code");
                 request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(code));
 
                 using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
