@@ -231,10 +231,17 @@ namespace DuetControlServer.Utility
             {
                 foreach (Board board in Model.Provider.Get.Boards)
                 {
-                    string newVersion = firmwareVersions[board.FirmwareFileName];
-                    if (!string.IsNullOrEmpty(board.FirmwareFileName) && board.FirmwareVersion != newVersion)
+                    if (!string.IsNullOrEmpty(board.FirmwareFileName) && firmwareVersions.TryGetValue(board.FirmwareFileName, out string newVersion))
                     {
-                        outdatedBoards.Add((Board)board.Clone());
+                        if (board.FirmwareVersion != newVersion)
+                        {
+                            outdatedBoards.Add((Board)board.Clone());
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Warning: Failed to get corresponding firmware version for {0}, RRF version {1}, firmware filename '{2}'",
+                            (board.CanAddress != 0) ? $"{board.Name} @ {board.CanAddress}" : board.Name, board.FirmwareVersion, board.FirmwareFileName);
                     }
                 }
             }
@@ -370,7 +377,7 @@ namespace DuetControlServer.Utility
             }
             else if (boardsToUpdate.Count > 0)
             {
-                Console.WriteLine("Resetting mainboard... ");
+                Console.Write("Resetting mainboard... ");
                 try
                 {
                     Commands.Code updateCode = new()
@@ -447,10 +454,17 @@ namespace DuetControlServer.Utility
             List<Board> outdatedBoards = new();
             foreach (Board board in objectModel.Boards)
             {
-                string newVersion = firmwareVersions[board.FirmwareFileName];
-                if (!string.IsNullOrEmpty(board.FirmwareFileName) && board.FirmwareVersion != newVersion)
+                if (!string.IsNullOrEmpty(board.FirmwareFileName) && firmwareVersions.TryGetValue(board.FirmwareFileName, out string newVersion))
                 {
-                    outdatedBoards.Add((Board)board.Clone());
+                    if (board.FirmwareVersion != newVersion)
+                    {
+                        outdatedBoards.Add((Board)board.Clone());
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Warning: Failed to get corresponding firmware version for {0}, RRF version {1}, firmware filename '{2}'",
+                        (board.CanAddress != 0) ? $"{board.Name} @ {board.CanAddress}" : board.Name, board.FirmwareVersion, board.FirmwareFileName);
                 }
             }
 
@@ -578,7 +592,7 @@ namespace DuetControlServer.Utility
             }
             else if (boardsToUpdate.Count > 0)
             {
-                Console.WriteLine("Resetting mainboard... ");
+                Console.Write("Resetting mainboard... ");
                 try
                 {
                     Commands.Code updateCode = new()

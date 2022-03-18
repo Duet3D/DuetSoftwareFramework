@@ -100,7 +100,7 @@ namespace DuetControlServer
             if (await CheckForAnotherInstance())
             {
                 // No need to log the start-up failure here
-                return ExitCode.TempFailure;
+                return Settings.UpdateOnly ? ExitCode.Success : ExitCode.TempFailure;
             }
 
             // Initialize everything
@@ -174,6 +174,10 @@ namespace DuetControlServer
                     _logger.Warn("Received SIGTERM, shutting down...");
                     try
                     {
+                        // Wait for potential firmware update to finish
+                        SPI.Interface.WaitForUpdate();
+
+                        // Shut down this instance after 4.5s tops
                         using CancellationTokenSource cts = new(4500);
                         ShutdownAsync(true).Wait(cts.Token);
                     }
@@ -423,7 +427,7 @@ namespace DuetControlServer
             }
 
             // Wait for potential firmware update to finish
-            await SPI.Interface.WaitForUpdate();
+            await SPI.Interface.WaitForUpdateAsync();
 
             // Make sure the program is terminated within 5s
             Task watchdogTask = Task.Run(async delegate

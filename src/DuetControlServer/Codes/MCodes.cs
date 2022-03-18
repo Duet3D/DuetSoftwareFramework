@@ -517,6 +517,10 @@ namespace DuetControlServer.Codes
                 case 112:
                     if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await SPI.Interface.Flush(code))
                     {
+                        // Wait for potential firmware updates to complete first
+                        await SPI.Interface.WaitForUpdateAsync();
+
+                        // Perform emergency stop but don't wait longer than 4.5s
                         Task stopTask = SPI.Interface.EmergencyStop();
                         Task completedTask = await Task.WhenAny(stopTask, Task.Delay(4500, Program.CancellationToken));
                         if (stopTask != completedTask)
@@ -526,6 +530,7 @@ namespace DuetControlServer.Codes
                             return new Message(MessageType.Error, "Halt timed out, killing DCS");
                         }
 
+                        // RRF halted
                         using (await Model.Provider.AccessReadWriteAsync())
                         {
                             Model.Provider.Get.State.Status = MachineStatus.Halted;
@@ -955,6 +960,10 @@ namespace DuetControlServer.Codes
                     {
                         if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await SPI.Interface.Flush(code))
                         {
+                            // Wait for potential firmware updates to complete first
+                            await SPI.Interface.WaitForUpdateAsync();
+
+                            // Perform firmware reset but don't wait longer than 4.5s
                             Task resetTask = SPI.Interface.ResetFirmware();
                             Task completedTask = await Task.WhenAny(resetTask, Task.Delay(4500, Program.CancellationToken));
                             if (resetTask != completedTask)
@@ -964,6 +973,7 @@ namespace DuetControlServer.Codes
                                 return new Message(MessageType.Error, "Reset timed out, killing DCS");
                             }
 
+                            // Firmware reset
                             return new Message();
                         }
                         throw new OperationCanceledException();
