@@ -8,7 +8,12 @@
         /// <summary>
         /// Whether the drive goes forwards
         /// </summary>
-        public bool Forwards { get; set; } = true;
+        public bool Forwards
+        {
+            get => _forwards;
+            set => SetPropertyValue(ref _forwards, value);
+        }
+        private bool _forwards = true;
 
         /// <summary>
         /// Stall detection settings

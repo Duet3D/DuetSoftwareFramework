@@ -222,10 +222,6 @@ namespace DuetControlServer.SPI
                             _fullTransferStopwatch.Start();
                         }
                     }
-                    else if (_transferStopwatch.IsRunning)
-                    {
-                        _fullTransferStopwatch.Stop();
-                    }
 
                     // Exchange transfer headers. This also deals with transfer responses
                     if (!ExchangeHeader())
@@ -293,7 +289,6 @@ namespace DuetControlServer.SPI
                     _logger.Debug(e, "Lost connection to Duet");
                     _txHeader.ProtocolVersion = Consts.ProtocolVersion;
                     _waitingForFirstTransfer = true;
-                    _connected = false;
 
                     if (!_hadTimeout && _connected)
                     {
@@ -301,6 +296,7 @@ namespace DuetControlServer.SPI
                         Updater.ConnectionLost();
                         Logger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
                     }
+                    _connected = false;
                 }
             }
             while (!Program.CancellationToken.IsCancellationRequested);
@@ -1281,11 +1277,6 @@ namespace DuetControlServer.SPI
 
         #region Functions for data transfers
         /// <summary>
-        /// Static stopwatch to measure the transfer times with
-        /// </summary>
-        private static readonly Stopwatch _transferStopwatch = new();
-
-        /// <summary>
         /// Wait for the Duet to flag when it is ready to transfer data
         /// </summary>
         /// <param name="inTransfer">Whether a full transfer is being performed</param>
@@ -1293,38 +1284,43 @@ namespace DuetControlServer.SPI
         {
             if (_waitingForFirstTransfer)
             {
-                _transferReadyPin.FlushEvents();
-                if (!_transferReadyPin.Value)
-                {
-                    try
-                    {
-                        // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred
-                        while (!_transferReadyPin.WaitForEvent(_updating ? Consts.IapTimeout : Settings.SpiConnectTimeout)) { }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        if (Program.CancellationToken.IsCancellationRequested)
-                        {
-                            throw new OperationCanceledException("Program termination");
-                        }
-                        throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
-                    }
-                }
-                _waitingForFirstTransfer = false;
-                _expectedTfrRdyPinValue = false;
+                // When a connection is established for the first time, the TfrRdy pin must be high
+                _expectedTfrRdyPinValue = true;
             }
-            else
+
+            _transferReadyPin.FlushEvents();
+            if (_transferReadyPin.Value != _expectedTfrRdyPinValue)
             {
-                // Wait a moment until the transfer ready pin is toggled or until a timeout has occurred.
-                int timeout = _updating ? Consts.IapTimeout : (inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout);
-                _transferStopwatch.Restart();
+                // Determine how long to wait for the pin level transition
+                int timeout;
+                if (_waitingForFirstTransfer)
+                {
+                    timeout = _updating ? Consts.IapTimeout : Settings.SpiConnectTimeout;
+                    _expectedTfrRdyPinValue = true;
+                }
+                else
+                {
+                    timeout = _updating ? Consts.IapTimeout : (inTransfer ? Settings.SpiTransferTimeout : Settings.SpiConnectionTimeout);
+                }
+
+                // Wait for the expected pin level
+                Stopwatch stopwatch = Stopwatch.StartNew();
                 try
                 {
-                    int timeToWait = timeout - (int)_transferStopwatch.ElapsedMilliseconds;
-                    while (timeToWait > 0 && _transferReadyPin.WaitForEvent(timeToWait) != _expectedTfrRdyPinValue)
+                    do
                     {
+                        int timeToWait = timeout - (int)stopwatch.ElapsedMilliseconds;
+                        if (timeToWait <= 0 || Program.CancellationToken.IsCancellationRequested)
+                        {
+                            throw new OperationCanceledException();
+                        }
+
+                        if (_transferReadyPin.WaitForEvent(timeToWait) == _expectedTfrRdyPinValue)
+                        {
+                            break;
+                        }
                         _numTfrPinGlitches++;
-                    }
+                    } while (true);
                 }
                 catch (OperationCanceledException)
                 {
@@ -1333,32 +1329,34 @@ namespace DuetControlServer.SPI
                         throw new OperationCanceledException("Program termination");
                     }
 
-                    if (_transferStopwatch.ElapsedMilliseconds > timeout + 500)
+                    if (stopwatch.ElapsedMilliseconds > timeout + 500)
                     {
                         // In case this application does not seem to get enough CPU time, log a different message
                         Logger.LogOutput(MessageType.Warning, "Did not get enough CPU time during SPI transfer, your SBC may be overloaded");
                     }
                     throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                 }
-                _transferStopwatch.Stop();
-                _expectedTfrRdyPinValue = !_expectedTfrRdyPinValue;
 
-                // Keep track of the maximum times to wait for the TfrRdy pin to change
+                // Keep track of the maximum wait times
                 if (inTransfer)
                 {
-                    if (_transferStopwatch.Elapsed > _maxPinWaitDuration)
+                    if (stopwatch.Elapsed > _maxPinWaitDuration)
                     {
-                        _maxPinWaitDuration = _transferStopwatch.Elapsed;
+                        _maxPinWaitDuration = stopwatch.Elapsed;
                     }
                 }
-                else
+                else if (!_waitingForFirstTransfer)
                 {
-                    if (_transferStopwatch.Elapsed > _maxPinWaitDurationFull)
+                    if (stopwatch.Elapsed > _maxPinWaitDurationFull)
                     {
-                        _maxPinWaitDurationFull = _transferStopwatch.Elapsed;
+                        _maxPinWaitDurationFull = stopwatch.Elapsed;
                     }
                 }
             }
+
+            // Transition complete
+            _expectedTfrRdyPinValue = !_expectedTfrRdyPinValue;
+            _waitingForFirstTransfer = false;
         }
 
         /// <summary>
