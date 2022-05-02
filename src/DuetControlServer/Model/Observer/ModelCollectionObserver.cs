@@ -26,11 +26,6 @@ namespace DuetControlServer.Model
         {
             return (sender, e) =>
             {
-                if (collectionName == "restorePoints")
-                {
-                    Console.WriteLine("Something changed!");
-                }
-
                 // Notify clients that something has been changed in this collection
                 IList senderList = (IList)sender;
 
