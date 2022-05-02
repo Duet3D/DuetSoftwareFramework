@@ -338,9 +338,9 @@ namespace DuetAPI.ObjectModel
                             }
 #endif
                         }
-                        catch (JsonException e)
+                        catch (JsonException e) when (ObjectModel.DeserializationFailed(this, property.PropertyType, jsonProperty.Value.Clone(), e))
                         {
-                            throw new JsonException($"Failed to deserialize property [{GetType().Name}].{property.Name} (type {property.PropertyType.Name}) from JSON {jsonProperty.Value.GetRawText()}", e);
+                            // suppressed
                         }
                     }
                 }

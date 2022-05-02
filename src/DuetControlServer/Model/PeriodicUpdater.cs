@@ -76,7 +76,7 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
-            DateTime lastUpdateTime = DateTime.Now;
+            TimeSpan measuredDelay = TimeSpan.Zero;
             string lastHostname = Environment.MachineName;
             do
             {
@@ -93,7 +93,7 @@ namespace DuetControlServer.Model
                 }
 
                 // Check if the system time has to be updated
-                if (DateTime.Now - lastUpdateTime > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 5000) && !Debugger.IsAttached)
+                if (measuredDelay > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 2000) && !Debugger.IsAttached)
                 {
                     _logger.Info("System time has been changed");
                     Code code = new()
@@ -133,8 +133,9 @@ namespace DuetControlServer.Model
                 }
 
                 // Wait for next scheduled update check
-                lastUpdateTime = DateTime.Now;
+                DateTime lastUpdateTime = DateTime.Now;
                 await Task.Delay(Settings.HostUpdateInterval, Program.CancellationToken);
+                measuredDelay = DateTime.Now - lastUpdateTime;
             }
             while (!Program.CancellationToken.IsCancellationRequested);
         }

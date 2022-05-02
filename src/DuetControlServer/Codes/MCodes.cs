@@ -1051,7 +1051,7 @@ namespace DuetControlServer.Codes
 
             await FileExecution.Job.Diagnostics(builder);
             IPC.Processors.CodeInterception.Diagnostics(builder);
-            await Model.Updater.Diagnostics(builder);
+            Model.Provider.Diagnostics(builder);
             await SPI.Interface.Diagnostics(builder);
 
             result.Append(MessageType.Success, builder.ToString());

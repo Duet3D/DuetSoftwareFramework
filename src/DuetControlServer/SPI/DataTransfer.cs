@@ -31,7 +31,7 @@ namespace DuetControlServer.SPI
         private static InputGpioPin _transferReadyPin;
         private static bool _expectedTfrRdyPinValue;
         private static SpiDevice _spiDevice;
-        private static bool _waitingForFirstTransfer = true, _started, _hadTimeout, _resetting, _updating;
+        private static bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _resetting, _updating;
         private static ushort _lastTransferNumber;
 
         private static DateTime _lastTransferMeasureTime = DateTime.Now, _lastCodesMeasureTime = DateTime.Now;
@@ -206,7 +206,7 @@ namespace DuetControlServer.SPI
                 try
                 {
                     // Keep track of the maximum times between regular full transfers
-                    if (!connecting && !_waitingForFirstTransfer && _started && !_hadTimeout && !_updating && !_resetting)
+                    if (!connecting && !_waitingForFirstTransfer && _connected && !_hadTimeout && !_updating && !_resetting)
                     {
                         if (_fullTransferStopwatch.IsRunning)
                         {
@@ -241,7 +241,7 @@ namespace DuetControlServer.SPI
 
                     // Verify the protocol version
                     ProtocolVersion = _rxHeader.ProtocolVersion;
-                    if ((_hadTimeout || !_started) && ProtocolVersion != Consts.ProtocolVersion)
+                    if ((_hadTimeout || !_connected) && ProtocolVersion != Consts.ProtocolVersion)
                     {
                         Logger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
                     }
@@ -254,10 +254,10 @@ namespace DuetControlServer.SPI
                     }
 
                     // Deal with the first transmission
-                    if (!_started)
+                    if (!_connected)
                     {
                         _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
-                        _started = true;
+                        _connected = true;
                     }
 
                     // Transfer OK
@@ -277,7 +277,7 @@ namespace DuetControlServer.SPI
                     // Deal with reset requests
                     if (_resetting && Settings.NoTerminateOnReset)
                     {
-                        _started = _resetting = false;
+                        _connected = _resetting = false;
                         _waitingForFirstTransfer = true;
                         PerformFullTransfer();
                     }
@@ -293,8 +293,9 @@ namespace DuetControlServer.SPI
                     _logger.Debug(e, "Lost connection to Duet");
                     _txHeader.ProtocolVersion = Consts.ProtocolVersion;
                     _waitingForFirstTransfer = true;
+                    _connected = false;
 
-                    if (!_hadTimeout && _started)
+                    if (!_hadTimeout && _connected)
                     {
                         _hadTimeout = true;
                         Updater.ConnectionLost();
@@ -309,10 +310,7 @@ namespace DuetControlServer.SPI
         /// Check if the controller has been reset
         /// </summary>
         /// <returns>Whether the controller has been reset</returns>
-        public static bool HadReset()
-        {
-            return _started && ((ushort)(_lastTransferNumber + 1) != _rxHeader.SequenceNumber);
-        }
+        public static bool HadReset() => _connected && ((ushort)(_lastTransferNumber + 1) != _rxHeader.SequenceNumber);
 
         #region Read functions
         /// <summary>
@@ -978,7 +976,7 @@ namespace DuetControlServer.SPI
             Thread.Sleep(Consts.IapRebootDelay);
 
             // Wait for the first data transfer from the firmware
-            _updating = _started = false;
+            _updating = _connected = false;
             _waitingForFirstTransfer = true;
             _rxHeader.SequenceNumber = 1;
             _txHeader.SequenceNumber = 0;
@@ -1322,7 +1320,8 @@ namespace DuetControlServer.SPI
                 _transferStopwatch.Restart();
                 try
                 {
-                    while (_transferReadyPin.WaitForEvent(timeout) != _expectedTfrRdyPinValue)
+                    int timeToWait = timeout - (int)_transferStopwatch.ElapsedMilliseconds;
+                    while (timeToWait > 0 && _transferReadyPin.WaitForEvent(timeToWait) != _expectedTfrRdyPinValue)
                     {
                         _numTfrPinGlitches++;
                     }
@@ -1333,10 +1332,16 @@ namespace DuetControlServer.SPI
                     {
                         throw new OperationCanceledException("Program termination");
                     }
+
+                    if (_transferStopwatch.ElapsedMilliseconds > timeout + 500)
+                    {
+                        // In case this application does not seem to get enough CPU time, log a different message
+                        Logger.LogOutput(MessageType.Warning, "Did not get enough CPU time during SPI transfer, your SBC may be overloaded");
+                    }
                     throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
                 }
-                _expectedTfrRdyPinValue = !_expectedTfrRdyPinValue;
                 _transferStopwatch.Stop();
+                _expectedTfrRdyPinValue = !_expectedTfrRdyPinValue;
 
                 // Keep track of the maximum times to wait for the TfrRdy pin to change
                 if (inTransfer)
@@ -1400,8 +1405,12 @@ namespace DuetControlServer.SPI
                 uint responseCode = MemoryMarshal.Read<uint>(_rxHeaderBuffer.Span);
                 if (responseCode == TransferResponse.BadResponse)
                 {
-                    _logger.Warn("Restarting transfer because the Duet received a bad response (header)");
-                    return false;
+                    _logger.Warn("Received bad response instead of header, retrying exchange of the data response");
+                    if (_connected && ExchangeDataResponse(out bool success) && success)
+                    {
+                        continue;
+                    }
+                    throw new OperationCanceledException("SPI data transfer failed");
                 }
 
                 // Read received header
@@ -1433,7 +1442,7 @@ namespace DuetControlServer.SPI
                         responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
-                            _logger.Warn("Restarting transfer because the Duet received a bad response (header response)");
+                            _logger.Warn("Restarting full transfer because RepRapFirmware received a bad header response");
                             return false;
                         }
                         if (responseCode != TransferResponse.Success)
@@ -1452,7 +1461,7 @@ namespace DuetControlServer.SPI
                         responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
-                            _logger.Warn("Restarting transfer because the Duet received a bad response (header response)");
+                            _logger.Warn("Restarting full transfer because RepRapFirmware received a bad header response");
                             return false;
                         }
                         if (responseCode != TransferResponse.Success)
@@ -1499,7 +1508,7 @@ namespace DuetControlServer.SPI
                     throw new Exception($"Data too long ({_rxHeader.DataLength} bytes)");
                 }
 
-                // Acknowledge reception
+                // Acknowledge receipt
                 uint response = ExchangeResponse(TransferResponse.Success);
                 switch (response)
                 {
@@ -1515,19 +1524,27 @@ namespace DuetControlServer.SPI
                         _logger.Warn("RepRapFirmware got a bad header checksum");
                         continue;
                     case TransferResponse.BadResponse:
-                        _logger.Warn("Restarting transfer because RepRapFirmware received a bad response (header response)");
+                        _logger.Warn("Restarting full transfer because RepRapFirmware received a bad header response");
                         return false;
                     case TransferResponse.LowPin:
                     case TransferResponse.HighPin:
                         throw new OperationCanceledException("Board is not available (no header response)");
                     default:
-                        _logger.Warn("Restarting transfer because a bad header response was received (0x{0:x8})", response);
+                        _logger.Warn("Restarting full transfer because a bad header response was received (0x{0:x8})", response);
+                        if (_rxHeader.DataLength == 0 && _txPointer == 0)
+                        {
+                            // No data was transferred so we are still in sync. Continue with the next transfer
+                            _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
+                            return true;
+                        }
+
+                        // Transfer bad data response to restart the transfer
                         ExchangeResponse(TransferResponse.BadResponse);
                         return false;
                 }
             }
 
-            _logger.Warn("Restarting transfer because the number of maximum retries has been exceeded");
+            _logger.Warn("Restarting full transfer because the number of maximum retries has been exceeded");
             ExchangeResponse(TransferResponse.BadResponse);
             return false;
         }
@@ -1564,7 +1581,7 @@ namespace DuetControlServer.SPI
                 uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);
                 if (responseCode == TransferResponse.BadResponse)
                 {
-                    _logger.Warn("Restarting transfer because RepRapFirmware received a bad response (data content)");
+                    _logger.Warn("Restarting full transfer because RepRapFirmware received a bad data response");
                     return false;
                 }
 
@@ -1578,7 +1595,7 @@ namespace DuetControlServer.SPI
                         responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
-                            _logger.Warn("Restarting transfer because the Duet received a bad response (data response)");
+                            _logger.Warn("Restarting full transfer because RepRapFirmware received a bad data response");
                             return false;
                         }
                         if (responseCode != TransferResponse.Success)
@@ -1597,7 +1614,7 @@ namespace DuetControlServer.SPI
                         responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
                         if (responseCode == TransferResponse.BadResponse)
                         {
-                            _logger.Warn("Restarting transfer because the Duet received a bad response (data response)");
+                            _logger.Warn("Restarting full transfer because RepRapFirmware received a bad data response");
                             return false;
                         }
                         if (responseCode != TransferResponse.Success)
@@ -1608,31 +1625,48 @@ namespace DuetControlServer.SPI
                     }
                 }
 
-                // Check response
+                // Exchange data response and restart the data transfer if it failed
+                if (ExchangeDataResponse(out bool success))
+                {
+                    return success;
+                }
+            }
+            throw new OperationCanceledException("SPI connection reset because the number of maximum retries has been exceeded");
+        }
+
+        /// <summary>
+        /// Exchange the data response
+        /// </summary>
+        /// <param name="success">Whether the transfer was successful</param>
+        /// <returns>True when done</returns>
+        private static bool ExchangeDataResponse(out bool success)
+        {
+            for (int retry = 0; retry < Settings.MaxSpiRetries; retry++)
+            {
                 uint response = ExchangeResponse(TransferResponse.Success);
                 switch (response)
                 {
                     case TransferResponse.Success:
+                        success = true;
                         return true;
                     case TransferResponse.BadDataChecksum:
                         _logger.Warn("RepRapFirmware got a bad data checksum");
-                        continue;
-                    case TransferResponse.BadResponse:
-                        _logger.Warn("Restarting transfer because RepRapFirmware received a bad response (data response)");
+                        success = false;
                         return false;
+                    case TransferResponse.BadResponse:
+                        _logger.Warn("Restarting full transfer because RepRapFirmware received a bad data response");
+                        success = false;
+                        return true;
                     case TransferResponse.LowPin:
                     case TransferResponse.HighPin:
                         throw new OperationCanceledException("Board is not available (no data response)");
                     default:
-                        _logger.Warn("Restarting transfer because a bad data response was received (0x{0:x8})", response);
+                        _logger.Warn("Restarting data response exchange because a bad code was received (0x{0:x8})", response);
                         ExchangeResponse(TransferResponse.BadResponse);
-                        return false;
+                        continue;
                 }
             }
-
-            _logger.Warn("Restarting transfer because the number of maximum retries has been exceeded");
-            ExchangeResponse(TransferResponse.BadResponse);
-            return false;
+            throw new OperationCanceledException("SPI connection reset because the number of maximum retries has been exceeded");
         }
         #endregion
     }

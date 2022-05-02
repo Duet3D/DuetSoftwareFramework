@@ -85,6 +85,9 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Current machine position (in mm) or null if unknown/unset
         /// </summary>
+        /// <remarks>
+        /// This value reflects the machine position of the move being performed or of the last one if the machine is not moving
+        /// </remarks>
         public float? MachinePosition
         {
             get => _machinePosition;
@@ -180,6 +183,9 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Current user position (in mm) or null if unknown
         /// </summary>
+        /// <remarks>
+        /// This value reflects the target position of the last move fed into the look-ahead buffer
+        /// </remarks>
         public float? UserPosition
         {
             get => _userPosition;

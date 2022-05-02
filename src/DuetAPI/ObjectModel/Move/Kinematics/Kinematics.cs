@@ -9,7 +9,7 @@ namespace DuetAPI.ObjectModel
     public class Kinematics : ModelObject
     {
         /// <summary>
-        /// Currently configured geometry type
+        /// Nme of the configured kinematics
         /// </summary>
         public KinematicsName Name
         {

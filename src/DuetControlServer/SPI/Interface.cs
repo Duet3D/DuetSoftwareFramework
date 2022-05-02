@@ -758,7 +758,7 @@ namespace DuetControlServer.SPI
                     Logger.LogOutput(MessageType.Warning, "SPI connection has been reset");
                 }
 
-                // Check for changes of the print status.
+                // Check for changes of the print status
                 using (_printStateLock.Lock(Program.CancellationToken))
                 {
                     if (_setPrintInfoRequest != null && DataTransfer.WritePrintFileInfo(Model.Provider.Get.Job.File))
