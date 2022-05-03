@@ -54,7 +54,8 @@ namespace DuetHttpClient.Connector
 
             if (response.IsSuccessStatusCode)
             {
-                ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(await response.Content.ReadAsStreamAsync(), JsonHelper.DefaultJsonOptions, cancellationToken);
+                using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
                 return new RestConnector(baseUri, options, responseObj.SessionKey);
             }
 
@@ -107,16 +108,16 @@ namespace DuetHttpClient.Connector
             using CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
             connectCts.CancelAfter(Options.Timeout);
 
-            using HttpResponseMessage connectResponse = await HttpClient.GetAsync($"machine/connect?password=${Options.Password}", connectCts.Token);
-            if (connectResponse.IsSuccessStatusCode)
+            using HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password=${Options.Password}", connectCts.Token);
+            if (response.IsSuccessStatusCode)
             {
-                await using Stream stream = await connectResponse.Content.ReadAsStreamAsync();
-                ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(stream, cancellationToken: connectCts.Token);
+                using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
 
                 _sessionKey = responseObj.SessionKey;
                 HttpClient.DefaultRequestHeaders.Add("X-Session-Key", responseObj.SessionKey);
             }
-            else if (connectResponse.StatusCode == HttpStatusCode.Unauthorized || connectResponse.StatusCode == HttpStatusCode.Forbidden)
+            else if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
             {
                 // Invalid password specified
                 throw new InvalidPasswordException();
@@ -124,7 +125,7 @@ namespace DuetHttpClient.Connector
             else
             {
                 // Unknown response
-                throw new HttpRequestException($"Server returned ${connectResponse.StatusCode} ${connectResponse.ReasonPhrase}");
+                throw new HttpRequestException($"Server returned ${response.StatusCode} ${response.ReasonPhrase}");
             }
         }
 
