@@ -9,7 +9,7 @@ namespace DuetAPI.ObjectModel
     public class Kinematics : ModelObject
     {
         /// <summary>
-        /// Nme of the configured kinematics
+        /// Name of the configured kinematics
         /// </summary>
         public KinematicsName Name
         {
