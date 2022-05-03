@@ -1580,7 +1580,6 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Invalidate every resource due to a critical event
         /// </summary>
-        /// <returns>Asynchronous task</returns>
         private static void Invalidate()
         {
             // No longer starting or stopping a print. Must do this before aborting the print
