@@ -7,10 +7,10 @@ using System.Text.Json.Serialization;
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
-    /// Representation of the full machine model as maintained by DCS
+    /// Representation of the Duet3D object model
     /// </summary>
     [JsonConverter(typeof(ObjectModelConverter))]
-    public sealed class ObjectModel : ModelObject
+    public class ObjectModel : ModelObject
     {
         /// <summary>
         /// List of connected boards

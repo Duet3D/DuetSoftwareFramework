@@ -101,7 +101,15 @@
         }
         private int? _speed;
 
-        // DSF does not support the status property
+        /// <summary>
+        /// Network state
+        /// </summary>
+        public NetworkState? State
+        {
+            get => _state;
+            set => SetPropertyValue(ref _state, value);
+        }
+        private NetworkState? _state;
 
         /// <summary>
         /// Subnet of the network adapter
