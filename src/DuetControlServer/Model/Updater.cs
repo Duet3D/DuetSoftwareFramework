@@ -332,8 +332,8 @@ namespace DuetControlServer.Model
                 Provider.Get.Job.Layers.Clear();
             }
 
-            // Don't continue from here unless the layer number is known
-            if (Provider.Get.Job.Layer == null)
+            // Don't continue from here unless the layer number is known and valid
+            if (Provider.Get.Job.Layer == null || Provider.Get.Job.Layer.Value < 0)
             {
                 return;
             }
@@ -415,7 +415,7 @@ namespace DuetControlServer.Model
                     }
                     else
                     {
-                        lastLayer = Provider.Get.Job.Layers[_lastLayer];
+                        lastLayer = Provider.Get.Job.Layers[_lastLayer - 1];
                     }
 
                     lastLayer.Duration += avgLayerDuration;
