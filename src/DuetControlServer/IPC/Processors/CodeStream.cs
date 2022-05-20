@@ -20,12 +20,18 @@ namespace DuetControlServer.IPC.Processors
     public sealed class CodeStream : Base
     {
         /// <summary>
-        /// List of supported commands in this mode
+        /// List of supported commands in this mode.
+        /// This is not really used because this mode reads lines and no JSON objects
         /// </summary>
         public static readonly Type[] SupportedCommands =
         {
             typeof(Code)
         };
+
+        /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
         /// List of active subscribers
@@ -88,7 +94,7 @@ namespace DuetControlServer.IPC.Processors
                 throw new ArgumentException("BufferSize is out of range");
             }
             _channel = codeStreamInitMessage.Channel;
-            conn.Logger.Debug("CodeStream processor added");
+            _logger.Debug("CodeStream processor added for IPC#{0}", conn.Id);
         }
 
         /// <summary>
@@ -213,7 +219,7 @@ namespace DuetControlServer.IPC.Processors
                         // Send errors back to the client
                         if (e is not OperationCanceledException)
                         {
-                            Connection.Logger.Error(e, "Failed to execute code");
+                            _logger.Error(e, "IPC#{0}: Failed to execute stream code", Connection.Id);
                         }
                         await Connection.SendResponse(e);
                     }

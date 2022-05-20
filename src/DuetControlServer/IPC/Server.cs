@@ -23,6 +23,11 @@ namespace DuetControlServer.IPC
         public const int MinimumProtocolVersion = 7;
 
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// UNIX socket for inter-process communication
         /// </summary>
         private static readonly Socket _unixSocket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
@@ -116,7 +121,7 @@ namespace DuetControlServer.IPC
             try
             {
                 // Check if this connection is permitted
-                connection.Logger.Debug("Got new UNIX connection, checking permissions...");
+                _logger.Debug("Got new UNIX connection via IPC#{0}, checking permissions...", connection.Id);
                 if (await connection.AssignPermissions())
                 {
                     // Send server-side init message to the client
@@ -134,12 +139,12 @@ namespace DuetControlServer.IPC
                     }
                     else
                     {
-                        connection.Logger.Debug("Failed to find processor");
+                        _logger.Debug("IPC#{0}: Failed to find processor", connection.Id);
                     }
                 }
                 else
                 {
-                    connection.Logger.Warn("Terminating connection due to insufficient permissions");
+                    _logger.Warn("IPC#{0}: Terminating connection due to insufficient permissions", connection.Id);
                     await connection.Send(new UnauthorizedAccessException("Insufficient permissions"));
                 }
             }
@@ -148,12 +153,12 @@ namespace DuetControlServer.IPC
                 if (e is not OperationCanceledException && e is not SocketException)
                 {
                     // Log unexpected errors
-                    connection.Logger.Error(e, "Terminating connection due to unexpected exception");
+                    _logger.Error(e, "IPC#{0}: Terminating connection due to unexpected exception", connection.Id);
                 }
             }
             finally
             {
-                connection.Logger.Debug("Connection closed");
+                _logger.Debug("IPC#{0}: Connection closed", connection.Id);
 
                 // Unlock the machine model again in case the client application crashed
                 await LockManager.UnlockMachineModel(connection);
@@ -178,13 +183,13 @@ namespace DuetControlServer.IPC
                 if (initMessage.Version < MinimumProtocolVersion || initMessage.Version > Defaults.ProtocolVersion)
                 {
                     string message = $"Incompatible protocol version (got {initMessage.Version}, need {MinimumProtocolVersion} to {Defaults.ProtocolVersion})";
-                    conn.Logger.Warn(message);
+                    _logger.Warn("IPC#{0}: {1}", conn.Id, message);
                     await conn.SendResponse(new IncompatibleVersionException(message));
                     return null;
                 }
                 else if (initMessage.Version != Defaults.ProtocolVersion)
                 {
-                    conn.Logger.Warn("Client with outdated protocol version connected (got {0}, want {1})", initMessage.Version, Defaults.ProtocolVersion);
+                    _logger.Warn("IPC#{0}: Client with outdated protocol version connected (got {1}, want {2})", conn.Id, initMessage.Version, Defaults.ProtocolVersion);
                 }
 
                 // Check the requested mode
@@ -232,7 +237,7 @@ namespace DuetControlServer.IPC
             }
             catch (Exception e) when (e is not OperationCanceledException && e is not SocketException)
             {
-                conn.Logger.Error(e, "Failed to assign connection processor");
+                _logger.Error(e, "IPC#{0}: Failed to assign connection processor", conn.Id);
                 await conn.SendResponse(e);
             }
 

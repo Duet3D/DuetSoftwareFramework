@@ -55,10 +55,15 @@ namespace DuetControlServer.IPC.Processors
         static Command() => AddSupportedCommands(SupportedCommands);
 
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// Constructor of the command interpreter
         /// </summary>
         /// <param name="conn">Connection instance</param>
-        public Command(Connection conn) : base(conn) => conn.Logger.Debug("Command processor added");
+        public Command(Connection conn) : base(conn) => _logger.Debug("Command processor added for IPC#{0}", conn.Id);
 
         /// <summary>
         /// Reads incoming command requests and processes them. See <see cref="DuetAPI.Commands"/> namespace for a list
@@ -107,16 +112,16 @@ namespace DuetControlServer.IPC.Processors
                         {
                             if (e is UnauthorizedAccessException)
                             {
-                                Connection.Logger.Error("Insufficient permissions to execute {0}", command.Command);
+                                _logger.Error("IPC#{0}: Insufficient permissions to execute {1}", Connection.Id, command.Command);
                             }
                             else
                             {
-                                Connection.Logger.Error(e, "Failed to execute {0}", command.Command);
+                                _logger.Error(e, "IPC#{0}: Failed to execute {1}", Connection.Id, command.Command);
                             }
                         }
                         else
                         {
-                            Connection.Logger.Error(e, "Failed to receive command");
+                            _logger.Error(e, "IPC#{0}: Failed to receive command", Connection.Id);
                         }
                     }
                     await Connection.SendResponse(e);

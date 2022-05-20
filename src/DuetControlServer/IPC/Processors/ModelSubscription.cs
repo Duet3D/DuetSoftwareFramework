@@ -38,6 +38,11 @@ namespace DuetControlServer.IPC.Processors
         static ModelSubscription() => AddSupportedCommands(SupportedCommands);
 
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// List of active subscribers
         /// </summary>
         private static readonly List<ModelSubscription> _subscriptions = new();
@@ -123,7 +128,7 @@ namespace DuetControlServer.IPC.Processors
             {
                 _subscriptions.Add(this);
             }
-            conn.Logger.Debug("Subscription processor registered in {0} mode", _mode);
+            _logger.Debug("Subscription processor for IPC#{0} registered in {1} mode", conn.Id, _mode);
         }
 
         /// <summary>
@@ -208,7 +213,7 @@ namespace DuetControlServer.IPC.Processors
                                 Connection.Poll();
                                 continue;
                             }
-                            Connection.Logger.Debug("Subscriber connection requested to terminate");
+                            _logger.Debug("IPC#{0}: Subscriber connection requested to terminate", Connection.Id);
                             throw;
                         }
                     }
@@ -256,7 +261,7 @@ namespace DuetControlServer.IPC.Processors
                 {
                     Observer.OnPropertyPathChanged -= MachineModelPropertyChanged;
                 }
-                Connection.Logger.Debug("Subscription processor unregistered");
+                _logger.Debug("IPC#{0}: Subscription processor unregistered", Connection.Id);
             }
         }
 
@@ -533,7 +538,7 @@ namespace DuetControlServer.IPC.Processors
                 }
                 catch (Exception e)
                 {
-                    Connection.Logger.Error(e, "Failed to record {0} = {1} ({2})", string.Join('/', path), value, changeType);
+                    _logger.Error(e, "IPC#{0}: Failed to record {1} = {2} ({3})", Connection.Id, string.Join('/', path), value, changeType);
                 }
             }
         }

@@ -39,6 +39,11 @@ namespace DuetControlServer.IPC.Processors
         static CodeInterception() => AddSupportedCommands(SupportedCommands);
 
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// Dictionary of interception mode vs item containers (connection vs queue of codes being intercepted)
         /// </summary>
         private static readonly Dictionary<InterceptionMode, List<CodeInterception>> _connections = new()
@@ -108,7 +113,7 @@ namespace DuetControlServer.IPC.Processors
             {
                 _connections[_mode].Add(this);
             }
-            Connection.Logger.Debug("Interception processor registered");
+            _logger.Debug("Interception processor registered for IPC#{0}", Connection.Id);
 
             using (await _codeMonitor.EnterAsync(Program.CancellationToken))
             {
@@ -192,7 +197,7 @@ namespace DuetControlServer.IPC.Processors
                     {
                         _connections[_mode].Remove(this);
                     }
-                    Connection.Logger.Debug("Interception processor unregistered");
+                    _logger.Debug("Interception processor unregistered for IPC#{0}", Connection.Id);
                 }
             }
         }
@@ -271,7 +276,7 @@ namespace DuetControlServer.IPC.Processors
                 }
                 catch (Exception e) when (e is not OperationCanceledException)
                 {
-                    Connection.Logger.Error(e, "Interception processor caught an exception");
+                    _logger.Error(e, "Interception processor for IPC#{0} caught an exception", Connection.Id);
                 }
             }
             return false;
@@ -305,17 +310,17 @@ namespace DuetControlServer.IPC.Processors
                 {
                     try
                     {
-                        processor.Connection.Logger.Debug("Intercepting code {0} ({1})", code, type);
+                        _logger.Debug("Intercepting code {0} ({1}) via IPC#{2}", code, type, processor.Connection.Id);
                         if (await processor.Intercept(code))
                         {
-                            processor.Connection.Logger.Debug("Code has been resolved");
+                            _logger.Debug("Code has been resolved by IPC#{0}", processor.Connection.Id);
                             return true;
                         }
-                        processor.Connection.Logger.Debug("Code has been ignored");
+                        _logger.Debug("Code has been ignored by IPC#{0}", processor.Connection.Id);
                     }
                     catch (OperationCanceledException)
                     {
-                        processor.Connection.Logger.Debug("Code has been cancelled");
+                        _logger.Debug("Code has been cancelled by IPC#{0}", processor.Connection.Id);
                         throw;
                     }
                 }
