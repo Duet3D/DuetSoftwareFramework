@@ -9,7 +9,7 @@ namespace DuetAPI.ObjectModel
     public class Kinematics : ModelObject
     {
         /// <summary>
-        /// Currently configured geometry type
+        /// Name of the configured kinematics
         /// </summary>
         public KinematicsName Name
         {
@@ -45,7 +45,6 @@ namespace DuetAPI.ObjectModel
                 case KinematicsName.MarkForged:
                     return typeof(CoreKinematics);
                 case KinematicsName.Delta:
-                case KinematicsName.RotaryDelta:
                     return typeof(DeltaKinematics);
                 case KinematicsName.Hangprinter:
                     return typeof(HangprinterKinematics);
@@ -54,6 +53,7 @@ namespace DuetAPI.ObjectModel
                     return typeof(ScaraKinematics);
                 case KinematicsName.Polar:
                     return typeof(PolarKinematics);
+                case KinematicsName.RotaryDelta:
                 default:
                     return typeof(Kinematics);
             }

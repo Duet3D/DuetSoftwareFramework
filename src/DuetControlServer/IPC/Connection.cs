@@ -28,7 +28,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Logger instance
         /// </summary>
-        public readonly NLog.Logger Logger;
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
         /// Identifier of this connection
@@ -69,8 +69,6 @@ namespace DuetControlServer.IPC
         {
             UnixSocket = socket;
             Id = Interlocked.Increment(ref _idCounter);
-
-            Logger = NLog.LogManager.GetLogger($"IPC#{Id}");
         }
 
         /// <summary>
@@ -109,13 +107,13 @@ namespace DuetControlServer.IPC
                 string remoteDirectory = Path.GetDirectoryName(Process.GetProcessById(pid)?.MainModule?.FileName);
                 if (dcsDirectory != remoteDirectory)
                 {
-                    Logger.Error("Failed to find plugin permissions for pid #{0}", pid);
+                    _logger.Error("IPC#{0}: Failed to find plugin permissions for pid #{1}", Id, pid);
                     return false;
                 }
             }
 
             // Grant full permissions to other programs
-            Logger.Debug("Granting full DSF permissions to external plugin");
+            _logger.Debug("IPC#{0}: Granting full DSF permissions to external plugin", Id);
             foreach (Enum permission in Enum.GetValues(typeof(SbcPermissions)))
             {
                 if (!permission.Equals(SbcPermissions.SuperUser))
@@ -200,13 +198,13 @@ namespace DuetControlServer.IPC
                 try
                 {
                     await using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
-                    Logger.Trace(() => $"Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+                    _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
                     return await JsonDocument.ParseAsync(jsonStream);
                 }
                 catch (JsonException e)
                 {
-                    Logger.Error(e, "Received malformed JSON");
+                    _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
                     await SendResponse(e);
                 }
             }
@@ -249,14 +247,14 @@ namespace DuetControlServer.IPC
                 try
                 {
                     await using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
-                    Logger.Trace(() => $"Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+                    _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
                     using StreamReader reader = new(jsonStream);
                     return await reader.ReadToEndAsync();
                 }
                 catch (JsonException e)
                 {
-                    Logger.Error(e, "Received malformed JSON");
+                    _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
                     await SendResponse(e);
                 }
             }
@@ -311,11 +309,11 @@ namespace DuetControlServer.IPC
                     // Log this
                     if (commandType == typeof(Acknowledge))
                     {
-                        Logger.Trace("Received command {0}", item.Value.GetString());
+                        _logger.Trace("IPC#{0}: Received command {1}", Id, item.Value.GetString());
                     }
                     else
                     {
-                        Logger.Debug("Received command {0}", item.Value.GetString());
+                        _logger.Debug("IPC#{0}: Received command {1}", Id, item.Value.GetString());
                     }
 
                     // Perform final deserialization and assign source identifier to this command
@@ -367,7 +365,7 @@ namespace DuetControlServer.IPC
         public Task Send<T>(T obj)
         {
             byte[] toSend = (obj is byte[] byteArray) ? byteArray : JsonSerializer.SerializeToUtf8Bytes(obj, JsonHelper.DefaultJsonOptions);
-            Logger.Trace(() => $"Sending {Encoding.UTF8.GetString(toSend)}");
+            _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
             return UnixSocket.SendAsync(toSend, SocketFlags.None);
         }
 
@@ -380,7 +378,7 @@ namespace DuetControlServer.IPC
         public Task Send(object obj)
         {
             byte[] toSend = (obj is byte[] byteArray) ? byteArray : JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
-            Logger.Trace(() => $"Sending {Encoding.UTF8.GetString(toSend)}");
+            _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
             return UnixSocket.SendAsync(toSend, SocketFlags.None);
         }
 

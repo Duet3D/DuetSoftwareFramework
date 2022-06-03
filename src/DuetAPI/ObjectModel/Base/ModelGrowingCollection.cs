@@ -191,8 +191,15 @@ namespace DuetAPI.ObjectModel
             {
                 foreach (JsonElement jsonItem in jsonElement.EnumerateArray())
                 {
-                    T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
-                    Add(itemValue);
+                    try
+                    {
+                        T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
+                        Add(itemValue);
+                    }
+                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem.Clone(), e))
+                    {
+                        // suppressed
+                    }
                 }
             }
             return this;

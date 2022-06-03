@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -155,10 +158,33 @@ namespace DuetControlServer.Model
         private static bool _isUpdating;
 
         /// <summary>
+        /// Dictionary of the properties vs. sender type + JSON content that failed to be deserialized
+        /// </summary>
+        private static readonly Dictionary<Type, Tuple<Type, JsonElement>> _deserializationErrors = new();
+
+        /// <summary>
+        /// Event handler to be called when the deserialization of a property failed
+        /// </summary>
+        /// <param name="sender">Object that failed to deserialze a property</param>
+        /// <param name="e">Event args pointing to the property that failed to be deserialized</param>
+        private static void OnDeserializationFailed(object sender, DeserializationFailedEventArgs e)
+        {
+            if (!_deserializationErrors.ContainsKey(e.TargetType))
+            {
+                lock (_deserializationErrors)
+                {
+                    _deserializationErrors.Add(e.TargetType, new(sender.GetType(), e.JsonValue));
+                }
+                _logger.Error("Failed to deserialize {0} -> {1} from {2}", sender.GetType().Name, e.TargetType.Name, e.JsonValue.GetRawText());
+            }
+        }
+
+        /// <summary>
         /// Initialize the object model provider with values that are not expected to change
         /// </summary>
         public static void Init()
         {
+            ObjectModel.OnDeserializationFailed += OnDeserializationFailed;
 #pragma warning disable CS0618 // Type or member is obsolete
             Get.State.DsfVersion = Program.Version;
             Get.State.DsfPluginSupport = Settings.PluginSupport;
@@ -425,5 +451,25 @@ namespace DuetControlServer.Model
         /// <param name="content">Content of the message</param>
         /// <returns>Asynchronous task</returns>
         public static Task OutputAsync(MessageType type, string content) => OutputAsync(new Message(type, content));
+
+        /// <summary>
+        /// Report the diagnostics of this class
+        /// </summary>
+        /// <param name="builder">Target to write to</param>
+        public static void Diagnostics(StringBuilder builder)
+        {
+            lock (_deserializationErrors)
+            {
+                if (_deserializationErrors.Count > 0)
+                {
+                    builder.AppendLine("Failed to deserialize the following properties:");
+                }
+
+                foreach (var kv in _deserializationErrors)
+                {
+                    builder.AppendLine($"- {kv.Value.Item1.Name} -> {kv.Key.Name} from {kv.Value.Item2.GetRawText()}");
+                }
+            }
+        }
     }
 }

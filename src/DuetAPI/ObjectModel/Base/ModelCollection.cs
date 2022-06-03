@@ -364,9 +364,9 @@ namespace DuetAPI.ObjectModel
                                 this[i] = itemValue;
                             }
                         }
-                        catch (JsonException e)
+                        catch (JsonException e) when (ObjectModel.DeserializationFailed(this, itemType, jsonItem.Clone(), e))
                         {
-                            throw new JsonException($"Failed to deserialize item type {itemType.Name} from JSON {jsonItem.GetRawText()}", e);
+                            // suppressed
                         }
                     }
                 }
@@ -393,9 +393,9 @@ namespace DuetAPI.ObjectModel
                             T newItem = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
                             Add(newItem);
                         }
-                        catch (JsonException e)
+                        catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem.Clone(), e))
                         {
-                            throw new JsonException($"Failed to deserialize item type {itemType.Name} from JSON {jsonItem.GetRawText()}", e);
+                            // suppressed
                         }
                     }
                 }

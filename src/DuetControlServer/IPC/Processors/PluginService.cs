@@ -17,6 +17,11 @@ namespace DuetControlServer.IPC.Processors
     public sealed class PluginService : Base
     {
         /// <summary>
+        /// Logger instance
+        /// </summary>
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
         /// Monitor for the service interfaces
         /// </summary>
         private static readonly AsyncMonitor _monitor = new();
@@ -89,7 +94,7 @@ namespace DuetControlServer.IPC.Processors
         /// Constructor of the plugin runner proxy processor
         /// </summary>
         /// <param name="conn">Connection instance</param>
-        public PluginService(Connection conn) : base(conn) => conn.Logger.Debug("PluginService processor added");
+        public PluginService(Connection conn) : base(conn) => _logger.Debug("PluginService processor added for IPC#{0}", conn.Id);
 
         /// <summary>
         /// Handles the remote connection

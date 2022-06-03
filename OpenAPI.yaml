@@ -1,0 +1,426 @@
+openapi: 3.0.0
+info:
+    version: '3.4.1'
+    title: 'DuetSoftwareFramework'
+    license:
+        name: GPL-3.0
+paths:
+    /machine/connect:
+        get:
+            summary: |
+                Establish a connection to the SBC and check the given password. The default password (in case none is set) is `reprap`. If no password is expected, the `password` key can be omitted.
+
+                For following HTTP requests, the session key must be added to the HTTP headers via `X-Session-Key`. For WebSocket requests, it must be appended to the URL using the `sessionKey` parameter (e.g. `ws://duet3/machine?sessionKey=<KEY>`).
+
+                The resulting session is maintained at least 8 seconds but it may last as long as
+                - a WebSocket is open
+                - a long-running HTTP request is being processed (code, upload, and package requests)
+            parameters:
+                - name: password
+                  in: query
+                  description: Password
+                  required: false
+                  schema:
+                    type: string
+                    format: password
+            responses:
+                '200':
+                    description: 'Connect response'
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    sessionKey:
+                                        type: string
+                '403':
+                    description: 'Forbidden (invalid password)'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+    /machine/noop:
+        get:
+            summary: |
+                Do nothing. May be used to ping the machine or to keep the HTTP session alive
+            responses:
+                '204':
+                    description: 'No Content'
+                '403':
+                    description: 'Forbidden (missing or invalid `X-Session-Key` header)'   
+    /machine/disconnect:
+        get: 
+            summary: |
+                Disconnect from the machine
+            responses:
+                '204':
+                    description: 'No Content'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+    /machine/status:
+        get:
+            summary: |
+                Query the full object model
+            responses:
+                '200':
+                    description: 'Query OK, current object model is returned as application/json'
+                    content:
+                        application/json: {}
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+    /machine/code:
+        get:
+            summary: |
+                Execute plain G/M/T-code(s) from the raw request body and return the G-code response when done.
+
+                The optional `async` parameter defines whether the request shall block until the code has been executed.
+                If it is set to `true` and a code reply is generated, the reply is output as a generic message
+            parameters:
+                - name: async
+                  in: query
+                  description: 'Execute the code(s) asynchronously'
+                  required: false
+                  schema:
+                    type: boolean
+            responses:
+                '200':
+                    description: 'Code(s) have finished, reply is returned as `text/plain`'
+                    content:
+                        text/plain: {}
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+    /machine/file/{filename}:
+        get:
+            summary: |
+                Download a file. The file path is translated to a physical file path
+            parameters:
+                - name: filename
+                  in: path
+                  description: 'Name of the file to download'
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '200':
+                    description: 'File content'
+                    content:
+                        application/octet-stream: {}
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '404':
+                    description: 'File not found'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+        put:
+            summary: |
+                Upload a file. The file path is translated to a physical file path. The body payload is the file content
+            parameters:
+                - name: filename
+                  in: path
+                  description: 'Name of the file to upload'
+                  required: true
+                  schema:
+                      type: string
+            requestBody:
+                description: 'Content of the file to upload'
+                content:
+                    application/octet-stream: {}
+            responses:
+                '201':
+                    description: 'File created'
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+        delete:
+            summary: |
+                Delete a file or directory. The file path is translated to a physical file path
+            parameters:
+                - name: filename
+                  in: path
+                  description: 'Name of the file to delete'
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '204':
+                    description: 'File or directory succesfully deleted'
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '404':
+                    description: 'File not found'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+    /machine/fileinfo/{filename}:
+        get:
+            summary: |
+                Parse a given G-code file and return information about this job file as a JSON object.
+                See [API Documentation](https://duet3d.github.io/DuetSoftwareFramework/api/DuetAPI.Machine.ParsedFileInfo.html) for further information about the object returned
+            parameters:
+                - name: filename
+                  in: path
+                  description: 'Name of the file to parse'
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '200':
+                    description: 'Parsed file information as `application/json`'
+                    content:
+                        application/json: {}
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '404':
+                    description: 'File not found'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+    /machine/file/move:
+        post:
+            summary: |
+                Move a file or directory from a to b. The file paths are translated to physical file paths
+            requestBody:
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            type: object
+                            properties:
+                                from:
+                                    description: 'Source file path'
+                                    type: string
+                                to:
+                                    description: 'Destination file path'
+                                    type: string
+                                force:
+                                    description: 'If the destination file already exists, delete it first. Defaults to false'
+                                    type: boolean
+                            required: ['from', 'to']
+            responses:
+                '204':
+                    description: 'File or directory succesfully moved'
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '404':
+                    description: 'File not found'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+    /machine/directory/{directory}:
+        get:
+            summary: |
+                Get a file list of the given directory. The directory path is translated to a physical file path
+            parameters:
+                - name: directory
+                  in: path
+                  description: 'Name of the directory to list'
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '200':
+                    description: 'File list of the directory`'
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    type: object
+                                    properties:
+                                        type:
+                                            type: string
+                                            enum:
+                                                - d
+                                                - f
+                                        name:
+                                            type: string
+                                        date:
+                                            type: string
+                                            format: 'date-time'
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '404':
+                    description: 'File not found'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+        put:
+            summary: |
+                Create the given directory. The directory path is translated to a physical directory path
+            parameters:
+                - name: directory
+                  in: path
+                  description: 'Name of the directory to create'
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '201':
+                    description: 'Directory created'
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '404':
+                    description: 'File not found'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+    /machine/plugin:
+        put:
+            summary: |
+                Install or upgrade a plugin ZIP file
+            requestBody:
+                description: 'Plugin ZIP content'
+                content:
+                    application/octet-stream: {}
+            responses:
+                '204':
+                    description: 'Plugin has been installed'
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+        delete:
+            summary: |
+                Uninstall a plugin
+            requestBody:
+                description: 'Name of the plugin to uninstall'
+                content:
+                    text/plain: {}
+            responses:
+                '204':
+                    description: 'Plugin has been uninstalled'
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+        patch:
+            summary: |
+                Set plugin data in the object model if there is no SBC executable.
+                If there is an SBC executable, expose your own HTTP endpoints to modify shared plugin data.
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            properties:
+                                plugin:
+                                    type: string
+                                key:
+                                    type: string
+                                value: {}
+            responses:
+                '204':
+                    description: 'Data has been set'
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+    /machine/startPlugin:
+        post:
+            description: |
+                Start a plugin on the SBC. This does nothing if a plugin has already been started
+            requestBody:
+                description: 'Name of the plugin to start'
+                content:
+                    'text/plain': {}
+            responses:
+                '204':
+                    description: 'Plugin has been started'
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+    /machine/stopPlugin:
+        post:
+            description: |
+                Stop a plugin on the SBC. This does nothing if a plugin has already been stopped
+            requestBody:
+                description: 'Name of the plugin to stop'
+                content:
+                    'text/plain': {}
+            responses:
+                '204':
+                    description: 'Plugin has been stop'
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+                '500':
+                    description: 'Generic error'
+                '502':
+                    description: 'Incompatible DCS version'
+                '503':
+                    description: 'DCS is unavailable'
+components:
+    securitySchemes:
+        SessionKey:
+            type: "apiKey"
+            description: "API key returned from the connect response (optional if no password is set)"
+            in: "header"
+            name: "X-Session-Key"
+servers:
+    - url: 'http://duet3'
+      description: 'Duet 3 in SBC mode'
+security:
+    - SessionKey: [
+        '/machine/noop',
+        '/machine/disconnect',
+        '/machine/status',
+        '/machine/code',
+        '/machine/file/{filename}',
+        '/machine/fileinfo/{filename}',
+        '/machine/file/move',
+        '/machine/directory/{directory}',
+        '/machine/plugin',
+        '/machine/startPlugin',
+        '/machine/stopPlugin'
+    ]
+

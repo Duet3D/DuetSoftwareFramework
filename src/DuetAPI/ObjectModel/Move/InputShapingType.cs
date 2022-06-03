@@ -42,6 +42,11 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// EI3 (3-hump)
         /// </summary>
-        EI3
+        EI3,
+
+        /// <summary>
+        /// Custom
+        /// </summary>
+        Custom
     }
 }

@@ -76,7 +76,7 @@ namespace DuetControlServer.Model
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
-            DateTime lastUpdateTime = DateTime.Now;
+            TimeSpan measuredDelay = TimeSpan.Zero;
             string lastHostname = Environment.MachineName;
             do
             {
@@ -93,7 +93,7 @@ namespace DuetControlServer.Model
                 }
 
                 // Check if the system time has to be updated
-                if (DateTime.Now - lastUpdateTime > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 5000) && !Debugger.IsAttached)
+                if (measuredDelay > TimeSpan.FromMilliseconds(Settings.HostUpdateInterval + 2000) && !Debugger.IsAttached)
                 {
                     _logger.Info("System time has been changed");
                     Code code = new()
@@ -133,8 +133,9 @@ namespace DuetControlServer.Model
                 }
 
                 // Wait for next scheduled update check
-                lastUpdateTime = DateTime.Now;
+                DateTime lastUpdateTime = DateTime.Now;
                 await Task.Delay(Settings.HostUpdateInterval, Program.CancellationToken);
+                measuredDelay = DateTime.Now - lastUpdateTime;
             }
             while (!Program.CancellationToken.IsCancellationRequested);
         }
@@ -149,10 +150,10 @@ namespace DuetControlServer.Model
             {
                 if (iface.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
                 {
-                    DuetAPI.ObjectModel.NetworkInterface networkInterface;
+                    NetworkInterface networkInterface;
                     if (index >= Provider.Get.Network.Interfaces.Count)
                     {
-                        networkInterface = new DuetAPI.ObjectModel.NetworkInterface();
+                        networkInterface = new NetworkInterface();
                         Provider.Get.Network.Interfaces.Add(networkInterface);
 
                         lock (_activeProtocols)
@@ -189,7 +190,14 @@ namespace DuetControlServer.Model
                     networkInterface.DnsServer = dnsServer?.ToString();
                     networkInterface.Mac = BitConverter.ToString(iface.GetPhysicalAddress().GetAddressBytes()).Replace('-', ':');
                     networkInterface.Speed = (int?)(iface.Speed / 1000000);
-                    networkInterface.Type = iface.Name.StartsWith("w") ? DuetAPI.ObjectModel.NetworkInterfaceType.WiFi : DuetAPI.ObjectModel.NetworkInterfaceType.LAN;
+                    networkInterface.State = iface.OperationalStatus switch
+                    {
+                        System.Net.NetworkInformation.OperationalStatus.Up => NetworkState.Active,
+                        System.Net.NetworkInformation.OperationalStatus.Down or System.Net.NetworkInformation.OperationalStatus.LowerLayerDown => NetworkState.Disabled,
+                        System.Net.NetworkInformation.OperationalStatus.Dormant => NetworkState.EstablishingLink,
+                        _ => null,
+                    };
+                    networkInterface.Type = iface.Name.StartsWith("w") ? NetworkInterfaceType.WiFi : NetworkInterfaceType.LAN;
 
                     // Get WiFi-specific values.
                     // Note that iface.NetworkInterfaceType is broken on Unix and cannot be used (.NET 5)
@@ -210,12 +218,12 @@ namespace DuetControlServer.Model
                             networkInterface.Signal = null;
                             _logger.Debug(e);
                         }
-                        networkInterface.Type = DuetAPI.ObjectModel.NetworkInterfaceType.WiFi;
+                        networkInterface.Type = NetworkInterfaceType.WiFi;
                     }
                     else
                     {
                         networkInterface.Signal = null;
-                        networkInterface.Type = DuetAPI.ObjectModel.NetworkInterfaceType.LAN;
+                        networkInterface.Type = NetworkInterfaceType.LAN;
                     }
                 }
             }

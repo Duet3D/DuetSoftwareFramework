@@ -4083,6 +4083,70 @@ references:
   isSpec: "True"
   fullName: DuetAPI.ObjectModel.DeltaTower.YPos
   nameWithType: DeltaTower.YPos
+- uid: DuetAPI.ObjectModel.DeserializationFailedEventArgs
+  name: DeserializationFailedEventArgs
+  href: api/DuetAPI.ObjectModel.DeserializationFailedEventArgs.html
+  commentId: T:DuetAPI.ObjectModel.DeserializationFailedEventArgs
+  fullName: DuetAPI.ObjectModel.DeserializationFailedEventArgs
+  nameWithType: DeserializationFailedEventArgs
+- uid: DuetAPI.ObjectModel.DeserializationFailedEventArgs.#ctor(System.Type,System.Text.Json.JsonElement,System.Exception)
+  name: DeserializationFailedEventArgs(Type, JsonElement, Exception)
+  href: api/DuetAPI.ObjectModel.DeserializationFailedEventArgs.html#DuetAPI_ObjectModel_DeserializationFailedEventArgs__ctor_System_Type_System_Text_Json_JsonElement_System_Exception_
+  commentId: M:DuetAPI.ObjectModel.DeserializationFailedEventArgs.#ctor(System.Type,System.Text.Json.JsonElement,System.Exception)
+  fullName: DuetAPI.ObjectModel.DeserializationFailedEventArgs.DeserializationFailedEventArgs(System.Type, System.Text.Json.JsonElement, System.Exception)
+  nameWithType: DeserializationFailedEventArgs.DeserializationFailedEventArgs(Type, JsonElement, Exception)
+- uid: DuetAPI.ObjectModel.DeserializationFailedEventArgs.#ctor*
+  name: DeserializationFailedEventArgs
+  href: api/DuetAPI.ObjectModel.DeserializationFailedEventArgs.html#DuetAPI_ObjectModel_DeserializationFailedEventArgs__ctor_
+  commentId: Overload:DuetAPI.ObjectModel.DeserializationFailedEventArgs.#ctor
+  isSpec: "True"
+  fullName: DuetAPI.ObjectModel.DeserializationFailedEventArgs.DeserializationFailedEventArgs
+  nameWithType: DeserializationFailedEventArgs.DeserializationFailedEventArgs
+- uid: DuetAPI.ObjectModel.DeserializationFailedEventArgs.Exception
+  name: Exception
+  href: api/DuetAPI.ObjectModel.DeserializationFailedEventArgs.html#DuetAPI_ObjectModel_DeserializationFailedEventArgs_Exception
+  commentId: P:DuetAPI.ObjectModel.DeserializationFailedEventArgs.Exception
+  fullName: DuetAPI.ObjectModel.DeserializationFailedEventArgs.Exception
+  nameWithType: DeserializationFailedEventArgs.Exception
+- uid: DuetAPI.ObjectModel.DeserializationFailedEventArgs.Exception*
+  name: Exception
+  href: api/DuetAPI.ObjectModel.DeserializationFailedEventArgs.html#DuetAPI_ObjectModel_DeserializationFailedEventArgs_Exception_
+  commentId: Overload:DuetAPI.ObjectModel.DeserializationFailedEventArgs.Exception
+  isSpec: "True"
+  fullName: DuetAPI.ObjectModel.DeserializationFailedEventArgs.Exception
+  nameWithType: DeserializationFailedEventArgs.Exception
+- uid: DuetAPI.ObjectModel.DeserializationFailedEventArgs.JsonValue
+  name: JsonValue
+  href: api/DuetAPI.ObjectModel.DeserializationFailedEventArgs.html#DuetAPI_ObjectModel_DeserializationFailedEventArgs_JsonValue
+  commentId: P:DuetAPI.ObjectModel.DeserializationFailedEventArgs.JsonValue
+  fullName: DuetAPI.ObjectModel.DeserializationFailedEventArgs.JsonValue
+  nameWithType: DeserializationFailedEventArgs.JsonValue
+- uid: DuetAPI.ObjectModel.DeserializationFailedEventArgs.JsonValue*
+  name: JsonValue
+  href: api/DuetAPI.ObjectModel.DeserializationFailedEventArgs.html#DuetAPI_ObjectModel_DeserializationFailedEventArgs_JsonValue_
+  commentId: Overload:DuetAPI.ObjectModel.DeserializationFailedEventArgs.JsonValue
+  isSpec: "True"
+  fullName: DuetAPI.ObjectModel.DeserializationFailedEventArgs.JsonValue
+  nameWithType: DeserializationFailedEventArgs.JsonValue
+- uid: DuetAPI.ObjectModel.DeserializationFailedEventArgs.TargetType
+  name: TargetType
+  href: api/DuetAPI.ObjectModel.DeserializationFailedEventArgs.html#DuetAPI_ObjectModel_DeserializationFailedEventArgs_TargetType
+  commentId: P:DuetAPI.ObjectModel.DeserializationFailedEventArgs.TargetType
+  fullName: DuetAPI.ObjectModel.DeserializationFailedEventArgs.TargetType
+  nameWithType: DeserializationFailedEventArgs.TargetType
+- uid: DuetAPI.ObjectModel.DeserializationFailedEventArgs.TargetType*
+  name: TargetType
+  href: api/DuetAPI.ObjectModel.DeserializationFailedEventArgs.html#DuetAPI_ObjectModel_DeserializationFailedEventArgs_TargetType_
+  commentId: Overload:DuetAPI.ObjectModel.DeserializationFailedEventArgs.TargetType
+  isSpec: "True"
+  fullName: DuetAPI.ObjectModel.DeserializationFailedEventArgs.TargetType
+  nameWithType: DeserializationFailedEventArgs.TargetType
+- uid: DuetAPI.ObjectModel.DeserializationFailedEventHandler
+  name: DeserializationFailedEventHandler
+  href: api/DuetAPI.ObjectModel.DeserializationFailedEventHandler.html
+  commentId: T:DuetAPI.ObjectModel.DeserializationFailedEventHandler
+  fullName: DuetAPI.ObjectModel.DeserializationFailedEventHandler
+  nameWithType: DeserializationFailedEventHandler
 - uid: DuetAPI.ObjectModel.DirectDisplay
   name: DirectDisplay
   href: api/DuetAPI.ObjectModel.DirectDisplay.html
@@ -6438,6 +6502,12 @@ references:
   commentId: T:DuetAPI.ObjectModel.InputShapingType
   fullName: DuetAPI.ObjectModel.InputShapingType
   nameWithType: InputShapingType
+- uid: DuetAPI.ObjectModel.InputShapingType.Custom
+  name: Custom
+  href: api/DuetAPI.ObjectModel.InputShapingType.html#DuetAPI_ObjectModel_InputShapingType_Custom
+  commentId: F:DuetAPI.ObjectModel.InputShapingType.Custom
+  fullName: DuetAPI.ObjectModel.InputShapingType.Custom
+  nameWithType: InputShapingType.Custom
 - uid: DuetAPI.ObjectModel.InputShapingType.EI2
   name: EI2
   href: api/DuetAPI.ObjectModel.InputShapingType.html#DuetAPI_ObjectModel_InputShapingType_EI2
@@ -9669,6 +9739,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.ObjectModel.NetworkInterface.Speed
   nameWithType: NetworkInterface.Speed
+- uid: DuetAPI.ObjectModel.NetworkInterface.State
+  name: State
+  href: api/DuetAPI.ObjectModel.NetworkInterface.html#DuetAPI_ObjectModel_NetworkInterface_State
+  commentId: P:DuetAPI.ObjectModel.NetworkInterface.State
+  fullName: DuetAPI.ObjectModel.NetworkInterface.State
+  nameWithType: NetworkInterface.State
+- uid: DuetAPI.ObjectModel.NetworkInterface.State*
+  name: State
+  href: api/DuetAPI.ObjectModel.NetworkInterface.html#DuetAPI_ObjectModel_NetworkInterface_State_
+  commentId: Overload:DuetAPI.ObjectModel.NetworkInterface.State
+  isSpec: "True"
+  fullName: DuetAPI.ObjectModel.NetworkInterface.State
+  nameWithType: NetworkInterface.State
 - uid: DuetAPI.ObjectModel.NetworkInterface.Subnet
   name: Subnet
   href: api/DuetAPI.ObjectModel.NetworkInterface.html#DuetAPI_ObjectModel_NetworkInterface_Subnet
@@ -9755,6 +9838,66 @@ references:
   commentId: F:DuetAPI.ObjectModel.NetworkProtocol.Telnet
   fullName: DuetAPI.ObjectModel.NetworkProtocol.Telnet
   nameWithType: NetworkProtocol.Telnet
+- uid: DuetAPI.ObjectModel.NetworkState
+  name: NetworkState
+  href: api/DuetAPI.ObjectModel.NetworkState.html
+  commentId: T:DuetAPI.ObjectModel.NetworkState
+  fullName: DuetAPI.ObjectModel.NetworkState
+  nameWithType: NetworkState
+- uid: DuetAPI.ObjectModel.NetworkState.Active
+  name: Active
+  href: api/DuetAPI.ObjectModel.NetworkState.html#DuetAPI_ObjectModel_NetworkState_Active
+  commentId: F:DuetAPI.ObjectModel.NetworkState.Active
+  fullName: DuetAPI.ObjectModel.NetworkState.Active
+  nameWithType: NetworkState.Active
+- uid: DuetAPI.ObjectModel.NetworkState.ChangingMode
+  name: ChangingMode
+  href: api/DuetAPI.ObjectModel.NetworkState.html#DuetAPI_ObjectModel_NetworkState_ChangingMode
+  commentId: F:DuetAPI.ObjectModel.NetworkState.ChangingMode
+  fullName: DuetAPI.ObjectModel.NetworkState.ChangingMode
+  nameWithType: NetworkState.ChangingMode
+- uid: DuetAPI.ObjectModel.NetworkState.Connected
+  name: Connected
+  href: api/DuetAPI.ObjectModel.NetworkState.html#DuetAPI_ObjectModel_NetworkState_Connected
+  commentId: F:DuetAPI.ObjectModel.NetworkState.Connected
+  fullName: DuetAPI.ObjectModel.NetworkState.Connected
+  nameWithType: NetworkState.Connected
+- uid: DuetAPI.ObjectModel.NetworkState.Disabled
+  name: Disabled
+  href: api/DuetAPI.ObjectModel.NetworkState.html#DuetAPI_ObjectModel_NetworkState_Disabled
+  commentId: F:DuetAPI.ObjectModel.NetworkState.Disabled
+  fullName: DuetAPI.ObjectModel.NetworkState.Disabled
+  nameWithType: NetworkState.Disabled
+- uid: DuetAPI.ObjectModel.NetworkState.Enabled
+  name: Enabled
+  href: api/DuetAPI.ObjectModel.NetworkState.html#DuetAPI_ObjectModel_NetworkState_Enabled
+  commentId: F:DuetAPI.ObjectModel.NetworkState.Enabled
+  fullName: DuetAPI.ObjectModel.NetworkState.Enabled
+  nameWithType: NetworkState.Enabled
+- uid: DuetAPI.ObjectModel.NetworkState.EstablishingLink
+  name: EstablishingLink
+  href: api/DuetAPI.ObjectModel.NetworkState.html#DuetAPI_ObjectModel_NetworkState_EstablishingLink
+  commentId: F:DuetAPI.ObjectModel.NetworkState.EstablishingLink
+  fullName: DuetAPI.ObjectModel.NetworkState.EstablishingLink
+  nameWithType: NetworkState.EstablishingLink
+- uid: DuetAPI.ObjectModel.NetworkState.ObtainingIP
+  name: ObtainingIP
+  href: api/DuetAPI.ObjectModel.NetworkState.html#DuetAPI_ObjectModel_NetworkState_ObtainingIP
+  commentId: F:DuetAPI.ObjectModel.NetworkState.ObtainingIP
+  fullName: DuetAPI.ObjectModel.NetworkState.ObtainingIP
+  nameWithType: NetworkState.ObtainingIP
+- uid: DuetAPI.ObjectModel.NetworkState.Starting1
+  name: Starting1
+  href: api/DuetAPI.ObjectModel.NetworkState.html#DuetAPI_ObjectModel_NetworkState_Starting1
+  commentId: F:DuetAPI.ObjectModel.NetworkState.Starting1
+  fullName: DuetAPI.ObjectModel.NetworkState.Starting1
+  nameWithType: NetworkState.Starting1
+- uid: DuetAPI.ObjectModel.NetworkState.Starting2
+  name: Starting2
+  href: api/DuetAPI.ObjectModel.NetworkState.html#DuetAPI_ObjectModel_NetworkState_Starting2
+  commentId: F:DuetAPI.ObjectModel.NetworkState.Starting2
+  fullName: DuetAPI.ObjectModel.NetworkState.Starting2
+  nameWithType: NetworkState.Starting2
 - uid: DuetAPI.ObjectModel.ObjectModel
   name: ObjectModel
   href: api/DuetAPI.ObjectModel.ObjectModel.html
@@ -9917,6 +10060,12 @@ references:
   isSpec: "True"
   fullName: DuetAPI.ObjectModel.ObjectModel.Network
   nameWithType: ObjectModel.Network
+- uid: DuetAPI.ObjectModel.ObjectModel.OnDeserializationFailed
+  name: OnDeserializationFailed
+  href: api/DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_OnDeserializationFailed
+  commentId: E:DuetAPI.ObjectModel.ObjectModel.OnDeserializationFailed
+  fullName: DuetAPI.ObjectModel.ObjectModel.OnDeserializationFailed
+  nameWithType: ObjectModel.OnDeserializationFailed
 - uid: DuetAPI.ObjectModel.ObjectModel.Plugins
   name: Plugins
   href: api/DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Plugins
@@ -17589,12 +17738,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.IPC.Connection.IsRoot
   nameWithType: Connection.IsRoot
-- uid: DuetControlServer.IPC.Connection.Logger
-  name: Logger
-  href: api/DuetControlServer.IPC.Connection.html#DuetControlServer_IPC_Connection_Logger
-  commentId: F:DuetControlServer.IPC.Connection.Logger
-  fullName: DuetControlServer.IPC.Connection.Logger
-  nameWithType: Connection.Logger
 - uid: DuetControlServer.IPC.Connection.Permissions
   name: Permissions
   href: api/DuetControlServer.IPC.Connection.html#DuetControlServer_IPC_Connection_Permissions
@@ -18650,6 +18793,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Model.Provider.AccessReadWriteAsync
   nameWithType: Provider.AccessReadWriteAsync
+- uid: DuetControlServer.Model.Provider.Diagnostics(System.Text.StringBuilder)
+  name: Diagnostics(StringBuilder)
+  href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_Diagnostics_System_Text_StringBuilder_
+  commentId: M:DuetControlServer.Model.Provider.Diagnostics(System.Text.StringBuilder)
+  fullName: DuetControlServer.Model.Provider.Diagnostics(System.Text.StringBuilder)
+  nameWithType: Provider.Diagnostics(StringBuilder)
+- uid: DuetControlServer.Model.Provider.Diagnostics*
+  name: Diagnostics
+  href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_Diagnostics_
+  commentId: Overload:DuetControlServer.Model.Provider.Diagnostics
+  isSpec: "True"
+  fullName: DuetControlServer.Model.Provider.Diagnostics
+  nameWithType: Provider.Diagnostics
 - uid: DuetControlServer.Model.Provider.Get
   name: Get
   href: api/DuetControlServer.Model.Provider.html#DuetControlServer_Model_Provider_Get
@@ -18809,19 +18965,6 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.Model.Updater.ConnectionLost
   nameWithType: Updater.ConnectionLost
-- uid: DuetControlServer.Model.Updater.Diagnostics(System.Text.StringBuilder)
-  name: Diagnostics(StringBuilder)
-  href: api/DuetControlServer.Model.Updater.html#DuetControlServer_Model_Updater_Diagnostics_System_Text_StringBuilder_
-  commentId: M:DuetControlServer.Model.Updater.Diagnostics(System.Text.StringBuilder)
-  fullName: DuetControlServer.Model.Updater.Diagnostics(System.Text.StringBuilder)
-  nameWithType: Updater.Diagnostics(StringBuilder)
-- uid: DuetControlServer.Model.Updater.Diagnostics*
-  name: Diagnostics
-  href: api/DuetControlServer.Model.Updater.html#DuetControlServer_Model_Updater_Diagnostics_
-  commentId: Overload:DuetControlServer.Model.Updater.Diagnostics
-  isSpec: "True"
-  fullName: DuetControlServer.Model.Updater.Diagnostics
-  nameWithType: Updater.Diagnostics
 - uid: DuetControlServer.Model.Updater.MachineModelFullyUpdated
   name: MachineModelFullyUpdated()
   href: api/DuetControlServer.Model.Updater.html#DuetControlServer_Model_Updater_MachineModelFullyUpdated
@@ -23267,6 +23410,19 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Interface.WaitForUpdate
   nameWithType: Interface.WaitForUpdate
+- uid: DuetControlServer.SPI.Interface.WaitForUpdateAsync
+  name: WaitForUpdateAsync()
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_WaitForUpdateAsync
+  commentId: M:DuetControlServer.SPI.Interface.WaitForUpdateAsync
+  fullName: DuetControlServer.SPI.Interface.WaitForUpdateAsync()
+  nameWithType: Interface.WaitForUpdateAsync()
+- uid: DuetControlServer.SPI.Interface.WaitForUpdateAsync*
+  name: WaitForUpdateAsync
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_WaitForUpdateAsync_
+  commentId: Overload:DuetControlServer.SPI.Interface.WaitForUpdateAsync
+  isSpec: "True"
+  fullName: DuetControlServer.SPI.Interface.WaitForUpdateAsync
+  nameWithType: Interface.WaitForUpdateAsync
 - uid: DuetControlServer.SPI.Serialization
   name: DuetControlServer.SPI.Serialization
   href: api/DuetControlServer.SPI.Serialization.html

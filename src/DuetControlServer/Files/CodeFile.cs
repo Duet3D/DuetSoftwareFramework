@@ -145,7 +145,7 @@ namespace DuetControlServer.Files
             FileName = fileName;
             Channel = channel;
 
-            _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
+            _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read);
             _reader = new StreamReader(_fileStream, leaveOpen: true);
         }
 

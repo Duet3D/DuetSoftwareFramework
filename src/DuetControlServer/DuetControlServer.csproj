@@ -1,12 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <LangVersion>default</LangVersion>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D Ltd</Company>
-    <Version>3.4.0</Version>
+    <Version>3.4.1</Version>
     <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
@@ -31,7 +30,7 @@
   <ItemGroup>
     <PackageReference Include="DynamicExpresso.Core" Version="2.12.0" />
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
-    <PackageReference Include="NLog" Version="4.7.14" />
+    <PackageReference Include="NLog" Version="5.0.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="1.0.4" />
   </ItemGroup>
 
@@ -44,5 +43,4 @@
   <ItemGroup>
     <DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
   </ItemGroup>
-
 </Project>

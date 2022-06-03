@@ -56,7 +56,12 @@
         /// <summary>
         /// True if the filament has been firmware-retracted
         /// </summary>
-        public bool IsRetracted { get; set; }
+        public bool IsRetracted
+        {
+            get => _isRetracted;
+            set => SetPropertyValue(ref _isRetracted, value);
+        }
+        private bool _isRetracted;
 
         /// <summary>
         /// Mix ratios of the associated extruder drives
@@ -108,12 +113,22 @@
         /// <summary>
         /// Index of the mapped spindle or -1 if not mapped
         /// </summary>
-        public int Spindle { get; set; } = -1;
+        public int Spindle
+        {
+            get => _spindle;
+            set => SetPropertyValue(ref _spindle, value);
+        }
+        private int _spindle = -1;
 
         /// <summary>
         /// RPM of the mapped spindle
         /// </summary>
-        public int SpindleRpm { get; set; }
+        public int SpindleRpm
+        {
+            get => _spindleRpm;
+            set => SetPropertyValue(ref _spindleRpm, value);
+        }
+        private int _spindleRpm;
 
         /// <summary>
         /// Standby temperatures of the associated heaters (in C)

@@ -9,6 +9,9 @@ namespace DuetAPI.Utility
     /// <summary>
     /// Class representing a heightmap
     /// </summary>
+    /// <remarks>
+    /// This class is no longer used in DSF. Also note that the heightmap format is now slightly different
+    /// </remarks>
     public sealed class Heightmap
     {
         /// <summary>

@@ -18,7 +18,7 @@
             get => _damping;
             set => SetPropertyValue(ref _damping, value);
         }
-        private float _damping = 0.2F;
+        private float _damping = 0.1F;
 
         /// <summary>
         /// Input shaper durations (in s)

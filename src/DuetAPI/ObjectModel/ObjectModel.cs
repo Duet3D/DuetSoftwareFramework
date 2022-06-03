@@ -7,10 +7,10 @@ using System.Text.Json.Serialization;
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
-    /// Representation of the full machine model as maintained by DCS
+    /// Representation of the Duet3D object model
     /// </summary>
     [JsonConverter(typeof(ObjectModelConverter))]
-    public sealed class ObjectModel : ModelObject
+    public class ObjectModel : ModelObject
     {
         /// <summary>
         /// List of connected boards
@@ -224,6 +224,71 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <returns></returns>
         public byte[] ToUtf8Json() => JsonSerializer.SerializeToUtf8Bytes(this, Utility.JsonHelper.DefaultJsonOptions);
+
+        /// <summary>
+        /// Static event to be called when the deserialization of a property failed.
+        /// If an event handler is assigned, potential JsonExceptions are suppressed and the event is called instead
+        /// </summary>
+        public static event DeserializationFailedEventHandler OnDeserializationFailed;
+
+        /// <summary>
+        /// Internal function to be called when the deserialization of a sub-property failed
+        /// </summary>
+        /// <param name="sender">Object that caused the exception</param>
+        /// <param name="type">Type of the object that could not be deserialized</param>
+        /// <param name="jsonValue">JSON data</param>
+        /// <param name="e">Exception that caused the error</param>
+        /// <returns>True if the exception can be suppressed</returns>
+        internal static bool DeserializationFailed(object sender, Type type, JsonElement jsonValue, JsonException e)
+        {
+            if (OnDeserializationFailed == null)
+            {
+                return false;
+            }
+            OnDeserializationFailed.Invoke(sender, new DeserializationFailedEventArgs(type, jsonValue, e));
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Delegate of the event to be called when deserialization of a property fails
+    /// </summary>
+    /// <param name="sender">Instance of the object that tried to deserialize a value`</param>
+    /// <param name="e">Event arguments pointing to the property that failed to be deserialized</param>
+    public delegate void DeserializationFailedEventHandler(object sender, DeserializationFailedEventArgs e);
+
+    /// <summary>
+    /// Event arguments for the event to be called when deserialization fails
+    /// </summary>
+    public sealed class DeserializationFailedEventArgs : EventArgs
+    {
+        /// <summary>
+        /// Constructor of this class
+        /// </summary>
+        /// <param name="type">Type that failed to be deserialized</param>
+        /// <param name="jsonValue">Data that failed to be deserialized</param>
+        /// <param name="e">Exception that caused the deserialization to fail</param>
+        public DeserializationFailedEventArgs(Type type, JsonElement jsonValue, Exception e)
+        {
+            TargetType = type;
+            JsonValue = jsonValue;
+            Exception = e;
+        }
+
+        /// <summary>
+        /// Type that failed to be deserialized
+        /// </summary>
+        public Type TargetType { get; private set; }
+
+        /// <summary>
+        /// Data that failed to be deserialized
+        /// </summary>
+        public JsonElement JsonValue { get; private set; }
+
+        /// <summary>
+        /// Exception that caused the deserialization to fail
+        /// </summary>
+        public Exception Exception { get; private set; }
     }
 
     /// <summary>

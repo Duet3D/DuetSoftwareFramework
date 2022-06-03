@@ -446,10 +446,17 @@ namespace DuetAPI.ObjectModel
                     }
                     else
                     {
-                        TValue newValue = JsonSerializer.Deserialize<TValue>(jsonProperty.Value.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
-                        if (!TryGetValue(jsonProperty.Name, out TValue value) || !value.Equals(newValue))
+                        try
                         {
-                            this[jsonProperty.Name] = newValue;
+                            TValue newValue = JsonSerializer.Deserialize<TValue>(jsonProperty.Value.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
+                            if (!TryGetValue(jsonProperty.Name, out TValue value) || !value.Equals(newValue))
+                            {
+                                this[jsonProperty.Name] = newValue;
+                            }
+                        }
+                        catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
+                        {
+                            // suppressed
                         }
                     }
                 }

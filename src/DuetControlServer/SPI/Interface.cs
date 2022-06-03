@@ -489,8 +489,19 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Wait for potential firmware update to finish
         /// </summary>
+        public static void WaitForUpdate()
+        {
+            using (_firmwareUpdateLock.Lock(Program.CancellationToken))
+            {
+                // This lock is acquired as long as a firmware update is in progress; no need to do anything else
+            }
+        }
+
+        /// <summary>
+        /// Wait for potential firmware update to finish
+        /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task WaitForUpdate()
+        public static async Task WaitForUpdateAsync()
         {
             using (await _firmwareUpdateLock.LockAsync(Program.CancellationToken))
             {
@@ -747,7 +758,7 @@ namespace DuetControlServer.SPI
                     Logger.LogOutput(MessageType.Warning, "SPI connection has been reset");
                 }
 
-                // Check for changes of the print status.
+                // Check for changes of the print status
                 using (_printStateLock.Lock(Program.CancellationToken))
                 {
                     if (_setPrintInfoRequest != null && DataTransfer.WritePrintFileInfo(Model.Provider.Get.Job.File))
@@ -1569,7 +1580,6 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Invalidate every resource due to a critical event
         /// </summary>
-        /// <returns>Asynchronous task</returns>
         private static void Invalidate()
         {
             // No longer starting or stopping a print. Must do this before aborting the print

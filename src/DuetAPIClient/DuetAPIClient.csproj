@@ -1,12 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFrameworks>netstandard2.1;net6.0</TargetFrameworks>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D Ltd</Company>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
-    <Version>3.4.0</Version>
+    <Version>3.4.1</Version>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Description>Official client API library for Duet Software Framework (Duet 3) by Duet3D</Description>
     <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
@@ -32,5 +31,4 @@
       <PackagePath></PackagePath>
     </None>
   </ItemGroup>
-
 </Project>
