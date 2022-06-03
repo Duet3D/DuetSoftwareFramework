@@ -42,7 +42,7 @@ namespace DuetAPI.ObjectModel
         public InputChannel Telnet => this[CodeChannel.Telnet];
 
         /// <summary>
-        /// G/M/T-code channel for file prints
+        /// G/M/T-code channel for primary file prints
         /// </summary>
         [JsonIgnore]
         public InputChannel File => this[CodeChannel.File];
@@ -66,7 +66,7 @@ namespace DuetAPI.ObjectModel
         public InputChannel Trigger => this[CodeChannel.Trigger];
 
         /// <summary>
-        /// G/M/T-code channel for the code queue
+        /// G/M/T-code channel for the primary code queue
         /// </summary>
         [JsonIgnore]
         public InputChannel Queue => this[CodeChannel.Queue];
@@ -94,6 +94,24 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         [JsonIgnore]
         public InputChannel Autopause => this[CodeChannel.Autopause];
+
+        /// <summary>
+        /// G/M/T-code channel for secondary file prints
+        /// </summary>
+        /// <remarks>
+        /// May not be available if async moves are not supported
+        /// </remarks>
+        [JsonIgnore]
+        public InputChannel File2 => this[CodeChannel.File2];
+
+        /// <summary>
+        /// G/M/T-code channel for the secondary code queue
+        /// </summary>
+        /// <remarks>
+        /// May not be available if async moves are not supported
+        /// </remarks>
+        [JsonIgnore]
+        public InputChannel Queue2 => this[CodeChannel.Queue2];
 
         /// <summary>
         /// Index operator for easy access via an <see cref="CodeChannel"/> value

@@ -106,6 +106,7 @@ namespace DuetControlServer
             // Initialize everything
             try
             {
+                Codes.Pipeline.Init();
                 Model.Provider.Init();
                 Model.Observer.Init();
                 _logger.Info("Environment initialized");

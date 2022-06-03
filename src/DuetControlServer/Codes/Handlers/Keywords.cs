@@ -7,7 +7,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
-namespace DuetControlServer.Codes
+namespace DuetControlServer.Codes.Handlers
 {
     /// <summary>
     /// Functions for interpreting meta G-code keywords
@@ -55,7 +55,7 @@ namespace DuetControlServer.Codes
                                 if (c == '"')
                                 {
                                     inQuotes = false;
-                                    isComplete = (numCurlyBraces == 0);
+                                    isComplete = numCurlyBraces == 0;
                                 }
                             }
                             else if (c == '"')
@@ -69,12 +69,12 @@ namespace DuetControlServer.Codes
                             else if (c == '}')
                             {
                                 numCurlyBraces--;
-                                isComplete = (numCurlyBraces == 0);
+                                isComplete = numCurlyBraces == 0;
                             }
                             else if (char.IsWhiteSpace(c))
                             {
                                 // Whitespaces after the initial > or >> are not permitted
-                                isComplete = (numCurlyBraces == 0);
+                                isComplete = numCurlyBraces == 0;
                             }
 
                             if (isComplete)
@@ -135,7 +135,7 @@ namespace DuetControlServer.Codes
                     }
                     else if (!char.IsWhiteSpace(c))
                     {
-                        if ((!char.IsLetterOrDigit(c) && c != '_' && (c != '.' || code.Keyword != KeywordType.Set)) || wantExpression)
+                        if (!char.IsLetterOrDigit(c) && c != '_' && (c != '.' || code.Keyword != KeywordType.Set) || wantExpression)
                         {
                             throw new CodeParserException("expected '='", code);
                         }

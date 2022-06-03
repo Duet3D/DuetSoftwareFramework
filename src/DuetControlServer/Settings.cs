@@ -192,6 +192,11 @@ namespace DuetControlServer
         public static int BufferedMacroCodes { get; set; } = 16;
 
         /// <summary>
+        /// Maximum number of pending codes per code channel
+        /// </summary>
+        public static int MaxCodesPerInput { get; set; } = 32;
+
+        /// <summary>
         /// Maximum space of buffered codes per channel (in bytes)
         /// </summary>
         public static int MaxBufferSpacePerChannel { get; set; } = 1536;

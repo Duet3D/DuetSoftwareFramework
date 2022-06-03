@@ -7,7 +7,6 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
-using DuetControlServer.Codes;
 using DuetControlServer.FileExecution;
 using DuetControlServer.IPC;
 using DuetControlServer.IPC.Processors;

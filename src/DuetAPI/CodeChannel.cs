@@ -23,7 +23,7 @@ namespace DuetAPI
         Telnet = 1,
 
         /// <summary>
-        /// Code channel for file prints
+        /// Code channel for primary file prints
         /// </summary>
         File = 2,
 
@@ -43,7 +43,7 @@ namespace DuetAPI
         Trigger = 5,
 
         /// <summary>
-        /// Code channel for the code queue that executes a couple of codes in-sync with moves
+        /// Code channel for the code queue that executes a couple of codes in-sync with moves of the primary print file
         /// </summary>
         Queue = 6,
 
@@ -73,8 +73,18 @@ namespace DuetAPI
         Autopause = 11,
 
         /// <summary>
+        /// Code channel for secondary file prints
+        /// </summary>
+        File2 = 12,
+
+        /// <summary>
+        /// Code channel for the code queue that executes a couple of codes in-sync with moves of the primary print file
+        /// </summary>
+        Queue2 = 13,
+
+        /// <summary>
         /// Unknown code channel
         /// </summary>
-        Unknown = 12
+        Unknown = 14
     }
 }

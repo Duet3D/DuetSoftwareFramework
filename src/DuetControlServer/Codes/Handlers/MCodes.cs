@@ -11,7 +11,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Codes
+namespace DuetControlServer.Codes.Handlers
 {
     /// <summary>
     /// Static class that processes M-codes in the control server
@@ -284,7 +284,7 @@ namespace DuetControlServer.Codes
                                 return new Message(MessageType.Error, "Filename expected");
                             }
 
-                            string prefix = (await code.EmulatingMarlin()) ? "ok\n" : string.Empty;
+                            string prefix = await code.EmulatingMarlin() ? "ok\n" : string.Empty;
                             string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
                             try
                             {

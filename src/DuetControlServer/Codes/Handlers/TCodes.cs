@@ -2,7 +2,7 @@
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 
-namespace DuetControlServer.Codes
+namespace DuetControlServer.Codes.Handlers
 {
     /// <summary>
     /// Static class that processes T-codes in the control server

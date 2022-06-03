@@ -76,6 +76,16 @@
         private bool _macroRestartable;
 
         /// <summary>
+        /// Active motion system index
+        /// </summary>
+        public int MotionSystem
+        {
+            get => _motionSystem;
+            set => SetPropertyValue(ref _motionSystem, value);
+        }
+        private int _motionSystem;
+
+        /// <summary>
         /// Name of this channel
         /// </summary>
         public CodeChannel Name
@@ -114,6 +124,16 @@
             set => SetPropertyValue(ref _lineNumber, value);
         }
         private long _lineNumber = 0;
+
+        /// <summary>
+        /// Index of the selected plane
+        /// </summary>
+        public int SelectedPlane
+        {
+            get => _selectedPlane;
+            set => SetPropertyValue(ref _selectedPlane, value);
+        }
+        private int _selectedPlane;
 
         /// <summary>
         /// Whether volumetric extrusion is being used
