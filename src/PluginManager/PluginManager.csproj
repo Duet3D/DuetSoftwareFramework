@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
@@ -10,7 +9,7 @@
     <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <Version>3.4.1-rc2</Version>
+    <Version>3.4.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,5 +19,4 @@
   <ItemGroup>
     <DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
   </ItemGroup>
-
 </Project>
