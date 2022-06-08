@@ -26,7 +26,7 @@ namespace DuetControlServer.Codes.Handlers
         /// <returns>Result of the code if the code completed, else null</returns>
         public static async Task<Message> Process(Code code)
         {
-            if (!await SPI.Interface.Flush(code, false))
+            if (!await Processor.FlushAsync(code, false))
             {
                 throw new OperationCanceledException();
             }

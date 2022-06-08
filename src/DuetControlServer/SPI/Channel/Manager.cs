@@ -67,27 +67,6 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
-        /// Get a channel that is currently idle in order to process a priority code
-        /// </summary>
-        /// <returns>Idle code channel</returns>
-        public async Task<CodeChannel> GetIdleChannel()
-        {
-            foreach (Processor channel in _channels)
-            {
-                using (await channel.LockAsync())
-                {
-                    if (channel.BufferedCodes.Count == 0)
-                    {
-                        return channel.Channel;
-                    }
-                }
-            }
-
-            _logger.Warn("Failed to find an idle channel, using fallback {0}", nameof(CodeChannel.Trigger));
-            return CodeChannel.Trigger;
-        }
-
-        /// <summary>
         /// Process requests in the G-code channel processors
         /// </summary>
         public void Run()

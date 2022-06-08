@@ -106,7 +106,7 @@ namespace DuetControlServer
             // Initialize everything
             try
             {
-                Codes.Pipeline.Init();
+                Codes.Processor.Init();
                 Model.Provider.Init();
                 Model.Observer.Init();
                 _logger.Info("Environment initialized");
@@ -160,6 +160,7 @@ namespace DuetControlServer
             // Start main tasks in the background
             Dictionary<Task, string> mainTasks = new()
             {
+                { Task.Factory.StartNew(Codes.Processor.Run, TaskCreationOptions.LongRunning).Unwrap(), "Code processor" },
                 { Utility.PriorityThreadRunner.Start(SPI.Interface.Run, ThreadPriority.Highest), "SPI" },
                 { Task.Factory.StartNew(Model.Updater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Update" },
                 { Task.Factory.StartNew(IPC.Server.Run, TaskCreationOptions.LongRunning).Unwrap(), "IPC" },
@@ -271,7 +272,8 @@ namespace DuetControlServer
                     {
                         using (Macro macro = new(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger))
                         {
-                            await macro.FinishAsync();
+                            macro.Start();
+                            await macro.WaitForFinishAsync();
                         }
 
                         try

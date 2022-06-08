@@ -1,6 +1,8 @@
-﻿using DuetControlServer.Commands;
+﻿using DuetControlServer.Codes.PipelineStages;
+using DuetControlServer.Commands;
 using DuetControlServer.FileExecution;
 using System.Collections.Generic;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.SPI.Channel
@@ -10,6 +12,17 @@ namespace DuetControlServer.SPI.Channel
     /// </summary>
     public class State
     {
+        /// <summary>
+        /// Corresponding state on the pipeline
+        /// </summary>
+        private readonly PipelineState _pipelineState;
+
+        /// <summary>
+        /// Constructor of this class
+        /// </summary>
+        /// <param name="pipelineState">Corresponding state of the firmware stage on the code pipeline</param>
+        public State(PipelineState pipelineState) => _pipelineState = pipelineState;
+
         /// <summary>
         /// Indicates if this state is waiting for a confirmation
         /// </summary>
@@ -31,7 +44,7 @@ namespace DuetControlServer.SPI.Channel
         /// <remarks>
         /// This is only assigned once after an instance has been created
         /// </remarks>
-        public Macro Macro { get; set; }
+        public Macro Macro { get => _pipelineState.Macro; }
 
         /// <summary>
         /// Indicates if the firmware has been notified about the macro completion
@@ -44,9 +57,9 @@ namespace DuetControlServer.SPI.Channel
         public Code StartCode { get; set; }
 
         /// <summary>
-        /// Queue of pending G/M/T-codes that have not been buffered yet
+        /// Pending codes ready to be sent over to the firmware
         /// </summary>
-        public Queue<Code> PendingCodes { get; } = new();
+        public Channel<Code> PendingCodes { get => _pipelineState.PendingCodes; }
 
         /// <summary>
         /// Queue of pending flush requests

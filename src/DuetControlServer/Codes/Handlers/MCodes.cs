@@ -42,7 +42,7 @@ namespace DuetControlServer.Codes.Handlers
                 // Sleep or Conditional stop
                 case 0:
                 case 1:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         using (await FileExecution.Job.LockAsync())
                         {
@@ -70,7 +70,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // List SD card
                 case 20:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         // Resolve the directory
                         string virtualDirectory = code.Parameter('P');
@@ -159,7 +159,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Initialize SD card
                 case 21:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         if (code.Parameter('P', 0) == 0)
                         {
@@ -177,7 +177,7 @@ namespace DuetControlServer.Codes.Handlers
                 // Select a file to print
                 case 23:
                 case 32:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         string file = code.GetUnprecedentedString();
                         if (string.IsNullOrWhiteSpace(file))
@@ -205,10 +205,9 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     throw new OperationCanceledException();
 
-
                 // Resume a file print
                 case 24:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         using (await FileExecution.Job.LockAsync())
                         {
@@ -225,7 +224,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Set SD position
                 case 26:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         using (await FileExecution.Job.LockAsync())
                         {
@@ -252,7 +251,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Report SD print status
                 case 27:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         using (await FileExecution.Job.LockAsync())
                         {
@@ -268,7 +267,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Begin write to SD card
                 case 28:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         int numChannel = (int)code.Channel;
                         using (await Commands.Code.FileLocks[numChannel].LockAsync(Program.CancellationToken))
@@ -304,7 +303,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // End write to SD card
                 case 29:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         int numChannel = (int)code.Channel;
                         using (await Commands.Code.FileLocks[numChannel].LockAsync(Program.CancellationToken))
@@ -329,7 +328,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Delete a file on the SD card
                 case 30:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         string file = code.GetUnprecedentedString();
                         string physicalFile = await FilePath.ToPhysicalAsync(file);
@@ -352,7 +351,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 36:
                     if (code.Parameters.Count > 0)
                     {
-                        if (await SPI.Interface.Flush(code))
+                        if (await Processor.FlushAsync(code))
                         {
                             try
                             {
@@ -393,7 +392,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Simulate file
                 case 37:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         CodeParameter pParam = code.Parameter('P');
                         if (pParam != null)
@@ -429,7 +428,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Compute SHA1 hash of target file
                 case 38:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         string file = code.GetUnprecedentedString();
                         string physicalFile = await FilePath.ToPhysicalAsync(file);
@@ -457,7 +456,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Report SD card information
                 case 39:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         using (await Model.Provider.AccessReadOnlyAsync())
                         {
@@ -502,7 +501,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 98:
                     if (code.Parameter('R') != null)
                     {
-                        if (await SPI.Interface.Flush(code))
+                        if (await Processor.FlushAsync(code))
                         {
                             await SPI.Interface.SetMacroPausable(code.Channel, code.Parameter('R') != 0);
                         }
@@ -515,7 +514,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Emergency Stop
                 case 112:
-                    if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await SPI.Interface.Flush(code))
+                    if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await Processor.FlushAsync(code))
                     {
                         // Wait for potential firmware updates to complete first
                         await SPI.Interface.WaitForUpdateAsync();
@@ -551,7 +550,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Create Directory on SD-Card
                 case 470:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         string path = code.Parameter('P');
                         if (path == null)
@@ -574,7 +573,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Rename File/Directory on SD-Card
                 case 471:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         string from = code.Parameter('S');
                         string to = code.Parameter('T');
@@ -613,7 +612,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Print settings
                 case 503:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         string configFile = await FilePath.ToPhysicalAsync(FilePath.ConfigFile, FileDirectory.System);
                         if (File.Exists(configFile))
@@ -634,7 +633,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Set configuration file folder
                 case 505:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         string directory = code.Parameter('P');
                         if (!string.IsNullOrEmpty(directory))
@@ -664,7 +663,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Set Name
                 case 550:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         // Verify the P parameter
                         string pParam = code.Parameter('P');
@@ -709,7 +708,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Set Password
                 case 551:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         string password = code.Parameter('P');
                         if (password != null)
@@ -725,7 +724,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Configure network protocols
                 case 586:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         string corsSite = code.Parameter('C');
                         if (corsSite != null)
@@ -750,7 +749,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Set current RTC date and time
                 case 905:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         bool seen = false;
 
@@ -805,7 +804,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Start/stop event logging to SD card
                 case 929:
-                    if (await SPI.Interface.Flush(code))
+                    if (await Processor.FlushAsync(code))
                     {
                         CodeParameter sParam = code.Parameter('S');
                         if (sParam == null)
@@ -858,7 +857,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 997:
                     if (((int[])code.Parameter('S', new[] { 0 })).Contains(0) && code.Parameter('B', 0) == 0)
                     {
-                        if (await SPI.Interface.Flush(code))
+                        if (await Processor.FlushAsync(code))
                         {
                             // Get the IAP and Firmware files
                             string iapFile, firmwareFile;
@@ -931,7 +930,7 @@ namespace DuetControlServer.Codes.Handlers
                             // Terminate the program - or - restart the plugins when done
                             if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
                             {
-                                _ = code.CodeTask.ContinueWith(async task =>
+                                _ = code.Task.ContinueWith(async task =>
                                 {
                                     await task;
                                     await Program.ShutdownAsync();
@@ -958,7 +957,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 999:
                     if (code.Parameters.Count == 0)
                     {
-                        if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await SPI.Interface.Flush(code))
+                        if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await Processor.FlushAsync(code))
                         {
                             // Wait for potential firmware updates to complete first
                             await SPI.Interface.WaitForUpdateAsync();
@@ -1028,7 +1027,7 @@ namespace DuetControlServer.Codes.Handlers
                     if (!Settings.NoTerminateOnReset && code.Parameters.Count == 0)
                     {
                         // DCS is supposed to terminate via M999 unless this option is explicitly disabled
-                        _ = code.CodeTask.ContinueWith(async task =>
+                        _ = code.Task.ContinueWith(async task =>
                         {
                             await task;
                             await Program.ShutdownAsync();
@@ -1049,6 +1048,7 @@ namespace DuetControlServer.Codes.Handlers
             builder.AppendLine("=== Duet Control Server ===");
             builder.AppendLine($"Duet Control Server v{Program.Version}");
 
+            Codes.Processor.Diagnostics(builder);
             await FileExecution.Job.Diagnostics(builder);
             IPC.Processors.CodeInterception.Diagnostics(builder);
             Model.Provider.Diagnostics(builder);

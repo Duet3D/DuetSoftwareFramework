@@ -13,7 +13,6 @@ using DuetControlServer.IPC.Processors;
 using DuetControlServer.Model;
 using DuetControlServer.SPI;
 using Nito.AsyncEx;
-using Job = DuetControlServer.FileExecution.Job;
 
 namespace DuetControlServer.Commands
 {
@@ -27,50 +26,13 @@ namespace DuetControlServer.Commands
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
-        #region Code Scheduling
-        /// <summary>
-        /// Internal type of a code. This reflects the priority as well
-        /// </summary>
-        private enum InternalCodeType : int
-        {
-            /// <summary>
-            /// Regular G/M/T-code
-            /// </summary>
-            Regular = 0,
-
-            /// <summary>
-            /// Regular G/M/T-code for a message prompt awaiting acknowledgement
-            /// </summary>
-            Acknowledgement = 1,
-
-            /// <summary>
-            /// Code from a macro file
-            /// </summary>
-            Macro = 2,
-
-            /// <summary>
-            /// Code with <see cref="CodeFlags.IsPrioritized"/> set
-            /// </summary>
-            Prioritized = 3
-        }
-
-        /// <summary>
-        /// Array of AsyncLocks to guarantee the ordered start of incoming G/M/T-codes
-        /// </summary>
-        /// <remarks>
-        /// AsyncLock implements an internal waiter queue, so it is safe to rely on it for
-        /// maintaining the right order of codes being executed per code channel
-        /// </remarks>
-        private static readonly AsyncLock[,] _codeStartLocks = new AsyncLock[Inputs.Total, Enum.GetValues(typeof(InternalCodeType)).Length];
-
-        /// <summary>
-        /// Array of AsyncLocks to guarantee the ordered finishing of G/M/T-codes
-        /// </summary>
-        private static readonly AsyncLock[,] _codeFinishLocks = new AsyncLock[Inputs.Total, Enum.GetValues(typeof(InternalCodeType)).Length];
-
         /// <summary>
         /// List of cancellation tokens to cancel pending codes while they are waiting for their execution
         /// </summary>
+        /// <remarks>
+        /// While it may appear nicer to move the cancellation functionality to the code pipeline itself,
+        /// this coule lead to performance issues or unexpected behaviour due to intercepted codes. So leave it here for now
+        /// </remarks>
         private static readonly CancellationTokenSource[] _cancellationTokenSources = new CancellationTokenSource[Inputs.Total];
 
         /// <summary>
@@ -80,11 +42,6 @@ namespace DuetControlServer.Commands
         {
             for (int i = 0; i < Inputs.Total; i++)
             {
-                foreach (InternalCodeType codeType in Enum.GetValues(typeof(InternalCodeType)))
-                {
-                    _codeStartLocks[i, (int)codeType] = new AsyncLock();
-                    _codeFinishLocks[i, (int)codeType] = new AsyncLock();
-                }
                 _cancellationTokenSources[i] = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
                 FileLocks[i] = new AsyncLock();
@@ -110,16 +67,6 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
-        /// Internal type assigned by the code scheduler
-        /// </summary>
-        private InternalCodeType _codeType;
-
-        /// <summary>
-        /// Lock that is maintained as long as this code prevents the next code from being started
-        /// </summary>
-        private IDisposable _codeStartLock;
-
-        /// <summary>
         /// Cancellation token that may be used to cancel this code
         /// </summary>
         internal CancellationToken CancellationToken { get; set; }
@@ -134,101 +81,6 @@ namespace DuetControlServer.Commands
                 CancellationToken = _cancellationTokenSources[(int)Channel].Token;
             }
         }
-
-        /// <summary>
-        /// Create a task that waits until this code can be executed.
-        /// It may be cancelled if this code is supposed to be cancelled before it is started
-        /// </summary>
-        /// <returns>Lock to maintain while the code is being executed internally</returns>
-        /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        private Task<IDisposable> WaitForExecution()
-        {
-            // Assign a cancellation token if required
-            if (CancellationToken == default)
-            {
-                lock (_cancellationTokenSources)
-                {
-                    CancellationToken = _cancellationTokenSources[(int)Channel].Token;
-                }
-            }
-
-            // Codes from interceptors do not have any order control to avoid deadlocks
-            Code codeBeingIntercepted = CodeInterception.GetCodeBeingIntercepted(Connection);
-            if (codeBeingIntercepted != null)
-            {
-                if (codeBeingIntercepted.Flags.HasFlag(CodeFlags.IsFromMacro))
-                {
-                    Flags |= CodeFlags.IsFromMacro;
-                    File = codeBeingIntercepted.File;
-                    Macro = codeBeingIntercepted.Macro;
-                }
-                return Task.FromResult<IDisposable>(null);
-            }
-
-            // Wait for pending high priority codes
-            if (Flags.HasFlag(CodeFlags.IsPrioritized))
-            {
-                _codeType = InternalCodeType.Prioritized;
-                _logger.Debug("Waiting for execution of {0} (prioritized)", this);
-                return _codeStartLocks[(int)Channel, (int)InternalCodeType.Prioritized].LockAsync(CancellationToken);
-            }
-
-            // Wait for pending codes from the current macro
-            if (Flags.HasFlag(CodeFlags.IsFromMacro))
-            {
-                _codeType = InternalCodeType.Macro;
-                _logger.Debug("Waiting for execution of {0} (macro code)", this);
-                return (Macro == null) ? _codeStartLocks[(int)Channel, (int)InternalCodeType.Macro].LockAsync(CancellationToken) : Macro.WaitForCodeStart();
-            }
-
-            // Wait for pending codes for message acknowledgments
-            // FIXME M0/M1 are not meant to be used while a message box is open
-            if (!Flags.HasFlag(CodeFlags.IsFromFirmware) && Interface.IsWaitingForAcknowledgment(Channel) && File == null &&
-                (Type != CodeType.MCode || (MajorNumber != 0 && MajorNumber != 1)))
-            {
-                _codeType = InternalCodeType.Acknowledgement;
-                _logger.Debug("Waiting for execution of {0} (acknowledgement)", this);
-                return _codeStartLocks[(int)Channel, (int)InternalCodeType.Acknowledgement].LockAsync(CancellationToken);
-            }
-
-            // Wait for pending regular codes
-            _codeType = InternalCodeType.Regular;
-            _logger.Debug("Waiting for execution of {0}", this);
-            return _codeStartLocks[(int)Channel, (int)InternalCodeType.Regular].LockAsync(CancellationToken);
-        }
-
-        /// <summary>
-        /// Start the next available G/M/T-code unless this code has already started one
-        /// </summary>
-        private void StartNextCode()
-        {
-            if (_codeStartLock != null)
-            {
-                _codeStartLock.Dispose();
-                _codeStartLock = null;
-            }
-        }
-
-        /// <summary>
-        /// Start the next available G/M/T-code and wait until this code may finish
-        /// </summary>
-        /// <returns>Awaitable disposable</returns>
-        private AwaitableDisposable<IDisposable> WaitForFinish()
-        {
-            if (!Flags.HasFlag(CodeFlags.Unbuffered))
-            {
-                StartNextCode();
-            }
-
-            if (CodeInterception.IsInterceptingConnection(Connection))
-            {
-                return new AwaitableDisposable<IDisposable>(Task.FromResult<IDisposable>(null));
-            }
-
-            AwaitableDisposable<IDisposable> finishTask = (Macro == null) ? _codeFinishLocks[(int)Channel, (int)_codeType].LockAsync(CancellationToken) : Macro.WaitForCodeFinish();
-            return finishTask;
-        }
-        #endregion
 
         /// <summary>
         /// Lock around the files being written
@@ -278,46 +130,34 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
-        /// Indicates if this code is supposed to deal with a message box awaiting acknowledgement
-        /// </summary>
-        internal bool IsForAcknowledgement => _codeType == InternalCodeType.Acknowledgement;
-
-        /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish
         /// </summary>
         /// <returns>Result of the code</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        public override Task<Message> Execute()
+        public override async Task<Message> Execute()
         {
-            // Wait until this code can be executed and then start it
-            CodeTask = WaitForExecution()
-                .ContinueWith(async task =>
-                {
-                    try
-                    {
-                        _codeStartLock = await task;
-                        return await ExecuteInternally();
-                    }
-                    finally
-                    {
-                        IsExecuted = true;
-                    }
-                }, TaskContinuationOptions.RunContinuationsAsynchronously)
-                .Unwrap();
+            // Assign a cancellation token when the execution starts
+            if (CancellationToken == default)
+            {
+                CancellationToken = _cancellationTokenSources[(int)Channel].Token;
+            }
 
-            // Return either the task itself or null and let it finish in the background
-            return Flags.HasFlag(CodeFlags.Asynchronous) ? Task.FromResult<Message>(null) : CodeTask;
+            // Send it to the code pipeline
+            await Codes.Processor.StartCodeAsync(this);
+
+            // Wait for the result unless it has the asynchronous flag
+            if (!Flags.HasFlag(CodeFlags.Asynchronous))
+            {
+                await Task;
+                return Result;
+            }
+            return null;
         }
 
         /// <summary>
-        /// Indicates whether the code has been internally processed
+        /// Current stage of this code on the code pipeline
         /// </summary>
-        internal bool InternallyProcessed { get; set; }
-
-        /// <summary>
-        /// Automatically log and output the code's result
-        /// </summary>
-        internal bool LogOutput { get; set; }
+        internal Codes.PipelineStage Stage { get; set; }
 
         /// <summary>
         /// File that started this code
@@ -330,157 +170,11 @@ namespace DuetControlServer.Commands
         internal Macro Macro { get; set; }
 
         /// <summary>
-        /// Execute the given code internally
-        /// </summary>
-        /// <returns>Result of the code</returns>
-        private async Task<Message> ExecuteInternally()
-        {
-            string logSuffix = Flags.HasFlag(CodeFlags.Asynchronous) ? " asynchronously" : string.Empty;
-
-            try
-            {
-                try
-                {
-                    CancellationToken.ThrowIfCancellationRequested();
-
-                    // Check if this code is supposed to be written to a file
-                    int numChannel = (int)Channel;
-                    using (await FileLocks[numChannel].LockAsync(Program.CancellationToken))
-                    {
-                        if (FilesBeingWritten[numChannel] != null && (Type != CodeType.MCode || MajorNumber != 29))
-                        {
-                            _logger.Debug("Writing {0}{1}", this, logSuffix);
-                            FilesBeingWritten[numChannel].WriteLine(this);
-                            return new Message();
-                        }
-                    }
-
-                    // Execute this code
-                    _logger.Debug("Processing {0}{1}", this, logSuffix);
-                    await Process();
-                    if (LogOutput)
-                    {
-                        await Utility.Logger.LogOutputAsync(Result);
-                    }
-                    _logger.Debug("Completed {0}{1}", this, logSuffix);
-                }
-                catch (OperationCanceledException oce)
-                {
-                    // Code has been cancelled
-                    if (_logger.IsDebugEnabled)
-                    {
-                        _logger.Debug(oce, "Cancelled {0}{1}", this, logSuffix);
-                    }
-                    else
-                    {
-                        _logger.Debug("Cancelled {0}{1}", this, logSuffix);
-                    }
-                    throw;
-                }
-                catch (InvalidOperationException ioe)
-                {
-                    // Some inputs may be disabled in a custom build
-                    _logger.Debug(ioe, "{0} cannot be executed{1} because its code channel {2} is disabled", this, logSuffix, Channel);
-                    Result = new Message(MessageType.Error, $"Code channel {Channel} is disabled");
-                }
-                catch (NotSupportedException nse)
-                {
-                    // Some codes may not be supported yet
-                    _logger.Debug(nse, "{0} is not supported{1}", this, logSuffix);
-                    Result = new Message(MessageType.Error, "Operation is not supported");
-                }
-                catch (Exception e)
-                {
-                    // This code is no longer processed if an exception has occurred
-                    _logger.Error(e, "Code {0} has thrown an exception{1}", this, logSuffix);
-                    throw;
-                }
-            }
-            catch (Exception e) when (e is not OperationCanceledException)
-            {
-                // Cancel the running file and then start the next code if an exception has occurred
-                if (Macro != null)
-                {
-                    using (await Macro.LockAsync())
-                    {
-                        await Macro.AbortAsync();
-                    }
-                }
-                else if (Channel == CodeChannel.File)
-                {
-                    using (await Job.LockAsync())
-                    {
-                        await Job.AbortAsync();
-                    }
-                }
-                StartNextCode();
-                throw;
-            }
-            finally
-            {
-                // Start the next (unbuffered or unsupported) code if everything went well
-                StartNextCode();
-            }
-            return Result;
-        }
-
-        /// <summary>
-        /// Process the code
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private async Task Process()
-        {
-            // Check if the corresponding code channel has been disabled
-            using (await Provider.AccessReadOnlyAsync())
-            {
-                if (!Settings.NoSpi && Provider.Get.Inputs[Channel] == null)
-                {
-                    throw new InvalidOperationException("Requested code channel has been disabled");
-                }
-            }
-
-            // Attempt to process the code internally first
-            if (!InternallyProcessed && await ProcessInternally())
-            {
-                _logger.Debug("Waiting for finish of {0}", this);
-                using (await WaitForFinish())
-                {
-                    await CodeExecuted();
-                }
-                return;
-            }
-
-            // Enqueue this code for further processing in RepRapFirmware
-            FirmwareTCS = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            await Interface.ProcessCode(this);
-
-            // Wait for the code to be processed by RepRapFirmware
-            try
-            {
-                _logger.Debug("Waiting for finish of {0}", this);
-                using (await WaitForFinish())
-                {
-                    await FirmwareTCS.Task;
-                    await CodeExecuted();
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // Cancelling a code clears the result
-                using (await WaitForFinish())
-                {
-                    Result = null;
-                    await CodeExecuted();
-                }
-                throw;
-            }
-        }
-
-        /// <summary>
         /// Attempt to process this code internally
         /// </summary>
         /// <returns>Whether the code could be processed internally</returns>
-        private async Task<bool> ProcessInternally()
+        /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
+        internal async Task<bool> ProcessInternally()
         {
             if (Keyword != KeywordType.None &&
                 Keyword != KeywordType.Echo &&
@@ -489,25 +183,28 @@ namespace DuetControlServer.Commands
                 Keyword != KeywordType.Var &&
                 Keyword != KeywordType.Set)
             {
-                // Other meta keywords must be handled before we get here...
+                // Other meta keywords will be handled later
                 throw new InvalidOperationException("Conditional codes must not be executed");
             }
 
-            // Pre-process this code
-            if (!Flags.HasFlag(CodeFlags.IsPreProcessed))
+            // Check if this code is supposed to be written to a file
+            int numChannel = (int)Channel;
+            using (await FileLocks[numChannel].LockAsync(Program.CancellationToken))
             {
-                bool resolved = await CodeInterception.Intercept(this, InterceptionMode.Pre);
-
-                Flags |= CodeFlags.IsPreProcessed;
-                if (resolved)
+                if (FilesBeingWritten[numChannel] != null && (Type != CodeType.MCode || MajorNumber != 29))
                 {
-                    InternallyProcessed = true;
+                    _logger.Debug("Writing {0}", this);
+                    FilesBeingWritten[numChannel].WriteLine(this);
+                    Result = new();
                     return true;
                 }
             }
 
+            // Try to process this code internally
+            _logger.Debug("Processing {0}", this);
+
             // Flush the code channel and populate SBC fields where applicable
-            if (Keyword == KeywordType.None && Expressions.ContainsSbcFields(this) && !await Interface.Flush(this, true, false))
+            if (Keyword == KeywordType.None && Expressions.ContainsSbcFields(this) && !await Interface.FlushAsync(this, true, false))
             {
                 throw new OperationCanceledException();
             }
@@ -516,21 +213,21 @@ namespace DuetControlServer.Commands
             switch (Type)
             {
                 case CodeType.GCode:
-                    Result = await GCodes.Process(this);
+                    Result = await Codes.Handlers.GCodes.Process(this);
                     break;
-
                 case CodeType.MCode:
-                    Result = await MCodes.Process(this);
+                    Result = await Codes.Handlers.MCodes.Process(this);
                     break;
-
                 case CodeType.TCode:
-                    Result = await TCodes.Process(this);
+                    Result = await Codes.Handlers.TCodes.Process(this);
+                    break;
+                case CodeType.Keyword:
+                    Result = await Codes.Handlers.Keywords.Process(this);
                     break;
             }
 
             if (Result != null && Keyword == KeywordType.None)
             {
-                InternallyProcessed = true;
                 return true;
             }
 
@@ -542,17 +239,8 @@ namespace DuetControlServer.Commands
                 Flags |= CodeFlags.IsPostProcessed;
                 if (resolved)
                 {
-                    InternallyProcessed = true;
                     return true;
                 }
-            }
-
-            // Handle keywords
-            if (Keyword != KeywordType.None)
-            {
-                Result = await Keywords.Process(this);
-                InternallyProcessed = true;
-                return true;
             }
 
             // Do not send comments that may not be interpreted by RRF
@@ -560,7 +248,6 @@ namespace DuetControlServer.Commands
                 (Type == CodeType.Comment && (string.IsNullOrWhiteSpace(Comment) || !Settings.FirmwareComments.Any(chunk => Comment.Contains(chunk)))))
             {
                 Result = new Message();
-                InternallyProcessed = true;
                 return true;
             }
 
@@ -574,106 +261,30 @@ namespace DuetControlServer.Commands
         internal int BinarySize { get; set; }
 
         /// <summary>
-        /// TCS used by the SPI subsystem to flag when the code has been cancelled/caused an error/finished
+        /// Task to complete when this code is complete
         /// </summary>
-        internal TaskCompletionSource FirmwareTCS { get; private set; }
+        internal Task Task => _tcs.Task;
 
         /// <summary>
-        /// Actual task of this code
+        /// Set this code as complete
         /// </summary>
-        internal Task<Message> CodeTask { get; private set; }
+        public void SetResult() => _tcs.TrySetResult();
 
         /// <summary>
-        /// Indicates if the code has been fully executed (including the Executed interceptor if applicable)
+        /// Set this code as cancelled
         /// </summary>
-        internal bool IsExecuted
-        {
-            get => _isExecuted;
-            private set => _isExecuted = value;
-        }
-        private volatile bool _isExecuted;
+        public void SetCancelled() => _tcs.TrySetCanceled();
 
         /// <summary>
-        /// Executed when the code has finished
+        /// Set an exception for this code
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private async Task CodeExecuted()
-        {
-            if (Result != null)
-            {
-                // Process the code result
-                switch (Type)
-                {
-                    case CodeType.GCode:
-                        await GCodes.CodeExecuted(this);
-                        break;
+        /// <param name="e">Exception to set</param>
+        public void SetException(Exception e) => _tcs.TrySetException(e);
 
-                    case CodeType.MCode:
-                        await MCodes.CodeExecuted(this);
-                        break;
-
-                    case CodeType.TCode:
-                        await TCodes.CodeExecuted(this);
-                        break;
-                }
-
-                if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
-                {
-                    // RepRapFirmware generally prefixes error messages with the code itself, mimic this behavior
-                    if (Result.Type == MessageType.Error)
-                    {
-                        Result.Content = ToShortString() + ": " + Result.Content;
-                    }
-
-                    // Messages from RRF and replies to file print codes are logged somewhere else,
-                    // so we only need to log internal code replies that are not part of file prints
-                    if (File == null || Channel != CodeChannel.File)
-                    {
-                        await Utility.Logger.LogAsync(Result);
-                    }
-                }
-
-                // Deal with firmware emulation
-                if (!Flags.HasFlag(CodeFlags.IsFromMacro))
-                {
-                    if (await EmulatingMarlin())
-                    {
-                        if (Flags.HasFlag(CodeFlags.IsLastCode))
-                        {
-                            if (Result == null || string.IsNullOrEmpty(Result.Content))
-                            {
-                                Result = new Message(MessageType.Success, "ok\n");
-                            }
-                            else if (Type == CodeType.MCode && MajorNumber == 105)
-                            {
-                                Result.Content = "ok " + Result.Content + "\n";
-                            }
-                            else
-                            {
-                                Result.AppendLine("ok\n");
-                            }
-                        }
-                    }
-                    else if (Result == null || string.IsNullOrEmpty(Result.Content))
-                    {
-                        Result = new Message(MessageType.Success, "\n");
-                    }
-                    else
-                    {
-                        Result.AppendLine(string.Empty);
-                    }
-                }
-
-                // Update the last code result
-                if (File != null)
-                {
-                    File.LastResult = (int)Result.Type;
-                }
-            }
-
-            // Done
-            await CodeInterception.Intercept(this, InterceptionMode.Executed);
-        }
+        /// <summary>
+        /// Internal TCS representing the lifecycle of a code
+        /// </summary>
+        private TaskCompletionSource _tcs = new();
 
         /// <summary>
         /// Resets more <see cref="Code"/> fields
@@ -682,12 +293,11 @@ namespace DuetControlServer.Commands
         {
             base.Reset();
             Connection = null;
-            InternallyProcessed = false;
+            Stage = Codes.PipelineStage.Start;
             File = null;
             Macro = null;
-            FirmwareTCS = null;
+            _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
             BinarySize = 0;
-            IsExecuted = false;
         }
     }
 }

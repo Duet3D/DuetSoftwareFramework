@@ -98,8 +98,7 @@ namespace DuetControlServer.Model
                     _logger.Info("System time has been changed");
                     Code code = new()
                     {
-                        InternallyProcessed = !Settings.NoSpi,
-                        Flags = CodeFlags.Asynchronous,
+                        Flags = (Settings.NoSpi ? CodeFlags.None : CodeFlags.IsInternallyProcessed) | CodeFlags.Asynchronous,
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
                         MajorNumber = 905,
@@ -119,8 +118,7 @@ namespace DuetControlServer.Model
                     lastHostname = Environment.MachineName;
                     Code code = new()
                     {
-                        InternallyProcessed = !Settings.NoSpi,
-                        Flags = CodeFlags.Asynchronous,
+                        Flags = (Settings.NoSpi ? CodeFlags.None : CodeFlags.IsInternallyProcessed) | CodeFlags.Asynchronous,
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
                         MajorNumber = 550,

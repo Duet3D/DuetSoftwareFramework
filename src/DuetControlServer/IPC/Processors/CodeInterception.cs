@@ -290,7 +290,7 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="type">Type of the interception</param>
         /// <returns>True if the code has been resolved</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        public static async Task<bool> Intercept(Code code, InterceptionMode type)
+        public static async ValueTask<bool> Intercept(Code code, InterceptionMode type)
         {
             if (Program.CancellationToken.IsCancellationRequested)
             {
@@ -357,24 +357,30 @@ namespace DuetControlServer.IPC.Processors
         /// Get the code being intercepted by a given connection
         /// </summary>
         /// <param name="connection">Connection to look up</param>
+        /// <param name="mode">Mode of the corresponding interceptor</param>
         /// <returns>Code being intercepted</returns>
-        public static Code GetCodeBeingIntercepted(Connection connection)
+        public static Code GetCodeBeingIntercepted(Connection connection, out InterceptionMode mode)
         {
-            foreach (List<CodeInterception> processorList in _connections.Values)
+            if (connection != null)
             {
-                lock (processorList)
+                foreach (List<CodeInterception> processorList in _connections.Values)
                 {
-                    foreach (CodeInterception processor in processorList)
+                    lock (processorList)
                     {
-                        if (processor.Connection != connection)
+                        foreach (CodeInterception processor in processorList)
                         {
-                            continue;
-                        }
+                            if (processor.Connection != connection)
+                            {
+                                continue;
+                            }
 
-                        return processor._codeBeingIntercepted;
+                            mode = processor._mode;
+                            return processor._codeBeingIntercepted;
+                        }
                     }
                 }
             }
+            mode = InterceptionMode.Pre;
             return null;
         }
 
@@ -390,7 +396,7 @@ namespace DuetControlServer.IPC.Processors
                 {
                     foreach (CodeInterception processor in processorList)
                     {
-                        if (processor._codeBeingIntercepted is { IsExecuted: false })
+                        if (processor._codeBeingIntercepted != null)
                         {
                             builder.AppendLine($"IPC connection #{processor.Connection.Id} is intercepting {processor._codeBeingIntercepted} ({processor._mode})");
                         }

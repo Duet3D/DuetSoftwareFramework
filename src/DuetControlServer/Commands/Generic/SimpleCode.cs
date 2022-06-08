@@ -94,7 +94,6 @@ namespace DuetControlServer.Commands
                     if (code.Type == CodeType.MCode &&
                         (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || (code.MajorNumber == 999 && code.Parameter('B', 0) == 0)))
                     {
-                        code.Channel = await SPI.Interface.GetIdleChannel();
                         code.Flags |= CodeFlags.IsPrioritized;
                         priorityCodes.Add(code);
                     }

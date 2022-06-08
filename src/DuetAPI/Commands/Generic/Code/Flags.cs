@@ -29,6 +29,11 @@ namespace DuetAPI.Commands
         IsPreProcessed = 2,
 
         /// <summary>
+        /// Code has been processed internally (if this is set the internal execution of a code is skipped)
+        /// </summary>
+        IsInternallyProcessed = 4096,
+
+        /// <summary>
         /// Code has been postprocessed (i.e. it has been processed by the internal DCS code processor)
         /// </summary>
         IsPostProcessed = 4,
@@ -59,17 +64,18 @@ namespace DuetAPI.Commands
         EnforceAbsolutePosition = 128,
 
         /// <summary>
-        /// Override every other code and send it to the firmware as quickly as possible
+        /// Execute this code as quickly as possible and skip codes that have the <see cref="Unbuffered"/> flag set
         /// </summary>
         /// <remarks>
-        /// When this type of code is intercepted, the code can be ignored, cancelled, or resolved,
-        /// but it is not possible to insert asynchronous codes that complete before the given code.
-        /// In a future DSF version it may be no longer possible to intercept prioritized codes
+        /// In order to execute this code as quickly as possible, DCS attempts to change the <see cref="Code.Channel"/> property
+        /// to a a code channel that is completely idle. If this fails, a warning is logged. This flag should be only used for
+        /// diagnostics and time-critical codes like M112/M122/M999
         /// </remarks>
         IsPrioritized = 256,
 
         /// <summary>
-        /// Do NOT process another code on the same channel before this code has been fully executed
+        /// Do NOT process another code on the same channel before this code has been fully executed.
+        /// Note that priority codes may still override codes that have this flag set
         /// </summary>
         Unbuffered = 512,
 

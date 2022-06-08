@@ -71,34 +71,6 @@ namespace DuetControlServer.FileExecution
         public CancellationToken CancellationToken => _cts.Token;
 
         /// <summary>
-        /// Internal lock used for starting codes in the right order
-        /// </summary>
-        private readonly AsyncLock _codeStartLock = new();
-
-        /// <summary>
-        /// Internal lock used for starting codes in the right order
-        /// </summary>
-        private readonly AsyncLock _codeFinishLock = new();
-
-        /// <summary>
-        /// Method to wait until a new code can be started in the right order
-        /// </summary>
-        /// <returns>Disposable lock</returns>
-        /// <remarks>
-        /// This is required in case a flush is requested before another nested macro is started
-        /// </remarks>
-        public AwaitableDisposable<IDisposable> WaitForCodeStart() => _codeStartLock.LockAsync(CancellationToken);
-
-        /// <summary>
-        /// Method to wait until a new code can be finished in the right order
-        /// </summary>
-        /// <returns>Disposable lock</returns>
-        /// <remarks>
-        /// This is required in case a flush is requested before another nested macro is started
-        /// </remarks>
-        public AwaitableDisposable<IDisposable> WaitForCodeFinish() => _codeFinishLock.LockAsync(CancellationToken);
-
-        /// <summary>
         /// File to read from
         /// </summary>
         private readonly CodeFile _file;
@@ -205,13 +177,18 @@ namespace DuetControlServer.FileExecution
             {
                 _logger.Error(e, "Failed to start macro file {0}: {1}", fileName, e.Message);
             }
-            finally
+        }
+
+        /// <summary>
+        /// Start the execution of this macro file
+        /// </summary>
+        public void Start()
+        {
+            string name = Path.GetFileName(FileName);
+            if (_file != null || (name == FilePath.ConfigFile && _file != null) || name == FilePath.ConfigFileFallback)
             {
-                if (_file != null || (name == FilePath.ConfigFile && _file != null) || name == FilePath.ConfigFileFallback)
-                {
-                    IsExecuting = JustStarted = true;
-                    _ = Task.Run(Run);
-                }
+                IsExecuting = JustStarted = true;
+                _ = Task.Run(Run);
             }
         }
 
@@ -275,7 +252,7 @@ namespace DuetControlServer.FileExecution
         /// <remarks>
         /// This task is always resolved and never cancelled
         /// </remarks>
-        public Task FinishAsync()
+        public Task WaitForFinishAsync()
         {
             if (!IsExecuting)
             {
@@ -297,7 +274,6 @@ namespace DuetControlServer.FileExecution
         private async Task Run()
         {
             Queue<Code> codes = new();
-            Queue<Task<Message>> codeTasks = new();
 
             do
             {
@@ -313,9 +289,8 @@ namespace DuetControlServer.FileExecution
                             break;
                         }
 
-                        readCode.LogOutput = true;
                         codes.Enqueue(readCode);
-                        codeTasks.Enqueue(readCode.Execute());
+                        await readCode.Execute();       // actual execution happens in the background
                     }
                     catch (OperationCanceledException oce)
                     {
@@ -351,12 +326,12 @@ namespace DuetControlServer.FileExecution
                 }
 
                 // Wait for the next code to finish
-                if (codes.TryDequeue(out Code code) && codeTasks.TryDequeue(out Task<Message> codeTask))
+                if (codes.TryDequeue(out Code code))
                 {
                     try
                     {
-                        // Logging is done before we get here...
-                        await codeTask;
+                        // Logging of regular messages is done by the code itself, no need to take care of it here
+                        await code.Task;
                     }
                     catch (OperationCanceledException)
                     {
@@ -423,7 +398,7 @@ namespace DuetControlServer.FileExecution
                         result = new Code
                         {
                             Channel = Channel,
-                            InternallyProcessed = true,          // don't check our own hostname
+                            Flags = CodeFlags.IsInternallyProcessed,        // don't check our own hostname
                             Type = CodeType.MCode,
                             MajorNumber = 550
                         };
@@ -435,7 +410,7 @@ namespace DuetControlServer.FileExecution
                         result = new Code
                         {
                             Channel = Channel,
-                            InternallyProcessed = true,          // don't update our own datetime
+                            Flags = CodeFlags.IsInternallyProcessed,        // don't update our own datetime
                             Type = CodeType.MCode,
                             MajorNumber = 905
                         };
@@ -459,7 +434,7 @@ namespace DuetControlServer.FileExecution
             {
                 result.CancellationToken = CancellationToken;
                 result.FilePosition = null;
-                result.Flags |= CodeFlags.IsFromMacro;
+                result.Flags |= CodeFlags.Asynchronous | CodeFlags.IsFromMacro;
                 result.Macro = this;
                 if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
                 if (IsConfigOverride) { result.Flags |= CodeFlags.IsFromConfigOverride; }

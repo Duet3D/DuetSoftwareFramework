@@ -38,6 +38,6 @@ namespace DuetControlServer.SPI.Channel
         /// Resolve the pending task with the given result
         /// </summary>
         /// <param name="lockAcquired">Whether the lock could be acquired</param>
-        public void Resolve(bool lockAcquired) =>  _tcs.SetResult(lockAcquired);
+        public void Resolve(bool lockAcquired) => _tcs.SetResult(lockAcquired);
     }
 }

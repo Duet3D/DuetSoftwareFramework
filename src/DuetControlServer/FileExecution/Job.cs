@@ -230,7 +230,6 @@ namespace DuetControlServer.FileExecution
 
                     // Process the file
                     Queue<Code> codes = new();
-                    Queue<Task<Message>> codeTasks = new();
                     long nextFilePosition = 0;
                     do
                     {
@@ -270,9 +269,9 @@ namespace DuetControlServer.FileExecution
                                     throw;
                                 }
 
-                                readCode.LogOutput = true;
+                                readCode.Flags |= CodeFlags.Asynchronous;
                                 codes.Enqueue(readCode);
-                                codeTasks.Enqueue(readCode.Execute());
+                                await readCode.Execute();
                             }
                             catch (OperationCanceledException)
                             {
@@ -304,13 +303,14 @@ namespace DuetControlServer.FileExecution
                         }
 
                         // Is there anything more to do?
-                        if (codes.TryDequeue(out Code code) && codeTasks.TryDequeue(out Task<Message> codeTask))
+                        if (codes.TryDequeue(out Code code))
                         {
                             try
                             {
                                 try
                                 {
-                                    _ = await codeTask;     // Logging is done before we get here...
+                                    // Logging of regular messages is done by the code itself, no need to take care of it here
+                                    await code.Task;
                                     nextFilePosition = code.FilePosition.Value + code.Length.Value;
                                 }
                                 catch (OperationCanceledException)

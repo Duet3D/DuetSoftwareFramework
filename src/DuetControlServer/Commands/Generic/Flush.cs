@@ -1,5 +1,4 @@
 ﻿using DuetControlServer.IPC;
-using DuetControlServer.SPI;
 using System;
 using System.Threading.Tasks;
 
@@ -31,8 +30,8 @@ namespace DuetControlServer.Commands
             }
 
             // Wait for it to be flushed
-            Code codeBeingIntercepted = IPC.Processors.CodeInterception.GetCodeBeingIntercepted(Connection);
-            return await ((codeBeingIntercepted != null) ? Interface.Flush(codeBeingIntercepted, false) : Interface.Flush(Channel));
+            Code codeBeingIntercepted = IPC.Processors.CodeInterception.GetCodeBeingIntercepted(Connection, out _);
+            return await ((codeBeingIntercepted != null) ? Codes.Processor.FlushAsync(codeBeingIntercepted, false) : Codes.Processor.FlushAsync(Channel));
         }
     }
 }

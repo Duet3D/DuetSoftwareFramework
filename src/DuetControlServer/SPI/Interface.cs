@@ -218,12 +218,6 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Get a channel that is currently idle in order to process a priority code
-        /// </summary>
-        /// <returns>Idle channel</returns>
-        public static Task<CodeChannel> GetIdleChannel() => _channels.GetIdleChannel();
-
-        /// <summary>
         /// Check if a code channel is waiting for acknowledgement
         /// </summary>
         /// <param name="channel">Channel to query</param>
@@ -231,31 +225,11 @@ namespace DuetControlServer.SPI
         public static bool IsWaitingForAcknowledgment(CodeChannel channel) => _channels[channel].IsWaitingForAcknowledgment;
 
         /// <summary>
-        /// Enqueue a G/M/T-code for execution by RepRapFirmware
-        /// </summary>
-        /// <param name="code">Code to execute</param>
-        /// <returns>Asynchronous task</returns>
-        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-        public static async Task ProcessCode(Code code)
-        {
-            Program.CancellationToken.ThrowIfCancellationRequested();
-            if (Settings.NoSpi)
-            {
-                throw new InvalidOperationException("Not connected over SPI");
-            }
-
-            using (await _channels[code.Channel].LockAsync())
-            {
-                _channels[code.Channel].ProcessCode(code);
-            }
-        }
-
-        /// <summary>
         /// Wait for all pending codes to finish
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static async Task<bool> Flush(CodeChannel channel)
+        public static async Task<bool> FlushAsync(CodeChannel channel)
         {
             Program.CancellationToken.ThrowIfCancellationRequested();
             if (Settings.NoSpi)
@@ -279,7 +253,7 @@ namespace DuetControlServer.SPI
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
         /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static async Task<bool> Flush(Code code, bool evaluateExpressions = true, bool evaluateAll = true)
+        public static async Task<bool> FlushAsync(Code code, bool evaluateExpressions = true, bool evaluateAll = true)
         {
             Program.CancellationToken.ThrowIfCancellationRequested();
             if (Settings.NoSpi)

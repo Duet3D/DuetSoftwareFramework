@@ -1,20 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace DuetControlServer.Codes.Pipelines
+﻿namespace DuetControlServer.Codes
 {
     /// <summary>
     /// Enumeration of different stages in the code pipeline
     /// </summary>
-    public enum Stage
+    public enum PipelineStage
     {
         /// <summary>
-        /// Code has been read from a G-code source
+        /// Code is about to start
         /// </summary>
-        Input,
+        Start,
 
         /// <summary>
         /// Code is intercepted by third-party plugins (pre stage)
@@ -22,9 +16,9 @@ namespace DuetControlServer.Codes.Pipelines
         Pre,
 
         /// <summary>
-        /// Code is internally executed
+        /// Code is executed internally if applicable
         /// </summary>
-        Execute,
+        ProcessInternally,
 
         /// <summary>
         /// Code is intercepted by third-party plugins (post stage)
@@ -34,6 +28,11 @@ namespace DuetControlServer.Codes.Pipelines
         /// <summary>
         /// Code is processed by the firmware
         /// </summary>
-        Firmware
+        Firmware,
+
+        /// <summary>
+        /// Code has been executed (resolved or cancelled). It is intercepted by third-party plugins (executed stage)
+        /// </summary>
+        Executed
     }
 }

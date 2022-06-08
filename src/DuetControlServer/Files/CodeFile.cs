@@ -68,11 +68,6 @@ namespace DuetControlServer.Files
         private readonly Stack<CodeBlock> _codeBlocks = new();
 
         /// <summary>
-        /// Last code read from the file
-        /// </summary>
-        private Code _lastCode;
-
-        /// <summary>
         /// Last code block
         /// </summary>
         private CodeBlock _lastCodeBlock;
@@ -249,8 +244,8 @@ namespace DuetControlServer.Files
                     {
                         if (state.HasLocalVariables)
                         {
-                            // Wait for pending commands to be executed so all the local variables can be disposed again
-                            await Flush();
+                            // Wait for pending commands to be executed so all the local variables can be disposed of again
+                            await Codes.Processor.FlushAsync(Channel);
                         }
 
                         if (state.StartingCode.Keyword == KeywordType.While)
@@ -268,7 +263,7 @@ namespace DuetControlServer.Files
                                     if (!state.HasLocalVariables)
                                     {
                                         // Wait for pending codes to be fully executed so that "iterations" can be incremented
-                                        await Flush();
+                                        await Codes.Processor.FlushAsync(Channel);
                                     }
 
                                     using (await _lock.LockAsync(Program.CancellationToken))
@@ -353,7 +348,7 @@ namespace DuetControlServer.Files
                             }
 
                             // Start a new conditional block if necessary
-                            await Flush();
+                            await Codes.Processor.FlushAsync(Channel);
                             _logger.Debug("Evaluating {0} block", code.Keyword);
                             if (code.Keyword != KeywordType.While || codeBlock == null || codeBlock.StartingCode.FilePosition != code.FilePosition)
                             {
@@ -401,7 +396,7 @@ namespace DuetControlServer.Files
                             }
 
                             _logger.Debug("Doing {0}", code.Keyword);
-                            await Flush();
+                            await Codes.Processor.FlushAsync(Channel);
 
                             foreach (CodeBlock state in _codeBlocks)
                             {
@@ -419,7 +414,6 @@ namespace DuetControlServer.Files
                             using (await _lock.LockAsync(Program.CancellationToken))
                             {
                                 Close();
-                                _lastCode = code;
                             }
                             return code;
 
@@ -439,24 +433,12 @@ namespace DuetControlServer.Files
                             {
                                 codeBlock.HasLocalVariables = true;
                             }
-
-                            using (await _lock.LockAsync(Program.CancellationToken))
-                            {
-                                _lastCode = code;
-                            }
                             return code;
 
                         case KeywordType.Echo:
                         case KeywordType.Global:
                         case KeywordType.None:
                         case KeywordType.Set:
-                            if (code.Keyword != KeywordType.None || code.Type != CodeType.Comment)
-                            {
-                                using (await _lock.LockAsync(Program.CancellationToken))
-                                {
-                                    _lastCode = code;
-                                }
-                            }
                             return code;
 
                         default:
@@ -470,33 +452,6 @@ namespace DuetControlServer.Files
                     sharedCode = new Code();
                 }
             }
-        }
-
-        /// <summary>
-        /// Wait for the last code to be fully executed
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        private async Task Flush()
-        {
-            while (await SPI.Interface.Flush(Channel))
-            {
-                using (await _lock.LockAsync(Program.CancellationToken))
-                {
-                    if (IsClosed)
-                    {
-                        // Cannot continue if the file has been closed
-                        break;
-                    }
-
-                    if (_lastCode == null || _lastCode.IsExecuted)
-                    {
-                        // No more code to await
-                        return;
-                    }
-                }
-            }
-            throw new OperationCanceledException();
         }
 
         /// <summary>
