@@ -139,22 +139,27 @@ namespace DuetControlServer.Files.ImageProcessing
         public static Image BinaryToImage(MemoryStream ms, out int width, out int height)
         {
             ms.Position = 0;
-            width = ms.ReadByte() << 8 | ms.ReadByte();
-            height = ms.ReadByte() << 8 | ms.ReadByte();
+            var internalWidth = ms.ReadByte() << 8 | ms.ReadByte(); //Have to use a local for the new anon call to ProcessPixelRows
+            var internalHeight = ms.ReadByte() << 8 | ms.ReadByte();
 
-            var target = new Image<Rgba32>(width, height);
-            for (int y = 0; y < height; y++)
-            {
-                Span<Rgba32> pixelRowSpan = target.GetPixelRowSpan(y);
-                for (int x = 0; x < width; x++)
+            var target = new Image<Rgba32>(internalWidth, internalHeight);
+            target.ProcessPixelRows(pixelAccessor => {
+                for (int y = 0; y < internalHeight; y++)
                 {
-                    byte upper = (byte)ms.ReadByte();
-                    byte lower = (byte)ms.ReadByte();
-                    int color = lower | upper << 8;
-                    byte[] rgb = RGB2To3Bytes(color);
-                    pixelRowSpan[x] = new Rgba32(rgb[0], rgb[1], rgb[2]);
+                    Span<Rgba32> pixelRowSpan = pixelAccessor.GetRowSpan(y);  
+                    for (int x = 0; x < internalWidth; x++)
+                    {
+                        byte upper = (byte)ms.ReadByte();
+                        byte lower = (byte)ms.ReadByte();
+                        int color = lower | upper << 8;
+                        byte[] rgb = RGB2To3Bytes(color);
+                        pixelRowSpan[x] = new Rgba32(rgb[0], rgb[1], rgb[2]);
+                    }
                 }
-            }
+            });
+             
+            width = internalWidth;
+            height = internalHeight;
             return target;
         }
 
