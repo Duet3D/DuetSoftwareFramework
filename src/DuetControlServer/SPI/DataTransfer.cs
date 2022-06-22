@@ -1380,7 +1380,6 @@ namespace DuetControlServer.SPI
             }
         }
 
-        static bool x = true;
         /// <summary>
         /// Exchange the transfer header
         /// </summary>
