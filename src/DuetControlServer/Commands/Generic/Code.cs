@@ -268,7 +268,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Set this code as complete
         /// </summary>
-        public void SetResult() => _tcs.TrySetResult();
+        public void SetFinished() => _tcs.TrySetResult();
 
         /// <summary>
         /// Set this code as cancelled

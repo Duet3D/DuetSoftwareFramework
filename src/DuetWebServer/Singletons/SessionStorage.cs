@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DuetWebServer.Singletons
@@ -14,11 +15,6 @@ namespace DuetWebServer.Singletons
     /// </summary>
     public interface ISessionStorage
     {
-        /// <summary>
-        /// Anonymous ticket that is used in case no password is set
-        /// </summary>
-        public AuthenticationTicket AnonymousTicket { get; }
-
         /// <summary>
         /// Check if the given session key provides the requested access to the given policy
         /// </summary>
@@ -31,9 +27,19 @@ namespace DuetWebServer.Singletons
         /// Make a new session key and register it if the session ID is valid
         /// </summary>
         /// <param name="sessionId">DSF session ID</param>
+        /// <param name="ipAddress">Optional IP address to store for IP address-based authentification</param>
         /// <param name="readWrite">Whether the client has read-write or read-only access</param>
         /// <returns>Authentication ticket</returns>
-        public string MakeSessionKey(int sessionId, bool readWrite);
+        public string MakeSessionKey(int sessionId, string ipAddress, bool readWrite);
+
+        /// <summary>
+        /// Make a new session ticket and register it if the session ID is valid
+        /// </summary>
+        /// <param name="sessionId">DSF session ID</param>
+        /// <param name="ipAddress">Optional IP address to store for IP address-based authentification</param>
+        /// <param name="readWrite">Whether the client has read-write or read-only access</param>
+        /// <returns>Authentication ticket</returns>
+        public AuthenticationTicket MakeSessionTicket(int sessionId, string ipAddress, bool readWrite);
 
         /// <summary>
         /// Get a session ID from the given key
@@ -47,7 +53,14 @@ namespace DuetWebServer.Singletons
         /// </summary>
         /// <param name="key">Key to query</param>
         /// <returns>Authentication ticket or null</returns>
-        public AuthenticationTicket GetTicket(string key);
+        public AuthenticationTicket GetTicketFromKey(string key);
+
+        /// <summary>
+        /// Get a ticket from the given IP address
+        /// </summary>
+        /// <param name="ipAddress">IP address to query</param>
+        /// <returns>Authentication ticket or null</returns>
+        public AuthenticationTicket GetTicketFromIpAddress(string ipAddress);
 
         /// <summary>
         /// Remove a session ticket returning the corresponding session ID
@@ -75,6 +88,18 @@ namespace DuetWebServer.Singletons
         /// <param name="sessionTimeout">Timeout for HTTP sessions</param>
         /// <param name="socketPath">API socket path</param>
         public void MaintainSessions(TimeSpan sessionTimeout, string socketPath);
+
+        /// <summary>
+        /// Cache an incoming generic message
+        /// </summary>
+        /// <param name="message">Message to cache</param>
+        public void CacheMessage(string message);
+
+        /// <summary>
+        /// Retrieve the cached messages of a given user
+        /// </summary>
+        /// <returns>Cached messages</returns>
+        public string GetCachedMessages(ClaimsPrincipal user);
     }
 
     /// <summary>
@@ -82,13 +107,6 @@ namespace DuetWebServer.Singletons
     /// </summary>
     public class SessionStorage : ISessionStorage
     {
-        /// <summary>
-        /// Anonymous ticket that is used in case no password is set
-        /// </summary>
-        public AuthenticationTicket AnonymousTicket { get; } = new(new ClaimsPrincipal(new ClaimsIdentity(new[] {
-            new Claim("access", Policies.ReadWrite)
-        })), SessionKeyAuthenticationHandler.SchemeName);
-
         /// <summary>
         /// Internal logger instance
         /// </summary>
@@ -114,11 +132,37 @@ namespace DuetWebServer.Singletons
 
             public int SessionId => Convert.ToInt32(Ticket.Principal.FindFirst("sessionId").Value);
 
+            public string IpAddress => Ticket.Principal.FindFirst("ipAddress").Value;
+
             public DateTime LastQueryTime { get; set; } = DateTime.Now;
 
             public int NumWebSocketsConnected { get; set; }
 
             public int NumRunningRequests { get; set; }
+
+            private readonly StringBuilder _cachedMessages = new();
+
+            public void CacheMessage(string message)
+            {
+                if (!string.IsNullOrEmpty(IpAddress))
+                {
+                    lock (_cachedMessages)
+                    {
+                        _cachedMessages.AppendLine(message.TrimEnd());
+                    }
+                }
+            }
+
+            public string GetCachedMessages()
+            {
+                string result;
+                lock (_cachedMessages)
+                {
+                    result = _cachedMessages.ToString();
+                    _cachedMessages.Clear();
+                }
+                return result;
+            }
 
             public Session(AuthenticationTicket ticket)
             {
@@ -162,9 +206,10 @@ namespace DuetWebServer.Singletons
         /// Make a new session key and register it if the session ID is valid
         /// </summary>
         /// <param name="sessionId">DSF session ID</param>
+        /// <param name="ipAddress">Optional IP address if the request came from a RRF HTTP request</param>
         /// <param name="readWrite">Whether the client has read-write or read-only access</param>
         /// <returns>Authentication ticket</returns>
-        public string MakeSessionKey(int sessionId, bool readWrite)
+        public string MakeSessionKey(int sessionId, string ipAddress, bool readWrite)
         {
             lock (_sessions)
             {
@@ -172,7 +217,8 @@ namespace DuetWebServer.Singletons
                 ClaimsIdentity identity = new(new[] {
                     new Claim("access", readWrite ? Policies.ReadWrite : Policies.ReadOnly),
                     new Claim("key", sessionKey),
-                    new Claim("sessionId", sessionId.ToString())
+                    new Claim("sessionId", sessionId.ToString()),
+                    new Claim("ipAddress", ipAddress)
                 }, nameof(SessionKeyAuthenticationHandler));
                 AuthenticationTicket ticket = new(new ClaimsPrincipal(identity), SessionKeyAuthenticationHandler.SchemeName);
                 if (sessionId > 0)
@@ -181,6 +227,34 @@ namespace DuetWebServer.Singletons
                     _logger?.LogInformation("Session {0} added ({1})", sessionKey, readWrite ? "readWrite" : "readOnly");
                 }
                 return sessionKey;
+            }
+        }
+
+        /// <summary>
+        /// Make a new session ticket and register it if the session ID is valid
+        /// </summary>
+        /// <param name="sessionId">DSF session ID</param>
+        /// <param name="ipAddress">Optional IP address if the request came from a RRF HTTP request</param>
+        /// <param name="readWrite">Whether the client has read-write or read-only access</param>
+        /// <returns>Authentication ticket</returns>
+        public AuthenticationTicket MakeSessionTicket(int sessionId, string ipAddress, bool readWrite)
+        {
+            lock (_sessions)
+            {
+                string sessionKey = Guid.NewGuid().ToString("N");
+                ClaimsIdentity identity = new(new[] {
+                    new Claim("access", readWrite ? Policies.ReadWrite : Policies.ReadOnly),
+                    new Claim("key", sessionKey),
+                    new Claim("sessionId", sessionId.ToString()),
+                    new Claim("ipAddress", ipAddress)
+                }, nameof(SessionKeyAuthenticationHandler));
+                AuthenticationTicket ticket = new(new ClaimsPrincipal(identity), SessionKeyAuthenticationHandler.SchemeName);
+                if (sessionId > 0)
+                {
+                    _sessions.Add(new(ticket));
+                    _logger?.LogInformation("Session {0} added ({1})", sessionKey, readWrite ? "readWrite" : "readOnly");
+                }
+                return ticket;
             }
         }
 
@@ -210,13 +284,34 @@ namespace DuetWebServer.Singletons
         /// </summary>
         /// <param name="key">Key to query</param>
         /// <returns>Authentication ticket or null</returns>
-        public AuthenticationTicket GetTicket(string key)
+        public AuthenticationTicket GetTicketFromKey(string key)
         {
             lock (_sessions)
             {
                 foreach (Session item in _sessions)
                 {
                     if (item.Key == key)
+                    {
+                        item.LastQueryTime = DateTime.Now;
+                        return item.Ticket;
+                    }
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Get a ticket from the given IP address
+        /// </summary>
+        /// <param name="ipAddress">IP address to query</param>
+        /// <returns>Authentication ticket or null</returns>
+        public AuthenticationTicket GetTicketFromIpAddress(string ipAddress)
+        {
+            lock (_sessions)
+            {
+                foreach (Session item in _sessions)
+                {
+                    if (item.IpAddress == ipAddress)
                     {
                         item.LastQueryTime = DateTime.Now;
                         return item.Ticket;
@@ -348,6 +443,40 @@ namespace DuetWebServer.Singletons
             {
                 _logger.LogWarning(e, "Failed to unregister expired user session");
             }
+        }
+
+        /// <summary>
+        /// Cache an incoming generic message
+        /// </summary>
+        /// <param name="message">Message to cache</param>
+        public void CacheMessage(string message)
+        {
+            lock (_sessions)
+            {
+                foreach (Session session in _sessions)
+                {
+                    session.CacheMessage(message);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Retrieve the cached messages of a given user
+        /// </summary>
+        /// <returns>Cached messages</returns>
+        public string GetCachedMessages(ClaimsPrincipal user)
+        {
+            lock (_sessions)
+            {
+                foreach (Session item in _sessions)
+                {
+                    if (item.Ticket.Principal == user)
+                    {
+                        return item.GetCachedMessages();
+                    }
+                }
+            }
+            return string.Empty;
         }
     }
 }

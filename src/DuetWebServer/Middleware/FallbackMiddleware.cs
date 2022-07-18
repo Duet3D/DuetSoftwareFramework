@@ -41,7 +41,7 @@ namespace DuetWebServer.Middleware
             if (context.Request.Method == HttpMethods.Get &&
                 !context.Request.Path.Value.Equals("/") &&
                 !context.Request.Path.Value.StartsWith("/rr_") && !context.Request.Path.Value.StartsWith("/machine/") &&
-                !context.Request.Path.Value.Contains("."))
+                !context.Request.Path.Value.Contains('.'))
             {
                 _logger.LogWarning("Could not find resource {0}, serving index file", context.Request.Path);
                 context.Request.Path = PathString.FromUriComponent("/");

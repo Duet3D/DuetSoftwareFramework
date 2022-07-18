@@ -15,6 +15,14 @@ namespace DuetWebServer.Singletons
         public Dictionary<string, HttpEndpoint> Endpoints { get; }
 
         /// <summary>
+        /// Sequence number for generic messages (analog to seqs.reply)
+        /// </summary>
+        public int ReplySeq { get; set; }
+
+        /// Sequence number for volume changes (analog to seqs.volumes)
+        public int VolumesSeq { get; set; }
+
+        /// <summary>
         /// Path to the web directory
         /// </summary>
         public string WebDirectory { get; set; }
@@ -40,6 +48,14 @@ namespace DuetWebServer.Singletons
         /// Dictionary of registered third-party paths vs third-party HTTP endpoints
         /// </summary>
         public Dictionary<string, HttpEndpoint> Endpoints { get; } = new();
+
+        /// <summary>
+        /// Sequence number for generic messages (analog to seqs.reply)
+        /// </summary>
+        public int ReplySeq { get; set; }
+
+        /// Sequence number for volume changes (analog to seqs.volumes)
+        public int VolumesSeq { get; set; }
 
         /// <summary>
         /// Path to the web directory

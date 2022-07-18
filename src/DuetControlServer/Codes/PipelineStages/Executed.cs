@@ -122,7 +122,18 @@ namespace DuetControlServer.Codes.PipelineStages
                 if (code.Result != null)
                 {
                     Pipeline.Logger.Debug("Finished code {0}", code);
-                    code.SetResult();
+                    if (code.Flags.HasFlag(CodeFlags.Asynchronous))
+                    {
+                        if (code.Channel == CodeChannel.File)
+                        {
+                            await Utility.Logger.LogOutputAsync(code.Result);
+                        }
+                        else
+                        {
+                            await Model.Provider.OutputAsync(code.Result);
+                        }
+                    }
+                    code.SetFinished();
                 }
                 else
                 {

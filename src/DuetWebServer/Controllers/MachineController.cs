@@ -82,7 +82,7 @@ namespace DuetWebServer.Controllers
                 if (await connection.CheckPassword(password))
                 {
                     int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress.ToString());
-                    string sessionKey = sessionStorage.MakeSessionKey(sessionId, true);
+                    string sessionKey = sessionStorage.MakeSessionKey(sessionId, string.Empty, true);
 
                     string jsonResponse = JsonSerializer.Serialize(new
                     {
@@ -116,7 +116,7 @@ namespace DuetWebServer.Controllers
                     _logger.LogError($"[{nameof(Connect)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(Connect)}] Failed to retrieve status");
+                _logger.LogWarning(e, $"[{nameof(Connect)}] Failed to handle connect request");
                 return StatusCode(500, e.Message);
             }
         }
@@ -188,7 +188,7 @@ namespace DuetWebServer.Controllers
                     _logger.LogError($"[{nameof(Disconnect)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(Disconnect)}] Failed to retrieve status");
+                _logger.LogWarning(e, $"[{nameof(Disconnect)}] Failed to handle disconnect request");
                 return StatusCode(500, e.Message);
             }
         }

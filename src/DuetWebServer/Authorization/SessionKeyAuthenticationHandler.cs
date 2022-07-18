@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Connection;
+using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Authentication;
@@ -62,7 +63,7 @@ namespace DuetWebServer.Authorization
             {
                 foreach (string sessionKey in sessionKeys)
                 {
-                    AuthenticationTicket ticket = _sessionStorage.GetTicket(sessionKey);
+                    AuthenticationTicket ticket = _sessionStorage.GetTicketFromKey(sessionKey);
                     if (ticket != null)
                     {
                         // Got a ticket, success!
@@ -72,20 +73,32 @@ namespace DuetWebServer.Authorization
             }
             else
             {
-                try
+                // Check for IP address authorization
+                string ipAddress = Context.Connection.RemoteIpAddress.ToString();
+                AuthenticationTicket ticket = _sessionStorage.GetTicketFromIpAddress(ipAddress);
+
+                // Make a new session if no ticket could be found and no password is set
+                if (ticket == null)
                 {
-                    using CommandConnection connection = await BuildConnection();
-                    if (await connection.CheckPassword(Defaults.Password))
+                    try
                     {
-                        // No password set - assign an anonymous ticket
-                        return AuthenticateResult.Success(_sessionStorage.AnonymousTicket);
+                        using CommandConnection connection = await BuildConnection();
+                        if (await connection.CheckPassword(Defaults.Password))
+                        {
+                            // No password set - assign a new ticket so that replies are saved
+                            int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, ipAddress);
+                            ticket = _sessionStorage.MakeSessionTicket(sessionId, ipAddress, true);
+                        }
+                    }
+                    catch
+                    {
+                        // Failed to check default password...
+                        return AuthenticateResult.NoResult();
                     }
                 }
-                catch
-                {
-                    // Failed to check default password...
-                    return AuthenticateResult.NoResult();
-                }
+
+                // Deal with the result
+                return (ticket != null) ? AuthenticateResult.Success(ticket) : AuthenticateResult.NoResult();
             }
             return AuthenticateResult.Fail("Missing X-Session-Key header");
         }

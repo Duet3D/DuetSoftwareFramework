@@ -51,6 +51,11 @@ namespace DuetWebServer.Services
         private readonly IModelProvider _modelProvider;
 
         /// <summary>
+        /// Session sotrage singleton
+        /// </summary>
+        private readonly ISessionStorage _sessionStorage;
+
+        /// <summary>
         /// Check the origin of an incoming WebSocket request and set the status on error
         /// </summary>
         /// <param name="httpContext">HTTP context to check</param>
@@ -98,11 +103,12 @@ namespace DuetWebServer.Services
         /// <param name="configuration">App configuration</param>
         /// <param name="logger">Logger instance</param>
         /// <param name="modelProvider">Model provider singleton</param>
-        public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IModelProvider modelProvider)
+        public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IModelProvider modelProvider, ISessionStorage sessionStorage)
         {
             _logger = logger;
             _configuration = configuration;
             _modelProvider = modelProvider;
+            _sessionStorage = sessionStorage;
         }
 
         /// <summary>
@@ -156,18 +162,24 @@ namespace DuetWebServer.Services
                         await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, new string[] {
                             "directories/www",
                             "httpEndpoints/**",
-                            "network/corsSite"
+                            "messages/**",
+                            "network/corsSite",
+                            "volumes/**"
                         }, unixSocket);
                         await commandConnection.Connect(unixSocket);
                         _logger.LogInformation("Connections to DuetControlServer established");
 
                         // Get the machine model and keep it up-to-date
                         model = await subscribeConnection.GetObjectModel(_stopRequest.Token);
+
+                        // Initialize CORS site
                         if (!string.IsNullOrEmpty(model.Network.CorsSite))
                         {
                             _logger.LogInformation("Changing CORS policy to accept site '{0}'", model.Network.CorsSite);
                             CorsPolicy.Origins.Add(model.Network.CorsSite);
                         }
+
+                        // Initialize HTTP endpoints
                         lock (_modelProvider.Endpoints)
                         {
                             _modelProvider.Endpoints.Clear();
@@ -186,12 +198,35 @@ namespace DuetWebServer.Services
 
                         do
                         {
+                            // Cache incoming messages
+                            foreach (Message message in model.Messages)
+                            {
+                                _sessionStorage.CacheMessage(message.ToString());
+                            }
+                            model.Messages.Clear();
+
                             // Wait for more updates
                             using JsonDocument jsonPatch = await subscribeConnection.GetObjectModelPatch(_stopRequest.Token);
                             model.UpdateFromJson(jsonPatch.RootElement, false);
 
+                            // Increment sequence numbers
+                            if (jsonPatch.RootElement.TryGetProperty("messages", out JsonElement messagesElement))
+                            {
+                                lock (_modelProvider)
+                                {
+                                    _modelProvider.ReplySeq += messagesElement.GetArrayLength();
+                                }
+                            }
+                            if (jsonPatch.RootElement.TryGetProperty("volumes", out _))
+                            {
+                                lock (_modelProvider)
+                                {
+                                    _modelProvider.VolumesSeq++;
+                                }
+                            }
+
                             // Check for updated CORS site
-                            if (jsonPatch.RootElement.TryGetProperty("network", out _))
+                            if (jsonPatch.RootElement.TryGetProperty("network", out JsonElement networkElement) && networkElement.TryGetProperty("corsSite", out _))
                             {
                                 CorsPolicy.Origins.Clear();
                                 if (!string.IsNullOrEmpty(model.Network.CorsSite))
