@@ -381,8 +381,8 @@ namespace DuetControlServer.FileExecution
                         {
                             try
                             {
-                                // Wait for custom codes to go in case a plugin inserted them
-                                await SPI.Interface.Flush(CodeChannel.File);
+                                // Flush one last time in case plugins inserted codes at the end of a print file
+                                await SPI.Interface.FlushAsync(CodeChannel.File);
                             }
                             catch (OperationCanceledException)
                             {
