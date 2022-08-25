@@ -3,13 +3,14 @@ using DuetAPIClient;
 using System;
 using System.IO;
 using System.Net.Sockets;
+using System.Security.AccessControl;
 using System.Threading.Tasks;
 
 namespace CodeStream
 {
     public static class Program
     {
-        public static async Task Main(string[] args)
+        public static async Task<int> Main(string[] args)
         {
             // Parse the command line arguments
             string lastArg = null, socketPath = Defaults.FullSocketPath;
@@ -40,14 +41,25 @@ namespace CodeStream
                     Console.WriteLine("-b, --buffer-size <size>: Maximum number of codes to execute simultaneously");
                     Console.WriteLine("-q, --quiet: Do not output any messages (not applicable for code replies in interactive mode)");
                     Console.WriteLine("-h, --help: Display this help text");
-                    return;
+                    return 0;
                 }
                 lastArg = arg;
             }
 
             // Create a new connection and connect to DuetControlServer
             using CodeStreamConnection connection = new();
-            await connection.Connect(bufferSize, DuetAPI.CodeChannel.Telnet, socketPath);
+            try
+            {
+                await connection.Connect(bufferSize, DuetAPI.CodeChannel.Telnet, socketPath);
+            }
+            catch (SocketException)
+            {
+                if (!quiet)
+                {
+                    Console.Error.WriteLine("Failed to connect to DCS");
+                }
+                return 1;
+            }
 
             // Start streaming
             // This aapplication does not register a console session, see CodeConsole for further details about that
@@ -66,6 +78,7 @@ namespace CodeStream
             {
                 connection.Close();
             }
+            return 0;
         }
 
         /// <summary>

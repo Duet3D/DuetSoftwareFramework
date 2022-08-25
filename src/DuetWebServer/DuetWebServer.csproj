@@ -4,7 +4,7 @@
     <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
     <Authors>Christian Hammacher</Authors>
     <Company>Duet3D Ltd</Company>
-    <Version>3.4.2-rc2</Version>
+    <Version>3.4.2-rc3</Version>
     <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
