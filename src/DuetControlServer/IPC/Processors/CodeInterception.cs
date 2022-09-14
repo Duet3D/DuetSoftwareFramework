@@ -209,12 +209,8 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Whether the code may be intercepted</returns>
         private bool CanIntercept(Code code)
         {
-            if (!Connection.IsConnected || code.Flags.HasFlag(CodeFlags.IsPrioritized) != _priorityCodes)
-            {
-                return false;
-            }
-
-            if (!_channels.Contains(code.Channel))
+            if (!Connection.IsConnected || code.Connection == Connection ||
+                code.Flags.HasFlag(CodeFlags.IsPrioritized) != _priorityCodes || !_channels.Contains(code.Channel))
             {
                 return false;
             }
@@ -237,7 +233,6 @@ namespace DuetControlServer.IPC.Processors
                 }
                 return false;
             }
-
             return true;
         }
 

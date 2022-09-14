@@ -2,6 +2,7 @@
 using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using System;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -26,11 +27,11 @@ namespace PluginManager
         /// <summary>
         /// Set to true if no regular messages are supposed to be printed
         /// </summary>
-        private static bool Quiet;
+        private static bool _quiet;
 
         private static void WriteLine(string format, params object[] arg)
         {
-            if (!Quiet)
+            if (!_quiet)
             {
                 Console.WriteLine(format, arg);
             }
@@ -103,7 +104,7 @@ namespace PluginManager
                 }
                 else if (arg == "-q" || arg == "--quiet")
                 {
-                    Quiet = true;
+                    _quiet = true;
                 }
                 else if (arg == "-h" || arg == "--help")
                 {
@@ -128,7 +129,18 @@ namespace PluginManager
 
             // Create a new connection and connect to DuetControlServer
             using CommandConnection connection = new();
-            await connection.Connect(socketPath);
+            try
+            {
+                await connection.Connect(socketPath);
+            }
+            catch (SocketException)
+            {
+                if (!_quiet)
+                {
+                    Console.Error.WriteLine("Failed to connect to DCS");
+                }
+                return 1;
+            }
 
             // Check what to do
             ObjectModel model;

@@ -105,6 +105,11 @@ namespace DuetAPI.ObjectModel
         private string _homepage;
 
         /// <summary>
+        /// List of general tags for search
+        /// </summary>
+        public ModelCollection<string> Tags { get; } = new ModelCollection<string>();
+
+        /// <summary>
         /// Major/minor compatible DWC version
         /// </summary>
         public string DwcVersion
