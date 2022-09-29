@@ -48,6 +48,16 @@ namespace DuetAPI.ObjectModel
         private string _filament = string.Empty;
 
         /// <summary>
+        /// Diameter of the corresponding filament (in mm)
+        /// </summary>
+        public float FilamentDiameter
+        {
+            get => _filamentDiameter;
+            set => SetPropertyValue(ref _filamentDiameter, value);
+        }
+        private float _filamentDiameter = 1.75F;
+
+        /// <summary>
         /// Extrusion factor to use (0..1 or greater)
         /// </summary>
         public float Factor

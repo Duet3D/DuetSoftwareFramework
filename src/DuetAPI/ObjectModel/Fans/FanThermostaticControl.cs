@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Thermostatic parameters of a fan
@@ -6,8 +8,9 @@
     public sealed class FanThermostaticControl : ModelObject
     {
         /// <summary>
-        /// List of the heaters to monitor (indices)
+        /// List of heaters to monitor (indices)
         /// </summary>
+        [Obsolete("Use Sensors instead")]
         public ModelCollection<int> Heaters { get; } = new ModelCollection<int>();
         
         /// <summary>
@@ -29,5 +32,10 @@
 			set => SetPropertyValue(ref _lowTemperature, value);
         }
         private float? _lowTemperature;
+
+        /// <summary>
+        /// List of sensors to monitor (indices)
+        /// </summary>
+        public ModelCollection<int> Sensors { get; } = new ModelCollection<int>();
     }
 }

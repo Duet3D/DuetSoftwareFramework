@@ -8,12 +8,52 @@
         /// <summary>
         /// Bitmap of the axis movement controls to show (indices)
         /// </summary>
-        public long AxisControls
+        public long? AxisControls
         {
             get => _axisControls;
             set => SetPropertyValue(ref _axisControls, value);
         }
-        private long _axisControls;
+        private long? _axisControls;
+
+        /// <summary>
+        /// Indicates if a cancel button is supposed to be shown
+        /// </summary>
+        public bool CancelButton
+        {
+            get => _cancelButton;
+            set => SetPropertyValue(ref _cancelButton, value);
+        }
+        private bool _cancelButton;
+
+        /// <summary>
+        /// List of possible choices (only for mode 4)
+        /// </summary>
+        public ModelCollection<string> Choices
+        {
+            get => _choices;
+            set => SetPropertyValue(ref _choices, value);
+        }
+        private ModelCollection<string> _choices;
+
+        /// <summary>
+        /// Default value (only for modes >= 4)
+        /// </summary>
+        public object Default
+        {
+            get => _default;
+            set => SetPropertyValue(ref _default, value);
+        }
+        private object _default;
+
+        /// <summary>
+        /// Maximum input value (only for modes >= 5)
+        /// </summary>
+        public float? Max
+        {
+            get => _max;
+            set => SetPropertyValue(ref _max, value);
+        }
+        private float? _max;
 
         /// <summary>
         /// Content of the message box
@@ -24,6 +64,16 @@
 			set => SetPropertyValue(ref _message, value);
         }
         private string _message = string.Empty;
+
+        /// <summary>
+        /// Minimum input value (only for modes >= 5)
+        /// </summary>
+        public float? Min
+        {
+            get => _min;
+            set => SetPropertyValue(ref _min, value);
+        }
+        private float? _min;
 
         /// <summary>
         /// Mode of the message box to display

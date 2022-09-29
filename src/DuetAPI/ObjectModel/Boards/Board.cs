@@ -232,5 +232,15 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _vIn, value);
         }
         private MinMaxCurrent<float> _vIn;
+
+        /// <summary>
+        /// Filename of the on-board WiFi chip or null if not present
+        /// </summary>
+        public string WifiFirmwareFileName
+        {
+            get => _wifiFirmwareFileName;
+            set => SetPropertyValue(ref _wifiFirmwareFileName, value);
+        }
+        private string _wifiFirmwareFileName;
     }
 }
