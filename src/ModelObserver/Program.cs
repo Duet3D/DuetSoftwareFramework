@@ -10,7 +10,7 @@ namespace ModelObserver
 {
     public static class Program
     {
-        private static async Task Main(string[] args)
+        private static async Task<int> Main(string[] args)
         {
             // Parse the command line arguments
             string lastArg = null, socketPath = Defaults.FullSocketPath, filter = null;
@@ -41,7 +41,7 @@ namespace ModelObserver
                     Console.WriteLine("-c, --confirm: Confirm every JSON receipt manually");
                     Console.WriteLine("-q, --quiet: Do not display when a connection has been established");
                     Console.WriteLine("-h, --help: Display this help text");
-                    return;
+                    return 0;
                 }
                 lastArg = arg;
             }
@@ -55,9 +55,20 @@ namespace ModelObserver
 
             // Connect to DCS
             using SubscribeConnection connection = new();
+            try
+            {
 #pragma warning disable CS0618 // Type or member is obsolete
-            await connection.Connect(SubscriptionMode.Patch, filter, socketPath);
+                await connection.Connect(SubscriptionMode.Patch, filter, socketPath);
 #pragma warning restore CS0618 // Type or member is obsolete
+            }
+            catch (SocketException)
+            {
+                if (!quiet)
+                {
+                    Console.Error.WriteLine("Failed to connect to DCS");
+                }
+                return 1;
+            }
 
             if (!quiet)
             {
@@ -86,6 +97,7 @@ namespace ModelObserver
                 }
             }
             while (true);
+            return 0;
         }
 
         /// <summary>

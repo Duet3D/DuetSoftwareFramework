@@ -179,6 +179,7 @@ namespace DuetAPI.Commands
                             {
                                 // Treat subsequent single-quotes as a single-quite char
                                 value += '\'';
+                                nextCharLowerCase = false;
                             }
                             else
                             {

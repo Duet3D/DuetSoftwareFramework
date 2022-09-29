@@ -8,12 +8,12 @@
         /// <summary>
         /// Action to perform when the trigger condition is met
         /// </summary>
-        public HeaterMonitorAction Action
+        public HeaterMonitorAction? Action
         {
             get => _action;
 			set => SetPropertyValue(ref _action, value);
         }
-        private HeaterMonitorAction _action = HeaterMonitorAction.GenerateFault;
+        private HeaterMonitorAction? _action = HeaterMonitorAction.GenerateFault;
 
         /// <summary>
         /// Condition to meet to perform an action
@@ -28,11 +28,11 @@
         /// <summary>
         /// Limit threshold for this heater monitor
         /// </summary>
-        public float Limit
+        public float? Limit
         {
             get => _limit;
 			set => SetPropertyValue(ref _limit, value);
         }
-        private float _limit = 2000F;
+        private float? _limit = null;
     }
 }

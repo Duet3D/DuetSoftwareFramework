@@ -39,7 +39,7 @@ namespace DuetPiManagementPlugin
             "M587",     // Add WiFi host network to remembered list, or list remembered networks
             "M588",     // Forget WiFi host network
             "M589",     // Configure access point parameters
-            "M999"      // Reboot SBC (priority codes are not handled)
+            "M999"      // Reboot or shutdown SBC (priority codes are not handled)
         };
 
         /// <summary>
@@ -518,7 +518,7 @@ namespace DuetPiManagementPlugin
                         {
                             if (await Connection.Flush(CancellationToken))
                             {
-                                string rebootResult = await Command.Execute("systemctl", "reboot");
+                                string rebootResult = await Command.Execute("systemctl", (code.Parameter('P') == "OFF") ? "poweroff" : "reboot");
                                 await Connection.ResolveCode(MessageType.Success, rebootResult);
                             }
                             else

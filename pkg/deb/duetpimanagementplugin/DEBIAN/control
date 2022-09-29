@@ -4,7 +4,7 @@ Section: electronics
 Priority: standard
 Architecture: TARGET_ARCH
 Depends: duetpluginservice (= DPSVER), duettools (= DCSVER), openssl
-Recommends: proftpd, ssh, telnetd, dnsmasq, hostapd, wpa_supplicant
+Recommends: proftpd, ssh, telnetd, dnsmasq, hostapd, wpasupplicant
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
 Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git

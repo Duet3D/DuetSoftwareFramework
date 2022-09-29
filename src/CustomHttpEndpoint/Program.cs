@@ -36,8 +36,8 @@ namespace CustomHttpEndpoint
         /// Entry point
         /// </summary>
         /// <param name="args">Command-line arguments</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task Main(string[] args)
+        /// <returns>Return code</returns>
+        public static async Task<int> Main(string[] args)
         {
             // Parse the command line arguments
             string lastArg = null, socketPath = Defaults.FullSocketPath, ns = "custom-http-endpoint", path = "demo";
@@ -52,7 +52,7 @@ namespace CustomHttpEndpoint
                     if (!Enum.TryParse(arg, true, out _method))
                     {
                         Console.WriteLine("Error: Invalid HTTP method");
-                        return;
+                        return 2;
                     }
                 }
                 else if (lastArg == "-n" || lastArg == "--namespace")
@@ -87,7 +87,7 @@ namespace CustomHttpEndpoint
                     Console.WriteLine("-a, --args <arguments>: Arguments for the executable command. Query values in % chars are replaced with query options (e.g. %myvalue%). Not applicable for WebSockets");
                     Console.WriteLine("-q, --quiet: Do not display info text");
                     Console.WriteLine("-h, --help: Displays this text");
-                    return;
+                    return 0;
                 }
                 lastArg = arg;
             }
@@ -98,7 +98,18 @@ namespace CustomHttpEndpoint
 
             // Create a new Command connection
             CommandConnection connection = new();
-            await connection.Connect(socketPath);
+            try
+            {
+                await connection.Connect(socketPath);
+            }
+            catch (SocketException)
+            {
+                if (!_quiet)
+                {
+                    Console.Error.WriteLine("Failed to connect to DCS");
+                }
+                return 1;
+            }
 
             // Create a new HTTP GET endpoint and keep listening for new requests
             try
@@ -141,6 +152,7 @@ namespace CustomHttpEndpoint
                     await connection.RemoveHttpEndpoint(_method, ns, path);
                 }
             }
+            return 0;
         }
 
         /// <summary>

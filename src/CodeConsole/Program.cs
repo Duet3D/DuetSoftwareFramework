@@ -9,7 +9,7 @@ namespace CodeConsole
 {
     public static class Program
     {
-        public static async Task Main(string[] args)
+        public static async Task<int> Main(string[] args)
         {
             // Parse the command line arguments
             string lastArg = null, codeToExecute = null, socketPath = Defaults.FullSocketPath;
@@ -35,14 +35,25 @@ namespace CodeConsole
                     Console.WriteLine("-c, --code <code>: Execute the given code(s), wait for the result and exit. Alternative codes: startUpdate (Set DSF to updating), endUpdate (End DSF updating state)");
                     Console.WriteLine("-q, --quiet: Do not output any messages (not applicable for code replies in interactive mode)");
                     Console.WriteLine("-h, --help: Display this help text");
-                    return;
+                    return 0;
                 }
                 lastArg = arg;
             }
 
             // Create a new connection and connect to DuetControlServer
             using CommandConnection connection = new();
-            await connection.Connect(socketPath);
+            try
+            {
+                await connection.Connect(socketPath);
+            }
+            catch (SocketException)
+            {
+                if (!quiet)
+                {
+                    Console.Error.WriteLine("Failed to connect to DCS");
+                }
+                return 1;
+            }
 
             // Check if this is an interactive session
             if (codeToExecute == null)
@@ -145,6 +156,7 @@ namespace CodeConsole
                     }
                 }
             }
+            return 0;
         }
     }
 }

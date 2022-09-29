@@ -11,7 +11,7 @@ namespace CodeLogger
 {
     public static class Program
     {
-        public static async Task Main(string[] args)
+        public static async Task<int> Main(string[] args)
         {
             bool quiet = false, priorityCodes = false;
             CodeChannel[] channels = null;
@@ -55,7 +55,7 @@ namespace CodeLogger
                     Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
                     Console.WriteLine("-q, --quiet: Do not display when a connection has been established");
                     Console.WriteLine("-h, --help: Display this help text");
-                    return;
+                    return 0;
                 }
                 lastArg = arg;
             }
@@ -64,20 +64,31 @@ namespace CodeLogger
             try
             {
                 // Connect to DCS
-                if (types.Contains("pre"))
+                try
                 {
-                    preConnection = new InterceptConnection();
-                    await preConnection.Connect(InterceptionMode.Pre, channels, filters, priorityCodes, socketPath);
+                    if (types.Contains("pre"))
+                    {
+                        preConnection = new InterceptConnection();
+                        await preConnection.Connect(InterceptionMode.Pre, channels, filters, priorityCodes, socketPath);
+                    }
+                    if (types.Contains("post"))
+                    {
+                        postConnection = new InterceptConnection();
+                        await postConnection.Connect(InterceptionMode.Post, channels, filters, priorityCodes, socketPath);
+                    }
+                    if (types.Contains("executed"))
+                    {
+                        executedConnection = new InterceptConnection();
+                        await executedConnection.Connect(InterceptionMode.Executed, channels, filters, priorityCodes, socketPath);
+                    }
                 }
-                if (types.Contains("post"))
+                catch (SocketException)
                 {
-                    postConnection = new InterceptConnection();
-                    await postConnection.Connect(InterceptionMode.Post, channels, filters, priorityCodes, socketPath);
-                }
-                if (types.Contains("executed"))
-                {
-                    executedConnection = new InterceptConnection();
-                    await executedConnection.Connect(InterceptionMode.Executed, channels, filters, priorityCodes, socketPath);
+                    if (!quiet)
+                    {
+                        Console.Error.WriteLine("Failed to connect to DCS");
+                    }
+                    return 1;
                 }
 
                 if (!quiet)
@@ -102,6 +113,7 @@ namespace CodeLogger
                 postConnection?.Dispose();
                 executedConnection?.Dispose();
             }
+            return 0;
         }
 
         private static async Task PrintIncomingCodes(InterceptConnection connection)

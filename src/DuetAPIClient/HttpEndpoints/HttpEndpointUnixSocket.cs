@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 
 namespace DuetAPIClient
 {
@@ -10,6 +11,38 @@ namespace DuetAPIClient
     /// </summary>
     public sealed class HttpEndpointUnixSocket : IDisposable
     {
+        #region Libc access
+        private const string LibcLibrary = "libc";
+
+        [DllImport(LibcLibrary, SetLastError = true, CharSet = CharSet.Ansi)]
+        private static extern int chmod(string pathname, ushort mode);
+
+        const uint GroupRwMode = 0x30;   // 000110000, mode 060
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct statbuf
+        {
+            public uint DeviceID;
+            public uint InodeNumber;
+            public uint Mode;
+            public uint HardLinks;
+            public uint UserID;
+            public uint GroupID;
+            public uint SpecialDeviceID;
+            public ulong Size;
+            public ulong BlockSize;
+            public uint Blocks;
+            public long TimeLastAccess;
+            public long TimeLastModification;
+            public long TimeLastStatusChange;
+        }
+
+        private const int STATVER = 1;
+
+        [DllImport(LibcLibrary, EntryPoint = "__xstat", SetLastError = true, CharSet = CharSet.Ansi)]
+        private static extern int stat(int vers, string pathname, ref statbuf statbuf);
+        #endregion
+
         /// <summary>
         /// Default number of pending connections
         /// </summary>
@@ -63,9 +96,19 @@ namespace DuetAPIClient
             // Create a new UNIX socket and start listening
             try
             {
+                // Create a new UNIX socket
                 UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(socketPath);
                 _unixSocket.Bind(endPoint);
                 _unixSocket.Listen(backlog);
+
+                // Allow the group to write to it
+                statbuf buf = new statbuf();
+                if (stat(STATVER, socketPath, ref buf) == 0)
+                {
+                    chmod(socketPath, (ushort)(buf.Mode | GroupRwMode));
+                }
+
+                // Start listening
                 AcceptConnections();
             }
             catch

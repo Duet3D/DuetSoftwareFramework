@@ -531,8 +531,6 @@ namespace DuetControlServer.Files
                 return;
             }
             IsClosed = true;
-            _reader.Close();
-            _fileStream.Close();
         }
     }
 }

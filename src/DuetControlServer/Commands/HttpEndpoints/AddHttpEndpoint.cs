@@ -44,10 +44,9 @@ namespace DuetControlServer.Commands
                 }
             }
 
-            // Create a UNIX socket file like /var/run/dsf/mynamespace/myaction-GET.sock
+            // Create a UNIX socket file like /run/dsf/mynamespace/myaction-GET.sock
             string socketPath = System.IO.Path.Combine(Settings.SocketDirectory, Namespace, $"{Path}-{EndpointType}.sock");
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(socketPath));
-            // NB: In case plugins are running as a separate user, the file has to be created here and the permissions have to be updated
 
             using (await Model.Provider.AccessReadWriteAsync())
             {
