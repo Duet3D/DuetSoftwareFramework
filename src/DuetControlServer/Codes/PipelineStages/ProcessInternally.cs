@@ -29,7 +29,7 @@ namespace DuetControlServer.Codes.PipelineStages
                 {
                     bool resolved = await code.ProcessInternally();
                     code.Flags |= CodeFlags.IsInternallyProcessed;
-                    await Pipeline.WriteCodeAsync(code, resolved ? Codes.PipelineStage.Executed : Codes.PipelineStage.ProcessInternally);
+                    await Pipeline.WriteCodeAsync(code, resolved ? Codes.PipelineStage.Executed : Codes.PipelineStage.Post);
                 }
                 catch (Exception e)
                 {

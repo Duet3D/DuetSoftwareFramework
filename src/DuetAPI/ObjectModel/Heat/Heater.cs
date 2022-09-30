@@ -62,6 +62,36 @@
         private float _min = -10F;
 
         /// <summary>
+        /// Maximum number of consecutive temperature reading failures before a heater fault is raised
+        /// </summary>
+        public int MaxBadReadings
+        {
+            get => _maxBadReadings;
+            set => SetPropertyValue(ref _maxBadReadings, value);
+        }
+        private int _maxBadReadings = 3;
+
+        /// <summary>
+        /// Time for which a temperature anomaly must persist on this heater before raising a heater fault (in s)
+        /// </summary>
+        public int MaxHeatingFaultTime
+        {
+            get => _maxHeatingFaultTime;
+            set => SetPropertyValue(ref _maxHeatingFaultTime, value);
+        }
+        private int _maxHeatingFaultTime = 5;
+
+        /// <summary>
+        /// Permitted temperature excursion from the setpoint for this heater (in K)
+        /// </summary>
+        public float MaxTempExcursion
+        {
+            get => _maxTempExcursion;
+            set => SetPropertyValue(ref _maxTempExcursion, value);
+        }
+        private float _maxTempExcursion = 15F;
+
+        /// <summary>
         /// Information about the heater model
         /// </summary>
         public HeaterModel Model { get; } = new HeaterModel();

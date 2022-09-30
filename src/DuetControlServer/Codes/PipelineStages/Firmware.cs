@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using DuetControlServer.Commands;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.PipelineStages
 {
@@ -14,6 +15,18 @@ namespace DuetControlServer.Codes.PipelineStages
         /// </summary>
         /// <param name="pipeline">Corresponding pipeline</param>
         public Firmware(Pipeline pipeline) : base(Codes.PipelineStage.Firmware, pipeline) { }
+
+        /// <summary>
+        /// Wait for the pipeline stage to become idle
+        /// </summary>
+        /// <param name="code">Code waiting for the flush</param>
+        /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
+        /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public override Task<bool> FlushAsync(Code code, bool evaluateExpressions = true, bool evaluateAll = true)
+        {
+            return SPI.Interface.FlushAsync(code, evaluateExpressions, evaluateAll);
+        }
 
         /// <summary>
         /// Process an incoming code

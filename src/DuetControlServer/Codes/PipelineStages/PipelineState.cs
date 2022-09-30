@@ -1,7 +1,7 @@
-﻿using DuetControlServer.FileExecution;
+﻿using DuetControlServer.Commands;
+using DuetControlServer.FileExecution;
 using Nito.AsyncEx;
 using System;
-using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
@@ -22,7 +22,7 @@ namespace DuetControlServer.Codes.PipelineStages
         {
             if (stage.Stage != Codes.PipelineStage.Executed)
             {
-                PendingCodes = Channel.CreateBounded<Commands.Code>(new BoundedChannelOptions(Settings.MaxCodesPerInput)
+                PendingCodes = Channel.CreateBounded<Code>(new BoundedChannelOptions(Settings.MaxCodesPerInput)
                 {
                     FullMode = BoundedChannelFullMode.Wait,
                     SingleReader = true,
@@ -31,7 +31,7 @@ namespace DuetControlServer.Codes.PipelineStages
             }
             else
             {
-                PendingCodes = Channel.CreateUnbounded<Commands.Code>(new UnboundedChannelOptions()
+                PendingCodes = Channel.CreateUnbounded<Code>(new UnboundedChannelOptions()
                 {
                     SingleReader = true,
                     SingleWriter = false
@@ -44,11 +44,16 @@ namespace DuetControlServer.Codes.PipelineStages
             {
                 ProcessorTask = Task.Factory.StartNew(async delegate
                 {
-                    await foreach (Commands.Code code in PendingCodes.Reader.ReadAllAsync(Program.CancellationToken))
+                    await foreach (Code code in PendingCodes.Reader.ReadAllAsync(Program.CancellationToken))
                     {
+                        if (code.CancellationToken.IsCancellationRequested && stage.Stage != Codes.PipelineStage.Executed)
+                        {
+                            Processor.CancelCode(code);
+                            continue;
+                        }
+
                         lock (this)
                         {
-                            Busy = true;
                             CodeBeingExecuted = code;
                         }
 
@@ -81,7 +86,7 @@ namespace DuetControlServer.Codes.PipelineStages
         /// <summary>
         /// Pending codes per channel
         /// </summary>
-        public readonly Channel<Commands.Code> PendingCodes;
+        public readonly Channel<Code> PendingCodes;
 
         /// <summary>
         /// Macro of the corresponding 
@@ -116,13 +121,38 @@ namespace DuetControlServer.Codes.PipelineStages
         /// <summary>
         /// Current code being executed
         /// </summary>
-        public Commands.Code CodeBeingExecuted;
+        public Code CodeBeingExecuted;
 
         /// <summary>
         /// Wait for the pipeline state to finish processing codes
         /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
+        /// <param name="code">Code waiting for the flush</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public async Task<bool> FlushAsync(Code code)
+        {
+            try
+            {
+                await _idleEvent.WaitAsync((code != null) ? code.CancellationToken : Program.CancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Enqueue a given code asynchrously on this pipeline state for execution
+        /// </summary>
+        /// <param name="code">Code to enqueue</param>
         /// <returns>Asynchronous task</returns>
-        public Task WaitForIdleAsync(CancellationToken cancellationToken) => _idleEvent.WaitAsync(cancellationToken);
+        public ValueTask WriteCodeAsync(Code code)
+        {
+            lock (this)
+            {
+                Busy = true;
+            }
+            return PendingCodes.Writer.WriteAsync(code, code.CancellationToken);
+        }
     }
 }

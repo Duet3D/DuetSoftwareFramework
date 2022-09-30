@@ -1,17 +1,16 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetWebServer.Utility
 {
-	/// <summary>
-	/// Functions for CRC32 calculation
-	/// </summary>
-	/// <remarks>
-	/// The internals of this class originate from Crc32.NET, see https://github.com/force-net/Crc32.NET
-	/// </remarks>
-	public static class CRC32
+    /// <summary>
+    /// Functions for CRC32 calculation
+    /// </summary>
+    /// <remarks>
+    /// The internals of this class originate from Crc32.NET, see https://github.com/force-net/Crc32.NET
+    /// </remarks>
+    public static class CRC32
     {
         private const uint Poly = 0xedb88320u;
 

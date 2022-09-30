@@ -226,7 +226,7 @@ namespace DuetControlServer.Commands
                     break;
             }
 
-            if (Result != null && Keyword == KeywordType.None)
+            if (Result != null)
             {
                 return true;
             }

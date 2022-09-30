@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.PipelineStages
@@ -127,21 +126,24 @@ namespace DuetControlServer.Codes.PipelineStages
         /// <summary>
         /// Wait for the pipeline stage to become idle
         /// </summary>
-        /// <returns></returns>
-        public Task WaitForIdleAsync(Macro macro, CancellationToken cancellationToken)
+        /// <param name="code">Code waiting for the flush</param>
+        /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
+        /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public virtual Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true)
         {
             lock (_states)
             {
                 foreach (PipelineState state in _states)
                 {
-                    if (state.Macro == macro)
+                    if (state.Macro == code.Macro)
                     {
-                        return state.WaitForIdleAsync(cancellationToken);
+                        return state.FlushAsync(code);
                     }
                 }
 
-                Pipeline.Logger.Warn("Failed to find corresponding state for wait request, falling back to top state");
-                return _states.Peek().WaitForIdleAsync(cancellationToken);
+                Pipeline.Logger.Warn("Failed to find corresponding state for flush request, falling back to top state");
+                return _states.Peek().FlushAsync(code);
             }
         }
 
@@ -153,14 +155,14 @@ namespace DuetControlServer.Codes.PipelineStages
         public abstract Task ProcessCodeAsync(Commands.Code code);
 
         /// <summary>
-        /// Execute a given code on this pipeline stage.
+        /// Enqueue a given code on this pipeline state for execution.
         /// This should not be used unless the corresponding code channel is unbounded
         /// </summary>
         /// <param name="code">Code to enqueue</param>
         public virtual void WriteCode(Commands.Code code) => throw new NotSupportedException();
 
         /// <summary>
-        /// Execute a given code on this pipeline stage
+        /// Enqueue a given code asynchronousl;y on this pipeline state for execution
         /// </summary>
         /// <param name="code">Code to enqueue</param>
         /// <returns>Asynchronous task</returns>
@@ -172,7 +174,7 @@ namespace DuetControlServer.Codes.PipelineStages
                 {
                     if (state.Macro == code.Macro)
                     {
-                        return state.PendingCodes.Writer.WriteAsync(code);
+                        return state.WriteCodeAsync(code);
                     }
                 }
             }

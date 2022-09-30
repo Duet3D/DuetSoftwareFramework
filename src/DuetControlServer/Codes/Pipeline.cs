@@ -1,5 +1,4 @@
 ﻿using DuetAPI;
-using DuetAPI.Connection;
 using DuetControlServer.FileExecution;
 using System;
 using System.Linq;
@@ -144,9 +143,15 @@ namespace DuetControlServer.Codes
         {
             foreach (PipelineStages.PipelineStage stage in _stages)
             {
-                await stage.WaitForIdleAsync(null, Program.CancellationToken);
+                Logger.Debug("Flushing codes on stage {0}", stage);
+                if (!await stage.FlushAsync(null))
+                {
+                    Logger.Debug("Failed to flush codes on stage {0}", stage);
+                    return false;
+                }
+                Logger.Debug("Flushed codes on stage {0}", stage);
             }
-            return await SPI.Interface.FlushAsync(Channel);
+            return true;
         }
 
         /// <summary>
@@ -163,12 +168,16 @@ namespace DuetControlServer.Codes
             {
                 if (code.Stage == PipelineStage.Executed || stage > code.Stage)
                 {
-                    Logger.Debug("Awaiting idle on stage {0} for {1}", stage, code);
-                    await _stages[(int)stage].WaitForIdleAsync(code.Macro, code.CancellationToken);
-                    Logger.Debug("Awaited idle on stage {0} for {1}", stage, code);
+                    Logger.Debug("Flushing codes on stage {0} for {1}", stage, code);
+                    if (!await _stages[(int)stage].FlushAsync(code, evaluateExpressions, evaluateAll))
+                    {
+                        Logger.Debug("Failed to flush codes on stage {0} for {1}", stage, code);
+                        return false;
+                    }
+                    Logger.Debug("Flushed codes on stage {0} for {1}", stage, code);
                 }
             }
-            return await SPI.Interface.FlushAsync(code, evaluateExpressions, evaluateAll);
+            return true;
         }
 
         /// <summary>
@@ -176,13 +185,23 @@ namespace DuetControlServer.Codes
         /// This should not be used unless the corresponding code channel is unbounded
         /// </summary>
         /// <param name="code">Code to enqueue</param>
-        public void WriteCode(Commands.Code code, PipelineStage stage) => _stages[(int)stage].WriteCode(code);
+        public void WriteCode(Commands.Code code, PipelineStage stage)
+        {
+            //Logger.Debug("Sending code {0} to stage {1}", code, stage);
+            _stages[(int)stage].WriteCode(code);
+            //Logger.Debug("Sent code {0} to stage {1}", code, stage);
+        }
 
         /// <summary>
         /// Execute a given code on a given pipeline stage
         /// </summary>
         /// <param name="code">Code to enqueue</param>
         /// <param name="stage">Stage level to enqueue it at</param>
-        public ValueTask WriteCodeAsync(Commands.Code code, PipelineStage stage) => _stages[(int)stage].WriteCodeAsync(code);
+        public async ValueTask WriteCodeAsync(Commands.Code code, PipelineStage stage)
+        {
+            //Logger.Debug("Sending code {0} to stage {1}", code, stage);
+            await _stages[(int)stage].WriteCodeAsync(code);
+            //Logger.Debug("Sent code {0} to stage {1}", code, stage);
+        }
     }
 }

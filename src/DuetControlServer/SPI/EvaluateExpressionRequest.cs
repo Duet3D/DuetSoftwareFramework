@@ -49,17 +49,17 @@ namespace DuetControlServer.SPI
         /// Set the result of the evaluated expression
         /// </summary>
         /// <param name="result">Result to set</param>
-        public void SetResult(object result) => _tcs.SetResult(result);
+        public void SetResult(object result) => _tcs.TrySetResult(result);
 
         /// <summary>
         /// Set the task to canceled
         /// </summary>
-        public void SetCanceled() => _tcs.SetCanceled();
+        public void SetCanceled() => _tcs.TrySetCanceled();
 
         /// <summary>
         /// Set an exception for the task
         /// </summary>
         /// <param name="exception">Exception to set</param>
-        public void SetException(Exception exception) => _tcs.SetException(exception);
+        public void SetException(Exception exception) => _tcs.TrySetException(exception);
     }
 }
