@@ -78,7 +78,7 @@ namespace DuetHttpClient.Connector
             if (connectResponse.IsEmulated)
             {
                 // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
-                throw new OperationCanceledException("HTTP backend is emulated");
+                throw new HttpRequestException("HTTP backend is emulated");
             }
 
             if (connectResponse.ApiLevel < MinApiLevel)
