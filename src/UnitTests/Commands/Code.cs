@@ -364,6 +364,17 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseApostropheM32()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M32 \"C ''t H, , . ., ''T H.gcode\""))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(32, code.MajorNumber);
+                Assert.AreEqual("C 't H, , . ., 'T H.gcode", code.GetUnprecedentedString());
+            }
+        }
+
+        [Test]
         public void ParseUnquotedM32()
         {
             foreach (DuetAPI.Commands.Code code in Parse("M32 foo bar.g"))

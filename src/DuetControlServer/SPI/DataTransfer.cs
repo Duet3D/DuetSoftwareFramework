@@ -1411,11 +1411,13 @@ namespace DuetControlServer.SPI
                     throw new OperationCanceledException("SPI data transfer failed");
                 }
 
-                // Read received header
+                // Read received header and verify the format code
                 _rxHeader = MemoryMarshal.Read<TransferHeader>(_rxHeaderBuffer.Span);
                 if (_rxHeader.FormatCode == 0 || _rxHeader.FormatCode == 0xFF)
                 {
-                    throw new OperationCanceledException("Board is not available (no header)");
+                    _logger.Warn("Restarting full transfer because a bad header format code was received (0x{0:x2})", _rxHeader.FormatCode);
+                    ExchangeResponse(TransferResponse.BadResponse);
+                    return false;
                 }
 
                 // Change the protocol version if necessary
@@ -1524,9 +1526,6 @@ namespace DuetControlServer.SPI
                     case TransferResponse.BadResponse:
                         _logger.Warn("Restarting full transfer because RepRapFirmware received a bad header response");
                         return false;
-                    case TransferResponse.LowPin:
-                    case TransferResponse.HighPin:
-                        throw new OperationCanceledException("Board is not available (no header response)");
                     default:
                         _logger.Warn("Restarting full transfer because a bad header response was received (0x{0:x8})", response);
                         if (_rxHeader.DataLength == 0 && _txPointer == 0)
@@ -1655,9 +1654,6 @@ namespace DuetControlServer.SPI
                         _logger.Warn("Restarting full transfer because RepRapFirmware received a bad data response");
                         success = false;
                         return true;
-                    case TransferResponse.LowPin:
-                    case TransferResponse.HighPin:
-                        throw new OperationCanceledException("Board is not available (no data response)");
                     default:
                         _logger.Warn("Restarting data response exchange because a bad code was received (0x{0:x8})", response);
                         ExchangeResponse(TransferResponse.BadResponse);

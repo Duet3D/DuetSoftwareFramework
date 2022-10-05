@@ -20,6 +20,9 @@ namespace UnitTests.HttpClient
         [OneTimeSetUp]
         public async Task Connect()
         {
+            // It may be necessary to assign an error handler first so that JSON errors are caught and the ObjectModel test completes
+            DuetAPI.ObjectModel.ObjectModel.OnDeserializationFailed += delegate { };
+
             // This has to be changed depending on the test setup.
             // The IP address must be either a Duet (standalone mode) or a SBC running DSF (SBC mode)
             session = await DuetHttpSession.ConnectAsync(new("http://ender3pro"));

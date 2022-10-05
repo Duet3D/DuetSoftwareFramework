@@ -92,7 +92,7 @@ namespace DuetWebServer.Middleware
 
             if (httpEndpoint != null)
             {
-                // Cnnect to the given UNIX socket endpoint
+                // Connect to the given UNIX socket endpoint
                 using HttpEndpointConnection endpointConnection = new();
                 endpointConnection.Connect(httpEndpoint.UnixSocket);
 

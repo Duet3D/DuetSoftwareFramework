@@ -93,11 +93,11 @@
         /// <summary>
         /// Standard voltage or null if unknown
         /// </summary>
-        public float? StandardVoltage
+        public float StandardVoltage
         {
             get => _standardVoltage;
 			set => SetPropertyValue(ref _standardVoltage, value);
         }
-        private float? _standardVoltage;
+        private float _standardVoltage;
     }
 }

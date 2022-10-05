@@ -16,6 +16,7 @@ This plugin provides system management functions using regular RepRapFirmware M-
 - `M588` Forget WiFi host network
 - `M589` Configure access point parameters
 - `M999 B-1` Reboot SBC
+- `M999 B-1 P"OFF"` Shut down SBC
 
 ## Requirements
 

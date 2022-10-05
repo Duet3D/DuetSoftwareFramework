@@ -4,7 +4,7 @@ Section: electronics
 Priority: standard
 Architecture: TARGET_ARCH
 Depends: duetsoftwareframework (>= 3.3), duetcontrolserver (= DCSVER)
-Recommends: apparmor
+Recommends: apparmor, python3-pip
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
 Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git

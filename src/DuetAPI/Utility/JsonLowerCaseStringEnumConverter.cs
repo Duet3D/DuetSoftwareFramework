@@ -56,7 +56,14 @@ namespace DuetAPI.Utility
                 }
                 if (reader.TokenType == JsonTokenType.String)
                 {
-                    return (T)Enum.Parse(typeToConvert, reader.GetString(), true);
+                    try
+                    {
+                        return (T)Enum.Parse(typeToConvert, reader.GetString(), true);
+                    }
+                    catch (ArgumentException ae)
+                    {
+                        throw new JsonException("Failed to deserialize lowercase enum value", ae);
+                    }
                 }
                 throw new JsonException($"Invalid {typeToConvert.Name}");
             }

@@ -89,7 +89,7 @@ namespace DuetPluginService
         /// <summary>
         /// Command to install third-party Python packages
         /// </summary>
-        public static string InstallPythonPackageCommand { get; set; } = "/usr/bin/pip";
+        public static string InstallPythonPackageCommand { get; set; } = "/usr/bin/pip3";
 
         /// <summary>
         /// Command-line arguments to install third-party Python packages
