@@ -386,7 +386,7 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
-        /// PUT /machine/file/{filename}
+        /// PUT /machine/file/{filename}?timeModified={timeModified}
         /// Upload a file from the HTTP body and create the subdirectories if necessary
         /// </summary>
         /// <param name="filename">Destination of the file to upload</param>
@@ -401,7 +401,7 @@ namespace DuetWebServer.Controllers
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPut("file/{*filename}")]
-        public async Task<IActionResult> UploadFile(string filename, [FromServices] ISessionStorage sessionStorage)
+        public async Task<IActionResult> UploadFile(string filename, DateTime? timeModified, [FromServices] ISessionStorage sessionStorage)
         {
             filename = HttpUtility.UrlDecode(filename);
 
@@ -425,6 +425,13 @@ namespace DuetWebServer.Controllers
                     {
                         await Request.Body.CopyToAsync(stream);
                     }
+
+                    // Change the datetime of the file if possible
+                    if (timeModified != null)
+                    {
+                        System.IO.File.SetLastWriteTime(resolvedPath, timeModified.Value);
+                    }
+
                     return Created(HttpUtility.UrlPathEncode(filename), null);
                 }
                 finally

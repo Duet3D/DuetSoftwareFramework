@@ -137,6 +137,13 @@ paths:
                   required: true
                   schema:
                       type: string
+                - name: timeModified
+                  in: query
+                  description: Optional timestamp of the file
+                  required: false
+                  schema:
+                    type: string
+                    format: date-time
             requestBody:
                 description: 'Content of the file to upload'
                 content:
