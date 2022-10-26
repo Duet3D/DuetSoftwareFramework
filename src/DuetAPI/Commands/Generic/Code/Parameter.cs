@@ -169,6 +169,38 @@ namespace DuetAPI.Commands
                     IsExpression = true;
                 }
             }
+            else if (value is int intValue)
+            {
+                StringValue = intValue.ToString("G", CultureInfo.InvariantCulture);
+            }
+            else if (value is uint uintValue)
+            {
+                StringValue = uintValue.ToString("G", CultureInfo.InvariantCulture);
+            }
+            else if (value is float floatValue)
+            {
+                StringValue = floatValue.ToString("G", CultureInfo.InvariantCulture);
+            }
+            else if (value is long longValue)
+            {
+                StringValue = longValue.ToString("G", CultureInfo.InvariantCulture);
+            }
+            else if (value is int[] intArray)
+            {
+                StringValue = string.Join(':', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture)));
+            }
+            else if (value is uint[] uintArray)
+            {
+                StringValue = string.Join(':', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture)));
+            }
+            else if (value is float[] floatArray)
+            {
+                StringValue = string.Join(':', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture)));
+            }
+            else if (value is long[] longArray)
+            {
+                StringValue = string.Join(':', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture)));
+            }
             else
             {
                 StringValue = value.ToString();
