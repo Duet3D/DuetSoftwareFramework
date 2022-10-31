@@ -411,13 +411,13 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Lock the move module and wait for standstill
+        /// Lock all movement systems and wait for standstill
         /// </summary>
         /// <param name="channel">Code channel acquiring the lock</param>
         /// <returns>Disposable lock object that releases the lock when disposed</returns>
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         /// <exception cref="OperationCanceledException">Failed to get movement lock</exception>
-        public static async Task<IAsyncDisposable> LockMovementAndWaitForStandstill(CodeChannel channel)
+        public static async Task<IAsyncDisposable> LockAllMovementSystemsAndWaitForStandstill(CodeChannel channel)
         {
             Program.CancellationToken.ThrowIfCancellationRequested();
             if (Settings.NoSpi)
@@ -428,7 +428,7 @@ namespace DuetControlServer.SPI
             Task<bool> lockTask;
             using (await _channels[channel].LockAsync())
             {
-                lockTask = _channels[channel].LockMovementAndWaitForStandstill();
+                lockTask = _channels[channel].LockAllMovementSystemsAndWaitForStandstill();
             }
 
             if (await lockTask)
@@ -907,7 +907,7 @@ namespace DuetControlServer.SPI
             {
                 case Request.ResendPacket:
                     DataTransfer.ResendPacket(packet, out Communication.SbcRequests.Request sbcRequest);
-                    if (sbcRequest != Communication.SbcRequests.Request.LockMovementAndWaitForStandstill)
+                    if (sbcRequest != Communication.SbcRequests.Request.LockAllMovementSystemsAndWaitForStandstill)
                     {
                         // It's expected that RRF will need a moment to lock the movement but report other resend requests
                         _logger.Warn("Resending packet #{0} (request {1})", packet.Id, sbcRequest);

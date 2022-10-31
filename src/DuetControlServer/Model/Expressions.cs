@@ -1,9 +1,12 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Commands;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
@@ -15,6 +18,63 @@ namespace DuetControlServer.Model
     /// </summary>
     public static class Expressions
     {
+        /// <summary>
+        /// Delegate for asynchronously resolving custom meta G-code fuctions
+        /// </summary>
+        /// <param name="functionName">Name of the function</param>
+        /// <param name="argument">Function arguments</param>
+        /// <returns>Result value</returns>
+        public delegate Task<object> CustomAsyncFunctionResolver(string functionName, object argument);
+
+        /// <summary>
+        /// Dictionary of custom meta G-code functions vs. async resolvers
+        /// </summary>
+        public static Dictionary<string, CustomAsyncFunctionResolver> CustomFunctions { get; } = new();
+
+        /// <summary>
+        /// Try to get the last function from a string builder and if applicable a custom function handler
+        /// </summary>
+        /// <param name="lastExpression">Last full expression before the next round brace</param>
+        /// <param name="lastFunction">Last function name</param>
+        /// <param name="wantsCount">If the function name is prefixed with a #</param>
+        /// <param name="fn">Asynchronous function handler if applicable</param>
+        /// <returns>If any handler could be found</returns>
+        private static bool TryGetCustomFunction(string lastExpression, out string lastFunction, out bool wantsCount, out CustomAsyncFunctionResolver fn)
+        {
+            // Read the last valid function
+            lastFunction = string.Empty;
+            wantsCount = false;
+            bool fnComplete = false;
+            for (int i = lastExpression.Length - 1; i >= 0; i--)
+            {
+                char c = lastExpression[i];
+                if (char.IsLetterOrDigit(c) || c == '.' || c == '_')
+                {
+                    if (fnComplete)
+                    {
+                        break;
+                    }
+                    lastFunction = c + lastFunction;
+                }
+                else if (c == '#')
+                {
+                    wantsCount = true;
+                    break;
+                }
+                else if (char.IsWhiteSpace(c))
+                {
+                    fnComplete = true;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            // Try to get the corresponding function
+            return CustomFunctions.TryGetValue(lastFunction, out fn);
+        }
+
         /// <summary>
         /// Split an echo expression separated by commas
         /// </summary>
@@ -79,7 +139,7 @@ namespace DuetControlServer.Model
             {
                 foreach (string expression in SplitExpression(code.KeywordArgument))
                 {
-                    if (ContainsSbcFields(expression, code))
+                    if (ContainsSbcFields(expression))
                     {
                         return true;
                     }
@@ -90,13 +150,13 @@ namespace DuetControlServer.Model
             // Conditional code
             if (code.Keyword != KeywordType.None && code.KeywordArgument != null)
             {
-                return ContainsSbcFields(code.KeywordArgument, code);
+                return ContainsSbcFields(code.KeywordArgument);
             }
 
             // Regular G/M/T-code
             foreach (CodeParameter parameter in code.Parameters)
             {
-                if (parameter.IsExpression && ContainsSbcFields(parameter, code))
+                if (parameter.IsExpression && ContainsSbcFields(parameter))
                 {
                     return true;
                 }
@@ -111,115 +171,62 @@ namespace DuetControlServer.Model
         /// <param name="code">Code for providing potential exception details</param>
         /// <returns>Whether the expressions contains any SBC object model fields</returns>
         /// <exception cref="CodeParserException">Failed to parse expression</exception>
-        private static bool ContainsSbcFields(string expression, Code code)
+        private static bool ContainsSbcFields(string expression)
         {
-            Stack<char> lastBracketTypes = new();
-            Stack<StringBuilder> parsedExpressions = new();
-            parsedExpressions.Push(new StringBuilder());
-
-            bool inQuotes = false;
-            char lastC = '\0';
+            bool inQuotes = false, clearToken = false;
+            StringBuilder lastExpression = new();
             foreach (char c in expression)
             {
                 if (inQuotes)
                 {
-                    if (lastC != '"' && c == '"')
-                    {
-                        inQuotes = false;
-                    }
-                    parsedExpressions.Peek().Append(c);
+                    inQuotes = (c != '"');
                 }
                 else if (c == '"')
                 {
                     inQuotes = true;
                 }
-                else if (c == '{' || c == '(' || c == '[')
+                else if (char.IsLetterOrDigit(c) || c == '.' || c == '_')
                 {
-                    lastBracketTypes.Push(c);
-                    parsedExpressions.Push(new StringBuilder());
-                }
-                else if (c == '}' || c == ')' || c == ']')
-                {
-                    if (lastBracketTypes.TryPop(out char lastBracketType))
+                    if (clearToken)
                     {
-                        if ((lastBracketType == '{' && c != '}') ||
-                            (lastBracketType == '(' && c != ')') ||
-                            (lastBracketType == '[' && c != ']'))
-                        {
-                            if (c == '}')
-                            {
-                                throw new CodeParserException("Unexpected curly bracket", code);
-                            }
-                            if (c == ')')
-                            {
-                                throw new CodeParserException("Unexpected round bracket", code);
-                            }
-                            throw new CodeParserException("Unexpected square bracket", code);
-                        }
-
-                        string subExpression = parsedExpressions.Pop().ToString();
-                        if (IsSbcExpression(subExpression))
-                        {
-                            return true;
-                        }
+                        lastExpression.Clear();
+                        clearToken = false;
                     }
-                    else
-                    {
-                        if (c == '}')
-                        {
-                            throw new CodeParserException("Unexpected curly bracket", code);
-                        }
-                        if (c == ')')
-                        {
-                            throw new CodeParserException("Unexpected round bracket", code);
-                        }
-                        throw new CodeParserException("Unexpected square bracket", code);
-                    }
+                    lastExpression.Append(c);
                 }
-                else if (c == '.' || char.IsLetter(c))
+                else if (!char.IsWhiteSpace(c))
                 {
-                    parsedExpressions.Peek().Append(c);
-                }
-                else if (!char.IsDigit(c) && parsedExpressions.Peek().Length > 0)
-                {
-                    string subExpression = parsedExpressions.Peek().ToString();
-                    if (IsSbcExpression(subExpression))
+                    if (lastExpression.Length > 0 && IsSbcExpression(lastExpression.ToString(), c == '('))
                     {
                         return true;
                     }
-                    parsedExpressions.Peek().Clear();
+                    lastExpression.Clear();
                 }
-                lastC = c;
-            }
-
-            if (inQuotes)
-            {
-                throw new CodeParserException("Unterminated quotes", code);
-            }
-
-            if (lastBracketTypes.TryPeek(out char lastBracket))
-            {
-                if (lastBracket == '{')
+                else
                 {
-                    throw new CodeParserException("Unterminated curly bracket", code);
+                    // Expressions may be "sin (3)" but in case we encounter "foo sin (3)"
+                    // we must make sure our parser does not read "foosin(3)" but only "sin(3)"
+                    clearToken = true;
                 }
-                if (lastBracket == '(')
-                {
-                    throw new CodeParserException("Unterminated round bracket", code);
-                }
-                throw new CodeParserException("Unterminated square bracket", code);
             }
 
-            return IsSbcExpression(parsedExpressions.Peek().ToString());
+            return (lastExpression.Length > 0 && IsSbcExpression(lastExpression.ToString(), false));
         }
 
         /// <summary>
         /// Checks if the given expression without indices is a SBC object model field
         /// </summary>
         /// <param name="expression">Expression without indices to check</param>
+        /// <param name="isFunction">Expression is followed by an opening brace, check only if it is a custom function</param>
         /// <returns>Whether the given expression is a SBC object model field</returns>
-        public static bool IsSbcExpression(string expression)
+        public static bool IsSbcExpression(string expression, bool isFunction)
         {
+            // Check for functions
+            if (isFunction)
+            {
+                return CustomFunctions.ContainsKey(expression);
+            }
+
             // Check for special variables
             if (expression == "iterations" || expression == "line" || expression == "result")
             {
@@ -229,7 +236,7 @@ namespace DuetControlServer.Model
             // We neither read from nor write data to the OM so don't care about locking it
             ModelObject model = Provider.Get;
 
-            foreach (string pathItem in expression.Split('.'))
+            foreach (string pathItem in expression.Split('.', '['))
             {
                 if (model.JsonProperties.TryGetValue(pathItem, out PropertyInfo property))
                 {
@@ -367,6 +374,11 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
+        /// Used only internally by the following function
+        /// </summary>
+        private static readonly object _nullResult = new();
+
+        /// <summary>
         /// Evaluate expression(s)
         /// </summary>
         /// <param name="code">Code holding the expression(s)</param>
@@ -377,145 +389,35 @@ namespace DuetControlServer.Model
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
         public static async Task<string> EvaluateExpression(Code code, string expression, bool onlySbcFields, bool encodeResult)
         {
-            Stack<char> lastBracketTypes = new();
-            Stack<StringBuilder> parsedExpressions = new();
-            parsedExpressions.Push(new StringBuilder());
+            int i = 0;
 
-            bool inQuotes = false;
-            char lastC = '\0';
-            foreach (char c in expression)
+            // Eat a double-quoted string and append its content to the given builder instance
+            void eatString(StringBuilder builder)
             {
-                if (inQuotes)
+                builder.Append('"');
+                while (i < expression.Length)
                 {
-                    if (lastC != '"' && c == '"')
-                    {
-                        inQuotes = false;
-                    }
-                    parsedExpressions.Peek().Append(c);
-                }
-                else if (c == '"')
-                {
-                    inQuotes = true;
-                    parsedExpressions.Peek().Append(c);
-                }
-                else if (c == '{' || c == '(' || c == '[')
-                {
-                    lastBracketTypes.Push(c);
-                    parsedExpressions.Push(new StringBuilder());
-                }
-                else if (c == '}' || c == ')' || c == ']')
-                {
-                    if (lastBracketTypes.TryPop(out char lastBracketType))
-                    {
-                        char expectedBracketType = lastBracketType switch
-                        {
-                            '{' => '}',
-                            '(' => ')',
-                            _   => ']'
-                        };
+                    char c = expression[i++];
+                    builder.Append(c);
 
-                        if (c != expectedBracketType)
-                        {
-                            if (c == '}')
-                            {
-                                throw new CodeParserException("Unexpected curly bracket", code);
-                            }
-                            if (c == ')')
-                            {
-                                throw new CodeParserException("Unexpected round bracket", code);
-                            }
-                            throw new CodeParserException("Unexpected square bracket", code);
-                        }
-
-                        string subExpression = parsedExpressions.Pop().ToString().Trim();
-                        string evaluationResult = await EvaluateSubExpression(code, subExpression, lastBracketType == '(' || onlySbcFields, true);
-                        if (lastBracketType == '(' || lastBracketType == '[' || subExpression == evaluationResult || onlySbcFields)
-                        {
-                            parsedExpressions.Peek().Append(lastBracketType);
-                            parsedExpressions.Peek().Append(evaluationResult);
-                            parsedExpressions.Peek().Append(expectedBracketType);
-                        }
-                        else
-                        {
-                            parsedExpressions.Peek().Append(evaluationResult);
-                        }
-                    }
-                    else
+                    if ((c == '"') && (i >= expression.Length || expression[i] != '"'))
                     {
-                        throw new CodeParserException($"Unexpected '{c}'", code);
+                        // end of string
+                        return;
                     }
                 }
-                else
-                {
-                    parsedExpressions.Peek().Append(c);
-                }
-                lastC = c;
-            }
-
-            if (inQuotes && lastC != '"')
-            {
                 throw new CodeParserException("Unterminated quotes", code);
             }
 
-            if (lastBracketTypes.TryPeek(out char lastBracket))
+            // Finish a token before appending it to the resulting expression
+            async Task appendToken(StringBuilder result, StringBuilder lastToken)
             {
-                if (lastBracket == '{')
-                {
-                    throw new CodeParserException("Unterminated curly bracket", code);
-                }
-                if (lastBracket == '(')
-                {
-                    throw new CodeParserException("Unterminated round bracket", code);
-                }
-                throw new CodeParserException("Unterminated square bracket", code);
-            }
+                string lastTokenValue = lastToken.ToString();
+                lastToken.Clear();
 
-            return await EvaluateSubExpression(code, parsedExpressions.Pop().ToString().Trim(), onlySbcFields, encodeResult);
-        }
-
-        /// <summary>
-        /// Evaluate a sub-expression
-        /// </summary>
-        /// <param name="code">Code holding the sub-expression</param>
-        /// <param name="expression">Expression to evaluate</param>
-        /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
-        /// <param name="encodeResult">Whether the final result shall be encoded</param>
-        /// <returns>String result or the expression</returns>
-        /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
-        private static async Task<string> EvaluateSubExpression(Code code, string expression, bool onlySbcFields, bool encodeResult)
-        {
-            StringBuilder result = new(), partialExpression = new();
-            bool inQuotes = false;
-
-            char lastC = '\0';
-            for (int i = 0; i <= expression.Length; i++)
-            {
-                char c = (i < expression.Length) ? expression[i] : '\0';
-                if (inQuotes)
+                switch (lastTokenValue.Trim())
                 {
-                    if (lastC != '"' && c == '"')
-                    {
-                        inQuotes = false;
-                    }
-                    if (c != '\0')
-                    {
-                        result.Append(c);
-                    }
-                }
-                else if (c == '"')
-                {
-                    inQuotes = true;
-                    result.Append(c);
-                }
-                else if (c == '#' || c == '.' || c == '[' || c == ']' || char.IsLetterOrDigit(c))
-                {
-                    partialExpression.Append(c);
-                }
-                else if (partialExpression.Length > 0)
-                {
-                    string subExpression = partialExpression.ToString().Trim();
-                    if (subExpression == "iterations")
-                    {
+                    case "iterations":
                         if (code.File == null)
                         {
                             throw new CodeParserException("not executing a file", code);
@@ -524,13 +426,13 @@ namespace DuetControlServer.Model
                         {
                             result.Append(code.File.GetIterations(code));
                         }
-                    }
-                    else if (subExpression == "line")
-                    {
+                        break;
+
+                    case "line":
                         result.Append(code.LineNumber);
-                    }
-                    else if (subExpression == "result")
-                    {
+                        break;
+
+                    case "result":
                         if (code.File == null)
                         {
                             throw new CodeParserException("not executing a file", code);
@@ -539,91 +441,265 @@ namespace DuetControlServer.Model
                         {
                             result.Append(code.File.LastResult);
                         }
-                    }
-                    else
-                    {
-                        string subFilter = subExpression;
-                        bool wantsCount = subExpression.StartsWith('#');
-                        if (wantsCount)
+                        break;
+
+                    default:
+                        bool wantsCount = lastTokenValue.TrimStart().StartsWith('#');
+                        string filterString = wantsCount ? lastTokenValue[1..].Trim() : lastTokenValue.Trim();
+                        if (IsSbcExpression(filterString, false))
                         {
-                            subFilter = subExpression[1..];
-                        }
-                        if (Filter.GetSpecific(subFilter, true, out object sbcField))
-                        {
-                            if (subExpression == expression)
+                            using (await Provider.AccessReadOnlyAsync())
                             {
-                                return ObjectToString(sbcField, wantsCount, encodeResult, code);
+                                if (Filter.GetSpecific(filterString, true, out object sbcField))
+                                {
+                                    string subResult = ObjectToString(sbcField, wantsCount, true, code);
+                                    result.Append(subResult);
+                                }
+                                else
+                                {
+                                    result.Append(lastTokenValue);
+                                }
                             }
-                            string subResult = ObjectToString(sbcField, wantsCount, true, code);
-                            result.Append(subResult);
                         }
                         else
                         {
-                            result.Append(partialExpression);
+                            result.Append(lastTokenValue);
                         }
+                        break;
+                }
+            }
+
+            // Evaluate a given expression to its final value. This function attempts to look up well-known values before asking RRF
+            async Task<object> getExpressionValue(string subExpression)
+            {
+                // Attempt to evaluate an atomic value and return the parsed result, returns null if that failed
+                // Note that it returns _nullResult instead of null in case value is "null"
+                async Task<object> attemptToEvaluate(string value)
+                {
+                    string trimmedValue = value.Trim();
+
+                    // Check for well-known constants
+                    switch (trimmedValue)
+                    {
+                        case "true":
+                            return true;
+                        case "false":
+                            return false;
+                        case "null":
+                            return _nullResult;
+
+                        case "iterations":
+                            if (code.File == null)
+                            {
+                                throw new CodeParserException("not executing a file", code);
+                            }
+                            using (await code.File.LockAsync())
+                            {
+                                return code.File.GetIterations(code);
+                            }
+                        case "line":
+                            return code.LineNumber;
+                        case "result":
+                            if (code.File == null)
+                            {
+                                throw new CodeParserException("not executing a file", code);
+                            }
+                            using (await code.File.LockAsync())
+                            {
+                                return code.File.LastResult;
+                            }
+
+                        // TODO in order to improve performance we could check for extra RRF consts here as well (like pi etc)
                     }
 
-                    partialExpression.Clear();
-                    if (c != '\0')
+                    // Check for valid string
+                    if (trimmedValue.StartsWith('"'))
                     {
+                        StringBuilder stringContent = new();
+                        bool inQuotes = false;
+
+                        char lastC = '\0';
+                        foreach (char c in trimmedValue)
+                        {
+                            if (inQuotes)
+                            {
+                                if (c == '"')
+                                {
+                                    inQuotes = false;
+                                }
+                                else if (lastC == '\'')
+                                {
+                                    stringContent.Append(char.ToLower(c));
+                                }
+                                else if (c != '\'')
+                                {
+                                    stringContent.Append(c);
+                                }
+                            }
+                            else if (c == '"')
+                            {
+                                if (lastC == '"')
+                                {
+                                    stringContent.Append('"');
+                                }
+                                inQuotes = true;
+                            }
+                            else
+                            {
+                                // Not an atomic string...
+                                return null;
+                            }
+                        }
+
+                        if (inQuotes)
+                        {
+                            // Unterminated string...
+                            return null;
+                        }
+                        return stringContent.ToString();
+                    }
+
+                    // Check for integer
+                    if (int.TryParse(trimmedValue, NumberStyles.Any, CultureInfo.InvariantCulture, out int intValue))
+                    {
+                        return intValue;
+                    }
+
+                    // Check for float
+                    if (float.TryParse(trimmedValue, NumberStyles.Any, CultureInfo.InvariantCulture, out float floatValue))
+                    {
+                        return floatValue;
+                    }
+
+                    // Not an atomic value...
+                    return null;
+                }
+
+                // Perform final expression evalution here
+                object evaluatedSubExpression = await attemptToEvaluate(subExpression);
+                if (evaluatedSubExpression != null)
+                {
+                    return (evaluatedSubExpression != _nullResult) ? evaluatedSubExpression : null;
+                }
+                return await SPI.Interface.EvaluateExpression(code.Channel, subExpression);
+            }
+
+            // Eat a sub-expression and evaluate SBC-only properties + custom functions where applicable
+            async Task<string> eatExpression(char brace)
+            {
+                StringBuilder lastToken = new(), result = new();
+                while (i < expression.Length)
+                {
+                    char c = expression[i++];
+                    if (c == '"')
+                    {
+                        result.Append(lastToken);
+                        eatString(result);
+                        lastToken.Clear();
+                    }
+                    else if (c == '(')
+                    {
+                        string subExpression = await eatExpression(c);
+                        if (TryGetCustomFunction(lastToken.ToString(), out string functionName, out bool wantsCount, out CustomAsyncFunctionResolver fn))
+                        {
+                            object expressionValue = await getExpressionValue(subExpression);
+                            object fnResult = await fn(functionName, expressionValue);
+                            result.Append(ObjectToString(fnResult, wantsCount, true, code));
+                        }
+                        else
+                        {
+                            result.Append(lastToken);
+                            result.Append('(');
+                            result.Append(subExpression);
+                            result.Append(')');
+                        }
+                        lastToken.Clear();
+                    }
+                    else if (c == '[')
+                    {
+                        lastToken.Append('[');
+
+                        string subExpression = await eatExpression(c);
+                        if (IsSbcExpression(lastToken.ToString().Trim(), false))
+                        {
+                            object evaluatedSubExpression = await getExpressionValue(subExpression);
+                            if (evaluatedSubExpression is int intValue)
+                            {
+                                lastToken.Append(intValue);
+                            }
+                            else
+                            {
+                                throw new CodeParserException("Index value in square brackets must be of type integer", code);
+                            }
+                        }
+                        else
+                        {
+                            lastToken.Append(subExpression);
+                        }
+
+                        lastToken.Append(']');
+                    }
+                    else if (c == '{')
+                    {
+                        result.Append(lastToken);
+                        result.Append('{');
+                        result.Append(await eatExpression(c));
+                        result.Append('}');
+                        lastToken.Clear();
+                    }
+                    else if (c == ')' || c == ']' || c == '}')
+                    {
+                        if (brace != '(' && c == ')')
+                        {
+                            throw new CodeParserException("Unexpected round bracket", code);
+                        }
+                        if (brace != '[' && c == ']')
+                        {
+                            throw new CodeParserException("Unexpected square bracket", code);
+                        }
+                        if (brace != '{' && c == '}')
+                        {
+                            throw new CodeParserException("Unexpected curly bracket", code);
+                        }
+
+                        await appendToken(result, lastToken);
+                        return result.ToString();
+                    }
+                    else if (char.IsLetterOrDigit(c) || c == '#' || c == '.' || c == '_' || char.IsWhiteSpace(c))
+                    {
+                        lastToken.Append(c);
+                    }
+                    else
+                    {
+                        await appendToken(result, lastToken);
                         result.Append(c);
                     }
                 }
-                else if (c != '\0')
+
+                if (brace == '(')
                 {
-                    result.Append(c);
+                    throw new CodeParserException("Unterminated round bracket", code);
                 }
-                lastC = c;
+                if (brace == '[')
+                {
+                    throw new CodeParserException("Unterminated square bracket", code);
+                }
+                if (brace == '{')
+                {
+                    throw new CodeParserException("Unterminated curly bracket", code);
+                }
+
+                await appendToken(result, lastToken);
+                return result.ToString();
             }
 
-            // Try to evaluate the resulting expression from DSF one last time
-            string finalExpression = result.ToString();
-            if (finalExpression == "iterations")
+            string expressionContent = await eatExpression('\0');
+            if (onlySbcFields)
             {
-                if (code.File == null)
-                {
-                    throw new CodeParserException("not executing a file", code);
-                }
-                using (await code.File.LockAsync())
-                {
-                    return code.File.GetIterations(code).ToString();
-                }
+                return expressionContent;
             }
-            if (finalExpression == "line")
-            {
-                return code.LineNumber.ToString();
-            }
-            if (finalExpression == "result")
-            {
-                if (code.File == null)
-                {
-                    throw new CodeParserException("not executing a file", code);
-                }
-                using (await code.File.LockAsync())
-                {
-                    return code.File.LastResult.ToString();
-                }
-            }
-            string finalFilter = finalExpression;
-            bool wantsFinalCount = finalExpression.StartsWith('#');
-            if (wantsFinalCount)
-            {
-                finalFilter = finalExpression[1..];
-            }
-            if (Filter.GetSpecific(finalFilter, true, out object finalSbcField))
-            {
-                return ObjectToString(finalSbcField, wantsFinalCount, encodeResult, code);
-            }
-
-            // If that failed, try to evaluate the expression in RRF as the final step
-            if (!onlySbcFields)
-            {
-                object firmwareField = await SPI.Interface.EvaluateExpression(code.Channel, finalExpression);
-                return ObjectToString(firmwareField, false, encodeResult, code);
-            }
-
-            // In case we're not done yet, return only the partial expression value
-            return finalExpression;
+            object expressionValue = await SPI.Interface.EvaluateExpression(code.Channel, expressionContent);
+            return ObjectToString(expressionValue, false, encodeResult, code);
         }
 
         /// <summary>

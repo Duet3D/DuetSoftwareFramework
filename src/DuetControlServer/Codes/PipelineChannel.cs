@@ -10,7 +10,7 @@ namespace DuetControlServer.Codes
     /// <summary>
     /// Class maintaining individual pipelines per code channel to deal with concurrent execution of G/M/T-codes
     /// </summary>
-    public class Pipeline
+    public class PipelineChannel
     {
         /// <summary>
         /// Pipeline stages that support push/pop
@@ -40,13 +40,13 @@ namespace DuetControlServer.Codes
         /// <summary>
         /// Retrieve the firmware state
         /// </summary>
-        internal PipelineStages.PipelineState FirmwareState => _stages[(int)PipelineStage.Firmware].State;
+        internal PipelineStages.Pipeline FirmwareState => _stages[(int)PipelineStage.Firmware].State;
 
         /// <summary>
         /// Constructor of this class
         /// </summary>
         /// <param name="channel"></param>
-        public Pipeline(CodeChannel channel)
+        public PipelineChannel(CodeChannel channel)
         {
             Channel = channel;
             Logger = NLog.LogManager.GetLogger(Channel.ToString());
@@ -88,9 +88,9 @@ namespace DuetControlServer.Codes
         /// Push a new state on the stack
         /// </summary>
         /// <returns>New pipeline state of the firmware for the SPI connector</returns>
-        public PipelineStages.PipelineState Push(Macro macro)
+        public PipelineStages.Pipeline Push(Macro macro)
         {
-            PipelineStages.PipelineState newState = null;
+            PipelineStages.Pipeline newState = null;
             foreach (PipelineStage stage in StagesWithStack)
             {
                 if (stage == PipelineStage.Firmware)

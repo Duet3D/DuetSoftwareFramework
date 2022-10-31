@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
-    <PackageReference Include="NLog" Version="5.0.1" />
+    <PackageReference Include="NLog" Version="5.0.5" />
   </ItemGroup>
 
   <ItemGroup>

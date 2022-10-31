@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Files;
+using DuetControlServer.Model;
 using System;
 using System.Globalization;
 using System.IO;
@@ -40,15 +41,17 @@ namespace DuetControlServer.Codes.Handlers
             {
                 // Stop or Unconditional stop
                 // Sleep or Conditional stop
+                // Program End
                 case 0:
                 case 1:
+                case 2:
                     if (await Processor.FlushAsync(code))
                     {
                         using (await FileExecution.Job.LockAsync())
                         {
                             if (FileExecution.Job.IsFileSelected)
                             {
-                                // M0/M1 may be used in a print file to terminate it
+                                // M0/M1/M2 may be used in a print file to terminate it
                                 if (code.Channel != CodeChannel.File && !FileExecution.Job.IsPaused)
                                 {
                                     return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
@@ -226,6 +229,14 @@ namespace DuetControlServer.Codes.Handlers
                 case 26:
                     if (await Processor.FlushAsync(code))
                     {
+                        // Wait for inputs[].motionSystem to be up-to-date
+                        await Updater.WaitForFullUpdate();
+                        int motionSystem;
+                        using (await Provider.AccessReadOnlyAsync())
+                        {
+                            motionSystem = Provider.Get.Inputs[code.Channel].MotionSystem;
+                        }
+
                         using (await FileExecution.Job.LockAsync())
                         {
                             if (!FileExecution.Job.IsFileSelected)
@@ -240,7 +251,8 @@ namespace DuetControlServer.Codes.Handlers
                                 {
                                     return new Message(MessageType.Error, "Position is out of range");
                                 }
-                                await FileExecution.Job.SetFilePosition(sParam);
+
+                                await FileExecution.Job.SetFilePosition(motionSystem, sParam);
                             }
                         }
 
@@ -253,11 +265,19 @@ namespace DuetControlServer.Codes.Handlers
                 case 27:
                     if (await Processor.FlushAsync(code))
                     {
+                        // Wait for inputs[].motionSystem to be up-to-date
+                        await Updater.WaitForFullUpdate();
+                        int motionSystem;
+                        using (await Provider.AccessReadOnlyAsync())
+                        {
+                            motionSystem = Provider.Get.Inputs[code.Channel].MotionSystem;
+                        }
+
                         using (await FileExecution.Job.LockAsync())
                         {
                             if (FileExecution.Job.IsFileSelected)
                             {
-                                long filePosition = await FileExecution.Job.GetFilePosition();
+                                long filePosition = await FileExecution.Job.GetFilePosition(motionSystem);
                                 return new Message(MessageType.Success, $"SD printing byte {filePosition}/{FileExecution.Job.FileLength}");
                             }
                             return new Message(MessageType.Success, "Not SD printing.");
@@ -638,7 +658,7 @@ namespace DuetControlServer.Codes.Handlers
                         string directory = code.Parameter('P');
                         if (!string.IsNullOrEmpty(directory))
                         {
-                            await using (await SPI.Interface.LockMovementAndWaitForStandstill(code.Channel))
+                            await using (await SPI.Interface.LockAllMovementSystemsAndWaitForStandstill(code.Channel))
                             {
                                 string physicalDirectory = await FilePath.ToPhysicalAsync(directory, "sys");
                                 if (Directory.Exists(physicalDirectory))

@@ -83,7 +83,7 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>New state</returns>
         public State Push(Macro macro = null)
         {
-            Codes.PipelineStages.PipelineState pipelineState = Codes.Processor.Push(Channel, macro);
+            Codes.PipelineStages.Pipeline pipelineState = Codes.Processor.Push(Channel, macro);
             State state = new(pipelineState);
 
             // Dequeue already suspended codes first so the correct order is maintained
@@ -422,10 +422,10 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
-        /// Lock the move module and wait for standstill
+        /// Lock all movement systems and wait for standstill
         /// </summary>
-        /// <returns>Whether the resource could be locked</returns>
-        public Task<bool> LockMovementAndWaitForStandstill()
+        /// <returns>Whether the movement systems could be locked</returns>
+        public Task<bool> LockAllMovementSystemsAndWaitForStandstill()
         {
             LockRequest request = new(true);
             CurrentState.LockRequests.Enqueue(request);
@@ -701,7 +701,7 @@ namespace DuetControlServer.SPI.Channel
             {
                 if (lockRequest.IsLockRequest)
                 {
-                    if (!lockRequest.IsLockRequested && DataTransfer.WriteLockMovementAndWaitForStandstill(Channel))
+                    if (!lockRequest.IsLockRequested && DataTransfer.WriteLockAllMovementSystemsAndWaitForStandstill(Channel))
                     {
                         lockRequest.IsLockRequested = true;
                     }

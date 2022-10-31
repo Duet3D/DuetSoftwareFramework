@@ -18,7 +18,7 @@ namespace DuetControlServer.Codes.PipelineStages
         /// Constructor of this class
         /// </summary>
         /// <param name="pipeline">Corresponding pipeline</param>
-        public Executed(Pipeline pipeline) : base(Codes.PipelineStage.Executed, pipeline)
+        public Executed(PipelineChannel pipeline) : base(Codes.PipelineStage.Executed, pipeline)
         {
             _state = _states.Peek();
         }
@@ -26,7 +26,7 @@ namespace DuetControlServer.Codes.PipelineStages
         /// <summary>
         /// The only state for this 
         /// </summary>
-        private readonly PipelineState _state;
+        private readonly Pipeline _state;
 
         /// <summary>
         /// Process an incoming code

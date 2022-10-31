@@ -15,13 +15,13 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Corresponding state on the pipeline
         /// </summary>
-        private readonly PipelineState _pipelineState;
+        private readonly Pipeline _pipelineState;
 
         /// <summary>
         /// Constructor of this class
         /// </summary>
         /// <param name="pipelineState">Corresponding state of the firmware stage on the code pipeline</param>
-        public State(PipelineState pipelineState) => _pipelineState = pipelineState;
+        public State(Pipeline pipelineState) => _pipelineState = pipelineState;
 
         /// <summary>
         /// Indicates if this state is waiting for a confirmation

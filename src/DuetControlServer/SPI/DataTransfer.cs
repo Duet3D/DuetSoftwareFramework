@@ -837,11 +837,11 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Request the movement to be locked and wait for standstill
+        /// Request the movement systems to be locked and wait for standstill
         /// </summary>
         /// <param name="channel">Code channel that requires the lock</param>
         /// <returns>True if the packet could be written</returns>
-        public static bool WriteLockMovementAndWaitForStandstill(CodeChannel channel)
+        public static bool WriteLockAllMovementSystemsAndWaitForStandstill(CodeChannel channel)
         {
             int dataLength = Marshal.SizeOf<CodeChannelHeader>();
             if (!CanWritePacket(dataLength))
@@ -849,7 +849,7 @@ namespace DuetControlServer.SPI
                 return false;
             }
 
-            WritePacket(Communication.SbcRequests.Request.LockMovementAndWaitForStandstill, dataLength);
+            WritePacket(Communication.SbcRequests.Request.LockAllMovementSystemsAndWaitForStandstill, dataLength);
             Serialization.Writer.WriteCodeChannel(GetWriteBuffer(dataLength), channel);
             return true;
         }

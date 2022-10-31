@@ -14,7 +14,7 @@ namespace DuetControlServer.Codes.PipelineStages
         /// Constructor of this class
         /// </summary>
         /// <param name="pipeline">Corresponding pipeline</param>
-        public Start(Pipeline pipeline) : base(Codes.PipelineStage.Start, pipeline) { }
+        public Start(PipelineChannel pipeline) : base(Codes.PipelineStage.Start, pipeline) { }
 
         /// <summary>
         /// Counter for unbuffered codes

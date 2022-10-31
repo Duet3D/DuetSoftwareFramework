@@ -10,7 +10,7 @@ namespace DuetControlServer.Codes.PipelineStages
     /// <summary>
     /// Pipeline state for pipeline stages
     /// </summary>
-    public class PipelineState
+    public class Pipeline
     {
         /// <summary>
         /// Constructor of this class
@@ -18,7 +18,7 @@ namespace DuetControlServer.Codes.PipelineStages
         /// <param name="processDelegate">Function to invoke on initialization</param>
         /// <param name="macro">Current macro file or null if not present</param>
         /// <param name="unbounded">Whether this state may hold an unlimited number of codes</param>
-        public PipelineState(PipelineStage stage, Macro macro)
+        public Pipeline(PipelineStage stage, Macro macro)
         {
             if (stage.Stage != Codes.PipelineStage.Executed)
             {

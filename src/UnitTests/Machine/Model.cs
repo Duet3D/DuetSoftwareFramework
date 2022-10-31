@@ -72,7 +72,6 @@ namespace UnitTests.Machine
                 RequestedValue = 0.75F
             });
             updatedModel.State.Status = MachineStatus.Pausing;
-            updatedModel.Scanner.Status = ScannerStatus.PostProcessing;
 
             string patch = updatedModel.MakeStringPatch(modelToUpdate);
             TestContext.Out.Write(patch);
@@ -89,7 +88,6 @@ namespace UnitTests.Machine
             Assert.AreEqual(0.5F, modelToUpdate.Fans[0].ActualValue);
             Assert.AreEqual(0.75F, modelToUpdate.Fans[0].RequestedValue);
             Assert.AreEqual(MachineStatus.Pausing, modelToUpdate.State.Status);
-            Assert.AreEqual(ScannerStatus.PostProcessing, modelToUpdate.Scanner.Status);
         }
 
         [Test]

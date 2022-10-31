@@ -26,6 +26,16 @@
         private float _deceleration;
 
         /// <summary>
+        /// Current extrusion rate (in mm/s)
+        /// </summary>
+        public float ExtrusionRate
+        {
+            get => _extrusionRate;
+            set => SetPropertyValue(ref _extrusionRate, value);
+        }
+        private float _extrusionRate;
+
+        /// <summary>
         /// Laser PWM of the current move (0..1) or null if not applicable
         /// </summary>
         public float? LaserPwm

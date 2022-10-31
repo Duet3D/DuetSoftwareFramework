@@ -31,11 +31,10 @@ namespace UnitTests.Machine
         [Test]
         public void IsLinuxExpression()
         {
-            Assert.IsFalse(DuetControlServer.Model.Expressions.IsSbcExpression("state"));
-            Assert.IsFalse(DuetControlServer.Model.Expressions.IsSbcExpression("state.status"));
-            Assert.IsTrue(DuetControlServer.Model.Expressions.IsSbcExpression("scanner"));
-            Assert.IsTrue(DuetControlServer.Model.Expressions.IsSbcExpression("network.interfaces"));
-            Assert.IsTrue(DuetControlServer.Model.Expressions.IsSbcExpression("volumes"));
+            Assert.IsFalse(DuetControlServer.Model.Expressions.IsSbcExpression("state", false));
+            Assert.IsFalse(DuetControlServer.Model.Expressions.IsSbcExpression("state.status", false));
+            Assert.IsTrue(DuetControlServer.Model.Expressions.IsSbcExpression("network.interfaces", false));
+            Assert.IsTrue(DuetControlServer.Model.Expressions.IsSbcExpression("volumes", false));
         }
 
         [Test]
@@ -63,13 +62,13 @@ namespace UnitTests.Machine
             code = new DuetControlServer.Commands.Code("echo volumes");
             Assert.ThrowsAsync<CodeParserException>(async () => await DuetControlServer.Model.Expressions.Evaluate(code, true));
 
-            code = new DuetControlServer.Commands.Code("echo scanner");
+            code = new DuetControlServer.Commands.Code("echo plugins");
             result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("{object}", result);
 
             code = new DuetControlServer.Commands.Code("echo move.axes[0].userPosition + volumes[0].freeSpace");
             result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
-            Assert.AreEqual("move.axes[0].userPosition + 12345", result);
+            Assert.AreEqual("move.axes[0].userPosition +12345", result);
 
             code = new DuetControlServer.Commands.Code("echo \"hello\"");
             result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
@@ -77,7 +76,19 @@ namespace UnitTests.Machine
 
             code = new DuetControlServer.Commands.Code("echo {\"hello\" ^ (\"there\" + volumes[0].freeSpace)}");
             result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
-            Assert.AreEqual("{\"hello\" ^ (\"there\" + 12345)}", result);
+            Assert.AreEqual("{\"hello\" ^ (\"there\" +12345)}", result);
+
+            DuetControlServer.Model.Expressions.CustomFunctions.Clear();
+            DuetControlServer.Model.Expressions.CustomFunctions.Add("fileexists", async (string functionName, object val) =>
+            {
+                Assert.AreEqual(functionName, "fileexists");
+                Assert.AreEqual(val, "0:/sys/config.g");
+                return await Task.FromResult(true);
+            });
+
+            code = new DuetControlServer.Commands.Code("echo fileexists(\"0:/sys/config.g\")");
+            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            Assert.AreEqual(result, "true");
         }
     }
 }

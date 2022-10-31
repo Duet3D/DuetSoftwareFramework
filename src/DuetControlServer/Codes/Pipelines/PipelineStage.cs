@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace DuetControlServer.Codes.PipelineStages
 {
     /// <summary>
-    /// Base class for a code pipeline
+    /// Stage holding the actual code pipelines
     /// </summary>
     public abstract class PipelineStage
     {
@@ -17,7 +17,7 @@ namespace DuetControlServer.Codes.PipelineStages
         /// </summary>
         /// <param name="stage">Stage type</param>
         /// <param name="pipeline">Corresponding pipeline</param>
-        public PipelineStage(Codes.PipelineStage stage, Pipeline pipeline)
+        public PipelineStage(Codes.PipelineStage stage, PipelineChannel pipeline)
         {
             Stage = stage;
             Pipeline = pipeline;
@@ -33,17 +33,17 @@ namespace DuetControlServer.Codes.PipelineStages
         /// <summary>
         /// Corresponding pipeline
         /// </summary>
-        public readonly Pipeline Pipeline;
+        public readonly PipelineChannel Pipeline;
 
         /// <summary>
         /// Stacks holding state information per input channel
         /// </summary>
-        protected readonly Stack<PipelineState> _states = new();
+        protected readonly Stack<Pipeline> _states = new();
 
         /// <summary>
         /// Get the current state. Should be used only on initialization
         /// </summary>
-        internal PipelineState State => _states.Peek();
+        internal Pipeline State => _states.Peek();
 
         /// <summary>
         /// Get the diagnostics from this pipeline stage
@@ -56,7 +56,7 @@ namespace DuetControlServer.Codes.PipelineStages
             int numIdleLevels = 0;
             lock (_states)
             {
-                foreach (PipelineState state in _states)
+                foreach (Pipeline state in _states)
                 {
                     lock (state)
                     {
@@ -118,7 +118,7 @@ namespace DuetControlServer.Codes.PipelineStages
         {
             lock (_states)
             {
-                PipelineState topState = _states.Peek();
+                Pipeline topState = _states.Peek();
                 return !topState.Busy && (code == null || code.Macro == topState.Macro);
             }
         }
@@ -134,7 +134,7 @@ namespace DuetControlServer.Codes.PipelineStages
         {
             lock (_states)
             {
-                foreach (PipelineState state in _states)
+                foreach (Pipeline state in _states)
                 {
                     if (state.Macro == code.Macro)
                     {
@@ -170,7 +170,7 @@ namespace DuetControlServer.Codes.PipelineStages
         {
             lock (_states)
             {
-                foreach (PipelineState state in _states)
+                foreach (Pipeline state in _states)
                 {
                     if (state.Macro == code.Macro)
                     {
@@ -188,9 +188,9 @@ namespace DuetControlServer.Codes.PipelineStages
         /// Push a new element onto the stack
         /// </summary>
         /// <param name="macro">Macro file or null if waiting for acknowledgment</param>
-        internal virtual PipelineState Push(Macro macro)
+        internal virtual Pipeline Push(Macro macro)
         {
-            PipelineState newState = new(this, macro);
+            Pipeline newState = new(this, macro);
             lock (_states)
             {
                 _states.Push(newState);
@@ -228,7 +228,7 @@ namespace DuetControlServer.Codes.PipelineStages
             List<Task> tasks = new();
             lock (_states)
             {
-                foreach (PipelineState state in _states)
+                foreach (Pipeline state in _states)
                 {
                     tasks.Add(state.ProcessorTask);
                 }

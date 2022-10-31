@@ -14,7 +14,7 @@ namespace DuetControlServer.Codes.PipelineStages
         /// Constructor of this class
         /// </summary>
         /// <param name="pipeline">Corresponding pipeline</param>
-        public Firmware(Pipeline pipeline) : base(Codes.PipelineStage.Firmware, pipeline) { }
+        public Firmware(PipelineChannel pipeline) : base(Codes.PipelineStage.Firmware, pipeline) { }
 
         /// <summary>
         /// Wait for the pipeline stage to become idle

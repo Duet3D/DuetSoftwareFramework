@@ -66,6 +66,26 @@
         private bool _inMacro = false;
 
         /// <summary>
+        /// Indicates if inverse time mode (G73) is active
+        /// </summary>
+        public bool InverseTimeMode
+        {
+            get => _inverseTimeMode;
+            set => SetPropertyValue(ref _inverseTimeMode, value);
+        }
+        private bool _inverseTimeMode;
+
+        /// <summary>
+        /// Number of the current line
+        /// </summary>
+        public long LineNumber
+        {
+            get => _lineNumber;
+            set => SetPropertyValue(ref _lineNumber, value);
+        }
+        private long _lineNumber = 0;
+
+        /// <summary>
         /// Indicates if the current macro file can be restarted after a pause
         /// </summary>
         public bool MacroRestartable
@@ -96,6 +116,16 @@
         private CodeChannel _name = CodeChannel.Unknown;
 
         /// <summary>
+        /// Index of the selected plane
+        /// </summary>
+        public int SelectedPlane
+        {
+            get => _selectedPlane;
+            set => SetPropertyValue(ref _selectedPlane, value);
+        }
+        private int _selectedPlane;
+
+        /// <summary>
         /// Depth of the stack
         /// </summary>
         public byte StackDepth
@@ -114,26 +144,6 @@
             set => SetPropertyValue(ref _state, value);
         }
         private InputChannelState _state = InputChannelState.Idle;
-
-        /// <summary>
-        /// Number of the current line
-        /// </summary>
-        public long LineNumber
-        {
-            get => _lineNumber;
-            set => SetPropertyValue(ref _lineNumber, value);
-        }
-        private long _lineNumber = 0;
-
-        /// <summary>
-        /// Index of the selected plane
-        /// </summary>
-        public int SelectedPlane
-        {
-            get => _selectedPlane;
-            set => SetPropertyValue(ref _selectedPlane, value);
-        }
-        private int _selectedPlane;
 
         /// <summary>
         /// Whether volumetric extrusion is being used

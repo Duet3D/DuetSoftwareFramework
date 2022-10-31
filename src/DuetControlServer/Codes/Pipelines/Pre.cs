@@ -14,7 +14,7 @@ namespace DuetControlServer.Codes.PipelineStages
         /// Constructor of this class
         /// </summary>
         /// <param name="pipeline">Corresponding pipeline</param>
-        public Pre(Pipeline pipeline) : base(Codes.PipelineStage.Pre, pipeline) { }
+        public Pre(PipelineChannel pipeline) : base(Codes.PipelineStage.Pre, pipeline) { }
 
         /// <summary>
         /// Process an incoming code

@@ -98,12 +98,6 @@ namespace DuetAPI.ObjectModel
         public ModelDictionary<Plugin> Plugins { get; } = new ModelDictionary<Plugin>(true);
 
         /// <summary>
-        /// Information about the 3D scanner subsystem
-        /// </summary>
-        [SbcProperty(true)]
-        public Scanner Scanner { get; } = new Scanner();
-        
-        /// <summary>
         /// Information about connected sensors including Z-probes and endstops
         /// </summary>
         public Sensors Sensors { get; } = new Sensors();

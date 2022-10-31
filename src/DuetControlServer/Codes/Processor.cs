@@ -23,7 +23,7 @@ namespace DuetControlServer.Codes
         /// <summary>
         /// Code pipeline per code channel
         /// </summary>
-        private static readonly Pipeline[] _pipelines = new Pipeline[Inputs.Total];
+        private static readonly PipelineChannel[] _channels = new PipelineChannel[Inputs.Total];
 
         /// <summary>
         /// Initialize this class
@@ -32,7 +32,7 @@ namespace DuetControlServer.Codes
         {
             for (int input = 0; input < Inputs.Total; input++)
             {
-                _pipelines[input] = new Pipeline((CodeChannel)input);
+                _channels[input] = new PipelineChannel((CodeChannel)input);
             }
         }
 
@@ -40,7 +40,7 @@ namespace DuetControlServer.Codes
         /// Lifecycle of this pipeline
         /// </summary>
         /// <returns></returns>
-        public static Task Run() => Task.WhenAll(_pipelines.Select(pipeline => pipeline.Run()));
+        public static Task Run() => Task.WhenAll(_channels.Select(pipeline => pipeline.Run()));
 
         /// <summary>
         /// Get diagnostics from every pipeline
@@ -48,7 +48,7 @@ namespace DuetControlServer.Codes
         /// <param name="builder">String builder to write to</param>
         public static void Diagnostics(StringBuilder builder)
         {
-            foreach (Pipeline pipeline in _pipelines)
+            foreach (PipelineChannel pipeline in _channels)
             {
                 pipeline.Diagnostics(builder);
             }
@@ -58,7 +58,7 @@ namespace DuetControlServer.Codes
         /// Get the pipeline state of the firmware stage from a given channel
         /// </summary>
         /// <param name="channel"></param>
-        internal static PipelineStages.PipelineState GetFirmwareState(CodeChannel channel) => _pipelines[(int)channel].FirmwareState;
+        internal static PipelineStages.Pipeline GetFirmwareState(CodeChannel channel) => _channels[(int)channel].FirmwareState;
 
         /// <summary>
         /// Push a new state on the stack of a given pipeline.
@@ -67,7 +67,7 @@ namespace DuetControlServer.Codes
         /// <param name="channel">Code channel</param>
         /// <param name="macro">Optional macro file</param>
         /// <returns>Pipeline state</returns>
-        public static PipelineStages.PipelineState Push(CodeChannel channel, Macro macro = null) => _pipelines[(int)channel].Push(macro);
+        public static PipelineStages.Pipeline Push(CodeChannel channel, Macro macro = null) => _channels[(int)channel].Push(macro);
 
         /// <summary>
         /// Push a new state on the stack of a given pipeline.
@@ -76,14 +76,14 @@ namespace DuetControlServer.Codes
         /// <param name="channel">Code channel</param>
         /// <param name="macro">Optional macro file</param>
         /// <returns>Pipeline state</returns>
-        public static void Pop(CodeChannel channel) => _pipelines[(int)channel].Pop();
+        public static void Pop(CodeChannel channel) => _channels[(int)channel].Pop();
 
         /// <summary>
         /// Wait for all pending codes to finish
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static Task<bool> FlushAsync(CodeChannel channel) => _pipelines[(int)channel].FlushAsync();
+        public static Task<bool> FlushAsync(CodeChannel channel) => _channels[(int)channel].FlushAsync();
 
         /// <summary>
         /// Wait for all pending codes on the same stack level as the given code to finish.
@@ -99,7 +99,7 @@ namespace DuetControlServer.Codes
             {
                 throw new ArgumentNullException(nameof(code));
             }
-            return _pipelines[(int)code.Channel].FlushAsync(code, evaluateExpressions, evaluateAll);
+            return _channels[(int)code.Channel].FlushAsync(code, evaluateExpressions, evaluateAll);
         }
 
         /// <summary>
@@ -108,7 +108,7 @@ namespace DuetControlServer.Codes
         /// <param name="code">Code to enqueue</param>
         public static ValueTask StartCodeAsync(Commands.Code code)
         {
-            Pipeline pipeline = _pipelines[(int)code.Channel];
+            PipelineChannel pipeline = _channels[(int)code.Channel];
             PipelineStage stage = PipelineStage.Start;
 
             // Deal with priority codes
@@ -125,7 +125,7 @@ namespace DuetControlServer.Codes
                 {
                     if (channel != code.Channel)
                     {
-                        Pipeline next = _pipelines[(int)channel];
+                        PipelineChannel next = _channels[(int)channel];
                         if (next.IsIdle(code))
                         {
                             code.Channel = channel;
@@ -182,6 +182,6 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="code">Code to enqueue</param>
         /// <param name="stage">Stage level to enqueue it at</param>
-        public static void CodeCompleted(Commands.Code code) => _pipelines[(int)code.Channel].WriteCode(code, PipelineStage.Executed);
+        public static void CodeCompleted(Commands.Code code) => _channels[(int)code.Channel].WriteCode(code, PipelineStage.Executed);
     }
 }

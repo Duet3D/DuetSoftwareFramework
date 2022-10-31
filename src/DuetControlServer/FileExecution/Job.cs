@@ -62,9 +62,14 @@ namespace DuetControlServer.FileExecution
         private static string _filename;
 
         /// <summary>
-        /// Job file being read from
+        /// First job file being read from
         /// </summary>
         private static CodeFile _file;
+
+        /// <summary>
+        /// Second job file being read from
+        /// </summary>
+        private static CodeFile _file2;
 
         /// <summary>
         /// Internal cancellation token source used to cancel pending codes when necessary
@@ -122,31 +127,50 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Get the current file position
         /// </summary>
+        /// <param name="motionSystem">Motion system</param>
         /// <returns>File position</returns>
-        public static async Task<long> GetFilePosition()
+        public static async Task<long> GetFilePosition(int motionSystem)
         {
-            if (_file == null)
+            if (_file != null && motionSystem == 0)
             {
-                return 0;
+                using (await _file.LockAsync())
+                {
+                    return _file.Position;
+                }
             }
-            using (await _file.LockAsync())
+
+            if (_file2 != null && motionSystem == 1)
             {
-                return _file.Position;
+                using (await _file2.LockAsync())
+                {
+                    return _file2.Position;
+                }
             }
+
+            return 0;
         }
 
         /// <summary>
         /// Set the current file position
         /// </summary>
+        /// <param name="motionSystem">Motion system</param>
         /// <param name="filePosition">New file position</param>
         /// <returns>File position</returns>
-        public static async Task SetFilePosition(long filePosition)
+        public static async Task SetFilePosition(int motionSystem, long filePosition)
         {
-            if (_file != null)
+            if (_file != null && motionSystem == 0)
             {
                 using (await _file.LockAsync())
                 {
                     _file.Position = filePosition;
+                }
+            }
+
+            if (_file2 != null && motionSystem == 1)
+            {
+                using (await _file2.LockAsync())
+                {
+                    _file2.Position = filePosition;
                 }
             }
         }
@@ -170,6 +194,7 @@ namespace DuetControlServer.FileExecution
             // Analyze and open the file
             GCodeFileInfo info = await InfoParser.Parse(fileName, true);
             CodeFile file = new(fileName, CodeChannel.File);
+            CodeFile file2 = new(fileName, CodeChannel.File2);
 
             // A file being printed may start another file print
             if (IsFileSelected)
@@ -183,6 +208,7 @@ namespace DuetControlServer.FileExecution
             IsSimulating = simulating;
             _filename = fileName;
             _file = file;
+            _file2 = file2;
             _pausePosition = null;
 
             // Update the object model
@@ -198,10 +224,19 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Perform actual print jobs
+        /// Print from the given file and send resulting codes to the specified channel
         /// </summary>
-        public static async Task Run()
+        /// <param name="file">File to read from</param>
+        /// <returns>Asynchronous task</returns>
+        private static async Task DoFilePrint(CodeFile file)
         {
+            // Get the cancellation token
+            CancellationToken cancellationToken;
+            using (await LockAsync())
+            {
+                cancellationToken = _cancellationTokenSource.Token;
+            }
+
             // Use a code pool for print files. This is possible for regular codes but should be avoided
             // for macro codes, because those codes may be referenced even after they finish
             Queue<Code> codePool = new();
@@ -210,16 +245,156 @@ namespace DuetControlServer.FileExecution
                 codePool.Enqueue(new Code());
             }
 
+            // Process the file being printed
+            Queue<Code> codes = new();
+            long nextFilePosition = 0;
+            do
+            {
+                // Fill up the code buffer
+                while (codePool.TryDequeue(out Code sharedCode))
+                {
+                    sharedCode.Reset();
+
+                    // Stop reading codes if the print has been paused or aborted
+                    using (await LockAsync())
+                    {
+                        if (IsPaused)
+                        {
+                            cancellationToken = _cancellationTokenSource.Token;
+                            codePool.Enqueue(sharedCode);
+                            break;
+                        }
+                    }
+
+                    // Try to read the next code
+                    try
+                    {
+                        Code readCode;
+                        try
+                        {
+                            readCode = await file.ReadCodeAsync(sharedCode);
+                            if (readCode == null)
+                            {
+                                codePool.Enqueue(sharedCode);
+                                break;
+                            }
+                            readCode.CancellationToken = cancellationToken;
+                        }
+                        catch
+                        {
+                            codePool.Enqueue(sharedCode);
+                            throw;
+                        }
+
+                        readCode.Flags |= CodeFlags.Asynchronous;
+                        codes.Enqueue(readCode);
+                        await readCode.Execute();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        using (await file.LockAsync())
+                        {
+                            file.Close();
+                        }
+                    }
+                    catch (AggregateException ae)
+                    {
+                        using (await file.LockAsync())
+                        {
+                            file.Close();
+                        }
+
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file (channel {file.Channel}): {ae.InnerException.Message}");
+                        _logger.Error(ae.InnerException);
+                    }
+                    catch (Exception e)
+                    {
+                        using (await LockAsync())
+                        {
+                            file.Close();
+                        }
+
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file (channel {file.Channel}): {e.Message}");
+                        _logger.Error(e);
+                    }
+                }
+
+                // Is there anything more to do?
+                if (codes.TryDequeue(out Code code))
+                {
+                    try
+                    {
+                        try
+                        {
+                            // Logging of regular messages is done by the code itself, no need to take care of it here
+                            await code.Task;
+                            nextFilePosition = code.FilePosition.Value + code.Length.Value;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Code has been cancelled, don't log this.
+                            // Note this can happen as well when the file being printed is exchanged or when a pausable macro is interrupted
+                        }
+                        catch (CodeParserException cpe)
+                        {
+                            await Logger.LogOutputAsync(MessageType.Error, cpe.Message);
+                        }
+                        catch (AggregateException ae)
+                        {
+                            await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception (channel {file.Channel}): [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                            _logger.Error(ae.InnerException);
+                        }
+                        catch (Exception e)
+                        {
+                            await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception (channel {file.Channel}): [{e.GetType().Name}] {e.Message}");
+                            _logger.Error(e);
+                        }
+                    }
+                    finally
+                    {
+                        codePool.Enqueue(code);
+                    }
+                }
+                else
+                {
+                    using (await LockAsync())
+                    {
+                        if (IsPaused)
+                        {
+                            // Adjust the file position
+                            long newFilePosition = _pausePosition ?? nextFilePosition;
+                            await SetFilePosition(0, newFilePosition);
+                            _logger.Info("Job has been paused at byte {1} on channel {2}, reason {3}", newFilePosition, file.Channel, _pauseReason);
+
+                            // Wait for the print to be resumed
+                            IsProcessing = false;
+                            await _resume.WaitAsync(Program.CancellationToken);
+                            IsProcessing = !IsAborted && !IsCancelled;
+                        }
+                        else
+                        {
+                            // No more codes available - print must have finished
+                            break;
+                        }
+                    }
+                }
+            }
+            while (!Program.CancellationToken.IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// Perform actual print jobs
+        /// </summary>
+        public static async Task Run()
+        {
             do
             {
                 // Wait for the next print to start
-                CancellationToken cancellationToken;
                 bool startingNewPrint;
                 using (await LockAsync())
                 {
                     await _resume.WaitAsync(Program.CancellationToken);
                     startingNewPrint = !_file.IsClosed;
-                    cancellationToken = _cancellationTokenSource.Token;
                     IsProcessing = startingNewPrint;
                 }
 
@@ -228,145 +403,14 @@ namespace DuetControlServer.FileExecution
                 {
                     _logger.Info("Starting file print");
 
-                    // Process the file
-                    Queue<Code> codes = new();
-                    long nextFilePosition = 0;
-                    do
-                    {
-                        // Fill up the code buffer
-                        while (codePool.TryDequeue(out Code sharedCode))
-                        {
-                            sharedCode.Reset();
+                    // Run the same file print on two distinct channels
+                    Task firstFileTask = DoFilePrint(_file);
+                    Task secondFileTask = DoFilePrint(_file2);
+                    await Task.WhenAll(firstFileTask, secondFileTask);
 
-                            // Stop reading codes if the print has been paused or aborted
-                            using (await LockAsync())
-                            {
-                                if (IsPaused)
-                                {
-                                    cancellationToken = _cancellationTokenSource.Token;
-                                    codePool.Enqueue(sharedCode);
-                                    break;
-                                }
-                            }
-
-                            // Try to read the next code
-                            try
-                            {
-                                Code readCode;
-                                try
-                                {
-                                    readCode = await _file.ReadCodeAsync(sharedCode);
-                                    if (readCode == null)
-                                    {
-                                        codePool.Enqueue(sharedCode);
-                                        break;
-                                    }
-                                    readCode.CancellationToken = cancellationToken;
-                                }
-                                catch
-                                {
-                                    codePool.Enqueue(sharedCode);
-                                    throw;
-                                }
-
-                                readCode.Flags |= CodeFlags.Asynchronous;
-                                codes.Enqueue(readCode);
-                                await readCode.Execute();
-                            }
-                            catch (OperationCanceledException)
-                            {
-                                using (await _file.LockAsync())
-                                {
-                                    _file.Close();
-                                }
-                            }
-                            catch (AggregateException ae)
-                            {
-                                using (await _file.LockAsync())
-                                {
-                                    _file.Close();
-                                }
-
-                                await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file: {ae.InnerException.Message}");
-                                _logger.Error(ae.InnerException);
-                            }
-                            catch (Exception e)
-                            {
-                                using (await LockAsync())
-                                {
-                                    _file.Close();
-                                }
-
-                                await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file: {e.Message}");
-                                _logger.Error(e);
-                            }
-                        }
-
-                        // Is there anything more to do?
-                        if (codes.TryDequeue(out Code code))
-                        {
-                            try
-                            {
-                                try
-                                {
-                                    // Logging of regular messages is done by the code itself, no need to take care of it here
-                                    await code.Task;
-                                    nextFilePosition = code.FilePosition.Value + code.Length.Value;
-                                }
-                                catch (OperationCanceledException)
-                                {
-                                    // Code has been cancelled, don't log this.
-                                    // Note this can happen as well when the file being printed is exchanged or when a pausable macro is interrupted
-                                }
-                                catch (CodeParserException cpe)
-                                {
-                                    await Logger.LogOutputAsync(MessageType.Error, cpe.Message);
-                                }
-                                catch (AggregateException ae)
-                                {
-                                    await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
-                                    _logger.Error(ae.InnerException);
-                                }
-                                catch (Exception e)
-                                {
-                                    await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception: [{e.GetType().Name}] {e.Message}");
-                                    _logger.Error(e);
-                                }
-                            }
-                            finally
-                            {
-                                codePool.Enqueue(code);
-                            }
-                        }
-                        else
-                        {
-                            using (await LockAsync())
-                            {
-                                if (IsPaused)
-                                {
-                                    // Adjust the file position
-                                    long newFilePosition = _pausePosition ?? nextFilePosition;
-                                    await SetFilePosition(newFilePosition);
-                                    _logger.Info("Job has been paused at byte {0}, reason {1}", newFilePosition, _pauseReason);
-
-                                    // Wait for the print to be resumed
-                                    IsProcessing = false;
-                                    await _resume.WaitAsync(Program.CancellationToken);
-                                    IsProcessing = !IsAborted && !IsCancelled;
-                                }
-                                else
-                                {
-                                    // No more codes available - print must have finished
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    while (!Program.CancellationToken.IsCancellationRequested);
-
+                    // Deal with the print result
                     using (await LockAsync())
                     {
-                        // Notify RepRapFirmware that the print file has been closed
                         if (IsCancelled)
                         {
                             // Prints are cancelled by M0/M1 which is processed by RRF
@@ -441,7 +485,8 @@ namespace DuetControlServer.FileExecution
 
                     // Dispose the file
                     _file.Dispose();
-                    _file = null;
+                    _file2.Dispose();
+                    _file = _file2 = null;
                     _filename = null;
 
                     // End
@@ -497,6 +542,10 @@ namespace DuetControlServer.FileExecution
                 {
                     _file.Close();
                 }
+                using (_file2.Lock())
+                {
+                    _file2.Close();
+                }
                 IsCancelled = IsPaused;
                 Resume();
             }
@@ -517,6 +566,10 @@ namespace DuetControlServer.FileExecution
                 using (await _file.LockAsync())
                 {
                     _file.Close();
+                }
+                using (await _file2.LockAsync())
+                {
+                    _file2.Close();
                 }
                 IsCancelled = IsPaused;
                 Resume();
@@ -539,6 +592,10 @@ namespace DuetControlServer.FileExecution
                 {
                     _file.Close();
                 }
+                using (_file2.Lock())
+                {
+                    _file2.Close();
+                }
                 IsAborted = true;
                 Resume();
             }
@@ -559,6 +616,10 @@ namespace DuetControlServer.FileExecution
                 using (await _file.LockAsync())
                 {
                     _file.Close();
+                }
+                using (await _file2.LockAsync())
+                {
+                    _file2.Close();
                 }
                 IsAborted = true;
                 Resume();

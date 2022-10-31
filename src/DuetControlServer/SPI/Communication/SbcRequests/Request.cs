@@ -71,7 +71,7 @@ namespace DuetControlServer.SPI.Communication.SbcRequests
         /// Lock movement and wait for standstill
         /// </summary>
         /// <seealso cref="Shared.CodeChannelHeader"/>
-        LockMovementAndWaitForStandstill = 10,
+        LockAllMovementSystemsAndWaitForStandstill = 10,
 
         /// <summary>
         /// Unlock everything again

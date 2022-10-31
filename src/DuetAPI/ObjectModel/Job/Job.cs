@@ -44,18 +44,6 @@ namespace DuetAPI.ObjectModel
         private long? _filePosition;
 
         /// <summary>
-        /// Duration of the first layer (in s or null)
-        /// </summary>
-        [JsonIgnore]
-        [Obsolete("No longer used, will always return null")]
-        public int? FirstLayerDuration
-        {
-            get => _firstLayerDuration;
-			set => SetPropertyValue(ref _firstLayerDuration, value);
-        }
-        private int? _firstLayerDuration;
-
-        /// <summary>
         /// Total duration of the last job (in s or null)
         /// </summary>
         public int? LastDuration

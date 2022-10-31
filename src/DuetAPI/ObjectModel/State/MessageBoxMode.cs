@@ -31,7 +31,7 @@
         MultipleChoice = 4,
 
         /// <summary>
-        /// Integer value required, blocking 
+        /// Integer value required, blocking
         /// </summary>
         IntInput = 5,
 
