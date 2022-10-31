@@ -106,6 +106,7 @@ namespace DuetControlServer
             // Initialize everything
             try
             {
+                Codes.Handlers.Functions.Init();
                 Codes.Processor.Init();
                 Model.Provider.Init();
                 Model.Observer.Init();

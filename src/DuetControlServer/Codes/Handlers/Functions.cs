@@ -9,9 +9,9 @@ namespace DuetControlServer.Codes.Handlers
     public static class Functions
     {
         /// <summary>
-        /// Static constructor of this class
+        /// Initializer function to register custom meta G-code functions
         /// </summary>
-        static Functions()
+        public static void Init()
         {
             // Register custom fileexists() function, evaluating it via RRF would cause a timeout
             Model.Expressions.CustomFunctions.Add("fileexists", FileExists);
@@ -23,9 +23,9 @@ namespace DuetControlServer.Codes.Handlers
         /// <param name="functionName">Function name</param>
         /// <param name="argument">Function argument</param>
         /// <returns>Whether the file exists</returns>
-        public static async Task<object> FileExists(string functionName, object argument)
+        public static async Task<object> FileExists(string functionName, object[] arguments)
         {
-            if (argument is string stringArgument)
+            if (arguments.Length == 1 && arguments[0] is string stringArgument)
             {
                 string resolvedPath = await Files.FilePath.ToPhysicalAsync(stringArgument);
                 return System.IO.File.Exists(resolvedPath);

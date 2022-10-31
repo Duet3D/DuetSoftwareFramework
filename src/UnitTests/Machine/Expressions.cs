@@ -78,11 +78,11 @@ namespace UnitTests.Machine
             result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("{\"hello\" ^ (\"there\" +12345)}", result);
 
-            DuetControlServer.Model.Expressions.CustomFunctions.Clear();
-            DuetControlServer.Model.Expressions.CustomFunctions.Add("fileexists", async (string functionName, object val) =>
+            DuetControlServer.Model.Expressions.CustomFunctions.Add("fileexists", async (string functionName, object[] vals) =>
             {
                 Assert.AreEqual(functionName, "fileexists");
-                Assert.AreEqual(val, "0:/sys/config.g");
+                Assert.AreEqual(vals.Length, 1);
+                Assert.AreEqual(vals[0], "0:/sys/config.g");
                 return await Task.FromResult(true);
             });
 

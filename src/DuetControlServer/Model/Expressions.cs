@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
@@ -22,9 +23,9 @@ namespace DuetControlServer.Model
         /// Delegate for asynchronously resolving custom meta G-code fuctions
         /// </summary>
         /// <param name="functionName">Name of the function</param>
-        /// <param name="argument">Function arguments</param>
+        /// <param name="arguments">Function arguments</param>
         /// <returns>Result value</returns>
-        public delegate Task<object> CustomAsyncFunctionResolver(string functionName, object argument);
+        public delegate Task<object> CustomAsyncFunctionResolver(string functionName, object[] arguments);
 
         /// <summary>
         /// Dictionary of custom meta G-code functions vs. async resolvers
@@ -76,7 +77,7 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
-        /// Split an echo expression separated by commas
+        /// Split a comma-separated expression
         /// </summary>
         /// <param name="expression">Expression to split</param>
         /// <returns>Expression items</returns>
@@ -409,6 +410,68 @@ namespace DuetControlServer.Model
                 throw new CodeParserException("Unterminated quotes", code);
             }
 
+            // Convert an object to a string value
+            string objectToString(object obj, bool wantsCount, bool encodeStrings)
+            {
+                if (obj == null)
+                {
+                    return "null";
+                }
+                if (obj is bool boolValue)
+                {
+                    return boolValue ? "true" : "false";
+                }
+                if (obj is string stringValue)
+                {
+                    return encodeStrings ? ('"' + stringValue.Replace("\"", "\"\"") + '"') : stringValue;
+                }
+                if (obj is int intValue)
+                {
+                    return intValue.ToString("G", CultureInfo.InvariantCulture);
+                }
+                if (obj is uint uintValue)
+                {
+                    return uintValue.ToString("G", CultureInfo.InvariantCulture);
+                }
+                if (obj is float floatValue)
+                {
+                    return floatValue.ToString("G", CultureInfo.InvariantCulture);
+                }
+                if (obj is long longValue)
+                {
+                    return longValue.ToString("G", CultureInfo.InvariantCulture);
+                }
+                if (obj is IList list)
+                {
+                    if (wantsCount)
+                    {
+                        return list.Count.ToString();
+                    }
+                    throw new CodeParserException("missing array index", code);
+                }
+                if (obj is int[] intArray)
+                {
+                    return string.Join(':', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture)));
+                }
+                if (obj is uint[] uintArray)
+                {
+                    return string.Join(':', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture)));
+                }
+                if (obj is float[] floatArray)
+                {
+                    return string.Join(':', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture)));
+                }
+                if (obj is long[] longArray)
+                {
+                    return string.Join(':', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture)));
+                }
+                if (obj.GetType().IsClass)
+                {
+                    return "{object}";
+                }
+                return obj.ToString();
+            }
+
             // Finish a token before appending it to the resulting expression
             async Task appendToken(StringBuilder result, StringBuilder lastToken)
             {
@@ -452,7 +515,7 @@ namespace DuetControlServer.Model
                             {
                                 if (Filter.GetSpecific(filterString, true, out object sbcField))
                                 {
-                                    string subResult = ObjectToString(sbcField, wantsCount, true, code);
+                                    string subResult = objectToString(sbcField, wantsCount, true);
                                     result.Append(subResult);
                                 }
                                 else
@@ -481,12 +544,13 @@ namespace DuetControlServer.Model
                     // Check for well-known constants
                     switch (trimmedValue)
                     {
+                        case "null":
+                            return _nullResult;
+
                         case "true":
                             return true;
                         case "false":
                             return false;
-                        case "null":
-                            return _nullResult;
 
                         case "iterations":
                             if (code.File == null)
@@ -602,9 +666,14 @@ namespace DuetControlServer.Model
                         string subExpression = await eatExpression(c);
                         if (TryGetCustomFunction(lastToken.ToString(), out string functionName, out bool wantsCount, out CustomAsyncFunctionResolver fn))
                         {
-                            object expressionValue = await getExpressionValue(subExpression);
-                            object fnResult = await fn(functionName, expressionValue);
-                            result.Append(ObjectToString(fnResult, wantsCount, true, code));
+                            List<object> arguments = new();
+                            foreach (string arg in SplitExpression(subExpression))
+                            {
+                                object argValue = await getExpressionValue(arg);
+                                arguments.Add(argValue);
+                            }
+                            object fnResult = await fn(functionName, arguments.ToArray());
+                            result.Append(objectToString(fnResult, wantsCount, true));
                         }
                         else
                         {
@@ -699,44 +768,7 @@ namespace DuetControlServer.Model
                 return expressionContent;
             }
             object expressionValue = await SPI.Interface.EvaluateExpression(code.Channel, expressionContent);
-            return ObjectToString(expressionValue, false, encodeResult, code);
-        }
-
-        /// <summary>
-        /// Convert an object to a string internally
-        /// </summary>
-        /// <param name="obj">Object to convert</param>
-        /// <param name="wantsCount">Whether the count is wanted</param>
-        /// <param name="encodeStrings">Whether the value is supposed to be encoded if it is a string</param>
-        /// <param name="code">Code requesting the conversion</param>
-        /// <returns>String representation of obj</returns>
-        private static string ObjectToString(object obj, bool wantsCount, bool encodeStrings, Code code)
-        {
-            if (obj == null)
-            {
-                return "null";
-            }
-            if (obj is bool boolValue)
-            {
-                return boolValue ? "true" : "false";
-            }
-            if (obj is string stringValue)
-            {
-                return encodeStrings ? ('"' + stringValue.Replace("\"", "\"\"") + '"') : stringValue;
-            }
-            if (obj is IList list)
-            {
-                if (wantsCount)
-                {
-                    return list.Count.ToString();
-                }
-                throw new CodeParserException("missing array index", code);
-            }
-            if (obj.GetType().IsClass)
-            {
-                return "{object}";
-            }
-            return obj.ToString();
+            return objectToString(expressionValue, false, encodeResult);
         }
     }
 }
