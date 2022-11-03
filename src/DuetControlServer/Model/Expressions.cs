@@ -410,6 +410,12 @@ namespace DuetControlServer.Model
                 throw new CodeParserException("Unterminated quotes", code);
             }
 
+            // Encode a string
+            string encodeString(string value)
+            {
+                return '"' + value.Replace("\"", "\"\"").Replace("'", "''") + '"';
+            }
+
             // Convert an object to a string value
             string objectToString(object obj, bool wantsCount, bool encodeStrings)
             {
@@ -423,7 +429,11 @@ namespace DuetControlServer.Model
                 }
                 if (obj is string stringValue)
                 {
-                    return encodeStrings ? ('"' + stringValue.Replace("\"", "\"\"") + '"') : stringValue;
+                    if (wantsCount)
+                    {
+                        return stringValue.Length.ToString();
+                    }
+                    return encodeStrings ? encodeString(stringValue) : stringValue;
                 }
                 if (obj is int intValue)
                 {
@@ -441,29 +451,37 @@ namespace DuetControlServer.Model
                 {
                     return longValue.ToString("G", CultureInfo.InvariantCulture);
                 }
-                if (obj is IList list)
+                if (wantsCount && obj is IList list)
                 {
-                    if (wantsCount)
-                    {
-                        return list.Count.ToString();
-                    }
-                    throw new CodeParserException("missing array index", code);
+                    return list.Count.ToString();
+                }
+                if (obj is bool[] boolArray)
+                {
+                    return '{' + string.Join(':', boolArray.Select(boolValue => boolValue ? "true" : "false")) + '}';
+                }
+                if (obj is string[] stringArray)
+                {
+                    return '{' + string.Join(':', stringArray.Select(stringValue => encodeString(stringValue))) + '}';
                 }
                 if (obj is int[] intArray)
                 {
-                    return string.Join(':', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture)));
+                    return '{' + string.Join(':', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + '}';
                 }
                 if (obj is uint[] uintArray)
                 {
-                    return string.Join(':', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture)));
+                    return '{' + string.Join(':', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + '}';
                 }
                 if (obj is float[] floatArray)
                 {
-                    return string.Join(':', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture)));
+                    return '{' + string.Join(':', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + '}';
                 }
                 if (obj is long[] longArray)
                 {
-                    return string.Join(':', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture)));
+                    return '{' + string.Join(':', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + '}';
+                }
+                if (!wantsCount && obj is IList)
+                {
+                    throw new CodeParserException("missing array index", code);
                 }
                 if (obj.GetType().IsClass)
                 {
