@@ -80,13 +80,14 @@ namespace DuetControlServer.Commands
                     Model.Provider.Get.State.PluginsStarted = true;
                 }
 
-                // Run dsf-config.g next
+                // Run dsf-config.g next. It must run asynchronously in case the SBC channel is busy at this point
                 string dsfConfigFile = await FilePath.ToPhysicalAsync(FilePath.DsfConfigFile, FileDirectory.System);
                 if (File.Exists(dsfConfigFile))
                 {
                     Code dsfConfigCode = new()
                     {
                         Channel = DuetAPI.CodeChannel.SBC,
+                        Flags = CodeFlags.Asynchronous,
                         Type = CodeType.MCode,
                         MajorNumber = 98,
                         Parameters = new()
